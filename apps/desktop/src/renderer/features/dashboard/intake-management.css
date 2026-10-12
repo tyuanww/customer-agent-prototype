@@ -12,8 +12,6 @@
 .intake-management button:not(.dash-action-primary) { border: 1px solid var(--dash-control-line); background: var(--dash-surface); color: var(--dash-ink); }
 .intake-management button:not(.dash-action-primary):hover:not(:disabled) { background: var(--dash-chrome-hover); }
 .intake-management button:not(.dash-action-primary):active:not(:disabled) { background: var(--dash-chrome-pressed); }
-.intake-workspace-switch button { min-height: 40px; }
-.intake-workspace-switch button[aria-pressed=true] { background: var(--dash-chrome-selected); border-color: var(--dash-purple); }
 .intake-management button:disabled { cursor: not-allowed; }
 .intake-management button:not(.dash-action-primary):disabled { background: var(--dash-disabled-bg); color: var(--dash-disabled-ink); border-color: var(--dash-line); }
 .intake-management button.intake-danger:not(:disabled) { color: var(--dash-danger); border-color: var(--dash-danger-line); background: var(--dash-danger-bg); }

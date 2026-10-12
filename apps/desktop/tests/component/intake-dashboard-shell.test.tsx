@@ -25,6 +25,8 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
   expect(within(shell).getAllByRole('tab')).toHaveLength(5);
+  expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');
   for (const [key,module] of [['ArrowDown','announce'],['ArrowUp','content'],['Home','overview'],['End','announce']]) {
@@ -78,11 +80,15 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   const fixture=intakePermissionsData(),owner=new ContentIntakePermissions(fixture.session),user=userEvent.setup();
   window.dashboardPermissions={current:async()=>({ok:true,view:owner.view()}),command:async c=>({ok:true,view:await owner.command(c)}),onInvalidated:fn=>owner.subscribe(fn)};
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
-  try{render(<DashboardApp/>);await user.click(await screen.findByRole('button',{name:'权限配置'}));
+  try{render(<DashboardApp/>);
+    expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
+    expect(screen.getAllByRole('tab')).toHaveLength(6);
+    expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-permissions'));
     await screen.findByRole('option',{name:'合成坐席'});await user.selectOptions(screen.getByRole('combobox',{name:'人员'}),owner.view().people[0]!.selection);
     fireEvent.change(screen.getByLabelText('生效时间'),{target:{value:'2026-10-08T18:00'}});fireEvent.change(screen.getByLabelText('失效时间'),{target:{value:'2026-10-09T18:00'}});
     await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览 · 尚未保存');
-    await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-permissions'));
     expect(screen.getByText('预览 · 尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
     await user.click(screen.getByRole('button',{name:'返回修改'}));expect(screen.getByRole('textbox',{name:'授权原因'})).toHaveValue('合成导航保留');
   }finally{cleanup();owner.dispose();}

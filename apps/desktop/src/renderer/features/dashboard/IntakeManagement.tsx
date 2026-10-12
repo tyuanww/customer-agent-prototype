@@ -1,4 +1,3 @@
-import { IntakePermissions } from './IntakePermissions';
 import type { components } from '@customer-agent/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
@@ -183,17 +182,6 @@ function sameCandidate(candidate: components['schemas']['IntakeCandidate'], sele
   return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version && candidate.sourceId === selected.sourceId;
 }
 export function IntakeManagement() {
-  const [page,setPage]=useState<'materials'|'permissions'>('materials');
-  return <>
-    {window.dashboardPermissions && <div className="intake-management intake-toolbar intake-workspace-switch" role="group" aria-label="内容管理工作区">
-      <button aria-pressed={page==='materials'} onClick={()=>setPage('materials')}>资料</button>
-      <button aria-pressed={page==='permissions'} onClick={()=>setPage('permissions')}>权限配置</button>
-    </div>}
-    <div hidden={page!=='materials'}><IntakeMaterials /></div>
-    {window.dashboardPermissions && <div hidden={page!=='permissions'}><IntakePermissions active={page==='permissions'} /></div>}
-  </>;
-}
-function IntakeMaterials() {
   const sectionId = useId();
   const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
