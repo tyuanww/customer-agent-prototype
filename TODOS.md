@@ -2,6 +2,8 @@
 
 ## 当前资料接入：沿既有内容管理完成本期收尾（2026-10-09 并行回收）
 
+**2026-10-12 草稿 PR CI 已通过：** `2515466` 的 run `38197770970` 中，验证范围、Linux 正式检查、PostgreSQL 15 集成、Linux/Windows 打包冒烟和 CI 总门均为成功。这不改变完整 `/review` 仍为 INCOMPLETE，也不代替真实飞书资料、生产 HTTP 或办公设备人工验收。
+
 **2026-10-12 迁移目录断言补齐：** `cf4567a` 的 PostgreSQL 15 集成、Linux/Windows 打包冒烟已通过。Linux 正式检查仍失败：`planner.test.ts` 的基线后缀仍写 31 段且名单止于 0040，生成目录已是 41 段，当前后缀为 32，末段 `0041_intake_readiness_v1_29`。断言已改到该目录。完整 `/review` 与真实接入未在本轮重跑。
 
 **2026-10-12 草稿 PR 合同断言与 e2e 构建顺序：** PR #38 在 `5c1e4b9` 上，Linux 正式检查失败于运行时合同测试仍断言 schema 1.28／`379b793`，生成来源已是 schema 1.29／`75e1889`。PostgreSQL 作业的数据库 75 项与 API 集成 112 项通过后，`test:e2e:backend` 在干净检出上编译 API 时找不到 `@customer-agent/content-intake` 的 dist 类型。测试断言已对齐当前来源，并在 API `tsc` 前构建 content-intake。定向 `vitest run tests/runtime.test.ts` 19/19 通过；移走 dist 后 content-intake 构建与 API `tsc -p tsconfig.build.json` 通过。本机 Node v25.8.2，仓库要求 `>=24 <25`，CI 为 Node 24。完整 PostgreSQL 端到端、完整 `/review` 与真实接入未在本轮重跑。
