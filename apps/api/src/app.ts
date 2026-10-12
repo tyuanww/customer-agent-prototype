@@ -44,6 +44,11 @@ import { registerContentReleaseRoutes, type ContentReleaseRouteDependencies } fr
 import { registerAnnounceRoutes, type AnnounceRouteDependencies } from './announce-routes.js';
 import { registerIterationTaskRoutes, type IterationTaskRouteDependencies } from './iteration-task-routes.js';
 import { registerOpsLoopRoutes, type OpsLoopRouteDependencies } from './ops-loop-routes.js';
+import { contentIntakeManagementRoutes } from './content-intake/management-http.js';
+import { contentIntakeUsageRoutes } from './content-intake/usage-http.js';
+import { createContentIntakeService } from './content-intake/service.js';
+import type { ContentObjectStore } from './content-object-store.js';
+import type { IntakePurposePool } from './content-intake/runtime-pool.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -76,6 +81,12 @@ export function createApiApp(
     sink?: ApiAccessLogSink;
   }>,
   noticeDependencies?: NoticeRouteDependencies,
+  intakeDependencies?: Readonly<{
+    business: IntakePurposePool;
+    usage: IntakePurposePool;
+    worker: IntakePurposePool;
+    store: ContentObjectStore;
+  }>,
 ): FastifyInstance {
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
@@ -153,6 +164,29 @@ export function createApiApp(
   registerAnnounceRoutes(app, authService, announceDependencies);
   registerIterationTaskRoutes(app, authService, iterationTaskDependencies);
   registerOpsLoopRoutes(app, authService, opsLoopDependencies);
+  if (intakeDependencies && authService.kind === 'product') {
+    const report = (_diagnosticId: string, error: unknown): void => {
+      try { diagnosticSink(createApiRuntimeDiagnostic('API_REQUEST_FAILED', error)); } catch { /* observational */ }
+    };
+    const usage = createContentIntakeService(
+      intakeDependencies.usage, intakeDependencies.store, report, undefined, { requireProductSession: true },
+    );
+    void app.register(contentIntakeUsageRoutes, { auth: authService, usage, report });
+    void app.register(contentIntakeManagementRoutes, {
+      auth: authService,
+      pool: intakeDependencies.business,
+      store: intakeDependencies.store,
+      terminalPool: intakeDependencies.worker,
+      report,
+    });
+    app.addHook('onClose', async () => {
+      await Promise.all([
+        intakeDependencies.business.end(),
+        intakeDependencies.usage.end(),
+        intakeDependencies.worker.end(),
+      ]);
+    });
+  }
 
   app.get('/health', async (_request, reply) => {
     const payload = parseContractSchema('HealthResponse', {

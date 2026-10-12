@@ -462,6 +462,12 @@ export function apiEnvironment(
     AUTH_DATABASE_URL: connection(DATABASE_ROLES.auth),
     CONTENT_REVIEW_DATABASE_URL: connection(DATABASE_ROLES.review),
     CONTENT_WORKER_DATABASE_URL: connection(DATABASE_ROLES.worker),
+    // The formal catalog never receives intake HTTP pools. A test database does.
+    ...(profile.databaseName === 'customer_agent_formal' ? {} : {
+      INTAKE_BUSINESS_DATABASE_URL: connection('stack_intake_business'),
+      INTAKE_USAGE_DATABASE_URL: connection('stack_intake_usage'),
+      INTAKE_WORKER_DATABASE_URL: connection('stack_intake_worker'),
+    }),
     SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: profile.identityOrigin,
     CONTENT_OBJECT_STORE_DIR: profile.objectStoreDirectory,
     IDEMPOTENCY_HMAC_KEYS: JSON.stringify({ 'hmac-idempotency-v1': LOCAL_SECRETS.idempotencyKey }),

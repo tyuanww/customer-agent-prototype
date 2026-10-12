@@ -78,6 +78,9 @@ describe('stack profile', () => {
       .map((key) => new URL(String(environment[key])).username);
     assert.equal(new Set(logins).size, logins.length, 'each pool must use its own login role');
     assert.ok(logins.every((login) => login.startsWith('stack_')));
+    assert.equal(new URL(String(environment.INTAKE_BUSINESS_DATABASE_URL)).username, 'stack_intake_business');
+    assert.equal(new URL(String(environment.INTAKE_USAGE_DATABASE_URL)).username, 'stack_intake_usage');
+    assert.equal(new URL(String(environment.INTAKE_WORKER_DATABASE_URL)).username, 'stack_intake_worker');
     assert.notEqual(environment.IDEMPOTENCY_HMAC_KEYS, undefined);
     assert.notEqual(environment.LOG_HASH_KEY, undefined);
   });
@@ -556,6 +559,7 @@ describe('stack production env', () => {
     };
     const environment = apiEnvironment(profile, parseApiEnvFile('LOG_HASH_KEY=real-material'));
     assert.equal(environment.LOG_HASH_KEY, 'real-material');
+    assert.equal(environment.INTAKE_BUSINESS_DATABASE_URL, undefined);
     // The DSN still comes from the profile, never from the file.
     assert.match(String(environment.DATABASE_URL), /host=%2Ftmp%2Fsocket&port=43199/u);
   });
