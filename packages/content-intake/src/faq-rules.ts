@@ -55,7 +55,6 @@ export function createFaqTableValidator(context: RuleContext, issue: AddIssue) {
       if (values[8] && values[9] && Date.parse(values[8]) >= Date.parse(values[9])) issue('INVALID_WINDOW', location.sheet, location.row, location.column(9), '失效时间须晚于生效时间');
       if (!parseFamilyReference(values[10]!, context)) issue('INVALID_FAMILY', location.sheet, location.row, location.column(10), '仅店铺来源可填写其他来源的 sourceId/businessEntryId；两段须为合法非示例稳定编号，留空取消关联');
       if (![ '', 'true', 'false'].includes(values[14]!) || (values[14] === 'true' && context.scopeKind !== 'brand')) issue('BRAND_OVERRIDE', location.sheet, location.row, location.column(14), '只有品牌通用来源可设置不可覆盖');
-      if ([title, body].some((value) => value.includes('过敏')) && (!body.includes('停手') || !body.includes('确认'))) issue('ALLERGY_BODY', location.sheet, location.row, location.column(2), '正文同时包含停手与确认；标题不代替正文');
       if (values[13]) issue('UNRESOLVED_MEDIA', location.sheet, location.row, location.column(13), '明确必要文字与媒体；P1 不认定附件已导入');
       rows.push({ id, title, body, state: state === '停用' ? '停用' : '启用', values });
     },
