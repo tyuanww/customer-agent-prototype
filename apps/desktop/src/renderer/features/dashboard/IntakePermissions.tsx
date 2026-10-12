@@ -115,7 +115,8 @@ export function IntakePermissions({ active }: { active: boolean }) {
     finally{if(gen===generation.current){pending.current=false;setBusy(false);}}
   };
   useEffect(()=>{
-    if(!active)return;
+    // 切走再回来时页面仍挂着。再读一次会清掉还没保存的预览。
+    if(!active || view)return;
     const gen=++generation.current;
     let alive=true;
     void (async()=>{
@@ -126,7 +127,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
       }catch{if(alive && gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}}
     })();
     return()=>{alive=false;};
-  },[active]);
+  },[active,view]);
   useEffect(()=>{
     const api=window.dashboardPermissions;if(!api)return;
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
