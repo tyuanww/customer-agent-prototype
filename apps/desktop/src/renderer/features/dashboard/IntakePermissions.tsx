@@ -70,9 +70,9 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
   return <section>
     {problem && <p role="alert">{problem}</p>}
     <fieldset className="intake-seat-create" disabled={blocked}><legend>新建外包坐席</legend>
-      <label>姓名<input aria-label="姓名" value={name} onChange={event => setName(event.target.value)} /></label>
-      <label>登录名<input aria-label="登录名" value={username} onChange={event => setUsername(event.target.value)} /></label>
-      <label>密码<input aria-label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} /></label>
+      <label>姓名<input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></label>
+      <label>登录名<input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></label>
+      <label>密码<input aria-label="密码" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
       <label>岗位<select aria-label="坐席岗位" value={post} onChange={event => choose(event.target.value)}>{INTAKE_POSTS.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
       <button disabled={!name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</button>
     </fieldset>
@@ -85,7 +85,7 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
         <td>{row.enabled ? '使用中' : '已停用'}
           {row.enabled && resetting !== row.username && <button disabled={blocked} onClick={() => { setResetting(row.username); setNextPassword(''); setDisabling(''); }}>重置</button>}
           {row.enabled && resetting === row.username && <span>
-            <label>新密码<input aria-label="重置密码" type="password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label>
+            <label>新密码<input aria-label="重置密码" type="password" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label>
             <button disabled={blocked || nextPassword.length === 0} onClick={() => void reset(row.username)}>确认重置</button>
             <button disabled={blocked} onClick={() => { setResetting(''); setNextPassword(''); }}>取消</button>
           </span>}
