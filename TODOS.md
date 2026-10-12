@@ -99,12 +99,6 @@
 
 ## Open
 
-### 设计审查 · 资料页与权限页（2026-10-13，intake-pages）
-
-**Status:** DEFERRED · 不改工作台外壳
-- 侧栏分组字「经营总览 / 话术运营 / 治理与架构」实测 10px，低于 DESIGN.md 辅助信息 11px 下限。
-- 窄于工作台最小窗（约 980×680）时，侧栏不收起，内容列被挤成竖排。不改成手机导航。
-
 ### P4 · 远端后端 profile（含必须先做的鉴权）
 
 **What:** 让打包客户端连接受控 HTTPS 远端，后端 API 与 PG 留在服务器内网，不公开 PG。
@@ -302,6 +296,14 @@ pinning 不应作为默认必选项（证书轮换、备用 pin、企业 TLS 检
 **Status:** DEFERRED · 仅记录后续方向，未实施或部署。
 
 ## Completed
+
+### 设计审查 · 资料页与权限页（2026-10-13，intake-pages）
+
+**What:** 收掉审查里故意留下的两项外壳问题。
+
+**Context:** 侧栏分组「经营总览 / 话术运营 / 治理与架构」从 10px 改为 11px，达到 DESIGN.md 辅助信息下限。工作台最小窗仍是 980×680；更窄时保持桌面侧栏，不改成手机导航。新建外包坐席仍不能从 `127.0.0.1:43101` 登录，`productionConsumerReady` 保持 false。说明见 [docs/explanation-intake-pages.md](docs/explanation-intake-pages.md)。
+
+**Completed:** 2026-10-13
 
 ### P3 · 显式离线 synthetic profile
 
