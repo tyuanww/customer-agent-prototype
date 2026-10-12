@@ -138,6 +138,7 @@ it.each([
   { name: 'saved quality draft', field: null, hasDraft: true },
 ])('blocks history refresh for $name while keeping report download available', async ({ field, hasDraft }) => {
   const user = userEvent.setup(), data = intakeManagementData(1); data.candidate.state = 'ready';
+  if (field === '发布标题') data.candidate.sourceEvidenceVersion = 1;
   const view: IntakeManagementView = { ...management(upload({ phase: 'validated', canSubmit: false, canRefresh: true, canSaveReport: true })),
     selected: data.candidate, material: data.material, canConfirmSource: true, canPublish: true, hasDraft };
   const command = vi.fn<IntakeManagementApi['command']>(async () => ({ ok: true, view: structuredClone(view) }));

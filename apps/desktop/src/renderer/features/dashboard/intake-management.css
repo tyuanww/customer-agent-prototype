@@ -31,8 +31,11 @@
 .intake-management dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 16px; }
 .intake-management dt { color: var(--dash-muted); }
 .intake-management dd { margin: 0; white-space: pre-wrap; }
-.intake-candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
-.intake-candidates button { display: flex; flex-direction: column; gap: 4px; text-align: left; overflow-wrap: anywhere; }
+.intake-candidate-table { width: 100%; border-collapse: collapse; text-align: left; }
+.intake-candidate-table th, .intake-candidate-table td { border-bottom: 1px solid var(--dash-line); padding: 12px 8px; vertical-align: top; }
+.intake-candidate-table th { font-weight: 600; }
+.intake-candidate-table td button + button { margin-left: 8px; }
+.intake-toolbar[aria-label='候选筛选'] button[aria-pressed=true] { border-color: var(--dash-purple); }
 .intake-card { margin: 16px 0; padding: 16px 0; border-block: 1px solid var(--dash-line); }
 .intake-card h3 { margin-top: 0; }
 .intake-notice, .intake-management [role=alert] { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--dash-line-strong); border-radius: var(--dash-radius); background: var(--dash-surface-subtle); color: var(--dash-ink); }
