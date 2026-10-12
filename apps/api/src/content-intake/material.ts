@@ -96,7 +96,8 @@ export function materialFromParse(input: {
       questions: [...questions.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
       productRefs, scenarioRefs,
       effectiveFrom: values[8] ? new Date(values[8]).toISOString() : old?.effectiveFrom ?? new Date(now).toISOString(),
-      effectiveTo: values[9] ? new Date(values[9]).toISOString() : null,
+      // A blank expiry cell keeps the published end date. A blank cell is not a request to remove it.
+      effectiveTo: values[9] ? new Date(values[9]).toISOString() : old?.effectiveTo ?? null,
       applicabilityNote: values[6], ...family,
       brandNonOverridable: values[14] === 'true', category: values[5], internalNote: values[11],
       riskNote: values[12], attachmentNote: values[13],

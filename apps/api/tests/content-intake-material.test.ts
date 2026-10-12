@@ -111,6 +111,27 @@ describe('formal candidate material from independently parsed workbook', () => {
     expect(removed.risk.level).not.toBe('critical');
   });
 
+  it('keeps a published end date when a later file leaves the expiry cell blank', async () => {
+    const dated = row();
+    dated[8] = '2026-10-12T00:00:00Z';
+    dated[9] = '2099-12-31T15:59:59Z';
+    const first = materialFromParse(await input([dated]));
+    expect(first.entries[0]).toMatchObject({
+      effectiveFrom: '2026-10-12T00:00:00.000Z',
+      effectiveTo: '2099-12-31T15:59:59.000Z',
+    });
+    const revised = materialFromParse({ ...await input([row('entry-a', '新正文')]), previous: first.entries });
+    expect(revised.entries[0]).toMatchObject({
+      answerText: '新正文',
+      effectiveFrom: '2026-10-12T00:00:00.000Z',
+      effectiveTo: '2099-12-31T15:59:59.000Z',
+    });
+    const replaced = row();
+    replaced[9] = '2030-01-01T00:00:00Z';
+    const next = materialFromParse({ ...await input([replaced]), previous: revised.entries });
+    expect(next.entries[0]?.effectiveTo).toBe('2030-01-01T00:00:00.000Z');
+  });
+
   it('treats an explicit risk note as an escalation and cannot downgrade by clearing it', async () => {
     const noted = row(); noted[12] = '赔付承诺需另一人复核';
     const first = materialFromParse(await input([noted]));
