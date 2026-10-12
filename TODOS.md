@@ -2,6 +2,8 @@
 
 ## 当前资料接入：沿既有内容管理完成本期收尾（2026-10-09 并行回收）
 
+**2026-10-12 迁移目录断言补齐：** `cf4567a` 的 PostgreSQL 15 集成、Linux/Windows 打包冒烟已通过。Linux 正式检查仍失败：`planner.test.ts` 的基线后缀仍写 31 段且名单止于 0040，生成目录已是 41 段，当前后缀为 32，末段 `0041_intake_readiness_v1_29`。断言已改到该目录。完整 `/review` 与真实接入未在本轮重跑。
+
 **2026-10-12 草稿 PR 合同断言与 e2e 构建顺序：** PR #38 在 `5c1e4b9` 上，Linux 正式检查失败于运行时合同测试仍断言 schema 1.28／`379b793`，生成来源已是 schema 1.29／`75e1889`。PostgreSQL 作业的数据库 75 项与 API 集成 112 项通过后，`test:e2e:backend` 在干净检出上编译 API 时找不到 `@customer-agent/content-intake` 的 dist 类型。测试断言已对齐当前来源，并在 API `tsc` 前构建 content-intake。定向 `vitest run tests/runtime.test.ts` 19/19 通过；移走 dist 后 content-intake 构建与 API `tsc -p tsconfig.build.json` 通过。本机 Node v25.8.2，仓库要求 `>=24 <25`，CI 为 Node 24。完整 PostgreSQL 端到端、完整 `/review` 与真实接入未在本轮重跑。
 
 **2026-10-12 就绪后继已完成版本化接收：** 用户批准 OpenAPI 1.24.0／schema 1.29／0041／`content-intake-readiness-successor-v1` 的固定前序加差量方案。治理提交 `75e1889` 已通过治理 release 与导出检查，导出包 `cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9` 状态为 `EXPORTED_NOT_INTAKE`；产品已实际 intake 同一包，合同锁、生成物和 0041 已落地，状态为 `VERIFIED_NOT_ACTIVATED`，`ddev_authorized=false`、`runtime_activated=false`。PG15 迁移/运行时 75/75、产品 intake 11/11、contracts/db 生成检查、typecheck、build 均通过；本轮保留旧失败记录，不宣称全仓审查或生产启用完成。完整 `/review` 与 `externalCompleteReview` 仍为 `INCOMPLETE`，真实飞书/客户资料、生产 HTTP/runner、Windows 与办公设备人工验收仍未完成。治理仓原有未相关的9项工作树修改未触碰；产品提交 `04c0f5e` 已推送。
