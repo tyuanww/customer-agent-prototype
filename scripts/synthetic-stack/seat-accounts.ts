@@ -1,4 +1,4 @@
-import { actionsForIntakePost, isIntakePost, type IntakePost } from '../../apps/desktop/src/shared/intake-post-actions.ts';
+import { actionsForIntakePost, DEFAULT_INTAKE_POST, isIntakePost, type IntakePost } from '../../apps/desktop/src/shared/intake-post-actions.ts';
 
 export type SeatAccountError =
   | 'missing-person'
@@ -21,17 +21,31 @@ export type PreparedPassword = {
   hash: string;
 };
 
+export type SeatListedPerson = {
+  displayName: string;
+  bindingId: string;
+  enabled: boolean;
+};
+
 export type SeatPeople = {
   insert(person: SeatPerson): Promise<{ ok: true } | { ok: false; error: 'person-write-failed' }>;
   remove(bindingId: string): Promise<{ ok: true } | { ok: false; error: 'person-write-failed' }>;
   disable(bindingId: string): Promise<{ ok: true } | { ok: false; error: 'missing-person' | 'person-write-failed' }>;
   find(bindingId: string): Promise<{ ok: true } | { ok: false; error: 'missing-person' | 'person-write-failed' }>;
+  list(): Promise<{ ok: true; people: SeatListedPerson[] } | { ok: false; error: 'person-write-failed' }>;
+};
+
+export type SeatPasswordRecord = {
+  username: string;
+  bindingId: string;
+  post: string | null;
 };
 
 export type SeatPasswords = {
   prepare(username: string, bindingId: string, password: string): Promise<{ ok: true; account: PreparedPassword } | { ok: false; error: 'missing-hash' }>;
-  write(account: PreparedPassword): Promise<{ ok: true } | { ok: false; error: 'password-write-failed' }>;
+  write(account: PreparedPassword, post: IntakePost): Promise<{ ok: true } | { ok: false; error: 'password-write-failed' }>;
   replace(username: string, bindingId: string, password: string): Promise<{ ok: true } | { ok: false; error: 'missing-hash' | 'password-write-failed' }>;
+  list(): Promise<{ ok: true; rows: SeatPasswordRecord[] } | { ok: false; error: 'password-write-failed' }>;
 };
 
 export type SeatCreateResult =
@@ -45,6 +59,17 @@ export type SeatResetResult =
 export type SeatDisableResult =
   | { ok: true }
   | { ok: false; error: 'missing-person' | 'person-write-failed' };
+
+export type SeatListedAccount = {
+  displayName: string;
+  username: string;
+  post: IntakePost;
+  enabled: boolean;
+};
+
+export type SeatListResult =
+  | { ok: true; seats: SeatListedAccount[] }
+  | { ok: false; error: 'accounts-unavailable' };
 
 const USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -97,7 +122,7 @@ export async function createSeatAccount(people: SeatPeople, passwords: SeatPassw
   if (!prepared.ok) return prepared;
   const inserted = await people.insert(person.person);
   if (!inserted.ok) return inserted;
-  const written = await passwords.write(prepared.account);
+  const written = await passwords.write(prepared.account, post);
   if (written.ok) return { ok: true, username: person.person.username, bindingId: person.person.bindingId, password, post };
   const removed = await people.remove(person.person.bindingId);
   if (!removed.ok) return removed;
@@ -123,4 +148,30 @@ export async function disableSeatAccount(people: SeatPeople, input: { username: 
   const login = seatUsername(input.username);
   if (!login.ok) return login;
   return people.disable(login.bindingId);
+}
+
+function storedPost(post: string | null): IntakePost {
+  return post !== null && isIntakePost(post) ? post : DEFAULT_INTAKE_POST;
+}
+
+export async function listSeatAccounts(people: SeatPeople, passwords: SeatPasswords): Promise<SeatListResult> {
+  const listedPeople = await people.list();
+  if (!listedPeople.ok) return { ok: false, error: 'accounts-unavailable' };
+  const listedPasswords = await passwords.list();
+  if (!listedPasswords.ok) return { ok: false, error: 'accounts-unavailable' };
+  const byBinding = new Map(listedPasswords.rows.map((row) => [row.bindingId, row]));
+  const seats: SeatListedAccount[] = [];
+  for (const person of listedPeople.people) {
+    const login = seatUsername(person.bindingId.startsWith('synthetic_') ? person.bindingId.slice('synthetic_'.length) : '');
+    if (!login.ok || login.bindingId !== person.bindingId) continue;
+    const stored = byBinding.get(person.bindingId);
+    seats.push({
+      displayName: person.displayName,
+      username: login.username,
+      post: storedPost(stored?.post ?? null),
+      enabled: person.enabled,
+    });
+  }
+  seats.sort((left, right) => left.username.localeCompare(right.username));
+  return { ok: true, seats };
 }

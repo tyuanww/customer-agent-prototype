@@ -48,6 +48,9 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
       fs: {
         allow: [resolve(__dirname)],
       },

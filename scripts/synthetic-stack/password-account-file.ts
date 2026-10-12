@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import type { IntakePost } from '../../apps/desktop/src/shared/intake-post-actions.ts';
 import { buildAccount } from './identity-admission.ts';
 import type { PreparedPassword, SeatPasswords } from './seat-accounts.ts';
 
@@ -47,11 +48,11 @@ export function createPasswordAccountFile(file: string): SeatPasswords {
     prepare(username, bindingId, password) {
       return Promise.resolve(prepared(username, bindingId, password));
     },
-    async write(account) {
+    async write(account, post: IntakePost) {
       const current = readRows(file);
       if (!current.ok) return current;
       if (current.rows.some((row) => row.username === account.username)) return { ok: false, error: 'password-write-failed' };
-      return storeRows(file, [...current.rows, { ...account }]);
+      return storeRows(file, [...current.rows, { ...account, post }]);
     },
     async replace(username, bindingId, password) {
       const next = prepared(username, bindingId, password);
@@ -65,6 +66,18 @@ export function createPasswordAccountFile(file: string): SeatPasswords {
       const stored = storeRows(file, current.rows);
       if (!stored.ok) return stored;
       return { ok: true };
+    },
+    async list() {
+      const current = readRows(file);
+      if (!current.ok) return current;
+      const rows: { username: string; bindingId: string; post: string | null }[] = [];
+      for (const row of current.rows) {
+        const username = row.username;
+        const bindingId = row.bindingId;
+        if (typeof username !== 'string' || typeof bindingId !== 'string') continue;
+        rows.push({ username, bindingId, post: typeof row.post === 'string' ? row.post : null });
+      }
+      return { ok: true as const, rows };
     },
   };
 }

@@ -71,5 +71,13 @@ describe('seat account command', { concurrency: 1 }, () => {
     const row = await client.query(`SELECT enabled FROM backend_identity.subject_bindings WHERE binding_id=$1`, ['synthetic_seatcmd']);
     assert.equal(row.rows[0]?.enabled, false);
     assert.equal(loadPasswordAccounts(accountsFile).has('seatcmd'), true);
+
+    const listed = await runSeatCommand(people, passwords, { action: 'list' });
+    assert.equal(JSON.stringify(listed).includes(resetPassword), false);
+    assert.equal(listed.ok, true);
+    if (!listed.ok || listed.action !== 'list') return;
+    assert.deepEqual(listed.seats.find((seat) => seat.username === 'seatcmd'), {
+      displayName: '外包丙', username: 'seatcmd', post: '客服', enabled: false,
+    });
   });
 });

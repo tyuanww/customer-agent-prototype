@@ -90,6 +90,14 @@ function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
   return id;
 }
 
+function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
+  if (!canOpenPermissions) return 'content';
+  const location = window.location;
+  const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'content';
+  return new URLSearchParams(location.search).get('page') === 'permissions' ? 'permissions' : 'content';
+}
+
 function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
   const index = items.findIndex((item) => item.id === active);
   return items[(index + delta + items.length) % items.length].id;
@@ -120,7 +128,7 @@ export function DashboardApp() {
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
   const navItems = sidebarItems(canOpenPermissions);
-  const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? 'content' : 'overview');
+  const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [signedIn, setSignedIn] = useState(false);

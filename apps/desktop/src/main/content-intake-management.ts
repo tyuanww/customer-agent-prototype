@@ -23,6 +23,13 @@ type Request = (path: string, body?: unknown) => Promise<unknown>;
 export type IntakePublicationPrompt = { kind: 'candidate'; title: string; sourceId: string; candidateVersion: number }
   | { kind: 'rollback'; baseReleaseId: string; targetReleaseId: string; scopes: C['IntakeSourceScope'][] };
 
+const DOMAIN_LABEL = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
+function scopeLabel(sources: IntakeAccess['sources'], sourceId: string): string {
+  const source = sources.find(item => item.scope.sourceId === sourceId);
+  if (!source) return '—';
+  const domain = DOMAIN_LABEL[source.scope.domain];
+  return `${source.scope.shopId ?? '品牌通用'} · ${domain}`;
+}
 const isRollback = (command: IntakeManagementCommand): command is IntakeRollbackCommand => command.action.startsWith('rollback-');
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;
 const reject = (code: 'FORBIDDEN' | 'STALE' | 'CONFLICT' | 'VALIDATION'): never => { throw new ProductHttpError(code); };
@@ -35,7 +42,7 @@ export class ContentIntakeManagement {
   private readonly quality: ContentIntakeQuality;
   private readonly upload: ContentIntakeUpload;
   private access: IntakeAccess | null = null;
-  private rows: IntakeManagementView['candidates'] = [];
+  private rows: { selection: string; candidate: C['IntakeCandidate'] }[] = [];
   private cursor: string | null = null;
   private selected: C['IntakeCandidate'] | null = null;
   private material: C['IntakeCandidatePage'] | null = null;
@@ -104,7 +111,9 @@ export class ContentIntakeManagement {
     const mutable = canRead && ['awaiting-evidence','ready'].includes(this.selected!.state);
     const canReview = mutable && this.can('review', this.selected!.sourceId);
     return structuredClone({ rollback: this.rollback.view(access), signedIn: session.signedIn, displayName: session.signedIn ? session.displayName ?? '已登录' : '未登录',
-      authorized, validUntil: access?.validUntil ?? null, candidates: this.rows, moreCandidates: this.cursor !== null,
+      authorized, validUntil: access?.validUntil ?? null,
+      candidates: this.rows.map(row => ({ ...row, scopeLabel: scopeLabel(this.access?.sources ?? [], row.candidate.sourceId) })),
+      moreCandidates: this.cursor !== null,
       selected: canRead ? this.selected : null, material: canRead ? this.material : null,
       canReview, quality: canReview ? this.quality.page(this.offset) : null, hasDraft: canReview && this.quality.hasDraft(),
       canConfirmSource: canRead && this.can('source-confirm', this.selected!.sourceId),

@@ -9,7 +9,7 @@ import { Client } from 'pg';
 import { loadPasswordAccounts, passwordMatches } from './identity-admission.ts';
 import { createPasswordAccountFile } from './password-account-file.ts';
 import { DATABASE_NAME, PG_PORT, PG_SOCKET_DIRECTORY } from './profile.ts';
-import { createSeatAccount, disableSeatAccount, resetSeatPassword } from './seat-accounts.ts';
+import { createSeatAccount, disableSeatAccount, listSeatAccounts, resetSeatPassword } from './seat-accounts.ts';
 import { createSubjectBindingPeople, type Sql } from './subject-binding-people.ts';
 
 const LIVE_ACCOUNTS = path.join(process.env.HOME ?? '', '.customer-agent-synthetic-stack', 'password-accounts.json');
@@ -75,7 +75,8 @@ describe('seat accounts', { concurrency: 1 }, () => {
     const text = readFileSync(accountsFile, 'utf8');
     assert.equal(text.includes('pw-seat-create'), false);
     const stored = JSON.parse(text) as Record<string, unknown>[];
-    assert.deepEqual(Object.keys(stored[0] ?? {}).sort(), ['bindingId', 'hash', 'salt', 'username']);
+    assert.deepEqual(Object.keys(stored[0] ?? {}).sort(), ['bindingId', 'hash', 'post', 'salt', 'username']);
+    assert.equal(stored[0]?.post, '客服');
     const loaded = loadPasswordAccounts(accountsFile).get('seatok');
     assert.ok(loaded);
     assert.equal(passwordMatches(loaded, 'pw-seat-create'), true);
@@ -139,7 +140,33 @@ describe('seat accounts', { concurrency: 1 }, () => {
     assert.equal(row?.enabled, false);
     assert.equal(row?.subject, '外包坐席乙');
     assert.equal(loadPasswordAccounts(accountsFile).get('seatreset')?.hash, after.hash);
+    const kept = JSON.parse(text) as { username: string; post?: string }[];
+    assert.equal(kept.find((row) => row.username === 'seatreset')?.post, '客服主管');
     assert.deepEqual(await disableSeatAccount(people, { username: 'seatghost' }), { ok: false, error: 'missing-person' });
+  });
+
+  it('lists saved seats with their posts and without the password hash', async () => {
+    const people = createSubjectBindingPeople(client as unknown as Sql);
+    const passwords = createPasswordAccountFile(accountsFile);
+    const created = await createSeatAccount(people, passwords, {
+      displayName: '外包坐席丙', username: 'seatlist', password: 'pw-seat-list', post: '客服主管',
+    });
+    assert.equal(created.ok, true);
+    const listed = await listSeatAccounts(people, passwords);
+    assert.equal(listed.ok, true);
+    if (!listed.ok) return;
+    const seat = listed.seats.find((row) => row.username === 'seatlist');
+    assert.deepEqual(seat, { displayName: '外包坐席丙', username: 'seatlist', post: '客服主管', enabled: true });
+    assert.equal(JSON.stringify(listed).includes('pw-seat-list'), false);
+    const file = JSON.parse(readFileSync(accountsFile, 'utf8')) as { username: string; hash: string }[];
+    const hash = file.find((row) => row.username === 'seatlist')?.hash;
+    assert.equal(typeof hash, 'string');
+    assert.equal(JSON.stringify(listed).includes(hash ?? 'missing-hash'), false);
+    await disableSeatAccount(people, { username: 'seatlist' });
+    const after = await listSeatAccounts(people, passwords);
+    assert.equal(after.ok, true);
+    if (!after.ok) return;
+    assert.equal(after.seats.find((row) => row.username === 'seatlist')?.enabled, false);
   });
 
   it('keeps the password path out of the page and the use case', () => {

@@ -2,6 +2,7 @@ import { exactKeys } from './product-session.ts';
 import { isIntakePost, type IntakePost } from './intake-post-actions.ts';
 
 export type SeatAccountIntent =
+  | { action: 'list' }
   | { action: 'create'; displayName: string; username: string; password: string; post: IntakePost }
   | { action: 'reset'; username: string; password: string }
   | { action: 'disable'; username: string };
@@ -14,6 +15,7 @@ export type SeatAccountRecord = {
 };
 
 export type SeatAccountReply =
+  | { ok: true; action: 'list'; seats: SeatAccountRecord[] }
   | { ok: true; action: 'create'; seat: SeatAccountRecord }
   | { ok: true; action: 'reset'; username: string }
   | { ok: true; action: 'disable'; username: string }
@@ -30,6 +32,7 @@ function text(value: unknown): value is string {
 export function isSeatAccountIntent(value: unknown): value is SeatAccountIntent {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
+  if (record.action === 'list') return exactKeys(record, ['action']);
   if (record.action === 'disable') return exactKeys(record, ['action', 'username']) && text(record.username);
   if (record.action === 'reset') {
     return exactKeys(record, ['action', 'username', 'password']) && text(record.username) && text(record.password);
@@ -47,6 +50,7 @@ const SEAT_FAILURES = [
   '人员没有写入，已停止。',
   '口令没有写入，已停止。',
   '账号没有保存。',
+  '账号没有读取。',
   '账号输入无效。',
 ] as const;
 
@@ -70,6 +74,16 @@ export function seatAccountReply(value: unknown): SeatAccountReply | null {
     return { ok: false, message: record.message };
   }
   if (record.ok !== true || !text(record.action)) return null;
+  if (record.action === 'list') {
+    if (!exactKeys(record, ['ok', 'action', 'seats']) || !Array.isArray(record.seats)) return null;
+    const seats: SeatAccountRecord[] = [];
+    for (const item of record.seats) {
+      const seat = seatRecord(item);
+      if (!seat) return null;
+      seats.push(seat);
+    }
+    return { ok: true, action: 'list', seats };
+  }
   if (record.action === 'reset' || record.action === 'disable') {
     if (!exactKeys(record, ['ok', 'action', 'username']) || !text(record.username)) return null;
     return { ok: true, action: record.action, username: record.username };

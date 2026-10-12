@@ -35,7 +35,7 @@ export type IntakeManagementView = {
   rollback: IntakeRollbackView;
   upload: IntakeUploadView;
   signedIn: boolean; displayName: string; authorized: boolean; validUntil: string | null;
-  candidates: { selection: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
+  candidates: { selection: string; scopeLabel: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
   selected: C['IntakeCandidate'] | null; material: C['IntakeCandidatePage'] | null;
   canReview: boolean; quality: QualityPage | null; hasDraft: boolean;
   canConfirmSource: boolean; canPublish: boolean; canRevise: boolean; canCancel: boolean;

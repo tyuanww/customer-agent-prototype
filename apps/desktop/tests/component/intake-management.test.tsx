@@ -279,6 +279,7 @@ it('opens the materials page as a candidate table and expands only the current s
   try {
     expect(await screen.findByRole('columnheader', { name: '名称' })).toBeInTheDocument();
     expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['名称', '范围', '状态', '下一步', '时间']);
+    expect(screen.getByRole('cell', { name: 'shop-a · 产品' })).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: '候选筛选' })).getAllByRole('button').map(button => button.textContent)).toEqual(['待我处理', '已发布', '全部']);
     expect(screen.getByRole('button', { name: '选择 CSV / Excel 文件' })).not.toHaveClass('dash-action-primary');
     await f.user.click(screen.getByRole('button', { name: 'source-a' }));
@@ -299,7 +300,7 @@ it('opens the materials page as a candidate table and expands only the current s
 });
 
 it('keeps rollback on the published row', async () => {
-  const f = setup(); f.data.candidate.state = 'published'; render(<IntakeManagement />);
+  const f = setup(); f.data.candidate.state = 'published'; f.data.state.rollback = true; render(<IntakeManagement />);
   try {
     await screen.findByRole('columnheader', { name: '名称' });
     expect(screen.getByText('这个筛选下没有候选。')).toBeInTheDocument();
@@ -307,5 +308,22 @@ it('keeps rollback on the published row', async () => {
     await f.user.click(screen.getByRole('button', { name: '已发布' }));
     expect(screen.getByRole('button', { name: '回退' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'source-a' })).toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: 'source-a' }));
+    const named = await screen.findByRole('region', { name: '已发布目录纠正回退' });
+    expect(named).not.toHaveFocus();
+    await f.user.click(screen.getByRole('button', { name: '回退' }));
+    expect(await screen.findByRole('region', { name: '已发布目录纠正回退' })).toHaveFocus();
+  } finally { f.main.dispose(); }
+});
+
+it('shows publishing as its status and does not offer a material check', async () => {
+  const f = setup();
+  f.data.candidate.state = 'publishing';
+  render(<IntakeManagement />);
+  try {
+    expect(await screen.findByRole('cell', { name: 'shop-a · 产品' })).toBeInTheDocument();
+    expect(screen.getAllByRole('cell', { name: '发布中' })).toHaveLength(2);
+    expect(screen.queryByRole('cell', { name: '核对材料' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: '质量检查' })).not.toBeInTheDocument();
   } finally { f.main.dispose(); }
 });

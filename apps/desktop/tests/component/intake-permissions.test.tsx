@@ -74,6 +74,7 @@ it('creates an outsourced seat from an intent and does not keep the password on 
  const intents:SeatAccountIntent[]=[];
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
  window.dashboardSeats={command:async intent=>{intents.push(structuredClone(intent));
+  if(intent.action==='list')return {ok:true,action:'list',seats:[{displayName:'已有坐席',username:'seatkept',post:'客服主管',enabled:true}]};
   if(intent.action==='create')return {ok:true,action:'create',seat:{displayName:intent.displayName,username:intent.username,post:intent.post,enabled:true}};
   if(intent.action==='reset')return {ok:true,action:'reset',username:intent.username};
   return {ok:true,action:'disable',username:intent.username};}};
@@ -91,13 +92,16 @@ it('creates an outsourced seat from an intent and does not keep the password on 
   expect(page).not.toContain('password-accounts');
   expect(page).not.toMatch(/seat-account-command|password-account-file|subject-binding|from 'pg'/);
   expect(login).toContain('飞书');expect(login).toContain('账号');expect(login).not.toContain('外包');
+  const kept=await within(screen.getByRole('table',{name:'外包坐席'})).findByRole('row',{name:/seatkept/});
+  expect(within(kept).getByRole('cell',{name:'客服主管'})).toBeInTheDocument();
+  expect(intents[0]).toEqual({action:'list'});
   await user.type(within(form).getByLabelText('姓名'),'外包甲');
   await user.type(within(form).getByLabelText('登录名'),'seatui');
   await user.type(within(form).getByLabelText('密码'),'pw-seat-ui');
   await user.click(within(form).getByRole('button',{name:'保存坐席'}));
   const table=screen.getByRole('table',{name:'外包坐席'});
   const row=await within(table).findByRole('row',{name:/seatui/});
-  expect(intents[0]).toEqual({action:'create',displayName:'外包甲',username:'seatui',password:'pw-seat-ui',post:'客服'});
+  expect(intents.find(intent=>intent.action==='create')).toEqual({action:'create',displayName:'外包甲',username:'seatui',password:'pw-seat-ui',post:'客服'});
   expect(document.body.innerHTML).not.toContain('pw-seat-ui');
   expect(within(form).getByLabelText('密码')).toHaveValue('');
   expect(within(row).getByRole('cell',{name:'seatui'})).toBeInTheDocument();

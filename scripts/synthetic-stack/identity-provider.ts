@@ -23,7 +23,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STACK_ROOT, SYNTHETIC_IDENTITIES } from './profile.ts';
-import { isAdmittedHost, loadPasswordAccounts, passwordMatches } from './identity-admission.ts';
+import { isAdmittedHost, loadPasswordAccounts, passwordMatches, reloadPasswordAccounts } from './identity-admission.ts';
 
 const MAX_BODY_BYTES = 4_096;
 const ALLOWED_BINDINGS = new Set(SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId));
@@ -54,9 +54,10 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 export function createIdentityProvider(
   { port, accountsFile = ACCOUNTS_FILE }: Readonly<{ port: number; accountsFile?: string }>,
 ) {
-  // Loaded once at startup. A missing or empty file fails the process rather than
-  // falling back to a built-in password, which is what the previous version did.
-  const accounts = loadPasswordAccounts(accountsFile);
+  // Startup still requires a usable file, and still has no built-in password.
+  // Each /password reads the file again so a reset is visible without a restart.
+  // A broken file refuses that attempt; it does not reuse this startup snapshot.
+  loadPasswordAccounts(accountsFile);
   const server = createServer((request, response) => {
     // NOTE: `url` is built from a fixed loopback base, so `url.hostname` is always
     // '127.0.0.1' and can never reject anything. Admission must read the Host header.
@@ -90,10 +91,13 @@ export function createIdentityProvider(
         const username = Reflect.get(parsed, 'username');
         const password = Reflect.get(parsed, 'password');
         if (typeof username !== 'string' || typeof password !== 'string') { send(response, 400, '{"error":"invalid_request"}'); return; }
+        const accounts = reloadPasswordAccounts(accountsFile);
+        if (!accounts) { send(response, 503, '{"error":"accounts_unavailable"}'); return; }
         const identity = SYNTHETIC_IDENTITIES.find((item) => item.bindingId === username);
         // Verify against the account file. The old code compared the submitted
         // password to a module constant, which granted any seeded subject — including
-        // owner — to anyone who knew that string.
+        // owner — to anyone who knew that string. Seeded subjects stay the only
+        // names this process will exchange; a new seat is not added here.
         const account = identity === undefined ? undefined : accounts.get(username);
         if (!identity || !account || !passwordMatches(account, password)) {
           send(response, 401, '{"error":"invalid_credentials"}'); return;

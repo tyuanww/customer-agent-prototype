@@ -16,6 +16,7 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const flight = useRef(false);
+  const listGeneration = useRef(0);
   const blocked = disabled || busy;
   const send = async (intent: SeatAccountIntent): Promise<SeatAccountReply | null> => {
     const api = window.dashboardSeats;
@@ -35,6 +36,7 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
   const create = async () => {
     const reply = await send({ action: 'create', displayName: name.trim(), username: username.trim(), password, post });
     if (reply === null || !reply.ok || reply.action !== 'create') return;
+    listGeneration.current += 1;
     setRows(current => [...current, reply.seat]);
     setName(''); setUsername(''); setPassword(''); setPost(DEFAULT_INTAKE_POST);
   };
@@ -53,6 +55,18 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
     if (!isIntakePost(value)) { setProblem('请选择岗位。'); return; }
     setPost(value);
   };
+  useEffect(() => {
+    const api = window.dashboardSeats;
+    if (!api) { setProblem('账号暂不可用。'); return; }
+    const generation = ++listGeneration.current;
+    let alive = true;
+    void api.command({ action: 'list' }).then(reply => {
+      if (!alive || generation !== listGeneration.current) return;
+      if (!reply.ok) { setProblem(reply.message); return; }
+      if (reply.action === 'list') setRows(reply.seats);
+    }).catch(() => { if (alive) setProblem('账号暂不可用。'); });
+    return () => { alive = false; };
+  }, []);
   return <section>
     {problem && <p role="alert">{problem}</p>}
     <fieldset disabled={blocked}><legend>新建外包坐席</legend>
@@ -89,7 +103,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
-  const generation=useRef(0),pending=useRef(false),started=useRef(false);
+  const generation=useRef(0),pending=useRef(false);
   const apply=async(command?:IntakePermissionCommand)=>{
     if(pending.current && command?.action!=='stop')return;
     const gen=++generation.current;pending.current=true;setBusy(true);setError('');
@@ -100,7 +114,17 @@ export function IntakePermissions({ active }: { active: boolean }) {
     finally{if(gen===generation.current){pending.current=false;setBusy(false);}}
   };
   useEffect(()=>{
-    if(!active || started.current)return;started.current=true;void apply({action:'refresh'});
+    if(!active)return;
+    const gen=++generation.current;
+    let alive=true;
+    void (async()=>{
+      try{const api=window.dashboardPermissions;if(!api)throw new Error('unavailable');
+        const reply=await api.command({action:'refresh'});
+        if(!alive || gen!==generation.current)return;
+        setView(reply.view);if(!reply.ok)setError(reply.message);
+      }catch{if(alive && gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}}
+    })();
+    return()=>{alive=false;};
   },[active]);
   useEffect(()=>{
     const api=window.dashboardPermissions;if(!api)return;
@@ -136,7 +160,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
         <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></label>
       {view.source && <>
         <table className="intake-candidate-table" aria-label="人员"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
-          {view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.person===p.label));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;})}
+          {view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;})}
         </tbody></table>
         {!view.people.length && <p>当前没有可选择的人员。</p>}
         {!view.preview ? <fieldset disabled={disabled}><legend>新增业务权限</legend>

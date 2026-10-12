@@ -172,6 +172,7 @@ function candidateVisible(state: string, filter: CandidateFilter, selected: bool
   return isOpenCandidate(state);
 }
 function listNext(candidate: components['schemas']['IntakeCandidate']) {
+  if (candidate.state === 'publishing') return states.publishing;
   if (candidate.publicationPolicy === 'approval-v1' && isOpenCandidate(candidate.state)) return '先修订或重新导入旧候选';
   if (!isOpenCandidate(candidate.state)) return states[candidate.state] ?? candidate.state;
   if (!candidate.sourceEvidenceVersion) return '核对材料';
@@ -189,6 +190,7 @@ export function IntakeManagement() {
   const stopPending = useRef(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('open');
+  const [rollbackFocus, setRollbackFocus] = useState(0);
   const onDirty = useCallback((id: string, dirty: boolean) => setDirtyIds(previous => {
     if (previous.has(id) === dirty) return previous;
     const next = new Set(previous); if (dirty) next.add(id); else next.delete(id); return next;
@@ -259,8 +261,18 @@ export function IntakeManagement() {
     });
     void apply({ action: 'list', next: false });
     const invalidate = () => { generation.current++; };
-    return () => { invalidate(); off(); };
+    // Drop the in-flight lock with the generation. Development remounts the
+    // effect before the first read returns, and a held lock would leave the
+    // table on "会话待确认".
+    return () => { invalidate(); pending.current = null; off(); };
   }, []);
+  useEffect(() => {
+    if (rollbackFocus === 0) return;
+    const region = document.querySelector<HTMLElement>('[aria-label="已发布目录纠正回退"]');
+    if (!region) return;
+    region.focus();
+    if (typeof region.scrollIntoView === 'function') region.scrollIntoView({ block: 'start' });
+  }, [rollbackFocus, view?.selected]);
   const upload = view?.upload;
   const disabled = busy || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
@@ -315,8 +327,8 @@ export function IntakeManagement() {
             const current = sameCandidate(row.candidate, view.selected);
             return <tr key={row.selection}>
               <td><button disabled={disabled || dirty || view.hasDraft || uploadDraft} onClick={() => void apply({ action: 'select', selection: row.selection })}>{row.candidate.sourceId}</button>
-                {row.candidate.state === 'published' && <button disabled={disabled || dirty || view.hasDraft || uploadDraft} onClick={() => void apply({ action: 'select', selection: row.selection })}>回退</button>}</td>
-              <td>{row.candidate.sourceId}</td>
+                {row.candidate.state === 'published' && <button disabled={disabled || dirty || view.hasDraft || uploadDraft} onClick={() => { setRollbackFocus(focus => focus + 1); void apply({ action: 'select', selection: row.selection }); }}>回退</button>}</td>
+              <td>{row.scopeLabel}</td>
               <td>{states[row.candidate.state] ?? row.candidate.state}</td>
               <td>{current && step ? step.title : listNext(row.candidate)}</td>
               <td>{formatIntakeTime(row.candidate.updatedAt)}</td>

@@ -1,5 +1,5 @@
 import type { SeatAccountIntent, SeatAccountReply } from '../../apps/desktop/src/shared/seat-account-intent.ts';
-import { createSeatAccount, disableSeatAccount, resetSeatPassword, type SeatPeople, type SeatPasswords } from './seat-accounts.ts';
+import { createSeatAccount, disableSeatAccount, listSeatAccounts, resetSeatPassword, type SeatPeople, type SeatPasswords } from './seat-accounts.ts';
 
 const MESSAGE: Record<string, string> = {
   'missing-person': '没有可授权的人。',
@@ -7,6 +7,7 @@ const MESSAGE: Record<string, string> = {
   'missing-hash': '请设定密码。',
   'person-write-failed': '人员没有写入，已停止。',
   'password-write-failed': '口令没有写入，已停止。',
+  'accounts-unavailable': '账号没有读取。',
 };
 
 function fail(error: string): { ok: false; message: string } {
@@ -18,6 +19,11 @@ export async function runSeatCommand(
   passwords: SeatPasswords,
   intent: SeatAccountIntent,
 ): Promise<SeatAccountReply> {
+  if (intent.action === 'list') {
+    const listed = await listSeatAccounts(people, passwords);
+    if (!listed.ok) return fail(listed.error);
+    return { ok: true, action: 'list', seats: listed.seats };
+  }
   if (intent.action === 'disable') {
     const disabled = await disableSeatAccount(people, intent);
     if (!disabled.ok) return fail(disabled.error);

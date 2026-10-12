@@ -93,5 +93,24 @@ export function createSubjectBindingPeople(sql: Sql): SeatPeople {
         return { ok: true as const };
       }, FAILED);
     },
+    list() {
+      return protect(sql, async () => {
+        const result = await sql.query(
+          `SELECT binding_id, subject, enabled
+           FROM backend_identity.subject_bindings
+           WHERE provider='synthetic' AND tenant='synthetic-tenant' AND role='agent'
+           ORDER BY binding_id`,
+        );
+        const people: { displayName: string; bindingId: string; enabled: boolean }[] = [];
+        for (const row of result.rows) {
+          const bindingId = row.binding_id;
+          const displayName = row.subject;
+          const enabled = row.enabled;
+          if (typeof bindingId !== 'string' || typeof displayName !== 'string' || typeof enabled !== 'boolean') continue;
+          people.push({ displayName, bindingId, enabled });
+        }
+        return { ok: true as const, people };
+      }, FAILED);
+    },
   };
 }
