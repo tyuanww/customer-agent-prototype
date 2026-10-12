@@ -90,12 +90,16 @@ describe('frozen standard CSV parser', () => {
   it.each([
     [0, 'EXAMPLE_01', 'INVALID_ID', 'F'], [7, 'unknown', 'INVALID_STATE', 'M'],
     [8, '2026-02-30T00:00:00Z', 'INVALID_TIME', 'N'], [10, 'wrong family', 'INVALID_FAMILY', 'P'],
-    [13, '必要图片', 'UNRESOLVED_MEDIA', 'S'], [14, 'true', 'BRAND_OVERRIDE', 'T'], [2, '过敏请核对', 'ALLERGY_BODY', 'H'],
+    [13, '必要图片', 'UNRESOLVED_MEDIA', 'S'], [14, 'true', 'BRAND_OVERRIDE', 'T'],
   ] as const)('reuses the workbook business rule for field %i', (index, value, code, col) => {
     const row = faq(); row[index] = value;
     const parsed = parseCsv(createCsvTemplate(context, [{ faq: row }]), context);
     expect(parsed.issues).toContainEqual(expect.objectContaining({ code, row: 2, column: col }));
     expect(parsed.rows).toEqual([]);
+  });
+  it('accepts reviewed allergy wording without a stop-and-confirm phrase', () => {
+    const row = faq(); row[2] = '过敏请核对';
+    expect(parseCsv(createCsvTemplate(context, [{ faq: row }]), context).ok).toBe(true);
   });
   it('requires a real activity expiry and a forward time window', () => {
     const selected = { ...context, domain: 'campaign' as const }, row = faq();
