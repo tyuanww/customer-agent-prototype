@@ -25,6 +25,7 @@ it('keeps IDs and original batch in Main; preview unsaved, unknown retry exact, 
   const writes=f.requests.filter(r=>r.path==='/v1/intake/grants');expect(writes).toHaveLength(2);expect(writes[0]).toEqual(writes[1]);expect(writes[0]!.method).toBe('POST');
   expect([...f.receipts.keys()]).toEqual([(writes[0]!.body as {operationId:string}).operationId]);
   const current=await main.command({action:'refresh'});await expect(main.command(f.command(view.people[0]!.selection))).rejects.toThrow();expect(current.grants[0]!.canRevoke).toBe(true);
+  expect(current.grants[0]!.personSelection).toBe(current.people[0]!.selection);
  }finally{main.dispose();}
 });
 it('rejects retry without a pending operation as a typed conflict',async()=>{
@@ -133,7 +134,7 @@ it('keeps the exact revoke operation through stop, forbidden retry, then receipt
 it('revokes an identifiable grant record after its current name disappears without exposing hidden identity',async()=>{
  const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session);
  try{const initial=await main.command({action:'refresh'});await main.command(f.command(initial.people[0]!.selection));await main.command({action:'save'});
-  f.hidePerson();const view=await main.command({action:'refresh'});expect(view.people).toEqual([]);expect(view.grants[0]).toMatchObject({person:'当前姓名不可用',reference:'created-business',canRevoke:true});
+  f.hidePerson();const view=await main.command({action:'refresh'});expect(view.people).toEqual([]);expect(view.grants[0]).toMatchObject({person:'当前姓名不可用',personSelection:null,reference:'created-business',canRevoke:true});
   expect(JSON.stringify(view)).not.toContain('registered-agent');await main.command({action:'revoke',selection:view.grants[0]!.selection,reason:'合成离职撤销'});expect(f.grants[0]!.revokedAt).not.toBeNull();
  }finally{main.dispose();}
 });

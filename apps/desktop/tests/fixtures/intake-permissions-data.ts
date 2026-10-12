@@ -2,7 +2,7 @@ import type { components } from '@customer-agent/contracts';
 import type { IntakeUsageSession } from '../../src/main/content-intake-usage';
 import { ProductHttpError } from '../../src/main/product-http';
 type C=components['schemas'];
-export function intakePermissionsData() {
+export function intakePermissionsData(mayAllocate: readonly C['IntakeAction'][] = ['query']) {
  const until=new Date(Date.now()+60000).toISOString();
  const scope:C['IntakeSourceScope']={tenantId:'tenant-a',appId:'app-a',brandId:'brand-a',shopId:'shop-a',sourceId:'source-a',domain:'product'};
  const source:C['IntakeSource']={scope,version:1,templateVersion:'faq-p1.1',ruleVersion:'intake-p1.1',mappingVersion:'mapping-1',structureDigest:'a'.repeat(64),contentIntakeMode:'v2-preview',modeVersion:1};
@@ -14,7 +14,7 @@ export function intakePermissionsData() {
   request:async(_epoch,path,options)=>{
    requests.push({path,method:(options as {method?:string}).method,body:options.body});let value:unknown;
    if(path.startsWith('/v1/intake/authorization'))value={factsVersion:1,revocationGeneration:0,policyVersion:1,validUntil:until,
-    capabilities:[{scope,actions:[],mayAllocate:['query'],mayDelegate:[],validUntil:until}],nextCursor:null};
+    capabilities:[{scope,actions:[],mayAllocate:[...mayAllocate],mayDelegate:[],validUntil:until}],nextCursor:null};
    else if(path.startsWith('/v1/intake/sources?'))value={items:[source],nextCursor:null};
    else if(path.startsWith('/v1/intake/principals?'))value={items:omitPerson?[]:[person],nextCursor:null};
    else if(path==='/v1/intake/grants/preview' || (path==='/v1/intake/grants' && options.body)){

@@ -12,7 +12,7 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
   useEffect(() => { onDirty('rollback-input', !!base || !!target); return () => onDirty('rollback-input', false); }, [base, target, onDirty]);
   useEffect(() => { if (impact) { setBase(''); setTarget(''); } }, [impact]);
   const reset = () => { setBase(''); setTarget(''); apply({ action: 'rollback-discard' }); };
-  return <section aria-label="已发布目录纠正回退">
+  return <section aria-label="已发布目录纠正回退" tabIndex={-1}>
     <h2>纠正已发布内容</h2><p>回退影响整个发布目录，不是只撤销某个店铺。先查看全部影响范围，发布前由系统弹窗再次确认。</p>
     {rollback.pending && <div className="intake-notice" aria-label="待恢复回退操作"><h3>回退操作结果待确认</h3>
       <p>请恢复原操作。确认最终结果前，不能更换计划或创建新的发布操作。</p>

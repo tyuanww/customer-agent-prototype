@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles/tokens.css';
 import './styles/app.css';
 import { App } from './App';
+import { installIntakeReviewBridge } from './intake-review-bridge';
 import { resolveDashboardTheme, systemPrefersDark } from './lib/dashboard-appearance';
 import { readRoleFromLocation } from './lib/window-role';
 
@@ -11,6 +12,7 @@ if (!root) {
   throw new Error('Root element not found');
 }
 
+installIntakeReviewBridge();
 const rendererRole = readRoleFromLocation();
 document.documentElement.dataset.role = rendererRole;
 

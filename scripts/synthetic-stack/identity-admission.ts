@@ -112,6 +112,18 @@ export function loadPasswordAccounts(file: string): Map<string, PasswordAccount>
   return accounts;
 }
 
+/**
+ * Reads the account file for one password check. A missing or broken file refuses
+ * this attempt. Callers must not keep a previous map and use it as a fallback.
+ */
+export function reloadPasswordAccounts(file: string): Map<string, PasswordAccount> | null {
+  try {
+    return loadPasswordAccounts(file);
+  } catch {
+    return null;
+  }
+}
+
 /** scrypt + constant-time compare. Never compares the submitted password as text. */
 export function passwordMatches(account: PasswordAccount, password: string): boolean {
   const actual = scryptSync(password, account.salt, 64);

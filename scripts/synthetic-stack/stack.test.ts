@@ -5,6 +5,7 @@ import os, { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
+import { createPasswordIdentityServer } from './password-identity-server.ts';
 import { buildAccount, isAdmittedHost, loadPasswordAccounts } from './identity-admission.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
@@ -354,6 +355,46 @@ describe('synthetic identity password', () => {
     }
   });
 
+  it('uses a password written after startup and refuses a broken file', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    const first = 'password-before-reload';
+    const second = 'password-after-reload';
+    const postPassword = async (origin: string, username: string, password: string) => fetch(`${origin}/password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_agent', 'synthetic_agent', first),
+    ]));
+    try {
+      const provider = createIdentityProvider({ port, accountsFile });
+      const origin = await provider.listen();
+      try {
+        assert.equal((await postPassword(origin, 'synthetic_agent', first)).status, 200);
+        writeFileSync(accountsFile, JSON.stringify([
+          buildAccount('synthetic_agent', 'synthetic_agent', second),
+        ]));
+        assert.equal((await postPassword(origin, 'synthetic_agent', first)).status, 401);
+        assert.equal((await postPassword(origin, 'synthetic_agent', second)).status, 200);
+        writeFileSync(accountsFile, '{');
+        assert.equal((await postPassword(origin, 'synthetic_agent', second)).status, 503);
+        writeFileSync(accountsFile, JSON.stringify([
+          buildAccount('synthetic_agent', 'synthetic_agent', second),
+          buildAccount('seatok', 'synthetic_seatok', 'seat-password'),
+        ]));
+        assert.equal((await postPassword(origin, 'seatok', 'seat-password')).status, 401);
+        assert.equal((await postPassword(origin, 'synthetic_agent', second)).status, 200);
+      } finally {
+        await provider.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('refuses to start when the account file is absent, instead of seeding a default', async () => {
     const port = await freeLoopbackPort();
     const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-accounts-'));
@@ -362,6 +403,52 @@ describe('synthetic identity password', () => {
         () => createIdentityProvider({ port, accountsFile: path.join(dir, 'absent.json') }),
         /identity accounts file is missing/,
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('password identity server reload', () => {
+  it('accepts a seat password written after startup and refuses a broken file', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'password-identity-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    const first = 'server-password-before';
+    const second = 'server-password-after';
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_agent', 'synthetic_agent', first),
+    ]));
+    const postPassword = (username: string, password: string) => fetch(`http://127.0.0.1:${String(port)}/password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    try {
+      const server = createPasswordIdentityServer({ port, accountsFile });
+      await server.listen();
+      try {
+        assert.equal((await postPassword('synthetic_agent', first)).status, 200);
+        writeFileSync(accountsFile, JSON.stringify([
+          buildAccount('synthetic_agent', 'synthetic_agent', second),
+          buildAccount('seatok', 'synthetic_seatok', 'seat-password'),
+        ]));
+        assert.equal((await postPassword('synthetic_agent', first)).status, 401);
+        const seated = await postPassword('seatok', 'seat-password');
+        assert.equal(seated.status, 200);
+        const issued = await seated.json() as { code: string };
+        const exchanged = await fetch(`http://127.0.0.1:${String(port)}/exchange`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code: issued.code }),
+        });
+        assert.equal(exchanged.status, 200);
+        assert.deepEqual(await exchanged.json(), { provider: 'synthetic', binding_id: 'synthetic_seatok' });
+        writeFileSync(accountsFile, '{');
+        assert.equal((await postPassword('seatok', 'seat-password')).status, 503);
+      } finally {
+        await server.close();
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

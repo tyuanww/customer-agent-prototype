@@ -48,17 +48,17 @@ test('director previews without saving, grants a named seat query access, then r
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-    await dashboard.getByRole('group', { name: '内容管理工作区' }).getByRole('button', { name: '权限配置', exact: true }).click();
+    await dashboard.getByRole('tab', { name: '权限', exact: true }).click();
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
     await panel.getByRole('combobox', { name: '人员', exact: true }).selectOption({ label: '合成坐席' });
-    await panel.getByRole('checkbox', { name: '查询复制', exact: true }).check();
+    await expect(panel.getByRole('combobox', { name: '岗位', exact: true })).toHaveValue('客服');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.setSize(980, 680));
     for (const theme of ['light','dark'] as const) {
       await dashboard.getByTestId('dashboard-theme-trigger').click();
       await dashboard.getByTestId(`dashboard-theme-${theme}`).click();
       await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', theme);
       await expect.poll(() => panel.getByRole('combobox', { name: '人员', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(28, 27, 32)':'rgb(255, 255, 255)');
-      await expect(panel.getByRole('checkbox', { name: '查询复制', exact: true })).toBeVisible();
+      await expect(panel.getByRole('combobox', { name: '岗位', exact: true })).toBeVisible();
       expect(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await dashboard.screenshot({ path: path.join(evidence, `permissions-${theme}.png`) });
     }

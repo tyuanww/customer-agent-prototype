@@ -1,5 +1,6 @@
 import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
+import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import {
   useCallback,
   useMemo,
@@ -15,14 +16,14 @@ import {
 import {
   DASHBOARD_MANIFEST,
   DASHBOARD_NAV,
-  nextDashboardNavId,
   type DashboardModuleId,
+  type DashboardNavItem,
   type DomainId,
 } from './data/dashboard-manifest';
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { ContentModule } from './features/dashboard/ContentModule';
-import { DashboardChromeIcon, DashboardNavIcon } from './features/dashboard/DashboardIcons';
+import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
 import { OverviewModule } from './features/dashboard/OverviewModule';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
@@ -66,6 +67,42 @@ import {
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
 
+type SidebarDestination = DashboardModuleId | 'permissions';
+
+type SidebarItem = {
+  id: SidebarDestination;
+  label: string;
+  group: DashboardNavItem['group'];
+};
+
+function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
+  if (!canOpenPermissions) return DASHBOARD_NAV;
+  const items: SidebarItem[] = [];
+  for (const item of DASHBOARD_NAV) {
+    items.push(item);
+    if (item.id === 'content') items.push({ id: 'permissions', label: '权限', group: '治理与架构' });
+  }
+  return items;
+}
+
+function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
+  if (id === 'permissions') return 'review';
+  return id;
+}
+
+function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
+  if (!canOpenPermissions) return 'content';
+  const location = window.location;
+  const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'content';
+  return new URLSearchParams(location.search).get('page') === 'permissions' ? 'permissions' : 'content';
+}
+
+function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
+  const index = items.findIndex((item) => item.id === active);
+  return items[(index + delta + items.length) % items.length].id;
+}
+
 type NavTooltipState = {
   key: string;
   label: string;
@@ -89,8 +126,9 @@ export function DashboardApp() {
 /** Both profiles share native chrome and appearance. Only the selected profile
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
-  const navItems = DASHBOARD_NAV;
-  const [active, setActive] = useState<DashboardModuleId>(profile === 'intake' ? 'content' : 'overview');
+  const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
+  const navItems = sidebarItems(canOpenPermissions);
+  const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [signedIn, setSignedIn] = useState(false);
@@ -994,14 +1032,14 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   };
 
   const move = (delta: number) => {
-    const nextId = nextDashboardNavId(active, delta, navItems);
+    const nextId = nextSidebarDestination(active, delta, navItems);
     setActive(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
     });
   };
 
-  const focusModule = (moduleId: DashboardModuleId) => {
+  const focusModule = (moduleId: SidebarDestination) => {
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${moduleId}`)?.focus();
     });
@@ -1172,7 +1210,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
                     }
                   }}
                 >
-                  <span className="dashboard-nav-icon"><DashboardNavIcon id={item.id} /></span>
+                  <span className="dashboard-nav-icon"><DashboardNavIcon id={sidebarIcon(item.id)} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
                 </button>
               </div>
@@ -1257,7 +1295,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           {profile === 'intake' ? <>
             {active === 'overview' && <section className="dash-module" data-testid="module-overview">
               <header className="dash-module-head"><h1>管理概览</h1></header>
-              <p>资料上传、检查与确认发布在内容管理中完成，总监和经理可在其中配置权限。</p>
+              <p>资料上传、检查与确认发布在内容管理中完成。{canOpenPermissions ? '岗位授权在侧栏的权限。' : null}</p>
               <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开内容管理</button>
                 <button className="dash-reset" onClick={() => setActive('wording')}>浏览可用话术</button></div>
               <p className="dash-scope">经营统计与待办指标未接入。</p>
@@ -1268,6 +1306,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             </section>}
             <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
             {keepContent || active === 'content' ? <div hidden={active !== 'content'}><IntakeManagement /></div> : null}
+            {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
           </> : <>
             {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
             {active === 'wording' ? (

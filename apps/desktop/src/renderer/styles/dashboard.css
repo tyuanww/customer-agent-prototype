@@ -717,7 +717,7 @@ html[data-role='dashboard'][data-dashboard-theme='dark'],
   height: 18px;
   margin: 10px 10px 4px 16px;
   color: var(--dash-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 18px;
   letter-spacing: 0.12em;

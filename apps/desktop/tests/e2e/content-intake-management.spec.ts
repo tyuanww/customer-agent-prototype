@@ -62,6 +62,12 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.getByRole('button', { name: /source-a/ }).click();
+    await dashboard.getByRole('button', { name: '查看材料' }).click();
+    await dashboard.getByRole('textbox', { name: '来源版本' }).fill('synthetic-v1');
+    await dashboard.getByRole('textbox', { name: '来源确认说明' }).fill('已核对合成资料');
+    await dashboard.getByRole('button', { name: '确认来源版本' }).click();
+    await expect(dashboard.getByRole('textbox', { name: '来源版本' })).toHaveCount(0);
+    await expect(dashboard.getByRole('button', { name: '发起组织审批' })).toHaveCount(0);
     await dashboard.getByRole('button', { name: '读取初检' }).click();
     await expect(dashboard.getByRole('button', { name: '提交本轮人工检查' })).toBeDisabled();
     await dashboard.getByRole('button', { name: '冻结本次抽样' }).click();
@@ -76,6 +82,7 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     expect(cancelledClose).toEqual({ messages: ['操作结果尚未确定或请求仍在处理。', '操作结果尚未确定或请求仍在处理。'], alive: true });
     await dashboard.getByRole('button', { name: '查询原操作回执' }).click();
     await dashboard.getByRole('button', { name: '刷新候选' }).click();
+    await dashboard.getByRole('button', { name: '查看材料' }).click();
     await dashboard.getByRole('button', { name: '读取初检' }).click();
     for (let i = 1; i <= 2; i++) {
       const card = dashboard.getByRole('article').filter({ has: dashboard.getByRole('heading', { name: `合成洁面 ${i}` }) });
@@ -90,12 +97,7 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
       .getByRole('status').filter({ hasText: /^操作回执：/ })).toContainText('质量检查通过');
     // Exercise actual preload -> Main -> native dialog adapter -> HTTP. The
     // Electron dialog response is controlled here; this is not OS click proof.
-    await dashboard.getByRole('button', { name: '查看材料' }).click();
-    await dashboard.getByRole('textbox', { name: '来源版本' }).fill('synthetic-v1');
-    await dashboard.getByRole('textbox', { name: '来源确认说明' }).fill('已核对合成资料');
-    await dashboard.getByRole('button', { name: '确认来源版本' }).click();
-    await expect(dashboard.getByRole('textbox', { name: '来源版本' })).toHaveValue('');
-    await expect(dashboard.getByRole('button', { name: '发起组织审批' })).toHaveCount(0);
+    await dashboard.getByRole('button', { name: '刷新候选状态' }).click();
     await dashboard.getByRole('textbox', { name: '发布标题' }).fill('合成确认发布');
     await dashboard.getByRole('textbox', { name: '发布摘要' }).fill('本机合成确认验证');
     await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async (_window, options) => {

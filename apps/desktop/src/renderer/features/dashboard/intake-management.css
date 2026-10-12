@@ -12,12 +12,19 @@
 .intake-management button:not(.dash-action-primary) { border: 1px solid var(--dash-control-line); background: var(--dash-surface); color: var(--dash-ink); }
 .intake-management button:not(.dash-action-primary):hover:not(:disabled) { background: var(--dash-chrome-hover); }
 .intake-management button:not(.dash-action-primary):active:not(:disabled) { background: var(--dash-chrome-pressed); }
-.intake-workspace-switch button { min-height: 40px; }
-.intake-workspace-switch button[aria-pressed=true] { background: var(--dash-chrome-selected); border-color: var(--dash-purple); }
 .intake-management button:disabled { cursor: not-allowed; }
 .intake-management button:not(.dash-action-primary):disabled { background: var(--dash-disabled-bg); color: var(--dash-disabled-ink); border-color: var(--dash-line); }
 .intake-management button.intake-danger:not(:disabled) { color: var(--dash-danger); border-color: var(--dash-danger-line); background: var(--dash-danger-bg); }
 .intake-management :is(select, textarea, input:not([type=checkbox])) { min-width: 0; max-width: 100%; padding: 8px 12px; border: 1px solid var(--dash-control-line); border-radius: var(--dash-radius); background: var(--dash-surface); color: var(--dash-ink); font: inherit; font-size: 16px; line-height: 24px; }
+.intake-management input:-webkit-autofill,
+.intake-management input:-webkit-autofill:hover,
+.intake-management input:-webkit-autofill:focus,
+.intake-management input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--dash-ink);
+  caret-color: var(--dash-ink);
+  box-shadow: 0 0 0 1000px var(--dash-surface) inset;
+  transition: background-color 99999s ease-out 0s;
+}
 .intake-management label select { appearance: auto; }
 .intake-management :is(select, textarea, input):disabled { color: var(--dash-disabled-ink); background: var(--dash-disabled-bg); border-color: var(--dash-line); cursor: not-allowed; }
 .intake-management :focus-visible { outline: 2px solid var(--dash-purple); outline-offset: 2px; }
@@ -25,14 +32,24 @@
 .intake-management textarea { flex: 1; min-height: 80px; resize: vertical; }
 .intake-management input:not([type=checkbox]) { flex: 1; }
 .intake-management fieldset { min-width: 0; border: 0; padding: 12px 0 0; margin: 0; }
+.intake-seat-create { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+.intake-seat-create > legend, .intake-seat-create > button { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 760px) { .intake-seat-create { grid-template-columns: 1fr; } }
 .intake-management legend { font-weight: 600; }
 .intake-management details { margin: 12px 0; }
 .intake-management summary { color: var(--dash-purple-strong); }
 .intake-management dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 16px; }
 .intake-management dt { color: var(--dash-muted); }
 .intake-management dd { margin: 0; white-space: pre-wrap; }
-.intake-candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
-.intake-candidates button { display: flex; flex-direction: column; gap: 4px; text-align: left; overflow-wrap: anywhere; }
+.intake-candidate-table { width: 100%; border-collapse: collapse; text-align: left; }
+.intake-candidate-table th, .intake-candidate-table td { border-bottom: 1px solid var(--dash-line); padding: 12px 8px; vertical-align: top; }
+.intake-candidate-table th { font-weight: 600; }
+.intake-candidate-table td button + button { margin-left: 8px; }
+.intake-toolbar[aria-label='候选筛选'] button[aria-pressed=true] {
+  border-color: var(--dash-purple-line);
+  background: var(--dash-chrome-selected);
+  color: var(--dash-ink);
+}
 .intake-card { margin: 16px 0; padding: 16px 0; border-block: 1px solid var(--dash-line); }
 .intake-card h3 { margin-top: 0; }
 .intake-notice, .intake-management [role=alert] { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--dash-line-strong); border-radius: var(--dash-radius); background: var(--dash-surface-subtle); color: var(--dash-ink); }
@@ -56,6 +73,7 @@
 @media (forced-colors: active) {
   .intake-management { color: CanvasText; }
   .intake-management :is(button, select, textarea, input, .intake-notice, [role=alert]) { border-color: ButtonText; background: Canvas; color: CanvasText; }
+  .intake-management input:-webkit-autofill { -webkit-text-fill-color: CanvasText; box-shadow: 0 0 0 1000px Canvas inset; }
   .intake-management :focus-visible { outline-color: Highlight; }
 }
 

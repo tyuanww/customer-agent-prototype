@@ -92,6 +92,8 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/src/main/content-intake-management.ts` / `content-intake-management-ipc.ts` | Dashboard 候选／材料选择、来源权限提示、限时投影与关闭提醒；Main 保管来源确认、发布、取消的精确原操作正文；direct-v1 发布冻结请求后调用默认取消的原生确认，迟到确认受会话／取消代际及当前权限约束；人工质量检查复用 ContentIntakeQuality；新审批命令拒绝，旧审批只读；未知直发查原回执或重试原请求，旧审批发布仅查原回执，成功后另读当前状态 | 仅 FAQ loopback 合成 profile；窄命令不接受 actor/key/操作 ID/URL；来源失权和会话变化清空材料；确认不等于权限或审批通过，旧未知请求不得改写 confirmed 后重发 |
 | `apps/desktop/src/main/content-intake-rollback.ts` | 独占上一版回退计划、影响摘要和精确未知操作恢复；执行前复用 Main 原生确认展示目标与范围；管理模块拥有会话、取消和有效期，renderer 只传版本选择与操作意图；旧审批历史可读但不续期 | 仅 FAQ 合成 profile；回退是新的确认发布，不直接还原 current；旧未知审批请求只查原回执；权限不足只展示有权范围和纠正上传入口 |
 | `apps/desktop/src/main/content-intake-permissions.ts` / `content-intake-permissions-ipc.ts` | 内容管理内的业务权限配置；复用完整授权/来源发现与已登记人员目录，持有限时选择句柄、只读预览、精确保存/撤销请求、未知结果恢复及窗口关闭提醒；人员自己的较早截止独立失效 | 仅 FAQ 合成 profile；renderer 不构造主体/范围/操作键；当前姓名不可用的历史授权按记录编号、范围和原原因核对，不猜名字；本片 UI 不新增 delegation/root allocation/接管操作 |
+| `apps/desktop/src/main/seat-account-ipc.ts` | `faq-v2` 的 `dashboard:seats-command`：把 list/create/reset/disable 意图交给合成栈运行脚本；人员进 `customer_agent_synthetic`，口令只写 salt/哈希 | 仅 `contentIntake === "faq-v2"`；renderer 不持主体 ID；43101 每次重读口令文件，读失败 503，仍不交换新建坐席；`preview=intake` 不走这条 IPC |
+| `apps/desktop/src/shared/seat-account-intent.ts` | `isSeatAccountIntent`、`seatAccountReply`、`SeatAccountApi`、`SeatAccountRecord`（`displayName`、`username`、`post`、`enabled`） | 只校验四种意图的字段形状；登录名正则在合成栈 `seatUsername` |
 | `apps/api/src/content-intake/discovery.ts` managementContext | 在原内容事务和发布锁内投影当前来源版本、本人 principal、事实版本、发布基线及最早有效期；只允许当前来源 import，receive 重新验权并比较版本 | 只读输入提示，不是资格、租约或提交票据；仅隔离宿主注册，不从 userId 推断主体或把未知基线当空值 |
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；合成宿主显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；标签不由账号推导，缺失整页失败；目录不是授权或同一时刻快照，不新增姓名表或真实员工读取 |
@@ -281,7 +283,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。`main@4739c39` 的 CI run `37024571842` 已通过，当时 `pnpm check:architecture` 对 303 个源码/配置文件报告 0 个依赖方向违规；本轮统一工作台检查为 389 个文件、0 违规，`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 恢复原五模块导航：`IntakeManagement` 在导航切换间保留上传/发布/权限表单；同一常驻 `IntakeLibrary` 投影话术库与当前可用版本。概览只有实际导航，SOP/经营统计/软件更新显示未接入，不订阅旧 `dashboardContent`、公告或目录适配器。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。
+FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 恢复原五模块导航：`IntakeManagement` 在导航切换间保留上传/发布/权限表单；同一常驻 `IntakeLibrary` 投影话术库与当前可用版本。`faq-v2` 在「内容管理」后增加侧栏「权限」，不进入 `DASHBOARD_MODULE_IDS`。上文 ASCII 仍画一期五项，那是旧工作台，不是这条合成页。概览只有实际导航，SOP/经营统计/软件更新显示未接入，不订阅旧 `dashboardContent`、公告或目录适配器。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。字段见[资料页与权限页](reference-intake-pages.md)。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 
