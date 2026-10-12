@@ -209,7 +209,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
     await expect(dashboard.getByRole('button', { name: '发起组织审批', exact: true })).toHaveCount(0);
-    await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeDisabled();
+    await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toHaveCount(0);
     await dashboard.getByRole('button', { name: '读取初检', exact: true }).click();
     await dashboard.getByRole('button', { name: '冻结本次抽样', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '操作回执：' })).toBeVisible();
@@ -247,7 +247,6 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await material.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-revision-v2.png') });
     await confirmSourceAndCheck(2);
-    await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;

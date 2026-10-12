@@ -60,12 +60,14 @@ export class ContentIntakePermissions {
   private fresh() { return !!this.access && Date.now()<Date.parse(this.access.validUntil) && performance.now()<this.deadline; }
   closeRisk() { return !!this.pending || !!this.preview || !!this.active; }
   view(): IntakePermissionView {
-    const fresh = this.fresh(), names = new Map(this.people.filter(p=>this.personFresh(p)).map(p=>[p.principalId,p.displayLabel]));
+    const fresh = this.fresh(), named = this.people.filter(p=>this.personFresh(p));
+    const names = new Map(named.map(p=>[p.principalId,p.displayLabel]));
+    const selections = new Map(named.map(p=>[p.principalId,p.selection]));
     return { signedIn:this.session.view().signedIn,available:fresh && this.sources.length>0,busy:!!this.active,
       validUntil:fresh ? this.access!.validUntil:null,sources:fresh?this.sources.map(s=>({selection:s.selection,label:label(s.source.scope)})):[],
-      source:fresh?this.selected?.selection??null:null,people:fresh?this.people.filter(p=>this.personFresh(p)).map(p=>({selection:p.selection,label:p.displayLabel})):[],
+      source:fresh?this.selected?.selection??null:null,people:fresh?named.map(p=>({selection:p.selection,label:p.displayLabel})):[],
       actions:fresh?this.selected?.actions??[]:[],grants:fresh?this.grants.map(({selection,grant:g})=>({selection,reference:g.grantId,startsAt:g.startsAt,reason:g.reason,
-        person:names.get(g.recipientPrincipalId)??'当前姓名不可用',action:g.action,scope:label(g.scope),expiresAt:g.expiresAt,
+        person:names.get(g.recipientPrincipalId)??'当前姓名不可用',personSelection:selections.get(g.recipientPrincipalId)??null,action:g.action,scope:label(g.scope),expiresAt:g.expiresAt,
         revoked:g.revokedAt!==null,canRevoke:g.kind==='business' && g.revokedAt===null})):[],
       preview:fresh && performance.now()<this.previewDeadline?this.previewView:null,pending:!!this.pending,
       resultUnknown:!!this.pending && (this.pending.uncertain || !!this.active),notice:this.notice };

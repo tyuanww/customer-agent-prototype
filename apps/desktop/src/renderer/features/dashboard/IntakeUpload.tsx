@@ -45,7 +45,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {view.sources.map(source => <option key={source.selection} value={source.selection}>{({product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'})[source.domain]} · {source.label}</option>)}
     </select></label>
     <div className="intake-toolbar">
-      <button className={!view.file ? 'dash-action-primary' : undefined} disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</button>
+      <button disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</button>
       {(view.sourceSelection || view.canReset) && <button disabled={disabled || !view.canReset} onClick={() => {
         if ((!view.file && !view.revisionOf) || window.confirm('放弃本地上传准备？已经提交的服务端任务不会因此撤销，原候选也不会因此取消。')) apply({ action: 'upload-reset' });
       }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</button>}
@@ -70,7 +70,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       </div>
       <label className="intake-confirmation"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
         <span>我已核对整理责任人及全部实际改稿人</span></label>
-      <button className="dash-action-primary" disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</button>
+      <button disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</button>
     </fieldset>}
     {view.pending && <div className="intake-notice" role="status">
       <p>{view.pending === 'upload' ? '文件上传' : '校验任务提交'}结果尚未确定。重试沿用原文件和原请求，不会换一个操作编号。</p>
@@ -80,7 +80,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {view.canStop && <button disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</button>}
       {view.canRefresh && <button disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</button>}
       {view.canSaveReport && <button disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</button>}
-      {view.canOpen && <button className="dash-action-primary" disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</button>}
+      {view.canOpen && <button disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</button>}
     </div>
     {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；形成候选后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">

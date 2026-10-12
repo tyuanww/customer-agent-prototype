@@ -1,5 +1,6 @@
 import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
+import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
@@ -95,6 +96,7 @@ if (!gotLock) {
   let productAnnounce: ProductAnnounce | null = null;
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
   let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
+  let seatAccounts: ReturnType<typeof registerSeatAccountIpc> | null = null;
   let disposeIntakeCatalog: (() => void) | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
   let pendingSecondInstance = false;
@@ -130,6 +132,7 @@ if (!gotLock) {
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
     intakePermissions?.dispose(); intakePermissions = null;
+    seatAccounts?.dispose(); seatAccounts = null;
     disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
     disposeIntakeQuery?.(); disposeIntakeQuery = null;
     void productSession?.shutdown();
@@ -258,6 +261,10 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakePermissions = registerContentIntakePermissionsIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+    seatAccounts = registerSeatAccountIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+      () => productProfile?.contentIntake === 'faq-v2');
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,

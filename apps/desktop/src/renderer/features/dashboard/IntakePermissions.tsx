@@ -1,12 +1,110 @@
 import { useEffect, useRef, useState } from 'react';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionView } from '@shared/content-intake-permissions';
+import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 import { formatIntakeTime } from './intake-time';
+
+function SeatAccounts({ disabled }: { disabled: boolean }) {
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [post, setPost] = useState<IntakePost>(DEFAULT_INTAKE_POST);
+  const [rows, setRows] = useState<SeatAccountRecord[]>([]);
+  const [resetting, setResetting] = useState('');
+  const [nextPassword, setNextPassword] = useState('');
+  const [disabling, setDisabling] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+  const flight = useRef(false);
+  const listGeneration = useRef(0);
+  const blocked = disabled || busy;
+  const send = async (intent: SeatAccountIntent): Promise<SeatAccountReply | null> => {
+    const api = window.dashboardSeats;
+    if (!api) { setProblem('账号暂不可用。'); return null; }
+    if (flight.current) return null;
+    flight.current = true;
+    setBusy(true); setProblem('');
+    try {
+      const reply = await api.command(intent);
+      if (!reply.ok) { setProblem(reply.message); return null; }
+      return reply;
+    } catch {
+      setProblem('账号暂不可用。');
+      return null;
+    } finally { flight.current = false; setBusy(false); }
+  };
+  const create = async () => {
+    const reply = await send({ action: 'create', displayName: name.trim(), username: username.trim(), password, post });
+    if (reply === null || !reply.ok || reply.action !== 'create') return;
+    listGeneration.current += 1;
+    setRows(current => [...current, reply.seat]);
+    setName(''); setUsername(''); setPassword(''); setPost(DEFAULT_INTAKE_POST);
+  };
+  const reset = async (login: string) => {
+    const reply = await send({ action: 'reset', username: login, password: nextPassword });
+    if (reply === null || !reply.ok || reply.action !== 'reset') return;
+    setNextPassword(''); setResetting('');
+  };
+  const disable = async (login: string) => {
+    const reply = await send({ action: 'disable', username: login });
+    if (reply === null || !reply.ok || reply.action !== 'disable') return;
+    setRows(current => current.map(row => row.username === login ? { ...row, enabled: false } : row));
+    setDisabling('');
+  };
+  const choose = (value: string) => {
+    if (!isIntakePost(value)) { setProblem('请选择岗位。'); return; }
+    setPost(value);
+  };
+  useEffect(() => {
+    const api = window.dashboardSeats;
+    if (!api) { setProblem('账号暂不可用。'); return; }
+    const generation = ++listGeneration.current;
+    let alive = true;
+    void api.command({ action: 'list' }).then(reply => {
+      if (!alive || generation !== listGeneration.current) return;
+      if (!reply.ok) { setProblem(reply.message); return; }
+      if (reply.action === 'list') setRows(reply.seats);
+    }).catch(() => { if (alive) setProblem('账号暂不可用。'); });
+    return () => { alive = false; };
+  }, []);
+  return <section>
+    {problem && <p role="alert">{problem}</p>}
+    <fieldset className="intake-seat-create" disabled={blocked}><legend>新建外包坐席</legend>
+      <label>姓名<input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></label>
+      <label>登录名<input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></label>
+      <label>密码<input aria-label="密码" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
+      <label>岗位<select aria-label="坐席岗位" value={post} onChange={event => choose(event.target.value)}>{INTAKE_POSTS.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+      <button disabled={!name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</button>
+    </fieldset>
+    <h2>已有外包坐席</h2>
+    <table className="intake-candidate-table" aria-label="外包坐席"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
+      {rows.map(row => <tr key={row.username}>
+        <td>{row.displayName}</td>
+        <td>{row.username}</td>
+        <td>{row.post}</td>
+        <td>{row.enabled ? '使用中' : '已停用'}
+          {row.enabled && resetting !== row.username && <button disabled={blocked} onClick={() => { setResetting(row.username); setNextPassword(''); setDisabling(''); }}>重置</button>}
+          {row.enabled && resetting === row.username && <span>
+            <label>新密码<input aria-label="重置密码" type="password" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label>
+            <button disabled={blocked || nextPassword.length === 0} onClick={() => void reset(row.username)}>确认重置</button>
+            <button disabled={blocked} onClick={() => { setResetting(''); setNextPassword(''); }}>取消</button>
+          </span>}
+          {row.enabled && disabling !== row.username && <button disabled={blocked} onClick={() => { setDisabling(row.username); setResetting(''); setNextPassword(''); }}>停用</button>}
+          {row.enabled && disabling === row.username && <span>
+            <button className="intake-danger" disabled={blocked} onClick={() => void disable(row.username)}>确认停用</button>
+            <button disabled={blocked} onClick={() => setDisabling('')}>取消</button>
+          </span>}
+        </td>
+      </tr>)}
+    </tbody></table>
+  </section>;
+}
 export function IntakePermissions({ active }: { active: boolean }) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [person,setPerson]=useState(''),[actions,setActions]=useState<IntakePermissionView['actions']>([]);
+  const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
-  const generation=useRef(0),pending=useRef(false),started=useRef(false);
+  const generation=useRef(0),pending=useRef(false);
   const apply=async(command?:IntakePermissionCommand)=>{
     if(pending.current && command?.action!=='stop')return;
     const gen=++generation.current;pending.current=true;setBusy(true);setError('');
@@ -17,16 +115,39 @@ export function IntakePermissions({ active }: { active: boolean }) {
     finally{if(gen===generation.current){pending.current=false;setBusy(false);}}
   };
   useEffect(()=>{
-    if(!active || started.current)return;started.current=true;void apply({action:'refresh'});
-  },[active]);
+    // 切走再回来时页面仍挂着。再读一次会清掉还没保存的预览。
+    if(!active || view)return;
+    const gen=++generation.current;
+    let alive=true;
+    void (async()=>{
+      try{const api=window.dashboardPermissions;if(!api)throw new Error('unavailable');
+        const reply=await api.command({action:'refresh'});
+        if(!alive || gen!==generation.current)return;
+        setView(reply.view);if(!reply.ok)setError(reply.message);
+      }catch{if(alive && gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}}
+    })();
+    return()=>{alive=false;};
+  },[active,view]);
   useEffect(()=>{
     const api=window.dashboardPermissions;if(!api)return;
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
   },[]);
-  useEffect(()=>{setPerson('');setActions([]);setRevoke('');setRevokeReason('');},[view?.source]);
+  useEffect(()=>{setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');},[view?.source]);
   useEffect(()=>{if(!view?.validUntil)return;const timer=setTimeout(()=>void apply(),Math.max(0,Date.parse(view.validUntil)-Date.now()));return()=>clearTimeout(timer);},[view?.validUntil]);
   useEffect(()=>()=>{generation.current++;},[]);
   const disabled=busy || !!view?.busy || !!view?.pending;
+  const offered=intakePostsCoveredBy(view?.actions??[]);
+  const chosen=offered.includes(post)?post:undefined;
+  const previewPost=()=>{
+    if(!chosen){setError('当前范围没有可授予的岗位。');return;}
+    const mapped=actionsForIntakePost(chosen);
+    if(!mapped.ok){setError('未知岗位。');return;}
+    void apply({action:'preview',person,actions:[...mapped.actions],startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason});
+  };
+  const choosePost=(value:string)=>{
+    if(!isIntakePost(value)){setError('未知岗位。');return;}
+    setPost(value);
+  };
   return <section className="intake-management" aria-label="权限配置">
     <header><div><h1>权限配置</h1><p>总监、经理在已获分配资格的范围内直接配置业务权限，无需审批。</p></div></header>
     <div className="intake-toolbar"><button disabled={disabled || !!view?.preview} onClick={()=>void apply({action:'refresh'})}>刷新权限列表</button>
@@ -36,19 +157,24 @@ export function IntakePermissions({ active }: { active: boolean }) {
     {view && !view.signedIn && <p>请先登录。</p>}
     {view?.signedIn && !view.available && !view.pending && <p>当前没有可配置范围，或读取资格已到期。请刷新核对。</p>}
     {view?.available && <>
+      <SeatAccounts disabled={disabled} />
       <label>配置范围<select aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
         <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></label>
       {view.source && <>
+        <h2>范围内的人员</h2>
+        <table className="intake-candidate-table" aria-label="人员"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
+          {view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;})}
+        </tbody></table>
+        {!view.people.length && <p>当前没有可选择的人员。</p>}
         {!view.preview ? <fieldset disabled={disabled}><legend>新增业务权限</legend>
           <label>人员<select aria-label="人员" value={person} onChange={e=>setPerson(e.target.value)}><option value="">请选择已确认人员</option>{view.people.map(p=><option key={p.selection} value={p.selection}>{p.label}</option>)}</select></label>
-          {!view.people.length && <p>当前没有可选择的人员。</p>}
-          <div role="group" aria-label="业务动作">{view.actions.map(action=><label key={action}><input type="checkbox" checked={actions.includes(action)} onChange={e=>setActions(current=>e.target.checked?[...current,action]:current.filter(a=>a!==action))}/>{labels[action]}</label>)}</div>
+          <label>岗位<select aria-label="岗位" value={chosen??''} disabled={offered.length===0} onChange={e=>choosePost(e.target.value)}>{!chosen && <option value="">{offered.length===0?'当前范围没有可授予的岗位':'请选择岗位'}</option>}{offered.map(name=><option key={name} value={name}>{name}</option>)}</select></label>
           <label>生效时间<input aria-label="生效时间" type="datetime-local" value={starts} onChange={e=>setStarts(e.target.value)}/></label>
           <label>失效时间<input aria-label="失效时间" type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
           <p>时间按本机时区填写，范围和期限仍由服务器核对。</p>
           <label>授权原因<textarea aria-label="授权原因" maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-          <button disabled={!person || !actions.length || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
-            onClick={()=>void apply({action:'preview',person,actions,startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason})}>预览权限</button>
+          <button disabled={!person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
+            onClick={previewPost}>预览权限</button>
         </fieldset>:<section aria-label="权限预览"><h2>预览 · 尚未保存</h2><p>{view.preview.person} · {view.preview.scope}</p>
           <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatIntakeTime(view.preview.startsAt)} 至 {formatIntakeTime(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
           <div className="intake-toolbar"><button className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</button>

@@ -10,7 +10,7 @@ export type IntakePermissionView = {
   signedIn: boolean; available: boolean; busy: boolean; validUntil: string | null;
   sources: { selection: string; label: string }[]; source: string | null;
   people: { selection: string; label: string }[]; actions: Action[];
-  grants: { selection: string; reference: string; person: string; action: Action; scope: string; startsAt: string; reason: string; expiresAt: string; revoked: boolean; canRevoke: boolean }[];
+  grants: { selection: string; reference: string; person: string; personSelection: string | null; action: Action; scope: string; startsAt: string; reason: string; expiresAt: string; revoked: boolean; canRevoke: boolean }[];
   preview: { person: string; actions: Action[]; scope: string; startsAt: string; expiresAt: string; reason: string } | null;
   pending: boolean; resultUnknown: boolean; notice: string | null;
 };

@@ -19,6 +19,7 @@ import {
   isAdmittedHost,
   loadPasswordAccounts,
   passwordMatches,
+  reloadPasswordAccounts,
 } from './identity-admission.ts';
 
 const MAX_BODY_BYTES = 4_096;
@@ -53,7 +54,9 @@ export function createPasswordIdentityServer(
 ) {
   // Throws when the file is missing or empty, so the process exits instead of
   // accepting a default password. The stack start surfaces this as a failed start.
-  const accounts = loadPasswordAccounts(accountsFile);
+  // /password reloads the file. A later broken file refuses that attempt and does
+  // not fall back to this snapshot. The failure lock stays in this process.
+  loadPasswordAccounts(accountsFile);
   const codes = new Map<string, CodeRow>();
   const failures = new Map<string, { count: number; lockedUntil: number }>();
   const server = createServer((request, response) => {
@@ -82,6 +85,8 @@ export function createPasswordIdentityServer(
         const now = Date.now();
         const fail = failures.get(username);
         if (fail && fail.lockedUntil > now) { send(response, 401, '{"error":"locked"}'); return; }
+        const accounts = reloadPasswordAccounts(accountsFile);
+        if (!accounts) { send(response, 503, '{"error":"accounts_unavailable"}'); return; }
         const account = accounts.get(username);
         if (!account || !passwordMatches(account, password)) {
           const next = { count: (fail?.count ?? 0) + 1, lockedUntil: 0 };
