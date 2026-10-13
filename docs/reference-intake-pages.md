@@ -1,17 +1,17 @@
 # 资料页与权限页
 
-`contentIntake: "faq-v2"` 的工作台在原外壳里打开两张操作页。资料页上传并核对 FAQ 候选。权限页给已有人员授岗位，并新建、重置、停用外包坐席。旧工作台的整库替换不走这两页。
+`contentIntake: "faq-v2"` 的工作台在原外壳里打开知识库和权限页。侧栏 id `content` 的文案是「知识库」，页面是本机人设问答，见[人设知识库](reference-desk-knowledge.md)。权限页给已有人员授岗位，并新建、重置、停用外包坐席。旧工作台的整库替换不走这两页。服务器 FAQ 候选组件 `IntakeManagement` 仍在仓库中，这个 profile 不挂载它。
 
 ## 页面
 
 | 页面 | 侧栏 | 打开条件 |
 | --- | --- | --- |
-| 资料管理 | 内容管理 | `contentIntake === "faq-v2"` |
-| 权限配置 | 内容管理后面的「权限」 | 同上，且 preload 提供 `dashboardPermissions` |
+| 知识库 | 「知识库」（id `content`） | `contentIntake === "faq-v2"` |
+| 权限配置 | 知识库后面的「权限」 | 同上，且 preload 提供 `dashboardPermissions` |
 
 「权限」不是第六个 `DASHBOARD_MODULE_IDS`。没有权限 preload 时侧栏保持原来的五项。
 
-资料页筛选是「待我处理」「已发布」「全部」。表列是名称、范围、状态、下一步、时间。点开一行只显示当前步骤。时间用本机可读时间和 UTC 偏移。
+知识库没有「待我处理 / 已发布 / 全部」这组候选筛选。运营看当前人设的卡片；坐席只看已投递的卡片。权限页时间仍用本机可读时间和 UTC 偏移。
 
 权限页两张表的标题是「已有外包坐席」和「范围内的人员」。新建坐席收集姓名、登录名、密码、岗位。岗位只有下面两种，默认「客服」。
 
@@ -55,6 +55,7 @@ Electron 主进程把意图交给 `scripts/synthetic-stack/seat-account-runtime.
 
 ## 相关
 
+- [如何记下一条人设知识](how-to-operate-desk-knowledge.md)
 - [如何操作资料页和权限页](how-to-operate-intake-pages.md)
 - [为什么岗位和登录是分开的](explanation-intake-pages.md)
 - [资料导入开发说明](how-to-develop-content-intake.md)
