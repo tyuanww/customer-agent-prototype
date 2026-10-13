@@ -1,6 +1,8 @@
 import type { components } from '@customer-agent/contracts';
+import { Empty } from 'antd';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
 import { formatIntakeTime } from './intake-time';
@@ -284,7 +286,7 @@ export function IntakeManagement() {
   const step = view?.authorized && view.selected && !view.rollback.pending && !view.rollback.impact && !dirtyIds.has('rollback-input')
     ? currentStep(view, dirtyIds) : null;
   const visibleCandidates = (view?.candidates ?? []).filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
-  return <section className="intake-management" aria-label="FAQ 资料管理">
+  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料管理">
     <header><div><h1>资料管理</h1><p>上传 FAQ、核对来源与质量，确认后发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
     {error && <div><p role="alert">{error}</p><button disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</button></div>}
     {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">
@@ -312,14 +314,14 @@ export function IntakeManagement() {
       {view?.selected && <button disabled={disabled} onClick={() => { if (window.confirm('放弃尚未提交的判断并关闭当前候选？')) void apply({ action: 'discard' }); }}>关闭当前候选</button>}</div>
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
     {view?.signedIn && !view.authorized && !view.pending && <p>当前没有可用的资料管理权限，请确认登录身份与店铺授权。</p>}
-    {view?.authorized && <>
+    {view?.authorized && <div className={view.selected ? 'intake-stage has-sheet' : 'intake-stage'}>
       <section aria-label="候选列表"><h2>有权范围内的候选</h2>
         <div className="intake-toolbar" role="group" aria-label="候选筛选">
           <button aria-pressed={candidateFilter === 'open'} onClick={() => setCandidateFilter('open')}>待我处理</button>
           <button aria-pressed={candidateFilter === 'published'} onClick={() => setCandidateFilter('published')}>已发布</button>
           <button aria-pressed={candidateFilter === 'all'} onClick={() => setCandidateFilter('all')}>全部</button>
         </div>
-        {!view.candidates.length && <p>这一页没有候选。</p>}
+        {!view.candidates.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这一页没有候选。选择来源并上传资料后，会出现在这里。" />}
         {!!view.candidates.length && !visibleCandidates.length && <p>这个筛选下没有候选。</p>}
         <table className="intake-candidate-table">
           <thead><tr><th scope="col">名称</th><th scope="col">范围</th><th scope="col">状态</th><th scope="col">下一步</th><th scope="col">时间</th></tr></thead>
@@ -334,9 +336,10 @@ export function IntakeManagement() {
               <td>{formatIntakeTime(row.candidate.updatedAt)}</td>
             </tr>;
           })}</tbody>
-        </table></section>
-      {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
-      {view.selected && <section aria-label="当前候选"><h2 id={`${sectionId}-candidate`} tabIndex={-1}>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
+        </table>
+        {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
+      </section>
+      {view.selected && <section className="intake-sheet" aria-label="当前候选"><h2 id={`${sectionId}-candidate`} tabIndex={-1}>当前候选 · {view.selected.sourceId} · 版本 {view.selected.key.version}</h2>
         <p>{states[view.selected.state]} · {['awaiting-evidence','ready'].includes(view.selected.state)
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
@@ -371,6 +374,6 @@ export function IntakeManagement() {
         </CandidateWorkflow>
         {view.receipt && <p role="status">操作回执：{states[view.receipt.state] ?? view.receipt.state}。这是本次操作记录，请重新读取检查状态。</p>}
       </section>}
-    </>}
-  </section>;
+    </div>}
+  </section></IntakeAntdTheme>;
 }

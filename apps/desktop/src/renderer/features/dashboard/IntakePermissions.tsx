@@ -1,4 +1,6 @@
+import { Alert, Button, Card, Empty, Form } from 'antd';
 import { useEffect, useRef, useState } from 'react';
+import { IntakeAntdTheme } from './intake-antd';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionView } from '@shared/content-intake-permissions';
 import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
@@ -68,15 +70,18 @@ function SeatAccounts({ disabled }: { disabled: boolean }) {
     return () => { alive = false; };
   }, []);
   return <section>
-    {problem && <p role="alert">{problem}</p>}
-    <fieldset className="intake-seat-create" disabled={blocked}><legend>新建外包坐席</legend>
-      <label>姓名<input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></label>
-      <label>登录名<input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></label>
-      <label>密码<input aria-label="密码" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
-      <label>岗位<select aria-label="坐席岗位" value={post} onChange={event => choose(event.target.value)}>{INTAKE_POSTS.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
-      <button disabled={!name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</button>
+    {problem && <Alert type="warning" showIcon message={problem} />}
+    <Card className="intake-job" variant="borderless">
+    <fieldset className="intake-seat-create intake-fields" disabled={blocked}><legend>新建外包坐席</legend>
+      <Form.Item label="姓名"><input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></Form.Item>
+      <Form.Item label="登录名"><input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></Form.Item>
+      <Form.Item label="密码"><input aria-label="密码" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></Form.Item>
+      <Form.Item label="岗位"><select aria-label="坐席岗位" value={post} onChange={event => choose(event.target.value)}>{INTAKE_POSTS.map(item => <option key={item} value={item}>{item}</option>)}</select></Form.Item>
+      <Button type="primary" className="dash-action-primary" disabled={!name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</Button>
     </fieldset>
+    </Card>
     <h2>已有外包坐席</h2>
+    {rows.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有外包坐席。填写姓名、登录名和密码后，会出现在这里。" />}
     <table className="intake-candidate-table" aria-label="外包坐席"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
       {rows.map(row => <tr key={row.username}>
         <td>{row.displayName}</td>
@@ -104,6 +109,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
+  const [job,setJob]=useState<'grants'|'seats'>('grants');
   const generation=useRef(0),pending=useRef(false);
   const apply=async(command?:IntakePermissionCommand)=>{
     if(pending.current && command?.action!=='stop')return;
@@ -148,8 +154,8 @@ export function IntakePermissions({ active }: { active: boolean }) {
     if(!isIntakePost(value)){setError('未知岗位。');return;}
     setPost(value);
   };
-  return <section className="intake-management" aria-label="权限配置">
-    <header><div><h1>权限配置</h1><p>总监、经理在已获分配资格的范围内直接配置业务权限，无需审批。</p></div></header>
+  return <IntakeAntdTheme><div className="desk-permissions-page"><section className="intake-management desk-permissions" aria-label="权限配置">
+    <h1 className="desk-sr">权限配置</h1>
     <div className="intake-toolbar"><button disabled={disabled || !!view?.preview} onClick={()=>void apply({action:'refresh'})}>刷新权限列表</button>
       <button disabled={!busy && !view?.busy} onClick={()=>void apply({action:'stop'})}>停止等待</button></div>
     {error && <p role="alert">{error}</p>}{view?.notice && <p role="status">{view.notice}</p>}
@@ -157,28 +163,18 @@ export function IntakePermissions({ active }: { active: boolean }) {
     {view && !view.signedIn && <p>请先登录。</p>}
     {view?.signedIn && !view.available && !view.pending && <p>当前没有可配置范围，或读取资格已到期。请刷新核对。</p>}
     {view?.available && <>
-      <SeatAccounts disabled={disabled} />
-      <label>配置范围<select aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
-        <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></label>
-      {view.source && <>
-        <h2>范围内的人员</h2>
+      <div className="intake-job-switch" role="tablist" aria-label="权限工作">
+        <button type="button" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>业务授权</button>
+        <button type="button" role="tab" aria-selected={job==='seats'} onClick={()=>setJob('seats')}>外包坐席</button>
+      </div>
+      <div hidden={job!=='grants'}>
+      <div className="intake-fields"><Form.Item label="配置范围"><select aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
+        <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></Form.Item></div>
+      <div className="intake-grant-split">
+        <div>
         <table className="intake-candidate-table" aria-label="人员"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
-          {view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;})}
+          {view.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;}) : <tr><td colSpan={4}>{view.source ? '当前没有可选择的人员。' : '请选择配置范围。'}</td></tr>}
         </tbody></table>
-        {!view.people.length && <p>当前没有可选择的人员。</p>}
-        {!view.preview ? <fieldset disabled={disabled}><legend>新增业务权限</legend>
-          <label>人员<select aria-label="人员" value={person} onChange={e=>setPerson(e.target.value)}><option value="">请选择已确认人员</option>{view.people.map(p=><option key={p.selection} value={p.selection}>{p.label}</option>)}</select></label>
-          <label>岗位<select aria-label="岗位" value={chosen??''} disabled={offered.length===0} onChange={e=>choosePost(e.target.value)}>{!chosen && <option value="">{offered.length===0?'当前范围没有可授予的岗位':'请选择岗位'}</option>}{offered.map(name=><option key={name} value={name}>{name}</option>)}</select></label>
-          <label>生效时间<input aria-label="生效时间" type="datetime-local" value={starts} onChange={e=>setStarts(e.target.value)}/></label>
-          <label>失效时间<input aria-label="失效时间" type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
-          <p>时间按本机时区填写，范围和期限仍由服务器核对。</p>
-          <label>授权原因<textarea aria-label="授权原因" maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-          <button disabled={!person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
-            onClick={previewPost}>预览权限</button>
-        </fieldset>:<section aria-label="权限预览"><h2>预览 · 尚未保存</h2><p>{view.preview.person} · {view.preview.scope}</p>
-          <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatIntakeTime(view.preview.startsAt)} 至 {formatIntakeTime(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
-          <div className="intake-toolbar"><button className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</button>
-          <button disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button></div></section>}
         <section aria-label="已有业务权限"><h2>当前可管理的业务权限</h2><p>当前姓名不可用时，请依据授权记录编号、范围和原授权原因核对后撤销；不会猜测人员。</p>
           {!view.grants.length && <p>此范围暂无可管理业务权限。</p>}
           {view.grants.map(g=><article className="intake-card" key={g.selection}><h3>{g.person} · {labels[g.action]}</h3><p>授权记录 {g.reference}</p><p>原授权原因：{g.reason}</p><p>{g.scope} · {formatIntakeTime(g.startsAt)} 至 {formatIntakeTime(g.expiresAt)} · {g.revoked?'已撤销':'授权记录（实际使用仍核验当前资格）'}</p>
@@ -187,7 +183,25 @@ export function IntakePermissions({ active }: { active: boolean }) {
               <div className="intake-toolbar"><button className="intake-danger" disabled={!revokeReason.trim()} onClick={()=>void apply({action:'revoke',selection:revoke,reason:revokeReason})}>确认撤销</button><button onClick={()=>setRevoke('')}>取消</button></div></fieldset>}
           </article>)}
         </section>
-      </>}
+        </div>
+        <div className="intake-grant-side">
+        {!view.preview ? <Card className="intake-job" variant="borderless"><fieldset className="intake-fields" disabled={disabled}><legend>新增业务权限</legend>
+          <Form.Item label="人员"><select aria-label="人员" value={person} onChange={e=>setPerson(e.target.value)}><option value="">请选择已确认人员</option>{view.people.map(p=><option key={p.selection} value={p.selection}>{p.label}</option>)}</select></Form.Item>
+          <Form.Item label="岗位"><select aria-label="岗位" value={chosen??''} disabled={offered.length===0} onChange={e=>choosePost(e.target.value)}>{!chosen && <option value="">{offered.length===0?'当前范围没有可授予的岗位':'请选择岗位'}</option>}{offered.map(name=><option key={name} value={name}>{name}</option>)}</select></Form.Item>
+          <Form.Item label="生效时间"><input aria-label="生效时间" type="datetime-local" value={starts} onChange={e=>setStarts(e.target.value)}/></Form.Item>
+          <Form.Item label="失效时间"><input aria-label="失效时间" type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></Form.Item>
+          <p>时间按本机时区填写，范围和期限仍由服务器核对。</p>
+          <Form.Item label="授权原因"><textarea aria-label="授权原因" maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></Form.Item>
+          <Button type="primary" className="dash-action-primary" disabled={!person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
+            onClick={previewPost}>预览权限</Button>
+        </fieldset></Card>:<section aria-label="权限预览"><h2>预览 · 尚未保存</h2><p>{view.preview.person} · {view.preview.scope}</p>
+          <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatIntakeTime(view.preview.startsAt)} 至 {formatIntakeTime(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
+          <div className="intake-toolbar"><Button type="primary" className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</Button>
+          <button disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button></div></section>}
+        </div>
+      </div>
+      </div>
+      <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} /></div>
     </>}
-  </section>;
+  </section></div></IntakeAntdTheme>;
 }

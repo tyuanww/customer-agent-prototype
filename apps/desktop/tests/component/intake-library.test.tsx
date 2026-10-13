@@ -66,7 +66,7 @@ it('browses four scoped domains and shares the same complete read with the avail
  rerender(<IntakeLibrary active="announce"/>);
  expect(screen.getByRole('region',{name:'当前可用版本'})).toBeVisible();
  expect(screen.getByText(/可用版本 rel_synthetic/)).toBeVisible();
- expect(screen.getByText(/不代表全库同步/)).toBeVisible();
+ expect(screen.getByText('软件更新未接入。')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(1);
 });
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{

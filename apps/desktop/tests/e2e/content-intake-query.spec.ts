@@ -128,7 +128,9 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-    await expect(dashboard.getByText('当前没有可用的资料管理权限，请确认登录身份与店铺授权。')).toBeVisible();
+    await expect(dashboard.getByRole('heading', { name: '知识库' })).toBeVisible();
+    await expect(dashboard.getByText('当前账号只能使用已生效的知识。')).toBeVisible();
+    await expect(dashboard.getByRole('button', { name: '保存' })).toHaveCount(0);
     await expect(dashboard.getByRole('button', { name: '冻结本次抽样' })).toHaveCount(0);
     const nativeMenu = await app.evaluate(({ app: nativeApp, Menu, BrowserWindow }) => {
       nativeApp.emit('activate');
