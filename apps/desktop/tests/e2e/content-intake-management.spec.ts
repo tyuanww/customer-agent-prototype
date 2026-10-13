@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,9 +8,9 @@ import { expect, test, _electron as electron, type ElectronApplication } from '@
 import { intakeManagementData } from '../fixtures/intake-management-data';
 import { closeOwnedElectron } from '../support/owned-electron';
 
-/** Actual Electron / preload / Main / HTTP / clipboard. The loopback service is
- * a contract wire double; actual PostgreSQL publication has separate evidence. */
-test('FAQ Dashboard performs human checks through the sandbox preload and retains unknown receipt recovery', async () => {
+/** Actual Electron / preload / Main. The loopback service only completes login.
+ * The content page stores persona knowledge on this machine. */
+test('knowledge desk uploads through the sandbox preload and keeps the row on disk', async () => {
   const wire = intakeManagementData(), token = 's'.repeat(43), requests: string[] = [];
   let authorized = false, apiOrigin = '', identityOrigin = '', dropFreeze = true;
   const api = createServer(async (req, res) => {
@@ -21,7 +21,7 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     if (url.pathname === '/v1/auth/callback') { authorized = true; return send({ ok: true }); }
     if (url.pathname.endsWith('/exchange')) return send(authorized ? { access_token: token, token_type: 'Bearer', expires_at: new Date(Date.now() + 899_000).toISOString() } : { status: 'pending', retry_after_seconds: 1 }, authorized ? 200 : 202);
     if (!authorized || req.headers.authorization !== `Bearer ${token}`) return send({ error: { code: 'UNAUTHORIZED' } }, 401);
-    if (url.pathname === '/v1/auth/me') return send({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
+    if (url.pathname === '/v1/auth/me') return send({ user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'mock' });
     if (url.pathname === '/v1/auth/logout') { authorized = false; res.statusCode = 204; res.end(); return; }
     if (url.pathname === '/v1/notices/current') return send({ error: { code: 'GONE' } }, 410);
     if (url.pathname.startsWith('/v1/intake/')) {
@@ -61,60 +61,20 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-    await dashboard.getByRole('button', { name: /source-a/ }).click();
-    await dashboard.getByRole('button', { name: '查看材料' }).click();
-    await dashboard.getByRole('textbox', { name: '来源版本' }).fill('synthetic-v1');
-    await dashboard.getByRole('textbox', { name: '来源确认说明' }).fill('已核对合成资料');
-    await dashboard.getByRole('button', { name: '确认来源版本' }).click();
-    await expect(dashboard.getByRole('textbox', { name: '来源版本' })).toHaveCount(0);
-    await expect(dashboard.getByRole('button', { name: '发起组织审批' })).toHaveCount(0);
-    await dashboard.getByRole('button', { name: '读取初检' }).click();
-    await expect(dashboard.getByRole('button', { name: '提交本轮人工检查' })).toBeDisabled();
-    await dashboard.getByRole('button', { name: '冻结本次抽样' }).click();
-    await expect(dashboard.getByRole('heading', { name: '操作结果待确认' })).toBeVisible();
-    const cancelledClose = await app.evaluate(({ BrowserWindow, app: nativeApp, dialog }) => {
-      const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!;
-      const original = dialog.showMessageBoxSync, messages: string[] = [];
-      dialog.showMessageBoxSync = ((options: { message: string }) => { messages.push(options.message); return 0; }) as typeof dialog.showMessageBoxSync;
-      try { win.close(); nativeApp.quit(); return { messages, alive: !win.isDestroyed() }; }
-      finally { dialog.showMessageBoxSync = original; }
-    });
-    expect(cancelledClose).toEqual({ messages: ['操作结果尚未确定或请求仍在处理。', '操作结果尚未确定或请求仍在处理。'], alive: true });
-    await dashboard.getByRole('button', { name: '查询原操作回执' }).click();
-    await dashboard.getByRole('button', { name: '刷新候选' }).click();
-    await dashboard.getByRole('button', { name: '查看材料' }).click();
-    await dashboard.getByRole('button', { name: '读取初检' }).click();
-    for (let i = 1; i <= 2; i++) {
-      const card = dashboard.getByRole('article').filter({ has: dashboard.getByRole('heading', { name: `合成洁面 ${i}` }) });
-      await card.getByRole('combobox').selectOption('pass');
-      await card.getByRole('button', { name: '保存本条判断' }).click();
-    }
-    await expect(dashboard.getByRole('button', { name: '提交本轮人工检查' })).toBeEnabled();
-    await dashboard.evaluate(() => window.scrollTo(0, 0));
-    if (process.env.INTAKE_MANAGEMENT_SCREENSHOT) await dashboard.screenshot({ path: process.env.INTAKE_MANAGEMENT_SCREENSHOT, fullPage: true });
-    await dashboard.getByRole('button', { name: '提交本轮人工检查' }).click();
-    await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })
-      .getByRole('status').filter({ hasText: /^操作回执：/ })).toContainText('质量检查通过');
-    // Exercise actual preload -> Main -> native dialog adapter -> HTTP. The
-    // Electron dialog response is controlled here; this is not OS click proof.
-    await dashboard.getByRole('button', { name: '刷新候选状态' }).click();
-    await dashboard.getByRole('textbox', { name: '发布标题' }).fill('合成确认发布');
-    await dashboard.getByRole('textbox', { name: '发布摘要' }).fill('本机合成确认验证');
-    await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async (_window, options) => {
-      if (options.defaultId !== 0 || options.cancelId !== 0 || !options.detail?.includes('来源：source-a')) throw new Error('Invalid publication confirmation');
-      return { response: 0, checkboxChecked: false };
-    }) as typeof dialog.showMessageBox; });
-    await dashboard.getByRole('button', { name: '发布当前候选' }).click();
-    await expect(dashboard.getByRole('button', { name: '发布当前候选' })).toBeEnabled();
-    expect(requests.filter(p => p.endsWith('/publish'))).toHaveLength(0);
-    await expect(dashboard.getByRole('textbox', { name: '发布标题' })).toHaveValue('合成确认发布');
-    await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as typeof dialog.showMessageBox; });
-    await dashboard.getByRole('button', { name: '发布当前候选' }).click();
-    await expect(dashboard.getByText(/当前候选已发布：rel_2/)).toBeVisible();
-    expect(requests.filter(p => p.endsWith('/publish'))).toHaveLength(1);
-    expect(requests.filter(p => p.endsWith('/review') || p.endsWith('/review/refresh'))).toHaveLength(0);
-    expect(wire.receipts.size).toBe(2);
-    expect(requests.filter(p => p.endsWith('/quality/freeze'))).toHaveLength(1);
+    await expect(dashboard.getByRole('heading', { name: '知识库' })).toBeVisible();
+    await dashboard.getByRole('button', { name: '售前客服' }).click();
+    await expect(dashboard.getByRole('button', { name: '售前客服' })).toHaveAttribute('aria-pressed', 'true');
+    await dashboard.getByRole('textbox', { name: '问题' }).fill('退货时效');
+    await dashboard.getByRole('combobox', { name: '分类' }).selectOption('aftersale');
+    await dashboard.getByRole('textbox', { name: '答案' }).fill('七天内可退');
+    await dashboard.getByRole('button', { name: '保存' }).click();
+    await expect(dashboard.getByRole('cell', { name: /退货时效/ })).toBeVisible();
+    await expect(dashboard.getByRole('list', { name: '坐席会收到' })).toContainText('退货时效');
+    const saved = JSON.parse(readFileSync(path.join(directory, 'desk-knowledge.json'), 'utf8')) as { revision: number; items: { name: string; personaId: string }[] };
+    expect(saved.revision).toBe(1);
+    expect(saved.items.map((item) => item.name)).toEqual(['退货时效']);
+    expect(saved.items[0]?.personaId).toBe('presale');
+    expect(requests.filter(p => p.endsWith('/publish') || p.endsWith('/quality/freeze'))).toHaveLength(0);
     expect(await dashboard.evaluate(() => ({ node: typeof (window as unknown as { require?: unknown }).require, overlay: !!window.customerAgent }))).toEqual({ node: 'undefined', overlay: false });
     expect(await query.evaluate(() => typeof window.dashboardIntake)).toBe('undefined');
     const security = await app.evaluate(({ BrowserWindow }) => {
@@ -122,13 +82,6 @@ test('FAQ Dashboard performs human checks through the sandbox preload and retain
       const p = (win.webContents as unknown as { getLastWebPreferences(): { sandbox: boolean; nodeIntegration: boolean; contextIsolation: boolean } }).getLastWebPreferences(); return { sandbox: p.sandbox, nodeIntegration: p.nodeIntegration, contextIsolation: p.contextIsolation };
     });
     expect(security).toEqual({ sandbox: true, nodeIntegration: false, contextIsolation: true });
-    const confirmedClose = await app.evaluate(({ BrowserWindow, dialog }) => {
-      const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!;
-      const original = dialog.showMessageBoxSync, messages: string[] = [];
-      dialog.showMessageBoxSync = ((options: { message: string }) => { messages.push(options.message); return 1; }) as typeof dialog.showMessageBoxSync;
-      try { win.close(); return messages; } finally { dialog.showMessageBoxSync = original; }
-    });
-    expect(confirmedClose).toEqual(['关闭后会丢失未提交的人工判断。']);
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally {
