@@ -64,12 +64,13 @@ test('knowledge desk uploads through the sandbox preload and keeps the row on di
     await expect(dashboard.getByRole('heading', { name: '知识库' })).toBeVisible();
     await dashboard.getByRole('button', { name: '售前客服' }).click();
     await expect(dashboard.getByRole('button', { name: '售前客服' })).toHaveAttribute('aria-pressed', 'true');
+    await dashboard.getByRole('button', { name: '添加话术' }).click();
     await dashboard.getByRole('textbox', { name: '问题' }).fill('退货时效');
     await dashboard.getByRole('combobox', { name: '分类' }).selectOption('aftersale');
     await dashboard.getByRole('textbox', { name: '答案' }).fill('七天内可退');
     await dashboard.getByRole('button', { name: '保存' }).click();
     await expect(dashboard.getByRole('cell', { name: /退货时效/ })).toBeVisible();
-    await expect(dashboard.getByRole('list', { name: '坐席会收到' })).toContainText('退货时效');
+    await expect(dashboard.getByText('坐席会收到 1 条。全店生效的知识会一起送到这个人设。')).toBeVisible();
     const saved = JSON.parse(readFileSync(path.join(directory, 'desk-knowledge.json'), 'utf8')) as { revision: number; items: { name: string; personaId: string }[] };
     expect(saved.revision).toBe(1);
     expect(saved.items.map((item) => item.name)).toEqual(['退货时效']);

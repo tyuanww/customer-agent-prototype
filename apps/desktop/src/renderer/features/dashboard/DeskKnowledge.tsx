@@ -13,11 +13,6 @@ const EMPTY: DeskView = {
   items: [], delivered: [], tacit: [], revision: 0, notice: null, persistence: 'ok',
 };
 
-function categoryLabel(code: string, custom: string | null): string {
-  if (code === 'custom') return custom ?? '自定分类';
-  return DESK_CATEGORIES.find((category) => category.code === code)?.label ?? code;
-}
-
 function statusTone(item: DeskItemView): string {
   if (item.parseState !== 'ok') return 'is-failed';
   if (item.statusLabel === '生效中') return 'is-live';
@@ -32,6 +27,7 @@ export function DeskKnowledge() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [writing, setWriting] = useState(false);
+  const [tacitOpen, setTacitOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('product');
@@ -76,57 +72,50 @@ export function DeskKnowledge() {
   }
   const operator = view.role === 'operator';
   const cards = view.role === null ? null : view.items;
+  const rows = !cards || cards.length === 0
+    ? <tr><td colSpan={5} className="desk-empty">{operator ? '还没有知识。' : '还没有生效知识。'}</td></tr>
+    : cards.map((item) => <tr key={item.id}>
+      <td>{item.name}</td>
+      <td><span className="desk-body" title={item.body}>{item.body}</span></td>
+      <td><span className={`desk-status ${statusTone(item)}`}>{item.statusLabel}</span></td>
+      <td>{item.updatedAt.slice(0, 16).replace('T', ' ')}</td>
+      <td>{operator ? <div className="desk-row-actions">
+        {item.validity !== 'always'
+          ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'always' })}>改为长期生效</button>
+          : <button type="button" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'inactive' })}>改为不生效</button>}
+        {item.parseState !== 'ok' ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'retry', id: item.id })}>重试</button> : null}
+        <button type="button" className="desk-delete" disabled={busy} onClick={() => setPendingDelete(item.id)}>删除</button>
+      </div> : null}</td>
+    </tr>);
   return <section className="desk-knowledge" aria-label="知识库">
     <div className="desk-column">
       <header className="desk-title">
-        <div className="desk-title-main">
-          <h1>知识库</h1>
-          <span className="desk-count">{view.items.length}</span>
+        <h1>知识库</h1>
+        <div className="desk-title-actions">
+          {view.signedIn ? <button type="button" className="desk-text-button" onClick={() => setTacitOpen(true)}>隐性知识</button> : null}
+          {operator ? <button type="button" className="desk-add" onClick={() => setWriting(true)}>添加话术</button> : null}
         </div>
-        {operator ? <button type="button" className="desk-text-button" onClick={() => setWriting(true)}>写下一条</button> : null}
       </header>
-      <div className="desk-personas" role="group" aria-label="人设">
-        {view.personas.map((persona) => <button key={persona.id} type="button" aria-pressed={persona.id === view.selectedPersonaId} disabled={busy}
-          onClick={() => void apply({ action: 'select-persona', personaId: persona.id })}>{persona.name}</button>)}
+      <div className="desk-toolbar">
+        <div className="desk-personas" role="group" aria-label="人设">
+          {view.personas.map((persona) => <button key={persona.id} type="button" aria-pressed={persona.id === view.selectedPersonaId} disabled={busy}
+            onClick={() => void apply({ action: 'select-persona', personaId: persona.id })}>{persona.name}</button>)}
+        </div>
       </div>
-      {view.role !== null ? <p className="desk-delivery">坐席会收到 {view.delivered.length} 条。全店生效的知识会一起送到这个人设。</p> : null}
+      {view.role !== null ? <p className="desk-note">坐席会收到 {view.delivered.length} 条。全店生效的知识会一起送到这个人设。</p> : null}
       {message ? <p role="status">{message}</p> : null}
       {view.notice && view.notice !== message ? <p role="status">{view.notice}</p> : null}
-      {view.role === null ? <p>{view.signedIn ? '正在读取知识库。' : '请先登录。'}</p> : cards && cards.length === 0 ? <div className="desk-empty">
-        <p>{operator ? '还没有知识。' : '还没有生效知识。'}</p>
-        {operator ? <button type="button" className="desk-text-button" onClick={() => setWriting(true)}>写下一条</button> : null}
-      </div> : <div className="desk-grid">
-        {cards?.map((item) => <article className="desk-card" key={item.id}>
-          <span className="desk-letter" aria-hidden="true">{Array.from(item.name)[0] ?? ''}</span>
-          <div className="desk-card-main">
-            <div className="desk-card-top">
-              <h3>{item.name}</h3>
-              <span className={`desk-status ${statusTone(item)}`}>{item.statusLabel}</span>
-            </div>
-            <p className="desk-category">{categoryLabel(item.category, item.customCategory)}</p>
-            {operator ? <div className="desk-card-actions">
-              {item.validity !== 'always'
-                ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'always' })}>改为长期生效</button>
-                : <button type="button" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'inactive' })}>改为不生效</button>}
-              {item.parseState !== 'ok' ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'retry', id: item.id })}>重试</button> : null}
-              <button type="button" className="desk-delete" disabled={busy} onClick={() => setPendingDelete(item.id)}>删除</button>
-            </div> : null}
-          </div>
-        </article>)}
-      </div>}
-      <h2 className="desk-tacit-title">隐性知识</h2>
-      <p className="desk-tacit-note">对话里记下的经验先放在这里。经验洞察约 30 天后淡化，情境上下文约 14 天后淡化。交给知识库之后仍是「未生效」，要改成长期生效才会到坐席。</p>
-      {view.signedIn ? <>
-        <label className="desk-tacit-field">类型 <select value={tacitKind} onChange={(event) => setTacitKind(event.target.value)}>{TACIT_KINDS.map((kind) => <option key={kind.code} value={kind.code}>{kind.label}</option>)}</select></label>
-        <label className="desk-tacit-field">内容 <textarea value={tacitText} onChange={(event) => setTacitText(event.target.value)} /></label>
-        <div className="desk-tacit-actions"><button type="button" disabled={busy} onClick={() => void apply({ action: 'add-tacit', personaId: view.selectedPersonaId, kind: tacitKind, text: tacitText })}>记下</button></div>
-        <ul aria-label="隐性知识">{view.tacit.map((note) => <li key={note.id}>{TACIT_KINDS.find((kind) => kind.code === note.kind)?.label} · {note.text} {note.promotedItemId ? '已交给知识库' : operator ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'promote', noteId: note.id })}>交给知识库</button> : null}</li>)}</ul>
-      </> : <p>登录后才能记下隐性知识。</p>}
+      {view.role === null ? <p>{view.signedIn ? '正在读取知识库。' : '请先登录。'}</p> : <table className="desk-table" aria-label="当前人设知识">
+        <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>最后更新时间</th><th>操作</th></tr></thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>}
     </div>
     {operator && writing ? <div className="desk-layer-backdrop">
       <div className="desk-layer" role="dialog" aria-labelledby="desk-write-title">
         <div className="desk-layer-body">
-          <h2 id="desk-write-title">写下一条</h2>
+          <h2 id="desk-write-title">添加话术</h2>
           <label className="desk-field"><span className="desk-field-label">问题<span className="desk-required" aria-hidden="true">*</span></span>
             <input aria-label="问题" value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label className="desk-field"><span className="desk-field-label">分类</span>
@@ -187,6 +176,21 @@ export function DeskKnowledge() {
               void apply({ action: 'remove', id });
             }}>确认删除</button>
           </div>
+        </div>
+      </div>
+    </div> : null}
+    {tacitOpen ? <div className="desk-layer-backdrop">
+      <div className="desk-layer" role="dialog" aria-labelledby="desk-tacit-title">
+        <div className="desk-layer-body">
+          <h2 id="desk-tacit-title">隐性知识</h2>
+          <p className="desk-tacit-note">对话里记下的经验先放在这里。经验洞察约 30 天后淡化，情境上下文约 14 天后淡化。交给知识库之后仍是「未生效」，要改成长期生效才会到坐席。</p>
+          {view.signedIn ? <>
+            <label className="desk-tacit-field">类型 <select value={tacitKind} onChange={(event) => setTacitKind(event.target.value)}>{TACIT_KINDS.map((kind) => <option key={kind.code} value={kind.code}>{kind.label}</option>)}</select></label>
+            <label className="desk-tacit-field">内容 <textarea value={tacitText} onChange={(event) => setTacitText(event.target.value)} /></label>
+            <div className="desk-layer-actions"><button type="button" disabled={busy} onClick={() => void apply({ action: 'add-tacit', personaId: view.selectedPersonaId, kind: tacitKind, text: tacitText })}>记下</button>
+              <button type="button" className="desk-cancel" onClick={() => setTacitOpen(false)}>关闭</button></div>
+            <ul aria-label="隐性知识">{view.tacit.map((note) => <li key={note.id}>{TACIT_KINDS.find((kind) => kind.code === note.kind)?.label} · {note.text} {note.promotedItemId ? '已交给知识库' : operator ? <button type="button" disabled={busy} onClick={() => void apply({ action: 'promote', noteId: note.id })}>交给知识库</button> : null}</li>)}</ul>
+          </> : <p>登录后才能记下隐性知识。</p>}
         </div>
       </div>
     </div> : null}

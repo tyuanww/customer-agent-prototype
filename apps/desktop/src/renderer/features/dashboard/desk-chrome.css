@@ -2,27 +2,29 @@
    on buttons and fields. Sizes stay the knowledge-page spec. */
 .dashboard-shell .desk-text-button,
 .dashboard-shell .desk-personas button,
+.dashboard-shell .desk-add,
 .dashboard-shell .desk-validity button,
 .dashboard-shell .desk-delete-cancel,
-.dashboard-shell .desk-delete-confirm {
+.dashboard-shell .desk-delete-confirm,
+.dashboard-shell .desk-row-actions button {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
   font-weight: 500;
 }
+.dashboard-shell .desk-add,
+.dashboard-shell .desk-personas button[aria-pressed='true'] {
+  font-weight: 600;
+}
 .dashboard-shell .desk-save,
 .dashboard-shell .desk-cancel,
-.dashboard-shell .desk-card-actions button,
-.dashboard-shell .desk-tacit-actions button,
 .dashboard-shell .desk-field input,
 .dashboard-shell .desk-field textarea,
 .dashboard-shell .desk-field select,
 .dashboard-shell .desk-tacit-field select,
 .dashboard-shell .desk-tacit-field textarea {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
+  font-size: 14px;
 }
-.dashboard-shell .desk-save,
-.dashboard-shell .desk-cancel,
-.dashboard-shell .desk-tacit-actions button {
-  font-weight: 500;
+.dashboard-shell .desk-save {
+  font-weight: 600;
 }
