@@ -47,3 +47,33 @@ export function hasPublishCloseHint(task: CloseHintTask, catalog: CloseHintCatal
   const published = new Set(catalog.entries.map((entry) => entry.scriptId));
   return related.some((scriptId) => published.has(scriptId));
 }
+
+export type IterationCloseDecision =
+  | { ok: true; status: 'resolved' | 'wont_fix'; resolutionNote: string }
+  | { ok: false; reason: 'needs_newer_release' | 'needs_reason' };
+
+/** 排序问题 and 过期仍召回 do not rewrite published script text. No cause auto-rewrites. */
+export function scriptTextAfterCause(
+  scriptText: string,
+  cause: CloseHintTask['suspectedCause'],
+): string {
+  if (cause === 'ranking' || cause === 'stale') return scriptText;
+  return scriptText;
+}
+
+export function decideIterationClose(input: {
+  task: CloseHintTask;
+  catalog: CloseHintCatalog | null;
+  status: 'resolved' | 'wont_fix';
+  resolutionNote: string;
+}): IterationCloseDecision {
+  const note = input.resolutionNote.trim();
+  if (input.status === 'wont_fix') {
+    if (note.length === 0) return Object.freeze({ ok: false, reason: 'needs_reason' });
+    return Object.freeze({ ok: true, status: 'wont_fix', resolutionNote: note });
+  }
+  if (input.task.suspectedCause === 'content_gap' && !hasPublishCloseHint(input.task, input.catalog)) {
+    return Object.freeze({ ok: false, reason: 'needs_newer_release' });
+  }
+  return Object.freeze({ ok: true, status: 'resolved', resolutionNote: note });
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ITERATION_CLOSE_HINT_COPY,
+  decideIterationClose,
   hasPublishCloseHint,
   relatedScriptIdsForTask,
 } from '../../src/shared/iteration-close-hint';
@@ -62,5 +63,60 @@ describe('iteration publish close hint', () => {
       entries: [{ scriptId: 'new-script' }],
     })).toBe(true);
     expect(ITERATION_CLOSE_HINT_COPY.footnote).toContain('不自动关单');
+  });
+
+  it('内容缺口 close is refused without a newer published release', () => {
+    const decision = decideIterationClose({
+      task: { ...openTask, suspectedCause: 'content_gap' },
+      catalog: {
+        catalogRefreshedAt: '2026-09-19T00:00:00.000Z',
+        entries: [{ scriptId: 'script-a' }],
+      },
+      status: 'resolved',
+      resolutionNote: '',
+    });
+    expect(decision).toEqual({ ok: false, reason: 'needs_newer_release' });
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'content_gap' },
+      catalog: null,
+      status: 'resolved',
+      resolutionNote: '补过了',
+    })).toEqual({ ok: false, reason: 'needs_newer_release' });
+  });
+
+  it('内容缺口 close is allowed after a newer published release', () => {
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'content_gap' },
+      catalog: {
+        catalogRefreshedAt: '2026-09-21T00:00:00.000Z',
+        entries: [{ scriptId: 'script-a' }],
+      },
+      status: 'resolved',
+      resolutionNote: '',
+    })).toEqual({ ok: true, status: 'resolved', resolutionNote: '' });
+  });
+
+  it('another cause can resolve', () => {
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'ranking' },
+      catalog: null,
+      status: 'resolved',
+      resolutionNote: '',
+    })).toEqual({ ok: true, status: 'resolved', resolutionNote: '' });
+  });
+
+  it('another cause is deferred only with a reason', () => {
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'stale' },
+      catalog: null,
+      status: 'wont_fix',
+      resolutionNote: '   ',
+    })).toEqual({ ok: false, reason: 'needs_reason' });
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'mixed' },
+      catalog: null,
+      status: 'wont_fix',
+      resolutionNote: '先观察一周',
+    })).toEqual({ ok: true, status: 'wont_fix', resolutionNote: '先观察一周' });
   });
 });
