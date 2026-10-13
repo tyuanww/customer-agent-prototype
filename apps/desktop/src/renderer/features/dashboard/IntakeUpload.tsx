@@ -1,3 +1,4 @@
+import { Button, Card, Form } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { IntakeUploadCommand, IntakeUploadView } from '@shared/content-intake-upload';
 
@@ -32,18 +33,20 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
   const declaring = !!view.file && view.canSubmit;
   const ready = !!preparer && editors.length > 0 && confirmed;
   return <section className="intake-upload" aria-label="上传 FAQ 资料">
+    <Card className="intake-job" variant="borderless">
     <h2>上传 FAQ 资料</h2>
     <p>使用当前来源对应的标准 CSV（UTF-8）或 Excel（XLSX）模板。缺少某行不会删除已发布资料；有阻断错误时，请整批修正后重新选择文件。</p>
     {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId} · 原版本 {view.revisionOf.version}。
       请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、完成质量检查与发布确认。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
     {!view.authorized && <p>当前没有可上传的来源，请核对登录身份与来源授权。</p>}
-    <label>上传来源<select aria-label="上传来源" value={view.sourceSelection ?? ''}
+    <div className="intake-fields"><Form.Item label="上传来源"><select aria-label="上传来源" value={view.sourceSelection ?? ''}
       disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
       onChange={event => { if (event.target.value) apply({ action: 'upload-source', selection: event.target.value }); }}>
       <option value="">请选择有权维护的来源</option>
       {view.sources.map(source => <option key={source.selection} value={source.selection}>{({product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'})[source.domain]} · {source.label}</option>)}
-    </select></label>
+    </select></Form.Item></div>
+    <p className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}</p>
     <div className="intake-toolbar">
       <button disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</button>
       {(view.sourceSelection || view.canReset) && <button disabled={disabled || !view.canReset} onClick={() => {
@@ -51,15 +54,14 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</button>}
     </div>
     {view.file && <p className="intake-file">已选择：<strong>{view.file.name}</strong> · {(view.file.bytes / 1024).toFixed(1)} KB</p>}
-    <p className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}</p>
     {view.notice && <p role="status">{view.notice}</p>}
-    {declaring && <fieldset disabled={disabled}>
+    {declaring && <fieldset className="intake-fields" disabled={disabled}>
       <legend>确认整理责任人与全部实际改稿人</legend>
       <p>请选择实际参与人。本人制作也须显式勾选本人；列入声明不会授予其操作权限。</p>
-      <label>整理责任人<select aria-label="整理责任人" value={preparer} onChange={event => { setPreparer(event.target.value); setConfirmed(false); }}>
+      <Form.Item label="整理责任人"><select aria-label="整理责任人" value={preparer} onChange={event => { setPreparer(event.target.value); setConfirmed(false); }}>
         <option value="">请选择整理责任人</option>
         {view.principals.map(person => <option key={person.selection} value={person.selection}>{person.displayLabel}{person.enabled ? '' : '（当前未启用）'}</option>)}
-      </select></label>
+      </select></Form.Item>
       <div className="intake-contributors" role="group" aria-label="全部实际改稿人">
         {view.principals.map(person => <label key={person.selection}>
           <input type="checkbox" aria-label={`实际改稿人 ${person.displayLabel}`} checked={editors.includes(person.selection)} onChange={event => {
@@ -70,7 +72,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       </div>
       <label className="intake-confirmation"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
         <span>我已核对整理责任人及全部实际改稿人</span></label>
-      <button disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</button>
+      <Button type="primary" className="dash-action-primary" disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</Button>
     </fieldset>}
     {view.pending && <div className="intake-notice" role="status">
       <p>{view.pending === 'upload' ? '文件上传' : '校验任务提交'}结果尚未确定。重试沿用原文件和原请求，不会换一个操作编号。</p>
@@ -82,6 +84,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {view.canSaveReport && <button disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</button>}
       {view.canOpen && <button disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</button>}
     </div>
+    </Card>
     {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；形成候选后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">
       <h3>校验结果</h3>

@@ -66,6 +66,7 @@ it('does not offer a post the current scope cannot grant',async()=>{
   const post=screen.getByRole('combobox',{name:/^岗位$/});
   expect(within(post).getAllByRole('option').map(option=>option.textContent)).toEqual(['客服']);
   expect(post).toHaveValue('客服');
+  fireEvent.click(screen.getByRole('tab',{name:'外包坐席'}));
   expect(within(screen.getByRole('combobox',{name:'坐席岗位'})).getAllByRole('option').map(option=>option.textContent)).toEqual(['客服','客服主管']);
  }finally{main.dispose();}
 });
@@ -81,6 +82,7 @@ it('creates an outsourced seat from an intent and does not keep the password on 
  const login=readFileSync(resolve(dirname(fileURLToPath(import.meta.url)),'../../src/renderer/LoginApp.tsx'),'utf8');
  const page=readFileSync(PAGE,'utf8');
  try{render(<IntakePermissions active/>);await screen.findByRole('option',{name:'合成坐席'});
+  await user.click(screen.getByRole('tab',{name:'外包坐席'}));
   const form=screen.getByRole('group',{name:'新建外包坐席'});
   expect(within(form).getByLabelText('姓名')).toBeInTheDocument();
   expect(within(form).getByLabelText('登录名')).toBeInTheDocument();
