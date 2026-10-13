@@ -283,7 +283,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。`main@4739c39` 的 CI run `37024571842` 已通过，当时 `pnpm check:architecture` 对 303 个源码/配置文件报告 0 个依赖方向违规；本轮统一工作台检查为 389 个文件、0 违规，`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 恢复原五模块导航：`IntakeManagement` 在导航切换间保留上传/发布/权限表单；同一常驻 `IntakeLibrary` 投影话术库与当前可用版本。`faq-v2` 在「内容管理」后增加侧栏「权限」，不进入 `DASHBOARD_MODULE_IDS`。上文 ASCII 仍画一期五项，那是旧工作台，不是这条合成页。概览只有实际导航，SOP/经营统计/软件更新显示未接入，不订阅旧 `dashboardContent`、公告或目录适配器。模块消费既有 `--dash-*` token 与共享主按钮，不能另建主题或复制导航状态机。字段见[资料页与权限页](reference-intake-pages.md)。
+FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块和业务订阅。FAQ 恢复原五模块导航。导航 id `content` 的文案是「知识库」，挂载 `DeskKnowledge`，本机文件是 `userData/desk-knowledge.json`。`IntakeManagement` 仍在仓库中供组件测试使用，这个 profile 不挂载它。同一常驻 `IntakeLibrary` 投影话术库与当前可用版本。`faq-v2` 在「知识库」后增加侧栏「权限」，不进入 `DASHBOARD_MODULE_IDS`。上文 ASCII 仍画一期五项，那是旧工作台，不是这条合成页。概览只有实际导航，SOP/经营统计/软件更新显示未接入，不订阅旧 `dashboardContent`、公告或目录适配器。知识库用灰底和蓝色主按钮；权限页只换同一套外壳。字段见[人设知识库](reference-desk-knowledge.md)和[资料页与权限页](reference-intake-pages.md)。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 

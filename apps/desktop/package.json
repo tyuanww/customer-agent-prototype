@@ -28,10 +28,11 @@
     "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "@customer-agent/contracts": "workspace:*",
-    "@customer-agent/retrieval-core": "workspace:*"
+    "@customer-agent/retrieval-core": "workspace:*",
+    "antd": "^5.29.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",

@@ -2,6 +2,7 @@ import type { IntakeCatalogApi } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi } from '../shared/content-intake-permissions';
 import type { SeatAccountApi } from '../shared/seat-account-intent';
 import type { IntakeManagementApi } from '../shared/content-intake-management';
+import type { DeskKnowledgeApi } from '../shared/desk-knowledge';
 import type { CustomerAgentApi } from '../shared/contracts';
 import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
 import type { DashboardContentApi } from '../shared/dashboard-content';
@@ -17,6 +18,7 @@ declare global {
     dashboardPermissions?: IntakePermissionApi;
     dashboardSeats?: SeatAccountApi;
     dashboardIntake?: IntakeManagementApi;
+    dashboardDesk?: DeskKnowledgeApi;
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
     dashboardAnnounce?: DashboardAnnounceApi;

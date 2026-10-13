@@ -74,6 +74,8 @@ test('director previews without saving, grants a named seat query access, then r
     await dashboard.getByTestId('nav-overview').click();
     await dashboard.getByTestId('nav-sop').click();
     await dashboard.getByTestId('nav-content').click();
+    // Other destinations keep the page mounted and hidden. Come back before judging the preview.
+    await dashboard.getByTestId('nav-permissions').click();
     await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();
     expect((await entitlement()).ok).toBe(false);
     await panel.getByRole('button', { name: '返回修改', exact: true }).click();

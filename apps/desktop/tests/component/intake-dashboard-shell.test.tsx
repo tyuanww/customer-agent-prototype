@@ -1,16 +1,35 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
-import { ContentIntakeManagement } from '../../src/main/content-intake-management';
-import { intakeManagementData } from '../fixtures/intake-management-data';
+import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
+const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+function installShippedDashboardCss() {
+  if (document.getElementById('shipped-dashboard.css')) return;
+  // Same order as DashboardApp: knowledge sheet, shell sheet, then the font longhands.
+  for (const file of [
+    'src/renderer/features/dashboard/intake-management.css',
+    'src/renderer/styles/dashboard.css',
+    'src/renderer/features/dashboard/desk-chrome.css',
+  ]) {
+    const node = document.createElement('style');
+    node.id = `shipped-${file.split('/').pop()}`;
+    node.textContent = readFileSync(resolve(desktopRoot, file), 'utf8');
+    document.head.appendChild(node);
+  }
+}
+
 afterEach(() => {
   // Unmount while the bridge still exists, including after an early assertion.
-  cleanup(); delete window.dashboardIntake; delete window.dashboardIntakeCatalog; delete window.dashboardContent; delete window.dashboardPermissions; vi.unstubAllGlobals();
+  cleanup(); delete window.dashboardIntake; delete window.dashboardDesk; delete window.dashboardIntakeCatalog; delete window.dashboardContent; delete window.dashboardPermissions; vi.unstubAllGlobals();
 });
 
 it('reuses workspace chrome and theme without mounting legacy modules or calling their session API', async () => {
@@ -41,7 +60,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   fireEvent.focus(window);
   expect(legacySession).not.toHaveBeenCalled();
   expect(screen.queryByTestId('overview-kpi-source')).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '资料管理' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '知识库' })).toBeInTheDocument();
 });
 
 it('fails closed before choosing a workspace profile when the mode lookup fails', async () => {
@@ -53,38 +72,48 @@ it('fails closed before choosing a workspace profile when the mode lookup fails'
   expect(window.dashboardIntake!.command).not.toHaveBeenCalled();
 });
 
-it('preserves unpublished input and a pending confirmation across workspace navigation',async()=>{
-  const data=intakeManagementData(1);data.status.state='passed';data.candidate.sourceEvidenceVersion=1;data.candidate.state='ready';
-  let answer!:(value:boolean)=>void;
-  const confirm=vi.fn(()=>new Promise<boolean>(resolve=>{answer=resolve;}));
-  const main=new ContentIntakeManagement({view:()=>({ok:true,enabled:true,signedIn:true,sessionEpoch:1,userId:'synthetic',role:'coach',authMode:'mock',displayName:'合成经理',expiresAt:'2099-01-01T00:00:00Z'}),
-    subscribe:()=>()=>undefined,request:async(_epoch,path,options={})=>({status:200,value:structuredClone(data.respond(path,options.body))})},undefined,confirm);
-  const command=vi.fn(async(c:Parameters<typeof main.command>[0])=>({ok:true as const,view:await main.command(c)}));
-  window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:true,view:main.view()}),command,onInvalidated:fn=>main.subscribe(fn)};
-  const user=userEvent.setup();
-  try{render(<DashboardApp/>);await user.click(await screen.findByRole('button',{name:/source-a/}));
-    await user.click(screen.getByRole('button',{name:'查看材料'}));
-    await user.type(screen.getByRole('textbox',{name:'发布标题'}),'保留的合成标题');await user.type(screen.getByRole('textbox',{name:'发布摘要'}),'保留的合成摘要');
-    await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-content'));
-    expect(screen.getByRole('textbox',{name:'发布标题'})).toHaveValue('保留的合成标题');
-    await user.click(screen.getByRole('button',{name:'发布当前候选'}));await waitFor(()=>expect(confirm).toHaveBeenCalledOnce());
-    await user.click(screen.getByTestId('nav-sop'));await user.click(screen.getByTestId('nav-content'));
-    expect(screen.getByRole('button',{name:'发布当前候选'})).toBeDisabled();
-    await act(async()=>{answer(false);});
-    expect(screen.getByRole('textbox',{name:'发布标题'})).toHaveValue('保留的合成标题');
-    expect(data.workflowReceipts.size).toBe(0);
-    expect(command.mock.calls.filter(([c])=>c.action==='list')).toHaveLength(1);
-  }finally{cleanup();main.dispose();}
+it('keeps an unsent knowledge name across workspace navigation', async () => {
+  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
+  window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
+  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }), command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }), onInvalidated: () => () => undefined };
+  const user = userEvent.setup();
+  installShippedDashboardCss();
+  render(<DashboardApp />);
+  const write = await screen.findByRole('button', { name: '添加话术' });
+  expect(getComputedStyle(write).fontSize).toBe('14px');
+  expect(getComputedStyle(write).fontWeight).toBe('600');
+  expect(getComputedStyle(screen.getByRole('button', { name: '全店' })).fontSize).toBe('14px');
+  expect(getComputedStyle(screen.getByRole('button', { name: '全店' })).fontWeight).toBe('600');
+  await user.click(write);
+  const question = screen.getByRole('textbox', { name: '问题' });
+  expect(getComputedStyle(question).fontSize).toBe('14px');
+  const save = screen.getByRole('button', { name: '保存' });
+  expect(getComputedStyle(save).fontSize).toBe('14px');
+  expect(getComputedStyle(save).fontWeight).toBe('600');
+  await user.type(question, '退货时效');
+  await user.click(screen.getByTestId('nav-overview'));
+  await user.click(screen.getByTestId('nav-content'));
+  expect(screen.getByRole('textbox', { name: '问题' })).toHaveValue('退货时效');
 });
 it('preserves an unsaved permission preview across outer navigation',async()=>{
   const fixture=intakePermissionsData(),owner=new ContentIntakePermissions(fixture.session),user=userEvent.setup();
   window.dashboardPermissions={current:async()=>({ok:true,view:owner.view()}),command:async c=>({ok:true,view:await owner.command(c)}),onInvalidated:fn=>owner.subscribe(fn)};
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
-  try{render(<DashboardApp/>);
+  try{installShippedDashboardCss();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
     expect(screen.getAllByRole('tab')).toHaveLength(6);
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-permissions'));
+    const permissionsPage = document.querySelector('.desk-permissions-page');
+    const permissionsColumn = document.querySelector('.desk-permissions');
+    if (!(permissionsPage instanceof HTMLElement) || !(permissionsColumn instanceof HTMLElement)) throw new Error('missing permissions page');
+    const content = screen.getByTestId('dashboard-content');
+    expect(getComputedStyle(content).backgroundColor).toBe('rgb(241, 244, 248)');
+    expect(getComputedStyle(permissionsPage).backgroundColor).toBe('rgb(241, 244, 248)');
+    expect(getComputedStyle(permissionsPage).minHeight).toBe('100%');
+    expect(getComputedStyle(permissionsPage).maxWidth).not.toBe('1000px');
+    expect(getComputedStyle(permissionsColumn).maxWidth).toBe('1000px');
+    expect(getComputedStyle(permissionsColumn).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     await screen.findByRole('option',{name:'合成坐席'});await user.selectOptions(screen.getByRole('combobox',{name:'人员'}),owner.view().people[0]!.selection);
     fireEvent.change(screen.getByLabelText('生效时间'),{target:{value:'2026-10-08T18:00'}});fireEvent.change(screen.getByLabelText('失效时间'),{target:{value:'2026-10-09T18:00'}});
     await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览 · 尚未保存');

@@ -2,6 +2,7 @@ import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
 import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
+import { registerDeskKnowledgeIpc } from './desk-knowledge-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
@@ -95,6 +96,7 @@ if (!gotLock) {
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
+  let deskKnowledge: ReturnType<typeof registerDeskKnowledgeIpc> | null = null;
   let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
   let seatAccounts: ReturnType<typeof registerSeatAccountIpc> | null = null;
   let disposeIntakeCatalog: (() => void) | null = null;
@@ -131,6 +133,7 @@ if (!gotLock) {
 
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
+    deskKnowledge?.dispose(); deskKnowledge = null;
     intakePermissions?.dispose(); intakePermissions = null;
     seatAccounts?.dispose(); seatAccounts = null;
     disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
@@ -267,6 +270,8 @@ if (!gotLock) {
       () => productProfile?.contentIntake === 'faq-v2');
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+    deskKnowledge = registerDeskKnowledgeIpc(productProfile?.contentIntake ? productSession : null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, userDataDirectory);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl);

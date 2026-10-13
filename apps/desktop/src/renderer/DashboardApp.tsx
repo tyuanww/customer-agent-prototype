@@ -1,5 +1,6 @@
 import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
-import { IntakeManagement } from './features/dashboard/IntakeManagement';
+import { IntakeOverview } from './features/dashboard/IntakeOverview';
+import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import {
   useCallback,
@@ -66,6 +67,7 @@ import {
   type DashboardThemeMode,
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
+import './features/dashboard/desk-chrome.css';
 
 type SidebarDestination = DashboardModuleId | 'permissions';
 
@@ -127,7 +129,9 @@ export function DashboardApp() {
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const navItems = sidebarItems(canOpenPermissions);
+  const navItems = sidebarItems(canOpenPermissions).map((item) => (
+    profile === 'intake' && item.id === 'content' ? { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' } : item
+  ));
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
@@ -1293,19 +1297,13 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {profile === 'intake' ? <>
-            {active === 'overview' && <section className="dash-module" data-testid="module-overview">
-              <header className="dash-module-head"><h1>管理概览</h1></header>
-              <p>资料上传、检查与确认发布在内容管理中完成。{canOpenPermissions ? '岗位授权在侧栏的权限。' : null}</p>
-              <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开内容管理</button>
-                <button className="dash-reset" onClick={() => setActive('wording')}>浏览可用话术</button></div>
-              <p className="dash-scope">经营统计与待办指标未接入。</p>
-            </section>}
+            {active === 'overview' && <IntakeOverview canOpenPermissions={canOpenPermissions} onOpen={setActive} />}
             {active === 'sop' && <section className="dash-module" data-testid="module-sop">
-              <header className="dash-module-head"><h1>SOP</h1></header>
-              <p>当前资料模式尚未接入 SOP。可在内容管理中维护售前、售后等 FAQ 资料。</p>
+              <h1 className="desk-sr">SOP</h1>
+              <p>未接入。</p>
             </section>}
-            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
-            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><IntakeManagement /></div> : null}
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} onOpenLibrary={() => setActive('wording')} />
+            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge /></div> : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
           </> : <>
             {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
