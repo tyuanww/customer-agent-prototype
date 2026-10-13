@@ -105,12 +105,14 @@ export function DeskKnowledge() {
       {view.role !== null ? <p className="desk-note">坐席会收到 {view.delivered.length} 条。全店生效的知识会一起送到这个人设。</p> : null}
       {message ? <p role="status">{message}</p> : null}
       {view.notice && view.notice !== message ? <p role="status">{view.notice}</p> : null}
-      {view.role === null ? <p>{view.signedIn ? '正在读取知识库。' : '请先登录。'}</p> : <table className="desk-table" aria-label="当前人设知识">
+      <table className="desk-table" aria-label="当前人设知识">
         <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>最后更新时间</th><th>操作</th></tr></thead>
         <tbody>
-          {rows}
+          {view.role === null
+            ? <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>
+            : rows}
         </tbody>
-      </table>}
+      </table>
     </div>
     {operator && writing ? <div className="desk-layer-backdrop">
       <div className="desk-layer" role="dialog" aria-labelledby="desk-write-title">
