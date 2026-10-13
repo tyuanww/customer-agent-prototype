@@ -123,7 +123,23 @@
 .desk-column { width: 100%; box-sizing: border-box; padding: 0 0 40px; }
 .desk-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .desk-title-actions { display: flex; align-items: center; gap: 16px; }
-.desk-knowledge h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; color: var(--dash-ink, #11192d); }
+.desk-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.desk-layer { position: relative; }
+.desk-layer-close {
+  position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--dash-ink, #11192d); font-size: 20px; line-height: 32px; cursor: pointer;
+}
+.desk-icon-button {
+  width: 32px; height: 32px; min-height: 32px; border: 1px solid var(--dash-line, #e6e8ee); border-radius: 8px;
+  background: #fff; color: var(--dash-purple, #6f4cc3); font-size: 18px; cursor: pointer;
+}
+.desk-filter-row, .desk-entry-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.desk-filter-row label, .intake-library .intake-toolbar label { display: inline-flex; align-items: center; gap: 8px; }
+.intake-grant-split { display: block; }
+.desk-knowledge h1.desk-sr { position: absolute; }
 .dashboard-shell .desk-text-button {
   border: 0; background: transparent; padding: 0; min-height: 0; height: auto;
   color: var(--dash-purple, #6f4cc3); font-size: 14px; font-weight: 500; cursor: pointer;
