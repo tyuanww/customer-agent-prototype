@@ -43,10 +43,14 @@ function isCause(value: string): value is DashboardIterationCause {
 }
 
 function catalogFromWording(result: DashboardWordingResult): CloseHintCatalog | null {
-  if (!result.ok || result.catalogRefreshedAt === null) return null;
+  if (!result.ok) return null;
   return {
     catalogRefreshedAt: result.catalogRefreshedAt,
-    entries: result.entries.map((entry) => ({ scriptId: entry.scriptId })),
+    matchesLease: result.matchesLease,
+    entries: result.entries.map((entry) => ({
+      scriptId: entry.scriptId,
+      effectiveFrom: entry.effectiveFrom,
+    })),
   };
 }
 

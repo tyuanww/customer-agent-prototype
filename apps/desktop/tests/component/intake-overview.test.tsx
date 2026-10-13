@@ -16,16 +16,22 @@ function task(status: DashboardIterationTask['status'], id = 'task-1'): Dashboar
   };
 }
 
-function wording(refreshedAt: string | null, scriptId = 'script-a'): DashboardWordingView {
+function wording(
+  refreshedAt: string | null,
+  scriptId = 'script-a',
+  lease: { matchesLease?: boolean; effectiveFrom?: string | null } = {},
+): DashboardWordingView {
   const entry: DashboardWordingEntry = {
     scriptId, domain: 'product', title: '运费', scene: '运费', answerPreview: '买家承担',
-    platform: '千牛', version: 'rel_9', scriptVersion: 2, effectiveFrom: null, effectiveTo: null,
+    platform: '千牛', version: 'rel_9', scriptVersion: 2,
+    effectiveFrom: lease.effectiveFrom === undefined ? null : lease.effectiveFrom,
+    effectiveTo: null,
     effectiveWindow: '当前发布', risk: 'low', lifecycle: 'published', lifecycleLabel: '已发布',
     ownerRole: '当前发布', dataClass: 'current-release',
   };
   return {
     ok: true, releaseId: 'rel_9', total: 1, entries: [entry],
-    catalogRefreshedAt: refreshedAt, matchesLease: true,
+    catalogRefreshedAt: refreshedAt, matchesLease: lease.matchesLease ?? true,
   };
 }
 
@@ -185,6 +191,62 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
   expect(close).toHaveBeenCalledWith({
     taskId: 'task-1', expectedVersion: 1, status: 'resolved', resolutionNote: '内容缺口',
   });
+});
+
+it('closes 内容缺口 when the announce lease shows that script published after the task', async () => {
+  const close = vi.fn(async () => ({ ok: true as const, task: task('resolved') }));
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [task('in_progress')], nextCursor: null })),
+    start: vi.fn(),
+    close,
+  };
+  const sameRelease = vi.fn(async () => wording(null, 'script-a', {
+    matchesLease: true,
+    effectiveFrom: '2026-10-12T00:00:00.000Z',
+  }));
+  window.dashboardWording = { list: sameRelease };
+  const user = userEvent.setup();
+  const { unmount } = render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  await screen.findByText('处理中');
+  await settleWording(sameRelease);
+  await user.click(screen.getByRole('button', { name: '已处理' }));
+  expect(await screen.findByText('内容缺口要等这条话术有更新的已发布版本后才能标已处理。')).toBeInTheDocument();
+  expect(close).not.toHaveBeenCalled();
+  unmount();
+
+  const newerLease = vi.fn(async () => wording(null, 'script-a', {
+    matchesLease: true,
+    effectiveFrom: '2026-10-14T00:00:00.000Z',
+  }));
+  window.dashboardWording = { list: newerLease };
+  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  await screen.findByText('处理中');
+  await settleWording(newerLease);
+  await user.click(screen.getByRole('button', { name: '已处理' }));
+  expect(close).toHaveBeenCalledWith({
+    taskId: 'task-1', expectedVersion: 1, status: 'resolved', resolutionNote: '内容缺口',
+  });
+});
+
+it('does not treat a local catalog without a refresh time as a newer release', async () => {
+  const close = vi.fn(async () => ({ ok: true as const, task: task('resolved') }));
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [task('in_progress')], nextCursor: null })),
+    start: vi.fn(),
+    close,
+  };
+  const local = vi.fn(async () => wording(null, 'script-a', {
+    matchesLease: false,
+    effectiveFrom: '2026-10-14T00:00:00.000Z',
+  }));
+  window.dashboardWording = { list: local };
+  const user = userEvent.setup();
+  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  await screen.findByText('处理中');
+  await settleWording(local);
+  await user.click(screen.getByRole('button', { name: '已处理' }));
+  expect(await screen.findByText('内容缺口要等这条话术有更新的已发布版本后才能标已处理。')).toBeInTheDocument();
+  expect(close).not.toHaveBeenCalled();
 });
 
 it('defers another cause only with a reason and does not rewrite the script', async () => {

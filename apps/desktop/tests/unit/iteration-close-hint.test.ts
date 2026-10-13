@@ -3,6 +3,7 @@ import {
   ITERATION_CLOSE_HINT_COPY,
   decideIterationClose,
   hasPublishCloseHint,
+  leasePublishesScriptAfterTask,
   relatedScriptIdsForTask,
 } from '../../src/shared/iteration-close-hint';
 
@@ -82,6 +83,30 @@ describe('iteration publish close hint', () => {
       status: 'resolved',
       resolutionNote: '补过了',
     })).toEqual({ ok: false, reason: 'needs_newer_release' });
+  });
+
+  it('accepts an announce lease only when that script effective time is after the task', () => {
+    const lease = {
+      catalogRefreshedAt: null,
+      matchesLease: true,
+      entries: [{ scriptId: 'script-a', effectiveFrom: '2026-09-21T00:00:00.000Z' }],
+    };
+    expect(leasePublishesScriptAfterTask(openTask, lease)).toBe(true);
+    expect(leasePublishesScriptAfterTask(openTask, {
+      ...lease,
+      entries: [{ scriptId: 'script-a', effectiveFrom: '2026-09-19T00:00:00.000Z' }],
+    })).toBe(false);
+    expect(leasePublishesScriptAfterTask(openTask, {
+      ...lease,
+      entries: [{ scriptId: 'other', effectiveFrom: '2026-09-21T00:00:00.000Z' }],
+    })).toBe(false);
+    expect(leasePublishesScriptAfterTask(openTask, { ...lease, matchesLease: false })).toBe(false);
+    expect(decideIterationClose({
+      task: { ...openTask, suspectedCause: 'content_gap' },
+      catalog: lease,
+      status: 'resolved',
+      resolutionNote: '',
+    })).toEqual({ ok: true, status: 'resolved', resolutionNote: '' });
   });
 
   it('内容缺口 close is allowed after a newer published release', () => {
