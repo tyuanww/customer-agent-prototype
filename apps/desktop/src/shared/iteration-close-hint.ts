@@ -15,7 +15,9 @@ export type CloseHintTask = InaccuracyTodoTask & Readonly<{
 
 export type CloseHintCatalog = Readonly<{
   catalogRefreshedAt: string | null;
-  entries: readonly Readonly<{ scriptId: string }>[];
+  /** True only for the in-memory announce lease. That payload has no file mtime. */
+  matchesLease?: boolean;
+  entries: readonly Readonly<{ scriptId: string; effectiveFrom?: string | null }>[];
 }>;
 
 export function relatedScriptIdsForTask(task: InaccuracyTodoTask): readonly string[] {
@@ -48,6 +50,32 @@ export function hasPublishCloseHint(task: CloseHintTask, catalog: CloseHintCatal
   return related.some((scriptId) => published.has(scriptId));
 }
 
+/**
+ * A live announce lease has no catalog file time. It proves a newer release
+ * only when the published script's own effectiveFrom is after the task.
+ * Callers must not invent that time.
+ */
+export function leasePublishesScriptAfterTask(task: CloseHintTask, catalog: CloseHintCatalog | null): boolean {
+  if (catalog === null || catalog.matchesLease !== true) return false;
+  if (catalog.catalogRefreshedAt !== null) return false;
+  if (task.status !== 'open' && task.status !== 'in_progress') return false;
+  const created = Date.parse(task.createdAt);
+  if (!Number.isFinite(created)) return false;
+  const related = new Set(relatedScriptIdsForTask(task));
+  if (related.size === 0) return false;
+  return catalog.entries.some((entry) => {
+    if (!related.has(entry.scriptId)) return false;
+    if (typeof entry.effectiveFrom !== 'string' || entry.effectiveFrom.length === 0) return false;
+    const from = Date.parse(entry.effectiveFrom);
+    return Number.isFinite(from) && from > created;
+  });
+}
+
+export function hasNewerPublishedRelease(task: CloseHintTask, catalog: CloseHintCatalog | null): boolean {
+  if (hasPublishCloseHint(task, catalog)) return true;
+  return leasePublishesScriptAfterTask(task, catalog);
+}
+
 export type IterationCloseDecision =
   | { ok: true; status: 'resolved' | 'wont_fix'; resolutionNote: string }
   | { ok: false; reason: 'needs_newer_release' | 'needs_reason' };
@@ -72,7 +100,7 @@ export function decideIterationClose(input: {
     if (note.length === 0) return Object.freeze({ ok: false, reason: 'needs_reason' });
     return Object.freeze({ ok: true, status: 'wont_fix', resolutionNote: note });
   }
-  if (input.task.suspectedCause === 'content_gap' && !hasPublishCloseHint(input.task, input.catalog)) {
+  if (input.task.suspectedCause === 'content_gap' && !hasNewerPublishedRelease(input.task, input.catalog)) {
     return Object.freeze({ ok: false, reason: 'needs_newer_release' });
   }
   return Object.freeze({ ok: true, status: 'resolved', resolutionNote: note });
