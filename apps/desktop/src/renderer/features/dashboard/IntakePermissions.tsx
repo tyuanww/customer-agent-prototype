@@ -155,7 +155,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
     setPost(value);
   };
   return <IntakeAntdTheme><div className="desk-permissions-page"><section className="intake-management desk-permissions" aria-label="权限配置">
-    <header><div><h1>权限配置</h1><p>总监、经理在已获分配资格的范围内直接配置业务权限，无需审批。</p></div></header>
+    <h1 className="desk-sr">权限配置</h1>
     <div className="intake-toolbar"><button disabled={disabled || !!view?.preview} onClick={()=>void apply({action:'refresh'})}>刷新权限列表</button>
       <button disabled={!busy && !view?.busy} onClick={()=>void apply({action:'stop'})}>停止等待</button></div>
     {error && <p role="alert">{error}</p>}{view?.notice && <p role="status">{view.notice}</p>}
@@ -170,12 +170,10 @@ export function IntakePermissions({ active }: { active: boolean }) {
       <div hidden={job!=='grants'}>
       <div className="intake-fields"><Form.Item label="配置范围"><select aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
         <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></Form.Item></div>
-      {view.source && <div className="intake-grant-split">
+      <div className="intake-grant-split">
         <div>
-        <h2>范围内的人员</h2>
-        {!view.people.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前没有可选择的人员。" />}
         <table className="intake-candidate-table" aria-label="人员"><thead><tr><th>姓名</th><th>登录名</th><th>岗位</th><th>状态</th></tr></thead><tbody>
-          {view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;})}
+          {view.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return <tr key={p.selection}><td>{p.label}</td><td>—</td><td>{grant.post ?? '—'}</td><td>{grant.status}</td></tr>;}) : <tr><td colSpan={4}>{view.source ? '当前没有可选择的人员。' : '请选择配置范围。'}</td></tr>}
         </tbody></table>
         <section aria-label="已有业务权限"><h2>当前可管理的业务权限</h2><p>当前姓名不可用时，请依据授权记录编号、范围和原授权原因核对后撤销；不会猜测人员。</p>
           {!view.grants.length && <p>此范围暂无可管理业务权限。</p>}
@@ -201,7 +199,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
           <div className="intake-toolbar"><Button type="primary" className="dash-action-primary" disabled={disabled} onClick={()=>void apply({action:'save'})}>确认保存权限</Button>
           <button disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button></div></section>}
         </div>
-      </div>}
+      </div>
       </div>
       <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} /></div>
     </>}

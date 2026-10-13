@@ -1,4 +1,5 @@
 import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
+import { IntakeOverview } from './features/dashboard/IntakeOverview';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import {
@@ -1296,18 +1297,12 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {profile === 'intake' ? <>
-            {active === 'overview' && <section className="dash-module" data-testid="module-overview">
-              <header className="dash-module-head"><h1>管理概览</h1></header>
-              <p>知识按人设上传，生效后才到坐席。{canOpenPermissions ? '岗位授权在侧栏的权限。' : null}</p>
-              <div className="intake-toolbar"><button className="dash-action-primary" onClick={() => setActive('content')}>打开知识库</button>
-                <button className="dash-reset" onClick={() => setActive('wording')}>浏览可用话术</button></div>
-              <p className="dash-scope">经营统计与待办指标未接入。</p>
-            </section>}
+            {active === 'overview' && <IntakeOverview canOpenPermissions={canOpenPermissions} onOpen={setActive} />}
             {active === 'sop' && <section className="dash-module" data-testid="module-sop">
-              <header className="dash-module-head"><h1>SOP</h1></header>
-              <p>售前、售后知识在知识库里按人设生效。SOP 流程未接入。</p>
+              <h1 className="desk-sr">SOP</h1>
+              <p>未接入。</p>
             </section>}
-            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} onOpenLibrary={() => setActive('wording')} />
             {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge /></div> : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
           </> : <>
