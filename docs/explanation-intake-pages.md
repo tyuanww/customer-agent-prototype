@@ -37,5 +37,6 @@
 
 ## 相关
 
+- [人设知识库](reference-desk-knowledge.md)
 - [资料页与权限页](reference-intake-pages.md)
 - [如何操作资料页和权限页](how-to-operate-intake-pages.md)
