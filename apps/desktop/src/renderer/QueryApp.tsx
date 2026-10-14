@@ -58,6 +58,7 @@ import {
   queryHandoffCssVars,
   queryShellClassName,
   resultCopyRankFromKey,
+  SESSION_NOTICE_TEXT,
   sessionNoticeForResult,
   type SessionNotice,
   type SessionNoticeSource,
@@ -110,6 +111,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   );
   const [smartEnabled, setSmartEnabled] = useState(true);
   const [layoutReady, setLayoutReady] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +139,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
   const sessionBusyRef = useRef(false);
+  const sessionGenerationRef = useRef(0);
   const noticeRequestRef = useRef(0);
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
@@ -1031,16 +1034,24 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     return () => { live = false; unsubscribe(); window.clearInterval(interval); };
   }, [acceptProductSession]);
 
-  const sessionAction = useCallback(async (): Promise<ProductSessionResult | null> => {
+  const sessionAction = useCallback(async (options?: { replace?: boolean }): Promise<ProductSessionResult | null> => {
     const product = window.customerAgent?.product;
-    if (!product || sessionBusy) {
-      return null;
+    if (!product) return null;
+    const signingOut = Boolean(productState?.ok && productState.signedIn);
+    // Logout stays single-flight. The login button can replace a missed
+    // authorization; the dashboard entry waits for the login already running.
+    if (sessionBusyRef.current && (signingOut || !options?.replace)) return null;
+    const generation = ++sessionGenerationRef.current;
+    if (!signingOut) {
+      const waiting = { kind: 'waiting' as const, text: SESSION_NOTICE_TEXT.waiting };
+      sessionNoticeRef.current = waiting;
+      setSessionNotice(waiting);
     }
     sessionBusyRef.current = true;
     setSessionBusy(true);
-    const signingOut = Boolean(productState?.ok && productState.signedIn);
     try {
       const result = await (signingOut ? product.logout() : product.login());
+      if (generation !== sessionGenerationRef.current) return null;
       if (result.sessionEpoch < productEpochRef.current) {
         pendingDashboardOpenRef.current = false;
         return null;
@@ -1054,13 +1065,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       return result;
     } catch {
-      pendingDashboardOpenRef.current = false;
+      if (generation === sessionGenerationRef.current) pendingDashboardOpenRef.current = false;
       return null;
     } finally {
-      sessionBusyRef.current = false;
-      setSessionBusy(false);
+      if (generation === sessionGenerationRef.current) {
+        sessionBusyRef.current = false;
+        setSessionBusy(false);
+      }
     }
-  }, [acceptProductSession, productState, sessionBusy]);
+  }, [acceptProductSession, productState]);
 
   const resetIntakeView = useCallback(() => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
@@ -1790,8 +1803,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           intake={intake}
-          scopeControl={<button type="button" className="capsule-session-entry" disabled={!signedInSession}
-            onClick={() => { reportPhase('RESULTS', results.length as ResultCount); }}>筛选</button>}
+          scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry" disabled={!signedInSession}
+            onClick={() => { setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', results.length as ResultCount); }}>筛选</button> : null}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}
@@ -1801,7 +1814,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
                 ? `${sessionEntryLabel(signedInSession)} · 到期 ${signedInSession.expiresAt}`
                 : '登录后查询话术'}
               unsignedLabel={SESSION_ENTRY_UNSIGNED_LABEL}
-              onClick={() => { void sessionAction(); }}
+              onClick={() => { void sessionAction({ replace: true }); }}
             />
           ) : null}
           foxVisualState={foxVisualState}
@@ -1857,7 +1870,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
+            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
+              onToggle={() => { setFiltersOpen(current => !current); setLayoutReady(false); }}
+              onOpen={() => { setFiltersOpen(true); setLayoutReady(false); }}
+              onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
                 values={placeholderValues}

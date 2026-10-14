@@ -130,7 +130,7 @@ export function maxContentBottom(
   return lastContentBottom;
 }
 
-export type SessionNoticeKind = 'unsigned' | 'expired' | 'success' | 'failed';
+export type SessionNoticeKind = 'unsigned' | 'expired' | 'success' | 'failed' | 'waiting';
 export type SessionNotice = { kind: SessionNoticeKind; text: string };
 export type SessionNoticeSource = 'status' | 'login' | 'logout';
 
@@ -139,6 +139,7 @@ export const SESSION_NOTICE_TEXT = {
   loggedOut: '已退出，请先登录',
   success: '登录成功，可以直接查询',
   expired: '登录已失效，请重新登录',
+  waiting: '请在登录页完成授权。如果没有点到授权，可以再次点击登录。',
 } as const;
 
 export const QUERY_PLACEHOLDER_UNSIGNED = '登录后查询话术';
@@ -168,6 +169,7 @@ export function sessionNoticeForResult(input: {
     if (wasSignedIn) {
       return { kind: 'expired', text: SESSION_NOTICE_TEXT.expired };
     }
+    if (source === 'status' && previous?.kind === 'waiting') return previous;
     if (source === 'status' && (previous?.kind === 'unsigned' || previous?.kind === 'failed')) {
       return previous;
     }

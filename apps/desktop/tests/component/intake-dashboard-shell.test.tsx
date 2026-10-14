@@ -82,6 +82,15 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   installShippedDashboardCss();
   render(<DashboardApp />);
   const write = await screen.findByRole('button', { name: '添加话术' });
+  const content = screen.getByTestId('dashboard-content');
+  const knowledge = document.querySelector('.desk-knowledge');
+  const column = document.querySelector('.desk-knowledge .desk-column');
+  if (!(knowledge instanceof HTMLElement) || !(column instanceof HTMLElement) || !(knowledge.parentElement instanceof HTMLElement)) {
+    throw new Error('missing knowledge page');
+  }
+  expect(getComputedStyle(content).backgroundColor).toBe('rgb(255, 255, 255)');
+  expect(getComputedStyle(knowledge.parentElement).backgroundColor).toBe('rgb(255, 255, 255)');
+  expect(getComputedStyle(column).maxWidth).toBe('none');
   expect(getComputedStyle(write).fontSize).toBe('14px');
   expect(getComputedStyle(write).fontWeight).toBe('600');
   expect(getComputedStyle(screen.getByRole('button', { name: '全店' })).fontSize).toBe('14px');

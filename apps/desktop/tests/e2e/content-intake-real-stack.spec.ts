@@ -301,6 +301,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(query.getByRole('button', { name: '登录', exact: true })).toBeVisible();
     await login();
     expect(await query.evaluate(() => window.customerAgent!.product!.sessionStatus())).toMatchObject({ role: 'agent', signedIn: true });
+    await query.getByRole('button', { name: '筛选', exact: true }).click();
     const shops = query.getByRole('combobox', { name: '当前店铺' });
     await expect(shops.locator('option')).toHaveCount(2);
     await shops.selectOption('shop-a');
