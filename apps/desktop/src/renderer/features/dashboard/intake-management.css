@@ -249,12 +249,11 @@
 .desk-knowledge button:disabled { cursor: not-allowed; opacity: 0.48; }
 @media (max-width: 760px) { .desk-grid { grid-template-columns: minmax(0, 1fr); } }
 
-.dashboard-shell .dashboard-content:has(> div:not([hidden]) > .desk-knowledge),
 .dashboard-shell .dashboard-content:has(> div:not([hidden]) > .desk-permissions-page) {
   flex: 1;
   background: #F1F4F8;
 }
-.dashboard-shell .dashboard-content > div:not([hidden]):has(> :is(.desk-knowledge, .desk-permissions-page)) {
+.dashboard-shell .dashboard-content > div:not([hidden]):has(> .desk-permissions-page) {
   min-height: 100%;
   background: #F1F4F8;
 }

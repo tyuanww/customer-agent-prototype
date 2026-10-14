@@ -9,25 +9,34 @@ const mocks = vi.hoisted(() => {
   const webContents = {
     setWindowOpenHandler: vi.fn(),
     on: vi.fn(),
+    focus: vi.fn(),
+    isDestroyed: vi.fn(() => false),
     getURL: vi.fn(() => 'http://127.0.0.1:5173/?role=login'),
     loadURL,
   };
   const windowInstance = {
     loadURL,
     show: vi.fn(),
+    moveTop: vi.fn(),
+    focus: vi.fn(),
+    setAlwaysOnTop: vi.fn(),
+    once: vi.fn(),
     destroy: vi.fn(),
     isDestroyed: vi.fn(() => false),
     webContents,
     on: vi.fn(),
   };
+  const getFocusedWindow = vi.fn((): unknown => null);
+  const BrowserWindow = Object.assign(vi.fn(function MockBrowserWindow() {
+    return windowInstance;
+  }), { getFocusedWindow });
   return {
     handlers,
     loadURL,
     webContents,
     windowInstance,
-    BrowserWindow: vi.fn(function MockBrowserWindow() {
-      return windowInstance;
-    }),
+    getFocusedWindow,
+    BrowserWindow,
     ipcMain: {
       removeHandler: vi.fn((channel: string) => { handlers.delete(channel); }),
       handle: vi.fn((channel: string, fn: (event: { sender: unknown }, payload?: unknown) => Promise<unknown>) => {
@@ -69,7 +78,16 @@ beforeEach(() => {
   mocks.loadURL.mockClear();
   mocks.BrowserWindow.mockClear();
   mocks.windowInstance.destroy.mockClear();
+  mocks.windowInstance.show.mockClear();
+  mocks.windowInstance.moveTop.mockClear();
+  mocks.windowInstance.focus.mockClear();
+  mocks.windowInstance.setAlwaysOnTop.mockClear();
+  mocks.windowInstance.once.mockReset();
   mocks.windowInstance.isDestroyed.mockReturnValue(false);
+  mocks.webContents.focus.mockClear();
+  mocks.webContents.isDestroyed.mockReturnValue(false);
+  mocks.getFocusedWindow.mockReset();
+  mocks.getFocusedWindow.mockReturnValue(null);
   mocks.shell.openExternal.mockClear();
 });
 
@@ -220,6 +238,55 @@ describe('createLoginWindow', () => {
     expect(LOGIN_IDENTITY_TIMEOUT_MS).toBe(15_000);
     expect(JSON.stringify(mocks.loadURL.mock.calls)).not.toContain('/v1/auth/callback');
     await opened;
+  });
+
+  it('raises the login window above the floating query panel and returns focus on close', async () => {
+    const previousContents = { isDestroyed: vi.fn(() => false), focus: vi.fn() };
+    const previous = {
+      focus: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      isVisible: vi.fn(() => true),
+      webContents: previousContents,
+    };
+    mocks.getFocusedWindow.mockReturnValue(previous);
+    const closed = new Map<string, () => void>();
+    mocks.windowInstance.once.mockImplementation((event: string, handler: () => void) => {
+      closed.set(event, handler);
+    });
+    openWindow();
+    await vi.waitFor(() => expect(mocks.windowInstance.show).toHaveBeenCalledOnce());
+    expect(mocks.BrowserWindow).toHaveBeenCalledWith(expect.objectContaining({
+      acceptFirstMouse: true, show: false, title: '登录',
+    }));
+    if (process.platform === 'darwin') {
+      expect(mocks.windowInstance.setAlwaysOnTop).toHaveBeenCalledWith(true, 'modal-panel');
+    } else {
+      expect(mocks.windowInstance.setAlwaysOnTop).toHaveBeenCalledWith(true);
+    }
+    expect(mocks.windowInstance.moveTop).toHaveBeenCalledOnce();
+    expect(mocks.windowInstance.focus).toHaveBeenCalledOnce();
+    expect(mocks.webContents.focus).toHaveBeenCalledOnce();
+    closed.get('closed')?.();
+    expect(previous.focus).toHaveBeenCalledOnce();
+    expect(previousContents.focus).toHaveBeenCalledOnce();
+  });
+
+  it('does not return focus to a hidden window when login closes', async () => {
+    const previous = {
+      focus: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      isVisible: vi.fn(() => false),
+      webContents: { isDestroyed: vi.fn(() => false), focus: vi.fn() },
+    };
+    mocks.getFocusedWindow.mockReturnValue(previous);
+    const closed = new Map<string, () => void>();
+    mocks.windowInstance.once.mockImplementation((event: string, handler: () => void) => {
+      closed.set(event, handler);
+    });
+    openWindow();
+    await vi.waitFor(() => expect(mocks.windowInstance.once).toHaveBeenCalledWith('closed', expect.any(Function)));
+    closed.get('closed')?.();
+    expect(previous.focus).not.toHaveBeenCalled();
   });
 
   it('aborts the login operation when cancelled after the browser opens', async () => {

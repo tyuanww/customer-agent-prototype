@@ -331,12 +331,13 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 .mask.on { z-index: 60; }
 
 /* ===== page width/background parity ===== */
+.dashboard-shell.is-intake .dashboard-content:has(> div:not([hidden]) > .desk-knowledge),
 .dashboard-shell.is-intake .dashboard-content:has(> div:not([hidden]) > .desk-permissions-page),
 .dashboard-shell.is-intake .dashboard-content > div:not([hidden]):has(> :is(.desk-knowledge, .desk-permissions-page)),
 .dashboard-shell.is-intake .desk-permissions-page { background: #fff; }
 .dashboard-shell.is-intake .wb9.intake-management,
-.dashboard-shell.is-intake .wb9.desk-knowledge .desk-column,
 .dashboard-shell.is-intake .desk-permissions.intake-management { max-width: 1000px; margin: 0; }
+.dashboard-shell.is-intake .wb9.desk-knowledge .desk-column { max-width: none; width: 100%; margin: 0; }
 .wb9 .intake-management, .wb9.intake-management { padding: 0; }
 .wb9 .search { position: relative; }
 .wb9 h2 { font-size: 14px; line-height: 22px; font-weight: 600; }

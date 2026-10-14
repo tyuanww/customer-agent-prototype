@@ -84,12 +84,16 @@ export function DeskKnowledge({
   useEffect(() => {
     if (!api) return undefined;
     let live = true;
-    void api.current().then((reply) => {
-      if (!live) return;
-      if (reply.view) setView(reply.view);
-      if (!reply.ok) setMessage(reply.message);
-    }).catch(() => { if (live) setMessage('知识库暂时读不出来。'); });
-    return () => { live = false; };
+    const load = () => {
+      void api.current().then((reply) => {
+        if (!live) return;
+        if (reply.view) setView(reply.view);
+        setMessage(reply.ok ? null : reply.message);
+      }).catch(() => { if (live) setMessage('知识库暂时读不出来。'); });
+    };
+    load();
+    const stop = window.dashboardContent?.onSessionChanged?.(load);
+    return () => { live = false; stop?.(); };
   }, [api]);
 
   useEffect(() => {

@@ -156,7 +156,10 @@ export class ProductSession {
     }
   }
   async login(): Promise<ProductSessionResult> {
-    if (this.operation) return productFailure('CONFLICT', this.epoch);
+    // A second click replaces an unfinished login. Leaving the first one
+    // running made the query button look dead until the 120s poll ended.
+    if (this.operation && !this.token) this.operation.abort();
+    else if (this.operation) return productFailure('CONFLICT', this.epoch);
     if (this.token) return this.status();
     const cleared = this.invalidate(); if (!cleared.ok) return cleared;
     const epoch = this.epoch; const operation = new AbortController(); this.operation = operation;
@@ -180,6 +183,7 @@ export class ProductSession {
         return this.install(token, await this.identify(token, operation.signal), epoch, operation.signal);
       }
     } catch (error) {
+      if (epoch !== this.epoch || this.operation !== operation) return productFailure('STALE', epoch);
       const failure = this.fail(error, epoch);
       if (exchangedToken) {
         try { await this.http.request('/v1/auth/logout', { token: exchangedToken, method: 'POST' }); }

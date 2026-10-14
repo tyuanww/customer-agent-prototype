@@ -746,6 +746,34 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('placeholder', '登录后查询话术');
   });
 
+  it('keeps login clickable and retries when the authorization page was missed', async () => {
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 4, userId: 'usr_synthetic_owner', role: 'owner' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: '管理员' };
+    const first = deferred<import('../../src/shared/product-session').ProductSessionResult>();
+    const second = deferred<import('../../src/shared/product-session').ProductSessionResult>();
+    const login = vi.fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedOut),
+      login,
+      logout: vi.fn(),
+      onSessionChanged: () => () => {},
+    };
+    render(<QueryApp />);
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByTestId('session-notice-waiting')).toHaveTextContent('请在登录页完成授权。如果没有点到授权，可以再次点击登录。');
+    const again = screen.getByRole('button', { name: '登录' });
+    expect(again).toBeEnabled();
+    fireEvent.click(again);
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(2));
+    await act(async () => { second.resolve(signedIn); });
+    expect(await screen.findByRole('button', { name: /· 退出$/ })).toBeInTheDocument();
+    await act(async () => { first.resolve({ ...signedOut, sessionEpoch: 2 }); });
+    expect(screen.getByRole('button', { name: /· 退出$/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('session-notice-waiting')).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     commandListeners.clear();
     delete window.customerAgent;
@@ -2529,7 +2557,8 @@ describe('QueryApp', () => {
       copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
     };
     render(<QueryApp intake />); activateQuery();
-    await user.click(await screen.findByRole('button', { name: '筛选' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toHaveClass('intake-filter-toggle'));
+    await user.click(screen.getByRole('button', { name: '筛选' }));
     await user.click(await screen.findByText('商品 · 通用'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成客户问题' } });
     await user.click(screen.getByRole('checkbox', { name: '合成商品' }));
