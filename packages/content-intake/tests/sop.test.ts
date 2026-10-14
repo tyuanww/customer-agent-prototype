@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { createSyntheticSopWorkbook, parseSopWorkbook, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
+import JSZip from 'jszip';
+import { createSyntheticSopWorkbook, parseSopWorkbook, repairEmptySharedStringMarkers, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
 
 const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=';
 const context: SopParseContext = {
@@ -27,6 +28,35 @@ async function fixture(options: { imageOnly?: boolean; extraSheet?: boolean; ver
 }
 
 describe('candidate SOP workbook parser', () => {
+  it('keeps a finite step number and a rich-text run that follows an empty text marker', async () => {
+    expect(repairEmptySharedStringMarkers('<ns0:si xmlns:ns0="urn:s"><ns0:t /><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>'))
+      .toBe('<ns0:si xmlns:ns0="urn:s"><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>');
+    const book = new ExcelJS.Workbook();
+    for (const name of SOP_SHEET_NAMES) {
+      const sheet = book.addWorksheet(name);
+      sheet.getCell('A1').value = name;
+      sheet.getCell('A2').value = '步骤文字';
+      if (name === SOP_SHEET_NAMES[1]) {
+        sheet.getCell('B2').value = 1;
+        // ExcelJS types say hyperlink text is a string. WPS writes a rich-text object there.
+        sheet.getCell('C2').value = { text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/sop' } as unknown as ExcelJS.CellValue;
+      }
+    }
+    const zip = await JSZip.loadAsync(Buffer.from(await book.xlsx.writeBuffer()));
+    const shared = zip.file('xl/sharedStrings.xml');
+    expect(shared).not.toBeNull();
+    const xml = await shared!.async('string');
+    zip.file('xl/sharedStrings.xml', xml.replace(
+      /<si>(?:<t[^>]*>步骤文字<\/t>|<t xml:space="preserve">步骤文字<\/t>)<\/si>/,
+      '<si><t/><r><t>步骤文字</t></r></si>',
+    ));
+    const result = await parseSopWorkbook(await zip.generateAsync({ type: 'nodebuffer' }), context);
+    expect(result.ok).toBe(true);
+    expect(result.rows.some((row) => row.sheet === SOP_SHEET_NAMES[1] && row.text.includes('1') && row.text.includes('链接文字'))).toBe(true);
+    expect(result.rows.some((row) => row.text.includes('https://synthetic.example/sop'))).toBe(false);
+    expect(result.rows.some((row) => row.text.includes('步骤文字'))).toBe(true);
+  });
+
   it('normalizes row text and attaches every image anchored on that row', async () => {
     const result = await parseSopWorkbook(await fixture(), context);
     expect(result.ok).toBe(true);

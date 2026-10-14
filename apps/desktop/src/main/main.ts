@@ -19,6 +19,8 @@ import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { registerDashboardContentIpc } from './dashboard-content-ipc';
 import { registerDashboardIterationIpc } from './dashboard-iteration-ipc';
+import { registerUsageLogIpc } from './usage-log-ipc';
+import { registerSopWorkbookIpc } from './sop-workbook-ipc';
 import { registerDashboardOpsLoopIpc } from './dashboard-ops-loop-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
@@ -280,6 +282,16 @@ if (!gotLock) {
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => controller?.dashboardWebContents() ?? null);
+    // faq-v2 and the legacy dashboard both read these channels. A null source
+    // still replies 未接入 and does not write a file.
+    registerUsageLogIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
+    registerSopWorkbookIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
     // The FAQ profile has no legacy hydrate, remote model, catalog or admin adapter.
     if (!productProfile?.contentIntake) {
       registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],

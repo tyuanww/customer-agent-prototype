@@ -1790,7 +1790,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           intake={intake}
-          scopeControl={<button type="button" className="retry-btn" disabled={!signedInSession}
+          scopeControl={<button type="button" className="capsule-session-entry" disabled={!signedInSession}
             onClick={() => { reportPhase('RESULTS', results.length as ResultCount); }}>筛选</button>}
           productControl={showProductSession ? (
             <QuerySessionControl

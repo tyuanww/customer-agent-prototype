@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import { createHash } from 'node:crypto';
 import { inspectArchive } from './archive.js';
 import { INTAKE_POLICY as P, IntakeFailure, type Issue } from './policy.js';
@@ -94,15 +95,47 @@ const validContext = (context: SopParseContext): boolean => Boolean(context)
   && SOP_SHEET_NAMES.every((name) => context.selectedSheets.includes(name))
   && new Set(context.selectedSheets).size === context.selectedSheets.length;
 
+function richTextParts(value: { richText?: readonly { text?: unknown }[] }): string | undefined {
+  if (!Array.isArray(value.richText) || !value.richText.every((part) => typeof part.text === 'string')) return undefined;
+  return value.richText.map((part) => part.text as string).join('');
+}
+
 function cellText(value: ExcelJS.CellValue): string | undefined {
   if (value === null || value === undefined || value === '') return '';
   if (typeof value === 'string') return value;
-  if (typeof value === 'object' && value !== null && 'richText' in value
-    && Array.isArray(value.richText) && value.richText.every((part) => typeof part.text === 'string')) {
-    return value.richText.map((part) => part.text).join('');
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value !== 'object' || value === null) return undefined;
+  if ('richText' in value) return richTextParts(value);
+  if ('text' in value) {
+    if (typeof value.text === 'string') return value.text;
+    if (value.text && typeof value.text === 'object' && 'richText' in value.text) return richTextParts(value.text);
   }
-  if (typeof value === 'object' && value !== null && 'text' in value && typeof value.text === 'string') return value.text;
   return undefined;
+}
+
+/** WPS and Feishu exports put an empty `<t/>` before rich-text runs. ExcelJS then
+ * tries to assign `richText` onto that empty string and refuses the workbook. */
+export function repairEmptySharedStringMarkers(xml: string): string {
+  return xml.replace(
+    /<((?:[\w.-]+):)?si\b([^>]*)>\s*<(?:[\w.-]+:)?t(?:\s[^>]*?)?(?:\/>|>\s*<\/(?:[\w.-]+:)?t>)(?=\s*<(?:[\w.-]+:)?r\b)/g,
+    '<$1si$2>',
+  );
+}
+
+async function workbookBytesForExcel(bytes: Buffer): Promise<Buffer> {
+  if (bytes.length > P.fileBytes) throw new IntakeFailure('FILE_TOO_LARGE');
+  await inspectArchive(bytes, { allowExternalHyperlinks: true });
+  const zip = await JSZip.loadAsync(bytes);
+  const entry = zip.file('xl/sharedStrings.xml');
+  if (!entry) return bytes;
+  const xml = await entry.async('string');
+  const repaired = repairEmptySharedStringMarkers(xml);
+  if (repaired === xml) return bytes;
+  zip.file('xl/sharedStrings.xml', repaired);
+  const repairedBytes = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  if (repairedBytes.length > P.fileBytes) throw new IntakeFailure('FILE_TOO_LARGE');
+  await inspectArchive(repairedBytes, { allowExternalHyperlinks: true });
+  return repairedBytes;
 }
 
 function imageBuffer(image: ExcelJS.Image): Buffer | undefined {
@@ -150,13 +183,11 @@ const refIds = (value: string): string[] => value ? value.split(',').map(part =>
 
 /** Map a six-sheet SOP workbook onto the existing FAQ row shape and keep image bytes. */
 export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ contentVersion: { kind: 'declared' | 'sha256'; value: string }; parsed: import('./policy.js').ParseResult; rowBindings: readonly { rowId: string; businessEntryId: string; title: string; answerText: string }[]; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string; sheet: string; row: number; column: number; ordinal: number; productRefIds: readonly string[]; scenarioRefIds: readonly string[]; familySourceId: string }[] } | null> {
-  const book = new ExcelJS.Workbook();
-  try { await book.xlsx.load(bytes as unknown as ExcelJS.Buffer); } catch { return null; }
-  if (!SOP_SHEET_NAMES.every(name => book.getWorksheet(name))) return null;
   const sop = await parseSopWorkbook(bytes, {
     sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? scope.brandId,
     scopeKind: scope.shopId === null ? 'brand' : 'shop', selectedSheets: SOP_SHEET_NAMES,
   });
+  if (sop.issues.some((issue) => issue.code === 'MISSING_SHEET' || issue.code === 'INVALID_XLSX')) return null;
   if (!sop.ok) {
     return { contentVersion: { kind: sop.versionKind, value: sop.version }, parsed: { ok: false, policyVersion: P.version, rows: [], questions: [], issues: sop.issues, excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length }, rowBindings: [], previews: [] };
   }
@@ -198,9 +229,10 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
   const rawSha256 = createHash('sha256').update(bytes).digest('hex');
   if (!validContext(context)) return issueResult(context, rawSha256, 'INVALID_CONTEXT');
   try {
-    const archive = await inspectArchive(bytes, { allowExternalHyperlinks: true });
+    const forExcel = await workbookBytesForExcel(bytes);
+    const archive = await inspectArchive(forExcel, { allowExternalHyperlinks: true });
     const book = new ExcelJS.Workbook();
-    await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
+    await book.xlsx.load(forExcel as unknown as ExcelJS.Buffer);
     const issues: Issue[] = [];
     const issue = (code: string, sheet: string, row: number, column: string, fix: string) => {
       issues.push({ code, sheet, row, column, fix });

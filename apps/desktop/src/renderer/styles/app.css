@@ -1441,7 +1441,9 @@
 
 .search-btn {
   flex: 0 0 auto;
-  min-height: 36px;
+  align-self: flex-end;
+  height: 28px;
+  min-height: 28px;
   min-width: 64px;
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--fox) 26%, var(--hairline));
