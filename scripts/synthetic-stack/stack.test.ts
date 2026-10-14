@@ -13,6 +13,7 @@ import {
   DESKTOP_APP_NAME,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
+  writeDesktopPackagedProfile,
   PID_DIRECTORY, PREFERRED_PORTS, STACK_ROOT, apiEnvironment, loadApiStackConfig, loadContentStackConfig,
   mergeStackOverrides, parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
   readProfile, shouldSeedSyntheticCatalog, stackPortOffset,
@@ -136,7 +137,82 @@ describe('stack profile', () => {
     assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
     assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
     assert.match(stack, /<start(?: \[--no-seed\] \[--foreground\])?\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|anomaly>/u);
-    assert.ok(written.includes('desktopPackagedProfilePath()'), 'packaged profile path must be resolved at write time');
+    assert.ok(written.includes('desktopPackagedProfilePath(locator)'), 'packaged profile path must be resolved at write time');
+  });
+
+  it('keeps an existing faq-v2 marker only for two different loopback origins', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'packaged-profile-'));
+    const locator = {
+      env: { CUSTOMER_AGENT_DESKTOP_USERDATA: directory },
+      platform: 'darwin' as const,
+      home: '/tmp/unused-home',
+    };
+    const file = desktopPackagedProfilePath(locator);
+    const profile = {
+      version: 1 as const,
+      createdAt: '2026-10-14T00:00:00.000Z',
+      stackRoot: '/tmp/stack',
+      apiOrigin: 'http://127.0.0.1:43110',
+      identityOrigin: 'http://127.0.0.1:43111',
+      apiPort: 43110,
+      identityPort: 43111,
+      databaseName: 'customer_agent_synthetic',
+      pgPort: 43199,
+      pgSocketDirectory: '/tmp/socket',
+      objectStoreDirectory: '/tmp/objects',
+      clientId: 'desk_x',
+    };
+    try {
+      writeFileSync(file, `${JSON.stringify({
+        mode: 'synthetic-local',
+        apiOrigin: 'http://127.0.0.1:43100',
+        identityOrigin: 'http://127.0.0.1:43101',
+        contentIntake: 'faq-v2',
+      })}\n`);
+      writeDesktopPackagedProfile(profile, locator);
+      assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), {
+        mode: 'synthetic-local',
+        apiOrigin: 'http://127.0.0.1:43110',
+        identityOrigin: 'http://127.0.0.1:43111',
+        contentIntake: 'faq-v2',
+      });
+
+      writeFileSync(file, `${JSON.stringify({
+        mode: 'synthetic-local',
+        apiOrigin: 'http://127.0.0.1:43100',
+        identityOrigin: 'http://127.0.0.1:43101',
+      })}\n`);
+      writeDesktopPackagedProfile(profile, locator);
+      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+
+      writeFileSync(file, `${JSON.stringify({
+        mode: 'synthetic-local',
+        apiOrigin: 'http://127.0.0.1:43100',
+        identityOrigin: 'http://127.0.0.1:43101',
+        contentIntake: 'faq-v2',
+      })}\n`);
+      writeDesktopPackagedProfile({
+        ...profile,
+        apiOrigin: 'http://127.0.0.1:43100',
+        identityOrigin: 'http://127.0.0.1:43100',
+      }, locator);
+      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+
+      writeFileSync(file, `${JSON.stringify({
+        mode: 'product-remote',
+        contentIntake: 'faq-v2',
+        apiOrigin: 'https://api.example.test',
+        identityOrigin: 'https://id.example.test',
+      })}\n`);
+      writeDesktopPackagedProfile(profile, locator);
+      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+
+      rmSync(file);
+      writeDesktopPackagedProfile(profile, locator);
+      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('follows Electron Linux userData, including XDG_CONFIG_HOME', () => {
