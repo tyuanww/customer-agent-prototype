@@ -136,8 +136,30 @@ describe('stack profile', () => {
     const desktop = stack.slice(stack.indexOf('function commandDesktop()'));
     assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
     assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
-    assert.match(stack, /<start(?: \[--no-seed\] \[--foreground\])?\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|anomaly>/u);
+    assert.match(stack, /<start(?: \[--no-seed\] \[--foreground\])?\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|migrate\|anomaly>/u);
     assert.ok(written.includes('desktopPackagedProfilePath(locator)'), 'packaged profile path must be resolved at write time');
+  });
+
+  it('bootstraps the recorded database without rewriting the desktop profile', () => {
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    const start = stack.indexOf('async function commandMigrate()');
+    assert.notEqual(start, -1);
+    const rest = stack.slice(start);
+    const end = rest.indexOf('\nasync function commandAnomaly');
+    const body = end === -1 ? rest : rest.slice(0, end);
+    assert.ok(body.includes('bootstrapDatabase('), 'migrate must bootstrap the recorded database');
+    assert.ok(body.includes('resolveProfile(undefined, { reuse: true })'), 'migrate must reuse the recorded profile');
+    assert.ok(body.includes("cluster.state() !== 'running'"), 'migrate must refuse to start postgres');
+    for (const forbidden of [
+      'writeProfile(',
+      'writeDesktopPackagedProfile(',
+      'commandStop(',
+      'startProcesses(',
+      'waitReady(',
+      'ensureRunning(',
+    ]) {
+      assert.equal(body.includes(forbidden), false, `migrate must not call ${forbidden}`);
+    }
   });
 
   it('keeps an existing faq-v2 marker only for two different loopback origins', () => {
