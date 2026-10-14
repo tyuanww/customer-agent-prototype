@@ -2,6 +2,8 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IntakeOverview } from '../../src/renderer/features/dashboard/IntakeOverview';
+import { v9Headline } from '../../src/renderer/features/dashboard/v9-overview-model';
+import type { UsageSourceRow } from '../../src/shared/usage-log-csv';
 import type { DashboardIterationTask } from '../../src/shared/dashboard-iteration';
 import type { DashboardWordingEntry, DashboardWordingView } from '../../src/shared/dashboard-wording';
 import type { DeskItemView, DeskView } from '../../src/shared/desk-knowledge';
@@ -51,11 +53,18 @@ function deskView(items: DeskItemView[]): DeskView {
   };
 }
 
+async function openTodo() {
+  const tab = await screen.findByRole('tab', { name: '迭代待办' });
+  if (tab.getAttribute('aria-selected') !== 'true') await userEvent.setup().click(tab);
+}
+
 afterEach(() => {
   cleanup();
   delete window.dashboardIteration;
   delete window.dashboardWording;
   delete window.dashboardDesk;
+  delete window.dashboardUsageLog;
+  window.history.pushState({}, '', '/');
 });
 
 it('lists only open iteration tasks and does not invent a rate', async () => {
@@ -65,10 +74,10 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
     close: vi.fn(),
   };
   const onOpen = vi.fn();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={onOpen} />);
+  render(<IntakeOverview onOpen={onOpen} />);
+  await openTodo();
   expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
   expect(screen.queryByText('task-2')).not.toBeInTheDocument();
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('button', { name: '去知识库' }));
   expect(onOpen).toHaveBeenCalledWith('content');
 });
@@ -83,12 +92,12 @@ it('shows only 待处理 and 处理中', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   const table = await screen.findByRole('table', { name: '话术迭代' });
   expect(table).toHaveTextContent('待处理');
   expect(table).toHaveTextContent('处理中');
   expect(screen.getAllByRole('row')).toHaveLength(3);
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 });
 
 it('says 当前没有待办 when empty', async () => {
@@ -97,17 +106,29 @@ it('says 当前没有待办 when empty', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   expect(await screen.findByText('当前没有待办')).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
   expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('未接入');
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 });
 
 it('says 未接入 when unloaded', async () => {
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('未接入');
+  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('未接入');
+  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('未接入');
+  expect(screen.getByText('命中率').parentElement).toHaveTextContent('未接入');
+  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('未接入');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('tab', { name: '无命中排行' }));
   expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('未接入');
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
+  const sop = document.querySelector('.pn:not([hidden])');
+  expect(sop).toHaveTextContent('未接入');
+  expect(sop).not.toHaveTextContent('打开次数');
+  expect(screen.queryByLabelText('SOP 接口(原型开关)')).not.toBeInTheDocument();
 });
 
 it('shows a separate 无命中 list and no percentage', async () => {
@@ -116,13 +137,14 @@ it('shows a separate 无命中 list and no percentage', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
   const misses = screen.getByRole('region', { name: '无命中' });
   expect(misses).toHaveTextContent('无命中');
   expect(misses).toHaveTextContent('未接入');
   expect(misses).not.toHaveTextContent('话术不准');
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 });
 
 it('knowledge that is not yet effective or already 已失效 shows a separate reminder and does not appear as an 不准 row', async () => {
@@ -142,7 +164,8 @@ it('knowledge that is not yet effective or already 已失效 shows a separate re
     })),
     command: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await userEvent.setup().click(await screen.findByRole('tab', { name: '话术过期提醒' }));
   const reminder = await screen.findByRole('table', { name: '知识有效期提醒' });
   expect(reminder).toHaveTextContent('退货运费什么时候到');
   expect(reminder).toHaveTextContent('待生效');
@@ -150,11 +173,11 @@ it('knowledge that is not yet effective or already 已失效 shows a separate re
   expect(reminder).toHaveTextContent('已失效');
   expect(reminder).not.toHaveTextContent('生效中的运费');
   expect(reminder).not.toHaveTextContent('不准');
+  await openTodo();
   const iteration = screen.getByRole('table', { name: '话术迭代' });
   expect(iteration).toHaveTextContent('话术不准 · script-a');
   expect(iteration).not.toHaveTextContent('退货运费什么时候到');
   expect(iteration).not.toHaveTextContent('旧包装说明');
-  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
 });
 
 async function settleWording(list: ReturnType<typeof vi.fn>) {
@@ -174,7 +197,8 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
   const older = vi.fn(async () => wording('2026-10-12T00:00:00.000Z'));
   window.dashboardWording = { list: older };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await settleWording(older);
   await user.click(screen.getByRole('button', { name: '已处理' }));
@@ -184,7 +208,8 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
 
   const newer = vi.fn(async () => wording('2026-10-14T00:00:00.000Z'));
   window.dashboardWording = { list: newer };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await settleWording(newer);
   await user.click(screen.getByRole('button', { name: '已处理' }));
@@ -206,7 +231,8 @@ it('closes 内容缺口 when the announce lease shows that script published afte
   }));
   window.dashboardWording = { list: sameRelease };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await settleWording(sameRelease);
   await user.click(screen.getByRole('button', { name: '已处理' }));
@@ -219,7 +245,8 @@ it('closes 内容缺口 when the announce lease shows that script published afte
     effectiveFrom: '2026-10-14T00:00:00.000Z',
   }));
   window.dashboardWording = { list: newerLease };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await settleWording(newerLease);
   await user.click(screen.getByRole('button', { name: '已处理' }));
@@ -241,7 +268,8 @@ it('does not treat a local catalog without a refresh time as a newer release', a
   }));
   window.dashboardWording = { list: local };
   const user = userEvent.setup();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await settleWording(local);
   await user.click(screen.getByRole('button', { name: '已处理' }));
@@ -266,7 +294,8 @@ it('defers another cause only with a reason and does not rewrite the script', as
     command,
   };
   const user = userEvent.setup();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
+  await openTodo();
   await screen.findByText('处理中');
   await user.click(screen.getByRole('button', { name: '暂不处理' }));
   expect(await screen.findByText('暂不处理需要填写原因。')).toBeInTheDocument();
@@ -277,4 +306,52 @@ it('defers another cause only with a reason and does not rewrite the script', as
     taskId: 'task-1', expectedVersion: 1, status: 'wont_fix', resolutionNote: '排序问题：先观察',
   });
   expect(command).not.toHaveBeenCalled();
+});
+
+it('shows the v9 sample only while preview=intake and keeps SOP unwired', async () => {
+  window.history.pushState({}, '', '/?preview=intake');
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findAllByText(v9Headline(7).use)).not.toHaveLength(0);
+  expect(screen.getByText('运费谁承担')).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
+  const sop = document.querySelector('.pn:not([hidden])');
+  expect(sop).toHaveTextContent('未接入');
+  expect(screen.queryByText('打开次数')).not.toBeInTheDocument();
+  expect(screen.queryByText('走完率')).not.toBeInTheDocument();
+});
+
+it('computes overview figures from the usage rows and still leaves SOP unwired', async () => {
+  window.history.pushState({}, '', '/?preview=intake');
+  const rows: UsageSourceRow[] = [
+    { id: '1', askedAt: '2026-10-13T01:00:00.000Z', agent: '坐席甲', question: '退货多久', scriptTitle: '退货时效', result: 'copied', snapshotStale: false, consented: true },
+    { id: '2', askedAt: '2026-10-13T02:00:00.000Z', agent: '坐席甲', question: '尺码', scriptTitle: '尺码怎么选', result: 'viewed', snapshotStale: false },
+    { id: '3', askedAt: '2026-10-13T03:00:00.000Z', agent: '坐席乙', question: '改地址', scriptTitle: null, result: 'miss', snapshotStale: false, consented: false },
+    { id: '4', askedAt: '2026-10-13T04:00:00.000Z', agent: '坐席乙', question: null, scriptTitle: null, result: 'miss', snapshotStale: false },
+  ];
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: true as const, rows, nextCursor: null, canExport: true })),
+    previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
+    export: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findByText('退货时效')).toBeInTheDocument();
+  expect(screen.getByText('尺码怎么选')).toBeInTheDocument();
+  expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();
+  expect(screen.queryByText(v9Headline(7).use)).not.toBeInTheDocument();
+  const useTile = screen.getByText('话术使用次数').parentElement;
+  expect(useTile).toHaveTextContent('2');
+  expect(useTile).not.toHaveTextContent('较上期');
+  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('2');
+  expect(screen.getByText('命中率').parentElement).toHaveTextContent('50.0%');
+  expect(screen.getByRole('table', { name: '使用与无命中趋势表' })).toHaveTextContent('2026-10-13');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('tab', { name: '无命中排行' }));
+  const misses = screen.getByRole('region', { name: '无命中' });
+  expect(misses).toHaveTextContent('改地址');
+  expect(misses).toHaveTextContent('已脱敏');
+  expect(misses).not.toHaveTextContent('能开发票吗');
+  await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
+  expect(document.querySelector('.pn:not([hidden])')).toHaveTextContent('未接入');
+  expect(screen.queryByText('打开次数')).not.toBeInTheDocument();
 });

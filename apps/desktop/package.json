@@ -28,6 +28,7 @@
     "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
   },
   "dependencies": {
+    "@customer-agent/content-intake": "workspace:*",
     "@customer-agent/contracts": "workspace:*",
     "@customer-agent/retrieval-core": "workspace:*",
     "antd": "^5.29.3",

@@ -8,6 +8,8 @@ import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
 import type { DashboardContentApi } from '../shared/dashboard-content';
 import type { DashboardIterationApi } from '../shared/dashboard-iteration';
 import type { DashboardOpsApi } from '../shared/dashboard-ops-loop';
+import type { DashboardUsageLogApi } from '../shared/dashboard-usage-log';
+import type { SopWorkbookOpenReply } from '../shared/sop-workbook-preview';
 import type { DashboardWordingApi } from '../shared/dashboard-wording';
 import type { LoginWindowApi } from '../shared/login-window';
 import type { SopWindowApi } from '../shared/sop-window';
@@ -25,6 +27,8 @@ declare global {
     dashboardContent?: DashboardContentApi;
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;
+    dashboardUsageLog?: DashboardUsageLogApi;
+    dashboardSopWorkbook?: { open(): Promise<SopWorkbookOpenReply> };
     loginWindow?: LoginWindowApi;
     sopWindow?: SopWindowApi;
   }

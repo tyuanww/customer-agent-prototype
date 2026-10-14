@@ -12,8 +12,14 @@ export async function loadRenderer(
     return 'cancelled';
   }
   try {
+    // Design preview is dev-server only. Packaged installs load the React
+    // workbench and do not turn on sample data. The standalone HTML mock is
+    // not kept in the repo; it blew the source-input budget.
+    const design = role === 'dashboard' && devServerUrl ? process.env.CUSTOMER_AGENT_DESKTOP_DESIGN : undefined;
+    const useV9ReactPreview = design === 'v9';
     if (devServerUrl) {
       const url = new URL(devServerUrl);
+      if (useV9ReactPreview) url.searchParams.set('preview', 'intake');
       url.searchParams.set('role', role);
       url.searchParams.set('platform', process.platform);
       await win.loadURL(url.toString());

@@ -10,12 +10,12 @@ export default defineConfig({
     // unsigned package only ships out/** plus package.json.
     // `source` keeps retrieval-core on its TypeScript entry so packaging does
     // not need a separate dist build before electron-vite.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/retrieval-core'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core'] })],
     resolve: {
       conditions: ['source'],
     },
     ssr: {
-      noExternal: ['@customer-agent/retrieval-core'],
+      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake'],
       resolve: {
         conditions: ['source'],
       },

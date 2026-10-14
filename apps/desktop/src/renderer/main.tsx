@@ -12,7 +12,11 @@ if (!root) {
   throw new Error('Root element not found');
 }
 
-installIntakeReviewBridge();
+try {
+  installIntakeReviewBridge();
+} catch {
+  // A preview fixture must not stop the workbench from painting.
+}
 const rendererRole = readRoleFromLocation();
 document.documentElement.dataset.role = rendererRole;
 

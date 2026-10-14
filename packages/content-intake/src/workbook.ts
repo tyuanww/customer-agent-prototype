@@ -3,7 +3,7 @@ import { inspectArchive } from './archive.js';
 import { createFaqTableValidator, validRegisteredContext } from './faq-rules.js';
 export { parseCsv, createCsvTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256, type CsvContext, type CsvParseResult } from './csv.js';
 export { parseFamilyReference } from './faq-rules.js';
-export { parseSopWorkbook, tryParseSopAsFaq, createSyntheticSopWorkbook, SOP_POLICY_VERSION, SOP_SHEET_NAMES,
+export { parseSopWorkbook, tryParseSopAsFaq, createSyntheticSopWorkbook, repairEmptySharedStringMarkers, SOP_POLICY_VERSION, SOP_SHEET_NAMES,
   type SopAttachment, type SopParseContext, type SopParseResult, type SopRow } from './sop.js';
 import { FAQ_HEADERS, QUESTION_HEADERS, SOURCE_HEADERS, TEMPLATE_VERSION, INTAKE_POLICY as P,
   IntakeFailure, failedParse, type ParseContext, type ParseResult, type Issue } from './policy.js';

@@ -34,15 +34,15 @@ it('shows entry dates and the read deadline in the same local time zone with an 
  vi.stubEnv('TZ','America/New_York');vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-01-15T14:59:00Z'));
  const f=setup(),view=data();view.rows[0]!.effectiveFrom='2026-01-15T15:00:00Z';view.rows[0]!.effectiveTo='2026-01-15T16:00:00Z';
  f.command.mockResolvedValueOnce({ok:true,view});const {rerender}=render(<IntakeLibrary active="wording"/>);
- expect(await screen.findByRole('article',{name:'合成标题 product'})).toHaveTextContent('生效 2026年01月15日 10:00:00（UTC-05:00） · 失效 2026年01月15日 11:00:00（UTC-05:00）');
+ expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026年01月15日 10:00:00（UTC-05:00） · 失效 2026年01月15日 11:00:00（UTC-05:00）');
  rerender(<IntakeLibrary active="announce"/>);
- expect(screen.getByText(/可用版本 rel_synthetic/)).toHaveTextContent('资格截止 2026年01月15日 10:00:00（UTC-05:00）');
+ expect(screen.getByText(/当前发布 rel_synthetic/)).toHaveTextContent('资格截止 2026年01月15日 10:00:00（UTC-05:00）');
  expect(f.command).toHaveBeenCalledTimes(1);
 });
 it('shows missing and invalid entry times explicitly instead of inventing a date',async()=>{
  const f=setup(),view=data();view.rows[0]!.effectiveFrom='';view.rows[0]!.effectiveTo='not-a-date';
  f.command.mockResolvedValueOnce({ok:true,view});render(<IntakeLibrary active="wording"/>);
- const row=await screen.findByRole('article',{name:'合成标题 product'});
+ const row=await screen.findByRole('row',{name:/合成标题 product/});
  expect(row).toHaveTextContent('生效 未提供时间 · 失效 时间无效');
  expect(row).not.toHaveTextContent(/1970|Invalid Date/);
 });
@@ -53,21 +53,27 @@ it('does not turn an absent optional timestamp into the Unix epoch',()=>{
 });
 it('browses four scoped domains and shares the same complete read with the available-version page',async()=>{
  const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active="wording"/>);
- await screen.findByRole('article',{name:'合成标题 product'});
+ await screen.findByRole('row',{name:/合成标题 product/});
  expect(screen.getByRole('option',{name:'合成同名店（shop-b）'})).toHaveValue('shop-b');
- for(const [label,domain] of [['活动话术','campaign'],['售前流程','presale'],['售后流程','aftersale']]){
+ for(const [label,domain] of [['活动','campaign'],['售前','presale'],['售后','aftersale']]){
   await user.click(screen.getByRole('tab',{name:label}));expect(screen.getByText(`合成原文 ${domain}`)).toBeVisible();
   expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
  }
- fireEvent.keyDown(screen.getByRole('tab',{name:'售后流程'}),{key:'Home'});
- expect(screen.getByRole('tab',{name:'产品话术'})).toHaveFocus();
+ fireEvent.keyDown(screen.getByRole('tab',{name:'售后'}),{key:'Home'});
+ expect(screen.getByRole('tab',{name:'产品'})).toHaveFocus();
  expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby','intake-domain-product');
  expect(screen.queryByRole('button',{name:/复制|下架|导出/})).not.toBeInTheDocument();
  rerender(<IntakeLibrary active="announce"/>);
  expect(screen.getByRole('region',{name:'当前可用版本'})).toBeVisible();
- expect(screen.getByText(/可用版本 rel_synthetic/)).toBeVisible();
+ expect(screen.getByText(/当前发布 rel_synthetic/)).toBeVisible();
  expect(screen.getByText('软件更新未接入。')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(1);
+ expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
+ rerender(<IntakeLibrary active="wording"/>);
+ await user.click(screen.getByRole('tab',{name:'SOP'}));
+ expect(screen.getByRole('tabpanel')).toHaveTextContent('未接入');
+ expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');
+ expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
 });
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active="wording"/>);
@@ -131,10 +137,10 @@ it.each(['LIMIT','UNAVAILABLE'] as const)('preserves a real Main command failure
  const user=userEvent.setup();
  try{render(<IntakeLibrary active="wording"/>);await screen.findByRole('option',{name:'shop-a'});
   await user.selectOptions(screen.getByRole('combobox',{name:'目录店铺'}),'shop-a');
-  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await screen.findByRole('article',{name:'洁面用法 0'});
+  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await screen.findByRole('row',{name:/洁面用法 0/});
   fail=true;await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
   expect(await screen.findByRole('alert')).toHaveTextContent(`目录失败 ${code}`);
-  expect(screen.queryByRole('article',{name:'洁面用法 0'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('row',{name:/洁面用法 0/})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'刷新可用资料'})).toBeEnabled();expect(invalidations).not.toHaveBeenCalled();
  }finally{cleanup();owner.dispose();}
 });

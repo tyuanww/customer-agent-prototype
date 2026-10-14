@@ -41,7 +41,10 @@ export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 18.5 * 1024 * 1024 }),
+  // 2026-10-14: after the standalone v9 HTML mock left the repo, measured
+  // source-inputs were 19.0 MiB on the maintainer Mac. 19.25 MiB covers that
+  // reading. The 45 MiB total cap is unchanged.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 19.25 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

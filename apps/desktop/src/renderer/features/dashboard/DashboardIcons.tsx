@@ -8,6 +8,7 @@ export type DashboardNavIconId =
   | 'sop'
   | 'content'
   | 'announce'
+  | 'permissions'
   | 'architecture'
   | 'workorder-trash';
 
@@ -19,8 +20,9 @@ const NAV_ICON_PATHS: Record<DashboardNavIconId, readonly string[]> = {
   wording: ['M4 5c3-1 6 0 8 2v13c-2-2-5-3-8-2z', 'M20 5c-3-1-6 0-8 2v13c2-2 5-3 8-2z'],
   iteration: ['M20 7v5h-5', 'M4 17v-5h5', 'M18.5 9A7 7 0 0 0 6 7', 'M5.5 15A7 7 0 0 0 18 17'],
   sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3'],
-  content: ['M12 3v12', 'm8 7 4-4 4 4', 'M5 14v6h14v-6'],
-  announce: ['M6 17h12l-2-3v-4a4 4 0 0 0-8 0v4z', 'M10 20h4'],
+  content: ['M7 3.5h7l4 4v13H7z', 'M14 3.5v4h4', 'M10 12h5M10 15.5h5'],
+  announce: ['M19.5 8.5A8 8 0 0 0 5.8 7', 'M5.5 3.5V7H9', 'M4.5 15.5A8 8 0 0 0 18.2 17', 'M18.5 20.5V17H15'],
+  permissions: ['M8.5 11.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8', 'm11.4 12.6 8.1-8.1', 'm16.5 7.5 2.5 2.5', 'm14 10 1.8 1.8'],
   architecture: ['M12 4v5', 'M5 20v-5h14v5', 'M5 15h14', 'm12 9-7 6', 'm12-6 7 6'],
   'workorder-trash': ['M4 7h16', 'M9 7V4h6v3', 'M7 7l1 14h8l1-14'],
 };
