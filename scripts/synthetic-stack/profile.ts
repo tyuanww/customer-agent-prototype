@@ -383,18 +383,55 @@ export function desktopPackagedProfilePath(options: DesktopUserDataLocator = {})
   return path.join(defaultDesktopUserDataDirectory(options), 'synthetic-stack.json');
 }
 
+/** Same loopback rule the packaged client uses before it accepts contentIntake. */
+function packagedLoopbackOrigin(value: string): string | undefined {
+  let url: URL;
+  try { url = new URL(value); } catch { return undefined; }
+  const port = Number(url.port);
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
+    || !Number.isInteger(port) || port < 1024 || port > 65_535
+    || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return undefined;
+  return url.origin;
+}
+
+/** True only when the file already marks this client as the local faq-v2 workbench. */
+function existingPackagedFaqV2(packagedPath: string): boolean {
+  if (!existsSync(packagedPath)) return false;
+  try {
+    const value: unknown = JSON.parse(readFileSync(packagedPath, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const record = value as Record<string, unknown>;
+    return record.mode === 'synthetic-local' && record.contentIntake === 'faq-v2';
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Publish the resolved origins for the packaged client. Only the two loopback
- * origins and an exact mode marker are written — no token, DSN or secret.
+ * Publish the resolved origins for the packaged client. Writes the mode marker
+ * and the two origins — no token, DSN or secret. An existing `contentIntake`
+ * marker is kept only when the file already says synthetic-local and the
+ * origins being written are two different loopback origins. A file that does
+ * not already carry the marker never gains one here.
  */
-export function writeDesktopPackagedProfile(profile: StackProfile): string {
-  const packagedPath = desktopPackagedProfilePath();
+export function writeDesktopPackagedProfile(
+  profile: StackProfile,
+  locator: DesktopUserDataLocator = {},
+): string {
+  const packagedPath = desktopPackagedProfilePath(locator);
   mkdirSync(path.dirname(packagedPath), { recursive: true });
+  const apiOrigin = packagedLoopbackOrigin(profile.apiOrigin);
+  const identityOrigin = packagedLoopbackOrigin(profile.identityOrigin);
+  const keepFaqV2 = apiOrigin !== undefined
+    && identityOrigin !== undefined
+    && apiOrigin !== identityOrigin
+    && existingPackagedFaqV2(packagedPath);
   const temporary = `${packagedPath}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify({
     mode: 'synthetic-local',
     apiOrigin: profile.apiOrigin,
     identityOrigin: profile.identityOrigin,
+    ...(keepFaqV2 ? { contentIntake: 'faq-v2' as const } : {}),
   }, null, 2)}\n`, { mode: 0o600 });
   renameSync(temporary, packagedPath);
   return packagedPath;
