@@ -74,7 +74,7 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
     close: vi.fn(),
   };
   const onOpen = vi.fn();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={onOpen} />);
+  render(<IntakeOverview onOpen={onOpen} />);
   await openTodo();
   expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
   expect(screen.queryByText('task-2')).not.toBeInTheDocument();
@@ -92,7 +92,7 @@ it('shows only 待处理 and 处理中', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   const table = await screen.findByRole('table', { name: '话术迭代' });
   expect(table).toHaveTextContent('待处理');
@@ -106,7 +106,7 @@ it('says 当前没有待办 when empty', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByText('当前没有待办')).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
@@ -114,7 +114,7 @@ it('says 当前没有待办 when empty', async () => {
 });
 
 it('says 未接入 when unloaded', async () => {
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('未接入');
   expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('未接入');
@@ -137,7 +137,7 @@ it('shows a separate 无命中 list and no percentage', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
@@ -164,7 +164,7 @@ it('knowledge that is not yet effective or already 已失效 shows a separate re
     })),
     command: vi.fn(),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await userEvent.setup().click(await screen.findByRole('tab', { name: '话术过期提醒' }));
   const reminder = await screen.findByRole('table', { name: '知识有效期提醒' });
   expect(reminder).toHaveTextContent('退货运费什么时候到');
@@ -197,7 +197,7 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
   const older = vi.fn(async () => wording('2026-10-12T00:00:00.000Z'));
   window.dashboardWording = { list: older };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(older);
@@ -208,7 +208,7 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
 
   const newer = vi.fn(async () => wording('2026-10-14T00:00:00.000Z'));
   window.dashboardWording = { list: newer };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(newer);
@@ -231,7 +231,7 @@ it('closes 内容缺口 when the announce lease shows that script published afte
   }));
   window.dashboardWording = { list: sameRelease };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(sameRelease);
@@ -245,7 +245,7 @@ it('closes 内容缺口 when the announce lease shows that script published afte
     effectiveFrom: '2026-10-14T00:00:00.000Z',
   }));
   window.dashboardWording = { list: newerLease };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(newerLease);
@@ -268,7 +268,7 @@ it('does not treat a local catalog without a refresh time as a newer release', a
   }));
   window.dashboardWording = { list: local };
   const user = userEvent.setup();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(local);
@@ -294,7 +294,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
     command,
   };
   const user = userEvent.setup();
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await user.click(screen.getByRole('button', { name: '暂不处理' }));
@@ -310,7 +310,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
 
 it('shows the v9 sample only while preview=intake and keeps SOP unwired', async () => {
   window.history.pushState({}, '', '/?preview=intake');
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   expect(await screen.findAllByText(v9Headline(7).use)).not.toHaveLength(0);
   expect(screen.getByText('运费谁承担')).toBeInTheDocument();
   const user = userEvent.setup();
@@ -334,7 +334,7 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
     previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
     export: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
   };
-  render(<IntakeOverview canOpenPermissions={false} onOpen={() => undefined} />);
+  render(<IntakeOverview onOpen={() => undefined} />);
   expect(await screen.findByText('退货时效')).toBeInTheDocument();
   expect(screen.getByText('尺码怎么选')).toBeInTheDocument();
   expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();

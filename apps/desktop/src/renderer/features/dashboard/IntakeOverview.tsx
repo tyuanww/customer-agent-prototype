@@ -71,12 +71,10 @@ function judgedTask(task: DashboardIterationTask, cause: DashboardIterationCause
 
 /** faq-v2 overview lists open iteration tasks only. It does not invent rates. */
 export function IntakeOverview({
-  canOpenPermissions,
   onOpen,
   onTodoCount,
   onSupplyScript,
 }: {
-  canOpenPermissions: boolean;
   onOpen: (target: 'content' | 'wording' | 'permissions') => void;
   onTodoCount?: (count: number) => void;
   onSupplyScript?: (question: string) => void;

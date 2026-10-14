@@ -38,7 +38,8 @@ describe('candidate SOP workbook parser', () => {
       sheet.getCell('A2').value = '步骤文字';
       if (name === SOP_SHEET_NAMES[1]) {
         sheet.getCell('B2').value = 1;
-        sheet.getCell('C2').value = { text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/sop' };
+        // ExcelJS types say hyperlink text is a string. WPS writes a rich-text object there.
+        sheet.getCell('C2').value = { text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/sop' } as unknown as ExcelJS.CellValue;
       }
     }
     const zip = await JSZip.loadAsync(Buffer.from(await book.xlsx.writeBuffer()));

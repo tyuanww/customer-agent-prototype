@@ -33,7 +33,7 @@ function Conditions({ label, options, selected, disabled, change }: {
 
 /** One mounted reader serves the library and available-version views. Navigation
  * only changes presentation; Main owns snapshots, authorization and cancellation. */
-export function IntakeLibrary({ active, onOpenLibrary }: { active: 'wording' | 'announce' | null; onOpenLibrary?: () => void }) {
+export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | null }) {
   const [view,setView] = useState<IntakeCatalogView|null>(null), [busy,setBusy] = useState(false), [error,setError] = useState('');
   const [domain,setDomain] = useState<LibraryTab>('product');
   const [question,setQuestion] = useState('');

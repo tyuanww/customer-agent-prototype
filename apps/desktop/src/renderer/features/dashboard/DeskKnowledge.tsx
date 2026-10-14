@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   DESK_CATEGORIES,
   type DeskCommand,
-  type DeskItemView,
   type DeskView,
 } from '@shared/desk-knowledge';
 import './intake-management.css';
@@ -54,12 +53,6 @@ const EMPTY: DeskView = {
   signedIn: false, role: null, displayName: null, personas: [], selectedPersonaId: 'shop',
   items: [], delivered: [], tacit: [], revision: 0, notice: null, persistence: 'ok',
 };
-
-function statusTone(item: DeskItemView): string {
-  if (item.parseState !== 'ok') return 'is-failed';
-  if (item.statusLabel === '生效中') return 'is-live';
-  return 'is-idle';
-}
 
 /** Operator view edits one persona. A seat only sees knowledge that is already
  * effective for that persona, including the shared shop set. */

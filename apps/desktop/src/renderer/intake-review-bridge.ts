@@ -1,5 +1,5 @@
 import type { IntakeCatalogView } from '@shared/content-intake-catalog';
-import type { IntakeManagementView } from '@shared/content-intake-management';
+import type { IntakeManagementCommand, IntakeManagementView } from '@shared/content-intake-management';
 import type { IntakePermissionView } from '@shared/content-intake-permissions';
 import type { DashboardIterationTask } from '@shared/dashboard-iteration';
 import type { DashboardUsageLogApi, UsageLogRow } from '@shared/dashboard-usage-log';
@@ -171,7 +171,7 @@ export function installIntakeReviewBridge(location: Location = window.location):
   exposePreview('dashboardIntake', {
     mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: true, view: materials }),
-    command: async (command) => {
+    command: async (command: IntakeManagementCommand) => {
       if (command.action === 'select') {
         const row = materials.candidates.find(item => item.selection === command.selection);
         materials = { ...materials, selected: row?.candidate ?? null };

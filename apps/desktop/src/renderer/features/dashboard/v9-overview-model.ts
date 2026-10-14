@@ -52,7 +52,6 @@ export function v9Trend(days: 7 | 30) {
     const date = new Date(2026, 9, 13 - (days - 1 - index));
     return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   });
-  const width = 600;
   const x0 = 34;
   const x1 = 578;
   const step = (x1 - x0) / (days - 1);

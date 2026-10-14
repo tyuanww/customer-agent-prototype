@@ -1324,9 +1324,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {profile === 'intake' ? <>
-            {active === 'overview' && <IntakeOverview canOpenPermissions={canOpenPermissions} onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
+            {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
             {active === 'sop' && <IntakeSopSource />}
-            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} onOpenLibrary={() => jump('wording')} />
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
             {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
           </> : <>
