@@ -19,6 +19,10 @@ All notable changes to this customer-agent product implementation repository are
 
 - Hardened documented acceptance and deployment procedures with full Git SHA provenance, credential-like path guards, isolated test profiles, lease locking, build-user separation, atomic release switching, readiness rollback, failed-release retention, and interrupted-acceptance recovery.
 
+### Noted on 2026-10-14
+
+- The repository version stays 0.3.26. The published unsigned installer stays GitHub Release v0.3.25. Source merged in PR #48 (`4a22c6b`) adds the faq-v2 six-tab workbench: a local unpublished six-sheet SOP preview, usage rows that stay unavailable until a source exists, and a source-input budget of 19.25 MiB inside the same 45 MiB total. This note does not publish an installer.
+
 ## [0.3.25] - 2026-09-29
 
 ### Changed
