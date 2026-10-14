@@ -45,12 +45,12 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
-  expect(within(shell).getAllByRole('tab')).toHaveLength(5);
+  expect(within(shell).getAllByRole('tab')).toHaveLength(6);
   expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');
-  for (const [key,module] of [['ArrowDown','announce'],['ArrowUp','content'],['Home','overview'],['End','announce']]) {
+  for (const [key,module] of [['ArrowDown','announce'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
     fireEvent.keyDown(screen.getByTestId('nav-content'), { key });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', module);
   }
@@ -113,7 +113,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
-    expect(screen.getAllByRole('tab')).toHaveLength(6);
+    expect(screen.getAllByRole('tab')).toHaveLength(7);
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-permissions'));
     const permissionsPage = document.querySelector('.desk-permissions-page');

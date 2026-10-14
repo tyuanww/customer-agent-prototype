@@ -103,6 +103,8 @@ describe('DashboardApp', () => {
     delete window.dashboardContent;
     delete window.dashboardIteration;
     delete window.dashboardAnnounce;
+    delete window.dashboardIntake;
+    delete window.dashboardPermissions;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -131,6 +133,8 @@ describe('DashboardApp', () => {
     expect(screen.queryByText('演示环境')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent('未接入');
     expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('未接入');
+    expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
     expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
 
     for (const item of DASHBOARD_NAV) {
@@ -173,6 +177,70 @@ describe('DashboardApp', () => {
     fireEvent.keyDown(screen.getByTestId('nav-content'), { key: 'ArrowUp' });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
+  });
+
+  it('adds 资料管理 after 系统同步 on the intake sidebar and projects the whitelist line', async () => {
+    const user = userEvent.setup();
+    window.dashboardPermissions = {
+      current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取权限', view: null }),
+      command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取权限', view: null }),
+      onInvalidated: () => () => undefined,
+    } as typeof window.dashboardPermissions;
+    window.dashboardIntake = {
+      mode: async () => ({ ok: true, enabled: true }),
+      current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      onInvalidated: () => () => undefined,
+      shellLine: async () => ({ ok: true, profileMode: 'synthetic-local', contentIntake: 'faq-v2' }),
+    };
+    render(<DashboardApp />);
+    const materials = await screen.findByTestId('nav-materials');
+    expect(materials).toHaveAccessibleName('资料管理');
+    expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid'))).toEqual([
+      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-permissions', 'nav-announce', 'nav-materials',
+    ]);
+    expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
+    expect(screen.getByTestId('nav-announce')).toHaveAccessibleName('系统同步');
+    const line = await screen.findByTestId('intake-shell-line');
+    expect(line).toHaveTextContent('synthetic-local');
+    expect(line).toHaveTextContent('faq-v2');
+    expect(line.textContent).not.toMatch(/43100|password|DATABASE|secret|apiOrigin/i);
+    await user.click(materials);
+    expect(await screen.findByRole('heading', { name: '资料管理' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '知识库' })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-content'));
+    expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '资料管理' })).not.toBeInTheDocument();
+  });
+
+  it('hides the intake shell line unless both whitelist strings are present', async () => {
+    window.dashboardIntake = {
+      mode: async () => ({ ok: true, enabled: true }),
+      current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      onInvalidated: () => () => undefined,
+      shellLine: async () => ({ ok: true, profileMode: 'product-remote', contentIntake: 'faq-v2', apiOrigin: 'https://synthetic.invalid' } as unknown as { ok: true; profileMode: 'synthetic-local'; contentIntake: 'faq-v2' }),
+    };
+    render(<DashboardApp />);
+    await screen.findByTestId('nav-materials');
+    expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
+    expect(screen.queryByText('product-remote')).not.toBeInTheDocument();
+    expect(screen.queryByText('https://synthetic.invalid')).not.toBeInTheDocument();
+  });
+
+  it('hides the intake shell line when the projection is not ok', async () => {
+    window.dashboardIntake = {
+      mode: async () => ({ ok: true, enabled: true }),
+      current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
+      onInvalidated: () => () => undefined,
+      shellLine: async () => ({ ok: false, profileMode: 'synthetic-local', contentIntake: 'faq-v2' } as unknown as { ok: true; profileMode: 'synthetic-local'; contentIntake: 'faq-v2' }),
+    };
+    render(<DashboardApp />);
+    await screen.findByTestId('nav-materials');
+    expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
+    expect(screen.queryByText('synthetic-local')).not.toBeInTheDocument();
   });
 
   it('uses the fox brand asset and keeps navigation compact without losing module context', () => {

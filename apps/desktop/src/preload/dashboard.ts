@@ -506,6 +506,7 @@ contextBridge.exposeInMainWorld('dashboardIteration', {
 // Main validates exact command payloads before any state or native side effect.
 contextBridge.exposeInMainWorld('dashboardIntake', {
   mode: () => ipcRenderer.invoke('dashboard:intake-mode'),
+  shellLine: () => ipcRenderer.invoke('dashboard:intake-shell-line'),
   current: () => ipcRenderer.invoke('dashboard:intake-current'),
   command: (command: IntakeManagementCommand) => ipcRenderer.invoke('dashboard:intake-command', command),
   onInvalidated: (listener: () => void) => {

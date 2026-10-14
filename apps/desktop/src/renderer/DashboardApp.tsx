@@ -3,6 +3,7 @@ import { IntakeOverview } from './features/dashboard/IntakeOverview';
 import { IntakeSopSource } from './features/dashboard/IntakeSopSource';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
+import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
   useMemo,
@@ -71,7 +72,7 @@ import './styles/dashboard.css';
 import './features/dashboard/workbench-v9.css';
 import './features/dashboard/desk-chrome.css';
 
-type SidebarDestination = DashboardModuleId | 'permissions';
+type SidebarDestination = DashboardModuleId | 'permissions' | 'materials';
 
 type SidebarItem = {
   id: SidebarDestination;
@@ -87,6 +88,17 @@ function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
     if (item.id === 'content') items.push({ id: 'permissions', label: '权限', group: '治理与架构' });
   }
   return items;
+}
+
+function intakeSidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
+  return [...sidebarItems(canOpenPermissions), { id: 'materials', label: '资料管理', group: '治理与架构' }];
+}
+
+function intakeShellLine(value: unknown): { profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true || record.profileMode !== 'synthetic-local' || record.contentIntake !== 'faq-v2') return null;
+  return { profileMode: 'synthetic-local', contentIntake: 'faq-v2' };
 }
 
 function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
@@ -134,9 +146,19 @@ export function DashboardApp() {
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const navItems = sidebarItems(canOpenPermissions).map((item) => (
+  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => (
     profile === 'intake' && item.id === 'content' ? { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' } : item
   ));
+  const [shellLine, setShellLine] = useState<{ profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null>(null);
+  useEffect(() => {
+    if (profile !== 'intake') return;
+    const read = window.dashboardIntake?.shellLine;
+    if (!read) return;
+    let active = true;
+    void read().then(value => { if (active) setShellLine(intakeShellLine(value)); })
+      .catch(() => { if (active) setShellLine(null); });
+    return () => { active = false; };
+  }, [profile]);
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [backStack, setBackStack] = useState<SidebarDestination[]>([]);
@@ -1306,6 +1328,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             {profile === 'intake' ? <p className="intake-crumb">
               {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
               <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
+            {profile === 'intake' && shellLine ? <p className="intake-shell-line" data-testid="intake-shell-line">{shellLine.profileMode} {shellLine.contentIntake}</p> : null}
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
               {profile === 'intake' ? '' : refreshLabel}
             </p>
@@ -1329,6 +1352,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
             {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
+            {active === 'materials' ? <IntakeManagement /> : null}
           </> : <>
             {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
             {active === 'wording' ? (

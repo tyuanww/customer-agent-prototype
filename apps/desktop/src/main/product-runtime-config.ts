@@ -48,6 +48,16 @@ export type PackagedProductProfile = Readonly<{
   contentIntake?: 'faq-v2';
 }>;
 
+/** Shell whitelist. `contentIntake` is set only after synthetic-local and two
+ * distinct loopback origins have already passed, so this does not re-read the
+ * profile file. It returns the two constants, never origins or the raw profile. */
+export function projectIntakeShellLine(
+  profile: Pick<PackagedProductProfile, 'contentIntake'> | null | undefined,
+): { readonly profileMode: typeof MODE; readonly contentIntake: 'faq-v2' } | null {
+  if (profile?.contentIntake !== 'faq-v2') return null;
+  return Object.freeze({ profileMode: MODE, contentIntake: 'faq-v2' });
+}
+
 /**
  * Why the packaged profile could not be used. The distinction exists so the
  * startup failure notice can tell an operator to install the stack (file
