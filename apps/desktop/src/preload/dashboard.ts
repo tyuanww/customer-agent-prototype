@@ -404,6 +404,40 @@ contextBridge.exposeInMainWorld('dashboardAnnounce', {
   },
 });
 
+contextBridge.exposeInMainWorld('dashboardSopWorkbook', {
+  async open() {
+    try {
+      return await ipcRenderer.invoke('dashboard:sop-workbook-open');
+    } catch {
+      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+    }
+  },
+});
+
+contextBridge.exposeInMainWorld('dashboardUsageLog', {
+  async list(filter: unknown) {
+    try {
+      return await ipcRenderer.invoke('dashboard:usage-list', filter);
+    } catch {
+      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+    }
+  },
+  async previewExport() {
+    try {
+      return await ipcRenderer.invoke('dashboard:usage-preview');
+    } catch {
+      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+    }
+  },
+  async export() {
+    try {
+      return await ipcRenderer.invoke('dashboard:usage-export');
+    } catch {
+      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+    }
+  },
+});
+
 contextBridge.exposeInMainWorld('dashboardIteration', {
   async list() {
     try {

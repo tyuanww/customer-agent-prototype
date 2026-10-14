@@ -1,5 +1,11 @@
+import type { IntakeCatalogView } from '@shared/content-intake-catalog';
 import type { IntakeManagementView } from '@shared/content-intake-management';
 import type { IntakePermissionView } from '@shared/content-intake-permissions';
+import type { DashboardIterationTask } from '@shared/dashboard-iteration';
+import type { DashboardUsageLogApi, UsageLogRow } from '@shared/dashboard-usage-log';
+import { usageExportPreviewCounts } from '@shared/usage-log-csv';
+import type { DashboardWordingEntry, DashboardWordingView } from '@shared/dashboard-wording';
+import { DESK_PERSONAS, type DeskItemView, type DeskView } from '@shared/desk-knowledge';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 
 const REVIEW_HOSTS = new Set(['127.0.0.1', 'localhost']);
@@ -65,7 +71,95 @@ function permissionView(): IntakePermissionView {
   };
 }
 
-/** Local layout fixture for the materials and permissions pages. It never reads the account file or the database. */
+function deskItem(id: string, name: string, body: string, statusLabel: string, validity: DeskItemView['validity']): DeskItemView {
+  return {
+    id, personaId: 'shop', name, category: 'product', customCategory: null, fileName: '问答.txt', body,
+    parseState: 'ok', validity, validFrom: '2026-10-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z',
+    updatedAt: '2026-10-13T02:00:00.000Z', statusLabel, delivered: statusLabel === '生效中',
+  };
+}
+
+function deskView(): DeskView {
+  const items = [
+    deskItem('k-live', '运费谁承担', '七天无理由，运费由买家承担。', '生效中', 'always'),
+    deskItem('k-due', '退货运费什么时候到', '到点后才发给坐席。', '待生效', 'scheduled'),
+    deskItem('k-old', '旧包装说明', '这句已经过了有效期。', '已失效', 'scheduled'),
+  ];
+  return {
+    signedIn: true, role: 'operator', displayName: '运营', personas: DESK_PERSONAS, selectedPersonaId: 'shop',
+    items, delivered: items.filter((item) => item.delivered), tacit: [], revision: 1, notice: null, persistence: 'ok',
+  };
+}
+
+function iterationTask(id: string, status: DashboardIterationTask['status']): DashboardIterationTask {
+  return {
+    taskId: id, signalId: 'inaccuracy:script-a', clusterKey: 'script-a',
+    sampleQueryIds: ['q1', 'q2', 'q3'], suspectedCause: 'content_gap', suggestedScriptIds: ['script-a'],
+    status, assigneeRole: 'coach', resolution: null, resolutionNote: null, version: 1,
+    createdAt: '2026-10-13T00:00:00.000Z', updatedAt: '2026-10-13T00:00:00.000Z', resolvedAt: null,
+  };
+}
+
+function wordingView(): DashboardWordingView {
+  const entry: DashboardWordingEntry = {
+    scriptId: 'script-a', domain: 'product', title: '运费谁承担', scene: '退货运费', answerPreview: '买家承担',
+    platform: '千牛', version: 'rel_9', scriptVersion: 2, effectiveFrom: '2026-10-14T00:00:00.000Z', effectiveTo: null,
+    effectiveWindow: '当前发布', risk: 'low', lifecycle: 'published', lifecycleLabel: '已发布',
+    ownerRole: '当前发布', dataClass: 'current-release',
+  };
+  return { ok: true, releaseId: 'rel_9', total: 1, entries: [entry], catalogRefreshedAt: null, matchesLease: true };
+}
+
+function catalogView(): IntakeCatalogView {
+  const until = '2099-01-01T00:00:00.000Z';
+  return {
+    signedIn: true, busy: false,
+    context: {
+      shops: ['shop-a'], shopNames: [{ id: 'shop-a', label: '合成旗舰店' }], shopNamesValidUntil: until,
+      shopId: 'shop-a', products: [], scenarios: [], productIds: [], scenarioIds: [], validUntil: until,
+    },
+    releaseId: 'rel_9', validUntil: until,
+    rows: [{
+      id: 'row-1', domain: 'product', title: '运费谁承担', answerText: '七天无理由，运费由买家承担。',
+      applicabilityNote: '全店通用', riskNote: '', category: '售后', scriptVersion: 2,
+      effectiveFrom: '2026-10-01T00:00:00.000Z', effectiveTo: null,
+    }],
+  };
+}
+
+
+function usageLogFixture(): DashboardUsageLogApi {
+  const rows: UsageLogRow[] = [
+    { id: 'u1', askedAt: '2026-10-13T07:42:00Z', agent: '外包甲', question: '这个面膜孕妇能用吗', scriptTitle: '产品材质', result: 'copied', snapshotStale: false },
+    { id: 'u2', askedAt: '2026-10-13T07:40:00Z', agent: '外包乙', question: null, scriptTitle: '运费谁承担', result: 'copied', snapshotStale: false },
+    { id: 'u3', askedAt: '2026-10-13T07:31:00Z', agent: '外包甲', question: '能开发票吗', scriptTitle: null, result: 'miss', snapshotStale: false },
+    { id: 'u4', askedAt: '2026-10-13T07:20:00Z', agent: '外包乙', question: '七天能退吗', scriptTitle: '七天无理由怎么算', result: 'viewed', snapshotStale: false },
+    { id: 'u5', askedAt: '2026-10-13T07:02:00Z', agent: '外包甲', question: '什么时候发货', scriptTitle: '发货时间', result: 'copied', snapshotStale: true },
+  ];
+  return {
+    list: async (filter) => ({
+      ok: true,
+      rows: rows.filter(row => (!filter.result || row.result === filter.result)
+        && (!filter.query || row.agent.includes(filter.query) || (row.question ?? '').includes(filter.query))),
+      nextCursor: null,
+      canExport: true,
+    }),
+    previewExport: async () => ({ ok: true, ...usageExportPreviewCounts(rows) }),
+    export: async () => ({ ok: true, written: usageExportPreviewCounts(rows).exportable }),
+  };
+}
+
+function exposePreview(key: string, value: unknown): void {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(window, key);
+    if (descriptor && descriptor.writable === false && descriptor.configurable === false) return;
+    (window as unknown as Record<string, unknown>)[key] = value;
+  } catch {
+    // Electron preload already published this API as read-only.
+  }
+}
+
+/** Local layout fixture for the workbench pages. It never reads the account file or the database. */
 export function installIntakeReviewBridge(location: Location = window.location): boolean {
   if (!REVIEW_HOSTS.has(location.hostname) || new URLSearchParams(location.search).get('preview') !== 'intake') return false;
   let materials = managementView();
@@ -74,7 +168,7 @@ export function installIntakeReviewBridge(location: Location = window.location):
     { displayName: '外包甲', username: 'seat-jia', post: '客服', enabled: true },
     { displayName: '外包乙', username: 'seat-yi', post: '客服主管', enabled: true },
   ];
-  window.dashboardIntake = {
+  exposePreview('dashboardIntake', {
     mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: true, view: materials }),
     command: async (command) => {
@@ -86,13 +180,31 @@ export function installIntakeReviewBridge(location: Location = window.location):
       return { ok: true, view: materials };
     },
     onInvalidated: () => () => undefined,
-  };
-  window.dashboardPermissions = {
+  });
+  exposePreview('dashboardPermissions', {
     current: async () => ({ ok: true, view: permissions }),
     command: async () => ({ ok: true, view: permissions }),
     onInvalidated: () => () => undefined,
-  };
-  window.dashboardSeats = {
+  });
+  const desk = deskView();
+  exposePreview('dashboardDesk', {
+    current: async () => ({ ok: true, view: desk }),
+    command: async () => ({ ok: true, view: desk }),
+  });
+  exposePreview('dashboardIteration', {
+    list: async () => ({ ok: true, items: [iterationTask('task-open', 'open'), iterationTask('task-progress', 'in_progress')], nextCursor: null }),
+    start: async () => ({ ok: true, task: iterationTask('task-open', 'in_progress') }),
+    close: async () => ({ ok: true, task: iterationTask('task-open', 'resolved') }),
+  });
+  exposePreview('dashboardWording', { list: async () => wordingView() });
+  exposePreview('dashboardUsageLog', usageLogFixture());
+  const catalog = catalogView();
+  exposePreview('dashboardIntakeCatalog', {
+    current: async () => ({ ok: true, view: catalog }),
+    command: async () => ({ ok: true, view: catalog }),
+    onInvalidated: () => () => undefined,
+  });
+  exposePreview('dashboardSeats', {
     command: async (intent: SeatAccountIntent): Promise<SeatAccountReply> => {
       if (intent.action === 'list') return { ok: true, action: 'list', seats };
       if (intent.action === 'create') {
@@ -104,6 +216,6 @@ export function installIntakeReviewBridge(location: Location = window.location):
       seats = seats.map(seat => seat.username === intent.username ? { ...seat, enabled: false } : seat);
       return { ok: true, action: 'disable', username: intent.username };
     },
-  };
+  });
   return true;
 }

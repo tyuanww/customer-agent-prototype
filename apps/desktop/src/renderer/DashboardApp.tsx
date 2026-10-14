@@ -1,5 +1,6 @@
 import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeOverview } from './features/dashboard/IntakeOverview';
+import { IntakeSopSource } from './features/dashboard/IntakeSopSource';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import {
@@ -67,6 +68,7 @@ import {
   type DashboardThemeMode,
 } from './lib/dashboard-appearance';
 import './styles/dashboard.css';
+import './features/dashboard/workbench-v9.css';
 import './features/dashboard/desk-chrome.css';
 
 type SidebarDestination = DashboardModuleId | 'permissions';
@@ -88,16 +90,19 @@ function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
 }
 
 function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
-  if (id === 'permissions') return 'review';
   return id;
 }
 
+const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions']);
+
 function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
-  if (!canOpenPermissions) return 'content';
   const location = window.location;
   const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'content';
-  return new URLSearchParams(location.search).get('page') === 'permissions' ? 'permissions' : 'content';
+  const page = new URLSearchParams(location.search).get('page');
+  if (page === 'permissions' && !canOpenPermissions) return 'content';
+  if (page && PREVIEW_PAGES.has(page as SidebarDestination)) return page as SidebarDestination;
+  return 'content';
 }
 
 function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
@@ -134,6 +139,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   ));
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
+  const [backStack, setBackStack] = useState<SidebarDestination[]>([]);
+  const [todoCount, setTodoCount] = useState<number | null>(null);
+  const [scriptDraft, setScriptDraft] = useState<string | null>(null);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [signedIn, setSignedIn] = useState(false);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
@@ -190,6 +198,24 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   );
   const chromeMode = dashboardChromeModeFor(hostPlatform);
   const collapsedSurface = dashboardCollapsedSurfaceWidth(chromeMode);
+  useEffect(() => {
+    if (profile !== 'intake') return undefined;
+    const api = window.dashboardIteration;
+    if (!api) return undefined;
+    let live = true;
+    void api.list().then((result) => {
+      if (live && result.ok) setTodoCount(result.items.filter((task) => task.status === 'open' || task.status === 'in_progress').length);
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [profile]);
+  const selectNav = (id: SidebarDestination) => { setBackStack([]); setActive(id); };
+  const jump = (id: SidebarDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); };
+  const goBack = () => {
+    const previous = backStack[backStack.length - 1];
+    if (!previous) return;
+    setBackStack((stack) => stack.slice(0, -1));
+    setActive(previous);
+  };
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
@@ -1037,7 +1063,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
 
   const move = (delta: number) => {
     const nextId = nextSidebarDestination(active, delta, navItems);
-    setActive(nextId);
+    selectNav(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
     });
@@ -1065,7 +1091,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   return (
     <div
       ref={shellRef}
-      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''}`}
+      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''}${profile === 'intake' ? ' is-intake' : ''}`}
       data-testid="dashboard-shell"
       data-window-role="dashboard"
       data-nav-collapsed={navCollapsed}
@@ -1171,7 +1197,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
                   data-testid={`nav-${item.id}`}
                   onClick={() => {
                     hideNavTooltip(true);
-                    setActive(item.id);
+                    selectNav(item.id);
                   }}
                   onMouseEnter={(event) => showNavTooltip(
                     event.currentTarget,
@@ -1203,29 +1229,28 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
                     if (event.key === 'Home') {
                       event.preventDefault();
                       const first = navItems[0].id;
-                      setActive(first);
+                      selectNav(first);
                       focusModule(first);
                     }
                     if (event.key === 'End') {
                       event.preventDefault();
                       const last = navItems[navItems.length - 1].id;
-                      setActive(last);
+                      selectNav(last);
                       focusModule(last);
                     }
                   }}
                 >
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={sidebarIcon(item.id)} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
+                  {profile === 'intake' && item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
                 </button>
               </div>
             );
           })}
         </div>
-        <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
-          <span data-testid="dashboard-boundary-disclaimer">
-            {profile === 'intake' ? '合成验证 · 未接入真实业务资料' : legacyDisclaimer}
-          </span>
-        </p>
+        {profile === 'intake' ? null : <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
+          <span data-testid="dashboard-boundary-disclaimer">{legacyDisclaimer}</span>
+        </p>}
         <div
           ref={navResizeHandleRef}
           className="dashboard-nav-resizer dashboard-no-drag"
@@ -1278,9 +1303,11 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             aria-hidden="true"
           />
           <div className="dashboard-page-context">
-            <strong>{activeItem.label}</strong>
+            {profile === 'intake' ? <p className="intake-crumb">
+              {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
+              <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {profile === 'intake' ? 'PILOT-S0 · SYNTHETIC' : refreshLabel}
+              {profile === 'intake' ? '' : refreshLabel}
             </p>
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
@@ -1297,13 +1324,10 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {profile === 'intake' ? <>
-            {active === 'overview' && <IntakeOverview canOpenPermissions={canOpenPermissions} onOpen={setActive} />}
-            {active === 'sop' && <section className="dash-module" data-testid="module-sop">
-              <h1 className="desk-sr">SOP</h1>
-              <p>未接入。</p>
-            </section>}
-            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} onOpenLibrary={() => setActive('wording')} />
-            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge /></div> : null}
+            {active === 'overview' && <IntakeOverview canOpenPermissions={canOpenPermissions} onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
+            {active === 'sop' && <IntakeSopSource />}
+            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} onOpenLibrary={() => jump('wording')} />
+            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
           </> : <>
             {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}

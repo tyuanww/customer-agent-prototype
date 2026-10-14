@@ -12,6 +12,6 @@
     "test": "pnpm build && pnpm test:built",
     "probe": "pnpm build && node scripts/probe.mjs"
   },
-  "dependencies": { "csv-parse": "7.0.3", "exceljs": "4.4.0", "yauzl": "3.4.0", "saxes": "6.0.0" },
-  "devDependencies": { "@types/node": "24.13.3", "@types/yauzl": "2.10.3", "jszip": "3.10.1", "typescript": "5.9.2", "vitest": "3.2.7" }
+  "dependencies": { "csv-parse": "7.0.3", "exceljs": "4.4.0", "jszip": "3.10.1", "yauzl": "3.4.0", "saxes": "6.0.0" },
+  "devDependencies": { "@types/node": "24.13.3", "@types/yauzl": "2.10.3", "typescript": "5.9.2", "vitest": "3.2.7" }
 }

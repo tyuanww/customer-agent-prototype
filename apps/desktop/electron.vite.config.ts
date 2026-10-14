@@ -10,7 +10,7 @@ export default defineConfig({
     // unsigned package only ships out/** plus package.json.
     // `source` keeps retrieval-core on its TypeScript entry so packaging does
     // not need a separate dist build before electron-vite.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/retrieval-core'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core'] })],
     resolve: {
       conditions: ['source'],
     },
@@ -59,6 +59,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
+          workbenchV9: resolve(__dirname, 'src/renderer/features/dashboard/workbench-design-v9.html'),
         },
       },
     },
