@@ -9,6 +9,7 @@ export type DashboardNavIconId =
   | 'content'
   | 'announce'
   | 'permissions'
+  | 'materials'
   | 'architecture'
   | 'workorder-trash';
 
@@ -23,6 +24,7 @@ const NAV_ICON_PATHS: Record<DashboardNavIconId, readonly string[]> = {
   content: ['M7 3.5h7l4 4v13H7z', 'M14 3.5v4h4', 'M10 12h5M10 15.5h5'],
   announce: ['M19.5 8.5A8 8 0 0 0 5.8 7', 'M5.5 3.5V7H9', 'M4.5 15.5A8 8 0 0 0 18.2 17', 'M18.5 20.5V17H15'],
   permissions: ['M8.5 11.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8', 'm11.4 12.6 8.1-8.1', 'm16.5 7.5 2.5 2.5', 'm14 10 1.8 1.8'],
+  materials: ['M4 7h6l2 2h8v9H4z', 'M4 7V5h5l2 2'],
   architecture: ['M12 4v5', 'M5 20v-5h14v5', 'M5 15h14', 'm12 9-7 6', 'm12-6 7 6'],
   'workorder-trash': ['M4 7h16', 'M9 7V4h6v3', 'M7 7l1 14h8l1-14'],
 };

@@ -46,11 +46,19 @@ export type IntakeManagementView = {
   receipt: C['IntakeQualityReceipt'] | null;
 };
 export type IntakeManagementReply = { ok: true; view: IntakeManagementView } | { ok: false; code: string; message: string; view: IntakeManagementView | null };
+/** Main-process whitelist. Null fields mean the shell draws no profile line. */
+export type IntakeShellLine = {
+  ok: true;
+  profileMode: 'synthetic-local' | null;
+  contentIntake: 'faq-v2' | null;
+};
 export type IntakeManagementApi = {
   mode(): Promise<{ ok: boolean; enabled: boolean }>;
   current(): Promise<IntakeManagementReply>;
   command(command: IntakeManagementCommand): Promise<IntakeManagementReply>;
   onInvalidated(listener: () => void): () => void;
+  /** Optional so existing session mocks keep compiling. Absent means no shell line. */
+  shellLine?: () => Promise<IntakeShellLine>;
 };
 export function isIntakeManagementCommand(raw: unknown): raw is IntakeManagementCommand {
   if (isIntakeUploadCommand(raw)) return true;
