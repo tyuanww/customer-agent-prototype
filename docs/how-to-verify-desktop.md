@@ -268,12 +268,12 @@ pnpm clean:preview
 
 `workspace:size` 按磁盘分配量拆分 `release/`、各 workspace 包的 `node_modules/` 与已知构建输出、精确派生图标、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
-`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **19.25 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同先调整为19/16/10，随后根据同一提交的Linux磁盘分配块差异，经用户明确批准调整为18.5/16/10.5（总45不变，见TODOS当前交接）；历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
+`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **19.25 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同先调整为19/16/10，随后根据同一提交的Linux磁盘分配块差异，经用户明确批准调整为18.5/16/10.5（总45不变，见TODOS当前交接）。2026-10-14 源码组改为 19.25 MiB，冻结合同仍是 16 MiB，冻结证据仍是 10.5 MiB，总量仍是 45 MiB。历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |
 | `pnpm clean:preview` | 默认 dry-run；列出本地未签名包、`apps/desktop/out/`、派生 `apps/desktop/build/icon.*`、测试报告、gstack QA 报告与 Vite 缓存 | 无改动 |
-| `pnpm workspace:check` | 检查三个保留输入分组的 18.5/16/10.5 MiB 上限及总量 45 MiB 上限 | 按输出定位增长归属；纠正误计或评审必要增量后重跑，不自动删除冻结输入 |
+| `pnpm workspace:check` | 检查三个保留输入分组的 19.25/16/10.5 MiB 上限及总量 45 MiB 上限 | 按输出定位增长归属；纠正误计或评审必要增量后重跑，不自动删除冻结输入 |
 | `pnpm clean:generated` | 只删除上面的精确 allowlist | `pnpm build`、相应 `package:*` / 测试命令重新生成 |
 | `pnpm clean:deep:preview` | 预览 generated + `node_modules` | 无改动 |
 | `pnpm clean:deep` | 在 generated 之外删除根、API、database 与桌面包依赖目录；适合归档或依赖树严重陈旧时 | `pnpm install --frozen-lockfile`，再按需 `pnpm electron:install` |
