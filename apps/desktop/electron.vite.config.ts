@@ -59,7 +59,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
-          workbenchV9: resolve(__dirname, 'src/renderer/features/dashboard/workbench-design-v9.html'),
         },
       },
     },

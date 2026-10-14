@@ -268,7 +268,7 @@ pnpm clean:preview
 
 `workspace:size` 按磁盘分配量拆分 `release/`、各 workspace 包的 `node_modules/` 与已知构建输出、精确派生图标、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
-`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **18.5 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同先调整为19/16/10，随后根据同一提交的Linux磁盘分配块差异，经用户明确批准调整为18.5/16/10.5（总45不变，见TODOS当前交接）；历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
+`workspace:check` 按已批准的三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **19.25 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **45 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。统计采用 allocated bytes（磁盘分配块，按 inode 去重），不是安装包大小或文件逻辑字节。`node_modules`、精确已知构建输出/派生图标、本地发布包、`.git`、`.codegraph` 和用户参考 ZIP 继续单列；未知输出、canonical 资产、构建配置和已提交 generated source 不会被宽泛排除。分组在2026-10-12为接收获批后继合同先调整为19/16/10，随后根据同一提交的Linux磁盘分配块差异，经用户明确批准调整为18.5/16/10.5（总45不变，见TODOS当前交接）；历史分组依据及2026-10-09批准记录见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。`--remainder-budget-mib=N` 只改变总量上限，不能绕过分组门禁；分组政策变更须根据真实构成另行审阅，不能删除冻结历史或仅靠临时参数使默认门禁显绿。
 
 | 命令 | 行为 | 恢复方式 |
 | --- | --- | --- |

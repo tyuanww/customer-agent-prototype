@@ -109,11 +109,13 @@ describe('loadRenderer', () => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('explicit v9 HTML preview route', () => {
-  it('loads the packaged standalone HTML when the preview switch is set', async () => {
+  it('does not load a standalone HTML page when that switch is set', async () => {
     vi.stubEnv('CUSTOMER_AGENT_DESKTOP_DESIGN', 'v9-html');
     const { win, loadURL } = createWindow();
     await expect(loadRenderer(win, 'dashboard', 'http://127.0.0.1:5173/')).resolves.toBe('loaded');
-    expect(new URL(String(loadURL.mock.calls[0]?.[0])).pathname).toBe('/features/dashboard/workbench-design-v9.html');
+    const loaded = new URL(String(loadURL.mock.calls[0]?.[0]));
+    expect(loaded.pathname).toBe('/');
+    expect(loaded.searchParams.get('preview')).toBeNull();
   });
 
   it('keeps React as the default packaged dashboard even if the preview switch is set', async () => {
@@ -136,12 +138,4 @@ describe('explicit v9 HTML preview route', () => {
     expect(loaded.searchParams.get('role')).toBe('dashboard');
   });
 
-  it('loads the standalone HTML route from the Vite dev server when enabled', async () => {
-    vi.stubEnv('CUSTOMER_AGENT_DESKTOP_DESIGN', 'v9-html');
-    const { win, loadURL } = createWindow();
-    await loadRenderer(win, 'dashboard', 'http://127.0.0.1:5173/');
-    const loaded = new URL(String(loadURL.mock.calls[0]?.[0]));
-    expect(loaded.pathname).toBe('/features/dashboard/workbench-design-v9.html');
-    expect(loaded.searchParams.get('role')).toBe('dashboard');
-  });
 });

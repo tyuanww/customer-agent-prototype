@@ -1,4 +1,4 @@
-/** Same deterministic sample as workbench-design-v9.html. Not a live usage feed. */
+/** Deterministic local preview sample. Not a live usage feed. */
 const hash = (str: string) => {
   let h = 2166136261;
   for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }

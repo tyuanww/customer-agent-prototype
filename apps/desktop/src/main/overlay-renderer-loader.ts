@@ -12,16 +12,13 @@ export async function loadRenderer(
     return 'cancelled';
   }
   try {
-    // Design preview switches are dev-server only. Packaged/customer installs
-    // always load the real React renderer without sample data.
-    //   CUSTOMER_AGENT_DESKTOP_DESIGN=v9      -> React dashboard with local sample data
-    //   CUSTOMER_AGENT_DESKTOP_DESIGN=v9-html -> raw standalone v9 HTML (static design)
+    // Design preview is dev-server only. Packaged installs load the React
+    // workbench and do not turn on sample data. The standalone HTML mock is
+    // not kept in the repo; it blew the source-input budget.
     const design = role === 'dashboard' && devServerUrl ? process.env.CUSTOMER_AGENT_DESKTOP_DESIGN : undefined;
-    const useV9HtmlPreview = design === 'v9-html';
     const useV9ReactPreview = design === 'v9';
     if (devServerUrl) {
       const url = new URL(devServerUrl);
-      if (useV9HtmlPreview) url.pathname = '/features/dashboard/workbench-design-v9.html';
       if (useV9ReactPreview) url.searchParams.set('preview', 'intake');
       url.searchParams.set('role', role);
       url.searchParams.set('platform', process.platform);

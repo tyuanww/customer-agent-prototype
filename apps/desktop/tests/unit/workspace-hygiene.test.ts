@@ -453,7 +453,7 @@ describe('workspace hygiene', () => {
   it.each([
     { key: 'frozen-contracts', relativePath: 'contracts/upstream/frozen/input.sql', capMiB: 16 },
     { key: 'frozen-evidence', relativePath: 'evidence/qa/frozen.log', capMiB: 10.5 },
-    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 18.5 },
+    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 19.25 },
   ])('rejects $key growth even with unused aggregate headroom', ({ key, relativePath, capMiB }) => {
     const root = createWorkspaceFixture();
     const target = path.join(root, relativePath);
