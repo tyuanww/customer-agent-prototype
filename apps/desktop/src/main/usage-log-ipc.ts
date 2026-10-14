@@ -1,4 +1,4 @@
-import { dialog, ipcMain, type WebContents } from 'electron';
+import { BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
 import type { UsageLogExportPreview, UsageLogExportReply, UsageLogReply } from '../shared/dashboard-usage-log';
 import { listUsageLog, usageExportPreviewCounts, type UsageSourceRow } from '../shared/usage-log-csv';
 import type { UsageLogFilter } from '../shared/dashboard-usage-log';
@@ -41,13 +41,20 @@ export function registerUsageLogIpc(
 
   ipcMain.handle(EXPORT, async (event): Promise<UsageLogExportReply> => {
     if (!guard(event) || usageSource === null) return unavailable();
-    const chosen = await dialog.showSaveDialog({
+    const snapshot = usageSource;
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const options = {
       title: '导出训练样本',
       defaultPath: 'usage.csv',
       filters: [{ name: 'CSV', extensions: ['csv'] }],
-    });
+    };
+    const chosen = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
     if (chosen.canceled || !chosen.filePath) return { ok: false, code: 'CANCELLED', message: '已取消' };
-    const { written } = saveUsageLogCsv(chosen.filePath, usageSource);
-    return { ok: true, written };
+    try {
+      const { written } = await saveUsageLogCsv(chosen.filePath, snapshot);
+      return { ok: true, written };
+    } catch {
+      return { ok: false, code: 'FAILED', message: '导出失败，请重试。' };
+    }
   });
 }

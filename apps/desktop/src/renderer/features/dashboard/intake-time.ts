@@ -12,6 +12,7 @@ export function formatIntakeTime(value: string | null | undefined): string {
 
 /** setTimeout fires immediately above 2^31-1 ms (~24.8 days). Wait in chunks until the absolute target. */
 export function timeoutUntil(run: () => void, targetEpochMs: number): () => void {
+  if (!Number.isFinite(targetEpochMs)) return () => undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const step = () => {
     const left = targetEpochMs - Date.now();

@@ -39,12 +39,12 @@ function splitCsv(text: string): string[][] {
 function previewCsv(fileName: string, size: number, csvText: string): CsvPreview {
   const rows = splitCsv(csvText);
   const header = rows[0] ?? [];
-  const body = rows.slice(1);
   const questionAt = Math.max(0, header.findIndex((value) => value.trim() === '问题'));
   const categoryAt = header.findIndex((value) => value.trim() === '分类');
+  const usable = rows.slice(1).filter((row) => (row[questionAt]?.trim() ?? '') !== '');
   return {
-    fileName, size, csvText, count: body.length,
-    sample: body.slice(0, 3).map((row) => [row[questionAt]?.trim() ?? '', categoryAt >= 0 ? row[categoryAt]?.trim() ?? '' : ''] as const),
+    fileName, size, csvText, count: usable.length,
+    sample: usable.slice(0, 3).map((row) => [row[questionAt]?.trim() ?? '', categoryAt >= 0 ? row[categoryAt]?.trim() ?? '' : ''] as const),
   };
 }
 
@@ -172,7 +172,15 @@ export function DeskKnowledge({
         <header><h3 id="desk-write-title">添加话术</h3>
           <button type="button" className="icon-btn" aria-label="关闭" onClick={() => setWriting(false)}><svg className="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button></header>
         {addMode === 'upload' ? <>
-          {!csv ? <label className="drop" tabIndex={0}>
+          {!csv ? <label className="drop" tabIndex={0} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+            event.preventDefault();
+            const file = event.dataTransfer.files?.[0];
+            const csvFile = !!file && (file.type === 'text/csv' || file.type === 'application/vnd.ms-excel' || /\.csv$/i.test(file.name));
+            if (!csvFile || !file || busy) return;
+            const reader = new FileReader();
+            reader.onload = () => setCsv(previewCsv(file.name, file.size, typeof reader.result === 'string' ? reader.result : ''));
+            reader.readAsText(file);
+          }}>
             <svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5" /><path d="m7.5 9.5 4.5-4.5 4.5 4.5" /><path d="M5 15v4h14v-4" /></svg>
             <b>拖拽文档到这里，或点击选择</b><span className="hint">支持 .csv，表头沿用「问题 / 标准话术 / 分类」</span>
             <input type="file" aria-label="导入 CSV" accept=".csv,text/csv" hidden disabled={busy} onChange={(event) => {

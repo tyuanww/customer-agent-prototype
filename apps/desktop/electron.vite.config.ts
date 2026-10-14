@@ -15,7 +15,7 @@ export default defineConfig({
       conditions: ['source'],
     },
     ssr: {
-      noExternal: ['@customer-agent/retrieval-core'],
+      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake'],
       resolve: {
         conditions: ['source'],
       },

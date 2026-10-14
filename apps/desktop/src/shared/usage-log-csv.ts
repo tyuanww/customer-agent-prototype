@@ -1,6 +1,6 @@
 import type { UsageLogFilter, UsageLogReply, UsageLogResult, UsageLogRow } from './dashboard-usage-log';
 
-/** A usage row plus the consent flag the export filter needs. Omitted consent counts as agreed. */
+/** A usage row plus the consent flag the export filter needs. Missing consent is not exportable. */
 export type UsageSourceRow = UsageLogRow & { consented?: boolean };
 
 const RESULT_LABEL: Record<UsageLogResult, string> = {
@@ -10,7 +10,7 @@ const RESULT_LABEL: Record<UsageLogResult, string> = {
 };
 
 export function usageRowIsExportable(row: UsageSourceRow): boolean {
-  return row.question !== null && row.consented !== false;
+  return row.question !== null && row.consented === true;
 }
 
 /** Export preview counts. A row that is both redacted and without consent is counted once, as redacted. */
@@ -24,7 +24,7 @@ export function usageExportPreviewCounts(rows: readonly UsageSourceRow[]): {
   let withoutConsent = 0;
   for (const row of rows) {
     if (row.question === null) redacted += 1;
-    else if (row.consented === false) withoutConsent += 1;
+    else if (row.consented !== true) withoutConsent += 1;
     else exportable += 1;
   }
   return { exportable, redacted, withoutConsent };
@@ -44,22 +44,30 @@ export function selectUsageLogRows(
   });
 }
 
+const USAGE_PAGE_SIZE = 50;
+
 /** The list reply the main handler returns. A missing source does not invent rows. */
 export function listUsageLog(
   source: readonly UsageSourceRow[] | null,
   filter: Partial<UsageLogFilter> | null | undefined,
 ): UsageLogReply {
   if (source === null) return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+  const selected = selectUsageLogRows(source, filter);
+  const cursor = filter?.cursor ?? null;
+  const found = cursor ? selected.findIndex((row) => row.id === cursor) : -1;
+  const offset = cursor ? (found >= 0 ? found : selected.length) : 0;
+  const rows = selected.slice(offset, offset + USAGE_PAGE_SIZE);
+  const next = selected[offset + USAGE_PAGE_SIZE];
   return {
     ok: true,
-    rows: selectUsageLogRows(source, filter),
-    nextCursor: null,
+    rows,
+    nextCursor: next ? next.id : null,
     canExport: source.some(usageRowIsExportable),
   };
 }
 
 function csvCell(value: string): string {
-  const guarded = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const guarded = /^\s*[=+\-@]/.test(value) ? `'${value}` : value;
   if (/[",\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
   return guarded;
 }
@@ -78,7 +86,7 @@ export function serializeUsageLogCsv(rows: readonly UsageSourceRow[]): string {
       RESULT_LABEL[row.result],
     ].map(csvCell).join(','));
   }
-  return `${lines.join('\n')}\n`;
+  return `\uFEFF${lines.join('\n')}\n`;
 }
 
 export function aggregateUsage(rows: readonly UsageSourceRow[]): {
@@ -89,7 +97,7 @@ export function aggregateUsage(rows: readonly UsageSourceRow[]): {
   const use = rows.filter((row) => row.result !== 'miss').length;
   const miss = rows.filter((row) => row.result === 'miss').length;
   const total = use + miss;
-  const rate = total === 0 ? '未接入' : `${((use / total) * 100).toFixed(1)}%`;
+  const rate = total === 0 ? '暂无记录' : `${((use / total) * 100).toFixed(1)}%`;
   return { use, miss, rate };
 }
 

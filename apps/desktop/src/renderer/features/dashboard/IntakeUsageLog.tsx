@@ -27,6 +27,7 @@ export function IntakeUsageLog() {
   const [load, setLoad] = useState<Load>(() => (window.dashboardUsageLog ? { kind: 'loading' } : { kind: 'unavailable' }));
   const [moreBusy, setMoreBusy] = useState(false);
   const [preview, setPreview] = useState<UsageLogExportPreview | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState('');
   const generation = useRef(0);
 
@@ -64,14 +65,26 @@ export function IntakeUsageLog() {
     setNotice('');
     void api.previewExport().then(setPreview).catch(() => setNotice('导出暂时不可用，请重试。'));
   };
-  const confirmExport = () => {
+  const resultClass = (result: UsageLogRow['result']) => {
+    if (result === 'copied') return ' is-copied';
+    if (result === 'viewed') return ' is-viewed';
+    return '';
+  };
+  const confirmExport = async () => {
     const api = window.dashboardUsageLog;
-    if (!api) return;
-    void api.export().then((reply) => {
+    if (!api || exporting) return;
+    setExporting(true);
+    try {
+      const reply = await api.export();
       setPreview(null);
       if (reply.ok) setNotice(`已导出 ${reply.written} 条。`);
       else if (reply.code !== 'CANCELLED') setNotice('导出失败，请重试。');
-    }).catch(() => { setPreview(null); setNotice('导出失败，请重试。'); });
+    } catch {
+      setPreview(null);
+      setNotice('导出失败，请重试。');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return <section className="sec intake-usage-log" aria-label="使用情况">
@@ -93,8 +106,8 @@ export function IntakeUsageLog() {
         {preview.ok ? <>
           <p className="fn-note" style={{ margin: '0 0 12px' }}>将导出 {preview.exportable} 条记录。已脱敏的 {preview.redacted} 条和未同意采集的 {preview.withoutConsent} 条不会导出，同一条只记一次。“已复制”不等于已发送，训练时请按此理解。</p>
           <div className="acts">
-            <button type="button" className="btn btn-sm" onClick={() => setPreview(null)}>取消</button>
-            <button type="button" className="btn btn-sm btn-primary" disabled={preview.exportable === 0} onClick={confirmExport}>导出 CSV</button>
+            <button type="button" className="btn btn-sm" disabled={exporting} onClick={() => setPreview(null)}>取消</button>
+            <button type="button" className="btn btn-sm btn-primary" disabled={exporting || preview.exportable === 0} onClick={() => void confirmExport()}>导出 CSV</button>
           </div>
         </> : <>
           <p className="fn-note" style={{ margin: '0 0 12px' }}>导出暂时不可用，请重试。</p>
@@ -114,7 +127,7 @@ export function IntakeUsageLog() {
             <td>{row.agent}</td>
             <td>{row.question === null ? <span className="redact">已脱敏</span> : row.question}</td>
             <td>{row.scriptTitle ?? <span className="mute">—</span>}{row.snapshotStale ? <span className="stale" title="坐席当时用的是旧快照">旧快照</span> : null}</td>
-            <td><span className="res"><i className={`dot${row.result === 'copied' ? ' ok' : row.result === 'viewed' ? ' wait' : ''}`} />{RESULT_LABEL[row.result]}</span></td>
+            <td><span className={`res intake-result${resultClass(row.result)}`}>{RESULT_LABEL[row.result]}</span></td>
           </tr>)}
         </tbody>
       </table> : null}

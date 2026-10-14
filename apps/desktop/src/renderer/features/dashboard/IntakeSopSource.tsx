@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SopWorkbookView } from '@shared/sop-workbook-preview';
 import './workbench-v9.css';
 
@@ -9,23 +9,34 @@ export function IntakeSopSource() {
   const [sheetName, setSheetName] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
+  const liveRef = useRef(true);
+  useEffect(() => () => { liveRef.current = false; }, []);
 
-  const open = () => {
+  const open = async () => {
     if (!api || busy) return;
     setBusy(true);
     setProblem('');
-    void api.open().then((reply) => {
-      setBusy(false);
+    try {
+      const reply = await api.open();
+      if (!liveRef.current) return;
       if (!reply.ok) {
-        if (reply.code !== 'CANCELLED') setProblem(reply.message);
+        if (reply.code !== 'CANCELLED') {
+          setView(null);
+          setSheetName('');
+          setProblem(reply.message);
+        }
         return;
       }
       setView(reply);
       setSheetName(reply.sheets[0]?.name ?? '');
-    }).catch(() => {
-      setBusy(false);
+    } catch {
+      if (!liveRef.current) return;
+      setView(null);
+      setSheetName('');
       setProblem('这个文件读不开。');
-    });
+    } finally {
+      if (liveRef.current) setBusy(false);
+    }
   };
 
   const sheet = view?.sheets.find((item) => item.name === sheetName) ?? view?.sheets[0];
@@ -33,7 +44,7 @@ export function IntakeSopSource() {
     <h1 className="desk-sr">SOP</h1>
     {!view ? <div className="notready">未接入</div> : null}
     {api ? <div className="toolbar">
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={open}>{busy ? '正在读取…' : '打开原始 SOP 表'}</button>
+      <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void open()}>{busy ? '正在读取…' : '打开原始 SOP 表'}</button>
     </div> : null}
     {problem ? <p role="alert">{problem}</p> : null}
     {view ? <>

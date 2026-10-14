@@ -129,13 +129,14 @@ export function IntakePermissions({ active }: { active: boolean }) {
   const [grantOpen,setGrantOpen]=useState(false),[seatCreateOpen,setSeatCreateOpen]=useState(false);
   const [eligibilityEnded,setEligibilityEnded]=useState(false);
   const generation=useRef(0),pending=useRef(false);
-  const apply=async(command?:IntakePermissionCommand)=>{
-    if(pending.current && command?.action!=='stop')return;
+  const apply=async(command?:IntakePermissionCommand): Promise<boolean>=>{
+    if(pending.current && command?.action!=='stop')return false;
     const gen=++generation.current;pending.current=true;setBusy(true);setError('');
     try{const api=window.dashboardPermissions;if(!api)throw new Error('unavailable');
-      const reply=await(command?api.command(command):api.current());if(gen!==generation.current)return;
-      setView(reply.view);if(!reply.ok)setError(reply.message);
-    }catch{if(gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}}
+      const reply=await(command?api.command(command):api.current());if(gen!==generation.current)return false;
+      setView(reply.view);if(!reply.ok){setError(reply.message);return false;}
+      return true;
+    }catch{if(gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}return false;}
     finally{if(gen===generation.current){pending.current=false;setBusy(false);}}
   };
   useEffect(()=>{
@@ -159,7 +160,10 @@ export function IntakePermissions({ active }: { active: boolean }) {
   useEffect(()=>{setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');},[view?.source]);
   useEffect(()=>{
     if(!view?.validUntil)return undefined;
-    return timeoutUntil(()=>{setEligibilityEnded(true);void apply();},Date.parse(view.validUntil));
+    const until=Date.parse(view.validUntil);
+    if(!Number.isFinite(until))return undefined;
+    setEligibilityEnded(false);
+    return timeoutUntil(()=>{setEligibilityEnded(true);void apply();},until);
   },[view?.validUntil]);
   useEffect(()=>()=>{generation.current++;},[]);
   const disabled=busy || !!view?.busy || !!view?.pending;
@@ -176,6 +180,10 @@ export function IntakePermissions({ active }: { active: boolean }) {
     setPost(value);
   };
   const closeX=<svg className="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>;
+  const closeGrant=()=>{
+    if(!view?.preview){setGrantOpen(false);return;}
+    void apply({action:'discard'}).then((ok)=>{if(ok)setGrantOpen(false);});
+  };
   const peopleRows=view?.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return {key:p.selection,label:p.label,post:grant.post ?? '—',status:grant.status};}) : [];
   return <div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="权限配置">
     <h1 className="desk-sr">权限配置</h1>
@@ -189,7 +197,7 @@ export function IntakePermissions({ active }: { active: boolean }) {
     {view?.available && <>
       <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="权限工作">
         <button type="button" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>业务授权</button>
-        <button type="button" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>setJob('seats')}>外包坐席</button>
+        <button type="button" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();setJob('seats');}}>外包坐席</button>
       </div>
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <button type="button" className="btn" onClick={()=>void apply({action:'stop'})}>停止等待</button>}
@@ -228,9 +236,9 @@ export function IntakePermissions({ active }: { active: boolean }) {
           </tbody></table></section></div>
       </div>
       <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} createOpen={seatCreateOpen} setCreateOpen={setSeatCreateOpen} /></div>
-      {grantOpen && <div className="mask on" onClick={event=>{if(event.target===event.currentTarget)setGrantOpen(false);}}>
+      {grantOpen && <div className="mask on" onClick={event=>{if(event.target===event.currentTarget)closeGrant();}}>
         <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="grant-title">
-          <header><h3 id="grant-title">{view.preview?'预览 · 尚未保存':'新增业务权限'}</h3><button type="button" className="icon-btn" aria-label="关闭" onClick={()=>setGrantOpen(false)}>{closeX}</button></header>
+          <header><h3 id="grant-title">{view.preview?'预览 · 尚未保存':'新增业务权限'}</h3><button type="button" className="icon-btn" aria-label="关闭" onClick={closeGrant}>{closeX}</button></header>
           {!view.preview ? <>
             <fieldset className="fields" disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}>
               <div className="two"><label>人员<select aria-label="人员" value={person} onChange={e=>setPerson(e.target.value)}><option value="">请选择已确认人员</option>{view.people.map(p=><option key={p.selection} value={p.selection}>{p.label}</option>)}</select></label>
@@ -240,14 +248,14 @@ export function IntakePermissions({ active }: { active: boolean }) {
               <span className="hint">时间按本机时区填写，范围和期限仍由服务器核对。</span>
               <label>授权原因<input aria-label="授权原因" maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></label>
             </fieldset>
-            <footer><button type="button" className="btn" onClick={()=>setGrantOpen(false)}>取消</button>
+            <footer><button type="button" className="btn" onClick={closeGrant}>取消</button>
               <button type="button" className="btn btn-primary" disabled={disabled || !person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
                 onClick={previewPost}>预览权限</button></footer>
           </> : <section aria-label="权限预览">
             <p>{view.preview.person} · {view.preview.scope}</p>
             <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatIntakeTime(view.preview.startsAt)} 至 {formatIntakeTime(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
             <footer><button type="button" className="btn" disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</button>
-              <button type="button" className="btn btn-primary" disabled={disabled} onClick={()=>void apply({action:'save'}).then(()=>setGrantOpen(false))}>确认保存权限</button></footer>
+              <button type="button" className="btn btn-primary" disabled={disabled} onClick={()=>void apply({action:'save'}).then((ok)=>{if(ok)setGrantOpen(false);})}>确认保存权限</button></footer>
           </section>}
         </div>
       </div>}

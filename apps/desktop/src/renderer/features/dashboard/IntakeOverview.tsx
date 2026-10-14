@@ -215,12 +215,28 @@ export function IntakeOverview({
     const api = window.dashboardUsageLog;
     if (!api) return undefined;
     let live = true;
-    void api.list({ result: '', query: '', cursor: null }).then((reply) => {
-      if (!live) return;
-      setSourceRows(reply.ok ? reply.rows : null);
-    }).catch(() => { if (live) setSourceRows(null); });
+    void (async () => {
+      const collected: UsageSourceRow[] = [];
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const reply = await api.list({ result: '', query: '', cursor });
+        if (!live) { setSourceRows(null); return; }
+        if (!reply.ok) { setSourceRows(null); return; }
+        if (cursor !== null && seen.has(cursor)) { setSourceRows(null); return; }
+        if (cursor !== null) seen.add(cursor);
+        collected.push(...reply.rows);
+        cursor = reply.nextCursor;
+      } while (cursor);
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      const windowed = collected.filter((row) => {
+        const asked = Date.parse(row.askedAt);
+        return Number.isFinite(asked) && asked >= cutoff;
+      });
+      if (live) setSourceRows(windowed);
+    })().catch(() => { if (live) setSourceRows(null); });
     return () => { live = false; };
-  }, []);
+  }, [days]);
   const sourced = sourceRows === null ? null : aggregateUsage(sourceRows);
   const headline = sourced
     ? { use: sourced.use.toLocaleString('en-US'), miss: sourced.miss.toLocaleString('en-US'), rate: sourced.rate }
@@ -284,12 +300,12 @@ export function IntakeOverview({
             <button type="button" aria-pressed={usageView === 'script'} onClick={() => { setUsageView('script'); setUsagePage(0); }}>按话术</button>
             <button type="button" aria-pressed={usageView === 'person'} onClick={() => { setUsageView('person'); setUsagePage(0); }}>按人员</button>
           </div>
-          <div className="seg" role="group" aria-label="话术类型">
+          {sourceRows === null ? <div className="seg" role="group" aria-label="话术类型">
             {['', '产品', '活动', '售前', '售后'].map((type) => <button key={type || 'all'} type="button" aria-pressed={usageType === type} onClick={() => { setUsageType(type); setUsagePage(0); }}>{type || '全部'}</button>)}
-          </div>
+          </div> : null}
           <span className="grow" />
-          <select aria-label="岗位" value={usageRole} onChange={(event) => { setUsageRole(event.target.value); setUsagePage(0); }}>
-            <option value="">全部岗位</option><option>客服</option><option>客服主管</option></select>
+          {sourceRows === null ? <select aria-label="岗位" value={usageRole} onChange={(event) => { setUsageRole(event.target.value); setUsagePage(0); }}>
+            <option value="">全部岗位</option><option>客服</option><option>客服主管</option></select> : null}
           <div className="search"><svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
             <input aria-label="搜索人员" placeholder="搜索人员" value={usageQuery} onChange={(event) => { setUsageQuery(event.target.value.trim()); setUsagePage(0); }} /></div>
         </div>
@@ -334,13 +350,13 @@ export function IntakeOverview({
             <td>{row.question}</td>
             <td><div className="cnt warn"><b>{row.count}</b></div></td>
             <td className="mute">{row.latest}</td>
-            <td className="jump"><button type="button" className="link" disabled={deskRole === 'seat'} title={deskRole === 'seat' ? '坐席不能添加话术' : undefined} onClick={() => onSupplyScript ? onSupplyScript(row.question) : onOpen('content')}>补充话术</button></td>
+            <td className="jump"><button type="button" className="link" disabled={deskRole !== 'operator'} title={deskRole === 'seat' ? '坐席不能添加话术' : '请先确认运营身份'} onClick={() => onSupplyScript ? onSupplyScript(row.question) : onOpen('content')}>补充话术</button></td>
           </tr>)) : showSynthetic ? V9_MISS.map(([question, count, when], index) => <tr className="item" key={question}>
             <td><span className={index < 3 ? 'rk top' : 'rk'}>{index + 1}</span></td>
             <td>{question}</td>
             <td><div className="cnt warn"><b>{count}</b></div></td>
             <td className="mute">{when}</td>
-            <td className="jump"><button type="button" className="link" disabled={deskRole === 'seat'} title={deskRole === 'seat' ? '坐席不能添加话术' : undefined} onClick={() => onSupplyScript ? onSupplyScript(question) : onOpen('content')}>补充话术</button></td>
+            <td className="jump"><button type="button" className="link" disabled={deskRole !== 'operator'} title={deskRole === 'seat' ? '坐席不能添加话术' : '请先确认运营身份'} onClick={() => onSupplyScript ? onSupplyScript(question) : onOpen('content')}>补充话术</button></td>
           </tr>) : <tr><td colSpan={5} className="empty">未接入</td></tr>}</tbody>
         </table>
         <p className="hint">{QUERY_ACTION_LEDGER_SURFACE}</p>
@@ -348,8 +364,8 @@ export function IntakeOverview({
       <section hidden={panel !== 'expire'} aria-label="知识有效期">
         <h2 className="desk-sr">知识有效期</h2>
         {deskReminders !== 'ready' ? <p>未接入</p> : reminders.length === 0 ? <p>{ITERATION_COPY.empty}</p> : <table className="desk-table" aria-label="知识有效期提醒">
-          <thead><tr><th>状态</th><th>话术名称</th><th>时间</th></tr></thead>
-          <tbody>{reminders.map((item) => <tr key={item.id}><td>{item.label}</td><td>{item.question}</td><td>{item.label}</td></tr>)}</tbody>
+          <thead><tr><th>状态</th><th>话术名称</th></tr></thead>
+          <tbody>{reminders.map((item) => <tr key={item.id}><td>{item.label}</td><td>{item.question}</td></tr>)}</tbody>
         </table>}
       </section>
       <div hidden={panel !== 'todo'}>

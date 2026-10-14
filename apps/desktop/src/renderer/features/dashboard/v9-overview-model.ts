@@ -72,19 +72,6 @@ export function v9Trend(days: 7 | 30) {
   return `${line ? `<path d="${line} L${xAt(days - 1)} 120 L${x0} 120 Z" fill="rgba(111,76,195,.10)"/><path d="${line}" fill="none" stroke="#6f4cc3" stroke-width="2"/>` : ''}${bars}${axis}`;
 }
 
-export function v9UsageRows(view: 'script' | 'person', type: string) {
-  const rows = view === 'script'
-    ? V9_SCRIPTS.filter(([, kind]) => !type || kind === type).map(([name, kind]) => {
-      const people = V9_PEOPLE.map((person) => [person.name, counts[person.name][name]] as const).filter((row) => row[1] > 0).sort((a, b) => b[1] - a[1]);
-      return { name, tag: kind, total: sum(people.map((row) => row[1])), extra: people.slice(0, 3).map((row) => `${row[0]} ${row[1]}`).join(' · ') };
-    })
-    : V9_PEOPLE.map((person) => {
-      const scripts = V9_SCRIPTS.filter(([, kind]) => !type || kind === type).map(([name]) => [name, counts[person.name][name]] as const).filter((row) => row[1] > 0).sort((a, b) => b[1] - a[1]);
-      return { name: person.name, tag: person.role, total: sum(scripts.map((row) => row[1])), extra: scripts.slice(0, 2).map((row) => `${row[0]} ${row[1]}`).join(' · ') };
-    });
-  return rows.filter((row) => row.total > 0).sort((a, b) => b.total - a.total).slice(0, 8);
-}
-
 export function v9Donut() {
   const types = ['产品', '活动', '售前', '售后'];
   const colors = ['#6f4cc3', '#a28be0', '#cdbff0', '#e6dff7'];
@@ -132,54 +119,6 @@ export function v9UsageQuery(query: V9UsageQuery): { rows: V9UsageRow[]; count: 
   return { rows: rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE), count: rows.length, pages, page, people: people.length };
 }
 export const V9_PAGE_SIZE = PAGE_SIZE;
-
-/* ---- SOP usage (sample only; real step events are not wired yet) ---- */
-export const V9_SOPS: ReadonlyArray<readonly [string, readonly string[]]> = [
-  ['过敏售后', ['确认症状', '安抚情绪', '索要凭证', '给出处理建议', '告知时效', '结束回访']],
-  ['退换货', ['确认订单', '判断是否在期', '说明运费', '引导寄回', '确认收货']],
-  ['物流异常', ['查询节点', '解释原因', '催件', '补偿说明']],
-  ['发货', ['确认仓库', '告知时效', '发货提醒']],
-];
-const sopCounts: Record<string, Record<string, number>> = {};
-for (const person of V9_PEOPLE) {
-  sopCounts[person.name] = {};
-  for (const [name] of V9_SOPS) {
-    const h = hash(`s${person.name}${name}`);
-    sopCounts[person.name][name] = h % 100 < 45 ? 1 + ((h >>> 8) % 15) : 0;
-  }
-}
-function reach(name: string, steps: readonly string[]) {
-  const r = [1];
-  let drop = -1;
-  let biggest = 0;
-  for (let i = 1; i < steps.length; i += 1) {
-    const k = name === '过敏售后' && i === 2 ? 0.38 : 0.62 + (hash(name + i) % 34) / 100;
-    r.push(r[i - 1] * k);
-    if (r[i - 1] - r[i] > biggest) { biggest = r[i - 1] - r[i]; drop = i - 1; }
-  }
-  return { r, drop };
-}
-export type V9SopQuery = { view: 'sop' | 'person'; role: string; q: string; selected: string };
-export function v9SopUsage(query: V9SopQuery) {
-  const people = V9_PEOPLE.filter((p) => (!query.role || p.role === query.role) && (!query.q || p.name.includes(query.q)));
-  const rows = (query.view === 'sop'
-    ? V9_SOPS.map(([name, steps]) => {
-      const per = people.map((p) => [p.name, sopCounts[p.name][name]] as const).filter((x) => x[1]).sort((a, b) => b[1] - a[1]);
-      const { r } = reach(name, steps);
-      return { name, tag: '', total: sum(per.map((x) => x[1])), extra: `走完 ${Math.round(r[r.length - 1] * 100)}% · ${per.slice(0, 2).map((x) => x[0]).join('、')}`, sop: true };
-    })
-    : people.map((p) => {
-      const per = V9_SOPS.map(([name]) => [name, sopCounts[p.name][name]] as const).filter((x) => x[1]).sort((a, b) => b[1] - a[1]);
-      return { name: p.name, tag: p.role, total: sum(per.map((x) => x[1])), extra: per.slice(0, 2).map((x) => `${x[0]} ${x[1]}`).join(' · '), sop: false };
-    })).filter((r) => r.total).sort((a, b) => b.total - a.total).slice(0, 8);
-  const [selName, steps] = V9_SOPS.find(([name]) => name === query.selected) ?? V9_SOPS[0];
-  const opens = sum(people.map((p) => sopCounts[p.name][selName]));
-  const { r, drop } = reach(selName, steps);
-  return {
-    rows,
-    funnel: { name: selName, opens, drop, steps: steps.map((label, i) => ({ label, count: Math.round(opens * r[i]), pct: Math.round(r[i] * 100) })) },
-  };
-}
 
 export function v9DonutRings() {
   const donut = v9Donut();

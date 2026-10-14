@@ -11,12 +11,12 @@ const rows: UsageSourceRow[] = [
   { id: '3', askedAt: '2026-10-13T03:00:00.000Z', agent: '坐席丙', question: '未同意的问题', scriptTitle: '保修多久', result: 'miss', snapshotStale: false, consented: false },
 ];
 
-it('writes the same CSV bytes twice and drops redacted and without-consent rows', () => {
+it('writes the same CSV bytes twice and drops redacted and without-consent rows', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'usage-log-'));
   const first = join(dir, 'a.csv');
   const second = join(dir, 'b.csv');
-  expect(saveUsageLogCsv(first, rows)).toEqual({ written: 1 });
-  expect(saveUsageLogCsv(second, rows)).toEqual({ written: 1 });
+  expect(await saveUsageLogCsv(first, rows)).toEqual({ written: 1 });
+  expect(await saveUsageLogCsv(second, rows)).toEqual({ written: 1 });
   const a = readFileSync(first);
   const b = readFileSync(second);
   expect(Buffer.compare(a, b)).toBe(0);
@@ -31,7 +31,7 @@ it('writes the same CSV bytes twice and drops redacted and without-consent rows'
   expect(usageExportPreviewCounts([...rows, both])).toEqual({ exportable: 1, redacted: 2, withoutConsent: 1 });
   const out = process.env.USAGE_CSV_DIR;
   if (out) {
-    saveUsageLogCsv(join(out, 'usage-a.csv'), rows);
-    saveUsageLogCsv(join(out, 'usage-b.csv'), rows);
+    await saveUsageLogCsv(join(out, 'usage-a.csv'), rows);
+    await saveUsageLogCsv(join(out, 'usage-b.csv'), rows);
   }
 });
