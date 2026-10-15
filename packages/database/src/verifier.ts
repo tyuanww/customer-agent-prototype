@@ -1014,7 +1014,7 @@ const READINESS_INVENTORY = Object.freeze({ tables: 104, functions: 270,
  * fingerprints come from the exact approved upgrade on isolated PG15, not the
  * cumulative schema, which is not an executable bootstrap. */
 export function verifyRepairSuccessor(client: DatabaseQueryClient, catalogue: ExecutableMigrationCatalogue): Promise<DatabaseVerificationReport> {
-  const repairCatalogue = catalogue.migrations.length === 41
+  const repairCatalogue = catalogue.migrations.length > 40
     ? { ...catalogue, migrations: catalogue.migrations.slice(0, 40),
       compatibility: { ...catalogue.compatibility, readinessSuccessor: null } }
     : catalogue;
@@ -1046,18 +1046,38 @@ export function verifyRepairPredecessor(client: DatabaseQueryClient, catalogue: 
  * this post-check proves the delta did not widen application authority or
  * leave any of the five invoker predicates executable by PUBLIC.
  */
+const OCCUPIED_DOMAIN_MIGRATION_ID = '0042_intake_occupied_domain_publish';
+const DEFAULT_TENANT_MIGRATION_ID = '0043_intake_publish_default_tenant';
+const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
+// Isolated PG15 measurement after frozen 0042 replaces publish_candidate. ACL, object, and trigger manifests stay on the 0041 values.
+const OCCUPIED_FUNCTION_SHA256 = '57466bc6aee6b73f01f8ba3afdddedf47be12da01b0c5cc1da33be87578c4663';
+// Disposable PG15 measurement after 0043 replaces publish_candidate. The DO block is outside the function, so only prosrc changes.
+const DEFAULT_TENANT_FUNCTION_SHA256 = 'b92de7433f8efba4373d3936032ff285796b45e92756e1b03fe65eac96fc946c';
+
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  if (catalogue.migrations.length !== 41
+  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43)
+    && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
+    && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
+  const adopted = catalogue.migrations.length === 43
+    && occupied
+    && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
+  if ((catalogue.migrations.length !== 41 && !occupied)
+    || (catalogue.migrations.length === 43 && !adopted)
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
+  const inventory = adopted
+    ? { ...READINESS_INVENTORY, functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 }
+    : occupied
+      ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
+      : READINESS_INVENTORY;
   const base = await verifyCatalogueState(client, catalogue, {
     entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c',
-  }, READINESS_INVENTORY, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
+  }, inventory, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
   const marker = await verifyQuery<{ schema_comment: string | null }>(client,
     `SELECT pg_catalog.obj_description('public'::pg_catalog.regnamespace, 'pg_namespace') AS schema_comment`);
   const publicExec = await verifyQuery<{ signature: string; public_exec: boolean }>(client, `
@@ -1095,7 +1115,7 @@ export async function verifyReadinessSuccessor(
   if (failures.length > 0) {
     throw new DatabaseMigrationError('MIGRATION_VERIFY_FAILED', `Readiness successor verification failed: ${failures.join(', ')}`);
   }
-  return Object.freeze({ ...base, migrationCount: 41 });
+  return Object.freeze({ ...base, migrationCount: catalogue.migrations.length });
 }
 
 export function verifyMigrationCatalogue(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
