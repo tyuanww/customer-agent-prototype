@@ -808,7 +808,12 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const defaultTenantMigration = occupiedMigration
     ? renderIntakeOverlay(projectRoot, snapshot, 43, '0043_intake_publish_default_tenant')
     : null;
-  const publishedMigrations = Object.freeze(defaultTenantMigration
+  const roleDefaultMigration = defaultTenantMigration
+    ? renderIntakeOverlay(projectRoot, snapshot, 44, '0044_intake_role_defaults')
+    : null;
+  const publishedMigrations = Object.freeze(roleDefaultMigration
+    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration]
+    : defaultTenantMigration
     ? [...migrations, occupiedMigration, defaultTenantMigration]
     : occupiedMigration ? [...migrations, occupiedMigration] : migrations);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
@@ -841,6 +846,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (readinessMigration) outputs.set(`packages/database/migrations/${readinessMigration.file}`, readinessMigration.sql);
   if (occupiedMigration) outputs.set(`packages/database/migrations/${occupiedMigration.file}`, occupiedMigration.sql);
   if (defaultTenantMigration) outputs.set(`packages/database/migrations/${defaultTenantMigration.file}`, defaultTenantMigration.sql);
+  if (roleDefaultMigration) outputs.set(`packages/database/migrations/${roleDefaultMigration.file}`, roleDefaultMigration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
