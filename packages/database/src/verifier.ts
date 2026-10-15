@@ -157,8 +157,12 @@ const EXPECTED_V127_FUNCTION_SECURITY_ENTRIES = 257;
 const EXPECTED_V127_FUNCTION_SECURITY_SHA256 = 'f077ee5d6f3bfb460f7fa2dbf6c503d03723a242404e6b8031a3b7f5b56b1d6b';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
+const READINESS_TRIGGER_ENTRIES = 112;
+const READINESS_TRIGGER_SHA256 = '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a';
 // Production keeps these two import-batch triggers disabled. The manifest
 // prefix is everything before tgenabled, so rewriting D to O is the whole delta.
+// The 109-entry predecessor and the 112-entry readiness fingerprint both accept
+// that rewrite. The check never enables the triggers.
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -186,7 +190,7 @@ function explainImportBatchEnablement(manifest: string): Readonly<{ sha256: stri
       return `${prefix}O|definition=${entry.slice(marker.length)}`;
     }
     return entry;
-  }).join('\n');
+  }).sort().join('\n');
   return Object.freeze({ sha256: sha256(rewritten), disabledTriggers: Object.freeze(disabledTriggers) });
 }
 
@@ -886,32 +890,39 @@ async function verifyCatalogueState(
   }
   const expectedTriggerEntries = expectedInventory.triggerEntries ?? EXPECTED_TRIGGER_MANIFEST_ENTRIES;
   const expectedTriggerSha = expectedInventory.triggerSha256 ?? EXPECTED_TRIGGER_MANIFEST_SHA256;
-  const checksFrozenTriggerManifest = expectedTriggerEntries === EXPECTED_TRIGGER_MANIFEST_ENTRIES
-    && expectedTriggerSha === EXPECTED_TRIGGER_MANIFEST_SHA256;
+  const acceptsNamedDisabledImportBatchTriggers = (
+    expectedTriggerEntries === EXPECTED_TRIGGER_MANIFEST_ENTRIES
+    && expectedTriggerSha === EXPECTED_TRIGGER_MANIFEST_SHA256
+  ) || (
+    expectedTriggerEntries === READINESS_TRIGGER_ENTRIES
+    && expectedTriggerSha === READINESS_TRIGGER_SHA256
+  );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
-    if (checksFrozenTriggerManifest) {
+    if (acceptsNamedDisabledImportBatchTriggers) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
         sha256: triggerSha,
-        frozenSha256: EXPECTED_TRIGGER_MANIFEST_SHA256,
+        frozenSha256: expectedTriggerSha,
         difference: 'none',
         disabledTriggers: Object.freeze([]),
       });
     }
   } else {
-    const explained = trigger && checksFrozenTriggerManifest ? explainImportBatchEnablement(trigger.manifest) : null;
+    const explained = trigger && acceptsNamedDisabledImportBatchTriggers
+      ? explainImportBatchEnablement(trigger.manifest)
+      : null;
     if (
       trigger
       && explained
-      && trigger.entries === EXPECTED_TRIGGER_MANIFEST_ENTRIES
+      && trigger.entries === expectedTriggerEntries
       && explained.disabledTriggers.length > 0
-      && explained.sha256 === EXPECTED_TRIGGER_MANIFEST_SHA256
+      && explained.sha256 === expectedTriggerSha
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
         sha256: triggerSha,
-        frozenSha256: EXPECTED_TRIGGER_MANIFEST_SHA256,
+        frozenSha256: expectedTriggerSha,
         difference: 'import_batches_tgenabled',
         disabledTriggers: explained.disabledTriggers,
       });
@@ -1008,7 +1019,7 @@ const V127_INVENTORY = Object.freeze({ tables: EXPECTED_SUCCESSOR_TABLES, functi
 const READINESS_INVENTORY = Object.freeze({ tables: 104, functions: 270,
   objectEntries: 3319, objectSha256: '527586edd3e6ce1bc42018fef37429f64f9e5e9c1281eef4a6624f141d5b8e65',
   functionEntries: 270, functionSha256: '78cd2e22d8eee25b1f75da542b79f2a6e9da0c4ff77bdf4deaa51354c6dd562e',
-  triggerEntries: 112, triggerSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a' });
+  triggerEntries: READINESS_TRIGGER_ENTRIES, triggerSha256: READINESS_TRIGGER_SHA256 });
 
 /** Physical checks and receipt verification share the 0040 transaction. These
  * fingerprints come from the exact approved upgrade on isolated PG15, not the
@@ -1027,7 +1038,7 @@ export function verifyRepairSuccessor(client: DatabaseQueryClient, catalogue: Ex
   }, { tables: 104, functions: 270,
     objectEntries: 3319, objectSha256: '527586edd3e6ce1bc42018fef37429f64f9e5e9c1281eef4a6624f141d5b8e65',
     functionEntries: 270, functionSha256: '78cd2e22d8eee25b1f75da542b79f2a6e9da0c4ff77bdf4deaa51354c6dd562e',
-    triggerEntries: 112, triggerSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a',
+    triggerEntries: READINESS_TRIGGER_ENTRIES, triggerSha256: READINESS_TRIGGER_SHA256,
   });
 }
 

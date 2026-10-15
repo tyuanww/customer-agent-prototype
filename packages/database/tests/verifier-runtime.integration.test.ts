@@ -141,4 +141,52 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       local.stop();
     }
   }, 180_000);
+
+  it('accepts the two disabled import-batch triggers on the 112-entry readiness fingerprint and leaves them disabled', async () => {
+    const local = new Pg15Harness();
+    let readiness: Client | undefined;
+    try {
+      local.start();
+      readiness = await local.connect(local.createDatabase('readiness_disabled_triggers').config);
+      await applyDatabaseMigrations(readiness);
+      await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER backend_review_sync_wait_on_batch_failed');
+      await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
+      expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
+        status: 'PASS',
+        migrationCount: 43,
+        triggerFingerprint: {
+          entries: 112,
+          frozenSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a',
+          difference: 'import_batches_tgenabled',
+          disabledTriggers: [
+            'backend_review_sync_wait_on_batch_failed',
+            'import_batches_restore_snapshots',
+          ],
+        },
+      });
+      const flags = await readiness.query<{ tgname: string; tgenabled: string }>(
+        `SELECT trigger.tgname, trigger.tgenabled::text AS tgenabled
+           FROM pg_catalog.pg_trigger trigger
+           JOIN pg_catalog.pg_class relation ON relation.oid = trigger.tgrelid
+           JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+          WHERE namespace.nspname = 'public'
+            AND relation.relname = 'import_batches'
+            AND NOT trigger.tgisinternal
+            AND trigger.tgname IN (
+              'backend_review_sync_wait_on_batch_failed',
+              'import_batches_restore_snapshots'
+            )
+          ORDER BY trigger.tgname`,
+      );
+      expect(flags.rows).toEqual([
+        { tgname: 'backend_review_sync_wait_on_batch_failed', tgenabled: 'D' },
+        { tgname: 'import_batches_restore_snapshots', tgenabled: 'D' },
+      ]);
+      await readiness.query('ALTER TABLE content_intake.publications DISABLE TRIGGER publication_family_guard');
+      await expect(verifyDatabaseMigrations(readiness)).rejects.toThrow(/exact trigger table\/function\/event\/enabled\/definition manifest/);
+    } finally {
+      await readiness?.end();
+      local.stop();
+    }
+  }, 180_000);
 });
