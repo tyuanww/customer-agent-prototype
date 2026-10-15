@@ -1059,29 +1059,38 @@ export function verifyRepairPredecessor(client: DatabaseQueryClient, catalogue: 
  */
 const OCCUPIED_DOMAIN_MIGRATION_ID = '0042_intake_occupied_domain_publish';
 const DEFAULT_TENANT_MIGRATION_ID = '0043_intake_publish_default_tenant';
+const ROLE_DEFAULT_MIGRATION_ID = '0044_intake_role_defaults';
 const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
 // Isolated PG15 measurement after frozen 0042 replaces publish_candidate. ACL, object, and trigger manifests stay on the 0041 values.
 const OCCUPIED_FUNCTION_SHA256 = '57466bc6aee6b73f01f8ba3afdddedf47be12da01b0c5cc1da33be87578c4663';
 // Disposable PG15 measurement after 0043 replaces publish_candidate. The DO block is outside the function, so only prosrc changes.
 const DEFAULT_TENANT_FUNCTION_SHA256 = 'b92de7433f8efba4373d3936032ff285796b45e92756e1b03fe65eac96fc946c';
+const ROLE_DEFAULT_FUNCTION_SHA256 = '65548958ec226c44b349c65657bade31590730cb7051341d89922bca85792ea3';
+const ROLE_DEFAULT_OBJECT_SHA256 = '32011d2d8211bd9a2a85516c877cbd6965dd444f39bcfd5c3f3b30760db99fbd';
 
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43)
+  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44)
     && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
     && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
-  const adopted = catalogue.migrations.length === 43
+  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44)
     && occupied
     && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
+  const roleDefaults = catalogue.migrations.length === 44
+    && adopted
+    && catalogue.migrations[43]?.id === ROLE_DEFAULT_MIGRATION_ID;
   if ((catalogue.migrations.length !== 41 && !occupied)
     || (catalogue.migrations.length === 43 && !adopted)
+    || (catalogue.migrations.length === 44 && !roleDefaults)
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
-  const inventory = adopted
+  const inventory = roleDefaults
+    ? { ...READINESS_INVENTORY, objectEntries: 3318, objectSha256: ROLE_DEFAULT_OBJECT_SHA256, functionSha256: ROLE_DEFAULT_FUNCTION_SHA256 }
+    : adopted
     ? { ...READINESS_INVENTORY, functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 }
     : occupied
       ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
