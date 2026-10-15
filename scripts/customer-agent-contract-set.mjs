@@ -694,11 +694,12 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![39, 40, 41, 42, 43].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length === 39 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Repair predecessor manifest drift');
   if (actual.migrations.length >= 41 && !existsSync(path.join(projectRoot, UPSTREAM_ROOT, READINESS_LOCK))) throw new Error('Readiness lock required for 41 migrations');
   if (actual.migrations.length >= 42 && actual.migrations[41]?.id !== '0042_intake_occupied_domain_publish') throw new Error('Unrecognized occupied-domain publication');
-  if (actual.migrations.length === 43 && (actual.migrations[41]?.sha256 !== 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37' || actual.migrations[42]?.id !== '0043_intake_publish_default_tenant')) throw new Error('Frozen occupied-domain migration 0042 drifted');
+  if (actual.migrations.length >= 43 && (actual.migrations[41]?.sha256 !== 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37' || actual.migrations[42]?.id !== '0043_intake_publish_default_tenant')) throw new Error('Frozen occupied-domain migration 0042 drifted');
+  if (actual.migrations.length === 44 && actual.migrations[43]?.id !== '0044_intake_role_defaults') throw new Error('Unrecognized intake role defaults');
   if (actual.migrations.length >= 40) {
     const lockPath = path.join(projectRoot, UPSTREAM_ROOT, REPAIR_LOCK);
     assertPathInsideRoot(projectRoot, lockPath); assertRegularFile(lockPath, 'Repair lock');
@@ -763,7 +764,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length === 40 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Readiness predecessor manifest drift');
   for (const expected of predecessor.migrations) {
     const found = actual.migrations[expected.position - 1];
@@ -772,7 +773,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
     assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness predecessor migration');
     if (sha256(file)!==expected.sha256 || lstatSync(file).size!==expected.bytes) throw new Error(`Readiness predecessor bytes drift: ${expected.file}`);
   }
-  if (actual.migrations.length === 41 || actual.migrations.length === 42 || actual.migrations.length === 43) {
+  if (actual.migrations.length === 41 || actual.migrations.length === 42 || actual.migrations.length === 43 || actual.migrations.length === 44) {
     const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
     assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
     const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));
@@ -782,7 +783,8 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
     const file=path.join(migrationRoot,expected.file); assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness migration');
     if(readFileSync(file,'utf8')!==expected.sql) throw new Error('Readiness migration bytes drift');
     if (actual.migrations.length >= 42 && actual.migrations[41]?.id !== '0042_intake_occupied_domain_publish') throw new Error('Unrecognized occupied-domain publication');
-    if (actual.migrations.length === 43 && (actual.migrations[41]?.sha256 !== 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37' || actual.migrations[42]?.id !== '0043_intake_publish_default_tenant')) throw new Error('Frozen occupied-domain migration 0042 drifted');
+    if (actual.migrations.length >= 43 && (actual.migrations[41]?.sha256 !== 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37' || actual.migrations[42]?.id !== '0043_intake_publish_default_tenant')) throw new Error('Frozen occupied-domain migration 0042 drifted');
+    if (actual.migrations.length === 44 && actual.migrations[43]?.id !== '0044_intake_role_defaults') throw new Error('Unrecognized intake role defaults');
   }
   return {readiness_sources:sources,...composed};
 }
