@@ -24,6 +24,7 @@
 | [2026-09-05-script-selection-preparation.md](2026-09-05-script-selection-preparation.md) | 已暂停的探索备忘，不是上线前置 |
 | [2026-09-19-local-unpushed-merge-order.md](2026-09-19-local-unpushed-merge-order.md) | 已合入 main 的分支合入记录 |
 | [2026-09-18-mac-dev-remainder.md](2026-09-18-mac-dev-remainder.md) | Mac 开发机收口边界 |
+| [2026-10-15-intake-catalog-baseline-and-0035.md](2026-10-15-intake-catalog-baseline-and-0035.md) | 第一份目录基线登记与 0035 五角色、触发器指纹 |
 
 ## 历史阶段（按主题，不逐个列）
 

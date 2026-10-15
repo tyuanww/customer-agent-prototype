@@ -115,4 +115,11 @@ export type DatabaseVerificationReport = Readonly<{
   }>;
   phase1PolicyHardOff: true;
   compatibility: MigrationStatus['compatibility'];
+  triggerFingerprint?: Readonly<{
+    entries: number;
+    sha256: string;
+    frozenSha256: string;
+    difference: 'none' | 'import_batches_tgenabled';
+    disabledTriggers: readonly string[];
+  }>;
 }>;
