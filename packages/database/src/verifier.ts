@@ -157,6 +157,12 @@ const EXPECTED_V127_FUNCTION_SECURITY_ENTRIES = 257;
 const EXPECTED_V127_FUNCTION_SECURITY_SHA256 = 'f077ee5d6f3bfb460f7fa2dbf6c503d03723a242404e6b8031a3b7f5b56b1d6b';
 const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
+// Production keeps these two import-batch triggers disabled. The manifest
+// prefix is everything before tgenabled, so rewriting D to O is the whole delta.
+const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
+  'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
+  'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
+]);
 const READINESS_FORMAT_FUNCTIONS = Object.freeze([
   'content_intake.candidate_format_guard()',
   'content_intake.input_format_matches(text,text,text,text,text)',
@@ -168,6 +174,20 @@ const READINESS_PREDICATE_ROLES = Object.freeze(['intake_business', 'intake_work
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function explainImportBatchEnablement(manifest: string): Readonly<{ sha256: string; disabledTriggers: readonly string[] }> {
+  const disabledTriggers: string[] = [];
+  const rewritten = manifest.split('\n').map((entry) => {
+    for (const prefix of IMPORT_BATCH_TRIGGER_PREFIXES) {
+      const marker = `${prefix}D|definition=`;
+      if (!entry.startsWith(marker)) continue;
+      disabledTriggers.push(prefix.split('|')[1] ?? prefix);
+      return `${prefix}O|definition=${entry.slice(marker.length)}`;
+    }
+    return entry;
+  }).join('\n');
+  return Object.freeze({ sha256: sha256(rewritten), disabledTriggers: Object.freeze(disabledTriggers) });
 }
 
 async function verifyQuery<Row extends QueryResultRow>(
@@ -224,6 +244,8 @@ async function verifyCatalogueState(
   // Fixed capability roles are immutable. Environment LOGIN membership is a
   // separate input: only one direct, non-admin capability grant is permitted,
   // without INHERIT or high-power role attributes. Owners never admit members.
+  // The five stack logins are the API pools. Their inherit flags are part of
+  // the exception: runtime and content admin inherit, the three backend logins do not.
   const roleResult = await verifyQuery<RoleRow>(client, `
     WITH required_roles(name, runtime, permits_environment_member) AS (VALUES
       ('cs_ai_definer',false,false), ('app_runtime',false,false),
@@ -235,6 +257,13 @@ async function verifyCatalogueState(
       ('intake_usage',true,true), ('intake_business',true,true),
       ('intake_worker',true,true), ('intake_org_writer',true,true),
       ('intake_directory_key_operator',true,true)
+    ),
+    production_login(member_name, granted_name, must_inherit) AS (VALUES
+      ('stack_runtime','app_runtime',true),
+      ('stack_content_admin','app_content_admin',true),
+      ('stack_backend_auth','app_backend_auth',false),
+      ('stack_backend_review','app_backend_review',false),
+      ('stack_backend_worker','app_backend_worker',false)
     )
     SELECT count(*)::int AS total,
       count(*) FILTER (WHERE NOT role.rolcanlogin AND NOT role.rolsuper AND NOT role.rolcreatedb
@@ -253,7 +282,22 @@ async function verifyCatalogueState(
            AND NOT member_role.rolreplication AND NOT member_role.rolbypassrls
            AND NOT membership.admin_option
            AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members extra
-             WHERE extra.member=membership.member AND extra.roleid<>membership.roleid))) AS memberships
+             WHERE extra.member=membership.member AND extra.roleid<>membership.roleid))
+         AND NOT EXISTS (
+           SELECT 1 FROM production_login expected
+           WHERE expected.member_name=member_role.rolname
+             AND expected.granted_name=granted_role.rolname
+             AND member_required.name IS NULL
+             AND member_role.rolcanlogin
+             AND member_role.rolinherit=expected.must_inherit
+             AND NOT member_role.rolsuper
+             AND NOT member_role.rolcreatedb
+             AND NOT member_role.rolcreaterole
+             AND NOT member_role.rolreplication
+             AND NOT member_role.rolbypassrls
+             AND NOT membership.admin_option
+             AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members extra
+               WHERE extra.member=membership.member AND extra.roleid<>membership.roleid))) AS memberships
     FROM required_roles required
     JOIN pg_catalog.pg_roles role ON role.rolname=required.name
   `);
@@ -816,6 +860,7 @@ async function verifyCatalogueState(
   const shape = shapeResult.rows[0];
   const seed = seedResult.rows[0];
   const failures: string[] = [];
+  let triggerFingerprint: DatabaseVerificationReport['triggerFingerprint'];
   if (!inventory || inventory.tables !== expectedInventory.tables || inventory.views !== 7 || inventory.functions !== expectedInventory.functions || !inventory.pgcrypto || !inventory.pg_trgm) {
     failures.push(`object or extension inventory [${inventory?.tables ?? 'missing'}/${inventory?.views ?? 'missing'}/${inventory?.functions ?? 'missing'}]`);
   }
@@ -839,12 +884,40 @@ async function verifyCatalogueState(
   ) {
     failures.push(`exact function definition/owner/security manifest [${functionSecurity?.entries ?? 'missing'}:${functionSecurity ? sha256(functionSecurity.manifest) : 'missing'}]`);
   }
-  if (
-    !trigger
-    || trigger.entries !== (expectedInventory.triggerEntries ?? EXPECTED_TRIGGER_MANIFEST_ENTRIES)
-    || sha256(trigger.manifest) !== (expectedInventory.triggerSha256 ?? EXPECTED_TRIGGER_MANIFEST_SHA256)
-  ) {
-    failures.push(`exact trigger table/function/event/enabled/definition manifest [${trigger?.entries ?? 'missing'}:${trigger ? sha256(trigger.manifest) : 'missing'}]`);
+  const expectedTriggerEntries = expectedInventory.triggerEntries ?? EXPECTED_TRIGGER_MANIFEST_ENTRIES;
+  const expectedTriggerSha = expectedInventory.triggerSha256 ?? EXPECTED_TRIGGER_MANIFEST_SHA256;
+  const checksFrozenTriggerManifest = expectedTriggerEntries === EXPECTED_TRIGGER_MANIFEST_ENTRIES
+    && expectedTriggerSha === EXPECTED_TRIGGER_MANIFEST_SHA256;
+  const triggerSha = trigger ? sha256(trigger.manifest) : '';
+  if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
+    if (checksFrozenTriggerManifest) {
+      triggerFingerprint = Object.freeze({
+        entries: trigger.entries,
+        sha256: triggerSha,
+        frozenSha256: EXPECTED_TRIGGER_MANIFEST_SHA256,
+        difference: 'none',
+        disabledTriggers: Object.freeze([]),
+      });
+    }
+  } else {
+    const explained = trigger && checksFrozenTriggerManifest ? explainImportBatchEnablement(trigger.manifest) : null;
+    if (
+      trigger
+      && explained
+      && trigger.entries === EXPECTED_TRIGGER_MANIFEST_ENTRIES
+      && explained.disabledTriggers.length > 0
+      && explained.sha256 === EXPECTED_TRIGGER_MANIFEST_SHA256
+    ) {
+      triggerFingerprint = Object.freeze({
+        entries: trigger.entries,
+        sha256: triggerSha,
+        frozenSha256: EXPECTED_TRIGGER_MANIFEST_SHA256,
+        difference: 'import_batches_tgenabled',
+        disabledTriggers: explained.disabledTriggers,
+      });
+    } else {
+      failures.push(`exact trigger table/function/event/enabled/definition manifest [${trigger?.entries ?? 'missing'}:${trigger ? triggerSha : 'missing'}]`);
+    }
   }
   if (schemaCommentFragments.some((fragment) => !schemaComment.includes(fragment))) {
     failures.push('schema evidence-boundary comment');
@@ -902,25 +975,29 @@ async function verifyCatalogueState(
     }),
     phase1PolicyHardOff: true,
     compatibility: migrationStatus.compatibility,
+    ...(triggerFingerprint === undefined ? {} : { triggerFingerprint }),
   });
 }
 
 // The ACL successor changes no objects, function bodies or triggers. Reuse the
 // full verifier with its exact frozen predecessor ledger and ACL, so a matching
 // ledger alone cannot authorize granting capabilities to a drifted installation.
-export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+export function legacyCheckPredecessorCatalogue(): ExecutableMigrationCatalogue {
   const predecessor = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.find(
     prior => prior.contractSetId === 'cs-ai-c11-openapi-1.22.0-schema-1.24-adbc7b1ce251',
   );
   if (!predecessor || predecessor.migrationCount !== 34) {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Frozen CSV predecessor is required for the legacy CHECK ACL upgrade');
   }
-  const catalogue = { ...generatedMigrationCatalogue, ...predecessor,
+  return { ...generatedMigrationCatalogue, ...predecessor,
     compatibility: { ...generatedMigrationCatalogue.compatibility,
       priorReviewedUpgrades: generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.filter(prior => prior.migrationCount < 34) },
     migrations: generatedMigrationCatalogue.migrations.slice(0, 34),
   };
-  return verifyCatalogueState(client, catalogue, {
+}
+
+export function verifyLegacyCheckPredecessor(client: DatabaseQueryClient): Promise<DatabaseVerificationReport> {
+  return verifyCatalogueState(client, legacyCheckPredecessorCatalogue(), {
     entries: 542, sha256: '95c8860d441fdb7429364476c09938e1935f8aa5383a9743a84b89399ff8f6b5',
   });
 }

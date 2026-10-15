@@ -1,8 +1,8 @@
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '../src/runner.js';
+import { applyDatabaseMigrations, applyMigrationCatalogue } from '../src/runner.js';
 import { Pg15Harness } from '../src/testkit/index.js';
-import { verifyDatabaseMigrations } from '../src/verifier.js';
+import { legacyCheckPredecessorCatalogue, verifyDatabaseMigrations, verifyLegacyCheckPredecessor } from '../src/verifier.js';
 
 // Explicit opt-in keeps the normal package unit command independent of local PG.
 // This fixture owns its cluster; no environment database or credentials are used.
@@ -87,4 +87,58 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await expect(verifyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_VERIFY_FAILED' });
     } finally { await client.query('ROLLBACK'); }
   });
+
+  it('accepts the five production logins and the import-batch trigger flags on the 0035 predecessor', async () => {
+    // Roles are cluster-wide. This check needs its own cluster so the 41-migration fixture stays sealed.
+    const local = new Pg15Harness();
+    let predecessor: Client | undefined;
+    try {
+      local.start();
+      predecessor = await local.connect(local.createDatabase('legacy_predecessor').config);
+      await applyMigrationCatalogue(predecessor, legacyCheckPredecessorCatalogue());
+      for (const [login, capability, inherit] of [
+        ['stack_runtime', 'app_runtime', 'INHERIT'],
+        ['stack_content_admin', 'app_content_admin', 'INHERIT'],
+        ['stack_backend_auth', 'app_backend_auth', 'NOINHERIT'],
+        ['stack_backend_review', 'app_backend_review', 'NOINHERIT'],
+        ['stack_backend_worker', 'app_backend_worker', 'NOINHERIT'],
+      ] as const) {
+        await predecessor.query(`CREATE ROLE ${login} LOGIN ${inherit}`);
+        await predecessor.query(`GRANT ${capability} TO ${login}`);
+      }
+      expect(await verifyLegacyCheckPredecessor(predecessor)).toMatchObject({
+        status: 'PASS',
+        migrationCount: 34,
+        capabilityRoles: { total: 17, safe: 17, memberships: 0 },
+        triggerFingerprint: {
+          entries: 109,
+          sha256: '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505',
+          difference: 'none',
+          disabledTriggers: [],
+        },
+      });
+      await predecessor.query('ALTER TABLE public.import_batches DISABLE TRIGGER backend_review_sync_wait_on_batch_failed');
+      await predecessor.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
+      expect(await verifyLegacyCheckPredecessor(predecessor)).toMatchObject({
+        status: 'PASS',
+        capabilityRoles: { memberships: 0 },
+        triggerFingerprint: {
+          entries: 109,
+          sha256: '650390f58729bcd850bc65150f5f5152da7acdb20bb2b0e7a2884e342757bb21',
+          frozenSha256: '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505',
+          difference: 'import_batches_tgenabled',
+          disabledTriggers: [
+            'backend_review_sync_wait_on_batch_failed',
+            'import_batches_restore_snapshots',
+          ],
+        },
+      });
+      await predecessor.query('CREATE ROLE runtime_bad LOGIN NOINHERIT');
+      await predecessor.query('GRANT app_runtime TO runtime_bad');
+      await expect(verifyLegacyCheckPredecessor(predecessor)).rejects.toThrow(/capability role safety/);
+    } finally {
+      await predecessor?.end();
+      local.stop();
+    }
+  }, 180_000);
 });
