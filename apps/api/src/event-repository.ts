@@ -232,8 +232,8 @@ export function createEventRepository(
 
   return Object.freeze({
     async executeSearch(request): Promise<OperationResult<SearchResponse>> {
-      // The notice-acceptance check for pilot_recorded runs in the route, before this
-      // call; reaching here means it passed. Anything else is still refused.
+      // The route records pilot_recorded even when notice acceptance is missing,
+      // declined, or unavailable. Other collection modes stay refused.
       if (request.collectionMode !== 'synthetic' && request.collectionMode !== 'pilot_recorded') {
         return failure('POLICY_DENIED');
       }
