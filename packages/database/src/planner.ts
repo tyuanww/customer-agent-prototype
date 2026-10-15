@@ -13,6 +13,9 @@ import type {
   MigrationStatus,
 } from './types.js';
 
+/** Bytes already recorded for 0042 on the Mac synthetic ledger. Later edits belong in a new migration. */
+const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
+
 interface LedgerPresenceRow extends QueryResultRow {
   ledger: string | null;
 }
@@ -134,21 +137,37 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
     const repair = catalogue.compatibility.repairSuccessor;
-    const matchesRepair = repair != null && index === 39 && [40, 41].includes(catalogue.migrations.length)
+    const matchesRepair = repair != null && index === 39 && [40, 41, 42, 43].includes(catalogue.migrations.length)
       && migration.id === '0040_intake_repair_successor_v1_28'
       && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
       && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
       && migration.sha256 === repair.migrationSha256;
     const readiness = catalogue.compatibility.readinessSuccessor;
-    const matchesReadiness = readiness != null && index === 40 && catalogue.migrations.length === 41
+    const matchesReadiness = readiness != null && index === 40 && [41, 42, 43].includes(catalogue.migrations.length)
       && migration.id === '0041_intake_readiness_v1_29'
       && migration.contractSetId === readiness.contractSetId && migration.sourceGitSha === readiness.sourceGitSha
       && migration.sourceSchemaSha256 === readiness.sourceSchemaSha256 && migration.sha256 === readiness.migrationSha256
       && repair != null && catalogue.migrations[39]?.id === '0040_intake_repair_successor_v1_28'
       && catalogue.migrations[39]?.sha256 === repair.migrationSha256;
+    if (index === 41 && migration.id === '0042_intake_occupied_domain_publish'
+      && migration.sha256 !== FROZEN_OCCUPIED_SHA256) {
+      catalogueError('Frozen occupied-domain migration 0042 drifted');
+    }
+    const matchesOccupied = index === 41 && [42, 43].includes(catalogue.migrations.length)
+      && migration.id === '0042_intake_occupied_domain_publish'
+      && migration.sha256 === FROZEN_OCCUPIED_SHA256
+      && readiness != null
+      && catalogue.migrations[40]?.id === '0041_intake_readiness_v1_29';
+    const matchesDefaultTenant = index === 42 && catalogue.migrations.length === 43
+      && migration.id === '0043_intake_publish_default_tenant'
+      && catalogue.migrations[41]?.id === '0042_intake_occupied_domain_publish'
+      && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
+      && readiness != null;
     if (matchesReadiness && !successorSuffix) catalogueError('Readiness requires the preceding repair successor');
     if (matchesRepair && !successorSuffix) catalogueError('Repair requires the preceding additive successor');
-    if (matchesSuccessor || matchesRepair || matchesReadiness) successorSuffix = true;
+    if (matchesOccupied && !successorSuffix) catalogueError('Occupied-domain publication requires the readiness successor');
+    if (matchesDefaultTenant && !successorSuffix) catalogueError('Default-tenant publication requires the occupied-domain successor');
+    if (matchesSuccessor || matchesRepair || matchesReadiness || matchesOccupied || matchesDefaultTenant) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
       !matchesSuccessor && !matchesRepair && !matchesReadiness

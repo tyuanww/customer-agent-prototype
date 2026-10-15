@@ -19,7 +19,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
 
   it('verifies the actual 41-migration installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 41,
+      status: 'PASS', migrationCount: 43,
       inventory: { tables: 104, views: 7, functions: 270 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });

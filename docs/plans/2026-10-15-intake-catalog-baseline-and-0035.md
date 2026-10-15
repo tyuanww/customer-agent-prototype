@@ -53,7 +53,11 @@ END IF;
 
 来源模式是登记之后的另一步，不是这句插入。Mac 上五个 `src-menokin-*` 现在都是 `legacy`，`mode_version` 为 1。上传页只列 `v2-preview`。要上传的四个话术来源（`src-menokin-faq`、`src-menokin-presale`、`src-menokin-aftersale`、`src-menokin-campaign`）改成 `v2-preview` 时，`mode_version` 必须加一，否则现有约束报 `VERSION_REGRESSION`。`src-menokin-sop` 保持 `legacy`。模式改完，发布调用的仍是 `publish_candidate`。域里还有条目时，这次调用失败，`content_current` id=1 仍是 `rel_20`。
 
-这次不删条目，不改 0032 的谓词，也不为了让指针离开 `rel_20` 去手插目录行。谓词要放行已有条目的域，需要另一次批准，改的是同一个 `publish_candidate`，而不是新的发布器。那一次不在这份设计里。
+这次不删条目，不改 0032 的谓词，也不为了让指针离开 `rel_20` 去手插目录行。谓词要放行已有条目的域，需要另一次批准，改的是同一个 `publish_candidate`，而不是新的发布器。
+
+## 已批准的占用域发布
+
+2026-10-15 负责人选择「授权占用域发布」。`0042_intake_occupied_domain_publish` 用 `CREATE OR REPLACE` 换上同一个 `publish_candidate`。不改已生成的 `0032_intake_direct_publication.sql`。没有目录基线时仍然 `ZA003` `MODE_CONFLICT`。基线已经在 `release_catalogs` 里、目标域仍有 `release_items` 时，函数把这些行复制到新发布，不删除基线上的行，然后 `UPDATE content_current`。schema 注释仍是 `schema.v1.29`。不新增角色，也不给新的对象授 `EXECUTE`。已应用的 `0042` 字节保持哈希 `c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37`。列默认租户的采纳在后一条 `0043_intake_publish_default_tenant`：基线 `content_releases.tenant_id` 仍是列默认值 `default`、登记范围的租户不是 `default` 时，`0043` 的函数先把基线租户改成范围租户，再做比较；两个已经写明且不同的租户仍是 `ZA003` `SOURCE_MISMATCH`，两边都是 `default` 时仍匹配。
 
 ## 0035 前置校验
 
