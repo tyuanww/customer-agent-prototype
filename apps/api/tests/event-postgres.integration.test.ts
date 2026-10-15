@@ -613,11 +613,10 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
 });
 
 /**
- * The pilot_recorded gate, against a real database. The unit test proves the route
- * refuses when the check says no; this proves the check actually reads the tables the
- * deploy would seed, and that the whole path opens only after a decision row exists.
+ * Seat search against a real database. A missing current-notice acceptance still
+ * reaches the shipped query_events insert. The notice tables stay readable.
  */
-describePg15('pilot_recorded requires an accepted notice', () => {
+describePg15('pilot_recorded is recorded without an accepted notice', () => {
   let harness: Pg15Harness;
   let owner: Client;
   let pool: Pool;
@@ -629,6 +628,7 @@ describePg15('pilot_recorded requires an accepted notice', () => {
     const database = harness.createDatabase('notice_gate');
     owner = await harness.connect(database.config);
     await applyDatabaseMigrations(owner);
+    await seedEventRelease(owner);
     pool = new Pool({ ...database.config, max: 2 });
   }, 120_000);
 
@@ -640,12 +640,10 @@ describePg15('pilot_recorded requires an accepted notice', () => {
     harness?.stop();
   }, 60_000);
 
-  it('denies collection until a decision row exists, then allows it', async () => {
+  it('records a search before a notice decision exists, then keeps the notice tables', async () => {
     const service = createServiceRepositoryForPool(pool as never, {});
     const noticeService = createNoticeServiceForPool(pool, false);
     const repository = createEventRepository(pool);
-    void repository;
-    // The gate must read the real tables, so wire the real service rather than a stub.
     const app = createApiApp(
       parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test',
@@ -654,9 +652,15 @@ describePg15('pilot_recorded requires an accepted notice', () => {
         CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-notice-gate',
       }),
       service,
-      undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined,
+      {
+        operation: { execute: (request) => repository.executeSearch(request) },
+        logHash: LOG_HASH,
+        idempotencyHmac: IDEMPOTENCY_KEYS,
+        hasAcceptedCurrentNotice: async () => false,
+      },
       undefined, undefined, undefined, undefined,
-      undefined,
+      undefined, undefined, undefined, undefined,
       { service: noticeService },
     );
     const headers = { 'x-mock-user': ACTOR.user_id, 'x-mock-role': ACTOR.role };
@@ -680,8 +684,24 @@ describePg15('pilot_recorded requires an accepted notice', () => {
     const before = await app.inject({ method: 'GET', url: '/v1/notices/current', headers });
     expect(before.statusCode).toBe(404);
 
-    // The gate is closed while there is nothing to accept.
+    // Nothing has been accepted. The shipped route still records the search.
     expect(await acceptedNow()).toBe(false);
+    const queryId = '10000000-0000-4000-8000-0000000000aa';
+    const recorded = await app.inject({
+      method: 'POST', url: '/v1/search', headers,
+      payload: {
+        query_id: queryId, parent_query_id: null, interaction_reason: 'original',
+        query_text: '什么时候发货', collection_mode: 'pilot_recorded',
+        detected_platform: 'qianniu', platform: 'qianniu', platform_source: 'foreground_process',
+        product_context_type: null, product_context_ref: null, top_k: 3,
+      },
+    });
+    expect(recorded.statusCode).not.toBe(403);
+    expect(recorded.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
+    await expect(owner.query(
+      'SELECT collection_mode FROM public.query_events WHERE query_id = $1',
+      [queryId],
+    )).resolves.toMatchObject({ rows: [{ collection_mode: 'pilot_recorded' }] });
 
     // Publish a notice and accept it as the actor.
     await owner.query(
