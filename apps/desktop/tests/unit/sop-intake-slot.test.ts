@@ -9,8 +9,9 @@ it('puts the catalog upload on the six-page SOP slot and keeps the seat window o
   const app = readFileSync(resolve(desktopRoot, 'src/renderer/DashboardApp.tsx'), 'utf8');
   const windowController = readFileSync(resolve(desktopRoot, 'src/main/sop-window-controller.ts'), 'utf8');
   const ops = readFileSync(resolve(desktopRoot, 'src/main/dashboard-ops-loop.ts'), 'utf8');
-  expect(app).toContain('{active === \'sop\' && <SopLibraryModule />}');
+  expect(app).toContain('{active === \'sop\' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? \'\'} />}');
   expect(app).not.toContain('{active === \'sop\' && <IntakeSopSource />}');
   expect(windowController).toContain('return this.tree ?? ALLERGY_SOP_TREE');
   expect(ops).toContain("'/v1/sop/import'");
+  expect(ops).toContain('sopUploadRefusal(client.view().job)');
 });
