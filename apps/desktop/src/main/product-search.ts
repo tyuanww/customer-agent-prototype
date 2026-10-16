@@ -176,15 +176,15 @@ export class ProductSearch {
     try { this.advance(sender, identity); return { ok: true, ...identity, cancelled: true }; }
     catch (error) { return this.failure(error, identity); }
   }
-  /** Every seat search is recorded, including a missing, declined, or failed notice check. */
   private async collectionMode(epoch: number): Promise<'pilot_recorded'> {
     try {
       await this.session.currentNotice();
-    } catch { /* The check can fail. The search still goes to the server record. */ }
+    } catch {
+      return 'pilot_recorded';
+    }
     void epoch;
     return 'pilot_recorded';
   }
-  /** Cards the loaded catalog can show. Null when the seat has to use the server candidates. */
   private localCatalog(
     state: SearchState,
     ranked: readonly RankedRetrieval[],
@@ -262,9 +262,6 @@ export class ProductSearch {
       }
       const gateId = this.announce.currentReleaseId?.() ?? this.hydrate?.releaseId ?? null;
       const local = this.localCatalog(state, ranked, gateId);
-      // A missing, declined, or failed notice check still posts /v1/search.
-      // Local cards stay the seat answer when a catalog is loaded. They do not
-      // replace that server record, and a missing snapshot does not throw UNAVAILABLE.
       const jobs = searchJobs(route);
       const pages = await Promise.all(jobs.map(async (job) => {
         const queryId = randomUUID();

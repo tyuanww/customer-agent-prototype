@@ -236,7 +236,7 @@ function restorePreviousFocus(previous: BrowserWindow | null, login: BrowserWind
     previous.focus();
     if (!previous.webContents.isDestroyed()) previous.webContents.focus();
   } catch {
-    // A dismissed palette is no longer focusable.
+    return;
   }
 }
 

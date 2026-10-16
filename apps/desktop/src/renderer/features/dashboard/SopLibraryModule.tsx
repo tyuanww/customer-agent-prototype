@@ -89,6 +89,7 @@ export function SopLibraryModule({
           type="file"
           accept=".csv"
           hidden
+          disabled={!canUploadSop}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             const file = event.target.files?.[0];
             event.target.value = '';

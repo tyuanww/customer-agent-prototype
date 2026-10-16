@@ -5,6 +5,7 @@ import type { IpcMainInvokeEvent,WebContents } from 'electron';
 import type { ProductSession } from '../../src/main/product-session';
 import { registerContentIntakePermissionsIpc } from '../../src/main/content-intake-permissions-ipc';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
+import { observeSessionJob } from '../../src/shared/product-session';
 const handlers=vi.hoisted(()=>new Map<string,(event:IpcMainInvokeEvent,...args:unknown[])=>Promise<unknown>>());
 const native=vi.hoisted(()=>({window:null as unknown,choice:0,show:vi.fn()}));
 vi.mock('electron',()=>({BrowserWindow:{fromWebContents:()=>native.window},dialog:{showMessageBoxSync:(...args:unknown[])=>{native.show(...args);return native.choice;}},ipcMain:{handle:(name:string,fn:(event:IpcMainInvokeEvent,...args:unknown[])=>Promise<unknown>)=>handlers.set(name,fn),removeHandler:(name:string)=>handlers.delete(name)}}));
@@ -23,7 +24,10 @@ it('rejects other windows, child frames and forged fields before accessing a ses
 it('warns about losing an uncertain grant request and permits an explicit close or exit',async()=>{
  const f=intakePermissionsData(),frame={parent:null},wc=Object.assign(new EventEmitter(),{id:1,mainFrame:frame,isDestroyed:()=>false,getURL:()=> 'http://127.0.0.1:5173/?role=dashboard',send:vi.fn()}) as unknown as WebContents;
  const win=Object.assign(new EventEmitter(),{isDestroyed:()=>false});native.window=win;native.choice=0;native.show.mockClear();
- const owned=registerContentIntakePermissionsIpc(f.session as unknown as ProductSession,()=>wc,()=> 'http://127.0.0.1:5173/');
+ const session=f.session as unknown as ProductSession;
+ const inner=session.view.bind(session);
+ session.view=()=>({...inner(),job:observeSessionJob({title:'客服总监',directory:[{name:'客服总监',enabled:true}]})}) as ReturnType<ProductSession['view']>;
+ const owned=registerContentIntakePermissionsIpc(session,()=>wc,()=> 'http://127.0.0.1:5173/');
  const event={sender:wc,senderFrame:frame} as IpcMainInvokeEvent;
  try{
   const command=handlers.get('dashboard:permissions-command')!;

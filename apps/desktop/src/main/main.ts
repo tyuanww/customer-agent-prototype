@@ -271,7 +271,7 @@ if (!gotLock) {
       () => controller?.rendererDevServerUrl,
       () => productProfile?.contentIntake === 'faq-v2');
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
-      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     deskKnowledge = registerDeskKnowledgeIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, userDataDirectory);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,

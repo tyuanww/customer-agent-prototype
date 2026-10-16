@@ -55,9 +55,6 @@ function filterSummary(state: IntakeFilterState, names: Map<string, string>, rep
   ].join(' · ');
 }
 
-/** Selection intent only; Main checks menu membership and the API reauthorizes
- * every query. The summary stays in the measured result region; shop, product,
- * scene, and the hint open from 筛选. */
 export function IntakeQueryFilters({ state, signedIn, open, onToggle, onOpen, onLayoutChange }: {
   state: IntakeFilterState; signedIn: boolean; open: boolean; onToggle: () => void; onOpen: () => void; onLayoutChange: () => void;
 }) {

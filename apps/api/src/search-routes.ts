@@ -134,10 +134,6 @@ export function registerSearchRoute(
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
     if (dependencies === undefined) return sendOverloaded(reply);
-    // Unactivated successor: a seat search is still recorded when the current notice
-    // was not accepted, was declined, or the acceptance check is missing or throws.
-    // The consumed contract still describes the old fail-closed gate. This call does
-    // not activate that contract and does not write from the six faq-v2 pages.
     if (contract.value.collection_mode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
       await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
     }

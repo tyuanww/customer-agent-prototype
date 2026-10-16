@@ -3425,7 +3425,6 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const base='rel_synthetic_g1a_v1';
     const beforeItems = (await admin.query('SELECT count(*)::int AS n FROM public.release_items WHERE release_id=$1',[base])).rows[0].n;
     await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[base]);
-    // An explicit tenant is not the column default, so the function must not adopt it.
     await admin.query("UPDATE public.content_releases SET tenant_id='tenant-other' WHERE release_id=$1 AND tenant_id='default'",[base]);
     const mixed=await publishable('legacy-members');
     const published = await service.publish(actor('enabler'),mixed.request);

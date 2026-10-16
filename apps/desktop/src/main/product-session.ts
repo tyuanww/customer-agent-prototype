@@ -170,8 +170,6 @@ export class ProductSession {
     }
   }
   async login(): Promise<ProductSessionResult> {
-    // A second click replaces an unfinished login. Leaving the first one
-    // running made the query button look dead until the 120s poll ended.
     if (this.operation && !this.token) this.operation.abort();
     else if (this.operation) return productFailure('CONFLICT', this.epoch);
     if (this.token) return this.status();

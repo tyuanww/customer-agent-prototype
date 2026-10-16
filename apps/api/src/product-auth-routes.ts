@@ -11,7 +11,6 @@ const IDENTITY_FAILURE_HTTP = {
   DEPENDENCY_UNAVAILABLE: [503, 'OVERLOADED'], RATE_LIMITED: [429, 'RATE_LIMITED'],
 } as const;
 
-/** Browser navigation asks for HTML. API clients keep the JSON error contract. */
 const CALLBACK_FAILURE_PAGE: Record<IdentityFailure['reason'], string> = {
   LOGIN_INVALID: '登录没有完成。请关闭此页，回到客户端重新登录。',
   REQUEST_INVALID: '登录请求无效。请关闭此页，回到客户端重新登录。',
@@ -34,7 +33,6 @@ export function prefersIdentityCallbackHtml(accept: string | string[] | undefine
   });
 }
 
-/** Fixed Chinese page. Never echoes the provider query. */
 export function identityCallbackFailureHtml(reason: IdentityFailure['reason']): string {
   return `<!doctype html><meta charset="utf-8"><title>登录没有完成</title><p>${CALLBACK_FAILURE_PAGE[reason]}</p>`;
 }
@@ -94,8 +92,6 @@ function registerRoutes(app: FastifyInstance, auth: ProductAuthService): void {
         .send(CALLBACK_SUCCESS_HTML);
     } catch (error) {
       const failure = error instanceof IdentityFailure ? error : new IdentityFailure('DEPENDENCY_UNAVAILABLE');
-      // A browser follows the provider redirect and would otherwise render the
-      // JSON error contract. API clients still receive that JSON.
       if (prefersIdentityCallbackHtml(request.headers.accept)) {
         const [status] = IDENTITY_FAILURE_HTTP[failure.reason];
         return reply.code(status).type('text/html; charset=utf-8')

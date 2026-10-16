@@ -60,8 +60,6 @@ export function recipientRoleAllows(role: Principal['role'], kind: 'business' | 
   return role === 'director' || role === 'manager' || role === 'supervisor' || role === 'lead';
 }
 
-/** Director, manager, and engineer allocate. Delegation cannot create another delegation;
- * it can still back a business grant. Historical rows stay and are rechecked. */
 export function allocationKinds(actor: Principal, kind: 'business' | 'delegation'): ('allocation' | 'delegation')[] {
   if (actor.role !== 'director' && actor.role !== 'manager' && actor.role !== 'engineer') return [];
   if (kind === 'delegation') return ['allocation'];
@@ -89,7 +87,6 @@ async function parentAuthority(client: IntakeTransaction, issuer: Principal, kin
   return rows[0].grant_id;
 }
 
-/** Primary accounts and the engineer may issue an import business grant when no parent row exists. */
 async function issuingParent(client: IntakeTransaction, issuer: Principal, kind: 'business' | 'delegation',
   action: C['IntakeAction'], scope: Scope, period?: { startsAt: string; expiresAt: string }): Promise<string | null> {
   try {
@@ -145,14 +142,8 @@ export async function previewGrants(client: IntakeTransaction, issuer: Principal
   })), nextCursor: null });
 }
 
-/** The disposable stack owner is not a formal root. A later business grant still
- * needs a different recipient: this row does not satisfy authorization_deadline. */
 const DISPOSABLE_SYNTHETIC_OWNER = 'usr_synthetic_owner';
 
-/** One privileged parent for createGrants. intake_business is refused before
- * any insert; the database trigger is the same boundary. A live row for this
- * recipient, scope, source, and action is returned instead of a second row.
- * Caller dates must already cover the present. This does not refresh facts. */
 export async function bootstrapRootAllocation(client: IntakeTransaction, input: {
   recipientId: string; scopeId: string; sourceId?: string | null; action: C['IntakeAction'];
   reason: string; startsAt: string; expiresAt: string;
