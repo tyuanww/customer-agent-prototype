@@ -114,6 +114,9 @@ jobs:
     name: Windows feasibility smoke
     runs-on: windows-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: write
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
@@ -134,6 +137,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm package:win
+      - if: needs.changes.outputs.mode == 'full'
+        name: Upload UNSIGNED Windows package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-local-unsigned
+          path: release/local-unsigned/windows/*UNSIGNED*.exe
+          if-no-files-found: error
+          retention-days: 7
       - if: needs.changes.outputs.mode == 'full'
         name: Smoke the desktop output just built by packaging
         run: pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @windows-feasibility
