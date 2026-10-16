@@ -94,12 +94,12 @@ export async function startApi(
           throw new Error('Product identity bootstrap is incomplete');
         }
         const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
-        const feishu = { ...bootstrap.productIdentity.feishu, observeJob: true };
-        const provider = bootstrap.productIdentity.kind === 'feishu'
-          ? (bootstrap.productIdentity.providerOrigin
-            ? createWorkforceIdentityProvider(feishu, bootstrap.productIdentity.providerOrigin, callback)
-            : createFeishuIdentityProvider(feishu))
-          : createSyntheticIdentityProvider(bootstrap.productIdentity.providerOrigin, callback);
+        const identity = bootstrap.productIdentity;
+        const provider = identity.kind === 'feishu'
+          ? (identity.providerOrigin
+            ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
+            : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
+          : createSyntheticIdentityProvider(identity.providerOrigin, callback);
         auth = await createProductAuthService(bootstrap.productIdentity.database, provider, config.authMode);
       }
       try {
