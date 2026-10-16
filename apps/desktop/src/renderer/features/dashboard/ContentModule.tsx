@@ -314,6 +314,8 @@ export function ContentModule({
   // Rollback is owner-only in the contract, and it needs a product session to reach the API.
   const rollbackDisabled = sessionView?.signedIn !== true
     || sessionView?.role !== 'owner'
+    || sessionView.job?.status !== 'resolved'
+    || sessionView.job.rights.grant !== true
     || rollbackBusy
     || submitting;
 

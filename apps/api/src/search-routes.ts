@@ -46,6 +46,7 @@ export type PreparedSearchOperation = Readonly<{
   // computed and thrown away, and the column shape forces text_storage_status to
   // 'suppressed' — i.e. the text is accepted and then silently dropped.
   queryTextRedacted: string;
+  retainQueryText: boolean;
   redactionPolicyVersion: string;
   queryHash: string;
   queryHashKeyVersion: string;
@@ -70,8 +71,9 @@ export type SearchRouteDependencies = Readonly<{
   logHash: Readonly<{ version: string; key: string }>;
   idempotencyHmac: ApiHmacKeyRing;
   /**
-   * Optional observation of the current notice decision. A missing check, a decline,
-   * or a thrown check does not deny collection_mode=pilot_recorded.
+   * Optional observation of the current notice decision. A missing check keeps
+   * pilot_recorded and stores the redacted text. A decline or a thrown check still
+   * returns the search, records collection_mode synthetic, and stores no query text.
    */
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
@@ -136,9 +138,13 @@ export function registerSearchRoute(
     if (dependencies === undefined) return sendOverloaded(reply);
     const redacted = redactQueryText(contract.value.query_text);
     let collectionMode = contract.value.collection_mode;
+    let retainQueryText = true;
     if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
       const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
-      if (!accepted) collectionMode = 'synthetic';
+      if (!accepted) {
+        collectionMode = 'synthetic';
+        retainQueryText = false;
+      }
     }
     const actorSubjectHash = hmacSafeValue(
       `actor:${actor.user_id}`,
@@ -173,6 +179,7 @@ export function registerSearchRoute(
       redactionPolicyVersion: redacted.policyVersion,
       // Stored, not discarded: the row keeps the redacted text plus a keyed hash of it.
       queryTextRedacted: redacted.text,
+      retainQueryText,
       queryHash: hmacRedactedQuery(
         redacted.text,
         dependencies.logHash.version,

@@ -169,6 +169,7 @@ describe('search HTTP route', () => {
     expect(declined).toHaveBeenCalledWith('usr_synthetic_agent_001');
     expect(execute).toHaveBeenCalledOnce();
     expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
+    expect(execute.mock.calls[0]?.[0]?.retainQueryText).toBe(false);
   });
 
   it('records pilot_recorded when the acceptance check is missing', async () => {
@@ -182,6 +183,7 @@ describe('search HTTP route', () => {
     expect(result.statusCode).not.toBe(403);
     expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
     expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0]?.[0]?.retainQueryText).toBe(true);
   });
 
   it('refuses pilot_recorded when the acceptance check itself errors', async () => {
@@ -196,6 +198,7 @@ describe('search HTTP route', () => {
     expect(result.statusCode).not.toBe(403);
     expect(execute).toHaveBeenCalledOnce();
     expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
+    expect(execute.mock.calls[0]?.[0]?.retainQueryText).toBe(false);
   });
 
   it('keeps the route fail-closed until the W3 atomic event operation is composed', async () => {
