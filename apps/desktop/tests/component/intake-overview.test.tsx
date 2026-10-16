@@ -117,10 +117,10 @@ it('says 未接入 when unloaded', async () => {
   render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('未接入');
-  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('未接入');
-  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('未接入');
-  expect(screen.getByText('命中率').parentElement).toHaveTextContent('未接入');
-  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('未接入');
+  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('使用情况读取失败');
+  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('使用情况读取失败');
+  expect(screen.getByText('命中率').parentElement).toHaveTextContent('使用情况读取失败');
+  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('使用情况读取失败');
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: '无命中排行' }));
   expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('未接入');

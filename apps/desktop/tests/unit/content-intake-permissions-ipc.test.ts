@@ -17,7 +17,7 @@ it('rejects other windows, child frames and forged fields before accessing a ses
   expect(await command(event(dashboard,{parent:frame}),{action:'refresh'})).toMatchObject({ok:false,view:null});
   expect(await command(event(dashboard),{action:'save',actor:'forged'})).toMatchObject({ok:false,message:'权限配置输入无效。'});
   expect(await current(event(dashboard),{})).toMatchObject({ok:false,message:'权限配置输入无效。'});
-  expect(await command(event(dashboard),{action:'refresh'})).toMatchObject({ok:false,message:'权限配置尚未接入当前运行模式。'});
+  expect(await command(event(dashboard),{action:'refresh'})).toMatchObject({ok:false,message:'正式环境未挂录入'});
  }finally{owned.dispose();}expect(handlers.size).toBe(0);
 });
 it('warns about losing an uncertain grant request and permits an explicit close or exit',async()=>{

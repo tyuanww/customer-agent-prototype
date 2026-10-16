@@ -4,6 +4,7 @@ import { ContentIntakePermissions } from './content-intake-permissions';
 import { isTrustedMainFrameSender } from './sender-guard';
 import type { ProductSession } from './product-session';
 import { ProductHttpError } from './product-http';
+import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
 const channels = ['dashboard:permissions-current','dashboard:permissions-command'] as const;
 /** Private per-window controller; no renderer-supplied identity or URL. */
 export function registerContentIntakePermissionsIpc(session: ProductSession | null, dashboard: () => WebContents | null, devUrl: () => string | undefined) {
@@ -12,7 +13,7 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
     const wc=dashboard();
     if(!wc || !isTrustedMainFrameSender(event,[wc],devUrl()))return {ok:false,message:'无权访问此窗口能力。',view:null};
     if(channel==='dashboard:permissions-command'?args.length!==1 || !isIntakePermissionCommand(args[0]):args.length!==0)return {ok:false,message:'权限配置输入无效。',view:null};
-    if(!session)return {ok:false,message:'权限配置尚未接入当前运行模式。',view:null};
+    if(!session)return {ok:false,message:WORKBENCH_EMPTY.intakeUnmounted,view:null};
     let owner=owners.get(wc);
     if(!owner){
       const win=BrowserWindow.fromWebContents(wc);if(!win || win.isDestroyed())return {ok:false,message:'窗口不可用。',view:null};

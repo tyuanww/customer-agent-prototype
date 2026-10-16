@@ -18,6 +18,7 @@ import {
 } from '@shared/query-action-ledger';
 import { v9Donut, v9DonutRings, v9Headline, v9Trend, v9UsageQuery, V9_MISS, V9_PAGE_SIZE } from './v9-overview-model';
 import { aggregateUsage, rankMissRows, rankUsageRows, trendFromUsage, type UsageSourceRow } from '@shared/usage-log-csv';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import './workbench-v9.css';
 
 const CAUSE_LABELS = {
@@ -33,6 +34,13 @@ const CAUSE_OPTIONS = [
   ['stale', CAUSE_LABELS.stale],
   ['mixed', CAUSE_LABELS.mixed],
 ] as const;
+
+function usageTile(phase: 'loading' | 'empty' | 'ready' | 'failed', value: string | undefined, synthetic: boolean): string {
+  if (synthetic && value) return value;
+  if (phase === 'failed') return WORKBENCH_EMPTY.usageFailed;
+  if (phase === 'loading') return '…';
+  return value ?? WORKBENCH_EMPTY.usageEmpty;
+}
 
 function statusLabel(status: DashboardIterationTask['status']): string {
   if (status === 'open') return '待处理';
@@ -97,6 +105,9 @@ export function IntakeOverview({
   const [usageDesc, setUsageDesc] = useState(true);
   const [usagePage, setUsagePage] = useState(0);
   const [sourceRows, setSourceRows] = useState<UsageSourceRow[] | null>(null);
+  const [usagePhase, setUsagePhase] = useState<'loading' | 'empty' | 'ready' | 'failed'>(
+    () => (typeof window !== 'undefined' && window.dashboardUsageLog ? 'loading' : 'failed'),
+  );
   const previewLocation = window.location;
   const showSynthetic = (previewLocation.hostname === '127.0.0.1' || previewLocation.hostname === 'localhost')
     && new URLSearchParams(previewLocation.search).get('preview') === 'intake';
@@ -211,17 +222,25 @@ export function IntakeOverview({
   ] as const;
   useEffect(() => {
     const api = window.dashboardUsageLog;
-    if (!api) return undefined;
+    if (!api) {
+      setSourceRows(null);
+      setUsagePhase('failed');
+      return undefined;
+    }
     let live = true;
+    setUsagePhase('loading');
     void (async () => {
       const collected: UsageSourceRow[] = [];
       const seen = new Set<string>();
       let cursor: string | null = null;
       do {
         const reply = await api.list({ result: '', query: '', cursor });
-        if (!live) { setSourceRows(null); return; }
-        if (!reply.ok) { setSourceRows(null); return; }
-        if (cursor !== null && seen.has(cursor)) { setSourceRows(null); return; }
+        if (!live) return;
+        if (!reply.ok || (cursor !== null && seen.has(cursor))) {
+          setSourceRows(null);
+          setUsagePhase('failed');
+          return;
+        }
         if (cursor !== null) seen.add(cursor);
         collected.push(...reply.rows);
         cursor = reply.nextCursor;
@@ -231,8 +250,14 @@ export function IntakeOverview({
         const asked = Date.parse(row.askedAt);
         return Number.isFinite(asked) && asked >= cutoff;
       });
-      if (live) setSourceRows(windowed);
-    })().catch(() => { if (live) setSourceRows(null); });
+      if (!live) return;
+      setSourceRows(windowed);
+      setUsagePhase(windowed.length === 0 ? 'empty' : 'ready');
+    })().catch(() => {
+      if (!live) return;
+      setSourceRows(null);
+      setUsagePhase('failed');
+    });
     return () => { live = false; };
   }, [days]);
   const sourced = sourceRows === null ? null : aggregateUsage(sourceRows);
@@ -261,9 +286,9 @@ export function IntakeOverview({
       </div>
     </div>
     <div className="tiles">
-      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{headline?.use ?? '未接入'}</b>{headline && !sourced ? <span className="t-sub up">较上期 ↑ 8%</span> : null}</div>
-      <div className="tile"><span className="t-lbl">无命中次数</span><b>{headline?.miss ?? '未接入'}</b>{headline && !sourced ? <span className="t-sub down">较上期 ↓ 5%</span> : null}</div>
-      <div className="tile"><span className="t-lbl">命中率</span><b>{headline?.rate ?? '未接入'}</b>{headline && !sourced ? <span className="t-sub up">较上期 ↑ 1.2 个百分点</span> : null}</div>
+      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{usageTile(usagePhase, headline?.use, showSynthetic && sourceRows === null)}</b>{headline && !sourced ? <span className="t-sub up">较上期 ↑ 8%</span> : null}</div>
+      <div className="tile"><span className="t-lbl">无命中次数</span><b>{usageTile(usagePhase, headline?.miss, showSynthetic && sourceRows === null)}</b>{headline && !sourced ? <span className="t-sub down">较上期 ↓ 5%</span> : null}</div>
+      <div className="tile"><span className="t-lbl">命中率</span><b>{usageTile(usagePhase, headline?.rate, showSynthetic && sourceRows === null)}</b>{headline && !sourced ? <span className="t-sub up">较上期 ↑ 1.2 个百分点</span> : null}</div>
       <div className="tile"><span className="t-lbl">待处理迭代</span><b>{openTasks.length}</b><span className="t-sub">需要人工判断</span></div>
     </div>
     <div className="charts">
@@ -271,10 +296,10 @@ export function IntakeOverview({
         <div className="card-head"><h3>使用与无命中趋势</h3><span className="legend"><i style={{ background: 'var(--p)' }} />使用<i style={{ background: '#e0b050' }} />无命中</span></div>
         <div className="chart-wrap">{liveTrend
           ? (liveTrend.length === 0
-            ? <p className="notready">未接入</p>
+            ? <p className="notready">{WORKBENCH_EMPTY.usageEmpty}</p>
             : <table className="fixed" aria-label="使用与无命中趋势表"><thead><tr><th>日期</th><th>使用</th><th>无命中</th></tr></thead>
               <tbody>{liveTrend.map((point) => <tr key={point.day}><td>{point.day}</td><td>{point.use}</td><td>{point.miss}</td></tr>)}</tbody></table>)
-          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">未接入</p>)}</div>
+          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</p>)}</div>
       </div>
       <div className="card" aria-label="话术类型占比">
         <div className="card-head"><h3>话术类型占比</h3></div>
@@ -285,7 +310,7 @@ export function IntakeOverview({
             <text x="70" y="86" textAnchor="middle" fontSize="11" fill="#6b6878">使用次数</text>
           </svg>
           <ul className="dlegend">{donut.parts.map((part) => <li key={part.type}><i style={{ background: part.color }} />{part.type}<span className="n">{part.total.toLocaleString('en-US')}</span><b>{part.pct}%</b></li>)}</ul>
-        </div> : <p className="notready">未接入</p>}
+        </div> : <p className="notready">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</p>}
       </div>
     </div>
     <div className="card flush">
@@ -313,13 +338,13 @@ export function IntakeOverview({
             <th><button type="button" className={`sort${usageDesc ? '' : ' asc'}`} aria-label="按使用次数排序" onClick={() => { setUsageDesc((value) => !value); setUsagePage(0); }}>使用次数<svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg></button></th>
             <th>{usageView === 'script' ? '近 7 天 · 使用人' : '最常用话术'}</th><th></th></tr></thead>
           <tbody>
-            {orderedRanks ? (orderedRanks.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : orderedRanks.map((row, index) => <tr className="item" key={row.name}>
+            {orderedRanks ? (orderedRanks.length === 0 ? <tr><td colSpan={5} className="empty">{usagePhase === 'empty' && usageQuery === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'}</td></tr> : orderedRanks.map((row, index) => <tr className="item" key={row.name}>
               <td><span className={index < 3 ? 'rk top' : 'rk'}>{index + 1}</span></td>
               <td>{row.name}</td>
               <td><div className="cnt"><b>{row.total}</b></div></td>
               <td><span className="who">{row.extra}</span></td>
               <td />
-            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">未接入</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
+            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
               const rank = usageDesc ? usage.page * V9_PAGE_SIZE + index + 1 : usage.count - (usage.page * V9_PAGE_SIZE + index);
               return <tr className="item" key={row.name}>
                 <td><span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span></td>
