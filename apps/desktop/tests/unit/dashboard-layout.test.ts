@@ -517,6 +517,12 @@ describe('dashboard layout contract', () => {
     expect(css).toContain("[data-nav-phase='collapsed'] .dashboard-brand-copy");
   });
 
+  it('binds six-page wording and announce to the published catalog', () => {
+    expect(app).toContain('<WordingLibraryModule');
+    expect(app).toContain('<AnnounceModule');
+    expect(app).not.toContain('IntakeLibrary');
+  });
+
   it('keeps announce simulation local, transient, and timer-cleaned', () => {
     // 四卡只读 announce 投影；条数/状态来自发布 summary，不读 hydrate 目录。
     expect(announce).toContain('dashboardAnnounce');
