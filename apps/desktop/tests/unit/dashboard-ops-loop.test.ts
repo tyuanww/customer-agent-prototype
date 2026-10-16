@@ -461,6 +461,16 @@ async function loginOwner(snapshot: JobSnapshot | null) {
 }
 
 it('refuses SOP import for a signed-in owner whose job cannot upload', async () => {
+  const signedOut = new ProductSession(
+    new ProductHttp('http://127.0.0.1:4100', vi.fn(async () => new Response('no', { status: 500 })) as unknown as typeof fetch),
+    { read: () => null, write: () => undefined, clear: () => undefined },
+    { open: async () => undefined },
+  );
+  expect(signedOut.view()).toMatchObject({ signedIn: false, job: null });
+  expect(await dashboardSopImport(signedOut, sopCsv)).toMatchObject({
+    ok: false, code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession,
+  });
+
   const agent = await loginOwner({ title: '普通客服', directory: [{ name: '普通客服', enabled: true }] });
   expect(agent.login).toMatchObject({
     job: { status: 'resolved', title: '普通客服', rights: { uploadSop: false } },
