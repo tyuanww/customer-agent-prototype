@@ -232,6 +232,7 @@ export function ContentModule({
     productAvailable: hasProductApi && sessionView?.enabled !== false,
     signedIn: sessionView?.signedIn === true,
     role: sessionView?.role ?? null,
+    job: sessionView?.job ?? null,
     rows,
     sourceBindings,
   });

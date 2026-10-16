@@ -1,4 +1,4 @@
-import { exactKeys, PRODUCT_ERRORS, type ProductErrorCode } from './product-session';
+import { exactKeys, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL, type ProductErrorCode, type SessionJobView } from './product-session';
 
 export const DASHBOARD_CONTENT_DOMAINS = ['presale', 'campaign', 'aftersale', 'product'] as const;
 export type DashboardContentDomain = (typeof DASHBOARD_CONTENT_DOMAINS)[number];
@@ -104,6 +104,7 @@ export type DashboardContentSessionView = Readonly<{
   signedIn: boolean;
   role: DashboardContentRole | null;
   displayName: string | null;
+  job: SessionJobView | null;
 }>;
 
 export type DashboardContentSessionResult = DashboardContentSessionView | DashboardContentFailure;
@@ -176,6 +177,7 @@ export type ContentPublishGateInput = Readonly<{
   productAvailable: boolean;
   signedIn: boolean;
   role: DashboardContentRole | null;
+  job?: SessionJobView | null;
   rows: readonly DashboardContentRow[];
   sourceBindings?: readonly DashboardContentBinding[];
 }>;
@@ -216,19 +218,21 @@ export function contentPublishGate(input: ContentPublishGateInput): ContentPubli
   if (!input.signedIn || input.role === null) {
     return { allowed: false, code: 'UNAUTHORIZED', message: CONTENT_PUBLISH_COPY.noSession };
   }
-  if (input.role === 'agent') {
-    return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent };
+  const job = input.job ?? null;
+  if (job?.status !== 'resolved' || job.rights.publish !== true) {
+    return {
+      allowed: false,
+      code: 'FORBIDDEN',
+      message: job?.status === 'resolved' ? CONTENT_PUBLISH_COPY.agent : UNRESOLVED_JOB_LABEL,
+    };
   }
   if (input.rows.length < 1) {
     return { allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.noDraft };
   }
-  if (input.role === 'owner') {
-    if ((input.sourceBindings?.length ?? 0) < 1) {
-      return { allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.missingBindings };
-    }
-    return { allowed: true };
+  if ((input.sourceBindings?.length ?? 0) < 1) {
+    return { allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.missingBindings };
   }
-  return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish };
+  return { allowed: true };
 }
 
 function isContentDomain(value: unknown): value is DashboardContentDomain {
@@ -255,14 +259,30 @@ export function isDashboardContentSessionResult(value: unknown): value is Dashbo
   if (isDashboardContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName', 'job'])) return false;
   if (typeof record.enabled !== 'boolean' || typeof record.signedIn !== 'boolean') return false;
+  if (!isContentJob(record.job)) return false;
   if (record.displayName !== null && (typeof record.displayName !== 'string'
     || record.displayName.length < 1 || record.displayName.length > 64)) return false;
   if (record.signedIn) {
     return record.enabled === true && isContentRole(record.role) && typeof record.displayName === 'string';
   }
-  return record.role === null && record.displayName === null;
+  return record.role === null && record.displayName === null && record.job === null;
+}
+
+function isContentJob(value: unknown): boolean {
+  if (value === null) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const job = value as Record<string, unknown>;
+  const rights = job.rights;
+  if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
+  const row = rights as Record<string, unknown>;
+  return (job.status === 'resolved' || job.status === 'unresolved')
+    && typeof row.publish === 'boolean'
+    && typeof row.grant === 'boolean'
+    && typeof row.uploadSop === 'boolean'
+    && typeof row.search === 'boolean'
+    && typeof row.readCatalog === 'boolean';
 }
 
 export function isDashboardContentRow(value: unknown): value is DashboardContentRow {

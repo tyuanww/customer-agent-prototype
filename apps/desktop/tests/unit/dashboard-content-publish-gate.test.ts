@@ -11,7 +11,13 @@ import {
   rowCoachPublishable,
   rowRequiresOwner,
 } from '../../src/shared/dashboard-content';
+import { observeSessionJob, UNRESOLVED_JOB_LABEL } from '../../src/shared/product-session';
 
+const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
+const director = titled('客服总监');
+const engineer = titled('AI赋能工程师');
+const agentJob = titled('普通客服');
+const unresolved = observeSessionJob(null);
 const productRow = { scene: '洁面用量确认', script: '先确认产品版本', domain: 'product' as const };
 const campaignRow = { scene: '满赠规则说明', script: '不承诺库存', domain: 'campaign' as const };
 const aftersaleRow = { scene: '售后质量升级', script: '记录必要证据', domain: 'aftersale' as const };
@@ -58,64 +64,53 @@ describe('content publish role gate', () => {
       productAvailable: true, signedIn: false, role: null, rows: [productRow],
     })).toEqual({ allowed: false, code: 'UNAUTHORIZED', message: CONTENT_PUBLISH_COPY.noSession });
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'owner', rows: [],
+      productAvailable: true, signedIn: true, role: 'owner', job: director, rows: [],
     })).toEqual({ allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.noDraft });
   });
 
-  it('never allows agent to publish', () => {
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'agent', rows: [productRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'agent', rows: [],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
-  });
-
-  it('keeps coach publish closed while the frozen API is owner-only', () => {
+  it('lets a resolved publishing job publish and keeps 普通客服 from publishing', () => {
     const bindings = [{ domain: 'product' as const, source_version_id: 'srcv_a' }];
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [productRow, campaignRow],
+      productAvailable: true, signedIn: true, role: 'coach', job: engineer, rows: [productRow],
       sourceBindings: bindings,
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
+    })).toEqual({ allowed: true });
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [productRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [aftersaleRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [productRow, allergyRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [compensationRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [unlabeledRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
-    expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', rows: [presaleRow],
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.ownerPublish });
+      productAvailable: true, signedIn: true, role: 'owner', job: agentJob, rows: [productRow],
+      sourceBindings: bindings,
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
+    expect(CONTENT_PUBLISH_COPY.agent).not.toBe(CONTENT_PUBLISH_COPY.ownerPublish);
   });
 
-  it('allows owner to publish restricted drafts', () => {
+  it('keeps an unresolved job from publishing or using the owner-only sentence', () => {
+    const bindings = [{ domain: 'product' as const, source_version_id: 'srcv_a' }];
+    for (const job of [unresolved, observeSessionJob({ title: '   ', directory: [{ name: '客服总监', enabled: true }] }), observeSessionJob({ title: '服务赋能师', directory: [{ name: '服务赋能师', enabled: true }] })]) {
+      const gate = contentPublishGate({
+        productAvailable: true, signedIn: true, role: 'owner', job, rows: [productRow], sourceBindings: bindings,
+      });
+      expect(gate).toEqual({ allowed: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL });
+      expect(gate).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
+    }
+  });
+
+  it('allows a resolved publishing job to publish restricted drafts when bindings exist', () => {
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'owner', rows: [aftersaleRow, allergyRow],
+      productAvailable: true, signedIn: true, role: 'coach', job: director, rows: [aftersaleRow, allergyRow],
       sourceBindings: [{ domain: 'aftersale', source_version_id: 'srcv_a' }],
     })).toEqual({ allowed: true });
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'owner', rows: [aftersaleRow],
+      productAvailable: true, signedIn: true, role: 'owner', job: director, rows: [aftersaleRow],
     })).toEqual({ allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.missingBindings });
   });
 
   it('accepts the dashboard content session projection without credentials', () => {
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师',
+      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师', job: null,
     })).toBe(true);
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: false, signedIn: false, role: null, displayName: null,
+      ok: true, enabled: false, signedIn: false, role: null, displayName: null, job: null,
     })).toBe(true);
     expect(isDashboardContentSessionResult({
-      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师', access_token: 'secret',
+      ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师', job: null, access_token: 'secret',
     })).toBe(false);
   });
 
