@@ -155,7 +155,7 @@ describe('search HTTP route', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('records pilot_recorded when the current notice was not accepted', async () => {
+  it('refuses pilot_recorded when the current notice was not accepted', async () => {
     const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
       ok: true, response: response() as never,
     });
@@ -166,10 +166,9 @@ describe('search HTTP route', () => {
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
     expect(result.statusCode).not.toBe(403);
-    expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
     expect(declined).toHaveBeenCalledWith('usr_synthetic_agent_001');
     expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('pilot_recorded');
+    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
   });
 
   it('records pilot_recorded when the acceptance check is missing', async () => {
@@ -185,7 +184,7 @@ describe('search HTTP route', () => {
     expect(execute).toHaveBeenCalledOnce();
   });
 
-  it('records pilot_recorded when the acceptance check itself errors', async () => {
+  it('refuses pilot_recorded when the acceptance check itself errors', async () => {
     const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
       ok: true, response: response() as never,
     });
@@ -195,8 +194,8 @@ describe('search HTTP route', () => {
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
     expect(result.statusCode).not.toBe(403);
-    expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
     expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
   });
 
   it('keeps the route fail-closed until the W3 atomic event operation is composed', async () => {

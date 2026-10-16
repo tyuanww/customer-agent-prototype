@@ -92,6 +92,19 @@ describe('content publish role gate', () => {
     }
   });
 
+  it('keeps a publishing job without grant away from sensitive drafts', () => {
+    const supervisor = observeSessionJob({ title: '客服主管', directory: [{ name: '客服主管', enabled: true }] });
+    const bindings = [{ domain: 'product' as const, source_version_id: 'srcv_a' }];
+    expect(contentPublishGate({
+      productAvailable: true, signedIn: true, role: 'coach', job: supervisor, rows: [productRow],
+      sourceBindings: bindings,
+    })).toEqual({ allowed: true });
+    expect(contentPublishGate({
+      productAvailable: true, signedIn: true, role: 'coach', job: supervisor, rows: [aftersaleRow],
+      sourceBindings: [{ domain: 'aftersale', source_version_id: 'srcv_a' }],
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive });
+  });
+
   it('allows a resolved publishing job to publish restricted drafts when bindings exist', () => {
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', job: director, rows: [aftersaleRow, allergyRow],

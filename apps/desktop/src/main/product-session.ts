@@ -111,10 +111,11 @@ export class ProductSession {
       const user = await this.identify(token, AbortSignal.timeout(5_000));
       if (epoch !== this.epoch || token !== this.token) return productFailure('STALE', epoch);
       const changed = user.role !== this.user?.role || user.userId !== this.user?.userId;
+      const previousJob = JSON.stringify(this.job);
       if (changed) this.epoch++;
       this.user = user;
       this.rememberJob(user.userId);
-      if (changed) this.emit(this.view());
+      if (changed || JSON.stringify(this.job) !== previousJob) this.emit(this.view());
       return this.view();
     } catch (error) {
       if (epoch !== this.epoch) return productFailure('STALE', epoch);

@@ -134,11 +134,12 @@ export function registerSearchRoute(
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
     if (dependencies === undefined) return sendOverloaded(reply);
-    if (contract.value.collection_mode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
-      await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
-    }
-
     const redacted = redactQueryText(contract.value.query_text);
+    let collectionMode = contract.value.collection_mode;
+    if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
+      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      if (!accepted) collectionMode = 'synthetic';
+    }
     const actorSubjectHash = hmacSafeValue(
       `actor:${actor.user_id}`,
       dependencies.logHash.version,
@@ -159,7 +160,7 @@ export function registerSearchRoute(
       queryId: contract.value.query_id,
       parentQueryId: contract.value.parent_query_id,
       interactionReason: contract.value.interaction_reason,
-      collectionMode: contract.value.collection_mode,
+      collectionMode,
       detectedPlatform: contract.value.detected_platform,
       platformSource: contract.value.platform_source,
       search: Object.freeze({

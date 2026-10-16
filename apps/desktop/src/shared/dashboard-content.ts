@@ -226,6 +226,9 @@ export function contentPublishGate(input: ContentPublishGateInput): ContentPubli
       message: job?.status === 'resolved' ? CONTENT_PUBLISH_COPY.agent : UNRESOLVED_JOB_LABEL,
     };
   }
+  if (input.rows.some(rowRequiresOwner) && job.rights.grant !== true) {
+    return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive };
+  }
   if (input.rows.length < 1) {
     return { allowed: false, code: 'VALIDATION', message: CONTENT_PUBLISH_COPY.noDraft };
   }
