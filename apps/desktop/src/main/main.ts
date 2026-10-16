@@ -237,7 +237,7 @@ if (!gotLock) {
     // `/v1/search`, and also must not require a developer shell.
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
-      if (!productProfile.contentIntake) applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
+      applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
       productSession = new ProductSession(new ProductHttp(productProfile.apiOrigin),
         createSessionStore(userDataDirectory, productProfile.apiOrigin), createLoginWindow(
           productProfile.identityOrigin,
@@ -248,8 +248,8 @@ if (!gotLock) {
               ? followAllowedLoginRedirects(productProfile.identityOrigin, productProfile.apiOrigin)
               : (url) => shell.openExternal(url),
           },
-        ), productProfile.contentIntake ? () => null : undefined);
-      if (!productProfile.contentIntake) productAnnounce = new ProductAnnounce(
+        ));
+      productAnnounce = new ProductAnnounce(
         productSession,
         readProductClientId(userDataDirectory),
         Date.now,
@@ -292,40 +292,37 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
     );
-    // The FAQ profile has no legacy hydrate, remote model, catalog or admin adapter.
-    if (!productProfile?.contentIntake) {
-      registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
-        contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-        identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
-      registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
-        contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
-      registerDashboardWordingIpc(
-        () => controller?.dashboardWebContents() ?? null,
-        () => controller?.rendererDevServerUrl,
-        () => productAnnounce?.snapshotCatalog() ?? null,
-      );
-      registerDashboardContentIpc(
-        productSession,
-        () => controller?.dashboardWebContents() ?? null,
-        () => controller?.rendererDevServerUrl,
-        async (sessionEpoch) => {
-          const announce = productAnnounce;
-          if (!announce) return null;
-          await announce.refresh({ sessionEpoch, generation: 0 });
-          return announce.currentDomainCounts();
-        },
-      );
-      registerDashboardIterationIpc(
-        productSession,
-        () => controller?.dashboardWebContents() ?? null,
-        () => controller?.rendererDevServerUrl,
-      );
-      registerDashboardOpsLoopIpc(
-        productSession,
-        () => controller?.dashboardWebContents() ?? null,
-        () => controller?.rendererDevServerUrl,
-      );
-    }
+    registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
+      identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
+    registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
+    registerDashboardWordingIpc(
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+      () => productAnnounce?.snapshotCatalog() ?? null,
+    );
+    registerDashboardContentIpc(
+      productSession,
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+      async (sessionEpoch) => {
+        const announce = productAnnounce;
+        if (!announce) return null;
+        await announce.refresh({ sessionEpoch, generation: 0 });
+        return announce.currentDomainCounts();
+      },
+    );
+    registerDashboardIterationIpc(
+      productSession,
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
+    registerDashboardOpsLoopIpc(
+      productSession,
+      () => controller?.dashboardWebContents() ?? null,
+      () => controller?.rendererDevServerUrl,
+    );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
       if (controller === next) {

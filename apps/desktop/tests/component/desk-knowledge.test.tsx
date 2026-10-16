@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it } from 'vitest';
 import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowledge';
 import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 
