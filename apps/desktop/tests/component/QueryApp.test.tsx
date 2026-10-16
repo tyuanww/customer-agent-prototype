@@ -609,21 +609,11 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('question-input')).not.toHaveAttribute('aria-invalid');
   });
 
-  it('shows the server notice once and records only an explicit button decision', async () => {
-    const signedIn = {
+  it('does not show the collection notice dialog and does not require a decision before search', async () => {
+    const f = connectProduct();
+    window.customerAgent!.product!.currentNotice = vi.fn().mockResolvedValue({
       ok: true as const,
-      enabled: true,
-      signedIn: true,
-      sessionEpoch: 12,
-      userId: 'usr_synthetic_agent',
-      role: 'agent' as const,
-      authMode: 'mock' as const,
-      expiresAt: new Date(Date.now() + 900_000).toISOString(),
-      displayName: 'synthetic_agent',
-    };
-    const currentNotice = vi.fn().mockResolvedValue({
-      ok: true as const,
-      sessionEpoch: 12,
+      sessionEpoch: 10,
       notice: {
         version: 'pilot-notice-v1',
         content: '服务器下发的正式告知正文',
@@ -633,57 +623,26 @@ describe('QueryApp', () => {
       decision: null,
       decided_at: null,
     });
-    const decideNotice = vi.fn().mockResolvedValue({
-      ok: true as const,
-      sessionEpoch: 12,
-      version: 'pilot-notice-v1',
-      decision: 'accepted' as const,
-      decided_at: '2026-09-30T00:01:00.000Z',
-    });
-    window.customerAgent!.product = {
-      sessionStatus: vi.fn().mockResolvedValue(signedIn),
-      login: vi.fn(),
-      logout: vi.fn(),
-      currentNotice,
-      decideNotice,
-      onSessionChanged: () => () => {},
-    };
-    render(<QueryApp />);
-    expect(await screen.findByTestId('notice-content')).toHaveTextContent('服务器下发的正式告知正文');
-    expect(decideNotice).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('notice-accept'));
-    await waitFor(() => expect(decideNotice).toHaveBeenCalledWith({ version: 'pilot-notice-v1', decision: 'accepted' }));
-    await waitFor(() => expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument());
-    expect(currentNotice).toHaveBeenCalledTimes(1);
-  });
-
-  it('blocks search while the notice is loading or unavailable, then allows retry after the gate clears', async () => {
-    const f = connectProduct();
-    const pending = deferred<import('../../src/shared/product-notice').ProductNoticeResult>();
-    const currentNotice = vi.fn()
-      .mockReturnValueOnce(pending.promise)
-      .mockResolvedValueOnce({
-        ok: false as const,
-        code: 'UNAVAILABLE' as const,
-        sessionEpoch: 10,
-        message: '服务暂不可用，请重试',
-      });
-    window.customerAgent!.product!.currentNotice = currentNotice;
+    window.customerAgent!.product!.decideNotice = vi.fn();
     render(<QueryApp />);
     await screen.findByRole('button', { name: /· 退出$/ });
+    expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
-    expect(f.search).not.toHaveBeenCalled();
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
+    expect(window.customerAgent!.product!.decideNotice).not.toHaveBeenCalled();
+  });
 
-    await act(async () => pending.resolve({
-      ok: false,
-      code: 'UNAVAILABLE',
-      sessionEpoch: 10,
-      message: '服务暂不可用，请重试',
-    }));
-    expect(await screen.findByTestId('notice-retry')).toBeInTheDocument();
+  it('lets search run while the collection notice is still loading', async () => {
+    const f = connectProduct();
+    const pending = deferred<import('../../src/shared/product-notice').ProductNoticeResult>();
+    window.customerAgent!.product!.currentNotice = vi.fn().mockReturnValue(pending.promise);
+    render(<QueryApp />);
+    await screen.findByRole('button', { name: /· 退出$/ });
+    expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
-    expect(f.search).not.toHaveBeenCalled();
+    await waitFor(() => expect(f.search).toHaveBeenCalled());
   });
 
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
@@ -2610,10 +2569,8 @@ describe('QueryApp', () => {
     };
     render(<QueryApp intake />); activateQuery();
     expect(screen.queryByText(/MiniMax 只规划/)).not.toBeInTheDocument();
-    await screen.findByTestId('notice-accept');
+    expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument();
     await act(async () => menu.resolve({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: null }));
-    expect(screen.getByTestId('notice-accept')).toBeVisible();
-    await user.click(screen.getByTestId('notice-accept'));
     await user.click(screen.getByRole('button', { name: '筛选' }));
     await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-a');
     await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-a'));

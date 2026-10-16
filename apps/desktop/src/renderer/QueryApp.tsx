@@ -1,6 +1,5 @@
 import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
 import type { ProductSessionResult } from '@shared/product-session';
-import type { NoticeDecision, ProductNoticeResult } from '@shared/product-notice';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -37,7 +36,6 @@ import {
 import { reduceOverlay, type OverlayPhase } from '@shared/overlay-machine';
 import { QueryAnnounceBanner } from './features/search/QueryAnnounceBanner';
 import { QueryCapsule } from './features/search/QueryCapsule';
-import { QueryNoticeDialog } from './features/search/QueryNoticeDialog';
 import { QueryResizeGrip } from './features/search/QueryResizeGrip';
 import { QueryResultsPane } from './features/search/QueryResultsPane';
 import { QueryScopeFields } from './features/search/QueryScopeFields';
@@ -79,11 +77,6 @@ import {
 
 export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
-  const [currentNotice, setCurrentNotice] = useState<ProductNoticeResult | null>(null);
-  const [noticeLoading, setNoticeLoading] = useState(false);
-  const [noticeBlocked, setNoticeBlocked] = useState(false);
-  const [noticeBusy, setNoticeBusy] = useState(false);
-  const [noticeError, setNoticeError] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
   const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
@@ -140,7 +133,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const dashboardOpenFailedRef = useRef(false);
   const sessionBusyRef = useRef(false);
   const sessionGenerationRef = useRef(0);
-  const noticeRequestRef = useRef(0);
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
@@ -780,12 +772,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setResults([]);
       setErrorMessage('');
       setInvalidMessage('');
-      const noticePending = noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null);
-      if (phase !== 'SEARCH_INPUT' && !noticePending) {
+      if (phase !== 'SEARCH_INPUT') {
         reportPhase(intake ? 'RESULTS' : 'SEARCH_INPUT');
       }
     },
-    [intake, cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, recordNoHitExit, reportPhase],
+    [intake, cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, recordNoHitExit, reportPhase],
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
@@ -816,88 +807,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
   }, [reportPhase, intake]);
 
-  const refreshCurrentNotice = useCallback(async (sessionEpoch: number) => {
-    const api = window.customerAgent?.product;
-    const requestId = ++noticeRequestRef.current;
-    if (!api?.currentNotice) {
-      // The real product preload exposes this method alongside productSearch.
-      // If that capability disappears at runtime, keep the product path closed
-      // instead of treating an unavailable consent gate as consent.
-      if (window.customerAgent?.productSearch) {
-        setNoticeLoading(false);
-        setNoticeBlocked(true);
-        setNoticeError('告知读取失败，请重试');
-        if (phaseRef.current === 'SEARCH_INPUT') reportPhase('ERROR');
-      }
-      return;
-    }
-    setCurrentNotice(null);
-    setNoticeLoading(true);
-    setNoticeBlocked(false);
-    setNoticeError('');
-    // Keep the query visibly blocked while the server decides whether a notice
-    // is required. Enter/search events are guarded by the same state below.
-    if (phaseRef.current === 'SEARCH_INPUT') reportPhase('ERROR');
-    try {
-      const result = await api.currentNotice();
-      if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
-      setNoticeLoading(false);
-      if (!result.ok) {
-        setCurrentNotice(null);
-        if (result.code === 'GONE') {
-          setNoticeBlocked(false);
-          setNoticeError('');
-          if (phaseRef.current === 'ERROR' && resultCountRef.current === 0) reportPhase('SEARCH_INPUT');
-          return;
-        }
-        setNoticeBlocked(true);
-        setNoticeError(result.message);
-        return;
-      }
-      setCurrentNotice(result);
-      setNoticeBlocked(false);
-      setNoticeError('');
-      // A pending notice is an explicit blocking step. Reading the page alone
-      // never records a decision; only the buttons below call decideNotice.
-      if (result.decision === null && phaseRef.current === 'SEARCH_INPUT') {
-        reportPhase('ERROR');
-      }
-    } catch {
-      if (requestId !== noticeRequestRef.current || sessionEpoch !== productEpochRef.current) return;
-      setCurrentNotice(null);
-      setNoticeLoading(false);
-      setNoticeBlocked(true);
-      setNoticeError('告知读取失败，请重试');
-    }
-  }, [reportPhase]);
-
-  const retryCurrentNotice = useCallback(() => {
-    void refreshCurrentNotice(productEpochRef.current);
-  }, [refreshCurrentNotice]);
-
-  const decideCurrentNotice = useCallback(async (decision: NoticeDecision) => {
-    const api = window.customerAgent?.product;
-    if (!api?.decideNotice || !currentNotice?.ok || currentNotice.decision !== null || noticeBusy) return;
-    setNoticeBusy(true);
-    setNoticeError('');
-    try {
-      const result = await api.decideNotice({ version: currentNotice.notice.version, decision });
-      if (result.sessionEpoch !== productEpochRef.current) return;
-      if (!result.ok) {
-        setNoticeError(result.message);
-        return;
-      }
-      setCurrentNotice((previous) => previous?.ok
-        ? { ...previous, decision: result.decision, decided_at: result.decided_at }
-        : previous);
-      if (phaseRef.current === 'ERROR' && results.length === 0) reportPhase('SEARCH_INPUT');
-    } catch {
-      setNoticeError('告知决定未提交，请重试');
-    } finally {
-      setNoticeBusy(false);
-    }
-  }, [currentNotice, noticeBusy, reportPhase, results.length]);
-
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
@@ -919,21 +828,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setInvalidMessage('');
     }
     if (!value.ok || (value.enabled && !value.signedIn)) {
-      noticeRequestRef.current += 1;
-      setCurrentNotice(null);
-      setNoticeLoading(false);
-      setNoticeBlocked(false);
-      setNoticeError('');
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setAnnounceInvalid(false);
       reportPhase('SEARCH_INPUT');
     } else if (value.ok && value.signedIn) {
-      void refreshCurrentNotice(value.sessionEpoch);
       if (!(sessionBusyRef.current && source === 'status')) {
         void refreshAnnounce(value.sessionEpoch);
       }
     }
-  }, [cancelPendingSearch, cancelPendingCopy, refreshAnnounce, refreshCurrentNotice, reportPhase]);
+  }, [cancelPendingSearch, cancelPendingCopy, refreshAnnounce, reportPhase]);
 
   useEffect(() => {
     const api = intake ? undefined : window.customerAgent?.productAnnounce;
@@ -1077,8 +980,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const resetIntakeView = useCallback(() => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
-    if (phaseRef.current !== 'FOX_IDLE') reportPhase(noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null) ? 'ERROR' : 'RESULTS');
-  }, [cancelPendingSearch, cancelPendingCopy, reportPhase, noticeLoading, noticeBlocked, currentNotice]);
+    if (phaseRef.current !== 'FOX_IDLE') reportPhase('RESULTS');
+  }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
   const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
     productState?.sessionEpoch ?? 0, resetIntakeView);
   useEffect(() => {
@@ -1094,7 +997,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   }, [intake, cancelPendingSearch, cancelPendingCopy, reportPhase]);
 
   const runSearch = useCallback(() => {
-    if (noticeLoading || noticeBlocked || (currentNotice?.ok && currentNotice.decision === null)) return;
     if (intake) {
       if (!(productState?.ok && productState.signedIn)) return;
       const api = window.customerAgent?.intakeQuery;
@@ -1232,7 +1134,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, currentNotice, noticeBlocked, noticeLoading, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
 
   const copyScript = useCallback(
     async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
@@ -1536,7 +1438,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
   const expanded = showQueryResizeGrip || phase === 'COPIED';
-  const openNotice = currentNotice?.ok && currentNotice.decision === null ? currentNotice : null;
   const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
   const showScopeFields = Boolean(
     window.customerAgent?.productSearch
@@ -1940,20 +1841,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
             onCopyContact={!intake && window.customerAgent?.productHelp ? copyContact : undefined}
             onOpenHelp={!intake && window.customerAgent?.productHelp ? openHelp : undefined}
             onLeaveNoHit={!intake && window.customerAgent?.productHelp ? leaveNoHit : undefined}
-          />
-        ) : null}
-        {expanded && (noticeLoading || noticeBlocked || openNotice) ? (
-          <QueryNoticeDialog
-            noticeLoading={noticeLoading}
-            noticeBlocked={noticeBlocked}
-            noticeBusy={noticeBusy}
-            noticeError={noticeError}
-            pendingNotice={openNotice !== null}
-            noticeVersion={openNotice?.notice.version ?? null}
-            noticeContent={openNotice?.notice.content ?? null}
-            onRetry={retryCurrentNotice}
-            onDecline={() => { void decideCurrentNotice('declined'); }}
-            onAccept={() => { void decideCurrentNotice('accepted'); }}
           />
         ) : null}
         {showQueryResizeGrip ? (
