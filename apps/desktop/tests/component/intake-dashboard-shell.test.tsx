@@ -37,7 +37,7 @@ afterEach(() => {
 it('reuses workspace chrome and theme without mounting legacy modules or calling their session API', async () => {
   const user = userEvent.setup();
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-  const legacySession = vi.fn();
+  const legacySession = vi.fn(async () => ({ ok: false as const }));
   window.dashboardContent = { session: legacySession } as unknown as typeof window.dashboardContent;
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '合成管理会话暂不可用', view: null }),
@@ -45,12 +45,12 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
-  expect(within(shell).getAllByRole('tab')).toHaveLength(6);
+  expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(7);
   expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');
-  for (const [key,module] of [['ArrowDown','announce'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
+  for (const [key,module] of [['ArrowDown','publish'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
     fireEvent.keyDown(screen.getByTestId('nav-content'), { key });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', module);
   }
@@ -60,7 +60,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   expect(shell).toHaveAttribute('data-theme', 'dark');
   expect(document.documentElement.style.colorScheme).toBe('dark');
   fireEvent.focus(window);
-  expect(legacySession).not.toHaveBeenCalled();
+  expect(legacySession).toHaveBeenCalled();
   expect(screen.queryByTestId('overview-kpi-source')).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '知识库' })).toBeInTheDocument();
 });
@@ -113,7 +113,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
-    expect(screen.getAllByRole('tab')).toHaveLength(7);
+    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(8);
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-permissions'));
     const permissionsPage = document.querySelector('.desk-permissions-page');

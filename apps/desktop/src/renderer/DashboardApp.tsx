@@ -266,7 +266,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     if (!api) return undefined;
     let live = true;
     const load = () => {
-      void api.session().then((result) => {
+      void Promise.resolve(api.session()).then((result) => {
         if (!live) return;
         const nextSignedIn = result.ok === true && result.signedIn === true;
         setSignedIn(nextSignedIn);
