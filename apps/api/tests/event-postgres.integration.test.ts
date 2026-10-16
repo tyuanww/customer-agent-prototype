@@ -692,12 +692,11 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
         product_context_type: null, product_context_ref: null, top_k: 3,
       },
     });
-    expect(recorded.statusCode).toBe(403);
-    expect(recorded.json()).toMatchObject({ error: { code: 'POLICY_DENIED' } });
+    expect(recorded.statusCode).not.toBe(403);
     await expect(owner.query(
-      'SELECT collection_mode FROM public.query_events WHERE query_id = $1',
+      'SELECT collection_mode, query_text_redacted FROM public.query_events WHERE query_id = $1',
       [queryId],
-    )).resolves.toMatchObject({ rows: [] });
+    )).resolves.toMatchObject({ rows: [{ collection_mode: 'synthetic', query_text_redacted: '' }] });
     acceptedNotice = true;
 
     // Publish a notice and accept it as the actor.

@@ -134,12 +134,16 @@ export function registerSearchRoute(
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
     if (dependencies === undefined) return sendOverloaded(reply);
-    if (contract.value.collection_mode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
-      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
-      if (!accepted) return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
-    }
-
     const redacted = redactQueryText(contract.value.query_text);
+    let collectionMode = contract.value.collection_mode;
+    let storedQuery = redacted.text;
+    if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
+      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      if (!accepted) {
+        collectionMode = 'synthetic';
+        storedQuery = '';
+      }
+    }
     const actorSubjectHash = hmacSafeValue(
       `actor:${actor.user_id}`,
       dependencies.logHash.version,
@@ -160,7 +164,7 @@ export function registerSearchRoute(
       queryId: contract.value.query_id,
       parentQueryId: contract.value.parent_query_id,
       interactionReason: contract.value.interaction_reason,
-      collectionMode: contract.value.collection_mode,
+      collectionMode,
       detectedPlatform: contract.value.detected_platform,
       platformSource: contract.value.platform_source,
       search: Object.freeze({
@@ -172,9 +176,9 @@ export function registerSearchRoute(
       }),
       redactionPolicyVersion: redacted.policyVersion,
       // Stored, not discarded: the row keeps the redacted text plus a keyed hash of it.
-      queryTextRedacted: redacted.text,
+      queryTextRedacted: storedQuery,
       queryHash: hmacRedactedQuery(
-        redacted.text,
+        storedQuery,
         dependencies.logHash.version,
         dependencies.logHash.key,
       ),

@@ -273,8 +273,8 @@ export class ProductSearch {
         const response = parseContractSchema('SearchResponse', value);
         this.current(sender, state);
         if (response.query_id !== queryId) throw new ProductHttpError('VALIDATION');
-        if (!this.announce.allows(response.release_id)
-          || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job))) {
+        if (!local && (!this.announce.allows(response.release_id)
+          || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job)))) {
           throw new ProductHttpError('VALIDATION');
         }
         return { queryId, response, queryText };
