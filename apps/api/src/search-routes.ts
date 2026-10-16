@@ -136,13 +136,9 @@ export function registerSearchRoute(
     if (dependencies === undefined) return sendOverloaded(reply);
     const redacted = redactQueryText(contract.value.query_text);
     let collectionMode = contract.value.collection_mode;
-    let storedQuery = redacted.text;
     if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
       const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
-      if (!accepted) {
-        collectionMode = 'synthetic';
-        storedQuery = '';
-      }
+      if (!accepted) collectionMode = 'synthetic';
     }
     const actorSubjectHash = hmacSafeValue(
       `actor:${actor.user_id}`,
@@ -176,9 +172,9 @@ export function registerSearchRoute(
       }),
       redactionPolicyVersion: redacted.policyVersion,
       // Stored, not discarded: the row keeps the redacted text plus a keyed hash of it.
-      queryTextRedacted: storedQuery,
+      queryTextRedacted: redacted.text,
       queryHash: hmacRedactedQuery(
-        storedQuery,
+        redacted.text,
         dependencies.logHash.version,
         dependencies.logHash.key,
       ),

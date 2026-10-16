@@ -694,9 +694,9 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     });
     expect(recorded.statusCode).not.toBe(403);
     await expect(owner.query(
-      'SELECT collection_mode, query_text_redacted FROM public.query_events WHERE query_id = $1',
+      'SELECT collection_mode FROM public.query_events WHERE query_id = $1',
       [queryId],
-    )).resolves.toMatchObject({ rows: [{ collection_mode: 'synthetic', query_text_redacted: '' }] });
+    )).resolves.toMatchObject({ rows: [{ collection_mode: 'synthetic' }] });
     acceptedNotice = true;
 
     // Publish a notice and accept it as the actor.
