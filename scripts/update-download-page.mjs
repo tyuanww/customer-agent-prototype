@@ -202,6 +202,13 @@ export function renderIndex(html, manifest) {
       `下载 · ${size} MB`,
       'download size',
     );
+    next = replaceAfterId(
+      next,
+      `panel-${platform}`,
+      /class="platform-meta">v[\d.]+ · [\d.]+ MB/u,
+      `class="platform-meta">v${manifest.version} · ${size} MB`,
+      'platform meta size',
+    );
   }
   return next;
 }
