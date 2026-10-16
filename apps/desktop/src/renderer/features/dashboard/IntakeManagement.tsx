@@ -201,9 +201,13 @@ export function IntakeManagement() {
   const apply = async (command?: IntakeManagementCommand) => {
     if (command?.action === 'upload-stop') {
       if (stopPending.current) return;
+      if (!window.dashboardIntake) {
+        setError(WORKBENCH_EMPTY.intakeUnmounted);
+        return;
+      }
       stopPending.current = true; setStopping(true); const gen = ++generation.current;
       try {
-        const reply = await window.dashboardIntake!.command(command);
+        const reply = await window.dashboardIntake.command(command);
         if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '' : reply.message); }
       } catch { if (generation.current === gen) setError('停止请求尚未确认，请重新读取当前状态。服务器可能仍在处理原任务。'); }
       finally {

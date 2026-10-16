@@ -1703,7 +1703,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <QueryCapsule
           intake={intake}
           scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry" disabled={!signedInSession}
-            onClick={() => { setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', results.length as ResultCount); }}>筛选</button> : null}
+            onClick={() => { setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', Math.min(3, results.length) as ResultCount); }}>筛选</button> : null}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}

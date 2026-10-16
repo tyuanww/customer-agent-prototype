@@ -20,7 +20,7 @@ it('selects a post, previews that post through the existing command, then saves 
  const f=intakePermissionsData([...supervisor.actions,...agent.actions]),main=new ContentIntakePermissions(f.session),user=userEvent.setup();
  const commands:IntakePermissionCommand[]=[];
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>{commands.push(c);return {ok:true,view:await main.command(c)};},onInvalidated:fn=>main.subscribe(fn)};
- try{render(<IntakePermissions active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   const people=screen.getByRole('table',{name:'人员'});
   for(const header of ['姓名','登录名','岗位','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
   expect(within(within(people).getByRole('row',{name:/合成坐席/})).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['合成坐席','—','—','未授权']);
@@ -71,7 +71,7 @@ it('selects a post, previews that post through the existing command, then saves 
 it('does not offer a post the current scope cannot grant',async()=>{
  const main=new ContentIntakePermissions(intakePermissionsData().session);
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
- try{render(<IntakePermissions active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await userEvent.click(screen.getByRole('button',{name:'新增授权'}));
   const post=screen.getByRole('combobox',{name:/^岗位$/});
   expect(within(post).getAllByRole('option').map(option=>option.textContent)).toEqual(['客服']);
@@ -96,7 +96,7 @@ it('creates an outsourced seat from an intent and does not keep the password on 
   return {ok:true,action:'disable',username:intent.username};}};
  const login=readFileSync(resolve(dirname(fileURLToPath(import.meta.url)),'../../src/renderer/LoginApp.tsx'),'utf8');
  const page=readFileSync(PAGE,'utf8');
- try{render(<IntakePermissions active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await user.click(screen.getByRole('tab',{name:'外包坐席'}));
   await user.click(screen.getByRole('button',{name:'新建坐席'}));
   const form=screen.getByRole('dialog',{name:'新建坐席'});
@@ -148,7 +148,7 @@ it('shows people headers before a scope is chosen and closing the dialogs does n
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async c=>{commands.push(c.action);if(c.action==='source')view={...view,source:c.selection};return {ok:true,view};},onInvalidated:()=>()=>undefined};
  window.dashboardSeats={command:async intent=>{intents.push(intent);return intent.action==='list'?{ok:true,action:'list',seats:[]}:{ok:false,message:'未保存'};}};
  const user=userEvent.setup();
- render(<IntakePermissions active/>);
+ render(<IntakePermissions canGrant active/>);
  const people=await screen.findByRole('table',{name:'人员'});
  for(const header of ['姓名','登录名','岗位','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
  expect(people).toHaveTextContent('请选择配置范围');
@@ -176,7 +176,7 @@ it('shows people headers before a scope is chosen and closing the dialogs does n
 it('does not say the read window expired when no countdown is running',async()=>{
  const view={signedIn:true,available:false,busy:false,validUntil:null,sources:[],source:null,people:[],actions:[],grants:[],preview:null,pending:false,resultUnknown:false,notice:null};
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async()=>({ok:true,view}),onInvalidated:()=>()=>undefined};
- render(<IntakePermissions active/>);
+ render(<IntakePermissions canGrant active/>);
  expect(await screen.findByText('当前没有可配置范围。请刷新核对。')).toBeInTheDocument();
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'停止等待'})).not.toBeInTheDocument();

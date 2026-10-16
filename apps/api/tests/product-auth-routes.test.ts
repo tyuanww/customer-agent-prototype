@@ -83,5 +83,6 @@ describe('prefersIdentityCallbackHtml', () => {
     expect(prefersIdentityCallbackHtml('*/*')).toBe(false);
     expect(prefersIdentityCallbackHtml(undefined)).toBe(false);
     expect(prefersIdentityCallbackHtml('application/json')).toBe(false);
+    expect(prefersIdentityCallbackHtml('text/html;q=0')).toBe(false);
   });
 });

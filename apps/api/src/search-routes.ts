@@ -135,7 +135,8 @@ export function registerSearchRoute(
     }
     if (dependencies === undefined) return sendOverloaded(reply);
     if (contract.value.collection_mode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
-      await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      if (!accepted) return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
 
     const redacted = redactQueryText(contract.value.query_text);

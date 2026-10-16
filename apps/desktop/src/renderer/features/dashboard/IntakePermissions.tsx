@@ -121,7 +121,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     </div>}
   </section>;
 }
-export function IntakePermissions({ active, canGrant = true, grantBlock = '' }: { active: boolean; canGrant?: boolean; grantBlock?: string }) {
+export function IntakePermissions({ active, canGrant = false, grantBlock = '' }: { active: boolean; canGrant?: boolean; grantBlock?: string }) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
