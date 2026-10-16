@@ -120,7 +120,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     </div>}
   </section>;
 }
-export function IntakePermissions({ active }: { active: boolean }) {
+export function IntakePermissions({ active, canGrant = true, grantBlock = '' }: { active: boolean; canGrant?: boolean; grantBlock?: string }) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
@@ -202,10 +202,11 @@ export function IntakePermissions({ active }: { active: boolean }) {
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <button type="button" className="btn" onClick={()=>void apply({action:'stop'})}>停止等待</button>}
           {job==='grants'
-            ? <button type="button" className="btn btn-primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</button>
+            ? <button type="button" className="btn btn-primary" style={{marginBottom:0}} disabled={disabled || !view.source || !canGrant} onClick={()=>setGrantOpen(true)}>新增授权</button>
             : <button type="button" className="btn btn-primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建坐席</button>}
         </span>
       </div>
+      {grantBlock ? <p role="status">{grantBlock}</p> : null}
       <div hidden={job!=='grants'}>
         <div className="sub"><label className="lbl">配置范围<select aria-label="配置范围" style={{width:260}} disabled={disabled || !!view.preview} value={view.source??''} onChange={e=>void apply({action:'source',selection:e.target.value})}>
           <option value="">请选择已有范围</option>{view.sources.map(s=><option key={s.selection} value={s.selection}>{s.label}</option>)}</select></label>

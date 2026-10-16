@@ -138,8 +138,8 @@ function isContentSession(value: unknown): boolean {
   if (isContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName'])) return false;
-  if (typeof record.enabled !== 'boolean' || typeof record.signedIn !== 'boolean') return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'enabled', 'signedIn', 'role', 'displayName', 'job'])) return false;
+  if (typeof record.enabled !== 'boolean' || typeof record.signedIn !== 'boolean' || !isContentJob(record.job)) return false;
   if (record.displayName !== null && (typeof record.displayName !== 'string'
     || record.displayName.length < 1 || record.displayName.length > 64)) return false;
   if (record.signedIn) {
@@ -147,7 +147,22 @@ function isContentSession(value: unknown): boolean {
       && (record.role === 'agent' || record.role === 'coach' || record.role === 'owner')
       && typeof record.displayName === 'string';
   }
-  return record.role === null && record.displayName === null;
+  return record.role === null && record.displayName === null && record.job === null;
+}
+
+function isContentJob(value: unknown): boolean {
+  if (value === null) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const job = value as Record<string, unknown>;
+  const rights = job.rights;
+  if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
+  const row = rights as Record<string, unknown>;
+  return (job.status === 'resolved' || job.status === 'unresolved')
+    && typeof row.publish === 'boolean'
+    && typeof row.grant === 'boolean'
+    && typeof row.uploadSop === 'boolean'
+    && typeof row.search === 'boolean'
+    && typeof row.readCatalog === 'boolean';
 }
 
 function isContentPublish(value: unknown): boolean {
