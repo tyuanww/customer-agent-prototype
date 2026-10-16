@@ -1,5 +1,6 @@
-import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeOverview } from './features/dashboard/IntakeOverview';
+import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
+import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
@@ -170,7 +171,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [navTooltip, setNavTooltip] = useState<NavTooltipState | null>(null);
-  const openWordingDomain = useCallback((_domain: DomainId) => {
+  const [wordingDomain, setWordingDomain] = useState<DomainId | undefined>(undefined);
+  const openWordingDomain = useCallback((domain: DomainId) => {
+    setWordingDomain(domain);
     setActive('wording');
   }, []);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -1342,7 +1345,13 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         >
           {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
           {active === 'sop' && <SopLibraryModule />}
-          <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
+          {active === 'wording' && (
+            <WordingLibraryModule
+              initialDomain={wordingDomain}
+              onDomainConsumed={() => setWordingDomain(undefined)}
+            />
+          )}
+          {active === 'announce' && <AnnounceModule onOpenDomain={openWordingDomain} />}
           {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
           {keepPublish || active === 'publish' ? (
             <div hidden={active !== 'publish'}>

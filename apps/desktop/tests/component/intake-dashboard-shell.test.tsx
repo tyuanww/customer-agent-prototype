@@ -181,8 +181,10 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
     expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入');
     expect(screen.queryByText('上传 CSV 会覆盖当前产品会话 SOP 树')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByRole('region', { name: '使用情况' })).toHaveTextContent('未接入');
-    expect(screen.queryByRole('table', { name: '使用情况' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
+    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '使用情况' })).not.toBeInTheDocument();
+    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
     const add = await screen.findByRole('button', { name: '添加话术' });
     for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
@@ -282,10 +284,10 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
       await user.click(screen.getByTestId('nav-announce'));
-      const exportButton = await screen.findByRole('button', { name: '导出训练样本' });
-      await tabUntil(user, exportButton);
-      await tabUntil(user, screen.getByRole('button', { name: '全部' }));
-      await tabUntil(user, screen.getByRole('textbox', { name: '搜索问题或坐席' }));
+      const wordingTab = await screen.findByRole('tab', { name: '话术版本更新' });
+      await tabUntil(user, wordingTab);
+      await tabUntil(user, screen.getByRole('tab', { name: '软件版本更新' }));
+      expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
     }
     await user.click(screen.getByTestId('nav-permissions'));
