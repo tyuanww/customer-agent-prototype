@@ -2,11 +2,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductSession, type SessionStore } from '../../src/main/product-session';
 import { ProductHttp, ProductHttpError } from '../../src/main/product-http';
-import { isProductSessionResult } from '../../src/shared/product-session';
+import { isProductSessionResult, UNRESOLVED_JOB_LABEL, type JobSnapshot } from '../../src/shared/product-session';
 
 const token = 't'.repeat(43);
 const user = { user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' };
-function fixture(options: { store?: Partial<SessionStore>; respond?: (path: string) => Response | Promise<Response>; identity?: { user_id: string; role: string; auth_mode: string } } = {}) {
+function fixture(options: {
+  store?: Partial<SessionStore>;
+  respond?: (path: string) => Response | Promise<Response>;
+  identity?: { user_id: string; role: string; auth_mode: string };
+  jobSnapshotFor?: (userId: string) => JobSnapshot | null;
+} = {}) {
   const stored = { access_token: token, expires_at: new Date(Date.now() + 899_000).toISOString() };
   const store = { read: vi.fn(() => null as unknown), write: vi.fn(), clear: vi.fn(), ...options.store };
   const requests: { path: string; init: RequestInit }[] = [];
@@ -24,9 +29,11 @@ function fixture(options: { store?: Partial<SessionStore>; respond?: (path: stri
     return Response.json(options.identity ?? user);
   }) as unknown as typeof fetch;
   const window = { open: vi.fn(async (_url?: string, _operation?: AbortController) => {}) };
-  const session = new ProductSession(new ProductHttp('http://127.0.0.1:4100', transport), store, window);
+  const session = new ProductSession(new ProductHttp('http://127.0.0.1:4100', transport), store, window, undefined, options.jobSnapshotFor);
   return { session, store, requests, stored, window };
 }
+const one = (name: string) => [{ name, enabled: true }];
+const unresolved = { status: 'unresolved', label: UNRESOLVED_JOB_LABEL, rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false } };
 afterEach(() => vi.useRealTimers());
 describe('product session lifetime', () => {
   it('uses PKCE without projecting credentials and revokes repeat logout safely', async () => {
@@ -170,6 +177,72 @@ describe('product session lifetime', () => {
     await f.session.login();
     await expect(f.session.decideNotice({ version: '../notice', decision: 'accepted' })).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
     expect(f.requests.some((entry) => entry.path.includes('notice'))).toBe(false);
+  });
+});
+describe('job observation from a signed-out session', () => {
+  it('starts signed out and resolves AI赋能工程师 on login and restore', async () => {
+    const snapshot: JobSnapshot = { title: 'AI赋能工程师', directory: one('AI赋能工程师') };
+    const loggedIn = fixture({ jobSnapshotFor: () => snapshot });
+    expect(loggedIn.session.view()).toMatchObject({ signedIn: false, job: null });
+    const login = await loggedIn.session.login();
+    expect(login).toMatchObject({
+      ok: true,
+      signedIn: true,
+      job: {
+        status: 'resolved',
+        title: 'AI赋能工程师',
+        role: 'engineer',
+        label: 'AI赋能工程师',
+        rights: { publish: true, grant: true, uploadSop: true, search: true, readCatalog: true },
+      },
+    });
+    expect(isProductSessionResult(login)).toBe(true);
+    const restored = fixture({ jobSnapshotFor: () => snapshot, store: { read: () => loggedIn.stored } });
+    expect(restored.session.view().signedIn).toBe(false);
+    expect(await restored.session.restore()).toMatchObject({
+      ok: true,
+      signedIn: true,
+      job: { status: 'resolved', role: 'engineer', rights: { publish: true, grant: true } },
+    });
+  });
+
+  it('lets 普通客服 search and read without publish, authorize, or SOP upload', async () => {
+    const f = fixture({ jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服') }) });
+    expect(f.session.view().signedIn).toBe(false);
+    expect(await f.session.login()).toMatchObject({
+      ok: true,
+      signedIn: true,
+      job: {
+        status: 'resolved',
+        role: 'agent',
+        rights: { publish: false, grant: false, uploadSop: false, search: true, readCatalog: true },
+      },
+    });
+  });
+
+  it('keeps a missing, blank, unknown, or duplicate title as 职务未识别 without write rights', async () => {
+    const cases: Array<{ snapshot: JobSnapshot | null; reason: 'missing' | 'blank' | 'unknown' | 'duplicate' }> = [
+      { snapshot: null, reason: 'missing' },
+      { snapshot: { title: null, directory: one('客服总监') }, reason: 'missing' },
+      { snapshot: { title: '   ', directory: one('客服总监') }, reason: 'blank' },
+      { snapshot: { title: '服务赋能师', directory: one('服务赋能师') }, reason: 'unknown' },
+      { snapshot: { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] }, reason: 'duplicate' },
+    ];
+    for (const entry of cases) {
+      const f = fixture({
+        identity: { user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'feishu' },
+        jobSnapshotFor: () => entry.snapshot,
+      });
+      expect(f.session.view().signedIn).toBe(false);
+      const login = await f.session.login();
+      expect(login).toMatchObject({
+        ok: true,
+        signedIn: true,
+        role: 'owner',
+        job: { ...unresolved, reason: entry.reason },
+      });
+      expect(isProductSessionResult(login)).toBe(true);
+    }
   });
 });
 describe('loopback transport', () => {
