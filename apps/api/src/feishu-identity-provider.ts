@@ -1,6 +1,6 @@
 import { IdentityFailure, type SyntheticIdentityProvider } from './product-auth-service.js';
 import { persistOperatorDisplayName } from './operator-display-names.js';
-import { readFeishuJobSnapshot, rememberJobSnapshot } from './feishu-job-snapshot.js';
+import { forgetJobSnapshot, readFeishuJobSnapshot, rememberJobSnapshot } from './feishu-job-snapshot.js';
 
 /** Official Feishu OAuth endpoints. Not configurable: arbitrary URLs would be an SSRF seam. */
 export const FEISHU_AUTHORIZE_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
@@ -193,8 +193,9 @@ export function createFeishuIdentityProvider(
           try {
             const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
             if (snapshot) rememberJobSnapshot(openId, snapshot);
+            else forgetJobSnapshot(openId);
           } catch {
-            // A missing job scope must not fail the login. The seat stays 职务未识别.
+            forgetJobSnapshot(openId);
           }
         }
         const name = readDisplayName(userBody);

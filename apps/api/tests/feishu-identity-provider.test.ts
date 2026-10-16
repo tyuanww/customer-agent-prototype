@@ -5,6 +5,7 @@ import {
   FEISHU_TOKEN_URL,
   FEISHU_USER_INFO_URL,
 } from '../src/feishu-identity-provider.js';
+import { bindSessionSubject, jobForToken, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 
 const persistOperatorDisplayName = vi.hoisted(() => vi.fn());
 vi.mock('../src/operator-display-names.js', () => ({ persistOperatorDisplayName }));
@@ -81,6 +82,27 @@ describe('feishu identity provider', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     provider.close();
     await expect(provider.exchange('one-time-code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' });
+  });
+
+  it('drops a stored job title when the next login cannot read one', async () => {
+    rememberJobSnapshot(openId, { title: '客服总监', directory: [{ name: '客服总监', enabled: true }] });
+    const token = 'c'.repeat(43);
+    bindSessionSubject(token, subjectHash(openId));
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === FEISHU_TOKEN_URL) {
+        return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
+      }
+      if (url === FEISHU_USER_INFO_URL) {
+        return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, FEISHU_USER_INFO_URL);
+      }
+      if (url.includes('tenant_access_token')) return jsonResponse({ code: 999 }, url);
+      throw new Error(`unexpected ${url}`);
+    }) as unknown as typeof fetch;
+    const provider = createFeishuIdentityProvider({ ...config, observeJob: true }, fetchImpl);
+    expect(await provider.exchange('one-time-code')).toBe(openId);
+    expect(jobForToken(token)).toBeNull();
+    provider.close();
   });
 
   it('treats rejected codes as LOGIN_INVALID and transport faults as unavailable', async () => {
