@@ -589,13 +589,12 @@ describe('dashboard layout contract', () => {
     expect(publishFeedbackRule).toContain('flex-direction: column');
 
     const replaceRowRule = css.match(/\.content-replace-row\s*\{([^}]*)\}/)?.[1] ?? '';
-    expect(replaceRowRule).toContain('margin: 0 0 14px');
-    expect(replaceRowRule).toContain('align-items: center');
-    expect(css).toContain('.dash-filter-toolbar.content-replace-row label');
-    expect(css).toContain('.content-replace-row .dash-scope');
-    expect(css).toMatch(/\.content-replace-row \.dash-scope\s*\{[^}]*margin:\s*0;/);
-    expect(css).toContain('.dashboard-shell .content-replace-row select');
-    expect(css).toContain('min-height: 40px');
+    expect(replaceRowRule).toContain('display: grid');
+    expect(replaceRowRule).toContain('grid-template-columns: minmax(220px, 280px) minmax(0, 1fr)');
+    expect(replaceRowRule).toContain('align-items: start');
+    expect(replaceRowRule).toContain('margin: 0 0 18px');
+    expect(css).toContain('.library-select-trigger');
+    expect(css).toMatch(/\.library-select-trigger\s*\{[^}]*min-height:\s*40px/);
 
     const titleClusterRule = css.match(/\.content-title-cluster\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(titleClusterRule).toContain('min-width: 0');
