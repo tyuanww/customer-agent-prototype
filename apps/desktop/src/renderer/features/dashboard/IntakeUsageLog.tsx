@@ -4,6 +4,7 @@ import {
   type UsageLogResult,
   type UsageLogRow,
 } from '@shared/dashboard-usage-log';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
 import './intake-management.css';
 
@@ -17,7 +18,7 @@ const RESULT_LABEL: Readonly<Record<UsageLogResult, string>> = { copied: '已复
 
 type Load = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'failed' } | { kind: 'ready' };
 
-/** 系统同步页下的「使用情况」。接口没接上时只写「未接入」，不画假数据。 */
+/** 系统同步页下的「使用情况」。读失败和空日志用不同的句子，不画假数据。 */
 export function IntakeUsageLog() {
   const [result, setResult] = useState<UsageLogResult | ''>('');
   const [query, setQuery] = useState('');
@@ -92,7 +93,7 @@ export function IntakeUsageLog() {
       <h2>使用情况</h2>
       {canExport && load.kind === 'ready' ? <button type="button" className="btn" onClick={startExport}>导出训练样本</button> : null}
     </div>
-    {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>未接入</p> : <>
+    {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageFailed}</p> : <>
       <div className="filters2" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <div className="seg" role="group" aria-label="结果">
           {RESULT_FILTERS.map((item) => <button key={item.id || 'all'} type="button" aria-pressed={result === item.id}
@@ -115,14 +116,14 @@ export function IntakeUsageLog() {
         </>}
       </div> : null}
       {notice ? <p role="status" className="hint">{notice}</p> : null}
-      {load.kind === 'failed' ? <p role="alert">使用情况读取失败，请重试。
+      {load.kind === 'failed' ? <p role="alert">{WORKBENCH_EMPTY.usageFailed}，请重试。
         <button type="button" className="btn btn-sm" onClick={() => fetchPage(null, result, query.trim())}>重试</button></p> : null}
       {load.kind === 'loading' ? <p role="status">正在读取…</p> : null}
       {load.kind === 'ready' ? <table className="fixed intake-usage-table" aria-label="使用情况">
         <colgroup><col style={{ width: 120 }} /><col style={{ width: 84 }} /><col /><col style={{ width: 200 }} /><col style={{ width: 104 }} /></colgroup>
         <thead><tr><th>时间</th><th>坐席</th><th>客户问题</th><th>命中话术</th><th>结果</th></tr></thead>
         <tbody>
-          {rows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : rows.map((row) => <tr className="item" key={row.id}>
+          {rows.length === 0 ? <tr><td colSpan={5} className="empty">{result === '' && query.trim() === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'}</td></tr> : rows.map((row) => <tr className="item" key={row.id}>
             <td className="mute">{formatShortTime(row.askedAt)}</td>
             <td>{row.agent}</td>
             <td>{row.question === null ? <span className="redact">已脱敏</span> : row.question}</td>

@@ -6,6 +6,7 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import { ContentIntakeManagement } from './content-intake-management';
 import { createIntakeNativeFiles } from './content-intake-native-files';
 import { projectIntakeShellLine } from './product-runtime-config';
+import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
 const CHANNELS = ['dashboard:intake-mode', 'dashboard:intake-shell-line', 'dashboard:intake-current', 'dashboard:intake-command'] as const;
 /** Only the explicit synthetic profile provides a session. No legacy product
  * capability is mounted in FAQ Dashboard, and no renderer supplies an identity. */
@@ -52,7 +53,7 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       const line = projectIntakeShellLine(session ? { contentIntake: 'faq-v2' } : null);
       return { ok: true, profileMode: line?.profileMode ?? null, contentIntake: line?.contentIntake ?? null };
     }
-    if (!session) return failure('UNAVAILABLE');
+    if (!session) return { ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.intakeUnmounted, view: null };
     let manager = windows.get(wc);
     if (!manager) {
       const win = BrowserWindow.fromWebContents(wc);

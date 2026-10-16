@@ -23,18 +23,27 @@ function install(overrides: Partial<DashboardUsageLogApi> = {}) {
   return api;
 }
 
-it('says 未接入 and draws no table when the interface is absent', () => {
+it('states a read failure and draws no table when the interface is absent', () => {
   render(<IntakeUsageLog />);
-  expect(screen.getByText('未接入')).toBeVisible();
+  expect(screen.getByText('使用情况读取失败')).toBeVisible();
+  expect(screen.queryByText('暂无使用记录')).toBeNull();
   expect(screen.queryByRole('table')).toBeNull();
 });
 
-it('says 未接入 when the source replies UNAVAILABLE and draws no table', async () => {
+it('states a read failure when the source replies UNAVAILABLE and draws no table', async () => {
   install({ list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })) });
   render(<IntakeUsageLog />);
-  expect(await screen.findByText('未接入')).toBeVisible();
+  expect(await screen.findByText('使用情况读取失败')).toBeVisible();
+  expect(screen.queryByText('暂无使用记录')).toBeNull();
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
+});
+
+it('says 暂无使用记录 when the log is empty', async () => {
+  install({ list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })) });
+  render(<IntakeUsageLog />);
+  expect(await screen.findByText('暂无使用记录')).toBeVisible();
+  expect(screen.queryByText('使用情况读取失败')).toBeNull();
 });
 
 it('moves keyboard focus across the filter, search and export controls', async () => {
