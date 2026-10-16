@@ -13,7 +13,6 @@ import type {
   MigrationStatus,
 } from './types.js';
 
-/** Bytes already recorded for 0042 on the Mac synthetic ledger. Later edits belong in a new migration. */
 const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
 
 interface LedgerPresenceRow extends QueryResultRow {

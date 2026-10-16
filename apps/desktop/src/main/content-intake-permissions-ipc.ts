@@ -5,6 +5,7 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import type { ProductSession } from './product-session';
 import { ProductHttpError } from './product-http';
 import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
+import { UNRESOLVED_JOB_LABEL } from '../shared/product-session';
 const channels = ['dashboard:permissions-current','dashboard:permissions-command'] as const;
 /** Private per-window controller; no renderer-supplied identity or URL. */
 export function registerContentIntakePermissionsIpc(session: ProductSession | null, dashboard: () => WebContents | null, devUrl: () => string | undefined) {
@@ -14,6 +15,15 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
     if(!wc || !isTrustedMainFrameSender(event,[wc],devUrl()))return {ok:false,message:'无权访问此窗口能力。',view:null};
     if(channel==='dashboard:permissions-command'?args.length!==1 || !isIntakePermissionCommand(args[0]):args.length!==0)return {ok:false,message:'权限配置输入无效。',view:null};
     if(!session)return {ok:false,message:WORKBENCH_EMPTY.intakeUnmounted,view:null};
+    if(channel==='dashboard:permissions-command'){
+      const action=(args[0] as {action?:string}).action;
+      if(action==='preview'||action==='revoke'||action==='save'||action==='retry'){
+        const job=session.view().job;
+        if(job?.status!=='resolved'||job.rights.grant!==true){
+          return {ok:false,message:job?.status==='resolved'?'当前职务不能授权':UNRESOLVED_JOB_LABEL,view:null};
+        }
+      }
+    }
     let owner=owners.get(wc);
     if(!owner){
       const win=BrowserWindow.fromWebContents(wc);if(!win || win.isDestroyed())return {ok:false,message:'窗口不可用。',view:null};

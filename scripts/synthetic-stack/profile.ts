@@ -383,7 +383,6 @@ export function desktopPackagedProfilePath(options: DesktopUserDataLocator = {})
   return path.join(defaultDesktopUserDataDirectory(options), 'synthetic-stack.json');
 }
 
-/** Same loopback rule the packaged client uses before it accepts contentIntake. */
 function packagedLoopbackOrigin(value: string): string | undefined {
   let url: URL;
   try { url = new URL(value); } catch { return undefined; }
@@ -394,7 +393,6 @@ function packagedLoopbackOrigin(value: string): string | undefined {
   return url.origin;
 }
 
-/** True only when the file already marks this client as the local faq-v2 workbench. */
 function existingPackagedFaqV2(packagedPath: string): boolean {
   if (!existsSync(packagedPath)) return false;
   try {
@@ -407,13 +405,6 @@ function existingPackagedFaqV2(packagedPath: string): boolean {
   }
 }
 
-/**
- * Publish the resolved origins for the packaged client. Writes the mode marker
- * and the two origins — no token, DSN or secret. An existing `contentIntake`
- * marker is kept only when the file already says synthetic-local and the
- * origins being written are two different loopback origins. A file that does
- * not already carry the marker never gains one here.
- */
 export function writeDesktopPackagedProfile(
   profile: StackProfile,
   locator: DesktopUserDataLocator = {},

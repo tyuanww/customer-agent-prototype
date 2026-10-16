@@ -159,10 +159,6 @@ const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
 const READINESS_TRIGGER_ENTRIES = 112;
 const READINESS_TRIGGER_SHA256 = '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a';
-// Production keeps these two import-batch triggers disabled. The manifest
-// prefix is everything before tgenabled, so rewriting D to O is the whole delta.
-// The 109-entry predecessor and the 112-entry readiness fingerprint both accept
-// that rewrite. The check never enables the triggers.
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -248,8 +244,6 @@ async function verifyCatalogueState(
   // Fixed capability roles are immutable. Environment LOGIN membership is a
   // separate input: only one direct, non-admin capability grant is permitted,
   // without INHERIT or high-power role attributes. Owners never admit members.
-  // The five stack logins are the API pools. Their inherit flags are part of
-  // the exception: runtime and content admin inherit, the three backend logins do not.
   const roleResult = await verifyQuery<RoleRow>(client, `
     WITH required_roles(name, runtime, permits_environment_member) AS (VALUES
       ('cs_ai_definer',false,false), ('app_runtime',false,false),
@@ -1061,9 +1055,7 @@ const OCCUPIED_DOMAIN_MIGRATION_ID = '0042_intake_occupied_domain_publish';
 const DEFAULT_TENANT_MIGRATION_ID = '0043_intake_publish_default_tenant';
 const ROLE_DEFAULT_MIGRATION_ID = '0044_intake_role_defaults';
 const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
-// Isolated PG15 measurement after frozen 0042 replaces publish_candidate. ACL, object, and trigger manifests stay on the 0041 values.
 const OCCUPIED_FUNCTION_SHA256 = '57466bc6aee6b73f01f8ba3afdddedf47be12da01b0c5cc1da33be87578c4663';
-// Disposable PG15 measurement after 0043 replaces publish_candidate. The DO block is outside the function, so only prosrc changes.
 const DEFAULT_TENANT_FUNCTION_SHA256 = 'b92de7433f8efba4373d3936032ff285796b45e92756e1b03fe65eac96fc946c';
 const ROLE_DEFAULT_FUNCTION_SHA256 = '65548958ec226c44b349c65657bade31590730cb7051341d89922bca85792ea3';
 const ROLE_DEFAULT_OBJECT_SHA256 = '32011d2d8211bd9a2a85516c877cbd6965dd444f39bcfd5c3f3b30760db99fbd';

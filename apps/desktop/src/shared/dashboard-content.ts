@@ -1,4 +1,4 @@
-import { exactKeys, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL, type ProductErrorCode, type SessionJobView } from './product-session';
+import { exactKeys, isSessionJob, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL, type ProductErrorCode, type SessionJobView } from './product-session';
 
 export const DASHBOARD_CONTENT_DOMAINS = ['presale', 'campaign', 'aftersale', 'product'] as const;
 export type DashboardContentDomain = (typeof DASHBOARD_CONTENT_DOMAINS)[number];
@@ -271,18 +271,7 @@ export function isDashboardContentSessionResult(value: unknown): value is Dashbo
 }
 
 function isContentJob(value: unknown): boolean {
-  if (value === null) return true;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const job = value as Record<string, unknown>;
-  const rights = job.rights;
-  if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
-  const row = rights as Record<string, unknown>;
-  return (job.status === 'resolved' || job.status === 'unresolved')
-    && typeof row.publish === 'boolean'
-    && typeof row.grant === 'boolean'
-    && typeof row.uploadSop === 'boolean'
-    && typeof row.search === 'boolean'
-    && typeof row.readCatalog === 'boolean';
+  return value === null || isSessionJob(value);
 }
 
 export function isDashboardContentRow(value: unknown): value is DashboardContentRow {

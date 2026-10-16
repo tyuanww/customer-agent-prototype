@@ -941,8 +941,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const product = window.customerAgent?.product;
     if (!product) return null;
     const signingOut = Boolean(productState?.ok && productState.signedIn);
-    // Logout stays single-flight. The login button can replace a missed
-    // authorization; the dashboard entry waits for the login already running.
     if (sessionBusyRef.current && (signingOut || !options?.replace)) return null;
     const generation = ++sessionGenerationRef.current;
     if (!signingOut) {

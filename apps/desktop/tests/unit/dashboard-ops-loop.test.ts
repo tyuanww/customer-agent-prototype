@@ -296,7 +296,7 @@ it('deletes SOP and maps session and HTTP failures without leaking product copy'
   expect(await dashboardSopImport(fakeSession('owner'), 'n'.repeat(SOP_UPLOAD_MAX_BYTES + 1)))
     .toMatchObject({ ok: false, code: 'VALIDATION' });
 
-  const owner = fakeSession('owner');
+  const owner = sessionThatMayUpload('owner');
   vi.mocked(owner.request)
     .mockResolvedValueOnce({
       status: 200,
@@ -460,6 +460,13 @@ async function loginOwner(snapshot: JobSnapshot | null) {
   expect(login).toMatchObject({ ok: true, signedIn: true, role: 'owner' });
   return { session, paths, login };
 }
+
+it('refuses an SOP patch when the signed-in job cannot upload', async () => {
+  const owner = fakeSession('owner');
+  expect(await dashboardSopPatch(owner, { nodeId: 'n1', expectedVersion: 1, title: '停手', body: '先停手' }))
+    .toMatchObject({ ok: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL });
+  expect(owner.request).not.toHaveBeenCalled();
+});
 
 it('refuses SOP import for a signed-in owner whose job cannot upload', async () => {
   const signedOut = new ProductSession(

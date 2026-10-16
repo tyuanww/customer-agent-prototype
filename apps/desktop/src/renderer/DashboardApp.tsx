@@ -183,7 +183,10 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     });
     return () => { alive = false; };
   }, []);
-  const canGrant = !jobKnown || (sessionJob?.status === 'resolved' && sessionJob.rights.grant);
+  const canGrant = jobKnown
+    && contentSignedIn === true
+    && sessionJob?.status === 'resolved'
+    && sessionJob.rights.grant === true;
   const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
   const grantBlock = !jobKnown

@@ -150,6 +150,15 @@ function isContentSession(value: unknown): boolean {
   return record.role === null && record.displayName === null && record.job === null;
 }
 
+const JOB_RIGHTS: Readonly<Record<string, readonly [boolean, boolean, boolean, boolean, boolean]>> = {
+  客服总监: [true, true, true, true, true],
+  客服经理: [true, true, true, true, true],
+  客服主管: [true, false, true, true, true],
+  客服组长: [true, false, true, true, true],
+  AI赋能工程师: [true, true, true, true, true],
+  普通客服: [false, false, false, true, true],
+};
+
 function isContentJob(value: unknown): boolean {
   if (value === null) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -157,12 +166,24 @@ function isContentJob(value: unknown): boolean {
   const rights = job.rights;
   if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
   const row = rights as Record<string, unknown>;
-  return (job.status === 'resolved' || job.status === 'unresolved')
-    && typeof row.publish === 'boolean'
-    && typeof row.grant === 'boolean'
-    && typeof row.uploadSop === 'boolean'
-    && typeof row.search === 'boolean'
-    && typeof row.readCatalog === 'boolean';
+  if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
+  const flags = [row.publish, row.grant, row.uploadSop, row.search, row.readCatalog];
+  if (!flags.every((flag) => typeof flag === 'boolean')) return false;
+  if (job.status === 'unresolved') {
+    return exactKeys(job, ['status', 'reason', 'label', 'rights'])
+      && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
+      && job.label === '职务未识别'
+      && flags.every((flag) => flag === false);
+  }
+  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights'])) return false;
+  if (typeof job.title !== 'string' || job.label !== job.title) return false;
+  const expected = JOB_RIGHTS[job.title];
+  return expected !== undefined
+    && flags[0] === expected[0]
+    && flags[1] === expected[1]
+    && flags[2] === expected[2]
+    && flags[3] === expected[3]
+    && flags[4] === expected[4];
 }
 
 function isContentPublish(value: unknown): boolean {
