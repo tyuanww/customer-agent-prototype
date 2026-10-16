@@ -72,7 +72,7 @@ import './styles/dashboard.css';
 import './features/dashboard/workbench-v9.css';
 import './features/dashboard/desk-chrome.css';
 
-type SidebarDestination = DashboardModuleId | 'permissions' | 'materials';
+type SidebarDestination = DashboardModuleId | 'permissions' | 'materials' | 'publish';
 
 type SidebarItem = {
   id: SidebarDestination;
@@ -91,7 +91,13 @@ function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
 }
 
 function intakeSidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
-  return [...sidebarItems(canOpenPermissions), { id: 'materials', label: '资料管理', group: '治理与架构' }];
+  const items: SidebarItem[] = [];
+  for (const item of sidebarItems(canOpenPermissions)) {
+    items.push(item);
+    if (item.id === 'content') items.push({ id: 'publish', label: '内容管理', group: '治理与架构' });
+  }
+  items.push({ id: 'materials', label: '资料管理', group: '治理与架构' });
+  return items;
 }
 
 function intakeShellLine(value: unknown): { profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null {
@@ -102,10 +108,10 @@ function intakeShellLine(value: unknown): { profileMode: 'synthetic-local'; cont
 }
 
 function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
-  return id;
+  return id === 'publish' ? 'content' : id;
 }
 
-const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions']);
+const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions', 'publish']);
 
 function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
   const location = window.location;
@@ -161,6 +167,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   }, [profile]);
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
+  const [keepPublish, setKeepPublish] = useState(false);
   const [backStack, setBackStack] = useState<SidebarDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
@@ -251,15 +258,15 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
 
   useEffect(() => {
     if (active === 'content') setKeepContent(true);
+    if (active === 'publish') setKeepPublish(true);
   }, [active]);
 
   useEffect(() => {
-    if (profile !== 'legacy') return undefined;
     const api = window.dashboardContent;
     if (!api) return undefined;
     let live = true;
     const load = () => {
-      void api.session().then((result) => {
+      void Promise.resolve(api.session()).then((result) => {
         if (!live) return;
         const nextSignedIn = result.ok === true && result.signedIn === true;
         setSignedIn(nextSignedIn);
@@ -1351,6 +1358,11 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             {active === 'sop' && <IntakeSopSource />}
             <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
             {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
+            {keepPublish || active === 'publish' ? (
+              <div hidden={active !== 'publish'}>
+                <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
+              </div>
+            ) : null}
             {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
             {active === 'materials' ? <IntakeManagement /> : null}
           </> : <>
