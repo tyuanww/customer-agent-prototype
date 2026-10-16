@@ -213,7 +213,7 @@ describe('dashboard live actions', () => {
   it('does not render fixture content releases when there is no live publish', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
     expect(screen.queryByTestId('release-rel-demo-2026-08-a')).not.toBeInTheDocument();
     expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
     expect(screen.queryByText('结构演示')).not.toBeInTheDocument();
