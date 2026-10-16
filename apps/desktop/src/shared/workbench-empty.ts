@@ -1,4 +1,3 @@
-/** Operator-facing empty and failure sentences. Each situation keeps its own line. */
 export const WORKBENCH_EMPTY = Object.freeze({
   usageEmpty: '暂无使用记录',
   usageFailed: '使用情况读取失败',

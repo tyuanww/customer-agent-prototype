@@ -54,6 +54,7 @@ function fakeSession(
       authMode: signedIn ? 'mock' : null,
       expiresAt: signedIn ? new Date(Date.now() + 60_000).toISOString() : null,
       displayName: signedIn ? 'synthetic' : null,
+      job: null,
     }),
     request: vi.fn(),
   };

@@ -113,6 +113,7 @@ describe('session notice projection', () => {
     authMode: null,
     expiresAt: null,
     displayName: null,
+    job: null,
   };
   const signedIn = {
     ...unsigned,

@@ -10,7 +10,7 @@ import { intakeManagementData } from '../fixtures/intake-management-data';
 function fixture(count = 2, files?: ConstructorParameters<typeof ContentIntakeManagement>[1]) {
   const data = intakeManagementData(count); let epoch = 1, signedIn = true;
   const listeners = new Set<Parameters<ProductSession['subscribe']>[0]>();
-  const view: ProductSession['view'] = () => signedIn ? { ok: true, enabled: true, signedIn, sessionEpoch: epoch, userId: 'synthetic', role: 'agent', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成管理人' } : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+  const view: ProductSession['view'] = () => signedIn ? { ok: true, enabled: true, signedIn, sessionEpoch: epoch, userId: 'synthetic', role: 'agent', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成管理人', job: null } : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
   const request = vi.fn(async (_epoch: number, path: string, options: Parameters<ProductSession['request']>[2] = {}) => ({ status: 200, value: structuredClone(data.respond(path, options.body)) }));
   const confirmPublication = vi.fn().mockResolvedValue(true);
   const main = new ContentIntakeManagement({ view, request, subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } }, files, confirmPublication);

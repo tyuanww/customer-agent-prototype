@@ -9,7 +9,7 @@ afterEach(() => { delete window.dashboardIntake; });
 function setup() {
   const data = intakeManagementData(1), listeners = new Set<() => void>();
   const session: Pick<ProductSession, 'view' | 'subscribe' | 'request'> = {
-    view: () => ({ ok: true, enabled: true, signedIn: true, sessionEpoch: 1, userId: 'synthetic', role: 'coach', authMode: 'mock', displayName: '合成审核员', expiresAt: '2099-01-01T00:00:00Z' }),
+    view: () => ({ ok: true, enabled: true, signedIn: true, sessionEpoch: 1, userId: 'synthetic', role: 'coach', authMode: 'mock', displayName: '合成审核员', expiresAt: '2099-01-01T00:00:00Z', job: null }),
     subscribe: () => () => undefined,
     request: async (_epoch, path, options = {}) => ({ status: 200, value: structuredClone(data.respond(path, options.body)) }),
   };

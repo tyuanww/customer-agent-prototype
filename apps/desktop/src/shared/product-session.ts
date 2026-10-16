@@ -6,8 +6,7 @@ export type ProductSessionView = {
   userId: string | null; role: 'agent' | 'coach' | 'owner' | null;
   authMode: 'mock' | 'feishu' | null; expiresAt: string | null;
   displayName: string | null;
-  /** Present on every main-process view. Older fixtures may omit it. */
-  job?: SessionJobView | null;
+  job: SessionJobView | null;
 };
 
 export const UNRESOLVED_JOB_LABEL = '职务未识别';
@@ -31,14 +30,13 @@ export type SessionJobView =
     readonly rights: BoardRights;
   };
 
-/** Identity snapshot already returned to this client. Null means the title was not returned. */
 export type JobSnapshot = {
-  readonly title: string | null;
+  readonly title: string;
   readonly directory: readonly JobDirectoryEntry[];
 };
 
 export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
-  if (snapshot === null || snapshot.title === null) {
+  if (snapshot === null) {
     return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
   }
   const lookup = resolveJobTitle(snapshot.title, snapshot.directory);

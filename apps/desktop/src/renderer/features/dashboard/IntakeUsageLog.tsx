@@ -18,7 +18,6 @@ const RESULT_LABEL: Readonly<Record<UsageLogResult, string>> = { copied: '已复
 
 type Load = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'failed' } | { kind: 'ready' };
 
-/** 系统同步页下的「使用情况」。读失败和空日志用不同的句子，不画假数据。 */
 export function IntakeUsageLog() {
   const [result, setResult] = useState<UsageLogResult | ''>('');
   const [query, setQuery] = useState('');
