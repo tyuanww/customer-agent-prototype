@@ -6,6 +6,7 @@ import {
   SOP_UPLOAD_MAX_BYTES,
   sopAllergyStepNeedsStopCopy,
   sopCsvAllergyStopMissing,
+  sopUploadRefusal,
   type DashboardOpsFailure,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
@@ -114,6 +115,8 @@ export async function dashboardSopImport(
     return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
   }
   return withSession(session, ['coach', 'owner'], async (client, epoch) => {
+    const refusal = sopUploadRefusal(client.view().job);
+    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
     const form = new FormData();
     form.append('file', new Blob([csvText], { type: 'text/csv' }), 'sop.csv');
     const result = await client.request(epoch, '/v1/sop/import', {

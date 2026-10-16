@@ -4,6 +4,7 @@ import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import { UNRESOLVED_JOB_LABEL, type SessionJobView } from '../shared/product-session';
+import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
@@ -138,6 +139,17 @@ type NavTooltipState = {
 export function DashboardApp() {
   return <DashboardWorkspace profile="intake" />;
 }
+function sopUploadControl(
+  jobKnown: boolean,
+  signedIn: boolean | null,
+  job: SessionJobView | null,
+): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
+  if (!jobKnown) return null;
+  if (signedIn === null) return { code: 'FORBIDDEN', message: '' };
+  if (!signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  return sopUploadRefusal(job);
+}
+
 /** Both profiles share native chrome and appearance. Only the selected profile
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
@@ -150,24 +162,30 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const [shellLine, setShellLine] = useState<{ profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null>(null);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [jobKnown, setJobKnown] = useState(false);
+  const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
   useEffect(() => {
     const read = window.dashboardContent?.session;
     if (!read) return;
     let alive = true;
     setJobKnown(true);
     setSessionJob(null);
+    setContentSignedIn(null);
     void read().then((value) => {
       if (!alive) return;
       setSessionJob(value.ok ? value.job ?? null : null);
+      setContentSignedIn(value.ok ? value.signedIn : false);
       setJobKnown(true);
     }).catch(() => {
       if (!alive) return;
       setSessionJob(null);
+      setContentSignedIn(false);
       setJobKnown(true);
     });
     return () => { alive = false; };
   }, []);
   const canGrant = !jobKnown || (sessionJob?.status === 'resolved' && sessionJob.rights.grant);
+  const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
+  const canUploadSop = uploadRefusal === null;
   const grantBlock = !jobKnown
     ? ''
     : sessionJob?.status === 'resolved'
@@ -1370,7 +1388,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
-          {active === 'sop' && <SopLibraryModule />}
+          {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
           {active === 'wording' && (
             <WordingLibraryModule
               initialDomain={wordingDomain}

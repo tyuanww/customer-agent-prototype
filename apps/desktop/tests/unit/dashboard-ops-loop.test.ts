@@ -22,8 +22,9 @@ import {
   SOP_UPLOAD_MAX_BYTES,
 } from '../../src/shared/dashboard-ops-loop';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
-import { ProductHttpError } from '../../src/main/product-http';
-import type { ProductSession } from '../../src/main/product-session';
+import { ProductHttp, ProductHttpError } from '../../src/main/product-http';
+import { ProductSession } from '../../src/main/product-session';
+import { observeSessionJob, UNRESOLVED_JOB_LABEL, type JobSnapshot } from '../../src/shared/product-session';
 
 const handlers = vi.hoisted(() => new Map<string, (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown>());
 vi.mock('electron', () => ({
@@ -58,6 +59,12 @@ const sopNode = Object.freeze({
   version: 1,
   lifecycle: 'active' as const,
 });
+
+function sessionThatMayUpload(role: 'coach' | 'owner', title = '客服总监') {
+  const session = fakeSession(role);
+  const job = observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
+  return { ...session, view: () => ({ ...session.view(), job }) };
+}
 
 function fakeSession(
   role: 'agent' | 'coach' | 'owner' | null,
@@ -178,7 +185,7 @@ it('keeps GONE software current as empty current and never mentions latest.yml',
 });
 
 it('imports SOP against default session and keeps script mutate in pending_review', async () => {
-  const owner = fakeSession('owner');
+  const owner = sessionThatMayUpload('owner', 'AI赋能工程师');
   vi.mocked(owner.request)
     .mockResolvedValueOnce({
       status: 202,
@@ -322,7 +329,7 @@ it('deletes SOP and maps session and HTTP failures without leaking product copy'
 
 it('invokes remaining ops IPC channels and keeps a present software current without latest.yml', async () => {
   const { dashboard, event } = trustedDashboard();
-  const session = fakeSession('owner');
+  const session = sessionThatMayUpload('owner');
   registerDashboardOpsLoopIpc(session as ProductSession, () => dashboard, () => 'http://127.0.0.1:5173/');
   vi.mocked(session.request)
     .mockResolvedValueOnce({
@@ -410,4 +417,82 @@ it('opens the current https download_url in the system browser and refuses a non
   });
   expect(ipcOpen).toHaveBeenCalledWith('https://example.com/app.dmg');
   expect(JSON.stringify(release)).not.toContain('latest.yml');
+});
+
+const sopCsv = 'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n';
+
+async function loginOwner(snapshot: JobSnapshot | null) {
+  const token = 't'.repeat(43);
+  const stored = { access_token: token, expires_at: new Date(Date.now() + 899_000).toISOString() };
+  const paths: string[] = [];
+  const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if (init?.signal?.aborted) {
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      throw error;
+    }
+    const path = new URL(String(url)).pathname;
+    paths.push(path);
+    if (path === '/v1/auth/login-requests') {
+      return Response.json({
+        login_id: `login_${'i'.repeat(43)}`,
+        authorize_url: 'http://127.0.0.1:4101/authorize?state=s',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+      }, { status: 201 });
+    }
+    if (path.endsWith('/exchange')) return Response.json({ ...stored, token_type: 'Bearer' });
+    if (path === '/v1/auth/me') return Response.json({ user_id: 'usr_owner_job', role: 'owner', auth_mode: 'feishu' });
+    if (path === '/v1/sop/import') {
+      return Response.json({ ok: true, product_session_id: 'default', node_count: 1 }, { status: 202 });
+    }
+    return new Response('missing', { status: 404 });
+  }) as unknown as typeof fetch;
+  const session = new ProductSession(
+    new ProductHttp('http://127.0.0.1:4100', transport),
+    { read: () => null, write: () => undefined, clear: () => undefined },
+    { open: async () => undefined },
+    undefined,
+    () => snapshot,
+  );
+  expect(session.view()).toMatchObject({ signedIn: false, job: null });
+  const login = await session.login();
+  expect(login).toMatchObject({ ok: true, signedIn: true, role: 'owner' });
+  return { session, paths, login };
+}
+
+it('refuses SOP import for a signed-in owner whose job cannot upload', async () => {
+  const signedOut = new ProductSession(
+    new ProductHttp('http://127.0.0.1:4100', vi.fn(async () => new Response('no', { status: 500 })) as unknown as typeof fetch),
+    { read: () => null, write: () => undefined, clear: () => undefined },
+    { open: async () => undefined },
+  );
+  expect(signedOut.view()).toMatchObject({ signedIn: false, job: null });
+  expect(await dashboardSopImport(signedOut, sopCsv)).toMatchObject({
+    ok: false, code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession,
+  });
+
+  const agent = await loginOwner({ title: '普通客服', directory: [{ name: '普通客服', enabled: true }] });
+  expect(agent.login).toMatchObject({
+    job: { status: 'resolved', title: '普通客服', rights: { uploadSop: false } },
+  });
+  expect(await dashboardSopImport(agent.session, sopCsv)).toMatchObject({
+    ok: false, code: 'FORBIDDEN', message: OPS_LOOP_COPY.sopUploadJob,
+  });
+  expect(agent.paths).not.toContain('/v1/sop/import');
+
+  const missing = await loginOwner(null);
+  expect(missing.login).toMatchObject({
+    job: { status: 'unresolved', label: UNRESOLVED_JOB_LABEL, rights: { uploadSop: false } },
+  });
+  expect(await dashboardSopImport(missing.session, sopCsv)).toMatchObject({
+    ok: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL,
+  });
+  expect(missing.paths).not.toContain('/v1/sop/import');
+  expect(JSON.stringify(await dashboardSopImport(missing.session, sopCsv))).not.toContain('一期发布仅管理员');
+
+  const engineer = await loginOwner({ title: 'AI赋能工程师', directory: [{ name: 'AI赋能工程师', enabled: true }] });
+  expect(await dashboardSopImport(engineer.session, sopCsv)).toEqual({
+    ok: true, productSessionId: 'default', nodeCount: 1,
+  });
+  expect(engineer.paths).toContain('/v1/sop/import');
 });
