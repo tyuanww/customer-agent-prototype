@@ -1,5 +1,6 @@
 import { IdentityFailure, type SyntheticIdentityProvider } from './product-auth-service.js';
 import { persistOperatorDisplayName } from './operator-display-names.js';
+import { forgetJobSnapshot, readFeishuJobSnapshot, rememberJobSnapshot } from './feishu-job-snapshot.js';
 
 /** Official Feishu OAuth endpoints. Not configurable: arbitrary URLs would be an SSRF seam. */
 export const FEISHU_AUTHORIZE_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
@@ -14,6 +15,7 @@ export type FeishuIdentityProviderConfig = Readonly<{
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  observeJob?: boolean;
 }>;
 
 type FetchLike = typeof fetch;
@@ -187,6 +189,15 @@ export function createFeishuIdentityProvider(
         }));
         const openId = readOpenId(userBody);
         if (!openId) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+        if (config.observeJob === true) {
+          try {
+            const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
+            if (snapshot) rememberJobSnapshot(openId, snapshot);
+            else forgetJobSnapshot(openId);
+          } catch {
+            forgetJobSnapshot(openId);
+          }
+        }
         const name = readDisplayName(userBody);
         if (name) {
           try {

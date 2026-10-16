@@ -44,6 +44,7 @@ export class ProductSession {
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(state: ProductSessionResult) => void>();
   private job: SessionJobView | null = null;
+  private remoteJob = false;
   constructor(readonly http: ProductHttp, private readonly store: SessionStore, private readonly window: LoginWindow,
     private readonly displayNameFor: (userId: string) => string | null = readOperatorDisplayName,
     private readonly jobSnapshotFor: (userId: string) => JobSnapshot | null = () => null) {}
@@ -61,10 +62,35 @@ export class ProductSession {
       expiresAt: this.token?.expires_at ?? null, displayName,
       job: this.token && this.user ? this.job : null };
   }
-  private rememberJob(userId: string) {
+  enableRemoteJobObservation(): void { this.remoteJob = true; }
+  private async rememberJob(userId: string) {
     let snapshot: JobSnapshot | null = null;
-    try { snapshot = this.jobSnapshotFor(userId); } catch { snapshot = null; }
+    try {
+      snapshot = await this.jobSnapshotFor(userId);
+    } catch { snapshot = null; }
+    if (snapshot === null && this.remoteJob && this.token) snapshot = await this.readRemoteJob();
     this.job = observeSessionJob(snapshot);
+  }
+  private async readRemoteJob(): Promise<JobSnapshot | null> {
+    if (!this.token) return null;
+    try {
+      const { value } = await this.http.request('/v1/auth/job', {
+        token: this.token.access_token, timeoutMs: 8_000,
+      });
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      const title = Reflect.get(value, 'title');
+      const directory = Reflect.get(value, 'directory');
+      if (typeof title !== 'string' || !Array.isArray(directory)) return null;
+      const entries: { name: string; enabled: boolean }[] = [];
+      for (const row of directory) {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+        const name = Reflect.get(row, 'name');
+        const enabled = Reflect.get(row, 'enabled');
+        if (typeof name !== 'string' || typeof enabled !== 'boolean') return null;
+        entries.push({ name, enabled });
+      }
+      return { title, directory: entries };
+    } catch { return null; }
   }
   private invalidate() {
     this.epoch++; this.operation?.abort(); this.operation = null; this.token = null; this.user = null; this.job = null;
@@ -81,12 +107,12 @@ export class ProductSession {
       || !['mock', 'feishu'].includes(value.auth_mode as string)) throw new ProductHttpError('UNAUTHORIZED');
     return { userId: value.user_id, role: value.role as 'agent' | 'coach' | 'owner', authMode: value.auth_mode as 'mock' | 'feishu' };
   }
-  private install(token: StoredSession, user: NonNullable<ProductSession['user']>, epoch: number, signal: AbortSignal) {
+  private async install(token: StoredSession, user: NonNullable<ProductSession['user']>, epoch: number, signal: AbortSignal) {
     if (signal.aborted || epoch !== this.epoch) throw new ProductHttpError('STALE');
     const remaining = Date.parse(token.expires_at) - Date.now();
     if (!sessionExpiryAccepted(token.expires_at)) throw new ProductHttpError('UNAUTHORIZED');
     this.store.write(token); this.epoch++; this.token = token; this.user = user;
-    this.rememberJob(user.userId);
+    await this.rememberJob(user.userId);
     this.expiry = setTimeout(() => this.invalidate(), remaining); this.expiry.unref?.();
     const state = this.view(); this.emit(state); return state;
   }
@@ -100,7 +126,7 @@ export class ProductSession {
     try {
       const stored = this.store.read(); if (stored === null) return this.view();
       if (!validSession(stored)) throw new ProductHttpError('UNAUTHORIZED');
-      return this.install(stored, await this.identify(stored, operation.signal), epoch, operation.signal);
+      return await this.install(stored, await this.identify(stored, operation.signal), epoch, operation.signal);
     } catch (error) { return this.fail(error, epoch); }
     finally { if (this.operation === operation) this.operation = null; }
   }
@@ -114,7 +140,7 @@ export class ProductSession {
       const previousJob = JSON.stringify(this.job);
       if (changed) this.epoch++;
       this.user = user;
-      this.rememberJob(user.userId);
+      await this.rememberJob(user.userId);
       if (changed || JSON.stringify(this.job) !== previousJob) this.emit(this.view());
       return this.view();
     } catch (error) {
@@ -193,7 +219,7 @@ export class ProductSession {
         const token = { access_token: v.access_token, expires_at: v.expires_at };
         if (!validSession(token)) throw new ProductHttpError('VALIDATION');
         exchangedToken = token.access_token;
-        return this.install(token, await this.identify(token, operation.signal), epoch, operation.signal);
+        return await this.install(token, await this.identify(token, operation.signal), epoch, operation.signal);
       }
     } catch (error) {
       if (epoch !== this.epoch || this.operation !== operation) return productFailure('STALE', epoch);

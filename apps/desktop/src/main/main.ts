@@ -249,6 +249,7 @@ if (!gotLock) {
               : (url) => shell.openExternal(url),
           },
         ));
+      productSession.enableRemoteJobObservation();
       productAnnounce = new ProductAnnounce(
         productSession,
         readProductClientId(userDataDirectory),
