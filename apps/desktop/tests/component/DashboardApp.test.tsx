@@ -143,8 +143,9 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入');
-    expect(screen.queryByTestId('sop-library-empty')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入：没有 SOP 写库通道');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
