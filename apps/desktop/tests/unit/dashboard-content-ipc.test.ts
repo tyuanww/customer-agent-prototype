@@ -10,6 +10,7 @@ import {
   dashboardContentSession,
 } from '../../src/main/dashboard-content';
 import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
+import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
@@ -27,7 +28,15 @@ const csv = 'scene,script,domain\n洁面用量确认,先确认产品版本,produ
 const aftersaleCsv = 'scene,script,domain\n过敏安抚,先停用并观察,aftersale\n';
 const productBinding = { domain: 'product' as const, source_version_id: 'srcv_product_v1' };
 
-function fakeSession(role: 'agent' | 'coach' | 'owner' | null, signedIn = true): Pick<ProductSession, 'view' | 'request'> {
+const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
+const directorJob = titled('客服总监');
+const agentJob = titled('普通客服');
+
+function fakeSession(
+  role: 'agent' | 'coach' | 'owner' | null,
+  signedIn = true,
+  job: SessionJobView | null = !signedIn || role === null || role === 'coach' ? null : role === 'agent' ? agentJob : directorJob,
+): Pick<ProductSession, 'view' | 'request'> {
   return {
     view: () => ({
       ok: true,
@@ -39,6 +48,7 @@ function fakeSession(role: 'agent' | 'coach' | 'owner' | null, signedIn = true):
       authMode: signedIn ? 'mock' : null,
       expiresAt: signedIn ? new Date(Date.now() + 60_000).toISOString() : null,
       displayName: signedIn ? 'synthetic' : null,
+      job: signedIn ? job : null,
     }),
     request: vi.fn(),
   };
@@ -73,7 +83,7 @@ it('projects session without credentials and fail-closes unsigned dashboard send
   expect(await status(event(query))).toMatchObject({ ok: false, code: 'FORBIDDEN' });
   expect(await status(event(dashboard), { extra: true })).toMatchObject({ ok: false, code: 'VALIDATION' });
   const view = await status(event(dashboard));
-  expect(view).toEqual({ ok: true, enabled: true, signedIn: true, role: 'owner', displayName: 'synthetic' });
+  expect(view).toEqual({ ok: true, enabled: true, signedIn: true, role: 'owner', displayName: 'synthetic', job: directorJob });
   expect(JSON.stringify(view)).not.toContain('usr_synthetic');
   expect(JSON.stringify(view)).not.toContain('access_token');
 });
@@ -90,7 +100,7 @@ it('blocks agent publish and coach aftersale before any product HTTP', async () 
   expect(await dashboardContentPublish(coach, publishPayload(aftersaleCsv))).toMatchObject({
     ok: false,
     code: 'FORBIDDEN',
-    message: CONTENT_PUBLISH_COPY.ownerPublish,
+    message: UNRESOLVED_JOB_LABEL,
   });
   expect(coach.request).not.toHaveBeenCalled();
   expect(await dashboardContentPublish(null, publishPayload())).toMatchObject({
@@ -143,7 +153,7 @@ it('fail-closes the cancel sweep without a product session instead of reporting 
 it('does not invent source bindings and never returns a fake success', async () => {
   const owner = fakeSession('owner');
   expect(dashboardContentSession(null)).toEqual({
-    ok: true, enabled: false, signedIn: false, role: null, displayName: null,
+    ok: true, enabled: false, signedIn: false, role: null, displayName: null, job: null,
   });
   expect(await dashboardContentImport(owner, {
     sourceName: 'draft.csv',
@@ -223,15 +233,28 @@ it('still returns the release when post-publish hydrate refresh throws', async (
   expect(afterPublish).toHaveBeenCalledWith(1);
 });
 
-it('stops coach publish before the request because the frozen API is owner-only', async () => {
+it('stops an unresolved job before the request and does not say the owner-only sentence', async () => {
   const coach = fakeSession('coach');
   const result = await dashboardContentPublish(coach, publishPayload(csv, [productBinding]));
   expect(result).toMatchObject({
     ok: false,
     code: 'FORBIDDEN',
-    message: CONTENT_PUBLISH_COPY.ownerPublish,
+    message: UNRESOLVED_JOB_LABEL,
   });
+  expect(result).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
   expect(coach.request).not.toHaveBeenCalled();
+});
+
+it('keeps a source snapshot mismatch on its own sentence', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', 'SOURCE_SNAPSHOT_MISMATCH'));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({
+    ok: false,
+    code: 'FORBIDDEN',
+    message: CONTENT_IMPORT_FAILURE_COPY.SOURCE_SNAPSHOT_MISMATCH,
+  });
+  expect(result).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
 });
 
 it('shows the source denial instead of the owner-only sentence', async () => {

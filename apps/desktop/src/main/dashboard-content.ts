@@ -178,7 +178,7 @@ export function dashboardContentSession(
   session: DashboardContentSessionClient | null,
 ): DashboardContentSessionResult {
   if (!session) {
-    return Object.freeze({ ok: true, enabled: false, signedIn: false, role: null, displayName: null });
+    return Object.freeze({ ok: true, enabled: false, signedIn: false, role: null, displayName: null, job: null });
   }
   const view = session.view();
   return Object.freeze({
@@ -187,6 +187,7 @@ export function dashboardContentSession(
     signedIn: view.signedIn,
     role: view.signedIn ? view.role : null,
     displayName: view.signedIn ? view.displayName : null,
+    job: view.signedIn ? view.job ?? null : null,
   });
 }
 
@@ -256,6 +257,7 @@ export async function dashboardContentPublish(
       productAvailable: true,
       signedIn: true,
       role: view.role,
+      job: view.job ?? null,
       rows: payload.rows,
       sourceBindings: payload.sourceBindings,
     });

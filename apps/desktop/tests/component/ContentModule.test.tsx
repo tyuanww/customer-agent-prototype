@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentModule } from '../../src/renderer/features/dashboard/ContentModule';
 import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY, CONTENT_ROLLBACK_COPY } from '../../src/shared/dashboard-content';
+import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
 import type {
   DashboardContentApi,
   DashboardContentFailure,
@@ -10,7 +11,13 @@ import type {
   DashboardContentSessionResult,
 } from '../../src/shared/dashboard-content';
 
-function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): DashboardContentApi {
+const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
+
+function mockSession(
+  role: 'agent' | 'coach' | 'owner',
+  signedIn = true,
+  job: SessionJobView | null = !signedIn ? null : role === 'agent' ? titled('普通客服') : role === 'owner' ? titled('客服总监') : null,
+): DashboardContentApi {
   return {
     session: vi.fn(async () => ({
       ok: true as const,
@@ -18,6 +25,7 @@ function mockSession(role: 'agent' | 'coach' | 'owner', signedIn = true): Dashbo
       signedIn,
       role: signedIn ? role : null,
       displayName: signedIn ? '合成管理员' : null,
+      job: signedIn ? job : null,
     })),
     parseUpload: vi.fn(async () => ({
       ok: false as const,
@@ -116,12 +124,13 @@ describe('ContentModule publish gate', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
     expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(UNRESOLVED_JOB_LABEL);
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
     expect(api.publishDraft).not.toHaveBeenCalled();
     expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
   });
 
-  it('keeps Publish off for coach product drafts while the API is owner-only', async () => {
+  it('keeps Publish off for coach product drafts when the job was not returned', async () => {
     const api = mockSession('coach');
     window.dashboardContent = api;
     const user = userEvent.setup();
@@ -137,8 +146,26 @@ describe('ContentModule publish gate', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
     expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(UNRESOLVED_JOB_LABEL);
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
     expect(api.publishDraft).not.toHaveBeenCalled();
+  });
+
+  it('does not block an AI赋能工程师 with the owner-only sentence', async () => {
+    const api = mockSession('coach', true, titled('AI赋能工程师'));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    await user.upload(screen.getByTestId('content-upload-input'), uploadFile(
+      'product.csv',
+      'scene,script,domain\n洁面用量确认,先确认产品版本,product\n',
+    ));
+    await waitFor(() => {
+      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
+    });
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
+    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent(UNRESOLVED_JOB_LABEL);
   });
 
   it('stages a zip xlsx through parseUpload without treating the preview as published', async () => {
@@ -409,6 +436,7 @@ describe('ContentModule session badge', () => {
       signedIn: true,
       role: 'owner' as const,
       displayName: '合成管理员',
+      job: null,
     }));
     window.dashboardContent = api;
     render(<ContentModule />);

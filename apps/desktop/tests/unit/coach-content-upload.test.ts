@@ -249,7 +249,7 @@ describe('coach content upload parser', () => {
       );
 
       window.dashboardContent = {
-        session: async () => ({ ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师' }),
+        session: async () => ({ ok: true, enabled: true, signedIn: true, role: 'coach', displayName: '话术师', job: null }),
         parseUpload: async () => ({
           ok: true,
           sourceName: 'faq.xlsx',

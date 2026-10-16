@@ -3,6 +3,7 @@ import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule'
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
+import { UNRESOLVED_JOB_LABEL, type SessionJobView } from '../shared/product-session';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
@@ -147,6 +148,31 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     return item;
   });
   const [shellLine, setShellLine] = useState<{ profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null>(null);
+  const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
+  const [jobKnown, setJobKnown] = useState(false);
+  useEffect(() => {
+    const read = window.dashboardContent?.session;
+    if (!read) return;
+    let alive = true;
+    setJobKnown(true);
+    setSessionJob(null);
+    void read().then((value) => {
+      if (!alive) return;
+      setSessionJob(value.ok ? value.job ?? null : null);
+      setJobKnown(true);
+    }).catch(() => {
+      if (!alive) return;
+      setSessionJob(null);
+      setJobKnown(true);
+    });
+    return () => { alive = false; };
+  }, []);
+  const canGrant = !jobKnown || (sessionJob?.status === 'resolved' && sessionJob.rights.grant);
+  const grantBlock = !jobKnown
+    ? ''
+    : sessionJob?.status === 'resolved'
+      ? (sessionJob.rights.grant ? '' : '当前职务不能授权')
+      : UNRESOLVED_JOB_LABEL;
   useEffect(() => {
     if (profile !== 'intake') return;
     const read = window.dashboardIntake?.shellLine;
@@ -1358,7 +1384,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
               <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
             </div>
           ) : null}
-          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
+          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantBlock={grantBlock} /></div> : null}
           {active === 'materials' ? <IntakeManagement /> : null}
         </main>
       </div>
