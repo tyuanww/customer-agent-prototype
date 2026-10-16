@@ -52,7 +52,7 @@ export type PackagedProductProfile = Readonly<{
  * distinct loopback origins have already passed, so this does not re-read the
  * profile file. It returns the two constants, never origins or the raw profile. */
 export function projectIntakeShellLine(
-  profile: Pick<PackagedProductProfile, 'contentIntake'> | null | undefined,
+  profile: PackagedProductProfile | Pick<PackagedProductProfile, 'contentIntake'> | null | undefined,
 ): { readonly profileMode: typeof MODE; readonly contentIntake: 'faq-v2' } | null {
   if (profile?.contentIntake !== 'faq-v2') return null;
   return Object.freeze({ profileMode: MODE, contentIntake: 'faq-v2' });
