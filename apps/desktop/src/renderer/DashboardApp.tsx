@@ -23,14 +23,10 @@ import {
   type DashboardNavItem,
   type DomainId,
 } from './data/dashboard-manifest';
-import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
-import { OverviewModule } from './features/dashboard/OverviewModule';
-import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
-import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
 import {
   DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED,
   DASHBOARD_WINDOW_TITLE,
@@ -116,11 +112,11 @@ const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop',
 function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
   const location = window.location;
   const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'content';
+  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'overview';
   const page = new URLSearchParams(location.search).get('page');
-  if (page === 'permissions' && !canOpenPermissions) return 'content';
+  if (page === 'permissions' && !canOpenPermissions) return 'overview';
   if (page && PREVIEW_PAGES.has(page as SidebarDestination)) return page as SidebarDestination;
-  return 'content';
+  return 'overview';
 }
 
 function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
@@ -137,24 +133,17 @@ type NavTooltipState = {
 };
 
 export function DashboardApp() {
-  const [mode, setMode] = useState<'loading' | 'legacy' | 'intake' | 'failed'>(window.dashboardIntake ? 'loading' : 'legacy');
-  useEffect(() => {
-    if (!window.dashboardIntake) return;
-    let active = true;
-    void window.dashboardIntake.mode().then(r => { if (active) setMode(r.ok ? r.enabled ? 'intake' : 'legacy' : 'failed'); })
-      .catch(() => { if (active) setMode('failed'); });
-    return () => { active = false; };
-  }, []);
-  if (mode === 'loading' || mode === 'failed') return <p role="status">{mode === 'loading' ? '正在读取管理模式…' : '管理模式不可用，请重新打开窗口。'}</p>;
-  return <DashboardWorkspace profile={mode} />;
+  return <DashboardWorkspace profile="intake" />;
 }
 /** Both profiles share native chrome and appearance. Only the selected profile
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => (
-    profile === 'intake' && item.id === 'content' ? { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' } : item
-  ));
+  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => {
+    if (profile === 'intake' && item.id === 'content') return { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' };
+    if (profile === 'intake' && item.id === 'overview') return { ...item, label: '概览', blurb: item.blurb };
+    return item;
+  });
   const [shellLine, setShellLine] = useState<{ profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null>(null);
   useEffect(() => {
     if (profile !== 'intake') return;
@@ -180,10 +169,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [navTooltip, setNavTooltip] = useState<NavTooltipState | null>(null);
-  // 系统同步四卡点进来时要落到的域；消费一次后清空，避免再次切到话术库时串域。
-  const [wordingDomain, setWordingDomain] = useState<DomainId | undefined>(undefined);
-  const openWordingDomain = useCallback((domain: DomainId) => {
-    setWordingDomain(domain);
+  const openWordingDomain = useCallback((_domain: DomainId) => {
     setActive('wording');
   }, []);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -1353,34 +1339,17 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {profile === 'intake' ? <>
-            {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
-            {active === 'sop' && <IntakeSopSource />}
-            <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
-            {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
-            {keepPublish || active === 'publish' ? (
-              <div hidden={active !== 'publish'}>
-                <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
-              </div>
-            ) : null}
-            {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
-            {active === 'materials' ? <IntakeManagement /> : null}
-          </> : <>
-            {active === 'overview' ? <OverviewModule onNavigate={setActive} /> : null}
-            {active === 'wording' ? (
-              <WordingLibraryModule
-                initialDomain={wordingDomain}
-                onDomainConsumed={() => setWordingDomain(undefined)}
-              />
-            ) : null}
-            {active === 'sop' ? <SopLibraryModule /> : null}
-            {active === 'announce' ? <AnnounceModule onOpenDomain={openWordingDomain} /> : null}
-            {keepContent || active === 'content' ? (
-              <div hidden={active !== 'content'}>
-                <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
-              </div>
-            ) : null}
-          </>}
+          {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
+          {active === 'sop' && <IntakeSopSource />}
+          <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
+          {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
+          {keepPublish || active === 'publish' ? (
+            <div hidden={active !== 'publish'}>
+              <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
+            </div>
+          ) : null}
+          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} /></div> : null}
+          {active === 'materials' ? <IntakeManagement /> : null}
         </main>
       </div>
     </div>

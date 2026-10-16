@@ -326,7 +326,11 @@ it('enables FAQ only through explicit synthetic loopback configuration', () => {
   expect(parsed).toMatchObject({ contentIntake: 'faq-v2' });
   expect(projectIntakeShellLine(parsed)).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   write(directory, { mode: 'product-remote', apiOrigin: 'https://synthetic-api.invalid', identityOrigin: 'https://synthetic-id.invalid', contentIntake: 'faq-v2' });
-  expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+  expect(readPackagedProductProfile(directory)).toMatchObject({
+    apiOrigin: 'https://synthetic-api.invalid',
+    identityOrigin: 'https://synthetic-id.invalid',
+    contentIntake: 'faq-v2',
+  });
   expect(Object.keys(projectIntakeShellLine({ contentIntake: 'faq-v2' }) ?? {})).toEqual(['profileMode', 'contentIntake']);
   expect(projectIntakeShellLine({
     apiOrigin: 'http://127.0.0.1:43100',

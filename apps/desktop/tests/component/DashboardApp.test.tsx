@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
-import { DASHBOARD_NAV } from '../../src/renderer/data/dashboard-manifest';
 import { COACH_UPLOAD_MAX_BYTES } from '../../src/renderer/features/dashboard/coach-content-upload';
 import { IterationModule } from '../../src/renderer/features/dashboard/IterationModule';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
@@ -131,26 +130,21 @@ describe('DashboardApp', () => {
     expect(screen.queryByText('演示数据')).not.toBeInTheDocument();
     expect(screen.queryByText('无后端 · 不保存')).not.toBeInTheDocument();
     expect(screen.queryByText('演示环境')).not.toBeInTheDocument();
-    expect(screen.getByTestId('dashboard-boundary-disclaimer')).toHaveTextContent('未接入');
-    expect(screen.getByTestId('dashboard-refresh')).toHaveTextContent('未接入');
-    expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
-    expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
-
-    for (const item of DASHBOARD_NAV) {
-      await user.click(screen.getByTestId(`nav-${item.id}`));
-      expect(screen.getByTestId(`module-${item.id}`)).toBeInTheDocument();
-      expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', item.id);
-    }
+    expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-overview')).toHaveAccessibleName('概览');
+    expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
+    expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
+    await user.click(screen.getByTestId('nav-publish'));
+    expect(screen.getByLabelText('将替换')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
   });
 
   it('shows the allergy SOP tree as a read-only 话术运营 module', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入：没有 SOP 写库通道');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
-    expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入');
+    expect(screen.queryByTestId('sop-library-empty')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
@@ -213,7 +207,6 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-content'));
     expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '资料管理' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('将替换')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-publish'));
     expect(screen.getByLabelText('将替换')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
@@ -262,11 +255,11 @@ describe('DashboardApp', () => {
     expect(brand).not.toHaveTextContent('狐客服运营工作台');
 
     const overviewNav = screen.getByTestId('nav-overview');
-    expect(overviewNav).toHaveTextContent('管理概览');
+    expect(overviewNav).toHaveTextContent('概览');
     expect(overviewNav).toHaveClass('is-active');
     expect(overviewNav).not.toHaveStyle({ borderLeft: '3px solid rgb(111, 76, 195)' });
     expect(within(overviewNav).queryByText('风险、责任与处理进度')).not.toBeInTheDocument();
-    expect(screen.getAllByText('管理概览').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('概览').length).toBeGreaterThanOrEqual(1);
 
     const shell = screen.getByTestId('dashboard-shell');
     expect(['integrated', 'native']).toContain(shell.getAttribute('data-dashboard-chrome'));
@@ -919,7 +912,7 @@ describe('DashboardApp', () => {
     act(() => vi.advanceTimersByTime(319));
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1));
-    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('管理概览');
+    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('概览');
     expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveClass('is-visible');
 
     fireEvent.mouseLeave(overview);
@@ -928,7 +921,7 @@ describe('DashboardApp', () => {
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
 
     fireEvent.focus(overview);
-    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('管理概览');
+    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('概览');
     expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveClass('is-visible');
     fireEvent.keyDown(overview, { key: 'Escape' });
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
@@ -1319,14 +1312,10 @@ describe('DashboardApp', () => {
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('heading', { name: '待处理事项（未接入）' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '核心指标' })).toBeInTheDocument();
-    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入产品会话');
-    expect(screen.queryByLabelText('今日状态')).not.toBeInTheDocument();
-    expect(screen.queryAllByRole('article')).toHaveLength(0);
-    expect(screen.getByLabelText('核心运营指标')).toBeInTheDocument();
-    expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('未接入');
-    expect(screen.getByTestId('overview-kpi-source')).not.toHaveTextContent('固定周期合成演示数据');
+    expect(screen.getByRole('heading', { name: '概览' })).toBeInTheDocument();
+    expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('话术使用次数');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理迭代');
   });
 
   it('navigates from a manager decision into the wording detail', async () => {
@@ -1338,9 +1327,8 @@ describe('DashboardApp', () => {
 
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
-    const kpiSection = screen.getByRole('list', { name: '核心运营指标' });
-    expect(kpiSection).toHaveTextContent('无命中率');
-    expect(kpiSection).toHaveTextContent('未接入');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('无命中次数');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('未接入');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
@@ -1360,337 +1348,13 @@ describe('DashboardApp', () => {
     expect(true).toBe(true);
   });
 
-    it('filters the four-domain wording library from the local catalog', async () => {
+  it('opens the six-page wording library instead of the retired local catalog', async () => {
     const user = userEvent.setup();
-    window.dashboardWording = {
-      list: async () => ({
-        ok: true as const,
-        releaseId: 'rel_18',
-        catalogRefreshedAt: null,
-        matchesLease: false,
-        total: 2,
-        entries: [
-          {
-            scriptId: 'mn-1',
-            domain: 'product',
-            title: '洁面用法',
-            scene: '怎么用',
-            answerPreview: '先打湿再打圈',
-            platform: '千牛 / 抖音',
-            version: 'rel_18',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '本机目录',
-            risk: 'low',
-            lifecycle: 'published',
-            lifecycleLabel: '已发布',
-            ownerRole: '本机话术库',
-            dataClass: 'local-catalog',
-          },
-          {
-            scriptId: 'mn-2',
-            domain: 'campaign',
-            title: '满赠规则',
-            scene: '活动',
-            answerPreview: '满赠不叠加',
-            platform: '千牛 / 抖音',
-            version: 'rel_18',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '本机目录',
-            risk: 'medium',
-            lifecycle: 'published',
-            lifecycleLabel: '已发布',
-            ownerRole: '本机话术库',
-            dataClass: 'local-catalog',
-          },
-        ],
-      }),
-    };
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-wording'));
-    expect(await screen.findByTestId('module-wording')).toHaveTextContent('产品话术');
-    expect(await screen.findByTestId('wording-detail-owner')).toHaveTextContent('本机话术库');
-    expect(screen.getByTestId('wording-detail')).not.toHaveTextContent('DEMO · SYNTHETIC');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('洁面用法');
-
-    const productTab = screen.getByTestId('wording-domain-product');
-    productTab.focus();
-    fireEvent.keyDown(productTab, { key: 'ArrowRight' });
-    expect(screen.getByTestId('wording-domain-campaign')).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByTestId('wording-domain-campaign')).toHaveAttribute('tabindex', '0');
-    expect(productTab).toHaveAttribute('tabindex', '-1');
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    expect(screen.getByTestId('wording-domain-campaign')).toHaveFocus();
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('满赠规则');
-
-    await user.click(screen.getByTestId('wording-domain-presale'));
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('本机目录');
-    expect(screen.getByTestId('wording-source-readiness')).not.toHaveTextContent('NOT_CREATED');
-    expect(screen.getByTestId('wording-empty')).toHaveTextContent('没有匹配的话术');
-    expect(screen.queryByTestId('wording-pager')).not.toBeInTheDocument();
-    expect(screen.getByTestId('wording-export')).toBeDisabled();
-  });
-
-  it('labels the wording library as 当前发布 when the announce lease matches the catalog', async () => {
-    const user = userEvent.setup();
-    window.dashboardWording = {
-      list: async () => ({
-        ok: true as const,
-        releaseId: 'rel_25',
-        catalogRefreshedAt: null,
-        matchesLease: true,
-        total: 1,
-        entries: [
-          {
-            scriptId: 'mn-1',
-            domain: 'product',
-            title: '洁面用法',
-            scene: '怎么用',
-            answerPreview: '先打湿再打圈',
-            platform: '千牛 / 抖音',
-            version: 'rel_25',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '当前发布',
-            risk: 'low',
-            lifecycle: 'published',
-            lifecycleLabel: '已发布',
-            ownerRole: '当前发布',
-            dataClass: 'local-catalog',
-          },
-        ],
-      }),
-    };
-    window.dashboardAnnounce = {
-      current: async () => ({
-        ok: true as const,
-        signedIn: true,
-        releaseId: 'rel_25',
-        announcement: null,
-        counts: { product: 1, campaign: 0, presale: 0, aftersale: 0 },
-        unread: false,
-        unreadDomains: [],
-      }),
-      markRead: async () => undefined,
-    };
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-wording'));
-    expect(await screen.findByTestId('wording-source-readiness')).toHaveTextContent('当前发布已挂载');
-    expect(screen.getByTestId('wording-source-readiness')).toHaveTextContent('这是坐席现在能搜到的目录');
-  });
-
-  it('labels the wording detail card with the entry ownerRole', async () => {
-    const user = userEvent.setup();
-    window.dashboardWording = {
-      list: async () => ({
-        ok: true as const,
-        releaseId: 'rel_18',
-        catalogRefreshedAt: null,
-        matchesLease: false,
-        total: 1,
-        entries: [
-          {
-            scriptId: 'mn-1',
-            domain: 'product',
-            title: '洁面用法',
-            scene: '怎么用',
-            answerPreview: '先打湿再打圈',
-            platform: '千牛 / 抖音',
-            version: 'rel_18',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '当前发布',
-            risk: 'low',
-            lifecycle: 'published',
-            lifecycleLabel: '已发布',
-            ownerRole: '当前发布',
-            dataClass: 'local-catalog',
-          },
-        ],
-      }),
-    };
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-wording'));
-    expect(await screen.findByTestId('wording-detail-owner')).toHaveTextContent('当前发布');
-    expect(screen.getByTestId('wording-detail-owner')).not.toHaveTextContent('本机话术库');
-  });
-
-  it('pages the wording library and exports the filtered published CSV', async () => {
-    const user = userEvent.setup();
-    const originalCreateObjectURL = URL.createObjectURL;
-    const originalRevokeObjectURL = URL.revokeObjectURL;
-    const createObjectURL = vi.fn(() => 'blob:wording-export');
-    const revokeObjectURL = vi.fn();
-    const click = vi.fn();
-    let downloadLink: HTMLAnchorElement | undefined;
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURL });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURL });
-    const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string, options?: ElementCreationOptions) => {
-      const node = originalCreateElement(tagName, options);
-      if (tagName === 'a') {
-        downloadLink = node as HTMLAnchorElement;
-        Object.defineProperty(node, 'click', { configurable: true, value: click });
-      }
-      return node;
-    }) as typeof document.createElement);
-    window.dashboardWording = {
-      list: async () => ({
-        ok: true as const,
-        releaseId: 'rel_18',
-        catalogRefreshedAt: null,
-        matchesLease: false,
-        total: 25,
-        entries: Array.from({ length: 25 }, (_, index) => ({
-          scriptId: `mn-${index + 1}`,
-          domain: 'product' as const,
-          title: `产品话术 ${index + 1}`,
-          scene: '怎么用',
-          answerPreview: `正文 ${index + 1}`,
-          platform: '千牛 / 抖音',
-          version: 'rel_18',
-          scriptVersion: 1,
-          effectiveFrom: '2026-01-01T00:00:00Z',
-          effectiveTo: null,
-          effectiveWindow: '当前发布',
-          risk: 'low' as const,
-          lifecycle: 'published' as const,
-          lifecycleLabel: '已发布' as const,
-          ownerRole: '当前发布',
-          dataClass: 'local-catalog' as const,
-        })),
-      }),
-    };
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-wording'));
-    expect(await screen.findByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 20');
-    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
-    expect(screen.getByTestId('wording-page-prev')).toBeDisabled();
-    expect(screen.getByTestId('wording-page-next')).toBeEnabled();
-    fireEvent.click(screen.getByTestId('wording-page-prev'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    await user.click(screen.getByRole('button', { name: /产品话术 2 怎么用/ }));
-    expect(screen.getByTestId('wording-detail')).toHaveTextContent('产品话术 2');
-    await user.click(screen.getByTestId('wording-page-next'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 21');
-    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 1');
-    expect(screen.getByTestId('wording-detail')).toHaveTextContent('产品话术 21');
-    expect(screen.getByTestId('wording-page-prev')).toBeEnabled();
-    expect(screen.getByTestId('wording-page-next')).toBeDisabled();
-    fireEvent.click(screen.getByTestId('wording-page-next'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
-    await user.click(screen.getByTestId('wording-page-prev'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
-    await user.click(screen.getByTestId('wording-export'));
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(click).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:wording-export');
-    expect(downloadLink?.download).toMatch(/^话术库-产品话术-已发布-\d{4}-\d{2}-\d{2}\.csv$/);
-    const firstCall = createObjectURL.mock.calls[0] as unknown[] | undefined;
-    const blob = firstCall?.[0];
-    expect(blob instanceof Blob).toBe(true);
-    if (!(blob instanceof Blob)) throw new Error('expected csv blob');
-    expect(blob.type).toContain('text/csv');
-    const csv = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsText(blob);
-    });
-    expect(csv.startsWith('script_id,domain,title,')).toBe(true);
-    expect(csv).toContain('mn-1,product,产品话术 1,');
-    expect(csv).toContain('mn-25,product,产品话术 25,');
-    expect(csv).toContain('\r\n');
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: originalCreateObjectURL });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: originalRevokeObjectURL });
-  });
-
-  it('resets the wording page when domain, lifecycle, search, or reset change', async () => {
-    const user = userEvent.setup();
-    window.dashboardWording = {
-      list: async () => ({
-        ok: true as const,
-        releaseId: 'rel_18',
-        catalogRefreshedAt: null,
-        matchesLease: false,
-        total: 26,
-        entries: [
-          ...Array.from({ length: 25 }, (_, index) => ({
-            scriptId: `mn-${index + 1}`,
-            domain: 'product' as const,
-            title: `产品话术 ${index + 1}`,
-            scene: '怎么用',
-            answerPreview: `正文 ${index + 1}`,
-            platform: '千牛 / 抖音',
-            version: 'rel_18',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '当前发布',
-            risk: 'low' as const,
-            lifecycle: 'published' as const,
-            lifecycleLabel: '已发布' as const,
-            ownerRole: '当前发布',
-            dataClass: 'local-catalog' as const,
-          })),
-          {
-            scriptId: 'mn-campaign-1',
-            domain: 'campaign' as const,
-            title: '活动话术 1',
-            scene: '活动',
-            answerPreview: '满赠不叠加',
-            platform: '千牛 / 抖音',
-            version: 'rel_18',
-            scriptVersion: 1,
-            effectiveFrom: '2026-01-01T00:00:00Z',
-            effectiveTo: null,
-            effectiveWindow: '当前发布',
-            risk: 'low' as const,
-            lifecycle: 'published' as const,
-            lifecycleLabel: '已发布' as const,
-            ownerRole: '当前发布',
-            dataClass: 'local-catalog' as const,
-          },
-        ],
-      }),
-    };
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-wording'));
-    expect(await screen.findByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    await user.click(screen.getByTestId('wording-page-next'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 2 / 2 页');
-
-    await user.click(screen.getByTestId('wording-domain-campaign'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 1 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('活动话术 1');
-
-    await user.click(screen.getByTestId('wording-domain-product'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
-    expect(screen.getByTestId('wording-list')).not.toHaveTextContent('产品话术 21');
-
-    await user.click(screen.getByTestId('wording-page-next'));
-    await user.type(screen.getByTestId('wording-search'), '正文 25');
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 1 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 25');
-
-    await user.clear(screen.getByTestId('wording-search'));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
-
-    await user.click(screen.getByTestId('wording-page-next'));
-    await user.click(screen.getByRole('button', { name: '重置' }));
-    expect(screen.getByTestId('wording-page-status')).toHaveTextContent('第 1 / 2 页');
-    expect(screen.getByTestId('wording-list')).toHaveTextContent('产品话术 1');
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
+    expect(screen.queryByTestId('wording-list')).not.toBeInTheDocument();
   });
 
   it('supports roving keyboard navigation between modules', async () => {
@@ -1718,21 +1382,17 @@ describe('DashboardApp', () => {
   });
 
   it('demonstrates local announce success and recoverable failure without changing facets', async () => {
-    const user = userEvent.setup();
     render(<DashboardApp />);
     fireEvent.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('announce-wording-empty')).toHaveTextContent('未接入');
-    await user.click(screen.getByTestId('system-sync-tab-software'));
-    await user.click(screen.getByTestId('software-check-update'));
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未接入');
-    expect(screen.queryByTestId('announce-push-action')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
+    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
   });
 
   it('shows ledger details without a sent body and keeps publish disabled', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     // ledger is now accessible via overview: open the details section
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
       '当前没有产品会话，无法发布',
@@ -1747,7 +1407,7 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     expect(window.customerAgent).toBeUndefined();
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
 
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('content-replace-row')).toHaveTextContent('将替换');
@@ -1850,7 +1510,7 @@ describe('DashboardApp', () => {
   it('keeps the staged preview after leaving content and coming back', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
     const csv = new File(
       ['scene,script\n洁面用量确认,先确认产品版本\n'],
       'coach-draft.csv',
@@ -1861,7 +1521,7 @@ describe('DashboardApp', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
     await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
     expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
     expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent('请先导入草稿');
@@ -1870,7 +1530,7 @@ describe('DashboardApp', () => {
   it('clears the coach preview back to idle without leaving released state behind', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
 
     const clear = screen.getByTestId('content-upload-clear');
     expect(clear).toBeDisabled();
@@ -1900,7 +1560,7 @@ describe('DashboardApp', () => {
   it('fail-closes bad coach tables without leaking a staged preview or enabling publish', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-publish'));
     const demoCsv = new File(
       ['scene,script\n洁面用量确认,先确认产品版本\n'],
       'coach-draft.csv',
@@ -1947,11 +1607,11 @@ describe('DashboardApp', () => {
     // iteration 模块已并入概览，通过概览双栏卡片验证
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
     // 「话术优化待办」标题出现在双栏卡片里
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理事项');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理迭代');
 
     await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('module-announce')).toHaveTextContent('话术版本');
-    expect(screen.queryByTestId('announce-table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
+    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
   });
 
   it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
