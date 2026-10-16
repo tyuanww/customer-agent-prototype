@@ -331,7 +331,8 @@ it('enables FAQ only through explicit synthetic loopback configuration', () => {
     identityOrigin: 'https://synthetic-id.invalid',
     contentIntake: 'faq-v2',
   });
-  expect(Object.keys(projectIntakeShellLine({ contentIntake: 'faq-v2' }) ?? {})).toEqual(['profileMode', 'contentIntake']);
+  expect(projectIntakeShellLine(readPackagedProductProfile(directory))).toBeNull();
+  expect(projectIntakeShellLine({ contentIntake: 'faq-v2' })).toBeNull();
   expect(projectIntakeShellLine({
     apiOrigin: 'http://127.0.0.1:43100',
     identityOrigin: 'http://127.0.0.1:43101',

@@ -21,6 +21,7 @@ import {
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { ProductHttpError } from './product-http';
+import { UNRESOLVED_JOB_LABEL } from '../shared/product-session';
 import type { ProductSession } from './product-session';
 import { LIBRARY_DOMAINS, composeLibraryDelta, type LibraryDomainCounts } from '../shared/library-delta';
 
@@ -219,6 +220,12 @@ export async function dashboardContentImport(
       return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
     }
     if (view.role === 'agent') return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.agent);
+    if (view.job?.status !== 'resolved' || view.job.rights.publish !== true) {
+      return dashboardContentFailure(
+        'FORBIDDEN',
+        view.job?.status === 'resolved' ? CONTENT_PUBLISH_COPY.agent : UNRESOLVED_JOB_LABEL,
+      );
+    }
     if (payload.sourceBindings.length < 1) {
       return dashboardContentFailure('VALIDATION', CONTENT_PUBLISH_COPY.missingBindings);
     }

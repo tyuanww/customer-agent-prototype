@@ -552,6 +552,7 @@ async function commandMigrate(): Promise<void> {
   if (cluster.state() !== 'running') {
     fail('postgres is not running; migrate leaves the cluster stopped');
   }
+  if (profile.databaseName === 'customer_agent_formal') fail('migrate refuses the formal catalog');
   const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {

@@ -150,6 +150,16 @@ it('fail-closes the cancel sweep without a product session instead of reporting 
   expect(unsigned.request).not.toHaveBeenCalled();
 });
 
+it('refuses a content import when the signed-in job cannot publish', async () => {
+  const owner = fakeSession('owner', true, agentJob);
+  expect(await dashboardContentImport(owner, {
+    sourceName: 'draft.csv',
+    csvText: csv,
+    sourceBindings: [productBinding],
+  })).toMatchObject({ ok: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
+  expect(owner.request).not.toHaveBeenCalled();
+});
+
 it('does not invent source bindings and never returns a fake success', async () => {
   const owner = fakeSession('owner');
   expect(dashboardContentSession(null)).toEqual({

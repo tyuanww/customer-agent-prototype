@@ -150,14 +150,11 @@ describe('SopLibraryModule', () => {
       softwareCatalog: vi.fn(),
       softwareOpenDownload: vi.fn(),
     };
-    const user = userEvent.setup();
     render(<SopLibraryModule canUploadSop={false} uploadBlock={OPS_LOOP_COPY.sopUploadJob} />);
     await waitFor(() => expect(screen.getByTestId('sop-library-list')).toHaveTextContent('停手'));
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-upload-input')).toBeDisabled();
     expect(screen.getByTestId('sop-custom-step')).toBeDisabled();
-    const file = new File(['node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n'], 'sop.csv', { type: 'text/csv' });
-    await user.upload(screen.getByTestId('sop-upload-input'), file);
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent(OPS_LOOP_COPY.sopUploadJob);
     expect(sopImport).not.toHaveBeenCalled();
   });
 

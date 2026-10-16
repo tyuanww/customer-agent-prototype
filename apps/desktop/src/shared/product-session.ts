@@ -90,7 +90,7 @@ export function isProductSessionResult(value: unknown): value is ProductSessionR
     && isSessionJob(v.job);
 }
 
-function isSessionJob(value: unknown): value is SessionJobView {
+export function isSessionJob(value: unknown): value is SessionJobView {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const job = value as Record<string, unknown>;
   const rights = job.rights;

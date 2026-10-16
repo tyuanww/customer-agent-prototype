@@ -148,6 +148,8 @@ export async function dashboardSopPatch(
     return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
   }
   return withSession(session, ['coach', 'owner'], async (client, epoch) => {
+    const refusal = sopUploadRefusal(client.view().job);
+    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
     const result = await client.request(
       epoch,
       `/v1/sop/nodes/${encodeURIComponent(nodeId)}`,
@@ -179,6 +181,8 @@ export async function dashboardSopDelete(
     return dashboardOpsFailure('VALIDATION');
   }
   return withSession(session, ['owner'], async (client, epoch) => {
+    const refusal = sopUploadRefusal(client.view().job);
+    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
     const result = await client.request(
       epoch,
       `/v1/sop/nodes/${encodeURIComponent(nodeId)}`,

@@ -10,8 +10,26 @@ import { ContentIntakePermissions } from '../../src/main/content-intake-permissi
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 import type { UsageLogRow } from '../../src/shared/dashboard-usage-log';
+import { observeSessionJob } from '../../src/shared/product-session';
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+function allowGrant() {
+  window.dashboardContent = {
+    session: async () => ({
+      ok: true,
+      enabled: true,
+      signedIn: true,
+      role: 'owner',
+      displayName: '合成管理员',
+      job: observeSessionJob({ title: '客服总监', directory: [{ name: '客服总监', enabled: true }] }),
+    }),
+    parseUpload: async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用，请重试' }),
+    publishDraft: async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用，请重试' }),
+    rollbackPrevious: async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用，请重试' }),
+    cancelInFlight: async () => ({ ok: true as const }),
+  };
+}
 
 function installShippedDashboardCss() {
   if (document.getElementById('shipped-dashboard.css')) return;
@@ -114,7 +132,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   const fixture=intakePermissionsData(),owner=new ContentIntakePermissions(fixture.session),user=userEvent.setup();
   window.dashboardPermissions={current:async()=>({ok:true,view:owner.view()}),command:async c=>({ok:true,view:await owner.command(c)}),onInvalidated:fn=>owner.subscribe(fn)};
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
-  try{installShippedDashboardCss();render(<DashboardApp/>);
+  try{installShippedDashboardCss();allowGrant();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
     expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(8);
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
@@ -233,6 +251,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     export: async () => ({ ok: true, written: 1 }),
   };
   installShippedDashboardCss();
+  allowGrant();
   document.documentElement.style.width = '980px';
   document.body.style.cssText = 'width:980px;height:680px;margin:0';
   const user = userEvent.setup();

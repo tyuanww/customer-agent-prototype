@@ -41,7 +41,11 @@ it('rejects non-Dashboard, child frames and extra intent fields before touching 
 it('projects only synthetic-local and faq-v2 when an intake session exists', async () => {
   const frame = { parent: null };
   const dashboard = { id: 1, mainFrame: frame, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=dashboard' } as unknown as WebContents;
-  const owned = registerContentIntakeManagementIpc({} as never, () => dashboard, () => 'http://127.0.0.1:5173/');
+  const owned = registerContentIntakeManagementIpc({} as never, () => dashboard, () => 'http://127.0.0.1:5173/', {
+    apiOrigin: 'http://127.0.0.1:43100',
+    identityOrigin: 'http://127.0.0.1:43101',
+    contentIntake: 'faq-v2',
+  });
   const event = { sender: dashboard, senderFrame: frame } as IpcMainInvokeEvent;
   try {
     const line = await handlers.get('dashboard:intake-shell-line')!(event);

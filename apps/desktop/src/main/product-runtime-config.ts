@@ -51,7 +51,11 @@ export type PackagedProductProfile = Readonly<{
 export function projectIntakeShellLine(
   profile: PackagedProductProfile | Pick<PackagedProductProfile, 'contentIntake'> | null | undefined,
 ): { readonly profileMode: typeof MODE; readonly contentIntake: 'faq-v2' } | null {
-  if (profile?.contentIntake !== 'faq-v2') return null;
+  if (!profile || profile.contentIntake !== 'faq-v2') return null;
+  if (!('apiOrigin' in profile) || !('identityOrigin' in profile)) return null;
+  const apiOrigin = loopbackOrigin(profile.apiOrigin);
+  const identityOrigin = loopbackOrigin(profile.identityOrigin);
+  if (!apiOrigin || !identityOrigin || apiOrigin === identityOrigin) return null;
   return Object.freeze({ profileMode: MODE, contentIntake: 'faq-v2' });
 }
 
