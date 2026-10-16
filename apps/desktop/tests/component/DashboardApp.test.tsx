@@ -1354,8 +1354,9 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
-    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
-    expect(screen.queryByTestId('wording-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-wording')).toBeInTheDocument();
+    expect(screen.getByTestId('wording-empty')).toHaveTextContent('当前发布未挂载');
+    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
   it('supports roving keyboard navigation between modules', async () => {
@@ -1386,7 +1387,9 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     fireEvent.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
+    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
+    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
   it('shows ledger details without a sent body and keeps publish disabled', async () => {
@@ -1612,7 +1615,9 @@ describe('DashboardApp', () => {
 
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByText('可用资料暂不可读取，请重试。')).toBeInTheDocument();
+    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
+    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
   it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
