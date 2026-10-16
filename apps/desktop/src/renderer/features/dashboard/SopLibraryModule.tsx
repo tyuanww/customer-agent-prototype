@@ -93,7 +93,7 @@ export function SopLibraryModule({
             const file = event.target.files?.[0];
             event.target.value = '';
             if (!canUploadSop) {
-              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
+              if (uploadBlock) setMessage(uploadBlock);
               return;
             }
             const api = window.dashboardOps;
@@ -121,13 +121,7 @@ export function SopLibraryModule({
           className="dash-reset"
           data-testid="sop-upload"
           disabled={!canUploadSop}
-          onClick={() => {
-            if (!canUploadSop) {
-              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
-              return;
-            }
-            uploadRef.current?.click();
-          }}
+          onClick={() => uploadRef.current?.click()}
         >
           上传
         </button>
@@ -226,10 +220,6 @@ export function SopLibraryModule({
           data-testid="sop-custom-step"
           disabled={!canUploadSop}
           onClick={() => {
-            if (!canUploadSop) {
-              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
-              return;
-            }
             const api = window.dashboardOps;
             if (!api) {
               setMessage(OPS_LOOP_COPY.noProduct);

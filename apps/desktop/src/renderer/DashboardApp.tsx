@@ -139,6 +139,17 @@ type NavTooltipState = {
 export function DashboardApp() {
   return <DashboardWorkspace profile="intake" />;
 }
+function sopUploadControl(
+  jobKnown: boolean,
+  signedIn: boolean | null,
+  job: SessionJobView | null,
+): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
+  if (!jobKnown) return null;
+  if (signedIn === null) return { code: 'FORBIDDEN', message: '' };
+  if (!signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  return sopUploadRefusal(job);
+}
+
 /** Both profiles share native chrome and appearance. Only the selected profile
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
@@ -173,11 +184,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     return () => { alive = false; };
   }, []);
   const canGrant = !jobKnown || (sessionJob?.status === 'resolved' && sessionJob.rights.grant);
-  const uploadRefusal = !jobKnown || contentSignedIn === null
-    ? null
-    : contentSignedIn
-      ? sopUploadRefusal(sessionJob)
-      : { code: 'UNAUTHORIZED' as const, message: OPS_LOOP_COPY.noSession };
+  const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
   const grantBlock = !jobKnown
     ? ''
