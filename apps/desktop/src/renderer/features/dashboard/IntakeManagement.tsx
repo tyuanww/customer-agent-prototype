@@ -2,6 +2,7 @@ import type { components } from '@customer-agent/contracts';
 import { Empty } from 'antd';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
@@ -214,6 +215,12 @@ export function IntakeManagement() {
       return;
     }
     if (pending.current !== null || stopPending.current) return;
+    if (!window.dashboardIntake) {
+      setView(null);
+      setError(WORKBENCH_EMPTY.intakeUnmounted);
+      setBusy(false);
+      return;
+    }
     setBusy(true); setError(''); const gen = ++generation.current; pending.current = gen;
     const uploading = command?.action.startsWith('upload-') ?? false; setUploadRequest(uploading);
     try {
@@ -254,7 +261,12 @@ export function IntakeManagement() {
     return () => { active = false; window.clearInterval(timer); };
   }, [busy, uploadRequest]);
   useEffect(() => {
-    const api = window.dashboardIntake!;
+    const api = window.dashboardIntake;
+    if (!api) {
+      setView(null);
+      setError(WORKBENCH_EMPTY.intakeUnmounted);
+      return undefined;
+    }
     const off = api.onInvalidated(() => {
       const gen = ++generation.current; setDirtyIds(new Set()); setView(null); setError('会话、权限或请求上下文已改变，请刷新。');
       // Preserve only a Main-owned unknown receipt handle, never the old material.

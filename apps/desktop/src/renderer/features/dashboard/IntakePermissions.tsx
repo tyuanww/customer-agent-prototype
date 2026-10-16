@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './workbench-v9.css';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionView } from '@shared/content-intake-permissions';
 import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 import { formatIntakeTime, timeoutUntil } from './intake-time';
 
@@ -132,11 +133,11 @@ export function IntakePermissions({ active, canGrant = true, grantBlock = '' }: 
   const apply=async(command?:IntakePermissionCommand): Promise<boolean>=>{
     if(pending.current && command?.action!=='stop')return false;
     const gen=++generation.current;pending.current=true;setBusy(true);setError('');
-    try{const api=window.dashboardPermissions;if(!api)throw new Error('unavailable');
+    try{const api=window.dashboardPermissions;if(!api)throw new Error('unmounted');
       const reply=await(command?api.command(command):api.current());if(gen!==generation.current)return false;
       setView(reply.view);if(!reply.ok){setError(reply.message);return false;}
       return true;
-    }catch{if(gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}return false;}
+    }catch(error){if(gen===generation.current){setError(error instanceof Error && error.message==='unmounted' ? WORKBENCH_EMPTY.intakeUnmounted : '权限配置暂不可用，请重新读取。');setView(null);}return false;}
     finally{if(gen===generation.current){pending.current=false;setBusy(false);}}
   };
   useEffect(()=>{
@@ -145,11 +146,11 @@ export function IntakePermissions({ active, canGrant = true, grantBlock = '' }: 
     const gen=++generation.current;
     let alive=true;
     void (async()=>{
-      try{const api=window.dashboardPermissions;if(!api)throw new Error('unavailable');
+      try{const api=window.dashboardPermissions;if(!api)throw new Error('unmounted');
         const reply=await api.command({action:'refresh'});
         if(!alive || gen!==generation.current)return;
         setView(reply.view);if(!reply.ok)setError(reply.message);
-      }catch{if(alive && gen===generation.current){setError('权限配置暂不可用，请重新读取。');setView(null);}}
+      }catch(error){if(alive && gen===generation.current){setError(error instanceof Error && error.message==='unmounted' ? WORKBENCH_EMPTY.intakeUnmounted : '权限配置暂不可用，请重新读取。');setView(null);}}
     })();
     return()=>{alive=false;};
   },[active,view]);
