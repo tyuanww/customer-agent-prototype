@@ -701,6 +701,16 @@ describe('ContentModule rollback to previous release', () => {
     }
   });
 
+  it('keeps rollback off for an owner whose job cannot grant', async () => {
+    cleanup();
+    const api = mockSession('owner', true, titled('客服主管'));
+    window.dashboardContent = api;
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
+    expect(api.rollbackPrevious).not.toHaveBeenCalled();
+  });
+
   it('requires a confirmation click before calling the API, then reports the copied release', async () => {
     const api = mockSession('owner');
     api.rollbackPrevious = vi.fn(async () => ({

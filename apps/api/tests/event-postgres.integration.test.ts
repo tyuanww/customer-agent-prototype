@@ -205,6 +205,7 @@ function searchRequest(queryId: string, overrides: Partial<PreparedSearchOperati
     }),
     redactionPolicyVersion: 'redaction-synthetic-v1',
     queryTextRedacted: '什么时候发货',
+    retainQueryText: true,
     queryHash: hmacSafeValue('什么时候发货', LOG_HASH.version, LOG_HASH.key),
     queryHashKeyVersion: LOG_HASH.version,
     productContextRefHash: null,
@@ -694,9 +695,17 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     });
     expect(recorded.statusCode).not.toBe(403);
     await expect(owner.query(
-      'SELECT collection_mode FROM public.query_events WHERE query_id = $1',
+      `SELECT collection_mode, text_storage_status, query_text_redacted, query_text_hash
+       FROM public.query_events WHERE query_id = $1`,
       [queryId],
-    )).resolves.toMatchObject({ rows: [{ collection_mode: 'synthetic' }] });
+    )).resolves.toMatchObject({
+      rows: [{
+        collection_mode: 'synthetic',
+        text_storage_status: 'suppressed',
+        query_text_redacted: null,
+        query_text_hash: null,
+      }],
+    });
     acceptedNotice = true;
 
     // Publish a notice and accept it as the actor.
