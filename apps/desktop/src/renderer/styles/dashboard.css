@@ -1840,10 +1840,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   font-size: 12px;
 }
 
-.content-staged-preview {
-  min-height: 280px;
-}
-
 .content-publish-veil {
   position: absolute;
   inset: 0;
