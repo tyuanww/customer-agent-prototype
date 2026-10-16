@@ -72,6 +72,12 @@ it('rejects two enabled directory rows with the same name', () => {
   ])).toEqual({ status: 'unresolved', reason: 'duplicate' });
 });
 
+it('does not treat inherited object keys as job titles', () => {
+  for (const name of ['toString', 'constructor', '__proto__']) {
+    expect(resolveJobTitle(name, one(name))).toEqual({ status: 'unresolved', reason: 'unknown' });
+  }
+});
+
 it('ignores a disabled twin when one enabled row remains', () => {
   expect(resolveJobTitle('客服总监', [
     { name: '客服总监', enabled: false },

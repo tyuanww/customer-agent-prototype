@@ -37,7 +37,7 @@ export function resolveJobTitle(title: string, directory: readonly JobDirectoryE
   if (name.length === 0) return { status: 'unresolved', reason: 'blank' };
   const matches = directory.filter((entry) => entry.enabled && entry.name === name);
   if (matches.length > 1) return { status: 'unresolved', reason: 'duplicate' };
-  const role = TITLE_ROLE[name];
+  const role = Object.hasOwn(TITLE_ROLE, name) ? TITLE_ROLE[name] : undefined;
   if (matches.length !== 1 || role === undefined) return { status: 'unresolved', reason: 'unknown' };
   return { status: 'resolved', title: name, role, rights: RIGHTS[role] };
 }
