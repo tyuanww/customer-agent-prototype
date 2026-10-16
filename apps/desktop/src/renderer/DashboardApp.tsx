@@ -1,6 +1,5 @@
 import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeOverview } from './features/dashboard/IntakeOverview';
-import { IntakeSopSource } from './features/dashboard/IntakeSopSource';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
@@ -27,6 +26,7 @@ import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
+import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import {
   DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED,
   DASHBOARD_WINDOW_TITLE,
@@ -1341,7 +1341,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
-          {active === 'sop' && <IntakeSopSource />}
+          {active === 'sop' && <SopLibraryModule />}
           <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} />
           {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
           {keepPublish || active === 'publish' ? (
