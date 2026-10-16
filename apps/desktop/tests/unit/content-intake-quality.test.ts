@@ -43,7 +43,7 @@ function fixture(count = 2) {
   };
   const request = vi.fn(respond);
   const session: Pick<ProductSession, 'view' | 'subscribe' | 'request'> = { request,
-    view: () => ({ ok: true, enabled: true, signedIn: true, sessionEpoch: epoch, userId: 'synthetic-reviewer', role: 'coach', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成审核人' }),
+    view: () => ({ ok: true, enabled: true, signedIn: true, sessionEpoch: epoch, userId: 'synthetic-reviewer', role: 'coach', authMode: 'mock', expiresAt: '2099-01-01T00:00:00Z', displayName: '合成审核人', job: null }),
     subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } };
   const main = new ContentIntakeQuality(session); main.select(key);
   const relogin = () => { epoch++; listeners.forEach(f => f(session.view())); };

@@ -32,8 +32,8 @@ function fixture(format: 'xlsx' | 'csv' = 'xlsx') {
   let epoch = 1, signedIn = true;
   const listeners = new Set<Parameters<ProductSession['subscribe']>[0]>();
   const view: ProductSession['view'] = () => signedIn ? { ok: true, enabled: true, signedIn: true, sessionEpoch: epoch,
-    userId: 'user-not-principal-a', role: 'agent', authMode: 'mock', expiresAt: validUntil, displayName: '合成用户' }
-    : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    userId: 'user-not-principal-a', role: 'agent', authMode: 'mock', expiresAt: validUntil, displayName: '合成用户', job: null }
+    : { ok: true, enabled: true, signedIn: false, sessionEpoch: epoch, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
   const request = vi.fn(async (_epoch: number, path: string, _options: Parameters<ProductSession['request']>[2] = {}) => {
     const p = new URL(path, 'http://127.0.0.1').pathname;
     const value = p.endsWith('/management-context') ? context : p.endsWith('/principals') ? principals

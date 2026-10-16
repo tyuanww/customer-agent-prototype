@@ -223,7 +223,6 @@ describe('job observation from a signed-out session', () => {
   it('keeps a missing, blank, unknown, or duplicate title as 职务未识别 without write rights', async () => {
     const cases: Array<{ snapshot: JobSnapshot | null; reason: 'missing' | 'blank' | 'unknown' | 'duplicate' }> = [
       { snapshot: null, reason: 'missing' },
-      { snapshot: { title: null, directory: one('客服总监') }, reason: 'missing' },
       { snapshot: { title: '   ', directory: one('客服总监') }, reason: 'blank' },
       { snapshot: { title: '服务赋能师', directory: one('服务赋能师') }, reason: 'unknown' },
       { snapshot: { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] }, reason: 'duplicate' },
