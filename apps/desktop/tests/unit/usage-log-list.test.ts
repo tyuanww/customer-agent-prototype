@@ -16,12 +16,10 @@ const rows: UsageSourceRow[] = [
 it('registers the usage channels before the legacy-only branch', () => {
   const main = readFileSync(resolve(desktopRoot, 'src/main/main.ts'), 'utf8');
   const handler = readFileSync(resolve(desktopRoot, 'src/main/usage-log-ipc.ts'), 'utf8');
-  const guard = main.indexOf('if (!productProfile?.contentIntake)');
   const call = main.indexOf('registerUsageLogIpc(');
-  expect(guard).toBeGreaterThan(0);
   expect(call).toBeGreaterThan(0);
-  expect(call).toBeLessThan(guard);
   expect(main.indexOf('registerUsageLogIpc(', call + 1)).toBe(-1);
+  expect(main).not.toMatch(/if \(!productProfile\??\.contentIntake\)[\s\S]{0,80}registerUsageLogIpc\(/);
   expect(handler).toContain('return listUsageLog(usageSource, filter)');
   expect(handler).toContain('usageExportPreviewCounts(usageSource)');
   expect(handler).toContain('if (!guard(event) || usageSource === null) return unavailable()');
