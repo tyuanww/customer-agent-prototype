@@ -48,9 +48,6 @@ export type PackagedProductProfile = Readonly<{
   contentIntake?: 'faq-v2';
 }>;
 
-/** Shell whitelist. `contentIntake` is set only after synthetic-local and two
- * distinct loopback origins have already passed, so this does not re-read the
- * profile file. It returns the two constants, never origins or the raw profile. */
 export function projectIntakeShellLine(
   profile: PackagedProductProfile | Pick<PackagedProductProfile, 'contentIntake'> | null | undefined,
 ): { readonly profileMode: typeof MODE; readonly contentIntake: 'faq-v2' } | null {

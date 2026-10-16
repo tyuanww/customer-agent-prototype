@@ -202,8 +202,6 @@ describe.skipIf(!enabled)('intake scope runtime assembly refusals (synthetic onl
   });
 
   it('does not move content_current id=1 when sources.mode is not v2-preview or the catalog row is absent', async () => {
-    // Success path that does move id=1: scripts/intake-synthetic/host.test.ts publishes
-    // against the seeded rel_native_base catalog, then snapshot.releaseId === currentReleaseId.
     const pointer = async () => (await admin.query<{ current_release_id: string }>(
       'SELECT current_release_id FROM public.content_current WHERE id=1',
     )).rows[0]!.current_release_id;

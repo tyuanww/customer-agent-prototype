@@ -19,7 +19,6 @@
  *   node scripts/synthetic-stack/stack.ts destroy   stop, then remove the isolated cluster
  *   node scripts/synthetic-stack/stack.ts desktop           print the desktop client env for this stack
  *   node scripts/synthetic-stack/stack.ts packaged-profile  write/print userData synthetic-stack.json path
- *   node scripts/synthetic-stack/stack.ts migrate           bootstrap the recorded database only
  *   node scripts/synthetic-stack/stack.ts anomaly           status | session-revoke | source-suspend <id>
  *
  * Full M3 check (separate entry): node scripts/synthetic-stack/anomaly-check.ts
@@ -546,11 +545,6 @@ function commandPackagedProfile(): void {
   process.stdout.write(`${writeDesktopPackagedProfile(profile)}\n`);
 }
 
-/**
- * Apply pending migrations, then the idempotent reference seed, on the database
- * named by the existing profile. Refuses to start a stopped cluster. Does not
- * rewrite either profile file and does not start or stop identity, API, or worker.
- */
 async function commandMigrate(): Promise<void> {
   if (!readProfile()) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
   const profile = await resolveProfile(undefined, { reuse: true });

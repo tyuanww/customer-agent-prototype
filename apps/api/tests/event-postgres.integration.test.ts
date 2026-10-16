@@ -612,10 +612,6 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
   });
 });
 
-/**
- * Seat search against a real database. A missing current-notice acceptance still
- * reaches the shipped query_events insert. The notice tables stay readable.
- */
 describePg15('pilot_recorded is recorded without an accepted notice', () => {
   let harness: Pg15Harness;
   let owner: Client;
@@ -684,7 +680,6 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     const before = await app.inject({ method: 'GET', url: '/v1/notices/current', headers });
     expect(before.statusCode).toBe(404);
 
-    // Nothing has been accepted. The shipped route still records the search.
     expect(await acceptedNow()).toBe(false);
     const queryId = '10000000-0000-4000-8000-0000000000aa';
     const recorded = await app.inject({
