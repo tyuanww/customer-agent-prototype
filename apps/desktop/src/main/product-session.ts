@@ -2,10 +2,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   exactKeys,
+  observeSessionJob,
   productFailure,
   sessionDisplayName,
+  type JobSnapshot,
   type ProductSessionResult,
   type ProductSessionView,
+  type SessionJobView,
 } from '../shared/product-session';
 import { parseContractSchema } from '@customer-agent/contracts';
 import {
@@ -40,8 +43,10 @@ export class ProductSession {
   private operation: AbortController | null = null;
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(state: ProductSessionResult) => void>();
+  private job: SessionJobView | null = null;
   constructor(readonly http: ProductHttp, private readonly store: SessionStore, private readonly window: LoginWindow,
-    private readonly displayNameFor: (userId: string) => string | null = readOperatorDisplayName) {}
+    private readonly displayNameFor: (userId: string) => string | null = readOperatorDisplayName,
+    private readonly jobSnapshotFor: (userId: string) => JobSnapshot | null = () => null) {}
   subscribe(listener: (state: ProductSessionResult) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private emit(state: ProductSessionResult) { for (const listener of this.listeners) listener(state); }
   view(): ProductSessionView {
@@ -53,10 +58,16 @@ export class ProductSession {
     });
     return { ok: true, enabled: true, signedIn: !!this.token && !!this.user, sessionEpoch: this.epoch,
       userId, role: this.user?.role ?? null, authMode: this.user?.authMode ?? null,
-      expiresAt: this.token?.expires_at ?? null, displayName };
+      expiresAt: this.token?.expires_at ?? null, displayName,
+      job: this.token && this.user ? this.job : null };
+  }
+  private rememberJob(userId: string) {
+    let snapshot: JobSnapshot | null = null;
+    try { snapshot = this.jobSnapshotFor(userId); } catch { snapshot = null; }
+    this.job = observeSessionJob(snapshot);
   }
   private invalidate() {
-    this.epoch++; this.operation?.abort(); this.operation = null; this.token = null; this.user = null;
+    this.epoch++; this.operation?.abort(); this.operation = null; this.token = null; this.user = null; this.job = null;
     if (this.expiry) clearTimeout(this.expiry); this.expiry = null;
     let state: ProductSessionResult;
     try { this.store.clear(); state = this.view(); } catch { state = productFailure('UNAVAILABLE', this.epoch); }
@@ -75,6 +86,7 @@ export class ProductSession {
     const remaining = Date.parse(token.expires_at) - Date.now();
     if (!sessionExpiryAccepted(token.expires_at)) throw new ProductHttpError('UNAUTHORIZED');
     this.store.write(token); this.epoch++; this.token = token; this.user = user;
+    this.rememberJob(user.userId);
     this.expiry = setTimeout(() => this.invalidate(), remaining); this.expiry.unref?.();
     const state = this.view(); this.emit(state); return state;
   }
@@ -98,9 +110,11 @@ export class ProductSession {
     try {
       const user = await this.identify(token, AbortSignal.timeout(5_000));
       if (epoch !== this.epoch || token !== this.token) return productFailure('STALE', epoch);
-      if (user.role !== this.user?.role || user.userId !== this.user?.userId) {
-        this.epoch++; this.user = user; this.emit(this.view());
-      }
+      const changed = user.role !== this.user?.role || user.userId !== this.user?.userId;
+      if (changed) this.epoch++;
+      this.user = user;
+      this.rememberJob(user.userId);
+      if (changed) this.emit(this.view());
       return this.view();
     } catch (error) {
       if (epoch !== this.epoch) return productFailure('STALE', epoch);
