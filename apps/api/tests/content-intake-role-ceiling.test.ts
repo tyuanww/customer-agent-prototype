@@ -56,7 +56,7 @@ describe('content intake role ceiling', () => {
     const client = (issuerRole: Principal['role'], recipientRole: Principal['role'], recipientId: string): IntakeTransaction => ({
       validUntil() {},
       beforeCommit() {},
-      query: async (sql: string, params?: unknown[]) => {
+      query: (async (sql: string, params?: unknown[]) => {
         if (sql.includes('policy_versions')) return { rows: [{ version: '1' }] };
         if (sql.includes('clock_timestamp() AS time')) return { rows: [{ time: new Date(now) }] };
         if (sql.includes('AS roles')) {
@@ -68,7 +68,7 @@ describe('content intake role ceiling', () => {
         if (sql.includes('FROM content_intake.scopes')) return { rows: [{ scope_id: 'scope-a' }] };
         if (sql.includes('grant_id,expires_at')) return { rows: [] };
         return { rows: [] };
-      },
+      }) as IntakeTransaction['query'],
     });
     const request = (recipientId: string) => ({
       operationId: 'grant-import', issuerFactsVersion: 1, policyVersion: 1,
