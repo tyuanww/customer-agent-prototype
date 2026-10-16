@@ -2,12 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
 import {
   authenticateRequestHeaders,
+  bearerToken,
   type AuthService,
 } from './auth-service.js';
 import {
   sendUnauthorized,
   sendValidationError,
 } from './contract-http-errors.js';
+import { jobForToken } from './feishu-job-snapshot.js';
 
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -50,5 +52,15 @@ export function registerAuthRoutes(
     });
     reply.header('cache-control', 'no-store');
     return payload;
+  });
+
+  app.get('/v1/auth/job', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const user = await authenticateRequestHeaders(authService, request.headers);
+    if (user === null) return sendUnauthorized(reply);
+    const token = bearerToken(request.headers.authorization);
+    const snapshot = token ? jobForToken(token) : null;
+    if (!snapshot) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
+    return { title: snapshot.title, directory: snapshot.directory };
   });
 }
