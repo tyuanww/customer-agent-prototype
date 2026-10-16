@@ -62,14 +62,17 @@ function indexFixture() {
   <p class="meta">Windows 10+ x64 · 87.2 MB · 未代码签名</p>
   <p class="section-lead">v0.3.24 · 2026年9月29日</p>
   <div class="panel is-on" id="panel-win" role="tabpanel">
+    <p class="platform-meta">v0.3.24 · 1.0 MB</p>
     <button class="chip" type="button" data-copy="c2dd941031791b8dc589fbadf1cbfa0231c72734ebc846c8809971f8e55510cd">SHA-256\u3000c2dd9410…f55510cd</button>
     <a class="btn btn-primary" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-win-x64-UNSIGNED.exe">下载 · 87.2 MB</a>
   </div>
   <div class="panel" id="panel-mac" role="tabpanel" hidden>
+    <p class="platform-meta">v0.3.24 · 2.0 MB</p>
     <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256\u3000476d16e7…6f157eb3</button>
     <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
   </div>
   <div class="panel" id="panel-linux" role="tabpanel" hidden>
+    <p class="platform-meta">v0.3.24 · 3.0 MB</p>
     <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256\u3000af48a336…3f19068e</button>
     <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
   </div>
@@ -149,6 +152,12 @@ test('renderIndex rewrites version, date, sizes, checksums and every URL', () =>
   assert.match(rendered, /download\/v0\.3\.25\/Demo-0\.3\.25-linux-x86_64-UNSIGNED\.AppImage/u);
   assert.match(rendered, /下载 · 213\.5 MB/u);
   assert.match(rendered, /下载 · 125\.9 MB/u);
+  assert.match(rendered, /class="platform-meta">v0\.3\.25 · 87\.2 MB/u);
+  assert.match(rendered, /class="platform-meta">v0\.3\.25 · 213\.5 MB/u);
+  assert.match(rendered, /class="platform-meta">v0\.3\.25 · 125\.9 MB/u);
+  assert.ok(!rendered.includes('1.0 MB'), 'stale windows meta size is gone');
+  assert.ok(!rendered.includes('2.0 MB'), 'stale mac meta size is gone');
+  assert.ok(!rendered.includes('3.0 MB'), 'stale linux meta size is gone');
 });
 
 test('renderIndex and renderWindows are idempotent', () => {
