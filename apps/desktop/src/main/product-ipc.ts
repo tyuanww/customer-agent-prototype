@@ -13,7 +13,7 @@ export function registerProductIpc(
   devUrl: () => string | undefined,
   sessionFanout: () => Array<WebContents | null> = () => [],
 ) {
-  const disabled: ProductSessionView = { ok: true, enabled: false, signedIn: false, sessionEpoch: 0, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+  const disabled: ProductSessionView = { ok: true, enabled: false, signedIn: false, sessionEpoch: 0, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
   for (const [channel, method] of [
     [IPC_CHANNELS.PRODUCT_SESSION_STATUS, 'status'], [IPC_CHANNELS.PRODUCT_LOGIN, 'login'], [IPC_CHANNELS.PRODUCT_LOGOUT, 'logout'],
   ] as const) {

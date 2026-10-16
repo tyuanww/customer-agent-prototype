@@ -1,10 +1,58 @@
+import { resolveJobTitle, type BoardRights, type BoardRole, type JobDirectoryEntry } from './workbench-job';
+
 /** Public session projection. Credentials never cross preload. Epoch is owned by main. */
 export type ProductSessionView = {
   ok: true; enabled: boolean; signedIn: boolean; sessionEpoch: number;
   userId: string | null; role: 'agent' | 'coach' | 'owner' | null;
   authMode: 'mock' | 'feishu' | null; expiresAt: string | null;
   displayName: string | null;
+  /** Present on every main-process view. Older fixtures may omit it. */
+  job?: SessionJobView | null;
 };
+
+export const UNRESOLVED_JOB_LABEL = '职务未识别';
+
+const NO_JOB_RIGHTS: BoardRights = {
+  publish: false, grant: false, uploadSop: false, search: false, readCatalog: false,
+};
+
+export type SessionJobView =
+  | {
+    readonly status: 'resolved';
+    readonly title: string;
+    readonly role: BoardRole;
+    readonly label: string;
+    readonly rights: BoardRights;
+  }
+  | {
+    readonly status: 'unresolved';
+    readonly reason: 'blank' | 'unknown' | 'duplicate' | 'missing';
+    readonly label: typeof UNRESOLVED_JOB_LABEL;
+    readonly rights: BoardRights;
+  };
+
+/** Identity snapshot already returned to this client. Null means the title was not returned. */
+export type JobSnapshot = {
+  readonly title: string | null;
+  readonly directory: readonly JobDirectoryEntry[];
+};
+
+export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
+  if (snapshot === null || snapshot.title === null) {
+    return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
+  }
+  const lookup = resolveJobTitle(snapshot.title, snapshot.directory);
+  if (lookup.status === 'unresolved') {
+    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
+  }
+  return {
+    status: 'resolved',
+    title: lookup.title,
+    role: lookup.role,
+    label: lookup.title,
+    rights: { ...lookup.rights },
+  };
+}
 export const PRODUCT_ERRORS = {
   UNAUTHORIZED: '请先登录，或重新登录后继续', VALIDATION: '请求内容无效',
   FORBIDDEN: '当前身份不能执行此操作', GONE: '登录请求已过期，请重试',
@@ -30,16 +78,45 @@ export function isProductSessionResult(value: unknown): value is ProductSessionR
   if (v.ok === false) return exactKeys(v, ['ok', 'code', 'sessionEpoch', 'message'])
     && typeof v.code === 'string' && Object.hasOwn(PRODUCT_ERRORS, v.code)
     && v.message === PRODUCT_ERRORS[v.code as ProductErrorCode];
-  if (!exactKeys(v, ['ok', 'enabled', 'signedIn', 'sessionEpoch', 'userId', 'role', 'authMode', 'expiresAt', 'displayName'])
+  if (!exactKeys(v, ['ok', 'enabled', 'signedIn', 'sessionEpoch', 'userId', 'role', 'authMode', 'expiresAt', 'displayName', 'job'])
     || v.ok !== true || typeof v.enabled !== 'boolean' || typeof v.signedIn !== 'boolean') return false;
   if (!v.signedIn) {
-    return v.userId === null && v.role === null && v.authMode === null && v.expiresAt === null && v.displayName === null;
+    return v.userId === null && v.role === null && v.authMode === null && v.expiresAt === null
+      && v.displayName === null && v.job === null;
   }
   return v.enabled && typeof v.userId === 'string' && v.userId.length > 0 && v.userId.length <= 128
     && ['agent', 'coach', 'owner'].includes(v.role as string)
     && ['mock', 'feishu'].includes(v.authMode as string)
     && typeof v.expiresAt === 'string' && Number.isFinite(Date.parse(v.expiresAt))
-    && typeof v.displayName === 'string' && v.displayName.length > 0 && v.displayName.length <= 64;
+    && typeof v.displayName === 'string' && v.displayName.length > 0 && v.displayName.length <= 64
+    && isSessionJob(v.job);
+}
+
+function isSessionJob(value: unknown): value is SessionJobView {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const job = value as Record<string, unknown>;
+  const rights = job.rights;
+  if (!rights || typeof rights !== 'object' || Array.isArray(rights)) return false;
+  const row = rights as Record<string, unknown>;
+  if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
+  if (![row.publish, row.grant, row.uploadSop, row.search, row.readCatalog].every((flag) => typeof flag === 'boolean')) return false;
+  if (job.status === 'unresolved') {
+    return exactKeys(job, ['status', 'reason', 'label', 'rights'])
+      && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
+      && job.label === UNRESOLVED_JOB_LABEL
+      && row.publish === false && row.grant === false && row.uploadSop === false
+      && row.search === false && row.readCatalog === false;
+  }
+  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights'])) return false;
+  if (typeof job.title !== 'string' || job.label !== job.title) return false;
+  const expected = resolveJobTitle(job.title, [{ name: job.title, enabled: true }]);
+  return expected.status === 'resolved'
+    && expected.role === job.role
+    && expected.rights.publish === row.publish
+    && expected.rights.grant === row.grant
+    && expected.rights.uploadSop === row.uploadSop
+    && expected.rights.search === row.search
+    && expected.rights.readCatalog === row.readCatalog;
 }
 export type ProductSessionApi = {
   sessionStatus(): Promise<ProductSessionResult>;
