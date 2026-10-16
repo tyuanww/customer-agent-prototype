@@ -9,6 +9,7 @@ import {
   type DashboardContentSessionView,
 } from '@shared/dashboard-content';
 import { StatusBadge } from './StatusBadge';
+import { LibrarySelect } from './LibrarySelect';
 import {
   readCoachUploadFile,
   type CoachUploadResult,
@@ -30,7 +31,7 @@ const UPLOAD_COPY = {
 } as const;
 
 const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
-const REPLACE_HINT = '必须手选要换的库。发布会整库替换这一库，其它库沿用。';
+const REPLACE_HINT = '发布会整库替换这一库，其它库沿用。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
 const ROLLBACK_ARIA_LABEL = '把上一个已发布版本重新发布为当前版本，不改动任何草稿';
 
@@ -94,15 +95,31 @@ function uploadSourceName(upload: UploadView): string {
   return upload.status === 'ready' ? upload.sourceName : '';
 }
 
-function detectedDomainCopy(upload: UploadView): string | null {
+function pickLibraryFromUpload(upload: UploadView): DashboardContentDomain | '' {
+  if (upload.status !== 'ready') return '';
+  const domains = uniqueRowDomains(upload.rows);
+  return domains.length === 1 ? domains[0] : '';
+}
+
+function DetectedDomainLine({ upload }: { upload: UploadView }) {
   if (upload.status !== 'ready') return null;
-  const labels = [...new Set(
-    upload.rows
-      .map((row) => row.domain)
-      .filter((domain): domain is DashboardContentDomain => Boolean(domain)),
-  )].map(domainLabel);
-  if (labels.length === 0) return '表里没有域列';
-  return `表里识别到：${labels.join('、')}`;
+  const domains = uniqueRowDomains(upload.rows);
+  return (
+    <div className="content-detected" data-testid="content-domain-detected">
+      <p className="content-detected-title">表里识别到</p>
+      <p className="content-detected-values">
+        {domains.length === 0 ? '表里没有域列' : domains.map((domain, index) => (
+          <span key={domain}>
+            {index > 0 ? '、' : null}
+            {domain === 'aftersale'
+              ? <strong data-testid="content-detected-aftersale">{domainLabel(domain)}</strong>
+              : domainLabel(domain)}
+          </span>
+        ))}
+      </p>
+      <p className="content-detected-hint">{REPLACE_HINT}</p>
+    </div>
+  );
 }
 
 type SessionState = 'pending' | 'signed-in' | 'disconnected';
@@ -178,6 +195,7 @@ export function ContentModule({
   const [rollbackBusy, setRollbackBusy] = useState(false);
   const [domainOverride, setDomainOverride] = useState<DashboardContentDomain | ''>('');
   const [pendingDevOpen, setPendingDevOpen] = useState(false);
+  const [publishPhase, setPublishPhase] = useState<'idle' | 'busy' | 'done'>('idle');
   const ingestGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadStatusRef = useRef<UploadView['status']>('idle');
@@ -252,12 +270,11 @@ export function ContentModule({
 
   const sessionState = sessionStateOf(hasProductApi, sessionSettled, sessionView);
   const sessionBadge = sessionBadgeOf(sessionState);
-  const replaceDetected = detectedDomainCopy(upload);
-
   const clearUpload = () => {
     ingestGeneration.current += 1;
     setPublishFeedback(null);
     setPublishSucceededThisRound(false);
+    setPublishPhase('idle');
     setDomainOverride('');
     setReplaceConfirm(false);
     setPendingDevOpen(false);
@@ -274,13 +291,16 @@ export function ContentModule({
     const sourceName = file.name.trim() || 'untitled.csv';
     setPublishFeedback(null);
     setPublishSucceededThisRound(false);
+    setPublishPhase('idle');
     setDomainOverride('');
     setReplaceConfirm(false);
     setUpload({ status: 'reading', sourceName });
     void readCoachUploadFile(file).then(
       (result) => {
         if (generation !== ingestGeneration.current) return;
-        setUpload(applyUploadResult(result, sourceName));
+        const next = applyUploadResult(result, sourceName);
+        setUpload(next);
+        setDomainOverride(pickLibraryFromUpload(next));
       },
       () => {
         if (generation !== ingestGeneration.current) return;
@@ -354,6 +374,7 @@ export function ContentModule({
     if (!api) return;
     const generation = ingestGeneration.current;
     setSubmitting(true);
+    setPublishPhase('busy');
     setReplaceConfirm(false);
     setPublishFeedback(null);
     const sourceName = uploadSourceName(upload);
@@ -375,16 +396,20 @@ export function ContentModule({
     }).then((result) => {
       if (generation !== ingestGeneration.current) return;
       if (!result.ok) {
-        // 失败不说替换，也不画 delta。
+        setPublishPhase('idle');
         setPublishFeedback(result.message);
         return;
       }
       setPublishSucceededThisRound(true);
+      setPublishPhase('done');
       const who = result.publisherDisplayName ?? sessionView?.displayName;
       const headline = who ? `已发布 ${result.releaseId} · ${who}` : `已发布 ${result.releaseId}`;
       setPublishFeedback(result.summary ? `${headline}\n${result.summary}` : headline);
+      setUpload({ status: 'idle' });
+      setPendingDevOpen(false);
     }).catch(() => {
       if (generation !== ingestGeneration.current) return;
+      setPublishPhase('idle');
       setPublishFeedback('服务暂不可用，请重试');
     }).finally(() => {
       if (generation === ingestGeneration.current) setSubmitting(false);
@@ -401,7 +426,7 @@ export function ContentModule({
   };
 
   return (
-    <div className="dash-module" data-testid="module-content">
+    <div className={`dash-module content-stage${publishPhase !== 'idle' ? ' is-publishing' : ''}`} data-testid="module-content">
       <header className="dash-module-head">
         <div className="content-title-cluster">
           <h1>内容管理</h1>
@@ -437,13 +462,16 @@ export function ContentModule({
             </button>
             <button
               type="button"
-              className="dash-publish"
+              className={`dash-publish${publishPhase === 'done' ? ' is-done' : ''}${publishPhase === 'busy' ? ' is-busy' : ''}`}
               disabled={publishDisabled}
               data-testid="publish-action"
               aria-describedby="content-publish-note"
               onClick={onPublish}
             >
-              发布
+              <span className="dash-publish-label">发布</span>
+              <span className="dash-publish-mark" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path d="M5 10.5 8.2 14 15 6.5" /></svg>
+              </span>
             </button>
           </div>
           <span id="content-publish-note" className="content-publish-note">
@@ -490,28 +518,29 @@ export function ContentModule({
         </div>
       </header>
 
-      <div className="dash-filter-toolbar compact content-replace-row" data-testid="content-replace-row">
-        <label htmlFor="content-domain-override">将替换</label>
-        <select
-          id="content-domain-override"
-          data-testid="content-domain-override"
-          value={domainOverride}
-          disabled={submitting}
-          onChange={(event) => {
-            setReplaceConfirm(false);
-            setDomainOverride(event.currentTarget.value as DashboardContentDomain | '');
-          }}
-        >
-          <option value="">选择话术库</option>
-          {DOMAIN_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        {replaceDetected ? (
-          <span data-testid="content-domain-detected">{replaceDetected}</span>
-        ) : null}
-        <span className="dash-scope">{REPLACE_HINT}</span>
+      <div className="content-replace-row" data-testid="content-replace-row">
+        <div className="content-replace-pick">
+          <label htmlFor="content-domain-override">将替换</label>
+          <LibrarySelect
+            id="content-domain-override"
+            value={domainOverride}
+            disabled={submitting}
+            options={DOMAIN_OPTIONS}
+            onChange={(next) => {
+              setReplaceConfirm(false);
+              setDomainOverride(next);
+            }}
+          />
+        </div>
+        <DetectedDomainLine upload={upload} />
       </div>
+      {publishPhase !== 'idle' ? (
+        <div className="content-publish-veil" data-testid="content-publish-veil" role="status">
+          <p className="content-publish-toast" data-testid="content-publish-toast">
+            {publishPhase === 'busy' ? '发布中' : '已发布'}
+          </p>
+        </div>
+      ) : null}
       {replaceConfirm ? (
         <div className="content-replace-confirm" data-testid="content-replace-confirm" role="status">
           <span>
@@ -565,7 +594,7 @@ export function ContentModule({
       ) : null}
 
       <details
-        className="dash-contract-details"
+        className="dash-contract-details content-preview-hero"
         data-testid="content-pending-dev"
         open={pendingDevOpen}
         onToggle={(event) => {

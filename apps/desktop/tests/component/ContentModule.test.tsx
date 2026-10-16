@@ -57,6 +57,11 @@ function toggleSummary(): void {
   fireEvent.click(summary);
 }
 
+async function pickLibrary(user: ReturnType<typeof userEvent.setup>, value: string) {
+  await user.click(screen.getByTestId('content-domain-override'));
+  await user.click(screen.getByTestId(`content-domain-option-${value}`));
+}
+
 function uploadFile(name: string, body: string): File {
   return new File([body], name, { type: 'text/csv' });
 }
@@ -257,7 +262,8 @@ describe('ContentModule publish gate', () => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
     expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
+    expect(screen.getByTestId('content-domain-override')).toHaveTextContent('产品');
+    await pickLibrary(user, 'campaign');
     expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('产品');
     expect(screen.getByTestId('content-domain-detected')).not.toHaveTextContent('活动');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('活动');
@@ -296,9 +302,7 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('请选择将替换哪一库');
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
+    expect(screen.getByTestId('content-domain-override')).toHaveTextContent('售前');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback-delta')).toBeInTheDocument());
     expect(screen.getByTestId('publish-feedback-headline')).toHaveTextContent('已发布 rel_25 · 合成管理员');
@@ -336,7 +340,7 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
+    await pickLibrary(user, 'product');
     await user.click(screen.getByTestId('publish-action'));
     expect(api.publishDraft).not.toHaveBeenCalled();
     expect(screen.getByTestId('content-replace-confirm')).toHaveTextContent('将整库替换「产品」');
@@ -377,7 +381,7 @@ describe('ContentModule publish gate', () => {
     });
     await user.upload(screen.getByTestId('content-upload-input'), xlsx);
     await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'presale');
+    await pickLibrary(user, 'presale');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('服务暂不可用'));
     expect(screen.queryByTestId('publish-feedback-delta')).not.toBeInTheDocument();
@@ -464,6 +468,28 @@ describe('ContentModule session badge', () => {
 describe('ContentModule header layout', () => {
   afterEach(() => {
     delete window.dashboardContent;
+  });
+
+  it('bolds 售后 in the detected line under 表里识别到', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'aftersale.xlsx',
+      rows: [{ scene: '过敏询问', script: '亲亲先停用', domain: 'aftersale' as const }],
+      csvText: 'scene,script,domain\n过敏询问,亲亲先停用,aftersale\n',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'aftersale.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-domain-detected')).toBeInTheDocument());
+    expect(screen.getByTestId('content-detected-aftersale').tagName).toBe('STRONG');
+    expect(screen.getByTestId('content-domain-detected')).toHaveTextContent('发布会整库替换这一库');
+    expect(screen.getByTestId('content-domain-override')).toHaveTextContent('售后');
   });
 
   it('keeps 将替换 outside 内容导入 so the operator names the library before opening the fold', () => {
@@ -608,7 +634,7 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
+    await pickLibrary(user, 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => expect(screen.getByTestId('content-upload-pick')).toBeDisabled());
     expect(screen.getByTestId('content-upload-clear')).toBeDisabled();
@@ -619,7 +645,7 @@ describe('ContentModule pending dev disclosure', () => {
     expect(screen.getByTestId('cancel-in-flight')).toBeEnabled();
   });
 
-  it('disables publish after a successful release without touching the staged preview', async () => {
+  it('clears the staged preview after a successful release and keeps publish disabled', async () => {
     const api = mockSession('owner');
     api.publishDraft = vi.fn(async () => ({
       ok: true as const,
@@ -638,19 +664,15 @@ describe('ContentModule pending dev disclosure', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'product');
     await user.click(screen.getByTestId('publish-action'));
     await waitFor(() => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent('rel_menokin_2026');
     });
+    expect(screen.getByTestId('content-publish-toast')).toHaveTextContent('已发布');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
+    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     expect(screen.getByTestId('content-pending-dev').querySelector('summary'))
-      .toHaveTextContent('coach-draft.csv · 待发布 1 行');
-    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
-    // Correcting the domain must not re-enable publish for the same round.
-    await user.selectOptions(screen.getByTestId('content-domain-override'), 'campaign');
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
+      .toHaveTextContent('内容导入');
   });
 });
 
