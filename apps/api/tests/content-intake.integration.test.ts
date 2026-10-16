@@ -3229,6 +3229,75 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM content_intake.approval_facts')).rows[0].count).toBe('0');
   });
 
+  it('publishes a cataloged baseline that already has target-domain legacy rows and keeps those rows', async () => {
+    await seedSyntheticG1aRelease(admin);
+    await admin.query('BEGIN');
+    await admin.query("SELECT set_config('app.publishing','on',true)");
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,status,source_binding_hash,tenant_id)
+      SELECT 'rel_native_base',2,'published',source_binding_hash,'tenant-a' FROM public.content_releases WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_source_bindings SELECT 'rel_native_base',domain,source_version_id
+      FROM public.release_source_bindings WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_items SELECT (jsonb_populate_record(NULL::public.release_items,
+      to_jsonb(i)||jsonb_build_object('release_id','rel_native_base'))).* FROM public.release_items i
+      WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ('rel_native_base','intake-v2.1')");
+    await admin.query("UPDATE public.content_current SET current_release_id='rel_native_base'");
+    await admin.query("SELECT setval('public.content_release_seq',2,true)");
+    await admin.query('COMMIT');
+    const legacyRows = async (releaseId: string) => (await admin.query(
+      "SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id", [releaseId])).rows;
+    const before = await legacyRows('rel_native_base');
+    expect(before.length).toBeGreaterThan(8);
+    expect(before.some(row => row.row.category === 'product')).toBe(true);
+    const { request } = await publishable('occupied-domain');
+    const published = await service.publish(actor('enabler'), request);
+    expect(published.ok, JSON.stringify(published)).toBe(true);
+    const out = value(published);
+    expect(out.releaseId).not.toBe('rel_native_base');
+    expect(await legacyRows('rel_native_base')).toEqual(before);
+    expect(await legacyRows(out.releaseId!)).toEqual(before);
+    expect((await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id).toBe(out.releaseId);
+    expect((await admin.query('SELECT release_id FROM content_intake.release_catalogs WHERE release_id=$1', [out.releaseId])).rows).toEqual([{ release_id: out.releaseId }]);
+    expect((await admin.query(`SELECT release_id FROM content_intake.release_lineage
+      WHERE release_id=$1 AND candidate_id=$2`, [out.releaseId, request.key.candidateId])).rowCount).toBeGreaterThan(0);
+  });
+
+  it('adopts the column-default tenant inside publish_candidate and moves the pointer through service.publish', async () => {
+    await seedSyntheticG1aRelease(admin);
+    await admin.query('BEGIN');
+    await admin.query("SELECT set_config('app.publishing','on',true)");
+    await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,status,source_binding_hash,tenant_id)
+      SELECT 'rel_default_base',2,'published',source_binding_hash,'default' FROM public.content_releases WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_source_bindings SELECT 'rel_default_base',domain,source_version_id
+      FROM public.release_source_bindings WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query(`INSERT INTO public.release_items SELECT (jsonb_populate_record(NULL::public.release_items,
+      to_jsonb(i)||jsonb_build_object('release_id','rel_default_base'))).* FROM public.release_items i
+      WHERE release_id='rel_synthetic_g1a_v1'`);
+    await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ('rel_default_base','intake-v2.1')");
+    await admin.query("UPDATE public.content_current SET current_release_id='rel_default_base'");
+    await admin.query("SELECT setval('public.content_release_seq',2,true)");
+    await admin.query('COMMIT');
+    const legacyRows = async (releaseId: string) => (await admin.query(
+      "SELECT to_jsonb(i)-'release_id' AS row FROM public.release_items i WHERE release_id=$1 ORDER BY script_id", [releaseId])).rows;
+    const before = await legacyRows('rel_default_base');
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.some(row => row.row.category === 'product')).toBe(true);
+    const { request } = await publishable('default-tenant');
+    expect((await admin.query("SELECT tenant_id FROM public.content_releases WHERE release_id='rel_default_base'")).rows[0].tenant_id).toBe('default');
+    const published = await service.publish(actor('enabler'), request);
+    expect(published.ok, JSON.stringify(published)).toBe(true);
+    const out = value(published);
+    expect(out.releaseId).not.toBe('rel_default_base');
+    expect(await legacyRows('rel_default_base')).toEqual(before);
+    expect(await legacyRows(out.releaseId!)).toEqual(before);
+    expect((await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id).toBe(out.releaseId);
+    expect((await admin.query('SELECT tenant_id FROM public.content_releases WHERE release_id=$1', [out.releaseId])).rows[0].tenant_id).toBe('tenant-a');
+    expect((await admin.query("SELECT tenant_id FROM public.content_releases WHERE release_id='rel_default_base'")).rows[0].tenant_id).toBe('tenant-a');
+    expect((await admin.query('SELECT release_id FROM content_intake.release_catalogs WHERE release_id=$1', [out.releaseId])).rows).toEqual([{ release_id: out.releaseId }]);
+    expect((await admin.query(`SELECT release_id FROM content_intake.release_lineage
+      WHERE release_id=$1 AND candidate_id=$2`, [out.releaseId, request.key.candidateId])).rowCount).toBeGreaterThan(0);
+  });
+
   it.each(['quality','publisher-revoked','cancelled','source-version','suspended-source'] as const)(
     'publication rejects %s with zero release/ticket side effects', async gate => {
       await publicationBase(); const { c,request }=await publishable(gate);
@@ -3349,14 +3418,19 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('1');
   });
 
-  it('refuses missing bootstrap and unmapped legacy-domain rows instead of silently replacing them', async () => {
+  it('refuses a missing catalog baseline and does not delete legacy rows when a later gate fails', async () => {
     const empty=await publishable('no-base');
     expect(await service.publish(actor('enabler'),empty.request)).toMatchObject({ ok:false,reason:'MODE_CONFLICT' });
     await seedSyntheticG1aRelease(admin);
     const base='rel_synthetic_g1a_v1';
+    const beforeItems = (await admin.query('SELECT count(*)::int AS n FROM public.release_items WHERE release_id=$1',[base])).rows[0].n;
     await admin.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES ($1,'intake-v2.1')",[base]);
+    // An explicit tenant is not the column default, so the function must not adopt it.
+    await admin.query("UPDATE public.content_releases SET tenant_id='tenant-other' WHERE release_id=$1 AND tenant_id='default'",[base]);
     const mixed=await publishable('legacy-members');
-    expect(await service.publish(actor('enabler'),mixed.request)).toMatchObject({ ok:false,reason:'MODE_CONFLICT' });
+    const published = await service.publish(actor('enabler'),mixed.request);
+    expect(published).toMatchObject({ ok:false, reason:'SOURCE_MISMATCH' });
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.release_items WHERE release_id=$1',[base])).rows[0].n).toBe(beforeItems);
     expect((await admin.query('SELECT current_release_id FROM public.content_current')).rows[0].current_release_id).toBe(base);
     expect((await admin.query('SELECT count(*) FROM content_intake.publications')).rows[0].count).toBe('0');
   });

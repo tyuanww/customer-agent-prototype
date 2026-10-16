@@ -124,6 +124,7 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
     host.selectIdentity('agent'); await openQuery();
     await query.getByRole('button', { name: / · 退出$/ }).click();
     await expect(query.getByRole('button', { name: '登录', exact: true })).toBeVisible(); await login();
+    await query.getByRole('button', { name: '筛选', exact: true }).click();
     const shops = query.getByRole('combobox', { name: '当前店铺' });
     await expect(shops.locator('option')).toHaveCount(2); await shops.selectOption('shop-a');
     await expect(shops).toBeEnabled(); await expect(shops).toHaveValue('shop-a');

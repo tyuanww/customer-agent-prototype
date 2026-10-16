@@ -21,6 +21,7 @@ test('real Query shows registered duplicate shop names while selection and quali
   await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked','false');await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening','false');
   await query.getByRole('button',{name:'登录',exact:true}).click();await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=login'))).toBe(true);
   await app.windows().find(w=>w.url().includes('role=login'))!.getByRole('button',{name:'飞书登录'}).click();
+  await query.getByRole('button',{name:'筛选',exact:true}).click();
   const shops=query.getByRole('combobox',{name:'当前店铺'});await expect(shops).toBeVisible();
   await expect(shops.getByRole('option',{name:'合成示例店（shop-a）',exact:true})).toHaveAttribute('value','shop-a');
   await expect(shops.getByRole('option',{name:'合成示例店（shop-b）',exact:true})).toHaveAttribute('value','shop-b');

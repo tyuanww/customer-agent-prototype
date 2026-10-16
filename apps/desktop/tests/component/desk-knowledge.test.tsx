@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowledge';
 import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 
-afterEach(() => { cleanup(); delete window.dashboardDesk; });
+afterEach(() => { cleanup(); delete window.dashboardDesk; delete window.dashboardContent; });
 
 it('uploads a sheet and shows it as what the seat receives', async () => {
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
@@ -73,4 +73,29 @@ it('keeps the knowledge columns and dismisses the add layer without saving', asy
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(commands).not.toContain('upload');
   expect(screen.queryByText('读取资格已到期')).not.toBeInTheDocument();
+});
+
+it('reloads an operator view after the query window signs in', async () => {
+  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
+  let role: 'operator' | null = null;
+  window.dashboardDesk = {
+    current: async () => desk.reply(role, role ? '合成经理' : null),
+    command: async (command) => desk.command(role, command, role ? '合成经理' : null),
+  };
+  let notify = () => {};
+  window.dashboardContent = {
+    onSessionChanged(listener: () => void) {
+      notify = listener;
+      return () => { notify = () => {}; };
+    },
+  } as unknown as Window['dashboardContent'];
+  render(<DeskKnowledge />);
+  expect(await screen.findByText('请先登录。')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '全店' }));
+  expect(await screen.findByText('请先在查询窗口登录。')).toBeInTheDocument();
+  role = 'operator';
+  notify();
+  expect(await screen.findByRole('button', { name: '添加话术' })).toBeInTheDocument();
+  expect(screen.queryByText('请先在查询窗口登录。')).not.toBeInTheDocument();
+  expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
 });

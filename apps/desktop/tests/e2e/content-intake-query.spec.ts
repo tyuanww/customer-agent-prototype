@@ -59,6 +59,7 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.getByRole('button', { name: '登录', exact: true }).click();
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
     await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
+    await query.getByRole('button', { name: '筛选', exact: true }).click();
     const shop = query.getByRole('combobox', { name: '当前店铺' });
     await expect.poll(async () => {
       const status = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());

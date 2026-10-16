@@ -81,7 +81,7 @@ export function createLoginWindow(
           catch { callback({ cancel: true }); }
         });
         const window = new BrowserWindow({
-          width: 520, height: 420, title: '登录', show: false,
+          width: 520, height: 420, title: '登录', show: false, acceptFirstMouse: true,
           webPreferences: {
             session: isolated, contextIsolation: true, sandbox: true, nodeIntegration: false,
             preload: join(__dirname, '../preload/login.cjs'),
@@ -149,8 +149,9 @@ export function createLoginWindow(
           if (event.sender !== window.webContents) return;
           cancel();
         });
-        void loadChooser(window, 'entry', devServerUrl?.()).then(() => { if (!closed && !window.isDestroyed()) window.show(); })
-          .catch(() => finish(new ProductHttpError('UNAVAILABLE')));
+        void loadChooser(window, 'entry', devServerUrl?.()).then(() => {
+          if (!closed && !window.isDestroyed()) presentLoginWindow(window);
+        }).catch(() => finish(new ProductHttpError('UNAVAILABLE')));
       });
     },
   };
@@ -214,6 +215,28 @@ async function verifySyntheticPassword(
     return Reflect.get(value, 'code') as string;
   } catch {
     return 'unavailable';
+  }
+}
+
+/** Query is a macOS floating panel. A normal window opens behind it, so the next click only activates the panel. */
+function presentLoginWindow(window: BrowserWindow): void {
+  const previous = BrowserWindow.getFocusedWindow();
+  if (process.platform === 'darwin') window.setAlwaysOnTop(true, 'modal-panel');
+  else window.setAlwaysOnTop(true);
+  window.show();
+  window.moveTop();
+  window.focus();
+  if (!window.webContents.isDestroyed()) window.webContents.focus();
+  window.once('closed', () => restorePreviousFocus(previous, window));
+}
+
+function restorePreviousFocus(previous: BrowserWindow | null, login: BrowserWindow): void {
+  if (!previous || previous === login || previous.isDestroyed() || !previous.isVisible()) return;
+  try {
+    previous.focus();
+    if (!previous.webContents.isDestroyed()) previous.webContents.focus();
+  } catch {
+    // A dismissed palette is no longer focusable.
   }
 }
 

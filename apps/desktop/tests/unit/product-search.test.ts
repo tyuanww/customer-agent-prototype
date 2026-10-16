@@ -12,12 +12,32 @@ const candidate: ProductCandidate = { rank: 1, release_id: 'rel-synthetic-001', 
   content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale', answer_text: '合成订单 {订单号}', platform_scope: ['qianniu'],
   product_scope_type: 'storewide', product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
   intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low', risk_categories: [], has_conflict: false, placeholder_keys: ['order_id'] };
-async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; respectJob?: boolean; openEntry?: () => boolean | Promise<boolean> } = {}) {
+async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; respectJob?: boolean; noticeAccepted?: boolean; notice?: 'missing' | 'declined' | 'throws'; openEntry?: () => boolean | Promise<boolean> } = {}) {
   const events: unknown[] = []; const write = vi.fn();
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const p = new URL(String(url)).pathname;
     if (p.endsWith('/me')) return Response.json({ user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' });
     if (p.endsWith('/logout')) return new Response(null, { status: 204 });
+    if (p === '/v1/notices/current') {
+      if (options.notice === 'throws') throw new Error('notice check failed');
+      if (options.notice === 'declined') {
+        return Response.json({
+          notice: {
+            version: 'pilot-notice-v1', content: '合成告知', content_hash: 'c'.repeat(64),
+            published_at: '2026-01-01T00:00:00.000Z',
+          },
+          decision: 'declined', decided_at: '2026-01-02T00:00:00.000Z',
+        });
+      }
+      if (!options.noticeAccepted) return new Response(null, { status: 404 });
+      return Response.json({
+        notice: {
+          version: 'pilot-notice-v1', content: '合成告知', content_hash: 'c'.repeat(64),
+          published_at: '2026-01-01T00:00:00.000Z',
+        },
+        decision: 'accepted', decided_at: '2026-01-02T00:00:00.000Z',
+      });
+    }
     const body = JSON.parse(String(init?.body));
     if (p === '/v1/search') {
       const row = options.candidate ?? candidate;
@@ -55,6 +75,28 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
   return { search, session, request, copy, write, events, transport, announce, help, queryId: result.queryId };
 }
 describe('product query and native copy provenance', () => {
+  function recordedModes(transport: { mock: { calls: unknown[][] } }): string[] {
+    return transport.mock.calls.flatMap((call) => {
+      const raw = (call[1] as RequestInit | undefined)?.body;
+      if (typeof raw !== 'string' || raw.length === 0) return [];
+      const body = JSON.parse(raw) as { collection_mode?: string };
+      return body.collection_mode ? [body.collection_mode] : [];
+    });
+  }
+  it('records a server search when the notice is missing and when it is accepted', async () => {
+    const declined = await fixture();
+    expect(recordedModes(declined.transport)).toEqual(['pilot_recorded', 'pilot_recorded']);
+    await declined.session.logout();
+    const accepted = await fixture({ noticeAccepted: true });
+    expect(recordedModes(accepted.transport)).toEqual(['pilot_recorded', 'pilot_recorded']);
+    await accepted.session.logout();
+    const refused = await fixture({ notice: 'declined' });
+    expect(recordedModes(refused.transport)).toEqual(['pilot_recorded', 'pilot_recorded']);
+    await refused.session.logout();
+    const failed = await fixture({ notice: 'throws' });
+    expect(recordedModes(failed.transport)).toEqual(['pilot_recorded', 'pilot_recorded']);
+    await failed.session.logout();
+  });
   it('copies cached original then records one terminal, without placeholder values in HTTP', async () => {
     const f = await fixture();
     expect(await f.search.copy(1, f.copy)).toMatchObject({ ok: true, copied: true, eventStatus: 'recorded' });
@@ -107,7 +149,7 @@ describe('product query and native copy provenance', () => {
     expect(isProductSearchRequest({ ...f.request, productContextType: 'sku' })).toBe(false);
     expect(isProductCopyRequest({ ...f.copy, answerText: 'injected' })).toBe(false); await f.session.logout();
   });
-  it('hydrates ranked scripts locally without calling /v1/search', async () => {
+  it('records a server search when hydrate can answer locally', async () => {
     const retrieve = {
       rank: () => [{
         scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
@@ -123,9 +165,11 @@ describe('product query and native copy provenance', () => {
     const search = new ProductSearch(f.session, f.write, f.announce, f.help, retrieve, hydrate);
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
-    expect(result).toMatchObject({ ok: true, hitStatus: 'hit' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit', telemetryStatus: 'recorded' });
+    if (result.ok) expect(result.candidates[0]?.script_id).toBe(candidate.script_id);
     const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
-    expect(searchCalls).toHaveLength(0);
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
   it('ranks the current hydrate snapshot instead of leftover index ids', async () => {
@@ -183,7 +227,7 @@ describe('product query and native copy provenance', () => {
     expect(searchBodies.some((body) => body.query_text === '合成发货')).toBe(false);
     await f.session.logout();
   });
-  it('uses the retrieval pipeline then hydrates locally without leftover HTTP', async () => {
+  it('uses the retrieval pipeline then hydrates locally and still records the search', async () => {
     const retrieve = { rank: vi.fn(() => []) };
     const pipeline = {
       run: vi.fn(async () => ({
@@ -210,11 +254,13 @@ describe('product query and native copy provenance', () => {
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
     expect(result).toMatchObject({
-      ok: true, hitStatus: 'hit', telemetryStatus: 'collection_disabled',
+      ok: true, hitStatus: 'hit', telemetryStatus: 'recorded',
     });
     expect(pipeline.run).toHaveBeenCalledWith('什么时候发货呀', true, expect.any(AbortSignal));
     expect(retrieve.rank).not.toHaveBeenCalled();
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
   it('returns STALE when hydrate is loaded but the announce gate rejects the release', async () => {
@@ -243,7 +289,9 @@ describe('product query and native copy provenance', () => {
       f.session, f.write, f.announce, f.help, { rank: () => [] }, emptyHydrate, null, pipeline,
     );
     expect(await miss.search(1, { ...f.request, generation: 3 })).toMatchObject({ code: 'STALE' });
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
   it('does not rerank fallback BM25 when smart retrieval is off', async () => {
@@ -304,6 +352,9 @@ describe('product query and native copy provenance', () => {
     if (!result.ok) throw new Error('expected hit');
     expect(result.candidates.map((row) => row.script_id)).toEqual(['script-usable']);
     expect(result.candidates[0]?.rank).toBe(1);
+    const searchCalls = f.transport.mock.calls.filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
   it('does not commit a local hydrate result after cancel', async () => {
@@ -353,10 +404,12 @@ describe('product query and native copy provenance', () => {
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
     expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
-  it('does not call leftover HTTP when hydrate env is set but the snapshot failed to load', async () => {
+  it('records the search when hydrate env is set but the snapshot failed to load', async () => {
     const previous = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
     const f = await fixture();
     process.env.CUSTOMER_AGENT_HYDRATE_INDEX = '/tmp/missing-hydrate-catalog.json';
@@ -365,15 +418,18 @@ describe('product query and native copy provenance', () => {
         f.session, f.write, f.announce, f.help, { rank: () => [] }, null,
       );
       const before = f.transport.mock.calls.length;
-      expect(await search.search(1, { ...f.request, generation: 2 })).toMatchObject({ code: 'UNAVAILABLE' });
-      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+      const result = await search.search(1, { ...f.request, generation: 2 });
+      expect(result).toMatchObject({ ok: true, telemetryStatus: 'recorded' });
+      const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+      expect(searchCalls.length).toBeGreaterThan(0);
+      expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
       await f.session.logout();
     } finally {
       if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
     }
   });
-  it('does not call leftover HTTP when a desktop API origin is set', async () => {
+  it('records the search when a desktop API origin is set', async () => {
     const previousOrigin = process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
     const previousHydrate = process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
     const f = await fixture();
@@ -384,8 +440,11 @@ describe('product query and native copy provenance', () => {
         f.session, f.write, f.announce, f.help, { rank: () => [] }, null,
       );
       const before = f.transport.mock.calls.length;
-      expect(await search.search(1, { ...f.request, generation: 2 })).toMatchObject({ code: 'UNAVAILABLE' });
-      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+      const result = await search.search(1, { ...f.request, generation: 2 });
+      expect(result).toMatchObject({ ok: true, telemetryStatus: 'recorded' });
+      const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+      expect(searchCalls.length).toBeGreaterThan(0);
+      expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
       await f.session.logout();
     } finally {
       if (previousOrigin === undefined) delete process.env.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
@@ -437,7 +496,9 @@ describe('product query and native copy provenance', () => {
       writeFileSync(hydratePath, `${JSON.stringify({ version: 1, releaseId: 'rel-new', scripts: [{ ...row, releaseId: 'rel-new' }] })}\n`);
       const result = await search.search(1, { ...f.request, generation: 3 });
       expect(result).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: 'rel-new' });
-      expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+      const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+      expect(searchCalls.length).toBeGreaterThan(0);
+      expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     } finally {
       if (previous === undefined) delete process.env.CUSTOMER_AGENT_HYDRATE_INDEX;
       else process.env.CUSTOMER_AGENT_HYDRATE_INDEX = previous;
@@ -469,10 +530,12 @@ describe('product query and native copy provenance', () => {
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '排骨汤还有吗' });
     expect(result).toMatchObject({ ok: true, hitStatus: 'no_hit', releaseId: candidate.release_id });
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
-  it('records hydrate impressions locally without leftover HTTP or query text', async () => {
+  it('records hydrate impressions locally and on the server without storing query text', async () => {
     const telemetry = noopRetrievalTelemetry();
     const pipeline = {
       run: async () => ({
@@ -495,17 +558,19 @@ describe('product query and native copy provenance', () => {
     );
     const before = f.transport.mock.calls.length;
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
-    expect(result).toMatchObject({ ok: true, hitStatus: 'hit', telemetryStatus: 'collection_disabled' });
+    expect(result).toMatchObject({ ok: true, hitStatus: 'hit', telemetryStatus: 'recorded' });
     const event = telemetry.snapshot().events.at(-1);
     expect(event).toMatchObject({
       hitStatus: 'hit', intent: 'shipping', adoptedScriptId: null,
       impressions: [{ scriptId: candidate.script_id, rank: 1, contentHash: candidate.content_hash }],
     });
     expect(JSON.stringify(telemetry.snapshot())).not.toContain('什么时候发货呀');
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'))).toHaveLength(0);
+    const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
-  it('fills hydrate misses from ranked answer text without leftover HTTP', async () => {
+  it('fills hydrate misses from ranked answer text and still records the search', async () => {
     const retrieve = {
       rank: () => [{
         scriptId: candidate.script_id, title: candidate.title, questionText: candidate.title,
@@ -524,7 +589,8 @@ describe('product query and native copy provenance', () => {
     expect(result).toMatchObject({ ok: true, hitStatus: 'hit', releaseId: candidate.release_id });
     if (result.ok) expect(result.candidates[0]?.script_id).toBe(candidate.script_id);
     const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
-    expect(searchCalls).toHaveLength(0);
+    expect(searchCalls.length).toBeGreaterThan(0);
+    expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
     await f.session.logout();
   });
   it('fans out all-platform unscoped search and copies through the originating query', async () => {
@@ -582,7 +648,7 @@ describe('product query and native copy provenance', () => {
     })).toMatchObject({ code: 'STALE' });
     await f.session.logout();
   });
-  it('keeps collection_disabled inaccuracy local-only without posting', async () => {
+  it('posts inaccuracy after a recorded search when the notice was not accepted', async () => {
     const pipeline = {
       run: async () => ({
         intent: 'shipping' as const,
@@ -604,14 +670,17 @@ describe('product query and native copy provenance', () => {
     );
     const result = await search.search(1, { ...f.request, generation: 2, queryText: '什么时候发货呀' });
     if (!result.ok) throw new Error(result.code);
-    expect(result.telemetryStatus).toBe('collection_disabled');
+    expect(result.telemetryStatus).toBe('recorded');
     const before = f.transport.mock.calls.length;
     expect(await search.reportInaccuracy(1, {
       sessionEpoch: result.sessionEpoch, generation: result.generation,
       queryId: result.queryId, scriptId: candidate.script_id,
-    })).toMatchObject({ ok: true, recorded: false });
-    expect(f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/inaccuracy-reports')))
-      .toHaveLength(0);
+    })).toMatchObject({ ok: true, recorded: true });
+    const posted = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/inaccuracy-reports'));
+    expect(posted).toHaveLength(1);
+    expect(JSON.parse(String(posted[0]?.[1]?.body))).toMatchObject({
+      query_id: result.queryId, script_id: candidate.script_id,
+    });
     await f.session.logout();
   });
   it('maps inaccuracy HTTP errors via queryFailure and posts only query_id+script_id without a candidate', async () => {

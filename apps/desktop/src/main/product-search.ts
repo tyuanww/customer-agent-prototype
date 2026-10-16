@@ -12,7 +12,7 @@ import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscala
 import { routeQuery, type QueryRoute } from '../shared/query-route.ts';
 import { admitRetrieval } from '../shared/retrieval-quality.ts';
 import { parseRetrievalIndex, scriptsOf } from '../shared/retrieval-index.ts';
-import type { RetrievalScript } from '../shared/hybrid-retrieve.ts';
+import type { RankedRetrieval, RetrievalScript } from '../shared/hybrid-retrieve.ts';
 import { loadSemanticRetriever, type SemanticRetriever } from './semantic-retrieve';
 import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 import { loadHydrateCatalog, type HydrateCatalog } from './hydrate-catalog.ts';
@@ -176,6 +176,48 @@ export class ProductSearch {
     try { this.advance(sender, identity); return { ok: true, ...identity, cancelled: true }; }
     catch (error) { return this.failure(error, identity); }
   }
+  /** Every seat search is recorded, including a missing, declined, or failed notice check. */
+  private async collectionMode(epoch: number): Promise<'pilot_recorded'> {
+    try {
+      await this.session.currentNotice();
+    } catch { /* The check can fail. The search still goes to the server record. */ }
+    void epoch;
+    return 'pilot_recorded';
+  }
+  /** Cards the loaded catalog can show. Null when the seat has to use the server candidates. */
+  private localCatalog(
+    state: SearchState,
+    ranked: readonly RankedRetrieval[],
+    gateId: string | null,
+  ): { stale: true } | { stale: false; releaseId: string; candidates: ProductCandidate[] } | null {
+    if (!(this.hydrate || ranked.length > 0)) return null;
+    const fromHydrate = this.hydrate ? this.hydrate.hydrate(ranked) : [];
+    const seen = new Set(fromHydrate.map((candidate) => candidate.script_id));
+    const filled = [
+      ...fromHydrate,
+      ...ranked.flatMap((row) => (
+        seen.has(row.scriptId) || row.answerText.trim().length === 0 || !gateId
+          ? []
+          : [candidateFromScript(row, gateId)]
+      )),
+    ].map((candidate) => (gateId && candidate.release_id !== gateId ? { ...candidate, release_id: gateId } : candidate));
+    const local = filled
+      .filter((candidate) => this.usable(candidate, state))
+      .slice(0, 3)
+      .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
+    if (local.length > 0) {
+      if (!this.announce.allows(local[0]!.release_id)) return { stale: true };
+      return { stale: false, releaseId: local[0]!.release_id, candidates: local };
+    }
+    if (this.hydrate && this.announce.allows(this.hydrate.releaseId)) {
+      return { stale: false, releaseId: this.hydrate.releaseId, candidates: [] };
+    }
+    if (gateId && this.announce.allows(gateId)) {
+      return { stale: false, releaseId: gateId, candidates: [] };
+    }
+    if (this.hydrate) return { stale: true };
+    return null;
+  }
   private usable(candidate: ProductCandidate, state: SearchState) {
     const platformOk = candidate.platform_scope.some((platform) => platform === 'qianniu' || platform === 'douyin');
     const route = state.route;
@@ -212,53 +254,43 @@ export class ProductSearch {
           : rewritten;
         ranked = admitRetrieval(queryText, fallback);
       }
+      const collectionMode = await this.collectionMode(request.sessionEpoch);
+      const hydrateIndex = productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json');
+      if (hydrateIndex.length > 0 && !this.hydrate && this.liveHydrate) {
+        this.hydrate = loadHydrateCatalog(hydrateIndex);
+        this.bindHydrateCorpus();
+      }
       const gateId = this.announce.currentReleaseId?.() ?? this.hydrate?.releaseId ?? null;
-      if (this.hydrate || ranked.length > 0) {
-        const fromHydrate = this.hydrate ? this.hydrate.hydrate(ranked) : [];
-        const seen = new Set(fromHydrate.map((candidate) => candidate.script_id));
-        const filled = [
-          ...fromHydrate,
-          ...ranked.flatMap((row) => (
-            seen.has(row.scriptId) || row.answerText.trim().length === 0 || !gateId
-              ? []
-              : [candidateFromScript(row, gateId)]
-          )),
-        ].map((candidate) => (gateId && candidate.release_id !== gateId ? { ...candidate, release_id: gateId } : candidate));
-        const local = filled
-          .filter((candidate) => this.usable(candidate, state))
-          .slice(0, 3)
-          .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
-        if (local.length > 0) {
-          if (!this.announce.allows(local[0]!.release_id)) throw new ProductHttpError('STALE');
-          return this.finishLocal(sender, state, request, local[0]!.release_id, local);
-        }
-        if (this.hydrate && this.announce.allows(this.hydrate.releaseId)) {
-          return this.finishLocal(sender, state, request, this.hydrate.releaseId, []);
-        }
-        if (gateId && this.announce.allows(gateId)) {
-          return this.finishLocal(sender, state, request, gateId, []);
-        }
-        if (this.hydrate) throw new ProductHttpError('STALE');
-      }
-      if (productStackReadPath('CUSTOMER_AGENT_HYDRATE_INDEX', 'retrieval-hydrate.json').length > 0) {
-        throw new ProductHttpError('UNAVAILABLE');
-      }
+      const local = this.localCatalog(state, ranked, gateId);
+      // A missing, declined, or failed notice check still posts /v1/search.
+      // Local cards stay the seat answer when a catalog is loaded. They do not
+      // replace that server record, and a missing snapshot does not throw UNAVAILABLE.
       const jobs = searchJobs(route);
       const pages = await Promise.all(jobs.map(async (job) => {
         const queryId = randomUUID();
         const { value } = await this.session.request(request.sessionEpoch, '/v1/search', { signal: state.controller.signal, body: {
-          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: queryText, collection_mode: 'synthetic',
+          query_id: queryId, parent_query_id: null, interaction_reason: 'original', query_text: queryText, collection_mode: collectionMode,
           detected_platform: job.platform, platform: job.platform, platform_source: 'manual',
           product_context_type: job.productContextType, product_context_ref: job.productContextRef, top_k: 3,
         } });
         const response = parseContractSchema('SearchResponse', value);
         this.current(sender, state);
-        if (!this.announce.allows(response.release_id) || response.query_id !== queryId
-          || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job))) {
+        if (response.query_id !== queryId) throw new ProductHttpError('VALIDATION');
+        if (!local && (!this.announce.allows(response.release_id)
+          || response.candidates.some((candidate) => candidate.release_id !== response.release_id || !matchesJob(candidate, job)))) {
           throw new ProductHttpError('VALIDATION');
         }
         return { queryId, response, queryText };
       }));
+      if (local?.stale) throw new ProductHttpError('STALE');
+      const primaryRecord = pages[0];
+      if (!primaryRecord) throw new ProductHttpError('VALIDATION');
+      if (local) {
+        const telemetryStatus = primaryRecord.response.telemetry_status === 'collection_disabled' ? 'collection_disabled' : 'recorded';
+        return this.finishLocal(sender, state, request, local.releaseId, local.candidates, {
+          queryId: primaryRecord.queryId, telemetryStatus,
+        });
+      }
       const origins = new Map<string, string>();
       const merged: ProductCandidate[] = [];
       for (const page of pages) {
@@ -307,14 +339,15 @@ export class ProductSearch {
     request: ProductSearchRequest,
     releaseId: string,
     candidates: ProductCandidate[],
+    recorded: { queryId: string; telemetryStatus: 'recorded' | 'collection_disabled' },
   ): Extract<ProductSearchResult, { ok: true }> {
     this.current(sender, state);
-    const queryId = randomUUID();
+    const queryId = recorded.queryId;
     const origins = new Map(candidates.map((candidate) => [candidate.script_id, queryId]));
     const result: Extract<ProductSearchResult, { ok: true }> = {
       ok: true, sessionEpoch: request.sessionEpoch, generation: request.generation,
       queryId, hitStatus: candidates.length > 0 ? 'hit' : 'no_hit', releaseId,
-      telemetryStatus: 'collection_disabled', candidates,
+      telemetryStatus: recorded.telemetryStatus, candidates,
     };
     state.origins = origins;
     state.result = structuredClone(result);

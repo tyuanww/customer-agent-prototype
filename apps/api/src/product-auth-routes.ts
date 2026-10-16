@@ -4,14 +4,43 @@ import { bearerToken, type ProductAuthService } from './auth-service.js';
 import { isRequestBodyValidationError } from './contract-http-errors.js';
 import { IdentityFailure } from './product-auth-service.js';
 
+const IDENTITY_FAILURE_HTTP = {
+  LOGIN_INVALID: [400, 'VALIDATION'], REQUEST_INVALID: [400, 'VALIDATION'],
+  LOGIN_EXPIRED: [410, 'GONE'], LOGIN_CONSUMED: [409, 'CONFLICT'],
+  SESSION_INVALID: [401, 'UNAUTHORIZED'], CAPABILITY_DENIED: [403, 'FORBIDDEN'],
+  DEPENDENCY_UNAVAILABLE: [503, 'OVERLOADED'], RATE_LIMITED: [429, 'RATE_LIMITED'],
+} as const;
+
+/** Browser navigation asks for HTML. API clients keep the JSON error contract. */
+const CALLBACK_FAILURE_PAGE: Record<IdentityFailure['reason'], string> = {
+  LOGIN_INVALID: '登录没有完成。请关闭此页，回到客户端重新登录。',
+  REQUEST_INVALID: '登录请求无效。请关闭此页，回到客户端重新登录。',
+  LOGIN_EXPIRED: '登录请求已过期。请关闭此页，回到客户端重新登录。',
+  LOGIN_CONSUMED: '这次登录已经用过。请关闭此页，回到客户端重新登录。',
+  SESSION_INVALID: '登录没有完成。请关闭此页，回到客户端重新登录。',
+  CAPABILITY_DENIED: '当前账号不能完成登录。请关闭此页，回到客户端。',
+  DEPENDENCY_UNAVAILABLE: '登录服务暂时不可用。请关闭此页，稍后回到客户端重试。',
+  RATE_LIMITED: '操作过于频繁。请关闭此页，稍后回到客户端重试。',
+};
+
+const CALLBACK_SUCCESS_HTML = '<!doctype html><meta charset="utf-8"><title>登录完成</title><p>登录已完成，请返回客户端继续。</p>';
+const CALLBACK_PAGE_CSP = "default-src 'none'; frame-ancestors 'none'";
+
+export function prefersIdentityCallbackHtml(accept: string | string[] | undefined): boolean {
+  const header = Array.isArray(accept) ? accept.join(',') : accept ?? '';
+  return header.split(',').some((part) => {
+    const media = part.split(';')[0]?.trim().toLowerCase();
+    return media === 'text/html' || media === 'application/xhtml+xml';
+  });
+}
+
+/** Fixed Chinese page. Never echoes the provider query. */
+export function identityCallbackFailureHtml(reason: IdentityFailure['reason']): string {
+  return `<!doctype html><meta charset="utf-8"><title>登录没有完成</title><p>${CALLBACK_FAILURE_PAGE[reason]}</p>`;
+}
+
 export function sendIdentityFailure(reply: FastifyReply, failure: IdentityFailure) {
-  const mapping = {
-    LOGIN_INVALID: [400, 'VALIDATION'], REQUEST_INVALID: [400, 'VALIDATION'],
-    LOGIN_EXPIRED: [410, 'GONE'], LOGIN_CONSUMED: [409, 'CONFLICT'],
-    SESSION_INVALID: [401, 'UNAUTHORIZED'], CAPABILITY_DENIED: [403, 'FORBIDDEN'],
-    DEPENDENCY_UNAVAILABLE: [503, 'OVERLOADED'], RATE_LIMITED: [429, 'RATE_LIMITED'],
-  } as const;
-  const [status, code] = mapping[failure.reason];
+  const [status, code] = IDENTITY_FAILURE_HTTP[failure.reason];
   reply.header('cache-control', 'no-store');
   if (status === 401) reply.header('www-authenticate', 'Bearer');
   if (status === 429 || status === 503) reply.header('retry-after', '1');
@@ -50,18 +79,32 @@ function registerRoutes(app: FastifyInstance, auth: ProductAuthService): void {
   });
   app.get('/v1/auth/callback', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    limit('callback', 40);
-    const query = request.query as Record<string, unknown>;
-    if (Object.keys(query).some(key => !['state', 'code', 'error'].includes(key))
-      || typeof query.state !== 'string' || query.state.length < 1 || query.state.length > 256
-      || (query.code !== undefined && (typeof query.code !== 'string' || query.code.length < 1 || query.code.length > 4096))
-      || (query.error !== undefined && (typeof query.error !== 'string' || query.error.length < 1 || query.error.length > 256))
-      || (query.code === undefined) === (query.error === undefined)) throw new IdentityFailure('REQUEST_INVALID');
-    await auth.callback(query.state, query.code as string | undefined);
-    return reply.type('text/html; charset=utf-8')
-      .header('content-security-policy', "default-src 'none'; frame-ancestors 'none'")
-      .header('referrer-policy', 'no-referrer')
-      .send('<!doctype html><meta charset="utf-8"><title>登录完成</title><p>登录已完成，请返回客户端继续。</p>');
+    try {
+      limit('callback', 40);
+      const query = request.query as Record<string, unknown>;
+      if (Object.keys(query).some(key => !['state', 'code', 'error'].includes(key))
+        || typeof query.state !== 'string' || query.state.length < 1 || query.state.length > 256
+        || (query.code !== undefined && (typeof query.code !== 'string' || query.code.length < 1 || query.code.length > 4096))
+        || (query.error !== undefined && (typeof query.error !== 'string' || query.error.length < 1 || query.error.length > 256))
+        || (query.code === undefined) === (query.error === undefined)) throw new IdentityFailure('REQUEST_INVALID');
+      await auth.callback(query.state, query.code as string | undefined);
+      return reply.type('text/html; charset=utf-8')
+        .header('content-security-policy', CALLBACK_PAGE_CSP)
+        .header('referrer-policy', 'no-referrer')
+        .send(CALLBACK_SUCCESS_HTML);
+    } catch (error) {
+      const failure = error instanceof IdentityFailure ? error : new IdentityFailure('DEPENDENCY_UNAVAILABLE');
+      // A browser follows the provider redirect and would otherwise render the
+      // JSON error contract. API clients still receive that JSON.
+      if (prefersIdentityCallbackHtml(request.headers.accept)) {
+        const [status] = IDENTITY_FAILURE_HTTP[failure.reason];
+        return reply.code(status).type('text/html; charset=utf-8')
+          .header('content-security-policy', CALLBACK_PAGE_CSP)
+          .header('referrer-policy', 'no-referrer')
+          .send(identityCallbackFailureHtml(failure.reason));
+      }
+      return sendIdentityFailure(reply, failure);
+    }
   });
   app.post('/v1/auth/login-requests/:login_id/exchange', async (request, reply) => {
     reply.header('cache-control', 'no-store');

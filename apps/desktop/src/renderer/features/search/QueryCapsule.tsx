@@ -88,7 +88,7 @@ export function QueryCapsule({
                 value={query}
                 maxLength={MAX_QUERY_CHARS}
                 autoComplete="off"
-                aria-describedby={invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? 'query-guidance' : undefined}
+                aria-describedby={invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired' || sessionNotice.kind === 'waiting')) ? 'query-guidance' : undefined}
                 aria-invalid={invalidMessage ? true : undefined}
                 spellCheck={false}
                 readOnly={inputIdle}
@@ -113,7 +113,7 @@ export function QueryCapsule({
               {deepThinkingDescription}
             </span> : null}
             <div className="capsule-meta">
-              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired')) ? (
+              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired' || sessionNotice.kind === 'waiting')) ? (
               <p
                 id="query-guidance"
                 className="capsule-hint"

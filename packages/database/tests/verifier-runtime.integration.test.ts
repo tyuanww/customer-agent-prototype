@@ -1,8 +1,8 @@
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '../src/runner.js';
+import { applyDatabaseMigrations, applyMigrationCatalogue } from '../src/runner.js';
 import { Pg15Harness } from '../src/testkit/index.js';
-import { verifyDatabaseMigrations } from '../src/verifier.js';
+import { legacyCheckPredecessorCatalogue, verifyDatabaseMigrations, verifyLegacyCheckPredecessor } from '../src/verifier.js';
 
 // Explicit opt-in keeps the normal package unit command independent of local PG.
 // This fixture owns its cluster; no environment database or credentials are used.
@@ -19,7 +19,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
 
   it('verifies the actual 41-migration installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 41,
+      status: 'PASS', migrationCount: 44,
       inventory: { tables: 104, views: 7, functions: 270 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
@@ -87,4 +87,106 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await expect(verifyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_VERIFY_FAILED' });
     } finally { await client.query('ROLLBACK'); }
   });
+
+  it('accepts the five production logins and the import-batch trigger flags on the 0035 predecessor', async () => {
+    // Roles are cluster-wide. This check needs its own cluster so the 41-migration fixture stays sealed.
+    const local = new Pg15Harness();
+    let predecessor: Client | undefined;
+    try {
+      local.start();
+      predecessor = await local.connect(local.createDatabase('legacy_predecessor').config);
+      await applyMigrationCatalogue(predecessor, legacyCheckPredecessorCatalogue());
+      for (const [login, capability, inherit] of [
+        ['stack_runtime', 'app_runtime', 'INHERIT'],
+        ['stack_content_admin', 'app_content_admin', 'INHERIT'],
+        ['stack_backend_auth', 'app_backend_auth', 'NOINHERIT'],
+        ['stack_backend_review', 'app_backend_review', 'NOINHERIT'],
+        ['stack_backend_worker', 'app_backend_worker', 'NOINHERIT'],
+      ] as const) {
+        await predecessor.query(`CREATE ROLE ${login} LOGIN ${inherit}`);
+        await predecessor.query(`GRANT ${capability} TO ${login}`);
+      }
+      expect(await verifyLegacyCheckPredecessor(predecessor)).toMatchObject({
+        status: 'PASS',
+        migrationCount: 34,
+        capabilityRoles: { total: 17, safe: 17, memberships: 0 },
+        triggerFingerprint: {
+          entries: 109,
+          sha256: '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505',
+          difference: 'none',
+          disabledTriggers: [],
+        },
+      });
+      await predecessor.query('ALTER TABLE public.import_batches DISABLE TRIGGER backend_review_sync_wait_on_batch_failed');
+      await predecessor.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
+      expect(await verifyLegacyCheckPredecessor(predecessor)).toMatchObject({
+        status: 'PASS',
+        capabilityRoles: { memberships: 0 },
+        triggerFingerprint: {
+          entries: 109,
+          sha256: '650390f58729bcd850bc65150f5f5152da7acdb20bb2b0e7a2884e342757bb21',
+          frozenSha256: '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505',
+          difference: 'import_batches_tgenabled',
+          disabledTriggers: [
+            'backend_review_sync_wait_on_batch_failed',
+            'import_batches_restore_snapshots',
+          ],
+        },
+      });
+      await predecessor.query('CREATE ROLE runtime_bad LOGIN NOINHERIT');
+      await predecessor.query('GRANT app_runtime TO runtime_bad');
+      await expect(verifyLegacyCheckPredecessor(predecessor)).rejects.toThrow(/capability role safety/);
+    } finally {
+      await predecessor?.end();
+      local.stop();
+    }
+  }, 180_000);
+
+  it('accepts the two disabled import-batch triggers on the 112-entry readiness fingerprint and leaves them disabled', async () => {
+    const local = new Pg15Harness();
+    let readiness: Client | undefined;
+    try {
+      local.start();
+      readiness = await local.connect(local.createDatabase('readiness_disabled_triggers').config);
+      await applyDatabaseMigrations(readiness);
+      await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER backend_review_sync_wait_on_batch_failed');
+      await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
+      expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
+        status: 'PASS',
+        migrationCount: 44,
+        triggerFingerprint: {
+          entries: 112,
+          frozenSha256: '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a',
+          difference: 'import_batches_tgenabled',
+          disabledTriggers: [
+            'backend_review_sync_wait_on_batch_failed',
+            'import_batches_restore_snapshots',
+          ],
+        },
+      });
+      const flags = await readiness.query<{ tgname: string; tgenabled: string }>(
+        `SELECT trigger.tgname, trigger.tgenabled::text AS tgenabled
+           FROM pg_catalog.pg_trigger trigger
+           JOIN pg_catalog.pg_class relation ON relation.oid = trigger.tgrelid
+           JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+          WHERE namespace.nspname = 'public'
+            AND relation.relname = 'import_batches'
+            AND NOT trigger.tgisinternal
+            AND trigger.tgname IN (
+              'backend_review_sync_wait_on_batch_failed',
+              'import_batches_restore_snapshots'
+            )
+          ORDER BY trigger.tgname`,
+      );
+      expect(flags.rows).toEqual([
+        { tgname: 'backend_review_sync_wait_on_batch_failed', tgenabled: 'D' },
+        { tgname: 'import_batches_restore_snapshots', tgenabled: 'D' },
+      ]);
+      await readiness.query('ALTER TABLE content_intake.publications DISABLE TRIGGER publication_family_guard');
+      await expect(verifyDatabaseMigrations(readiness)).rejects.toThrow(/exact trigger table\/function\/event\/enabled\/definition manifest/);
+    } finally {
+      await readiness?.end();
+      local.stop();
+    }
+  }, 180_000);
 });

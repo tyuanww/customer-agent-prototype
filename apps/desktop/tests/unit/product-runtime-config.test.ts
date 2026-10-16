@@ -8,6 +8,7 @@ import {
   SYNTHETIC_OFFLINE_PROFILE_JSON,
   SYNTHETIC_STACK_PROFILE_FILE,
   developmentProductProfile,
+  projectIntakeShellLine,
   readPackagedProductProfile,
   resolveProductProfile,
   seedPackagedOfflineProfile,
@@ -321,7 +322,23 @@ it('enables FAQ only through explicit synthetic loopback configuration', () => {
   ]) expect(() => developmentProductProfile(env)).toThrow();
   const directory = userDataDirectory();
   write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2' });
-  expect(readPackagedProductProfile(directory)).toMatchObject({ contentIntake: 'faq-v2' });
+  const parsed = readPackagedProductProfile(directory);
+  expect(parsed).toMatchObject({ contentIntake: 'faq-v2' });
+  expect(projectIntakeShellLine(parsed)).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   write(directory, { mode: 'product-remote', apiOrigin: 'https://synthetic-api.invalid', identityOrigin: 'https://synthetic-id.invalid', contentIntake: 'faq-v2' });
   expect(() => readPackagedProductProfile(directory)).toThrow(PACKAGED_PROFILE_ERROR);
+  expect(Object.keys(projectIntakeShellLine({ contentIntake: 'faq-v2' }) ?? {})).toEqual(['profileMode', 'contentIntake']);
+  expect(projectIntakeShellLine({
+    apiOrigin: 'http://127.0.0.1:43100',
+    identityOrigin: 'http://127.0.0.1:43101',
+    contentIntake: 'faq-v2',
+  })).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
+  expect(JSON.stringify(projectIntakeShellLine({
+    apiOrigin: 'http://127.0.0.1:43100',
+    identityOrigin: 'http://127.0.0.1:43101',
+    contentIntake: 'faq-v2',
+  }))).not.toMatch(/43100|password|DATABASE|secret/);
+  expect(projectIntakeShellLine({ apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' })).toBeNull();
+  expect(projectIntakeShellLine(null)).toBeNull();
+  expect(projectIntakeShellLine(undefined)).toBeNull();
 });

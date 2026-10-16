@@ -71,7 +71,7 @@ export function LoginApp() {
         </>
       ) : state === 'waiting' ? (
         <>
-          <p className="login-copy">正在等待登录完成。可关闭浏览器页，回到此窗等待。</p>
+          <p className="login-copy">正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。</p>
           <div className="login-actions">
             <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
           </div>

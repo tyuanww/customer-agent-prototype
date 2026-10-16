@@ -51,6 +51,24 @@ describe('product session lifetime', () => {
     await f.session.logout(); finish(); await pending;
     expect(f.session.view().signedIn).toBe(false); expect(f.store.write).not.toHaveBeenCalled();
   });
+  it('replaces an unfinished login so a second click can finish', async () => {
+    const f = fixture();
+    let opened = 0;
+    f.window.open.mockImplementation((_url, operation) => new Promise((resolve, reject) => {
+      const attempt = ++opened;
+      const abort = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      if (operation?.signal.aborted) { abort(); return; }
+      operation?.signal.addEventListener('abort', abort, { once: true });
+      if (attempt > 1) resolve();
+    }));
+    const first = f.session.login();
+    await vi.waitFor(() => expect(f.window.open).toHaveBeenCalledTimes(1));
+    const second = f.session.login();
+    await expect(second).resolves.toMatchObject({ ok: true, signedIn: true });
+    await expect(first).resolves.toMatchObject({ ok: false, code: 'STALE' });
+    expect(f.session.view().signedIn).toBe(true);
+    expect(f.store.write).toHaveBeenCalledTimes(1);
+  });
   it('cancels exchange when the login window aborts after opening the browser', async () => {
     const f = fixture();
     f.window.open.mockImplementation(async (_url, operation) => { operation?.abort(); });

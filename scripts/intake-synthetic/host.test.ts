@@ -55,6 +55,7 @@ for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTT
     assert.equal(result.pendingApprovals, 0); assert.equal(result.directPublications, 1);
     assert.ok(result.diagnostics.some(d => d.reason === 'MATERIAL_CHANGED'));
     assert.equal(snapshot.releaseId, result.currentReleaseId);
+    assert.notEqual(result.currentReleaseId, 'rel_native_base');
     if (profile === 'purpose-runtime') {
       assert.ok(result.purposeQueries.business! > 10); assert.ok(result.purposeQueries.usage! > 10);
       if (domain === 'campaign') {

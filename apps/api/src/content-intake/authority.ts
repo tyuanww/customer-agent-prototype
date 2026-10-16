@@ -54,15 +54,16 @@ export function samePerson(a: Principal, b: Principal): boolean {
  * grant rows stay; new operations are rechecked here and in SQL. */
 export function recipientRoleAllows(role: Principal['role'], kind: 'business' | 'delegation', action: C['IntakeAction']): boolean {
   if (role === null) return false;
+  if (role === 'engineer') return true;
   if (kind === 'delegation') return role === 'director' || role === 'manager';
   if (action === 'query') return true;
   return role === 'director' || role === 'manager' || role === 'supervisor' || role === 'lead';
 }
 
-/** Only director/manager allocate. Delegation cannot create another delegation;
+/** Director, manager, and engineer allocate. Delegation cannot create another delegation;
  * it can still back a business grant. Historical rows stay and are rechecked. */
 export function allocationKinds(actor: Principal, kind: 'business' | 'delegation'): ('allocation' | 'delegation')[] {
-  if (actor.role !== 'director' && actor.role !== 'manager') return [];
+  if (actor.role !== 'director' && actor.role !== 'manager' && actor.role !== 'engineer') return [];
   if (kind === 'delegation') return ['allocation'];
   return ['allocation', 'delegation'];
 }
@@ -88,6 +89,19 @@ async function parentAuthority(client: IntakeTransaction, issuer: Principal, kin
   return rows[0].grant_id;
 }
 
+/** Primary accounts and the engineer may issue an import business grant when no parent row exists. */
+async function issuingParent(client: IntakeTransaction, issuer: Principal, kind: 'business' | 'delegation',
+  action: C['IntakeAction'], scope: Scope, period?: { startsAt: string; expiresAt: string }): Promise<string | null> {
+  try {
+    return await parentAuthority(client, issuer, kind, action, scope, period);
+  } catch (error) {
+    if (error instanceof IntakeRejection && error.reason === 'GRANT_AUTHORITY_DENIED'
+      && kind === 'business' && action === 'import'
+      && (issuer.role === 'director' || issuer.role === 'manager' || issuer.role === 'engineer')) return null;
+    throw error;
+  }
+}
+
 export async function readGrant(client: IntakeTransaction, id: string): Promise<Grant> {
   const { rows } = await client.query<{ value: unknown }>(`SELECT jsonb_build_object(
     'grantId',g.grant_id,'version',g.version,'kind',g.kind,'issuerPrincipalId',g.issuer_id,
@@ -103,7 +117,7 @@ export async function readGrant(client: IntakeTransaction, id: string): Promise<
 async function prepareGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']) {
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [issuer.tenantId, issuer.appId]);
   if (issuer.factsVersion !== request.issuerFactsVersion || Number(policy.rows[0]?.version) !== request.policyVersion) throw new IntakeRejection('PERMISSION_CHANGED');
-  const prepared: { item: C['IntakeGrantItem']; parent: string }[] = [];
+  const prepared: { item: C['IntakeGrantItem']; parent: string | null }[] = [];
   for (const item of request.items) {
     const recipient = await principal(client, { id: item.recipientPrincipalId });
     requireFresh(recipient, await clock(client));
@@ -113,7 +127,7 @@ async function prepareGrants(client: IntakeTransaction, issuer: Principal, reque
     if (recipient.factsVersion !== item.recipientFactsVersion) throw new IntakeRejection('PERMISSION_CHANGED');
     if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
     if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
-    const parent = await parentAuthority(client, issuer, item.kind, item.action, item.scope, item);
+    const parent = await issuingParent(client, issuer, item.kind, item.action, item.scope, item);
     prepared.push({ item, parent });
   }
   return prepared;
@@ -129,6 +143,56 @@ export async function previewGrants(client: IntakeTransaction, issuer: Principal
     issuerPrincipalId: issuer.id, revokedAt: null, stewardPrincipalId: issuer.id,
     mayRedelegate: false, lastChangeReason: null,
   })), nextCursor: null });
+}
+
+/** The disposable stack owner is not a formal root. A later business grant still
+ * needs a different recipient: this row does not satisfy authorization_deadline. */
+const DISPOSABLE_SYNTHETIC_OWNER = 'usr_synthetic_owner';
+
+/** One privileged parent for createGrants. intake_business is refused before
+ * any insert; the database trigger is the same boundary. A live row for this
+ * recipient, scope, source, and action is returned instead of a second row.
+ * Caller dates must already cover the present. This does not refresh facts. */
+export async function bootstrapRootAllocation(client: IntakeTransaction, input: {
+  recipientId: string; scopeId: string; sourceId?: string | null; action: C['IntakeAction'];
+  reason: string; startsAt: string; expiresAt: string;
+}): Promise<{ grantId: string; created: boolean }> {
+  const session = await client.query<{ role_name: string }>('SELECT current_user AS role_name');
+  if (session.rows[0]?.role_name === 'intake_business') throw new IntakeRejection('GRANT_AUTHORITY_DENIED', 'FORBIDDEN');
+  const action = parseContractSchema('IntakeAction', input.action);
+  const recipient = await principal(client, { id: input.recipientId });
+  if (recipient.userId === DISPOSABLE_SYNTHETIC_OWNER) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+  const now = await clock(client);
+  const startsAt = Date.parse(input.startsAt);
+  const expiresAt = Date.parse(input.expiresAt);
+  if (!input.reason.trim() || !Number.isFinite(startsAt) || !Number.isFinite(expiresAt) || startsAt > now || now >= expiresAt) {
+    throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+  }
+  const scope = await client.query<{ tenant_id: string; app_id: string }>(
+    'SELECT tenant_id, app_id FROM content_intake.scopes WHERE scope_id=$1', [input.scopeId]);
+  const registered = scope.rows[0];
+  if (!registered || registered.tenant_id !== recipient.tenantId || registered.app_id !== recipient.appId) {
+    throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+  }
+  const sourceId = input.sourceId ?? null;
+  if (sourceId !== null) {
+    const source = await client.query('SELECT 1 FROM content_intake.sources WHERE source_id=$1 AND scope_id=$2', [sourceId, input.scopeId]);
+    if (!source.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+  }
+  const existing = await client.query<{ grant_id: string }>(`
+    SELECT grant_id FROM content_intake.grants
+    WHERE recipient_id=$1 AND scope_id=$2 AND action=$3 AND kind='allocation' AND revoked_at IS NULL
+      AND source_id IS NOT DISTINCT FROM $4 AND steward_id IS NOT NULL
+      AND starts_at<=clock_timestamp() AND expires_at>clock_timestamp()
+    ORDER BY grant_id LIMIT 1`, [recipient.id, input.scopeId, action, sourceId]);
+  if (existing.rows[0]) return { grantId: existing.rows[0].grant_id, created: false };
+  const id = `grant_${randomUUID()}`;
+  await client.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,
+    scope_id,source_id,action,starts_at,expires_at,reason,steward_id)
+    VALUES ($1,'allocation',$2,$2,$3,$4,$5,$6,$7,$8,$9,$10,$2)`,
+  [id, recipient.id, recipient.tenantId, recipient.appId, input.scopeId, sourceId, action, input.startsAt, input.expiresAt, input.reason.trim()]);
+  await readGrant(client, id);
+  return { grantId: id, created: true };
 }
 
 /** Listing uses precisely the command's current bounded authority, never the
@@ -158,7 +222,7 @@ export async function createGrants(client: IntakeTransaction, issuer: Principal,
   // A slow batch cannot extend any recipient/parent deadline observed earlier.
   for (const item of request.items) {
     requireFresh(await principal(client, { id: item.recipientPrincipalId }), await clock(client));
-    await parentAuthority(client, issuer, item.kind, item.action, item.scope, item);
+    await issuingParent(client, issuer, item.kind, item.action, item.scope, item);
   }
   // Once per subject per atomic batch, even for a multi-action grant.
   await client.query('UPDATE content_intake.principals SET revocation_generation=revocation_generation+1 WHERE principal_id=ANY($1::text[])', [[...affected].sort()]);

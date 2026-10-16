@@ -200,4 +200,108 @@ describe.skipIf(!enabled)('intake scope runtime assembly refusals (synthetic onl
     expect((await admin.query<{ n: number }>(`SELECT count(*)::int AS n FROM content_intake.grants g
       JOIN content_intake.scopes s ON s.scope_id=g.scope_id WHERE s.shop_id='shop-b' AND g.revoked_at IS NULL`)).rows[0]!.n).toBe(0);
   });
+
+  it('does not move content_current id=1 when sources.mode is not v2-preview or the catalog row is absent', async () => {
+    // Success path that does move id=1: scripts/intake-synthetic/host.test.ts publishes
+    // against the seeded rel_native_base catalog, then snapshot.releaseId === currentReleaseId.
+    const pointer = async () => (await admin.query<{ current_release_id: string }>(
+      'SELECT current_release_id FROM public.content_current WHERE id=1',
+    )).rows[0]!.current_release_id;
+    expect(await pointer()).toBe('rel_native_base');
+    const catalogsBefore = (await admin.query<{ n: number }>('SELECT count(*)::int AS n FROM content_intake.release_catalogs')).rows[0]!.n;
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`INSERT INTO content_intake.objects(
+        object_id, source_id, actor_id, tenant_id, app_id, object_key, sha256, bytes, mime, purpose, received_at)
+        VALUES ('gate-object','source-a','enabler','tenant-a','app-a','intake/gate-object.xlsx', repeat('a',64), 1,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','input', clock_timestamp())`);
+      await admin.query(`INSERT INTO content_intake.candidate_versions(
+        candidate_id, version, source_id, scope_id, source_version, object_id, file_sha256, actor_id, base_release_id,
+        canonical_encoding, canonical_material, material, risk, explicit_disable_count, created_at, updated_at, publication_policy)
+        SELECT 'gate-candidate', 1, 'source-a', 'scope-a', 1, 'gate-object', repeat('a',64), 'enabler', 'rel_native_base',
+          'candidate-p1.1', material::text, material, 'routine', 0, clock_timestamp(), clock_timestamp(), 'direct-v1'
+        FROM (
+          SELECT jsonb_build_object(
+            'canonicalEncodingVersion', 'candidate-p1.1',
+            'scope', jsonb_build_object('tenantId', s.tenant_id, 'appId', s.app_id, 'brandId', s.brand_id,
+              'shopId', s.shop_id, 'domain', s.domain, 'sourceId', 'source-a'),
+            'object', jsonb_build_object('objectId', 'gate-object', 'sha256', repeat('a',64)),
+            'sourceClaim', jsonb_build_object('fileSha256', repeat('a',64)),
+            'contributors', jsonb_build_array('enabler'),
+            'baseReleaseId', 'rel_native_base',
+            'risk', jsonb_build_object('level', 'routine', 'explicitDisableCount', 0),
+            'entries', '[]'::jsonb
+          ) AS material
+          FROM content_intake.scopes s WHERE s.scope_id='scope-a'
+        ) built`);
+      const digest = (await admin.query<{ digest: string }>(
+        `SELECT digest FROM content_intake.candidate_versions WHERE candidate_id='gate-candidate' AND version=1`,
+      )).rows[0]!.digest;
+      const request = {
+        confirmed: true,
+        key: { candidateId: 'gate-candidate', version: 1, digest },
+        baseReleaseId: 'rel_native_base',
+        operationId: 'gate-deny',
+        sourceEvidenceVersion: 0,
+        title: '合成门禁',
+        summary: '指针不动',
+      };
+      const deny = () => admin.query(
+        `SELECT content_intake.publish_candidate('enabler',$1::jsonb,'null'::jsonb)`,
+        [JSON.stringify(request)],
+      );
+      await admin.query(`UPDATE content_intake.sources SET mode='legacy', mode_version=mode_version+1 WHERE source_id='source-a'`);
+      await admin.query('SAVEPOINT gate');
+      await expect(deny()).rejects.toMatchObject({ code: 'ZA003', message: 'MODE_CONFLICT' });
+      await admin.query('ROLLBACK TO SAVEPOINT gate');
+      expect(await pointer()).toBe('rel_native_base');
+      await admin.query(`UPDATE content_intake.sources SET mode='v2-preview', mode_version=mode_version+1 WHERE source_id='source-a'`);
+      await admin.query(`SELECT set_config('app.publishing','on',true)`);
+      await admin.query(`INSERT INTO public.content_releases(release_id,release_seq,title,status,source_binding_hash,tenant_id)
+        SELECT 'rel_gate_plain', nextval('public.content_release_seq'), '合成无目录基线', 'published', source_binding_hash, tenant_id
+        FROM public.content_releases WHERE release_id='rel_native_base'`);
+      await admin.query(`INSERT INTO public.release_source_bindings(release_id,domain,source_version_id)
+        SELECT 'rel_gate_plain', domain, source_version_id FROM public.release_source_bindings WHERE release_id='rel_native_base'`);
+      await admin.query(`UPDATE public.content_current SET current_release_id='rel_gate_plain' WHERE id=1`);
+      await admin.query(`INSERT INTO content_intake.candidate_versions(
+        candidate_id, version, source_id, scope_id, source_version, object_id, file_sha256, actor_id, base_release_id,
+        canonical_encoding, canonical_material, material, risk, explicit_disable_count, created_at, updated_at, publication_policy)
+        SELECT 'gate-plain', 1, 'source-a', 'scope-a', 1, 'gate-object', repeat('a',64), 'enabler', 'rel_gate_plain',
+          'candidate-p1.1', material::text, material, 'routine', 0, clock_timestamp(), clock_timestamp(), 'direct-v1'
+        FROM (
+          SELECT jsonb_build_object(
+            'canonicalEncodingVersion', 'candidate-p1.1',
+            'scope', jsonb_build_object('tenantId', s.tenant_id, 'appId', s.app_id, 'brandId', s.brand_id,
+              'shopId', s.shop_id, 'domain', s.domain, 'sourceId', 'source-a'),
+            'object', jsonb_build_object('objectId', 'gate-object', 'sha256', repeat('a',64)),
+            'sourceClaim', jsonb_build_object('fileSha256', repeat('a',64)),
+            'contributors', jsonb_build_array('enabler'),
+            'baseReleaseId', 'rel_gate_plain',
+            'risk', jsonb_build_object('level', 'routine', 'explicitDisableCount', 0),
+            'entries', '[]'::jsonb
+          ) AS material
+          FROM content_intake.scopes s WHERE s.scope_id='scope-a'
+        ) built`);
+      const plainDigest = (await admin.query<{ digest: string }>(
+        `SELECT digest FROM content_intake.candidate_versions WHERE candidate_id='gate-plain' AND version=1`,
+      )).rows[0]!.digest;
+      expect(await pointer()).toBe('rel_gate_plain');
+      await admin.query('SAVEPOINT gate');
+      await expect(admin.query(
+        `SELECT content_intake.publish_candidate('enabler',$1::jsonb,'null'::jsonb)`,
+        [JSON.stringify({ ...request, operationId: 'gate-plain', baseReleaseId: 'rel_gate_plain', key: { candidateId: 'gate-plain', version: 1, digest: plainDigest } })],
+      )).rejects.toMatchObject({ code: 'ZA003', message: 'MODE_CONFLICT' });
+      await admin.query('ROLLBACK TO SAVEPOINT gate');
+      expect(await pointer()).toBe('rel_gate_plain');
+      expect((await admin.query<{ n: number }>('SELECT count(*)::int AS n FROM content_intake.publications')).rows[0]!.n).toBe(0);
+      expect((await admin.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM content_intake.release_catalogs WHERE release_id='rel_gate_plain'`,
+      )).rows[0]!.n).toBe(0);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+    expect(await pointer()).toBe('rel_native_base');
+    expect((await admin.query<{ n: number }>('SELECT count(*)::int AS n FROM content_intake.release_catalogs')).rows[0]!.n).toBe(catalogsBefore);
+    expect((await admin.query<{ mode: string }>(`SELECT mode FROM content_intake.sources WHERE source_id='source-a'`)).rows[0]!.mode).toBe('v2-preview');
+  }, 30_000);
 });
