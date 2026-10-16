@@ -257,6 +257,14 @@ it('keeps a source snapshot mismatch on its own sentence', async () => {
   expect(result).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
 });
 
+it('does not relabel a reasonless refusal as the owner-only sentence', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN'));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: '当前身份不能执行此操作' });
+  expect(result).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
+});
+
 it('shows the source denial instead of the owner-only sentence', async () => {
   const owner = fakeSession('owner');
   vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', 'SOURCE_NOT_ELIGIBLE'));

@@ -55,7 +55,7 @@ function asFailure(error: unknown): DashboardContentFailure {
     if (error.reason === 'SOURCE_NOT_ELIGIBLE' || error.reason === 'SOURCE_SUSPENDED') {
       return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.sourceIneligible);
     }
-    return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.ownerPublish);
+    return dashboardContentFailure('FORBIDDEN');
   }
   return dashboardContentFailure(error.code);
 }
