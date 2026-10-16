@@ -74,6 +74,7 @@ type SidebarItem = {
   id: SidebarDestination;
   label: string;
   group: DashboardNavItem['group'];
+  blurb?: string;
 };
 
 function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {

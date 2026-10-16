@@ -48,6 +48,8 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(7);
   expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
+  expect(screen.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
+  await user.click(screen.getByTestId('nav-content'));
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');
   for (const [key,module] of [['ArrowDown','publish'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
@@ -65,12 +67,12 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   expect(screen.getByRole('heading', { name: '知识库' })).toBeInTheDocument();
 });
 
-it('fails closed before choosing a workspace profile when the mode lookup fails', async () => {
+it('opens the six-page shell without waiting on the intake mode lookup', async () => {
   window.dashboardIntake = { mode: async () => ({ ok: false, code: 'UNAVAILABLE' }),
     current: vi.fn(), command: vi.fn(), onInvalidated: vi.fn() } as unknown as typeof window.dashboardIntake;
   render(<DashboardApp />);
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('管理模式不可用'));
-  expect(screen.queryByTestId('dashboard-shell')).not.toBeInTheDocument();
+  expect(await screen.findByTestId('dashboard-shell')).toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
   expect(window.dashboardIntake!.command).not.toHaveBeenCalled();
 });
 
@@ -81,6 +83,7 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   const user = userEvent.setup();
   installShippedDashboardCss();
   render(<DashboardApp />);
+  await user.click(await screen.findByTestId('nav-content'));
   const write = await screen.findByRole('button', { name: '添加话术' });
   const content = screen.getByTestId('dashboard-content');
   const knowledge = document.querySelector('.desk-knowledge');
