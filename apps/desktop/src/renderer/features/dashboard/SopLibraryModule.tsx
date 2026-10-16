@@ -21,7 +21,13 @@ function toCsv(items: readonly DashboardSopNode[]): string {
   return [header, ...rows].join('\n');
 }
 
-export function SopLibraryModule() {
+export function SopLibraryModule({
+  canUploadSop = true,
+  uploadBlock = '',
+}: {
+  canUploadSop?: boolean;
+  uploadBlock?: string;
+} = {}) {
   const [items, setItems] = useState<readonly DashboardSopNode[] | null>(null);
   const [message, setMessage] = useState('加载中…');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,6 +92,10 @@ export function SopLibraryModule() {
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             const file = event.target.files?.[0];
             event.target.value = '';
+            if (!canUploadSop) {
+              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
+              return;
+            }
             const api = window.dashboardOps;
             if (!file || !api) {
               setMessage(file ? OPS_LOOP_COPY.noProduct : message);
@@ -110,7 +120,14 @@ export function SopLibraryModule() {
           type="button"
           className="dash-reset"
           data-testid="sop-upload"
-          onClick={() => uploadRef.current?.click()}
+          disabled={!canUploadSop}
+          onClick={() => {
+            if (!canUploadSop) {
+              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
+              return;
+            }
+            uploadRef.current?.click();
+          }}
         >
           上传
         </button>
@@ -207,7 +224,12 @@ export function SopLibraryModule() {
           type="button"
           className="dash-reset"
           data-testid="sop-custom-step"
+          disabled={!canUploadSop}
           onClick={() => {
+            if (!canUploadSop) {
+              setMessage(uploadBlock || OPS_LOOP_COPY.sopUploadJob);
+              return;
+            }
             const api = window.dashboardOps;
             if (!api) {
               setMessage(OPS_LOOP_COPY.noProduct);

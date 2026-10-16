@@ -1,9 +1,10 @@
-import { exactKeys } from './product-session';
+import { exactKeys, UNRESOLVED_JOB_LABEL, type SessionJobView } from './product-session';
 
 export const OPS_LOOP_COPY = Object.freeze({
   noProduct: '未接入：没有产品会话。',
   noSession: '未接入：请先登录。',
   forbidden: '当前角色不能执行这个操作。',
+  sopUploadJob: '当前职务不能上传 SOP',
   unavailable: '服务暂不可用，请重试',
   retireHint: '提交下架审核。坐席要等下一次发布才搜不到这条。',
   retirePending: '已提交下架审核，发布后才离开当前目录。',
@@ -84,6 +85,15 @@ export function sopCsvAllergyStopMissing(csvText: string): boolean {
 }
 
 export const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
+
+/** Signed-in product role is not enough. Missing and unresolved jobs fail closed. */
+export function sopUploadRefusal(job: SessionJobView | null | undefined): { code: 'FORBIDDEN'; message: string } | null {
+  if (job?.status === 'resolved' && job.rights.uploadSop === true) return null;
+  return {
+    code: 'FORBIDDEN',
+    message: job?.status === 'resolved' ? OPS_LOOP_COPY.sopUploadJob : UNRESOLVED_JOB_LABEL,
+  };
+}
 
 export type DashboardOpsFailureCode =
   | 'UNAUTHORIZED'

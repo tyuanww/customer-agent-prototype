@@ -4,6 +4,7 @@ import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import { UNRESOLVED_JOB_LABEL, type SessionJobView } from '../shared/product-session';
+import { sopUploadRefusal } from '../shared/dashboard-ops-loop';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
@@ -168,6 +169,8 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     return () => { alive = false; };
   }, []);
   const canGrant = !jobKnown || (sessionJob?.status === 'resolved' && sessionJob.rights.grant);
+  const uploadRefusal = jobKnown ? sopUploadRefusal(sessionJob) : null;
+  const canUploadSop = uploadRefusal === null;
   const grantBlock = !jobKnown
     ? ''
     : sessionJob?.status === 'resolved'
@@ -1370,7 +1373,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-active-module={active}
         >
           {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
-          {active === 'sop' && <SopLibraryModule />}
+          {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
           {active === 'wording' && (
             <WordingLibraryModule
               initialDomain={wordingDomain}

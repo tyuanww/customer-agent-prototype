@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SopLibraryModule } from '../../src/renderer/features/dashboard/SopLibraryModule';
+import { OPS_LOOP_COPY } from '../../src/shared/dashboard-ops-loop';
 
 describe('SopLibraryModule', () => {
   beforeEach(() => {
@@ -128,6 +129,36 @@ describe('SopLibraryModule', () => {
     await user.click(screen.getByTestId('sop-update'));
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('过敏步骤没有停手文案，不能发。');
     expect(sopPatch).not.toHaveBeenCalled();
+  });
+
+  it('does not upload when the signed-in job cannot upload SOP', async () => {
+    const sopImport = vi.fn();
+    window.dashboardOps = {
+      retrieval: vi.fn(),
+      sopCatalog: vi.fn(async () => ({
+        ok: true as const,
+        productSessionId: 'default',
+        items: [{
+          nodeId: 'n1', parentNodeId: null, title: '停手', body: '先停手',
+          sortKey: 0, version: 1, lifecycle: 'active' as const,
+        }],
+      })),
+      sopImport,
+      sopPatch: vi.fn(),
+      sopDelete: vi.fn(),
+      scriptDelete: vi.fn(),
+      softwareCatalog: vi.fn(),
+      softwareOpenDownload: vi.fn(),
+    };
+    const user = userEvent.setup();
+    render(<SopLibraryModule canUploadSop={false} uploadBlock={OPS_LOOP_COPY.sopUploadJob} />);
+    await waitFor(() => expect(screen.getByTestId('sop-library-list')).toHaveTextContent('停手'));
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-custom-step')).toBeDisabled();
+    const file = new File(['node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n'], 'sop.csv', { type: 'text/csv' });
+    await user.upload(screen.getByTestId('sop-upload-input'), file);
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent(OPS_LOOP_COPY.sopUploadJob);
+    expect(sopImport).not.toHaveBeenCalled();
   });
 
   it('blocks oversized SOP files and imports a custom step as replace-all', async () => {
