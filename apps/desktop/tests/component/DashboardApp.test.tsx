@@ -197,10 +197,11 @@ describe('DashboardApp', () => {
     const materials = await screen.findByTestId('nav-materials');
     expect(materials).toHaveAccessibleName('资料管理');
     expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid'))).toEqual([
-      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-permissions', 'nav-announce', 'nav-materials',
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid')).filter((id) => id?.startsWith('nav-'))).toEqual([
+      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-publish', 'nav-permissions', 'nav-announce', 'nav-materials',
     ]);
     expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
+    expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
     expect(screen.getByTestId('nav-announce')).toHaveAccessibleName('系统同步');
     const line = await screen.findByTestId('intake-shell-line');
     expect(line).toHaveTextContent('synthetic-local');
@@ -212,6 +213,11 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-content'));
     expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '资料管理' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('将替换')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-publish'));
+    expect(screen.getByLabelText('将替换')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '知识库' })).toBeNull();
   });
 
   it('hides the intake shell line unless both whitelist strings are present', async () => {
