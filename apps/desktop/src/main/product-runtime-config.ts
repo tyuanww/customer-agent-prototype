@@ -157,7 +157,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, kind: 'invalid' };
   const record = parsed as Record<string, unknown>;
-  if ('contentIntake' in record && (record.contentIntake !== 'faq-v2' || record.mode !== MODE)) {
+  if ('contentIntake' in record && record.contentIntake !== 'faq-v2') {
     return { ok: false, kind: 'invalid' };
   }
   if (record.mode === OFFLINE_MODE) {
@@ -171,7 +171,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
       return { ok: false, kind: 'invalid' };
     }
-    return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin }) };
+    return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin,
+      ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
   }
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
   const apiOrigin = loopbackOrigin(record.apiOrigin);

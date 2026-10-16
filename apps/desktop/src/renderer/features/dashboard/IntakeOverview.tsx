@@ -253,7 +253,7 @@ export function IntakeOverview({
   const rings = showSampleCharts ? v9DonutRings() : null;
   const donut = showSampleCharts ? v9Donut() : null;
   return <section className="dash-module intake-management intake-overview wb9" data-testid="module-overview">
-    <h1 className="desk-sr">管理概览</h1>
+    <h1 className="desk-sr">概览</h1>
     <div className="ov-head"><span className="mute">数据范围</span>
       <div className="seg" role="group" aria-label="时间范围">
         <button type="button" aria-pressed={days === 7} onClick={() => setDays(7)}>近 7 天</button>
