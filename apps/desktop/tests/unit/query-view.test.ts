@@ -208,4 +208,26 @@ describe('session notice projection', () => {
       previous: null,
     })).toEqual({ kind: 'failed', text: PRODUCT_ERRORS.UNAVAILABLE });
   });
+
+  it('keeps the missed-authorization notice until login itself finishes', () => {
+    const waiting = { kind: 'waiting' as const, text: SESSION_NOTICE_TEXT.waiting };
+    expect(sessionNoticeForResult({
+      value: unsigned,
+      source: 'status',
+      wasSignedIn: false,
+      previous: waiting,
+    })).toEqual(waiting);
+    expect(sessionNoticeForResult({
+      value: unsigned,
+      source: 'logout',
+      wasSignedIn: true,
+      previous: waiting,
+    })).toEqual({ kind: 'unsigned', text: SESSION_NOTICE_TEXT.loggedOut });
+    expect(sessionNoticeForResult({
+      value: { ok: false, sessionEpoch: 2, code: 'UNAVAILABLE', message: PRODUCT_ERRORS.UNAVAILABLE },
+      source: 'login',
+      wasSignedIn: false,
+      previous: waiting,
+    })).toEqual({ kind: 'failed', text: PRODUCT_ERRORS.UNAVAILABLE });
+  });
 });

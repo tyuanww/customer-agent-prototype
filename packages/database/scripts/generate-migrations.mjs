@@ -795,6 +795,27 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
       if (migrations[m.position-1][key] !== m[key]) throw new Error(`Generated readiness predecessor drift: ${m.file}`);
     }
   }
+  // Appended only after the frozen 41-migration closure. 0032 itself is not rewritten.
+  // 0042 bytes are the migration already applied on the Mac ledger. Re-rendering
+  // the restored overlay must reproduce that checksum; the tenant adoption is 0043.
+  const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
+  const occupiedMigration = readiness
+    ? renderIntakeOverlay(projectRoot, snapshot, 42, '0042_intake_occupied_domain_publish')
+    : null;
+  if (occupiedMigration && occupiedMigration.sha256 !== FROZEN_OCCUPIED_SHA256) {
+    throw new Error('Frozen occupied-domain migration 0042 drifted');
+  }
+  const defaultTenantMigration = occupiedMigration
+    ? renderIntakeOverlay(projectRoot, snapshot, 43, '0043_intake_publish_default_tenant')
+    : null;
+  const roleDefaultMigration = defaultTenantMigration
+    ? renderIntakeOverlay(projectRoot, snapshot, 44, '0044_intake_role_defaults')
+    : null;
+  const publishedMigrations = Object.freeze(roleDefaultMigration
+    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration]
+    : defaultTenantMigration
+    ? [...migrations, occupiedMigration, defaultTenantMigration]
+    : occupiedMigration ? [...migrations, occupiedMigration] : migrations);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -815,7 +836,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
         source_schema_sha256: successor.manifest.database.sha256,
       }) : null,
     }),
-    migrations: Object.freeze(migrations.map(({ sql: _sql, ...migration }) => migration)),
+    migrations: Object.freeze(publishedMigrations.map(({ sql: _sql, ...migration }) => migration)),
   });
   const outputs = new Map(prior.outputs);
   outputs.set(`packages/database/migrations/${legacyAcl.file}`, legacyAcl.sql);
@@ -823,11 +844,14 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
   if (readinessMigration) outputs.set(`packages/database/migrations/${readinessMigration.file}`, readinessMigration.sql);
+  if (occupiedMigration) outputs.set(`packages/database/migrations/${occupiedMigration.file}`, occupiedMigration.sql);
+  if (defaultTenantMigration) outputs.set(`packages/database/migrations/${defaultTenantMigration.file}`, defaultTenantMigration.sql);
+  if (roleDefaultMigration) outputs.set(`packages/database/migrations/${roleDefaultMigration.file}`, roleDefaultMigration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
-  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
-  return Object.freeze({ manifest, migrations, outputs });
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, publishedMigrations, compatibleUpgrades));
+  return Object.freeze({ manifest, migrations: publishedMigrations, outputs });
 }
 
 function outputGroupFor(relativePath) {

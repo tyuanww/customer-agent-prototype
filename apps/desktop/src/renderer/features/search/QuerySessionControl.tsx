@@ -16,7 +16,7 @@ export function QuerySessionControl({
   onClick,
 }: QuerySessionControlProps) {
   let caption = unsignedLabel;
-  if (busy) {
+  if (busy && signedIn) {
     caption = '处理中';
   } else if (signedIn) {
     caption = `${label} · 退出`;
@@ -25,9 +25,9 @@ export function QuerySessionControl({
     <button
       type="button"
       className="capsule-session-entry"
-      disabled={busy}
+      disabled={busy && signedIn}
       onClick={onClick}
-      title={title}
+      title={busy && !signedIn ? '登录还在等待。可以再次点击登录。' : title}
     >
       {caption}
     </button>

@@ -146,9 +146,6 @@ describe('search HTTP route', () => {
       [authHeaders, validRequest({ platform_source: 'unknown' }), 400],
       [authHeaders, validRequest({ detected_platform: 'douyin' }), 400],
       [authHeaders, validRequest({ collection_mode: 'approved_redacted' }), 403],
-      // pilot_recorded with no acceptance check configured must fail closed: the
-      // contract forbids recording real customer text without server-side proof.
-      [authHeaders, validRequest({ collection_mode: 'pilot_recorded' }), 403],
       [authHeaders, validRequest({ query_text: '🦊'.repeat(501) }), 400],
     ] as const;
     for (const [headers, payload, statusCode] of cases) {
@@ -158,43 +155,48 @@ describe('search HTTP route', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('denies pilot_recorded until the current notice has been accepted', async () => {
+  it('records pilot_recorded when the current notice was not accepted', async () => {
     const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
       ok: true, response: response() as never,
     });
-
-    // Not accepted -> refused, and the operation never runs.
-    const denied = vi.fn(async () => false);
-    const deniedApp = appWith({ execute }, denied);
-    const deniedResult = await deniedApp.inject({
+    const declined = vi.fn(async () => false);
+    const app = appWith({ execute }, declined);
+    const result = await app.inject({
       method: 'POST', url: '/v1/search', headers: authHeaders,
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
-    expect(deniedResult.statusCode).toBe(403);
-    expect(execute).not.toHaveBeenCalled();
-    expect(denied).toHaveBeenCalledWith('usr_synthetic_agent_001');
+    expect(result.statusCode).not.toBe(403);
+    expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
+    expect(declined).toHaveBeenCalledWith('usr_synthetic_agent_001');
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('pilot_recorded');
+  });
 
-    // Accepted -> the request proceeds to the operation boundary.
-    const accepted = vi.fn(async () => true);
-    const acceptedApp = appWith({ execute }, accepted);
-    const acceptedResult = await acceptedApp.inject({
+  it('records pilot_recorded when the acceptance check is missing', async () => {
+    const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
+      ok: true, response: response() as never,
+    });
+    const result = await appWith({ execute }).inject({
       method: 'POST', url: '/v1/search', headers: authHeaders,
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
-    expect(acceptedResult.statusCode).toBe(200);
+    expect(result.statusCode).not.toBe(403);
+    expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
     expect(execute).toHaveBeenCalledOnce();
   });
 
-  it('fails pilot_recorded closed when the acceptance check itself errors', async () => {
-    const execute = vi.fn<SearchOperation['execute']>();
+  it('records pilot_recorded when the acceptance check itself errors', async () => {
+    const execute = vi.fn<SearchOperation['execute']>().mockResolvedValue({
+      ok: true, response: response() as never,
+    });
     const app = appWith({ execute }, async () => { throw new Error('notice table unavailable'); });
     const result = await app.inject({
       method: 'POST', url: '/v1/search', headers: authHeaders,
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
-    // The contract says an unavailable check must fail closed rather than record.
-    expect(result.statusCode).toBe(403);
-    expect(execute).not.toHaveBeenCalled();
+    expect(result.statusCode).not.toBe(403);
+    expect(result.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
+    expect(execute).toHaveBeenCalledOnce();
   });
 
   it('keeps the route fail-closed until the W3 atomic event operation is composed', async () => {

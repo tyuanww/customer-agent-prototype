@@ -37,7 +37,7 @@ describe('LoginApp', () => {
     fireEvent.click(screen.getByRole('button', { name: '飞书登录' }));
     expect(await screen.findByText('正在打开浏览器…')).toBeInTheDocument();
     finish({ ok: true });
-    expect(await screen.findByText('正在等待登录完成。可关闭浏览器页，回到此窗等待。')).toBeInTheDocument();
+    expect(await screen.findByText('正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。')).toBeInTheDocument();
   });
 
   it('distinguishes a blocked browser from a rejected authorize URL', async () => {

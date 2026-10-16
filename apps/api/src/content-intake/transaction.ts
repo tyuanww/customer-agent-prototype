@@ -28,7 +28,7 @@ export type IntakeTransaction = Queryable & {
 export type Principal = {
   id: string; userId: string; tenantId: string; appId: string; identityScope: string; personKey: string;
   factsVersion: number; generation: number; enabled: boolean; checkedAt: number; validUntil: number;
-  role: 'agent' | 'enabler' | 'lead' | 'supervisor' | 'manager' | 'director' | null;
+  role: 'agent' | 'enabler' | 'lead' | 'supervisor' | 'manager' | 'director' | 'engineer' | null;
 };
 
 /** Lock the authentication module's private session reference until this read or

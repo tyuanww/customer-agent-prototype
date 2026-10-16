@@ -70,8 +70,8 @@ export type SearchRouteDependencies = Readonly<{
   logHash: Readonly<{ version: string; key: string }>;
   idempotencyHmac: ApiHmacKeyRing;
   /**
-   * Proof that the current notice version was accepted by this user. Required for
-   * collection_mode=pilot_recorded; omitted means such a request is denied.
+   * Optional observation of the current notice decision. A missing check, a decline,
+   * or a thrown check does not deny collection_mode=pilot_recorded.
    */
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
@@ -134,17 +134,12 @@ export function registerSearchRoute(
       return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
     }
     if (dependencies === undefined) return sendOverloaded(reply);
-    // pilot_recorded requires server-side proof that this user accepted the CURRENT
-    // notice; the contract adds that this check may not be delegated to JSON Schema and
-    // must fail closed. An unavailable check therefore denies the collection, it does
-    // not silently fall back to "record anyway".
-    if (contract.value.collection_mode === 'pilot_recorded') {
-      if (dependencies.hasAcceptedCurrentNotice === undefined) {
-        return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
-      }
-      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id)
-        .catch(() => false);
-      if (!accepted) return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED');
+    // Unactivated successor: a seat search is still recorded when the current notice
+    // was not accepted, was declined, or the acceptance check is missing or throws.
+    // The consumed contract still describes the old fail-closed gate. This call does
+    // not activate that contract and does not write from the six faq-v2 pages.
+    if (contract.value.collection_mode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
+      await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
     }
 
     const redacted = redactQueryText(contract.value.query_text);

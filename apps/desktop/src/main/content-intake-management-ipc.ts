@@ -5,7 +5,8 @@ import type { ProductSession } from './product-session';
 import { isTrustedMainFrameSender } from './sender-guard';
 import { ContentIntakeManagement } from './content-intake-management';
 import { createIntakeNativeFiles } from './content-intake-native-files';
-const CHANNELS = ['dashboard:intake-mode', 'dashboard:intake-current', 'dashboard:intake-command'] as const;
+import { projectIntakeShellLine } from './product-runtime-config';
+const CHANNELS = ['dashboard:intake-mode', 'dashboard:intake-shell-line', 'dashboard:intake-current', 'dashboard:intake-command'] as const;
 /** Only the explicit synthetic profile provides a session. No legacy product
  * capability is mounted in FAQ Dashboard, and no renderer supplies an identity. */
 export function registerContentIntakeManagementIpc(session: ProductSession | null,
@@ -47,6 +48,10 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     if (!wc || !isTrustedMainFrameSender(event, [wc], devUrl())) return failure('FORBIDDEN');
     if (channel === 'dashboard:intake-command' ? args.length !== 1 || !isIntakeManagementCommand(args[0]) : args.length !== 0) return failure('VALIDATION');
     if (channel === 'dashboard:intake-mode') return { ok: true, enabled: session !== null };
+    if (channel === 'dashboard:intake-shell-line') {
+      const line = projectIntakeShellLine(session ? { contentIntake: 'faq-v2' } : null);
+      return { ok: true, profileMode: line?.profileMode ?? null, contentIntake: line?.contentIntake ?? null };
+    }
     if (!session) return failure('UNAVAILABLE');
     let manager = windows.get(wc);
     if (!manager) {
