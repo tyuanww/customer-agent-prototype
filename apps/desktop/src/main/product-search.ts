@@ -206,7 +206,7 @@ export class ProductSearch {
       .slice(0, 3)
       .map((candidate, index) => ({ ...candidate, rank: (index + 1) as 1 | 2 | 3 }));
     if (local.length > 0) {
-      if (!this.announce.allows(local[0]!.release_id)) return { stale: true };
+      if (local.some((candidate) => !this.announce.allows(candidate.release_id))) return { stale: true };
       return { stale: false, releaseId: local[0]!.release_id, candidates: local };
     }
     if (this.hydrate && this.announce.allows(this.hydrate.releaseId)) {

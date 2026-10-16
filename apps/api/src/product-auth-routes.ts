@@ -28,8 +28,12 @@ const CALLBACK_PAGE_CSP = "default-src 'none'; frame-ancestors 'none'";
 export function prefersIdentityCallbackHtml(accept: string | string[] | undefined): boolean {
   const header = Array.isArray(accept) ? accept.join(',') : accept ?? '';
   return header.split(',').some((part) => {
-    const media = part.split(';')[0]?.trim().toLowerCase();
-    return media === 'text/html' || media === 'application/xhtml+xml';
+    const [media, ...params] = part.split(';').map((item) => item.trim().toLowerCase());
+    if (media !== 'text/html' && media !== 'application/xhtml+xml') return false;
+    const quality = params.find((item) => item.startsWith('q='));
+    if (!quality) return true;
+    const value = Number(quality.slice(2));
+    return Number.isFinite(value) && value > 0;
   });
 }
 

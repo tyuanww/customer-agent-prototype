@@ -329,7 +329,7 @@ export async function dashboardContentRollbackPrevious(
     }
     // Rollback is owner-only in the contract (x-required-roles: [owner]); gate here so a coach
     // gets a readable reason instead of an opaque API rejection.
-    if (view.role !== 'owner') {
+    if (view.role !== 'owner' || view.job?.status !== 'resolved' || view.job.rights.grant !== true) {
       return dashboardContentFailure('FORBIDDEN', CONTENT_ROLLBACK_COPY.ownerOnly);
     }
     const response = await client.request(epoch, '/v1/content/rollback-previous', {

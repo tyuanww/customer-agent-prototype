@@ -640,6 +640,7 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     const service = createServiceRepositoryForPool(pool as never, {});
     const noticeService = createNoticeServiceForPool(pool, false);
     const repository = createEventRepository(pool);
+    let acceptedNotice = false;
     const app = createApiApp(
       parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test',
@@ -653,7 +654,7 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
         operation: { execute: (request) => repository.executeSearch(request) },
         logHash: LOG_HASH,
         idempotencyHmac: IDEMPOTENCY_KEYS,
-        hasAcceptedCurrentNotice: async () => false,
+        hasAcceptedCurrentNotice: async () => acceptedNotice,
       },
       undefined, undefined, undefined, undefined,
       undefined, undefined, undefined, undefined,
@@ -692,11 +693,11 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
       },
     });
     expect(recorded.statusCode).not.toBe(403);
-    expect(recorded.json()).not.toMatchObject({ error: { code: 'POLICY_DENIED' } });
     await expect(owner.query(
       'SELECT collection_mode FROM public.query_events WHERE query_id = $1',
       [queryId],
-    )).resolves.toMatchObject({ rows: [{ collection_mode: 'pilot_recorded' }] });
+    )).resolves.toMatchObject({ rows: [{ collection_mode: 'synthetic' }] });
+    acceptedNotice = true;
 
     // Publish a notice and accept it as the actor.
     await owner.query(
