@@ -86,7 +86,6 @@ export function sopCsvAllergyStopMissing(csvText: string): boolean {
 
 export const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
 
-/** Signed-in product role is not enough. Missing and unresolved jobs fail closed. */
 export function sopUploadRefusal(job: SessionJobView | null | undefined): { code: 'FORBIDDEN'; message: string } | null {
   if (job?.status === 'resolved' && job.rights.uploadSop === true) return null;
   return {

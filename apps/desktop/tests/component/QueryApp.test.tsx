@@ -509,7 +509,7 @@ describe('QueryApp', () => {
   });
 
   it('blocks fixture search in product mode and exposes login/logout without credentials', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
     const signedIn = { ...signedOut, signedIn: true, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(signedOut),
@@ -544,7 +544,7 @@ describe('QueryApp', () => {
   });
 
   it('shows the release banner after login instead of a failed query', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
     const signedIn = {
       ...signedOut,
       signedIn: true,
@@ -646,7 +646,7 @@ describe('QueryApp', () => {
   });
 
   it('distinguishes expiry and login failure from unsigned guidance', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
     const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 8, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = {
@@ -692,7 +692,7 @@ describe('QueryApp', () => {
 
   it('ignores delayed old session events without clearing current UI', async () => {
     const pending = deferred<import('../../src/shared/product-session').ProductSessionResult>();
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
     const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 3, userId: 'usr_synthetic_agent', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: 'synthetic_agent' };
     let listener: (value: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
     window.customerAgent!.product = { sessionStatus: () => pending.promise, login: vi.fn().mockResolvedValue(signedIn), logout: vi.fn().mockResolvedValue(signedOut), onSessionChanged: handler => { listener = handler; return () => {}; } };
@@ -706,7 +706,7 @@ describe('QueryApp', () => {
   });
 
   it('keeps login clickable and retries when the authorization page was missed', async () => {
-    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const signedOut = { ok: true as const, enabled: true, signedIn: false, sessionEpoch: 1, userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null };
     const signedIn = { ...signedOut, signedIn: true, sessionEpoch: 4, userId: 'usr_synthetic_owner', role: 'owner' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 900_000).toISOString(), displayName: '管理员' };
     const first = deferred<import('../../src/shared/product-session').ProductSessionResult>();
     const second = deferred<import('../../src/shared/product-session').ProductSessionResult>();
