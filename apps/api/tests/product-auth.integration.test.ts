@@ -226,7 +226,7 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
     );
     await app.close();
     app = await build({
-      authorizeUrl: state => `http://127.0.0.1:45000/authorize?state=${state}`,
+      authorizeUrl: provider().authorizeUrl,
       exchange: async code => {
         if (code === 'feishu-new') return openId;
         if (code === 'feishu-owner') return ownerId;
