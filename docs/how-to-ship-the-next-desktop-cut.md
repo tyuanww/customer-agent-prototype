@@ -2,11 +2,11 @@
 
 发完一轮之后，下一轮按六条发布面分开做。合进 `main` 不会让坐席看到新包，也不会换杭州进程，也不会换线上话术。
 
-2026-10-17 这一轮的实测状态写在这里，方便下一轮对照。安装包版本是 `apps/desktop/package.json` 的 `0.3.28`。根目录 `VERSION` 仍是 `0.3.27`，这次没有改它。杭州代码软链是 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`。公网 `https://agent-auth.jianghua.site/health` 返回 `version` `0.3.28`。话术指针仍是 `rel_27`。GitHub Release `v0.3.27` 的三个附件仍指向 `d09f7da354b1a72bc0e8f8126f6487c751fc99df`，不要覆盖。
+2026-10-17 这一轮的实测状态写在这里，方便下一轮对照。根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.28`。杭州代码软链是 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`。公网 `https://agent-auth.jianghua.site/health` 返回 `version` `0.3.28`。这个健康检查字符串来自 `api.env` 的 `CUSTOMER_AGENT_BUILD_VERSION`，不是根目录 `VERSION` 文件。话术指针仍是 `rel_27`。GitHub Release `v0.3.27` 的三个附件仍指向 `d09f7da354b1a72bc0e8f8126f6487c751fc99df`，不要覆盖。
 
 ## Prerequisites
 
-- 产品版本只改 `apps/desktop/package.json`。要让根目录 `VERSION` 跟它一致时，单独决定，不要在文档修订里顺手改。
+- 产品版本同时写 `apps/desktop/package.json` 和根目录 `VERSION`。两处必须是同一串。健康检查仍只看 `api.env` 里的 `CUSTOMER_AGENT_BUILD_VERSION`。
 - Node 24。Mac 用 `$HOME/homebrew/opt/node@24`。杭州用 `/usr/local/bin/node`，这次是 v24.21.0。pnpm 锁在 `11.19.0`。
 - 六条面各自要一句单独的授权。代码部署、新的 GitHub Release、下载页、应用内目录、话术发布，不能用同一句「继续」带过。
 - 四张话术表是售前、活动、售后、FAQ。SOP 不在这一轮。

@@ -11,7 +11,7 @@ All notable changes to this customer-agent product implementation repository are
 - 应用内下载目录的当前行是 `sw_0328_mac`。
 - 登录后的概览可以画自己的使用趋势。未登录写「请先登录」。没有记录写「暂无使用记录」。
 - 录入路由挂在现有进程上。未登录访问 `GET /v1/intake/sources` 和 `GET /v1/events/usage` 会得到 401。
-- 下一轮换安装包和杭州代码时，按 [how-to-ship-the-next-desktop-cut](docs/how-to-ship-the-next-desktop-cut.md)。根目录 `VERSION` 仍是 0.3.27。安装包版本在 `apps/desktop/package.json`。
+- 下一轮换安装包和杭州代码时，按 [how-to-ship-the-next-desktop-cut](docs/how-to-ship-the-next-desktop-cut.md)。根目录 `VERSION` 与 `apps/desktop/package.json` 都是 `0.3.28`。
 
 ## [0.3.27] - 2026-10-17
 
