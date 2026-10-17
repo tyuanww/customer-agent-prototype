@@ -30,6 +30,8 @@
         Mac（只做开发，不再对外）
 ```
 
+图里的 `127.0.0.1:43199` 不是 TCP 监听。Postgres 只听 `/srv/customer-agent/stack/data/pg15-socket`。连接串里的 `port=43199` 配的是这个 socket。
+
 同一台机器上还跑着 fuqing-crm-analytics、WeKnora、tyuan-chat，以及宿主的 nginx / PG17 / Redis / Tailscale。**PG15 是独立集群**，只在 stack root 里的 Unix socket 上监听，和 PG17 的 5432 完全隔离。
 
 ## 东西放在哪
@@ -77,22 +79,51 @@ LOG_HASH_KEY  LOG_HASH_KEY_VERSION
 
 `IDEMPOTENCY_HMAC_KEYS` 与 `LOG_HASH_KEY` **必须和源机器一致**：库里已有的幂等键与日志哈希链是用它们算的，换一套就等于对不上账。
 
+正式库名是 `customer_agent_formal` 时，启动程序不会自己写出 `INTAKE_BUSINESS_DATABASE_URL`、`INTAKE_USAGE_DATABASE_URL`、`INTAKE_WORKER_DATABASE_URL`。这三个键不在推导拒绝名单里，所以写在 `api.env` 里才会挂上录入。不要把 `DATABASE_URL` 或其他推导键写进 `api.env`，`start` 会直接报错并点名。不要把连接串抄进文档。
+
 ## 更新代码
 
+2026-10-17 换到 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8` 时，落地的是 Mac 上的 bundle，不是在杭州 `git clone`。跑通的取分支是 `refs/remotes/origin/main` 到 `refs/heads/main`。先导出 `SHA`。
+
 ```bash
-SHA=<要部署的 git sha>
-ssh -i ~/.ssh/id_ed25519_pc2 root@100.93.46.46 bash -s <<EOF
-set -e
-DEST=/srv/customer-agent/releases/$SHA
-git clone https://github.com/tyuanww/customer-agent-prototype.git "\$DEST"
-cd "\$DEST" && git checkout $SHA
+SHA="${SHA:?set SHA to the 40-character git sha}"
+git fetch origin
+git bundle create "/tmp/${SHA}.bundle" origin/main
+git bundle list-heads "/tmp/${SHA}.bundle"
+# 期望一行：<同一 SHA> refs/remotes/origin/main
+scp -i ~/.ssh/id_ed25519_pc2 "/tmp/${SHA}.bundle" "root@100.93.46.46:/var/lib/ca-build/${SHA}.bundle"
+ssh -i ~/.ssh/id_ed25519_pc2 root@100.93.46.46 bash -s -- "$SHA" <<'EOF'
+set -eu
+SHA="$1"
+DEST="/srv/customer-agent/releases/$SHA"
+rm -rf "$DEST"
+mkdir -p "$DEST"
+git -C "$DEST" init -b scratch
+git -C "$DEST" fetch "/var/lib/ca-build/${SHA}.bundle" refs/remotes/origin/main:refs/heads/main
+git -C "$DEST" checkout "$SHA"
+cd "$DEST"
 pnpm install --frozen-lockfile
 pnpm build:services
-chown -R customer-agent:customer-agent "\$DEST"
-ln -sfn "\$DEST" /srv/customer-agent/current
+chown -R customer-agent:customer-agent "$DEST"
+ln -sfn "$DEST" /srv/customer-agent/current
 systemctl restart customer-agent-stack
 EOF
 ```
+
+`git clone` 这种 bundle 会得到空仓库，随后 `fatal: reference is not a tree`。`git init` 默认分支是 `main` 时，再 fetch 到 `refs/heads/main` 会被拒绝，原句是 `refusing to fetch into branch 'refs/heads/main' checked out`。先 `git init -b scratch`，再把 `refs/remotes/origin/main` 取到 `refs/heads/main`。`$SHA:refs/heads/main` 这一种写法没有在这次切换里试过。
+
+不要删 `profile.json`。删了之后端口会按目录重算，不再是 `43115` / `43116`。`api.env` 留在 `/srv/customer-agent/stack/`，换代码软链不会带走它。只改 `CUSTOMER_AGENT_BUILD_VERSION` 时先复制一份 `api.env`。这个值是健康检查里的版本字符串，不是 git SHA。杭州上的 pnpm 保持 `11.19.0`，不要跟着安装提示升到 12。
+
+核对：
+
+```bash
+readlink -f /srv/customer-agent/current
+curl --fail --show-error --max-time 5 http://127.0.0.1:43115/health
+curl --silent --output /dev/null --write-out '%{http_code}\n' --max-time 5 http://127.0.0.1:43115/v1/intake/sources
+curl --silent --output /dev/null --write-out '%{http_code}\n' --max-time 5 http://127.0.0.1:43115/v1/events/usage
+```
+
+2026-10-17 的结果是软链指向 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`，健康检查是 `{"status":"ok","service":"cs-ai-api","version":"0.3.28"}`，后两个地址都是 `401`。回滚是 `ln -sfn` 到上一份 release（这次之前是 `72380feb0baeb90d7e5a4ac61b223b8c53aedeba`）再 `systemctl restart`。代码切换不移动 `content_current`。
 
 保留 `releases/<sha>` 而不是原地 `git pull`，是为了「上一版还在，能立刻切回去」。回滚就是 `ln -sfn` 到旧 sha 再 `systemctl restart`。
 

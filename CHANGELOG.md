@@ -2,6 +2,17 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.28] - 2026-10-17
+
+### Changed
+
+- 你可以下载 `v0.3.28` 的 Windows、Mac、Linux 未签名包。`v0.3.27` 的三个旧附件还在。
+- 杭州正式进程换到 `ddeec390`。健康检查报 `0.3.28`。端口仍是 `43115` 和 `43116`。话术指针仍是 `rel_27`。
+- 应用内下载目录的当前行是 `sw_0328_mac`。
+- 登录后的概览可以画自己的使用趋势。未登录写「请先登录」。没有记录写「暂无使用记录」。
+- 录入路由挂在现有进程上。未登录访问 `GET /v1/intake/sources` 和 `GET /v1/events/usage` 会得到 401。
+- 下一轮换安装包和杭州代码时，按 [how-to-ship-the-next-desktop-cut](docs/how-to-ship-the-next-desktop-cut.md)。根目录 `VERSION` 仍是 0.3.27。安装包版本在 `apps/desktop/package.json`。
+
 ## [0.3.27] - 2026-10-17
 
 ### Changed
