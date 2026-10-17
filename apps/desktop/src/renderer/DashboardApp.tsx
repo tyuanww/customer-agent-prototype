@@ -209,7 +209,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
   const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
-  const [signedIn, setSignedIn] = useState(false);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
   const [navResizing, setNavResizing] = useState(false);
@@ -305,7 +304,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
       void Promise.resolve(api.session()).then((result) => {
         if (!live) return;
         const nextSignedIn = result.ok === true && result.signedIn === true;
-        setSignedIn(nextSignedIn);
         setRefreshLabel(
           nextSignedIn
             ? (sessionDisplayName({
@@ -316,7 +314,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         );
       }).catch(() => {
         if (!live) return;
-        setSignedIn(false);
         setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
       });
     };
