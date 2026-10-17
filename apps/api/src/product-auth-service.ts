@@ -140,10 +140,19 @@ export async function createProductAuthService(
         await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
       } catch (error) {
         const failure = identityFailure(error);
-        if (failure.reason === 'CAPABILITY_DENIED' && binding) {
-          console.info(`[api] identity binding not allowlisted: ${binding}`);
+        if (failure.reason === 'CAPABILITY_DENIED' && binding && /^ou_[A-Za-z0-9]{6,64}$/.test(binding)) {
+          try {
+            await query('SELECT backend_identity.admit_feishu_agent($1)', [binding]);
+            await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
+          } catch (retryError) {
+            throw identityFailure(retryError);
+          }
+        } else {
+          if (failure.reason === 'CAPABILITY_DENIED' && binding) {
+            console.info('[api] identity binding not allowlisted');
+          }
+          throw failure;
         }
-        throw failure;
       }
       if (providerFailure) {
         console.info(`[api] identity provider exchange failed: ${providerFailure.reason}`);
