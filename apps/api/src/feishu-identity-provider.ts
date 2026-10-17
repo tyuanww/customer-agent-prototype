@@ -192,8 +192,8 @@ export function createFeishuIdentityProvider(
         if (config.observeJob === true) {
           try {
             const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
-            if (snapshot && snapshot !== 'pending') rememberJobSnapshot(openId, snapshot);
-            else if (snapshot !== 'pending') forgetJobSnapshot(openId);
+            if (snapshot) rememberJobSnapshot(openId, snapshot);
+            else forgetJobSnapshot(openId);
           } catch {
             forgetJobSnapshot(openId);
           }
