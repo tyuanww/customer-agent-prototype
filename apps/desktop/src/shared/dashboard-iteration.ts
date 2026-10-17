@@ -6,7 +6,7 @@ export const ITERATION_TASK_ID = /^[\s\S]{1,128}$/;
 export const ITERATION_COPY = Object.freeze({
   unavailable: '服务暂不可用',
   empty: '当前没有待办',
-  noProduct: '当前没有产品会话，无法加载待办',
+  noProduct: '请先登录后再看待办。',
   noSession: '请先登录后再查看待办',
   agent: '坐席不能查看或处理话术优化待办',
   conflict: '待办已更新，请刷新后再处理',

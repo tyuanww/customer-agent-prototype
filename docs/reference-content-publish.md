@@ -138,15 +138,15 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 | reason / code | 屏幕 |
 | --- | --- |
-| `SOURCE_SNAPSHOT_MISMATCH` | 文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。 |
-| `CONTENT_CONTRACT_INVALID` | 表格式或花括号不合法。请按模板改表后重新导入。 |
-| `SOURCE_BASE_RELEASE_STALE` / `IMPORT_IN_FLIGHT` | 你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。 |
-| `QUESTION_IDENTITY_CONFLICT` | 表里有内容和线上已有版本冲突（同一问法被改成了不同话术）。请挑出这些行：要么改用线上版本的说法，要么把改动并进原条目后重新导入。 |
-| `QUALITY_GATE_NOT_PASSED` | 质检证明没写上，不能发布。请联系管理员，不要重复点发布。 |
-| `NO_IN_FLIGHT`（桌面本地码） | 当前没有未完成的导入。登录还在，不必重新登录。 |
-| 非 owner 发 `FORBIDDEN` | 一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。 |
-| 坐席 | 坐席不能发布内容。 |
-| 无会话 | 当前没有产品会话，无法发布。 |
+| `SOURCE_SNAPSHOT_MISMATCH` | 这份表和已登记的来源对不上。请确认是要发的那份表，然后重新导入。 |
+| `CONTENT_CONTRACT_INVALID` | 表的格式不对。请按模板改后重新导入。 |
+| `SOURCE_BASE_RELEASE_STALE` / `IMPORT_IN_FLIGHT` | 上一份表还没发布。请等它发布，或先取消未完成的导入。 |
+| `QUESTION_IDENTITY_CONFLICT` | 表里有的问法和线上话术不一样。请改成和线上一致，或在原条目上修改后再导入。 |
+| `QUALITY_GATE_NOT_PASSED` | 还不能发布。请让客服经理处理后再试。 |
+| `NO_IN_FLIGHT`（桌面本地码） | 没有未完成的导入。 |
+| 非 owner 发 `FORBIDDEN` | 请让客服经理发布。 |
+| 坐席 | 客服坐席不能发布。请让客服经理发布。 |
+| 无会话 | 请先登录后再发布。 |
 | 本地文件读不出来 | 无法读取该文件。请确认文件未打开且仍是 CSV/xlsx 后重试。 |
 
 映射在 `apps/desktop/src/main/dashboard-content.ts` 的 `asFailure`，文案表在 `apps/desktop/src/shared/dashboard-content.ts`。

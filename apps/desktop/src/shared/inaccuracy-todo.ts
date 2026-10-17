@@ -9,9 +9,9 @@ export const INACCURACY_TODO_COPY = Object.freeze({
   heading: '按稿不准次数',
   empty: '当前没有达到开单阈值的不准稿。',
   footnoteLive:
-    `「话术不准」按稿列出本页待办的样本查询数。达到 24 小时 ≥ ${INACCURACY_TASK_THRESHOLD_24H} 或 7 天 ≥ ${INACCURACY_TASK_THRESHOLD_7D} 才会打开待办；未达阈值的稿不会出现。不自动改写或关单。`,
+    `同一条话术，24 小时里被标不准达到 ${INACCURACY_TASK_THRESHOLD_24H} 次，或 7 天里达到 ${INACCURACY_TASK_THRESHOLD_7D} 次，才会出现在这里。`,
   footnoteMock:
-    `「话术不准」计数尚未接入。达到 24 小时 ≥ ${INACCURACY_TASK_THRESHOLD_24H} 或 7 天 ≥ ${INACCURACY_TASK_THRESHOLD_7D} 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。`,
+    `不准次数还没接上。这里先不显示数字。`,
 });
 
 export type InaccuracyTodoTask = Readonly<{

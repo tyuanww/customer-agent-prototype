@@ -592,12 +592,9 @@ export const DASHBOARD_MANIFEST = deepFreeze({
   },
   iteration: {
     title: '话术优化待办',
-    kicker: 'iteration_task · 与工单分析分域',
-    domainNote:
-      '工单分析看业务咨询分布；本页只收录话术库迭代任务。不自动改写 Answer，不回写 fixture。',
-    // 形状对齐 OpenAPI `IterationTask`：task_id / signal_id / cluster_key / sample_query_ids /
-    // suspected_cause / suggested_script_ids / status / version。priority 合同无此列，只作本页 UI 分层。
-    footnote: 'priority 是本页 UI 分层用的合成标注，不是正式 SLA，也不属于合同字段。',
+    kicker: '需要跟进的话术',
+    domainNote: '这里只看待处理的话术。',
+    footnote: '标成优先的事项先处理。',
     tasks: [
       {
         taskId: 'it-2041',

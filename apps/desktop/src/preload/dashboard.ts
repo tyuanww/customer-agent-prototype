@@ -451,31 +451,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asSopOpen(value: unknown) {
-  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
   if (!value.ok && typeof value.code === 'string' && typeof value.message === 'string') return value;
   if (value.ok && value.published === false && typeof value.fileName === 'string' && Array.isArray(value.sheets) && Array.isArray(value.issues)) return value;
-  return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
 }
 
 function asUsageList(value: unknown) {
-  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
   if (!value.ok && typeof value.code === 'string' && typeof value.message === 'string') return value;
   if (value.ok && Array.isArray(value.rows) && (value.nextCursor === null || typeof value.nextCursor === 'string') && typeof value.canExport === 'boolean') return value;
-  return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
 }
 
 function asUsagePreview(value: unknown) {
-  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
   if (!value.ok && typeof value.code === 'string' && typeof value.message === 'string') return value;
   if (value.ok && [value.exportable, value.redacted, value.withoutConsent].every((count) => typeof count === 'number' && Number.isFinite(count))) return value;
-  return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
 }
 
 function asUsageExport(value: unknown) {
-  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  if (!isRecord(value) || typeof value.ok !== 'boolean') return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
   if (!value.ok && typeof value.code === 'string' && typeof value.message === 'string') return value;
   if (value.ok && typeof value.written === 'number') return value;
-  return { ok: false as const, code: 'UNAVAILABLE', message: '未接入' };
+  return { ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' };
 }
 
 contextBridge.exposeInMainWorld('dashboardSopWorkbook', {
@@ -483,7 +483,7 @@ contextBridge.exposeInMainWorld('dashboardSopWorkbook', {
     try {
       return asSopOpen(await ipcRenderer.invoke(SOP_WORKBOOK_OPEN));
     } catch {
-      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+      return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
     }
   },
 });
@@ -493,21 +493,21 @@ contextBridge.exposeInMainWorld('dashboardUsageLog', {
     try {
       return asUsageList(await ipcRenderer.invoke(USAGE_LIST, filter));
     } catch {
-      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+      return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
     }
   },
   async previewExport() {
     try {
       return asUsagePreview(await ipcRenderer.invoke(USAGE_PREVIEW));
     } catch {
-      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+      return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
     }
   },
   async export() {
     try {
       return asUsageExport(await ipcRenderer.invoke(USAGE_EXPORT));
     } catch {
-      return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+      return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
     }
   },
 });

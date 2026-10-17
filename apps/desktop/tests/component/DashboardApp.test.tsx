@@ -143,8 +143,8 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入：没有 SOP 写库通道');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('现在不能保存 SOP。请稍后再试。');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
@@ -1329,7 +1329,7 @@ describe('DashboardApp', () => {
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
     expect(screen.getByTestId('module-overview')).toHaveTextContent('无命中次数');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('暂无记录');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
@@ -1355,7 +1355,7 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
     expect(screen.getByTestId('module-wording')).toBeInTheDocument();
-    expect(screen.getByTestId('wording-empty')).toHaveTextContent('当前发布未挂载');
+    expect(screen.getByTestId('wording-empty')).toHaveTextContent('还没有可查的话术');
     expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
@@ -1388,7 +1388,7 @@ describe('DashboardApp', () => {
     fireEvent.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
     expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
     expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
@@ -1399,7 +1399,7 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-publish'));
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '当前没有产品会话，无法发布',
+      '请先登录后再发布',
     );
     expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
     expect(screen.queryByTestId('missing-domain-block')).not.toBeInTheDocument();
@@ -1431,14 +1431,14 @@ describe('DashboardApp', () => {
 
     // The import workspace ships collapsed; the header carries the session state.
     expect(screen.getByTestId('content-pending-dev')).not.toHaveAttribute('open');
-    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
     const actionRow = document.querySelector('.content-action-row');
     expect(actionRow).toContainElement(screen.getByTestId('publish-action'));
     expect(actionRow).toContainElement(screen.getByTestId('cancel-in-flight'));
     expect(screen.getByTestId('content-replace-row').closest('[data-testid="content-pending-dev"]')).toBeNull();
     expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
       'title',
-      expect.stringContaining('产品会话'),
+      expect.stringContaining('请先登录后再导入和发布'),
     );
     expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
@@ -1492,7 +1492,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('不承诺库存');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '当前没有产品会话，无法发布',
+      '请先登录后再发布',
     );
     expect(window.customerAgent).toBeUndefined();
 
@@ -1505,7 +1505,7 @@ describe('DashboardApp', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
     });
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('Excel 需工作台主进程解析');
+    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('这个 Excel 现在打不开');
     expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(window.customerAgent).toBeUndefined();
@@ -1616,7 +1616,7 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
     expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
     expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
   });
 
@@ -1627,7 +1627,7 @@ describe('DashboardApp', () => {
     const reminder = screen.getByTestId('iteration-reminder');
     expect(reminder).toHaveClass('dash-card');
     expect(reminder).toHaveTextContent('有 2 条待处理 P0 需要跟进');
-    expect(reminder).toHaveTextContent('DEMO · 合成数据');
+    expect(reminder).not.toHaveTextContent('DEMO · 合成数据');
     expect(reminder).toHaveTextContent('会员积分过期补发缺少有效稿');
     expect(reminder).toHaveTextContent('退货检测旧稿已过有效期仍被召回');
     expect(reminder).not.toHaveTextContent('洁面泡沫少的首条场景过宽');
@@ -1638,10 +1638,10 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('iteration-it-2041')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('iteration-reminder-it-2041')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('module-iteration')).toHaveTextContent(
-      '正式仅 coach / owner · agent 403 · 本页 MOCK AUTH',
+      '需要跟进的话术',
     );
     expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent(
-      '「话术不准」计数尚未接入。达到 24 小时 ≥ 3 或 7 天 ≥ 10 才会打开 iteration_task；本页不展示实时数字，也不自动改写或关单。',
+      '不准次数还没接上。这里先不显示数字。',
     );
 
     await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');

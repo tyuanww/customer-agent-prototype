@@ -98,7 +98,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       loadRetrieval();
     });
     if (!iterationApi) {
-      setTaskMessage('未接入');
+      setTaskMessage('请先登录。');
       return () => {
         live = false;
         stopCatalog?.();
@@ -117,7 +117,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
     }).catch(() => {
       if (!live) return;
       setTasks(null);
-      setTaskMessage('未接入');
+      setTaskMessage('请先登录。');
     });
     return () => {
       live = false;
@@ -133,12 +133,12 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
   const wordingTitleById = new Map((wording?.entries ?? []).map((entry) => [entry.scriptId, entry.title]));
   const catalogCount = wording?.total ?? 0;
   const catalogDisplay = !wordingConnected
-    ? '未接入'
+    ? '暂无记录'
     : !wordingReady
       ? '—'
       : wording
         ? String(catalogCount)
-        : '未接入';
+        : '暂无记录';
   const catalogCaption = matchesLease
     ? (wording?.releaseId ?? '当前发布')
     : wording?.releaseId
@@ -158,41 +158,41 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
       <dl className="overview-scope-summary" data-testid="overview-scope">
         <div>
           <dt>统计范围</dt>
-          <dd>{connected ? '当前产品会话' : '未接入产品会话'}</dd>
+          <dd>{connected ? '已登录' : '请先登录'}</dd>
         </div>
         <div>
           <dt>待办</dt>
-          <dd>{tasks !== null ? '话术优化待办' : '未接入'}</dd>
+          <dd>{tasks !== null ? '话术优化待办' : '暂无记录'}</dd>
         </div>
         <div>
           <dt>话术条数</dt>
-          <dd>{matchesLease ? '当前发布' : wording?.releaseId ? '本机目录' : '未接入'}</dd>
+          <dd>{matchesLease ? '当前发布' : wording?.releaseId ? '本机目录' : '暂无记录'}</dd>
         </div>
         <div>
           <dt>检索账</dt>
-          <dd>{retrieval ? (retrieval.window === 'last_7d' ? '近 7 天' : '当前发布') : '未接入'}</dd>
+          <dd>{retrieval ? (retrieval.window === 'last_7d' ? '近 7 天' : '当前发布') : '暂无记录'}</dd>
         </div>
       </dl>
 
       <section className="overview-kpi-grid" aria-labelledby="overview-kpi-title">
         <div className="dash-section-title">
           <div><h2 id="overview-kpi-title">核心指标</h2></div>
-          <p data-testid="overview-kpi-source">{connected ? '待办与话术条数来自产品会话' : '未接入产品会话'}</p>
+          <p data-testid="overview-kpi-source">{connected ? '' : '请先登录'}</p>
         </div>
         <dl className="health-strip" role="list" aria-label="核心运营指标">
           <div className="health-kpi" role="listitem" data-testid="overview-alert-nohit">
             <dt>无命中率</dt>
-            <dd>{retrieval ? percent(retrieval.noHitRate) : '未接入'}</dd>
+            <dd>{retrieval ? percent(retrieval.noHitRate) : '暂无记录'}</dd>
             <p>{retrieval ? '当前发布检索账' : '没有检索账'}</p>
           </div>
           <div className="health-kpi" role="listitem">
             <dt>复制完成率</dt>
-            <dd>{retrieval ? percent(retrieval.copyCompleteRate) : '未接入'}</dd>
+            <dd>{retrieval ? percent(retrieval.copyCompleteRate) : '暂无记录'}</dd>
             <p>{retrieval ? '当前发布检索账' : '没有检索账'}</p>
           </div>
           <div className="health-kpi" role="listitem" data-testid="overview-alert-todos">
             <dt>开放待办</dt>
-            <dd>{tasks ? String(openTasks.length) : '未接入'}</dd>
+            <dd>{tasks ? String(openTasks.length) : '暂无记录'}</dd>
             <p>话术优化待办</p>
           </div>
           <div className="health-kpi" role="listitem" data-testid="overview-alert-catalog">
@@ -232,7 +232,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
                     data-testid={`overview-inaccuracy-${row.scriptId}`}
                   >
                     <div role="cell">{row.scriptId}</div>
-                    <div role="cell">{wordingTitleById.get(row.scriptId) ?? '当前发布未收录该稿标题'}</div>
+                    <div role="cell">{wordingTitleById.get(row.scriptId) ?? '还没有这条话术的标题'}</div>
                     <div role="cell">{row.sampleCount}</div>
                     <div role="cell">{row.openTaskCount}</div>
                   </div>
@@ -246,13 +246,12 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
 
       <section className="overview-action-list" aria-labelledby="overview-decisions-title">
         <div className="dash-section-title">
-          <div><h2 id="overview-decisions-title">{tasks === null ? '待处理事项（未接入）' : `待处理事项（${openTasks.length}）`}</h2></div>
+          <div><h2 id="overview-decisions-title">{tasks === null ? '待处理事项' : `待处理事项（${openTasks.length}）`}</h2></div>
           <p>来自话术优化待办</p>
         </div>
         {tasks === null ? (
           <div className="dash-empty-state" data-testid="overview-todos-empty">
             <strong>{taskMessage}</strong>
-            <span>没有产品会话时不展示待办数字。</span>
           </div>
         ) : openTasks.length === 0 ? (
           <div className="dash-empty-state" data-testid="overview-todos-empty">
@@ -323,7 +322,7 @@ export function OverviewModule({ onNavigate }: { onNavigate?: (target: Dashboard
                           setTasks((current) => (current ?? []).map((row) => (row.taskId === result.task.taskId ? result.task : row)));
                         }).catch(() => {
                           setBusyId(null);
-                          setTaskMessage('未接入');
+                          setTaskMessage('请先登录。');
                         });
                       }}
                     >

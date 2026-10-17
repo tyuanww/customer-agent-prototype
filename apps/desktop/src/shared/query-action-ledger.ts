@@ -1,12 +1,5 @@
 import { shouldOpenIterationTask } from './inaccuracy-report';
 
-/**
- * Frozen copy and inaccuracy bodies have no question text and no release id.
- * The live query surface therefore stays 未接入. This module only checks the
- * record; it does not add an HTTP route.
- */
-export const QUERY_ACTION_LEDGER_SURFACE = '未接入' as const;
-
 export const QUERY_ACTIONS = ['copy', 'miss', 'inaccurate'] as const;
 export type QueryActionKind = (typeof QUERY_ACTIONS)[number];
 

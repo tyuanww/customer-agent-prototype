@@ -110,23 +110,23 @@ it('says 当前没有待办 when empty', async () => {
   await openTodo();
   expect(await screen.findByText('当前没有待办')).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
-  expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('未接入');
+  expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('暂无记录');
 });
 
 it('says 未接入 when unloaded', async () => {
   render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
-  expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('未接入');
-  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('使用情况读取失败');
-  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('使用情况读取失败');
-  expect(screen.getByText('命中率').parentElement).toHaveTextContent('使用情况读取失败');
-  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('使用情况读取失败');
+  expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('暂无记录');
+  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByText('命中率').parentElement).toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('使用记录暂时读不出来');
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: '无命中排行' }));
-  expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('未接入');
+  expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('暂无记录');
   await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
   const sop = document.querySelector('.pn:not([hidden])');
-  expect(sop).toHaveTextContent('未接入');
+  expect(sop).toHaveTextContent('暂无记录');
   expect(sop).not.toHaveTextContent('打开次数');
   expect(screen.queryByLabelText('SOP 接口(原型开关)')).not.toBeInTheDocument();
 });
@@ -143,7 +143,7 @@ it('shows a separate 无命中 list and no percentage', async () => {
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
   const misses = screen.getByRole('region', { name: '无命中' });
   expect(misses).toHaveTextContent('无命中');
-  expect(misses).toHaveTextContent('未接入');
+  expect(misses).toHaveTextContent('暂无记录');
   expect(misses).not.toHaveTextContent('话术不准');
 });
 
@@ -316,7 +316,7 @@ it('shows the v9 sample only while preview=intake and keeps SOP unwired', async 
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
   const sop = document.querySelector('.pn:not([hidden])');
-  expect(sop).toHaveTextContent('未接入');
+  expect(sop).toHaveTextContent('暂无记录');
   expect(screen.queryByText('打开次数')).not.toBeInTheDocument();
   expect(screen.queryByText('走完率')).not.toBeInTheDocument();
 });
@@ -331,8 +331,8 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
   ];
   window.dashboardUsageLog = {
     list: vi.fn(async () => ({ ok: true as const, rows, nextCursor: null, canExport: true })),
-    previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
-    export: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
+    previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' })),
+    export: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' })),
   };
   render(<IntakeOverview onOpen={() => undefined} />);
   expect(await screen.findByText('退货时效')).toBeInTheDocument();
@@ -352,6 +352,6 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
   expect(misses).toHaveTextContent('已脱敏');
   expect(misses).not.toHaveTextContent('能开发票吗');
   await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
-  expect(document.querySelector('.pn:not([hidden])')).toHaveTextContent('未接入');
+  expect(document.querySelector('.pn:not([hidden])')).toHaveTextContent('暂无记录');
   expect(screen.queryByText('打开次数')).not.toBeInTheDocument();
 });

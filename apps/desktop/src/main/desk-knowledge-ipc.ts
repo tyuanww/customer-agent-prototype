@@ -46,7 +46,7 @@ export function registerDeskKnowledgeIpc(
   const handle = (event: IpcMainInvokeEvent, command?: unknown): DeskReply => {
     const contents = dashboard();
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return refuse('FORBIDDEN', '请求未完成或权限已改变。');
-    if (!store) return refuse('UNAVAILABLE', '当前运行模式没有接上知识库。');
+    if (!store) return refuse('UNAVAILABLE', '知识库还不能在这里用。');
     const actor = roleOf();
     if (command === undefined) return store.reply(actor.role, actor.displayName);
     if (!isDeskCommand(command)) return { ok: false, code: 'VALIDATION', message: '请检查输入。', view: store.reply(actor.role, actor.displayName).view };

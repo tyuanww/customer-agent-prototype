@@ -541,7 +541,7 @@ describe('dashboard layout contract', () => {
     expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');
     expect(sopLibrary).toContain('data-testid="sop-library-empty"');
-    expect(sopLibrary).toContain('未接入');
+    expect(sopLibrary).toContain('还没有 SOP');
     expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
     expect(sopLibrary).not.toContain('publishDraft');
   });

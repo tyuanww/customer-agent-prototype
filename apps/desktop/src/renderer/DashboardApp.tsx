@@ -3,7 +3,7 @@ import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule'
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
-import { UNRESOLVED_JOB_LABEL, type SessionJobView } from '../shared/product-session';
+import { type SessionJobView } from '../shared/product-session';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
@@ -31,7 +31,6 @@ import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from '
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import {
-  DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED,
   DASHBOARD_WINDOW_TITLE,
   dashboardChromeCssVars,
   dashboardChromeModeFor,
@@ -192,8 +191,8 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const grantBlock = !jobKnown
     ? ''
     : sessionJob?.status === 'resolved'
-      ? (sessionJob.rights.grant ? '' : '当前职务不能授权')
-      : UNRESOLVED_JOB_LABEL;
+      ? (sessionJob.rights.grant ? '' : OPS_LOOP_COPY.grantJob)
+      : '请重新登录后再查看职务。';
   useEffect(() => {
     if (profile !== 'intake') return;
     const read = window.dashboardIntake?.shellLine;
@@ -253,7 +252,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const contentRef = useRef<HTMLElement | null>(null);
   const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
-  const legacyDisclaimer = signedIn ? DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED : DASHBOARD_MANIFEST.banners.disclaimer;
+
   const navCollapsed = isDashboardNavRailPhase(navPhase);
   const hostPlatform = useMemo(
     () => inferDashboardHostPlatform({
@@ -1314,9 +1313,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             );
           })}
         </div>
-        {profile === 'intake' ? null : <p className="dashboard-nav-boundary dashboard-no-drag" data-testid="dashboard-boundary-details">
-          <span data-testid="dashboard-boundary-disclaimer">{legacyDisclaimer}</span>
-        </p>}
+
         <div
           ref={navResizeHandleRef}
           className="dashboard-nav-resizer dashboard-no-drag"

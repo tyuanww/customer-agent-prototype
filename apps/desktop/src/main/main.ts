@@ -283,8 +283,6 @@ if (!gotLock) {
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => controller?.dashboardWebContents() ?? null);
-    // faq-v2 and the legacy dashboard both read these channels. A null source
-    // still replies 未接入 and does not write a file.
     registerUsageLogIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,

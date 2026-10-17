@@ -19,7 +19,7 @@ export function registerSopWorkbookIpc(
   };
 
   ipcMain.handle(OPEN, async (event): Promise<SopWorkbookOpenReply> => {
-    if (!guard(event)) return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+    if (!guard(event)) return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
     const chosen = await dialog.showOpenDialog({
       title: '打开原始 SOP 表',
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],

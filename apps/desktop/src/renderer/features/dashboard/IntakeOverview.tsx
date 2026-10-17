@@ -12,7 +12,6 @@ import {
   type CloseHintTask,
 } from '@shared/iteration-close-hint';
 import {
-  QUERY_ACTION_LEDGER_SURFACE,
   knowledgeValidityReminders,
   type KnowledgeValidityReminder,
 } from '@shared/query-action-ledger';
@@ -116,7 +115,7 @@ export function IntakeOverview({
     const api = window.dashboardIteration;
     if (!api) {
       setTasks(null);
-      setMessage('未接入');
+      setMessage(WORKBENCH_EMPTY.noRecord);
       return undefined;
     }
     let live = true;
@@ -132,7 +131,7 @@ export function IntakeOverview({
     }).catch(() => {
       if (!live) return;
       setTasks(null);
-      setMessage('未接入');
+      setMessage(WORKBENCH_EMPTY.noRecord);
     });
     return () => { live = false; };
   }, []);
@@ -206,7 +205,7 @@ export function IntakeOverview({
       setMessage('');
     }).catch(() => {
       setBusyId(null);
-      setMessage('未接入');
+      setMessage(WORKBENCH_EMPTY.noRecord);
     });
   }
 
@@ -362,7 +361,7 @@ export function IntakeOverview({
           <button type="button" className="btn btn-sm" disabled={usage.page >= usage.pages - 1} onClick={() => setUsagePage(usage.page + 1)}>下一页</button></div> : null}
       </div>
       <div className="pn" hidden={panel !== 'sop'}>
-        <p className="notready" style={{ padding: '20px 12px' }}>未接入</p>
+        <p className="notready" style={{ padding: '20px 12px' }}>{WORKBENCH_EMPTY.noRecord}</p>
       </div>
       <section className="pn" hidden={panel !== 'miss'} aria-label="无命中">
         <h2 className="desk-sr">无命中</h2>
@@ -380,13 +379,13 @@ export function IntakeOverview({
             <td><div className="cnt warn"><b>{count}</b></div></td>
             <td className="mute">{when}</td>
             <td className="jump"><button type="button" className="link" disabled={deskRole !== 'operator'} title={deskRole === 'seat' ? '坐席不能添加话术' : '请先确认运营身份'} onClick={() => onSupplyScript ? onSupplyScript(question) : onOpen('content')}>补充话术</button></td>
-          </tr>) : <tr><td colSpan={5} className="empty">未接入</td></tr>}</tbody>
+          </tr>) : <tr><td colSpan={5} className="empty">{WORKBENCH_EMPTY.noRecord}</td></tr>}</tbody>
         </table>
-        <p className="hint">{QUERY_ACTION_LEDGER_SURFACE}</p>
+
       </section>
       <section hidden={panel !== 'expire'} aria-label="知识有效期">
         <h2 className="desk-sr">知识有效期</h2>
-        {deskReminders !== 'ready' ? <p>未接入</p> : reminders.length === 0 ? <p>{ITERATION_COPY.empty}</p> : <table className="desk-table" aria-label="知识有效期提醒">
+        {deskReminders !== 'ready' ? <p>{WORKBENCH_EMPTY.noRecord}</p> : reminders.length === 0 ? <p>{ITERATION_COPY.empty}</p> : <table className="desk-table" aria-label="知识有效期提醒">
           <thead><tr><th>状态</th><th>话术名称</th></tr></thead>
           <tbody>{reminders.map((item) => <tr key={item.id}><td>{item.label}</td><td>{item.question}</td></tr>)}</tbody>
         </table>}
@@ -420,7 +419,7 @@ export function IntakeOverview({
                   setBusyId(null);
                   if (!result.ok) { setMessage(result.message); return; }
                   setTasks((current) => (current ?? []).map((row) => row.taskId === result.task.taskId ? result.task : row));
-                }).catch(() => { setBusyId(null); setMessage('未接入'); });
+                }).catch(() => { setBusyId(null); setMessage(WORKBENCH_EMPTY.noRecord); });
               }}>开始处理</button> : null}
               <input placeholder="处理说明" aria-label={`处理说明 ${title}`} value={noteById[task.taskId] ?? ''} onChange={(event) => {
                 const value = event.target.value;

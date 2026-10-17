@@ -30,7 +30,7 @@ const UPLOAD_COPY = {
   readFailure: '无法读取该文件。请确认文件未打开且仍是 CSV/xlsx 后重试。',
 } as const;
 
-const SESSION_BANNER_FULL = '导入与发布走产品会话。没有会话时按钮保持未接入，不会写入假发布。';
+const SESSION_BANNER_FULL = '请先登录后再导入和发布。';
 const REPLACE_HINT = '发布会整库替换这一库，其它库沿用。';
 const CANCEL_ARIA_LABEL = '取消服务器上未完成的导入，不影响本页预览';
 const ROLLBACK_ARIA_LABEL = '把上一个已发布版本重新发布为当前版本，不改动任何草稿';
@@ -155,8 +155,8 @@ function sessionStateOf(
 
 function sessionBadgeOf(state: SessionState): { label: string; tone: 'neutral' | 'ok' | 'warn' } {
   if (state === 'pending') return { label: '正在确认会话', tone: 'neutral' };
-  if (state === 'signed-in') return { label: '已接入', tone: 'ok' };
-  return { label: '未接入', tone: 'warn' };
+  if (state === 'signed-in') return { label: '已登录', tone: 'ok' };
+  return { label: '请先登录', tone: 'warn' };
 }
 
 /** Fold summary: the only status source once the body is collapsed. */
@@ -328,7 +328,7 @@ export function ContentModule({
     }
     const api = window.dashboardContent;
     if (!api?.rollbackPrevious) {
-      setPublishFeedback('当前没有产品会话，无法回滚');
+      setPublishFeedback('请先登录后再回退。');
       return;
     }
     const generation = ingestGeneration.current;
@@ -362,7 +362,7 @@ export function ContentModule({
     if (cancelDisabled) return;
     const api = window.dashboardContent;
     if (!api?.cancelInFlight) {
-      setPublishFeedback('当前没有产品会话，无法取消导入');
+      setPublishFeedback('请先登录后再取消导入。');
       return;
     }
     void api.cancelInFlight().then((result) => {

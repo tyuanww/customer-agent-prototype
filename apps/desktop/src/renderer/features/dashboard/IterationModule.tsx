@@ -24,7 +24,6 @@ import { StatusBadge } from './StatusBadge';
 
 const data = DASHBOARD_MANIFEST.iteration;
 
-/** UI 三态：已关闭 = resolved ∪ wont_fix。 */
 type StatusFacet = 'open' | 'in_progress' | 'closed';
 type QueueStatusFilter = 'all' | StatusFacet;
 
@@ -320,13 +319,7 @@ export function IterationModule() {
           <h1>{data.title}</h1>
           <p className="dash-kicker">{data.kicker}</p>
         </div>
-        <div className="iteration-role-note">
-          <StatusBadge
-            label={live ? '正式仅 coach / owner · agent 403' : '正式仅 coach / owner · agent 403 · 本页 MOCK AUTH'}
-            tone="mock"
-          />
-          {live ? null : <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />}
-        </div>
+
       </header>
       <p className="dash-scope">{data.domainNote}</p>
       <p className="dash-footnote" data-testid="iteration-inaccuracy-counts-footnote">
@@ -369,7 +362,7 @@ export function IterationModule() {
           <h2 id="iteration-reminder-title">
             {p0Open.length > 0 ? `有 ${p0Open.length} 条待处理 P0 需要跟进` : '当前没有待处理 P0'}
           </h2>
-          {live ? null : <StatusBadge label={DASHBOARD_MANIFEST.banners.syntheticMark} tone="mock" />}
+
         </div>
         {p0Open.length > 0 ? (
           <ul className="iteration-reminder-list">

@@ -165,7 +165,7 @@ describe('IterationModule live list', () => {
     await waitFor(() => expect(screen.getByTestId('iteration-inaccuracy-script-a')).toBeInTheDocument());
     expect(screen.getByTestId('iteration-inaccuracy-script-a')).toHaveTextContent('稿 script-a · 样本 2 次 · 开放待办 1');
     expect(screen.getByTestId('iteration-itask-inacc')).toHaveTextContent('话术不准 · script-a');
-    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent('样本查询数');
+    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent('才会出现在这里');
     expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).not.toHaveTextContent('尚未接入');
   });
 

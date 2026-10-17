@@ -7,7 +7,7 @@ afterEach(() => { cleanup(); delete window.dashboardSopWorkbook; });
 
 it('stays 未接入 and draws no flow when the opener is absent', () => {
   render(<IntakeSopSource />);
-  expect(screen.getByText('未接入')).toBeVisible();
+  expect(screen.getByText('还没有 SOP。')).toBeVisible();
   expect(screen.queryByRole('button', { name: '打开原始 SOP 表' })).not.toBeInTheDocument();
   expect(screen.queryByText('索要凭证')).not.toBeInTheDocument();
 });
@@ -16,7 +16,7 @@ it('keeps 未接入 when the operator cancels the file dialog', async () => {
   window.dashboardSopWorkbook = { open: async () => ({ ok: false, code: 'CANCELLED', message: '已取消' }) };
   render(<IntakeSopSource />);
   await userEvent.setup().click(screen.getByRole('button', { name: '打开原始 SOP 表' }));
-  expect(await screen.findByText('未接入')).toBeVisible();
+  expect(await screen.findByText('还没有 SOP。')).toBeVisible();
   expect(screen.queryByText('未发布')).not.toBeInTheDocument();
 });
 

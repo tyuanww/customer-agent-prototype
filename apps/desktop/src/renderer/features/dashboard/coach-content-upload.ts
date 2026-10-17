@@ -57,7 +57,7 @@ export async function readCoachUploadFile(file: File): Promise<CoachUploadResult
   if (isZipSignature(bytes) || lower.endsWith('.xlsx') && bytes.includes(0)) {
     const api = window.dashboardContent;
     if (!api?.parseUpload) {
-      return fail('binary-workbook', 'Excel 需工作台主进程解析。当前没有产品会话通道。');
+      return fail('binary-workbook', '这个 Excel 现在打不开。请换成 CSV 后再试。');
     }
     const copy = new Uint8Array(bytes.byteLength);
     copy.set(bytes);

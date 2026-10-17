@@ -1,23 +1,24 @@
 import { exactKeys, UNRESOLVED_JOB_LABEL, type SessionJobView } from './product-session';
 
 export const OPS_LOOP_COPY = Object.freeze({
-  noProduct: '未接入：没有产品会话。',
-  noSession: '未接入：请先登录。',
-  forbidden: '当前角色不能执行这个操作。',
-  sopUploadJob: '当前职务不能上传 SOP',
+  noProduct: '请先登录。',
+  noSession: '请先登录。',
+  forbidden: '你现在不能做这一步。',
+  sopUploadJob: '当前职务不能上传 SOP。请让客服经理或客服总监开通。',
+  grantJob: '当前职务不能授权。请让客服经理或客服总监开通。',
   unavailable: '服务暂不可用，请重试',
-  retireHint: '提交下架审核。坐席要等下一次发布才搜不到这条。',
-  retirePending: '已提交下架审核，发布后才离开当前目录。',
-  noVersion: '未接入：没有当前话术版本号。',
+  retireHint: '提交后，要等下一次发布，坐席才搜不到这条。',
+  retirePending: '已提交下架。下一次发布后，坐席才搜不到这条。',
+  noVersion: '还没有可发布的版本。',
   selectWording: '请先选中话术。',
   selectSop: '请先选中节点。',
-  sopChannel: '未接入：没有 SOP 写库通道。',
+  sopChannel: '现在不能保存 SOP。请稍后再试。',
   sopTooLarge: 'SOP 文件超过 256KB。',
-  allergyStop: '过敏步骤没有停手文案，不能发。',
-  noSoftwareCurrent: '目录为空，没有当前建议版本。',
-  softwareDownloadNotHttps: '下载地址不是 https，不能打开。',
-  softwareOpened: '已在系统浏览器打开下载页',
-  softwareChannel: '未接入：没有安装包目录。',
+  allergyStop: '过敏步骤没有写停手和确认，不能发。',
+  noSoftwareCurrent: '现在还没有可下载的安装包。',
+  softwareDownloadNotHttps: '下载地址打不开。',
+  softwareOpened: '已打开下载页',
+  softwareChannel: '现在还没有可下载的安装包。',
 });
 
 /** Catalog download_url before shell.openExternal. https only, no userinfo. */

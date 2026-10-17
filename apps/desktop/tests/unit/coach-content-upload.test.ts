@@ -164,7 +164,7 @@ describe('coach content upload parser', () => {
     ));
     expect(zip).toMatchObject({ ok: false, code: 'binary-workbook' });
     if (zip.ok) return;
-    expect(zip.message).toContain('Excel 需工作台主进程解析');
+    expect(zip.message).toContain('这个 Excel 现在打不开');
 
     const huge = await readCoachUploadFile(new File(
       ['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)],
@@ -229,11 +229,11 @@ describe('coach content upload parser', () => {
     expect(mixed.ok).toBe(true);
     if (!mixed.ok) return;
     expect(mixed.rows).toEqual([{ scene: '可替换', script: '订单{订单号}于{日期}发出' }]);
-    expect(mixed.sourceName).toContain('花括号 1 行');
+    expect(mixed.sourceName).toContain('不能出现的符号 1 行');
     const allBad = parseCoachUploadCsv('scene,script\n非法,含{其他}占位\n', 'all-braces.csv');
     expect(allBad).toMatchObject({ ok: false, code: 'empty' });
     if (allBad.ok) return;
-    expect(allBad.message).toContain('合同不允许的花括号');
+    expect(allBad.message).toContain('模板里不能出现的符号');
   });
 
   describe('readCoachUploadFile parseUpload bridge', () => {
