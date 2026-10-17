@@ -348,7 +348,6 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
               <h2>{selected.title}</h2>
               <p className="wording-preview">{selected.answerPreview}</p>
               <dl className="dash-dl dash-dl-grid">
-                <div><dt>script_id</dt><dd>{selected.scriptId}</dd></div>
                 <div><dt>适用平台</dt><dd>{selected.platform}</dd></div>
                 <div className="wording-detail-window"><dt>有效窗</dt><dd>{selected.effectiveWindow}</dd></div>
                 <div><dt>来源</dt><dd>{selected.ownerRole}</dd></div>

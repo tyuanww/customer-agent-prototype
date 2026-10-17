@@ -76,7 +76,7 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
   const onOpen = vi.fn();
   render(<IntakeOverview onOpen={onOpen} />);
   await openTodo();
-  expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
+  expect(await screen.findByText('script-a')).toBeInTheDocument();
   expect(screen.queryByText('task-2')).not.toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('button', { name: '去知识库' }));
   expect(onOpen).toHaveBeenCalledWith('content');
@@ -139,12 +139,12 @@ it('shows a separate 无命中 list and no percentage', async () => {
   };
   render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
-  expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
+  expect(await screen.findByText('script-a')).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
   const misses = screen.getByRole('region', { name: '无命中' });
   expect(misses).toHaveTextContent('无命中');
   expect(misses).toHaveTextContent('暂无记录');
-  expect(misses).not.toHaveTextContent('话术不准');
+  expect(misses).not.toHaveTextContent('script-a');
 });
 
 it('knowledge that is not yet effective or already 已失效 shows a separate reminder and does not appear as an 不准 row', async () => {
@@ -175,7 +175,7 @@ it('knowledge that is not yet effective or already 已失效 shows a separate re
   expect(reminder).not.toHaveTextContent('不准');
   await openTodo();
   const iteration = screen.getByRole('table', { name: '话术迭代' });
-  expect(iteration).toHaveTextContent('话术不准 · script-a');
+  expect(iteration).toHaveTextContent('script-a');
   expect(iteration).not.toHaveTextContent('退货运费什么时候到');
   expect(iteration).not.toHaveTextContent('旧包装说明');
 });
@@ -300,7 +300,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
   await user.click(screen.getByRole('button', { name: '暂不处理' }));
   expect(await screen.findByText('暂不处理需要填写原因。')).toBeInTheDocument();
   expect(close).not.toHaveBeenCalled();
-  await user.type(screen.getByRole('textbox', { name: '处理说明 话术不准 · script-a' }), '先观察');
+  await user.type(screen.getByRole('textbox', { name: '处理说明 script-a' }), '先观察');
   await user.click(screen.getByRole('button', { name: '暂不处理' }));
   expect(close).toHaveBeenCalledWith({
     taskId: 'task-1', expectedVersion: 1, status: 'wont_fix', resolutionNote: '排序问题：先观察',

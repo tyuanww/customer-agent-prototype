@@ -139,7 +139,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
       {active==='announce' ? <>
         <div className="sync-line">
-          {fresh ? <span className="state"><i className="dot ok" /><b role="status">当前发布 {view!.releaseId} · {rows.length} 条 · 资格截止 {formatIntakeTime(view!.validUntil)}</b></span>
+          {fresh ? <span className="state"><i className="dot ok" /><b role="status">当前发布 · {rows.length} 条 · 资格截止 {formatIntakeTime(view!.validUntil)}</b></span>
             : <span className="state"><i className="dot" /><b>暂无有效发布</b></span>}
           {fresh && remainingLabel(view!.validUntil) && <span className="rel">{remainingLabel(view!.validUntil)}</span>}
           <span className="grow" />
