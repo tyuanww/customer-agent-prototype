@@ -27,7 +27,7 @@ it('registers the usage channels before the legacy-only branch', () => {
 
 it('filters the shipped list by result and query and does not invent rows when the source is absent', () => {
   expect(listUsageLog(null, { result: 'miss', query: '', cursor: null })).toEqual({
-    ok: false, code: 'UNAVAILABLE', message: '请稍后再试。',
+    ok: false, code: 'UNAVAILABLE', message: '使用记录还不能在这里看。',
   });
   const misses = listUsageLog(rows, { result: 'miss', query: '', cursor: null });
   expect(misses.ok).toBe(true);
