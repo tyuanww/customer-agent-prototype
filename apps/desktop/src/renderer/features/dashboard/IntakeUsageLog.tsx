@@ -92,7 +92,7 @@ export function IntakeUsageLog() {
       <h2>使用情况</h2>
       {canExport && load.kind === 'ready' ? <button type="button" className="btn" onClick={startExport}>导出训练样本</button> : null}
     </div>
-    {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageFailed}</p> : <>
+    {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageUnmounted}</p> : <>
       <div className="filters2" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <div className="seg" role="group" aria-label="结果">
           {RESULT_FILTERS.map((item) => <button key={item.id || 'all'} type="button" aria-pressed={result === item.id}

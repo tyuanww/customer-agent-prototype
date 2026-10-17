@@ -99,3 +99,13 @@ it('reloads an operator view after the query window signs in', async () => {
   expect(screen.queryByText('请先在查询窗口登录。')).not.toBeInTheDocument();
   expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
 });
+
+it('does not ask the seat to log in when the knowledge store is absent', async () => {
+  window.dashboardDesk = {
+    current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '知识库还不能在这里用。', view: null }),
+    command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '知识库还不能在这里用。', view: null }),
+  };
+  render(<DeskKnowledge />);
+  expect(await screen.findByText('知识库还不能在这里用。')).toBeInTheDocument();
+  expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
+});

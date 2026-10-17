@@ -34,11 +34,21 @@ const CAUSE_OPTIONS = [
   ['mixed', CAUSE_LABELS.mixed],
 ] as const;
 
-function usageTile(phase: 'loading' | 'empty' | 'ready' | 'failed', value: string | undefined, synthetic: boolean): string {
+type UsagePhase = 'loading' | 'empty' | 'ready' | 'failed' | 'unmounted';
+
+function usageTile(phase: UsagePhase, value: string | undefined, synthetic: boolean): string {
   if (synthetic && value) return value;
+  if (phase === 'unmounted') return WORKBENCH_EMPTY.usageUnmounted;
   if (phase === 'failed') return WORKBENCH_EMPTY.usageFailed;
   if (phase === 'loading') return '…';
   return value ?? WORKBENCH_EMPTY.usageEmpty;
+}
+
+function usageProse(phase: UsagePhase): string {
+  if (phase === 'loading') return '…';
+  if (phase === 'empty') return WORKBENCH_EMPTY.usageEmpty;
+  if (phase === 'unmounted') return WORKBENCH_EMPTY.usageUnmounted;
+  return WORKBENCH_EMPTY.usageFailed;
 }
 
 function statusLabel(status: DashboardIterationTask['status']): string {
@@ -104,7 +114,7 @@ export function IntakeOverview({
   const [usageDesc, setUsageDesc] = useState(true);
   const [usagePage, setUsagePage] = useState(0);
   const [sourceRows, setSourceRows] = useState<UsageSourceRow[] | null>(null);
-  const [usagePhase, setUsagePhase] = useState<'loading' | 'empty' | 'ready' | 'failed'>(
+  const [usagePhase, setUsagePhase] = useState<UsagePhase>(
     () => (typeof window !== 'undefined' && window.dashboardUsageLog ? 'loading' : 'failed'),
   );
   const previewLocation = window.location;
@@ -237,7 +247,7 @@ export function IntakeOverview({
         if (!live) return;
         if (!reply.ok || (cursor !== null && seen.has(cursor))) {
           setSourceRows(null);
-          setUsagePhase('failed');
+          setUsagePhase(!reply.ok && reply.code === 'UNAVAILABLE' ? 'unmounted' : 'failed');
           return;
         }
         if (cursor !== null) seen.add(cursor);
@@ -298,7 +308,7 @@ export function IntakeOverview({
             ? <p className="notready">{WORKBENCH_EMPTY.usageEmpty}</p>
             : <table className="fixed" aria-label="使用与无命中趋势表"><thead><tr><th>日期</th><th>使用</th><th>无命中</th></tr></thead>
               <tbody>{liveTrend.map((point) => <tr key={point.day}><td>{point.day}</td><td>{point.use}</td><td>{point.miss}</td></tr>)}</tbody></table>)
-          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</p>)}</div>
+          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">{usageProse(usagePhase)}</p>)}</div>
       </div>
       <div className="card" aria-label="话术类型占比">
         <div className="card-head"><h3>话术类型占比</h3></div>
@@ -309,7 +319,7 @@ export function IntakeOverview({
             <text x="70" y="86" textAnchor="middle" fontSize="11" fill="#6b6878">使用次数</text>
           </svg>
           <ul className="dlegend">{donut.parts.map((part) => <li key={part.type}><i style={{ background: part.color }} />{part.type}<span className="n">{part.total.toLocaleString('en-US')}</span><b>{part.pct}%</b></li>)}</ul>
-        </div> : <p className="notready">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</p>}
+        </div> : <p className="notready">{usageProse(usagePhase)}</p>}
       </div>
     </div>
     <div className="card flush">
@@ -343,7 +353,7 @@ export function IntakeOverview({
               <td><div className="cnt"><b>{row.total}</b></div></td>
               <td><span className="who">{row.extra}</span></td>
               <td />
-            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">{usagePhase === 'loading' ? '…' : usagePhase === 'empty' ? WORKBENCH_EMPTY.usageEmpty : WORKBENCH_EMPTY.usageFailed}</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
+            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">{usageProse(usagePhase)}</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
               const rank = usageDesc ? usage.page * V9_PAGE_SIZE + index + 1 : usage.count - (usage.page * V9_PAGE_SIZE + index);
               return <tr className="item" key={row.name}>
                 <td><span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span></td>

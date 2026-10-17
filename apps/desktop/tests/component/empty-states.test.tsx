@@ -33,11 +33,22 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
   render(<IntakeOverview onOpen={() => undefined} />);
   expect(await screen.findAllByText(WORKBENCH_EMPTY.usageEmpty)).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
+  cleanup();
+  window.dashboardUsageLog = {
+    list: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
+    previewExport: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
+    export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageUnmounted)).not.toHaveLength(0);
+  expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
+  expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
 
-it('names a failed usage read on the usage log and an empty log separately', async () => {
+it('names a missing usage source on the usage log and an empty log separately', async () => {
   render(<IntakeUsageLog />);
-  expect(screen.getByText(WORKBENCH_EMPTY.usageFailed)).toBeVisible();
+  expect(screen.getByText(WORKBENCH_EMPTY.usageUnmounted)).toBeVisible();
+  expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
 
