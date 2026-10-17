@@ -124,7 +124,7 @@ export function DeskKnowledge({
   }
 
   if (!api) {
-    return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>当前运行模式没有接上知识库。</p></div></section>;
+    return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>知识库还不能在这里用。</p></div></section>;
   }
   const operator = view.role === 'operator';
   const cards = view.role === null ? null : view.items;

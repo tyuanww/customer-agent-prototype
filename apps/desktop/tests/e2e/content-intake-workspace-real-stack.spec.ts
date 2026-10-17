@@ -65,7 +65,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       await expect(dashboard.getByTestId('nav-content')).toHaveAttribute('aria-selected', 'true');
       for (const module of ['overview', 'sop']) {
         await dashboard.getByTestId(`nav-${module}`).click();
-        await expect(dashboard.getByTestId('dashboard-content')).toContainText('未接入');
+        await expect(dashboard.getByTestId('dashboard-content')).toContainText('请先登录');
       }
       await dashboard.getByTestId('nav-wording').click();
       const library = dashboard.getByRole('region', { name: '可用话术目录', exact: true });
@@ -107,7 +107,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       await dashboard.getByTestId('nav-announce').click();
       const versions = dashboard.getByRole('region', { name: '当前可用版本', exact: true });
       await expect(versions).toContainText(receipt.releaseId!);
-      await expect(versions).toContainText('未接入');
+      await expect(versions).toContainText('暂无记录');
       await expect(versions.getByRole('button', { name: /安装|下载|已读/ })).toHaveCount(0);
       await dashboard.screenshot({ path: path.join(evidence, 'current-version.png') });
       // Directory refresh/navigation must leave Query's original qualification

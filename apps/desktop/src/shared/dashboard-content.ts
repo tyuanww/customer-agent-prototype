@@ -45,36 +45,34 @@ export const CONTENT_IMPORT_TIMEOUT_MS = 30_000;
 export const ACTOR_IN_FLIGHT_IMPORT_ID = 'imp_actor_in_flight_01';
 
 export const CONTENT_PUBLISH_COPY = Object.freeze({
-  noProduct: '当前没有产品会话，无法发布',
+  noProduct: '请先登录后再发布',
   noSession: '请先登录后再发布',
   noDraft: '请先导入并通过校验后再发布',
-  agent: '坐席不能发布内容',
-  sensitive: '售后、过敏或赔付内容需管理员发布',
-  coachScope: '话术师只能发布已标注的产品或活动内容',
-  ownerPublish: '一期发布仅管理员。话术师可导入产品或活动草稿，发布需管理员操作。',
-  sourceIneligible: '来源未登记或已停用，不能导入或发布。',
-  missingBindings: '缺少来源绑定，无法导入',
-  submitting: '正在校验并发布，请稍候，不要离开本页',
-  readyToPublish: '校验通过后可由管理员发布',
+  agent: '客服坐席不能发布。请让客服经理发布。',
+  sensitive: '售后、过敏或赔付内容，请让客服经理发布。',
+  coachScope: '只能发布已标好的产品或活动。',
+  ownerPublish: '请让客服经理发布。',
+  sourceIneligible: '这份来源还不能用，不能导入或发布。',
+  missingBindings: '这份表还没登记来源，不能导入。请让客服经理登记后再试。',
+  submitting: '正在发布，请留在本页。',
+  readyToPublish: '校验通过后，请让客服经理发布。',
 });
 
 export const CONTENT_ROLLBACK_COPY = Object.freeze({
-  ownerOnly: '一期回滚仅管理员。',
-  submitting: '正在回滚，请稍候，不要离开本页',
-  noPrevious: '没有可回滚的上一版（当前就是第一版）。',
+  ownerOnly: '请让客服经理回退。',
+  submitting: '正在回退，请留在本页。',
+  noPrevious: '这已经是第一版，没有更早的版本。',
 });
 
 /** Import/publish API reason → Chinese problem + next step. Codes stay in logs. */
 export const CONTENT_IMPORT_FAILURE_COPY = Object.freeze({
-  SOURCE_SNAPSHOT_MISMATCH: '文件和当前登记的来源对不上。请确认这是要发的那份表后重新导入。',
-  CONTENT_CONTRACT_INVALID: '表格式或花括号不合法。请按模板改表后重新导入。',
-  SOURCE_BASE_RELEASE_STALE: '你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。',
-  IMPORT_IN_FLIGHT: '你自己的上一份草稿还在队列里（还没发布）。请等它发布，或点「取消未完成导入」后再导下一份。',
-  QUALITY_GATE_NOT_PASSED: '质检证明没写上，不能发布。请联系管理员，不要重复点发布。',
-  NO_IN_FLIGHT: '当前没有未完成的导入。登录还在，不必重新登录。',
-  // The table's content collides with what is already published under the same stable identity.
-  // Not an in-flight problem: retrying or cancelling will not clear it, only editing the table will.
-  QUESTION_IDENTITY_CONFLICT: '表里有内容和线上已有版本冲突（同一问法被改成了不同话术）。请挑出这些行：要么改用线上版本的说法，要么把改动并进原条目后重新导入。',
+  SOURCE_SNAPSHOT_MISMATCH: '这份表和已登记的来源对不上。请确认是要发的那份表，然后重新导入。',
+  CONTENT_CONTRACT_INVALID: '表的格式不对。请按模板改后重新导入。',
+  SOURCE_BASE_RELEASE_STALE: '上一份表还没发布。请等它发布，或先取消未完成的导入。',
+  IMPORT_IN_FLIGHT: '上一份表还没发布。请等它发布，或先取消未完成的导入。',
+  QUALITY_GATE_NOT_PASSED: '还不能发布。请让客服经理处理后再试。',
+  NO_IN_FLIGHT: '没有未完成的导入。',
+  QUESTION_IDENTITY_CONFLICT: '表里有的问法和线上话术不一样。请改成和线上一致，或在原条目上修改后再导入。',
 });
 
 const CONTENT_FAILURE_CODES = [

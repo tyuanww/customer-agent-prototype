@@ -41,7 +41,7 @@ it('names a failed usage read on the usage log and an empty log separately', asy
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
 
-it('shows 正式环境未挂录入 on 权限 and 资料管理 without accusing the operator', async () => {
+it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限 and 资料管理 without accusing the operator', async () => {
   render(<IntakePermissions active />);
   expect(await screen.findByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText(/没有可用的资料管理权限|权限配置尚未接入/)).toBeNull();

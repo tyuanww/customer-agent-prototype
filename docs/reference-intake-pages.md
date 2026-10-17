@@ -41,7 +41,7 @@
 
 登录名必须匹配 `^[A-Za-z0-9_-]{1,64}$`，由 `seatUsername` 检查。不合规则、姓名为空或长于 256 字、重置或停用找不到人，错误都是 `missing-person`，文案是「没有可授权的人。」绑定 ID 是 `synthetic_` 加登录名。停用只把人员标成不可用，不删除。
 
-运行脚本映射的失败文案还有：请选择岗位。请设定密码。人员没有写入，已停止。口令没有写入，已停止。账号没有读取。未知错误码变成「账号没有保存。」IPC 在调用脚本前还会返回：账号输入无效。无权访问此窗口能力。账号尚未接入当前运行模式。node 没启动、15 秒超时、标准输出超过 64KiB，或回复通不过 `seatAccountReply`，也是「账号没有保存。」
+运行脚本映射的失败文案还有：请选择岗位。请设定密码。人员没有写入，已停止。口令没有写入，已停止。账号没有读取。未知错误码变成「账号没有保存。」IPC 在调用脚本前还会返回：账号输入无效。无权访问此窗口能力。账号还不能在这里改。node 没启动、15 秒超时、标准输出超过 64KiB，或回复通不过 `seatAccountReply`，也是「账号没有保存。」
 
 Electron 主进程把意图交给 `scripts/synthetic-stack/seat-account-runtime.ts`。人员写入合成库 `customer_agent_synthetic`（Unix socket，端口 43199）。口令只以 salt 和 scrypt 哈希写入 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，默认目录是用户主目录的 `.customer-agent-synthetic-stack`。明文密码不进页面、不进数据库、不进 git。
 

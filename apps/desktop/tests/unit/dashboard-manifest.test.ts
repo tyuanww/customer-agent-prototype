@@ -52,7 +52,7 @@ describe('dashboard manifest', () => {
     expect(source).not.toMatch(/Date\.now/);
     expect(source).not.toMatch(/localStorage|IndexedDB|indexedDB/);
     expect(DASHBOARD_MANIFEST.banners.refreshedAt).toBe('');
-    expect(DASHBOARD_MANIFEST.banners.disclaimer).toContain('未接入');
+    expect(DASHBOARD_MANIFEST.banners.disclaimer).toBe('');
   });
 
   it('keeps ledger dual-books without a sent answer body', () => {
@@ -183,7 +183,7 @@ describe('dashboard manifest', () => {
       expect(task.evidenceCount).toBeGreaterThan(0);
       expect(task.nextStep.length).toBeGreaterThan(0);
     }
-    expect(DASHBOARD_MANIFEST.iteration.domainNote).toContain('不自动改写');
+    expect(DASHBOARD_MANIFEST.iteration.domainNote).toBe('这里只看待处理的话术。');
   });
 
   it('keeps the iteration DTO aligned with the frozen IterationTask schema', () => {
@@ -211,7 +211,7 @@ describe('dashboard manifest', () => {
     // 风险升级属于 escalate 域；本模块只保留 no_hit / top1_skipped。
     expect(JSON.stringify(DASHBOARD_MANIFEST.iteration)).not.toContain('risk_escalated');
     expect(JSON.stringify(DASHBOARD_MANIFEST.iteration)).not.toContain('policy');
-    expect(DASHBOARD_MANIFEST.iteration.footnote).toContain('不是正式 SLA');
+    expect(DASHBOARD_MANIFEST.iteration.footnote).toBe('标成优先的事项先处理。');
   });
 
   it('lists only open P0 iteration tasks for the coach reminder', () => {

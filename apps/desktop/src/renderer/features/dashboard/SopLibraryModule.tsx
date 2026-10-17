@@ -53,7 +53,7 @@ export function SopLibraryModule({
       setSelectedId((current) => current && active.some((item) => item.nodeId === current)
         ? current
         : active[0]?.nodeId ?? null);
-      setMessage(active.length === 0 ? '当前产品会话没有 SOP 节点。' : '');
+      setMessage(active.length === 0 ? '还没有 SOP。' : '');
     }).catch(() => {
       if (!liveRef.current) return;
       setItems(null);
@@ -76,11 +76,11 @@ export function SopLibraryModule({
       <header className="dash-module-head">
         <div>
           <h1>SOP</h1>
-          <p className="dash-kicker">读当前产品会话 · 导入覆盖整树 · 删除仅管理员</p>
+          <p className="dash-kicker">上传会替换现有 SOP。删除请让客服经理操作。</p>
         </div>
       </header>
       <p className="dash-scope dash-scope-important">
-        上传 CSV 会覆盖当前产品会话 SOP 树。更新/删除针对选中节点。坐席过敏窗仍是只读预览。
+        上传 CSV 会替换现在的 SOP。改一条或删一条，先点中那一步。
       </p>
       <div className="dash-filter-toolbar" aria-label="SOP 写操作">
         <input
@@ -241,7 +241,7 @@ export function SopLibraryModule({
               },
             ]);
             void api.sopImport(csv).then((result) => {
-              setMessage(result.ok ? `已整树导入（覆盖当前会话 SOP） ${nodeId}` : result.message);
+              setMessage(result.ok ? 'SOP 已更新。' : result.message);
               if (result.ok) load();
             });
           }}
@@ -252,12 +252,11 @@ export function SopLibraryModule({
       {message ? <p className="dash-scope" data-testid="sop-write-status">{message}</p> : null}
       {items === null ? (
         <div className="dash-empty-state" data-testid="sop-library-empty">
-          <strong>未接入 SOP 库</strong>
-          <span>坐席过敏窗仍可用预览树；工作台不把合成树当作可运营目录。</span>
+          <strong>还没有 SOP。</strong>
         </div>
       ) : items.length === 0 ? (
         <div className="dash-empty-state" data-testid="sop-library-empty">
-          <strong>当前产品会话没有 SOP 节点</strong>
+          <strong>还没有 SOP。</strong>
         </div>
       ) : (
         <ul className="dash-list" data-testid="sop-library-list">

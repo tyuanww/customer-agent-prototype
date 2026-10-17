@@ -19,8 +19,8 @@ describe('SopLibraryModule', () => {
     render(<SopLibraryModule />);
     const module = screen.getByTestId('module-sop');
     expect(screen.getByRole('heading', { level: 1, name: 'SOP' })).toBeInTheDocument();
-    expect(module).toHaveTextContent('没有 SOP 写库通道');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(module).toHaveTextContent('现在不能保存 SOP');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByText('过敏凭证')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
@@ -32,15 +32,15 @@ describe('SopLibraryModule', () => {
     expect(screen.getByRole('button', { name: '上传' })).toBeInTheDocument();
     const file = new File(['scene,script\n过敏,先停用\n'], 'sop.csv', { type: 'text/csv' });
     await user.upload(screen.getByTestId('sop-upload-input'), file);
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录');
     await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
     await user.click(screen.getByTestId('sop-delete'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('没有 SOP 写库通道');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
     await user.click(screen.getByTestId('sop-export'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('没有 SOP 写库通道');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
     await user.click(screen.getByTestId('sop-custom-step'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录');
   });
 
   it('updates and deletes the selected live SOP node', async () => {
@@ -127,7 +127,7 @@ describe('SopLibraryModule', () => {
     render(<SopLibraryModule />);
     await waitFor(() => expect(screen.getByTestId('sop-library-list')).toHaveTextContent('过敏处理'));
     await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('过敏步骤没有停手文案，不能发。');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('过敏步骤没有写停手和确认，不能发。');
     expect(sopPatch).not.toHaveBeenCalled();
   });
 
@@ -220,7 +220,7 @@ describe('SopLibraryModule', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sop-write-status')).toHaveTextContent('当前角色不能执行这个操作');
     });
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
     unmount();
 
     window.dashboardOps = {
@@ -237,7 +237,7 @@ describe('SopLibraryModule', () => {
     };
     render(<SopLibraryModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('当前产品会话没有 SOP 节点');
+      expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
     });
   });
 });

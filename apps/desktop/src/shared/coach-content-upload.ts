@@ -180,7 +180,7 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
   }
   if (rows.length === 0) {
     return fail('empty', skippedBraces > 0
-      ? `没有可预览的数据行。已跳过 ${String(skippedBraces)} 行含合同不允许的花括号。`
+      ? `没有可预览的数据行。已跳过 ${String(skippedBraces)} 行模板里不能出现的符号。`
       : '没有可预览的数据行。');
   }
   if (rows.length > COACH_UPLOAD_MAX_ROWS) {
@@ -191,7 +191,7 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
     ...rows.map((row) => [row.scene, row.script, row.domain ?? ''].map(csvCell).join(',')),
   ].join('\n');
   const skippedNote = skippedEmpty > 0 || skippedBraces > 0
-    ? `已跳过空白或不完整 ${String(skippedEmpty)} 行` + (skippedBraces > 0 ? `、花括号 ${String(skippedBraces)} 行。` : '。')
+    ? `已跳过空白或不完整 ${String(skippedEmpty)} 行` + (skippedBraces > 0 ? `、不能出现的符号 ${String(skippedBraces)} 行。` : '。')
     : '';
   return Object.freeze({
     ok: true,

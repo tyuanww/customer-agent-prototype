@@ -51,7 +51,7 @@ export function listUsageLog(
   source: readonly UsageSourceRow[] | null,
   filter: Partial<UsageLogFilter> | null | undefined,
 ): UsageLogReply {
-  if (source === null) return { ok: false, code: 'UNAVAILABLE', message: '未接入' };
+  if (source === null) return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
   const selected = selectUsageLogRows(source, filter);
   const cursor = filter?.cursor ?? null;
   const found = cursor ? selected.findIndex((row) => row.id === cursor) : -1;

@@ -147,8 +147,8 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
           <button type="button" className="icon-btn bordered" aria-label="刷新可用资料" disabled={disabled} onClick={() => void apply({action:'refresh'})}>{refreshIcon}</button>
         </div>
         <table className="kv" style={{marginTop:8}}><tbody>
-          <tr className="item"><td>软件更新</td><td><span className="notready">软件更新未接入。</span></td></tr>
-          <tr className="item"><td>发布记录</td><td><span className="notready">未接入</span></td></tr>
+          <tr className="item"><td>软件更新</td><td><span className="notready">现在还没有可下载的安装包。</span></td></tr>
+          <tr className="item"><td>发布记录</td><td><span className="notready">暂无记录</span></td></tr>
         </tbody></table>
         <IntakeUsageLog />
       </> : <>
@@ -158,7 +158,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
             className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</button>)}
         </div></div>
         <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>
-          {domain==='sop' ? <p className="notready" style={{padding:'20px 12px'}}>未接入</p> : fresh && <table className="fixed">
+          {domain==='sop' ? <p className="notready" style={{padding:'20px 12px'}}>还没有 SOP。</p> : fresh && <table className="fixed">
             <colgroup><col style={{width:180}}/><col/><col style={{width:110}}/><col style={{width:130}}/></colgroup>
             <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>生效时间</th></tr></thead>
             <tbody>

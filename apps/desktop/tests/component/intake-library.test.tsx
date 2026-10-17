@@ -66,12 +66,12 @@ it('browses four scoped domains and shares the same complete read with the avail
  rerender(<IntakeLibrary active="announce"/>);
  expect(screen.getByRole('region',{name:'当前可用版本'})).toBeVisible();
  expect(screen.getByText(/当前发布 rel_synthetic/)).toBeVisible();
- expect(screen.getByText('软件更新未接入。')).toBeVisible();
+ expect(screen.getByText('现在还没有可下载的安装包。')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(1);
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  rerender(<IntakeLibrary active="wording"/>);
  await user.click(screen.getByRole('tab',{name:'SOP'}));
- expect(screen.getByRole('tabpanel')).toHaveTextContent('未接入');
+ expect(screen.getByRole('tabpanel')).toHaveTextContent('还没有 SOP');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
 });

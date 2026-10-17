@@ -81,7 +81,7 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.noProduct);
     expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
     // No API at all settles immediately as 未接入 — never as "still checking".
-    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
   });
 
   it('does not call publishDraft when there is no session', async () => {
@@ -110,7 +110,7 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.agent);
     expect(api.publishDraft).not.toHaveBeenCalled();
     // The badge reports the product session, not the publish permission.
-    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已登录');
   });
 
   it('keeps Publish off for coach when any row is aftersale', async () => {
@@ -132,7 +132,7 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(UNRESOLVED_JOB_LABEL);
     expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent(CONTENT_PUBLISH_COPY.ownerPublish);
     expect(api.publishDraft).not.toHaveBeenCalled();
-    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
+    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已登录');
   });
 
   it('keeps Publish off for coach product drafts when the job was not returned', async () => {
@@ -399,7 +399,7 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => expect(screen.getByTestId('cancel-in-flight')).toBeEnabled());
     await user.click(screen.getByTestId('cancel-in-flight'));
     await waitFor(() => {
-      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('当前没有产品会话，无法取消导入');
+      expect(screen.getByTestId('publish-feedback')).toHaveTextContent('请先登录后再取消导入。');
     });
     expect(api.cancelInFlight).not.toHaveBeenCalled();
   });
@@ -418,7 +418,7 @@ describe('ContentModule session badge', () => {
     const badge = screen.getByTestId('content-session-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('正在确认会话');
-    expect(badge).not.toHaveTextContent('未接入');
+    expect(badge).not.toHaveTextContent('请先登录');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
   });
@@ -428,7 +428,7 @@ describe('ContentModule session badge', () => {
     window.dashboardContent = api;
     render(<ContentModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已登录');
     });
   });
 
@@ -445,7 +445,7 @@ describe('ContentModule session badge', () => {
     window.dashboardContent = api;
     render(<ContentModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
     });
     expect(screen.getByTestId('publish-action')).toBeDisabled();
   });
@@ -460,7 +460,7 @@ describe('ContentModule session badge', () => {
     window.dashboardContent = api;
     render(<ContentModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('未接入');
+      expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
     });
   });
 });
@@ -502,7 +502,7 @@ describe('ContentModule header layout', () => {
     expect(screen.queryByTestId('content-domain-detected')).not.toBeInTheDocument();
     expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
       'title',
-      expect.stringContaining('不会写入假发布'),
+      expect.stringContaining('请先登录后再导入和发布。'),
     );
     expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
   });

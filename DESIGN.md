@@ -29,7 +29,7 @@
 - 锚定在狐狸位置附近，并钳制到当前屏 `workArea`。
 - 狐狸拖到当前屏左右边缘 18px 内时自动吸附：88px 原生窗始终完整留在工作区，renderer 在稳定窗口内平移裁切，令 64px 狐狸视觉左右都恰好露 32px；打开查询后仍从原侧向屏幕内展开。禁止把透明原生窗反复推到屏外与 WindowServer 争抢位置。
 - macOS 台前调度的最近 App 条带可能把后台透明窗限制在一个未由 Electron `screen.workArea` 暴露的“有效舞台边界”。此时以 WindowServer 实际接受的 `BrowserWindow.getBounds()` 为该 dock epoch 的位置真值；hover peek / retract 只改 renderer 裁切，不得再次 `setBounds(workArea.x)`。打开 Query、共享元素中心与关闭恢复都从实际 frame 采样。目标是在系统接受边界稳定半露且不横跳；Electron 公共 API 下不承诺后台窗口一定占据物理屏 x=0。
-- 查询胶囊不再贴 `DEMO`、`MOCK AUTH` 徽标。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。产品远端登录后，会话芯片只显示「{操作者姓名} · 退出」，禁止把 RBAC 角色（`owner` / `agent` / `coach`）画在查询主路径。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮。禁止「演示数据」「无后端 · 不保存」「演示环境」徽标墙。没有产品会话或没有冻结查询时，页面用空态 / 「未接入」，不得发明 fixture 数字。
+- 查询胶囊不再贴 `DEMO`、`MOCK AUTH` 徽标。话术卡片不再贴 `DEMO · 合成数据`；身份与目录仍是合成。产品远端登录后，会话芯片只显示「{操作者姓名} · 退出」，禁止把 RBAC 角色（`owner` / `agent` / `coach`）画在查询主路径。Dashboard 顶栏在 macOS integrated chrome 下就是 48px 单行标题栏：左侧模块名与紧凑刷新信息与标题栏同中心线；右侧只保留一个主题图标按钮。禁止「演示数据」「无后端 · 不保存」「演示环境」徽标墙。没有登录时写「请先登录」。没有数字时写「暂无记录」。不要写「未接入」，也不要发明数字。
 - macOS 查询窗保留可激活的普通窗口类型以保障 IME / 物理键盘焦点。应用必须保持 regular Dock / Cmd+Tab；Electron 只允许已是 `UIElementApplication` 时使用 `skipTransformProcessType: true`，因此本 Demo 不再把 Query 加入所有 Space 或覆盖全屏应用。当前 Space 内正常唤起仍成立。显示器新增、拔除、分辨率或 Dock 工作区变化后，Float 以防抖方式重新钳制到可用 `workArea`，不抢焦点、不重播动效、不打断共享元素交接。
 - `FOX_IDLE` 按“只显示狐狸头”的目标例外。
 
@@ -160,11 +160,11 @@ FAQ 纠正回退先展示上一发布版本及全部影响范围，再由 Main �
 
 一期导航不再包含 VOC / 工单垃圾桶 / 离线抽样 / 架构图。复制不能推断发送、采纳、未修改或回答正确。
 
-话术库与内容发布必须分开：话术库是已发布目录（可导出 CSV，详情「下架」），内容管理是用一张表替换四库之一。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），不复制、不上传、不改正文。Owner 下架走 `DELETE /v1/content/scripts/{id}`，进入 `pending_review` 草稿，不能跳过 dual-review，发布后才离开当前目录。屏幕写明坐席要等下次发布才搜不到。没有产品会话或没有冻结合同的数字写「未接入」，不得因为话术库挂上当前发布就宣称工作台已接正式后端。
+话术库与内容发布必须分开：话术库是已发布目录（可导出 CSV，详情「下架」），内容管理是用一张表替换四库之一。话术库读当前发布 hydrate（与查询胶囊同一份目录；hydrate 为空才回退本机检索索引），不复制、不上传、不改正文。Owner 下架走 `DELETE /v1/content/scripts/{id}`，进入 `pending_review` 草稿，不能跳过 dual-review，发布后才离开当前目录。屏幕写明坐席要等下次发布才搜不到。没有登录或没有数字时写「请先登录」或「暂无记录」。不要因为话术库挂上当前发布就宣称工作台已接正式后端。
 
 不读取 Float 真实输入，不写磁盘，不用 localStorage / IndexedDB。
 
-Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1/content/publish`。组织审核在飞书文档。没有会话时按钮保持未接入 / 禁用，禁止合成成功。角色不够不等于「未接入」：会话已登录就写「已接入」，发布禁用原因只走 `CONTENT_PUBLISH_COPY`（话术师走 `ownerPublish`，坐席走 `agent`），不把权限不足写成连接失败。
+Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1/content/publish`。组织审核在飞书文档。没有会话时按钮保持禁用。角色不够时写请谁发布，不写成没连上。已登录写「已登录」。发布禁用原因只走 `CONTENT_PUBLISH_COPY`。
 
 ### 状态与反馈
 

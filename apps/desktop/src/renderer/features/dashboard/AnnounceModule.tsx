@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { OPS_LOOP_COPY, type DashboardSoftwareCatalog } from '@shared/dashboard-ops-loop';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import type { DashboardAnnounceResult, DashboardAnnounceView } from '@shared/dashboard-announce';
 import {
   LIBRARY_DOMAINS,
@@ -117,8 +118,8 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
   if (!view) {
     return (
       <div className="dash-empty-state announce-empty" data-testid="announce-wording-empty">
-        <strong>未接入当前发布</strong>
-        <span>登录后才能看到本版四卡。</span>
+        <strong>{WORKBENCH_EMPTY.announceUnmounted}</strong>
+        <span>请先登录后再看这一版。</span>
       </div>
     );
   }
@@ -260,7 +261,7 @@ function SoftwareTab() {
         <div className="dash-card-row">
           <span className="dash-card-label">软件版本</span>
           <StatusBadge
-            label={catalog?.current ? catalog.current.version : '未接入'}
+            label={catalog?.current ? catalog.current.version : '暂无记录'}
             tone={softwareBadgeTone(catalog)}
           />
         </div>

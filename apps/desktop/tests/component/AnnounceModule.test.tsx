@@ -78,11 +78,11 @@ describe('AnnounceModule four library cards', () => {
     expect(screen.getByTestId('announce-library-product')).toBeInTheDocument();
   });
 
-  it('shows the whole page as 未接入当前发布 without a current release', async () => {
+  it('shows the whole page as 还没有可查的话术。 without a current release', async () => {
     const api = announceApi({ ok: false, code: 'NO_CURRENT', signedIn: true });
     window.dashboardAnnounce = api;
     render(<AnnounceModule />);
-    expect(await screen.findByTestId('announce-wording-empty')).toHaveTextContent('未接入当前发布');
+    expect(await screen.findByTestId('announce-wording-empty')).toHaveTextContent('还没有可查的话术。');
     expect(screen.queryByTestId('announce-library-grid')).not.toBeInTheDocument();
   });
 
@@ -198,7 +198,7 @@ describe('AnnounceModule four library cards', () => {
     await user.click(screen.getByTestId('software-open-download'));
     await waitFor(() => expect(softwareOpenDownload).toHaveBeenCalledTimes(1));
     expect(softwareOpenDownload.mock.calls[0]).toEqual([]);
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('已在系统浏览器打开下载页');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('已打开下载页');
     expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
   });
 
@@ -238,7 +238,7 @@ describe('AnnounceModule four library cards', () => {
     expect(open).toBeDisabled();
     finish?.({ ok: true, opened: true, version: '0.3.23' });
     await waitFor(() => {
-      expect(screen.getByTestId('software-update-status')).toHaveTextContent('已在系统浏览器打开下载页');
+      expect(screen.getByTestId('software-update-status')).toHaveTextContent('已打开下载页');
     });
   });
 });

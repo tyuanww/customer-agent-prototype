@@ -141,9 +141,7 @@ describe('dashboard window contract', () => {
 
   it('uses one visible demo marker while keeping the non-Dafuyan boundary explicit', () => {
     expect(DASHBOARD_ENV_BADGES).toEqual([]);
-    expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe(
-      '未接入产品会话时不展示数字。话术库读当前发布；没有冻结合同命令的写操作保持未接入。',
-    );
-    expect(DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED).toBe('话术库读当前发布。写操作走冻结合同。');
+    expect(DASHBOARD_STRUCTURE_DISCLAIMER).toBe('');
+    expect(DASHBOARD_STRUCTURE_DISCLAIMER_SIGNED).toBe('');
   });
 });

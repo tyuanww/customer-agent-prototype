@@ -5,7 +5,7 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import type { ProductSession } from './product-session';
 import { ProductHttpError } from './product-http';
 import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
-import { UNRESOLVED_JOB_LABEL } from '../shared/product-session';
+import { OPS_LOOP_COPY } from '../shared/dashboard-ops-loop';
 const channels = ['dashboard:permissions-current','dashboard:permissions-command'] as const;
 /** Private per-window controller; no renderer-supplied identity or URL. */
 export function registerContentIntakePermissionsIpc(session: ProductSession | null, dashboard: () => WebContents | null, devUrl: () => string | undefined) {
@@ -20,7 +20,7 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
       if(action==='preview'||action==='revoke'||action==='save'||action==='retry'){
         const job=session.view().job;
         if(job?.status!=='resolved'||job.rights.grant!==true){
-          return {ok:false,message:job?.status==='resolved'?'当前职务不能授权':UNRESOLVED_JOB_LABEL,view:null};
+          return {ok:false,message:job?.status==='resolved'?OPS_LOOP_COPY.grantJob:'请重新登录后再查看职务。',view:null};
         }
       }
     }
