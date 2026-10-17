@@ -15,8 +15,8 @@ html[data-role='dashboard'] {
   --dash-radius-dot: 50%;
   --dash-canvas: light-dark(#f4f4f6, #16151a);
   --dash-surface: light-dark(#ffffff, #1c1b20);
-  --dash-sidebar: light-dark(#f3f3f7, #141318);
-  --dash-sidebar-material: light-dark(rgba(242, 242, 246, 0.92), rgba(16, 15, 20, 0.92));
+  --dash-sidebar: light-dark(#e4e3ea, #0c0b10);
+  --dash-sidebar-material: light-dark(rgba(228, 227, 234, 0.94), rgba(12, 11, 16, 0.94));
   --dash-sidebar-hairline: light-dark(rgba(37, 32, 45, 0.10), rgba(255, 255, 255, 0.10));
   --dash-chrome-hover: light-dark(rgba(36, 33, 42, 0.055), rgba(255, 255, 255, 0.065));
   --dash-chrome-pressed: light-dark(rgba(36, 33, 42, 0.09), rgba(255, 255, 255, 0.10));
@@ -95,8 +95,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'],
 .dashboard-shell[data-theme='light'] {
   --dash-canvas: #f4f4f6;
   --dash-surface: #ffffff;
-  --dash-sidebar: #f3f3f7;
-  --dash-sidebar-material: rgba(242, 242, 246, 0.92);
+  --dash-sidebar: #e4e3ea;
+  --dash-sidebar-material: rgba(228, 227, 234, 0.94);
   --dash-sidebar-hairline: rgba(37, 32, 45, 0.10);
   --dash-chrome-hover: rgba(36, 33, 42, 0.055);
   --dash-chrome-pressed: rgba(36, 33, 42, 0.09);
@@ -147,8 +147,8 @@ html[data-role='dashboard'][data-dashboard-theme='dark'],
 .dashboard-shell[data-theme='dark'] {
   --dash-canvas: #16151a;
   --dash-surface: #1c1b20;
-  --dash-sidebar: #141318;
-  --dash-sidebar-material: rgba(16, 15, 20, 0.92);
+  --dash-sidebar: #0c0b10;
+  --dash-sidebar-material: rgba(12, 11, 16, 0.94);
   --dash-sidebar-hairline: rgba(255, 255, 255, 0.10);
   --dash-chrome-hover: rgba(255, 255, 255, 0.065);
   --dash-chrome-pressed: rgba(255, 255, 255, 0.10);
