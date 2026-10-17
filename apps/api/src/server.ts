@@ -1,6 +1,5 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
-import { startFeishuJobDirectoryWarm } from './feishu-job-snapshot.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -96,7 +95,6 @@ export async function startApi(
         }
         const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
         const identity = bootstrap.productIdentity;
-        if (identity.kind === 'feishu') startFeishuJobDirectoryWarm(identity.feishu);
         const provider = identity.kind === 'feishu'
           ? (identity.providerOrigin
             ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)

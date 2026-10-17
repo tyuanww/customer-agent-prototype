@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { bindSessionSubject, forgetJobSnapshot, jobForToken, readFeishuJobSnapshot, rememberJobSnapshot, resetFeishuJobObservationForTests, subjectHash } from '../src/feishu-job-snapshot.js';
+import { describe, expect, it } from 'vitest';
+import { bindSessionSubject, forgetJobSnapshot, jobForToken, readFeishuJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 
 const openId = 'ou_abcdef';
 
@@ -7,20 +7,26 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
-describe('feishu job snapshot', () => {
-  beforeEach(() => resetFeishuJobObservationForTests());
+function userFetch(title: string | null): typeof fetch {
+  return (async (url: string) => {
+    if (url.includes('job_titles')) throw new Error('the person read must not scan the company dictionary');
+    if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
+    if (url.includes('/users/')) return json({ code: 0, data: { user: title === null ? {} : { job_title: title } } });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+}
 
-  it('keeps a resolved title only after the directory is read', async () => {
-    const fetchImpl = (async (url: string) => {
-      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
-      if (url.includes('/users/')) return json({ code: 0, data: { user: { job_title: '客服总监' } } });
-      return json({ code: 0, data: { items: [{ name: '客服总监', status: true }, { name: '停用', status: false }], has_more: false } });
-    }) as typeof fetch;
-    const snapshot = await readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl);
+describe('feishu job snapshot', () => {
+  it('collects the person title as one enabled directory row', async () => {
+    const snapshot = await readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, userFetch('AI赋能工程师'));
     expect(snapshot).toEqual({
-      title: '客服总监',
-      directory: [{ name: '客服总监', enabled: true }, { name: '停用', enabled: false }],
+      title: 'AI赋能工程师',
+      directory: [{ name: 'AI赋能工程师', enabled: true }],
     });
+  });
+
+  it('returns null when the person has no job title', async () => {
+    await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, userFetch(null))).resolves.toBeNull();
   });
 
   it('returns null when the tenant token is refused', async () => {
@@ -28,61 +34,7 @@ describe('feishu job snapshot', () => {
     await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toBeNull();
   });
 
-  it('returns pending when another page of job titles is still unread', async () => {
-    let jobs = 0;
-    const fetchImpl = (async (url: string) => {
-      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
-      if (url.includes('/users/')) return json({ code: 0, data: { user: { job_title: '客服总监' } } });
-      jobs += 1;
-      return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: true, page_token: `page-${jobs}` } });
-    }) as typeof fetch;
-    await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toBe('pending');
-  });
-
-  it('resumes the job-title list from the saved page and then publishes the title', async () => {
-    let jobs = 0;
-    const fetchImpl = (async (url: string) => {
-      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
-      if (url.includes('/users/')) return json({ code: 0, data: { user: { job_title: '客服总监' } } });
-      jobs += 1;
-      if (jobs === 9 && !url.includes('page_token=p8')) throw new Error('resume token was not sent');
-      if (jobs < 10) {
-        return json({ code: 0, data: { items: [{ name: `其他${jobs}`, status: true }], has_more: true, page_token: `p${jobs}` } });
-      }
-      return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: false } });
-    }) as typeof fetch;
-    const config = { clientId: 'cli_abc', clientSecret: 'secret' };
-    await expect(readFeishuJobSnapshot(openId, config, fetchImpl)).resolves.toBe('pending');
-    const token = 'd'.repeat(43);
-    bindSessionSubject(token, subjectHash(openId));
-    expect(jobForToken(token)).toBeNull();
-    const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
-    expect(snapshot).toMatchObject({ title: '客服总监' });
-    if (snapshot === 'pending' || snapshot === null) throw new Error('directory walk did not finish');
-    expect(snapshot.directory).toContainEqual({ name: '客服总监', enabled: true });
-    expect(jobForToken(token)?.title).toBe('客服总监');
-  });
-
-  it('keeps a later duplicate so the desktop can refuse it', async () => {
-    let jobs = 0;
-    const fetchImpl = (async (url: string) => {
-      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
-      if (url.includes('/users/')) return json({ code: 0, data: { user: { job_title: '客服总监' } } });
-      jobs += 1;
-      if (jobs === 1) {
-        return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: true, page_token: 'next' } });
-      }
-      return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: false } });
-    }) as typeof fetch;
-    const snapshot = await readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl);
-    if (!snapshot || snapshot === 'pending') throw new Error('directory walk did not finish');
-    expect(snapshot.directory).toEqual([
-      { name: '客服总监', enabled: true },
-      { name: '客服总监', enabled: true },
-    ]);
-  });
-
-  it('finds the snapshot for the session that hashed the same open id', () => {
+  it('finds the collected title for the session that hashed the same open id', () => {
     rememberJobSnapshot(openId, { title: '客服经理', directory: [{ name: '客服经理', enabled: true }] });
     const token = 'a'.repeat(43);
     bindSessionSubject(token, subjectHash(openId));
