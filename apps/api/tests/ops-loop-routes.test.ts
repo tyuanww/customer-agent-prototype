@@ -106,6 +106,29 @@ function repository(): OpsLoopRepository {
       ok: false,
       code: 'NOT_FOUND',
     }),
+    readOwnUsage: vi.fn<OpsLoopRepository['readOwnUsage']>().mockResolvedValue({
+      ok: true,
+      response: [
+        {
+          userId: 'usr_synthetic_agent_001',
+          queryId: 'q-self',
+          askedAt: '2026-10-13T01:00:00.000Z',
+          question: '我的问题',
+          hit: true,
+          copied: false,
+          consented: true,
+        },
+        {
+          userId: 'usr_other',
+          queryId: 'q-other',
+          askedAt: '2026-10-13T02:00:00.000Z',
+          question: '别人的问题',
+          hit: false,
+          copied: false,
+          consented: true,
+        },
+      ],
+    }),
   };
 }
 
@@ -676,5 +699,24 @@ describe('ops-loop HTTP routes', () => {
     });
     expect(agent.statusCode).toBe(403);
     expect(ops.readRetrievalMetrics).not.toHaveBeenCalled();
+  });
+
+  it('lists the signed-in seat and leaves another seat out', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const unsigned = await app.inject({ method: 'GET', url: '/v1/events/usage' });
+    expect(unsigned.statusCode).toBe(401);
+    expect(ops.readOwnUsage).not.toHaveBeenCalled();
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/events/usage?user_id=usr_other',
+      headers: agentHeaders,
+    });
+    expect(listed.statusCode).toBe(200);
+    const body = listed.json() as { rows: Array<{ id: string; question: string | null }> };
+    expect(body.rows.map((row) => row.id)).toEqual(['q-self']);
+    expect(body.rows.some((row) => row.question === '别人的问题')).toBe(false);
+    expect(ops.readOwnUsage).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ops.readOwnUsage).mock.calls[0]?.[0].user_id).toBe('usr_synthetic_agent_001');
   });
 });

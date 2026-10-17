@@ -15,6 +15,7 @@ import {
 import { prepareIdempotencyHashes, type CanonicalJsonValue } from './idempotency.js';
 import { parseSopCsv, sopAllergyStepNeedsStopCopy } from './ops-loop-csv.js';
 import type { OpsLoopRepository } from './ops-loop-repository.js';
+import { ownUsageRows } from './own-usage.js';
 import { sendOperationFailure } from './operation-result.js';
 import type { ApiHmacKeyRing } from './runtime-config.js';
 
@@ -360,6 +361,17 @@ export function registerOpsLoopRoutes(
     const result = await dependencies.repository.readRetrievalMetrics(actor, window as RetrievalWindow);
     if (!result.ok) return sendOperationFailure(reply, result);
     return parseContractSchema('RetrievalMetrics', result.response);
+  });
+
+  app.get('/v1/events/usage', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const actor = await authenticateRequestHeaders(authService, request.headers);
+    if (actor === null) return sendUnauthorized(reply);
+    if (dependencies === undefined) return sendOverloaded(reply);
+    if (!limit('own-usage', actor.user_id, 60)) return sendRateLimited(reply);
+    const result = await dependencies.repository.readOwnUsage(actor);
+    if (!result.ok) return sendOperationFailure(reply, result);
+    return { rows: ownUsageRows(result.response, actor.user_id) };
   });
 
   app.get('/v1/software/releases', async (request, reply) => {

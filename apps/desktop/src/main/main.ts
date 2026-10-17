@@ -20,13 +20,15 @@ import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { registerDashboardContentIpc } from './dashboard-content-ipc';
 import { registerDashboardIterationIpc } from './dashboard-iteration-ipc';
-import { registerUsageLogIpc } from './usage-log-ipc';
+import { bindUsageFeed, registerUsageLogIpc, setUsageMount } from './usage-log-ipc';
+import { createUsageJournal } from './usage-journal';
 import { registerSopWorkbookIpc } from './sop-workbook-ipc';
 import { registerDashboardOpsLoopIpc } from './dashboard-ops-loop-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
+import { join } from 'node:path';
 import { app, Menu, screen, session, shell } from 'electron';
 import {
   applyChromiumLoopbackProxyBypass,
@@ -286,6 +288,18 @@ if (!gotLock) {
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => controller?.dashboardWebContents() ?? null);
+    const usageJournal = createUsageJournal(join(userDataDirectory, 'usage-journal.json'));
+    bindUsageFeed((actorId) => usageJournal.read(actorId));
+    if (productSession) {
+      const applyUsage = () => {
+        const view = productSession?.view();
+        setUsageMount(view?.signedIn && view.userId
+          ? { kind: 'signed-in', actorId: view.userId }
+          : { kind: 'signed-out' });
+      };
+      productSession.subscribe(applyUsage);
+      applyUsage();
+    }
     registerUsageLogIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
@@ -296,7 +310,8 @@ if (!gotLock) {
     );
     registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-      identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined);
+      identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined,
+      usageJournal);
     registerProductCatalogIpc(() => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     registerDashboardWordingIpc(
