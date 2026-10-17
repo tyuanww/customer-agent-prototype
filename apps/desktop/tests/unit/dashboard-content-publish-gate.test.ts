@@ -11,7 +11,7 @@ import {
   rowCoachPublishable,
   rowRequiresOwner,
 } from '../../src/shared/dashboard-content';
-import { observeSessionJob, UNRESOLVED_JOB_LABEL } from '../../src/shared/product-session';
+import { observeSessionJob } from '../../src/shared/product-session';
 
 const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
 const director = titled('客服总监');
@@ -87,7 +87,7 @@ describe('content publish role gate', () => {
       const gate = contentPublishGate({
         productAvailable: true, signedIn: true, role: 'owner', job, rows: [productRow], sourceBindings: bindings,
       });
-      expect(gate).toEqual({ allowed: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL });
+      expect(gate).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
       expect(gate).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
     }
   });

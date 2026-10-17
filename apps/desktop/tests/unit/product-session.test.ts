@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductSession, type SessionStore } from '../../src/main/product-session';
 import { ProductHttp, ProductHttpError } from '../../src/main/product-http';
-import { isProductSessionResult, UNRESOLVED_JOB_LABEL, type JobSnapshot } from '../../src/shared/product-session';
+import { isProductSessionResult, type JobSnapshot } from '../../src/shared/product-session';
 
 const token = 't'.repeat(43);
 const user = { user_id: 'usr_synthetic_agent', role: 'agent', auth_mode: 'mock' };
@@ -33,7 +33,6 @@ function fixture(options: {
   return { session, store, requests, stored, window };
 }
 const one = (name: string) => [{ name, enabled: true }];
-const unresolved = { status: 'unresolved', label: UNRESOLVED_JOB_LABEL, rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false } };
 afterEach(() => vi.useRealTimers());
 describe('product session lifetime', () => {
   it('uses PKCE without projecting credentials and revokes repeat logout safely', async () => {
@@ -220,17 +219,17 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
-  it('keeps a missing, blank, unknown, or duplicate title as 职务未识别 without write rights', async () => {
-    const cases: Array<{ snapshot: JobSnapshot | null; reason: 'missing' | 'blank' | 'unknown' | 'duplicate' }> = [
-      { snapshot: null, reason: 'missing' },
-      { snapshot: { title: '   ', directory: one('客服总监') }, reason: 'blank' },
-      { snapshot: { title: '服务赋能师', directory: one('服务赋能师') }, reason: 'unknown' },
-      { snapshot: { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] }, reason: 'duplicate' },
+  it('defaults a missing, blank, unknown, or duplicate title to 客服坐席 without write rights', async () => {
+    const cases: Array<JobSnapshot | null> = [
+      null,
+      { title: '   ', directory: one('客服总监') },
+      { title: '服务赋能师', directory: one('服务赋能师') },
+      { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] },
     ];
-    for (const entry of cases) {
+    for (const snapshot of cases) {
       const f = fixture({
         identity: { user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'feishu' },
-        jobSnapshotFor: () => entry.snapshot,
+        jobSnapshotFor: () => snapshot,
       });
       expect(f.session.view().signedIn).toBe(false);
       const login = await f.session.login();
@@ -238,7 +237,13 @@ describe('job observation from a signed-out session', () => {
         ok: true,
         signedIn: true,
         role: 'owner',
-        job: { ...unresolved, reason: entry.reason },
+        job: {
+          status: 'resolved',
+          title: '客服坐席',
+          role: 'agent',
+          label: '客服坐席',
+          rights: { publish: false, grant: false, uploadSop: false, search: true, readCatalog: true },
+        },
       });
       expect(isProductSessionResult(login)).toBe(true);
     }

@@ -35,14 +35,20 @@ export type JobSnapshot = {
   readonly directory: readonly JobDirectoryEntry[];
 };
 
-export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
-  if (snapshot === null) {
+const SEAT_TITLE = '客服坐席';
+
+function customerServiceSeat(): SessionJobView {
+  const seat = resolveJobTitle(SEAT_TITLE, [{ name: SEAT_TITLE, enabled: true }]);
+  if (seat.status !== 'resolved') {
     return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
   }
+  return { status: 'resolved', title: seat.title, role: seat.role, label: seat.title, rights: { ...seat.rights } };
+}
+
+export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
+  if (snapshot === null) return customerServiceSeat();
   const lookup = resolveJobTitle(snapshot.title, snapshot.directory);
-  if (lookup.status === 'unresolved') {
-    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
-  }
+  if (lookup.status === 'unresolved') return customerServiceSeat();
   return {
     status: 'resolved',
     title: lookup.title,
