@@ -81,7 +81,7 @@ describe('inaccuracy todo projection', () => {
   it('keeps live copy from inventing 24h/7d window numbers', () => {
     expect(INACCURACY_TODO_COPY.heading).toBe('按稿不准次数');
     expect(INACCURACY_TODO_COPY.empty).toContain('开单阈值');
-    expect(INACCURACY_TODO_COPY.footnoteLive).toContain('样本查询数');
+    expect(INACCURACY_TODO_COPY.footnoteLive).toContain('才会出现在这里');
     expect(INACCURACY_TODO_COPY.footnoteLive).not.toContain('尚未接入');
   });
 });

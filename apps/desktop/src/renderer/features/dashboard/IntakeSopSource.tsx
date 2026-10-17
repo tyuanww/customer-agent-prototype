@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { SopWorkbookView } from '@shared/sop-workbook-preview';
 import './workbench-v9.css';
 
-/** faq-v2 SOP page. No file yet means 未接入. An opened workbook stays unpublished. */
 export function IntakeSopSource() {
   const api = window.dashboardSopWorkbook;
   const [view, setView] = useState<SopWorkbookView | null>(null);
@@ -42,7 +41,7 @@ export function IntakeSopSource() {
   const sheet = view?.sheets.find((item) => item.name === sheetName) ?? view?.sheets[0];
   return <section className="dash-module wb9" data-testid="module-sop" aria-label="SOP">
     <h1 className="desk-sr">SOP</h1>
-    {!view ? <div className="notready">未接入</div> : null}
+    {!view ? <div className="notready">还没有 SOP。</div> : null}
     {api ? <div className="toolbar">
       <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void open()}>{busy ? '正在读取…' : '打开原始 SOP 表'}</button>
     </div> : null}

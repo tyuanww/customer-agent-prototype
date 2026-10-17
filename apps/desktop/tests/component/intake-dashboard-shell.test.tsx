@@ -196,11 +196,11 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('未接入');
-    expect(screen.queryByText('上传 CSV 会覆盖当前产品会话 SOP 树')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('还没有 SOP');
+    expect(screen.queryByText('上传 CSV 会替换现在的 SOP')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '使用情况' })).not.toBeInTheDocument();
     expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
@@ -306,7 +306,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
       const wordingTab = await screen.findByRole('tab', { name: '话术版本更新' });
       await tabUntil(user, wordingTab);
       await tabUntil(user, screen.getByRole('tab', { name: '软件版本更新' }));
-      expect(await screen.findByText('未接入当前发布')).toBeInTheDocument();
+      expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
     }
     await user.click(screen.getByTestId('nav-permissions'));

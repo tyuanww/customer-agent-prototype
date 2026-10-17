@@ -68,7 +68,7 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
       } else {
         await waitFor(() => {
           expect(grant).toBeDisabled();
-          expect(screen.getByText('当前职务不能授权')).toBeInTheDocument();
+          expect(screen.getByText(/当前职务不能授权/)).toBeInTheDocument();
         });
       }
       await user.click(screen.getByTestId('nav-materials'));

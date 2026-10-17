@@ -62,7 +62,7 @@ function runRuntime(script: string, payload: string): Promise<string> {
 
 async function perform(intent: unknown): Promise<SeatAccountReply> {
   const script = seatRuntimeScript();
-  if (!existsSync(script)) return { ok: false, message: '账号尚未接入当前运行模式。' };
+  if (!existsSync(script)) return { ok: false, message: '账号还不能在这里改。' };
   let text: string;
   try {
     text = await runRuntime(script, JSON.stringify(intent));
@@ -86,7 +86,7 @@ export function registerSeatAccountIpc(
   ipcMain.handle(CHANNEL, async (event, intent: unknown): Promise<SeatAccountReply> => {
     const contents = dashboard();
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return { ok: false, message: '无权访问此窗口能力。' };
-    if (!enabled()) return { ok: false, message: '账号尚未接入当前运行模式。' };
+    if (!enabled()) return { ok: false, message: '账号还不能在这里改。' };
     if (!isSeatAccountIntent(intent)) return INVALID;
     return perform(intent);
   });

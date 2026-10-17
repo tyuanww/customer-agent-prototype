@@ -6,7 +6,6 @@ import {
   listMissRecords,
   planInaccuracyTask,
   recordPublishedQueryAction,
-  QUERY_ACTION_LEDGER_SURFACE,
   type QueryActionAttempt,
   type QueryActionLedger,
 } from '../../src/shared/query-action-ledger';
@@ -118,7 +117,6 @@ describe('published query action ledger', () => {
     });
     expect(draft).toEqual({ ok: false, reason: 'unpublished' });
     expect(unreleased).toEqual({ ok: false, reason: 'unpublished' });
-    expect(QUERY_ACTION_LEDGER_SURFACE).toBe('未接入');
   });
 
   it('2 marks in 24h and 9 in 7d do not open a task', () => {

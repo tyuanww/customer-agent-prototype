@@ -9,14 +9,13 @@ const LIST = 'dashboard:usage-list';
 const PREVIEW = 'dashboard:usage-preview';
 const EXPORT = 'dashboard:usage-export';
 
-/** Null means the usage source is not connected. The UI must say 未接入. */
 let usageSource: readonly UsageSourceRow[] | null = null;
 
 export function setUsageLogSource(rows: readonly UsageSourceRow[] | null): void {
   usageSource = rows;
 }
 
-function unavailable(message = '未接入'): { ok: false; code: 'UNAVAILABLE'; message: string } {
+function unavailable(message = '请稍后再试。'): { ok: false; code: 'UNAVAILABLE'; message: string } {
   return { ok: false, code: 'UNAVAILABLE', message };
 }
 
@@ -30,7 +29,7 @@ export function registerUsageLogIpc(
   };
 
   ipcMain.handle(LIST, (event, filter: UsageLogFilter | undefined): UsageLogReply => {
-    if (!guard(event)) return { ok: false, code: 'FORBIDDEN', message: '未接入' };
+    if (!guard(event)) return { ok: false, code: 'FORBIDDEN', message: '请稍后再试。' };
     return listUsageLog(usageSource, filter);
   });
 

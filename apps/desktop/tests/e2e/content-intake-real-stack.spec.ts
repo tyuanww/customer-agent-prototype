@@ -253,7 +253,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;
     await dashboard.getByTestId('nav-sop').click();
-    await expect(dashboard.getByTestId('dashboard-content')).toContainText('未接入');
+    await expect(dashboard.getByTestId('dashboard-content')).toContainText('请先登录');
     await dashboard.getByTestId('nav-content').click();
     await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);

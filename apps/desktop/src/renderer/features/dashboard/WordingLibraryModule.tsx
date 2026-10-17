@@ -9,6 +9,7 @@ import {
   wordingPublishedCsv,
 } from '@shared/wording-library-browse';
 import { OPS_LOOP_COPY } from '@shared/dashboard-ops-loop';
+import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { StatusBadge } from './StatusBadge';
 
 const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
@@ -147,7 +148,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
   const releaseLabel = catalog?.releaseId ?? '未标明发布号';
   const matchesLease = Boolean(live && catalog?.matchesLease);
   let readinessLabel = '当前发布无此域';
-  if (!live) readinessLabel = '当前发布未挂载';
+  if (!live) readinessLabel = WORKBENCH_EMPTY.wordingUnmounted;
   else if (!matchesLease) readinessLabel = '本机目录';
   else if (domainCount > 0) readinessLabel = '当前发布已挂载';
   let sourceSummary = `${releaseLabel}。当前域没有条目。`;
@@ -307,7 +308,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             </button>
           )) : (
             <div className="dash-empty-state" data-testid="wording-empty">
-              <strong>{live ? '没有匹配的话术' : '当前发布未挂载'}</strong>
+              <strong>{live ? '没有匹配的话术' : WORKBENCH_EMPTY.wordingUnmounted}</strong>
               <span>{live ? '换一个域或清空筛选后再看。' : '登录后才能看到坐席能搜到的目录。'}</span>
             </div>
           )}

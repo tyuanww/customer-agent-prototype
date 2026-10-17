@@ -2,6 +2,13 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.27] - 2026-10-17
+
+### Changed
+
+- 坐席能看到的工作台句子改为下一步。空数字写「暂无记录」。没登录写「请先登录」。资料页写「请把表交给客服经理」。页脚不再写「冻结合同」。待办页不再写角色码和 MOCK AUTH。
+- 下载页和 GitHub Release `v0.3.27` 没有在这次改动里重发。
+
 ## [0.3.26] - 2026-10-01
 
 ### Added

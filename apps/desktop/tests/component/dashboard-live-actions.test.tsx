@@ -38,9 +38,9 @@ describe('dashboard live actions', () => {
     };
     render(<OverviewModule />);
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '待处理事项（未接入）' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '待处理事项' })).toBeInTheDocument();
     });
-    expect(screen.getByTestId('overview-alert-catalog')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('overview-alert-catalog')).toHaveTextContent('暂无记录');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('检索账');
     expect(screen.queryByTestId('overview-inaccuracy-counts')).not.toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('dashboard live actions', () => {
     render(<OverviewModule />);
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(screen.getByTestId('decision-it-live-1')).toHaveTextContent('面膜紫适用人群');
-    expect(screen.getByTestId('overview-kpi-source')).toHaveTextContent('产品会话');
+    expect(screen.getByTestId('overview-kpi-source')).toHaveTextContent('请先登录');
     expect(screen.getByTestId('overview-inaccuracy-empty')).toHaveTextContent('当前没有达到开单阈值的不准稿');
     expect(screen.queryByTestId('decision-close-hint-it-live-1')).not.toBeInTheDocument();
   });
@@ -204,10 +204,10 @@ describe('dashboard live actions', () => {
 
     render(<SopLibraryModule />);
     await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
     await user.click(screen.getByTestId('sop-export'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('没有 SOP 写库通道');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('未接入 SOP 库');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
   });
 
   it('does not render fixture content releases when there is no live publish', async () => {
@@ -218,7 +218,7 @@ describe('dashboard live actions', () => {
     expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
     expect(screen.queryByText('结构演示')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('当前没有产品会话');
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('请先登录');
   });
 
   it('fail-closes software update checks without mock version lists', async () => {
@@ -226,7 +226,7 @@ describe('dashboard live actions', () => {
     render(<AnnounceModule />);
     await user.click(screen.getByTestId('system-sync-tab-software'));
     await user.click(screen.getByTestId('software-check-update'));
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未接入');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('现在还没有可下载的安装包');
     expect(screen.queryByText('v0.3.14')).not.toBeInTheDocument();
   });
 
@@ -345,7 +345,7 @@ describe('dashboard live actions', () => {
     render(<OverviewModule />);
     await waitFor(() => expect(retrieval).toHaveBeenCalledWith('current_release'));
     expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('12.5%');
-    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入产品会话');
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('请先登录');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('本机目录');
     expect(screen.getByTestId('overview-scope')).toHaveTextContent('当前发布');
 
@@ -353,7 +353,7 @@ describe('dashboard live actions', () => {
     await user.click(screen.getByTestId('system-sync-tab-software'));
     await user.click(screen.getByTestId('software-check-update'));
     await waitFor(() => expect(softwareCatalog).toHaveBeenCalled());
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('目录为空');
+    expect(screen.getByTestId('software-update-status')).toHaveTextContent('现在还没有可下载的安装包');
     expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
   });
 
@@ -560,7 +560,7 @@ describe('dashboard live actions', () => {
     };
     render(<WordingLibraryModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('wording-empty')).toHaveTextContent('当前发布未挂载');
+      expect(screen.getByTestId('wording-empty')).toHaveTextContent('还没有可查的话术');
     });
   });
 
@@ -631,8 +631,8 @@ describe('dashboard live actions', () => {
     unmount();
 
     render(<OverviewModule />);
-    await waitFor(() => expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('未接入'));
-    expect(screen.getByTestId('overview-scope')).toHaveTextContent('未接入');
+    await waitFor(() => expect(screen.getByTestId('overview-alert-nohit')).toHaveTextContent('暂无记录'));
+    expect(screen.getByTestId('overview-scope')).toHaveTextContent('暂无记录');
 
     render(<AnnounceModule />);
     await user.click(screen.getByTestId('system-sync-tab-software'));
