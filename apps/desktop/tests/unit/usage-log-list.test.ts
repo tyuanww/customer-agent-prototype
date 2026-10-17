@@ -20,7 +20,8 @@ it('registers the usage channels before the legacy-only branch', () => {
   expect(call).toBeGreaterThan(0);
   expect(main.indexOf('registerUsageLogIpc(', call + 1)).toBe(-1);
   expect(main).not.toMatch(/if \(!productProfile\??\.contentIntake\)[\s\S]{0,80}registerUsageLogIpc\(/);
-  expect(handler).toContain('usageReplyForMount(usageMount, readUsageRows, filter)');
+  expect(handler).toContain('usageReplyFromSources(usageMount, readUsageRows, readRemoteUsage, filter)');
+  expect(main).toContain("'/v1/events/usage'");
   expect(handler).toContain('usageExportPreviewCounts(current.rows)');
   expect(main).toContain('bindUsageFeed');
   expect(main).toContain('setUsageMount');
