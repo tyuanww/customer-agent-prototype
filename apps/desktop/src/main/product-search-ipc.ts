@@ -7,6 +7,7 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayRole } from '../shared/overlay-events';
 import type { ProductSession } from './product-session';
 import { ProductSearch, type SearchHelp } from './product-search';
+import type { UsageJournal } from './usage-journal';
 import type { AnnounceGate } from '../shared/product-announce';
 import { isProductEscalateRequest, isProductTerminalRequest } from '../shared/product-help';
 import { loadRetrievalPreferenceStore } from './retrieval-preference-store';
@@ -14,13 +15,13 @@ import { loadRetrievalPipeline } from './retrieval-pipeline';
 import { writeSystemClipboard } from './system-clipboard.ts';
 import { DEFAULT_RETRIEVAL_PREFERENCE_PATH, productStackReadPath } from './packaged-retrieval-paths.ts';
 
-export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined, help?: SearchHelp) {
+export function registerProductSearchIpc(session: ProductSession | null, announce: AnnounceGate | null, trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null, devUrl: () => string | undefined, help?: SearchHelp, usage?: UsageJournal) {
   const preferenceStore = loadRetrievalPreferenceStore(
     productStackReadPath('CUSTOMER_AGENT_RETRIEVAL_PREFERENCE', 'retrieval-preference.json')
       || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
   );
   const search = session && announce
-    ? new ProductSearch(session, writeSystemClipboard, announce, help, undefined, undefined, undefined, loadRetrievalPipeline(), preferenceStore)
+    ? new ProductSearch(session, writeSystemClipboard, announce, help, undefined, undefined, undefined, loadRetrievalPipeline(), preferenceStore, undefined, usage)
     : null;
   const seen = new WeakSet<WebContents>();
   const guard = async (event: Parameters<Parameters<typeof ipcMain.handle>[1]>[0], args: unknown[], dispatch: (id: number, value: unknown) => unknown) => {

@@ -3,6 +3,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { AuthenticatedUser } from './auth-service.js';
 import { mapDatabaseContractError } from './database-contract-errors.js';
+import { OWN_USAGE_SQL, type OwnUsageEvent } from './own-usage.js';
 import type { PreparedIdempotencyHashes } from './idempotency.js';
 import type { OperationResult } from './operation-result.js';
 import {
@@ -89,6 +90,7 @@ export type OpsLoopRepository = Readonly<{
     actor: AuthenticatedUser,
     window: RetrievalWindow,
   ) => Promise<OperationResult<RetrievalMetrics>>;
+  readOwnUsage: (actor: AuthenticatedUser) => Promise<OperationResult<OwnUsageEvent[]>>;
   listSoftwareReleases: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareReleaseList>>;
   currentSoftwareRelease: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareRelease>>;
 }>;
@@ -482,6 +484,31 @@ export function createOpsLoopRepository(
           current_release_script_count: Number(row.current_release_script_count),
           window: row.metric_window,
           release_id: row.release_id ?? null,
+        });
+      });
+    },
+
+    readOwnUsage(actor) {
+      return read(async (client) => {
+        const result = await client.query(OWN_USAGE_SQL, [actor.user_id]);
+        return result.rows.map((row) => {
+          const userId = row.user_id;
+          const queryId = row.query_id;
+          const askedAt = row.created_at instanceof Date
+            ? row.created_at.toISOString()
+            : typeof row.created_at === 'string' ? new Date(row.created_at).toISOString() : '';
+          if (typeof userId !== 'string' || typeof queryId !== 'string' || askedAt === '' || Number.isNaN(Date.parse(askedAt))) {
+            throw new Error('OPS_LOOP_SHAPE');
+          }
+          return {
+            userId,
+            queryId,
+            askedAt,
+            question: typeof row.query_text_redacted === 'string' ? row.query_text_redacted : null,
+            hit: row.hit_status === 'hit',
+            copied: row.copied === true,
+            consented: row.text_storage_status === 'stored',
+          };
         });
       });
     },
