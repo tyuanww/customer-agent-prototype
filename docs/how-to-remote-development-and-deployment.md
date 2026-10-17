@@ -273,7 +273,7 @@
      'curl --fail --show-error --max-time 5 http://127.0.0.1:43115/ready'
    ```
 
-7. 部署已验收的 SHA 时创建新的 production release，不在 `current` 中原地拉代码。
+7. 部署已验收的 SHA 时创建新的 production release，不在 `current` 中原地拉代码。2026-10-17 的正式切换没有跑下面的 `git clone https://github.com/...`。那次用的是 Mac 上打出的 git bundle，命令在 [在杭州跑这条后端](how-to-run-backend-on-hangzhou.md) 的「更新代码」。下面整段是另一条编排草案，不要把它当成已经跑通的步骤。
 
    先确认本次 migration 已做向后兼容评审，并且生产 PG 有可恢复的最新备份 / 快照；readiness 回滚只能切回代码和进程，不能撤销已经提交的 schema 变更。部署账号是受限的非 root 编排账号：它只通过 `sudo -n` 的白名单规则执行目录准备、软链替换、`chown` 和生产 `systemctl restart`；clone、依赖安装和构建脚本都必须以没有 sudo、不能读取生产 stack 的 `<build-user>` 身份运行，避免仓库 lifecycle script 继承切换权限或读取生产凭据。先用 `sudo -n true` 验证不会等待交互式密码；不要以 root 或 `customer-agent` 运行 `pnpm install` / 构建脚本。审批过的完整 SHA 必须已推送到 GitHub，部署前必须确认当前 release 没有未备份的本地修改，并预先配置 deploy lock 文件的写权限。下面整段切换脚本必须以 `<deploy-user>` 身份在 WSL 本机的持久 `tmux` / `screen` 会话中执行，避免 Mac 到 WSL 的 SSH 断开后留下半完成状态；如果会话断开，重新连接后先执行步骤 8 核对 current、unit 和 readiness，再决定是否重试。
 
