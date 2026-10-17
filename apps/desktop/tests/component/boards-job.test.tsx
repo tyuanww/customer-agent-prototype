@@ -45,11 +45,11 @@ function install(job: SessionJobView) {
   return owner;
 }
 
-it('keeps 权限 and 资料管理 reachable for a resolved job and an unresolved job', async () => {
+it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席', async () => {
   const user = userEvent.setup();
   const engineer = observeSessionJob({ title: 'AI赋能工程师', directory: [{ name: 'AI赋能工程师', enabled: true }] });
-  const unresolved = observeSessionJob(null);
-  for (const job of [engineer, unresolved]) {
+  const seat = observeSessionJob(null);
+  for (const job of [engineer, seat]) {
     cleanup();
     delete window.dashboardIntake;
     delete window.dashboardContent;
@@ -62,13 +62,13 @@ it('keeps 权限 and 资料管理 reachable for a resolved job and an unresolved
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
       const grant = await screen.findByRole('button', { name: '新增授权' });
-      if (job.status === 'resolved') {
+      if (job.rights.grant) {
         await waitFor(() => expect(grant).toBeEnabled());
         expect(screen.queryByText(UNRESOLVED_JOB_LABEL)).not.toBeInTheDocument();
       } else {
         await waitFor(() => {
           expect(grant).toBeDisabled();
-          expect(screen.getByText(UNRESOLVED_JOB_LABEL)).toBeInTheDocument();
+          expect(screen.getByText('当前职务不能授权')).toBeInTheDocument();
         });
       }
       await user.click(screen.getByTestId('nav-materials'));
