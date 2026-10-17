@@ -9,6 +9,7 @@ import type { DashboardContentApi } from '../shared/dashboard-content';
 import type { DashboardIterationApi } from '../shared/dashboard-iteration';
 import type { DashboardOpsApi } from '../shared/dashboard-ops-loop';
 import type { DashboardUsageLogApi } from '../shared/dashboard-usage-log';
+import type { WorkbenchModeReply } from '../shared/workbench-mode';
 import type { SopWorkbookOpenReply } from '../shared/sop-workbook-preview';
 import type { DashboardWordingApi } from '../shared/dashboard-wording';
 import type { LoginWindowApi } from '../shared/login-window';
@@ -28,6 +29,7 @@ declare global {
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;
     dashboardUsageLog?: DashboardUsageLogApi;
+    dashboardWorkbench?: { mode(): Promise<WorkbenchModeReply> };
     dashboardSopWorkbook?: { open(): Promise<SopWorkbookOpenReply> };
     loginWindow?: LoginWindowApi;
     sopWindow?: SopWindowApi;

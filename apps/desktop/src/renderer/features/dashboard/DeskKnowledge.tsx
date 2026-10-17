@@ -66,6 +66,7 @@ export function DeskKnowledge({
   const api = window.dashboardDesk;
   const [view, setView] = useState<DeskView>(EMPTY);
   const [message, setMessage] = useState<string | null>(null);
+  const [settled, setSettled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [writing, setWriting] = useState(false);
   const [addMode, setAddMode] = useState<'upload' | 'manual'>('upload');
@@ -89,6 +90,7 @@ export function DeskKnowledge({
         if (!live) return;
         if (reply.view) setView(reply.view);
         setMessage(reply.ok ? null : reply.message);
+        setSettled(true);
       }).catch(() => { if (live) setMessage('知识库暂时读不出来。'); });
     };
     load();
@@ -159,7 +161,7 @@ export function DeskKnowledge({
         <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>最后更新时间</th><th>操作</th></tr></thead>
         <tbody>
           {view.role === null
-            ? (message ? null : <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>)
+            ? (!settled || message ? null : <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>)
             : rows}
         </tbody>
       </table>

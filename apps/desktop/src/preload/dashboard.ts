@@ -553,6 +553,10 @@ contextBridge.exposeInMainWorld('dashboardIntake', {
   },
 } satisfies IntakeManagementApi);
 
+contextBridge.exposeInMainWorld('dashboardWorkbench', {
+  mode: () => ipcRenderer.invoke('dashboard:workbench-mode'),
+});
+
 contextBridge.exposeInMainWorld('dashboardDesk', {
   current: () => ipcRenderer.invoke('dashboard:desk-current'),
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),

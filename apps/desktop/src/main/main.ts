@@ -3,6 +3,7 @@ import { registerContentIntakePermissionsIpc } from './content-intake-permission
 import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerDeskKnowledgeIpc } from './desk-knowledge-ipc';
+import { registerWorkbenchModeIpc } from './workbench-mode-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
@@ -273,6 +274,8 @@ if (!gotLock) {
       () => productProfile?.contentIntake === 'faq-v2');
     intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
+    registerWorkbenchModeIpc(productProfile ?? null,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     deskKnowledge = registerDeskKnowledgeIpc(productProfile?.contentIntake ? productSession : null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, userDataDirectory);
     disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
