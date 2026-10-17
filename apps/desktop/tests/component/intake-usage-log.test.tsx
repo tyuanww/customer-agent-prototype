@@ -23,17 +23,19 @@ function install(overrides: Partial<DashboardUsageLogApi> = {}) {
   return api;
 }
 
-it('states a read failure and draws no table when the interface is absent', () => {
+it('states that usage is not mounted and draws no table when the interface is absent', () => {
   render(<IntakeUsageLog />);
-  expect(screen.getByText('使用记录暂时读不出来。请稍后再试。')).toBeVisible();
+  expect(screen.getByText('使用记录还不能在这里看。')).toBeVisible();
+  expect(screen.queryByText('使用记录暂时读不出来。请稍后再试。')).toBeNull();
   expect(screen.queryByText('暂无使用记录')).toBeNull();
   expect(screen.queryByRole('table')).toBeNull();
 });
 
-it('states a read failure when the source replies UNAVAILABLE and draws no table', async () => {
-  install({ list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '请稍后再试。' })) });
+it('states that usage is not mounted when the source replies UNAVAILABLE and draws no table', async () => {
+  install({ list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '使用记录还不能在这里看。' })) });
   render(<IntakeUsageLog />);
-  expect(await screen.findByText('使用记录暂时读不出来。请稍后再试。')).toBeVisible();
+  expect(await screen.findByText('使用记录还不能在这里看。')).toBeVisible();
+  expect(screen.queryByText('使用记录暂时读不出来。请稍后再试。')).toBeNull();
   expect(screen.queryByText('暂无使用记录')).toBeNull();
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByRole('button', { name: '重试' })).toBeNull();

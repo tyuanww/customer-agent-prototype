@@ -1,4 +1,5 @@
 import type { UsageLogFilter, UsageLogReply, UsageLogResult, UsageLogRow } from './dashboard-usage-log';
+import { WORKBENCH_EMPTY } from './workbench-empty';
 
 /** A usage row plus the consent flag the export filter needs. Missing consent is not exportable. */
 export type UsageSourceRow = UsageLogRow & { consented?: boolean };
@@ -51,7 +52,7 @@ export function listUsageLog(
   source: readonly UsageSourceRow[] | null,
   filter: Partial<UsageLogFilter> | null | undefined,
 ): UsageLogReply {
-  if (source === null) return { ok: false, code: 'UNAVAILABLE', message: '请稍后再试。' };
+  if (source === null) return { ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted };
   const selected = selectUsageLogRows(source, filter);
   const cursor = filter?.cursor ?? null;
   const found = cursor ? selected.findIndex((row) => row.id === cursor) : -1;

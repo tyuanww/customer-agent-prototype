@@ -159,7 +159,7 @@ export function DeskKnowledge({
         <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>最后更新时间</th><th>操作</th></tr></thead>
         <tbody>
           {view.role === null
-            ? <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>
+            ? (message ? null : <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>)
             : rows}
         </tbody>
       </table>
