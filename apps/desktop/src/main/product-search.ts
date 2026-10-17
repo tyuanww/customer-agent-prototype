@@ -21,8 +21,15 @@ import { liveDenseQueryRanker } from './retrieval-embeddings-store.ts';
 import { createRetrievalPipeline, loadRetrievalPipeline, type RetrievalPipeline } from './retrieval-pipeline';
 import { loadRetrievalPreferenceStore, type RetrievalPreferenceStore } from './retrieval-preference-store';
 import { loadRetrievalTelemetryStore, type RetrievalTelemetry } from './retrieval-telemetry-store.ts';
+import type { UsageJournal } from './usage-journal';
 
 export type SearchHelp = { openEntry(): boolean | Promise<boolean> };
+
+const noopUsageJournal: UsageJournal = {
+  note() {},
+  markCopied() {},
+  read() { return []; },
+};
 
 type SearchJob = Readonly<{
   platform: 'qianniu' | 'douyin';
@@ -116,6 +123,7 @@ export class ProductSearch {
         || DEFAULT_RETRIEVAL_PREFERENCE_PATH,
     ),
     private readonly telemetry: RetrievalTelemetry = loadRetrievalTelemetryStore(),
+    private readonly usage: UsageJournal = noopUsageJournal,
   ) {
     this.liveHydrate = hydrate === undefined;
     this.hydrate = hydrate === undefined ? loadHydrateCatalog() : hydrate;
@@ -140,6 +148,29 @@ export class ProductSearch {
     this.activePipeline = scripts.length > 0
       ? createRetrievalPipeline(scripts, { dense: liveDenseQueryRanker() })
       : this.pipeline;
+  }
+  private rememberUsage(
+    queryId: string,
+    queryText: string,
+    result: Extract<ProductSearchResult, { ok: true }>,
+    retainQuestion: boolean,
+  ): void {
+    const view = this.session.view();
+    if (!view.signedIn || !view.userId) return;
+    const current = this.announce.currentReleaseId?.() ?? null;
+    try {
+      this.usage.note({
+        id: queryId,
+        askedAt: new Date().toISOString(),
+        actorId: view.userId,
+        agent: view.displayName?.trim() || '坐席',
+        question: retainQuestion ? queryText : null,
+        scriptTitle: result.candidates[0]?.title ?? null,
+        result: result.hitStatus === 'no_hit' ? 'miss' : 'viewed',
+        snapshotStale: current !== null && current !== result.releaseId,
+        consented: retainQuestion,
+      });
+    } catch { /* keep search */ }
   }
   forget(sender: number) {
     this.states.get(sender)?.controller.abort();
@@ -286,7 +317,7 @@ export class ProductSearch {
         const telemetryStatus = primaryRecord.response.telemetry_status === 'collection_disabled' ? 'collection_disabled' : 'recorded';
         return this.finishLocal(sender, state, request, local.releaseId, local.candidates, {
           queryId: primaryRecord.queryId, telemetryStatus,
-        });
+        }, queryText);
       }
       const origins = new Map<string, string>();
       const merged: ProductCandidate[] = [];
@@ -311,6 +342,7 @@ export class ProductSearch {
       };
       state.origins = origins;
       state.result = structuredClone(result); this.last.set(sender, state);
+      this.rememberUsage(result.queryId, queryText, result, result.telemetryStatus !== 'collection_disabled');
       try {
         this.telemetry.recordQuery({
           queryId: result.queryId,
@@ -337,6 +369,7 @@ export class ProductSearch {
     releaseId: string,
     candidates: ProductCandidate[],
     recorded: { queryId: string; telemetryStatus: 'recorded' | 'collection_disabled' },
+    queryText: string,
   ): Extract<ProductSearchResult, { ok: true }> {
     this.current(sender, state);
     const queryId = recorded.queryId;
@@ -349,6 +382,7 @@ export class ProductSearch {
     state.origins = origins;
     state.result = structuredClone(result);
     this.last.set(sender, state);
+    this.rememberUsage(queryId, queryText, result, recorded.telemetryStatus !== 'collection_disabled');
     try {
       this.telemetry.recordQuery({
         queryId,
@@ -390,6 +424,7 @@ export class ProductSearch {
       try { this.writeClipboard(text); } catch { throw new ProductHttpError('CLIPBOARD_FAILED'); }
       state.terminal = true;
       try { this.telemetry.markAdopted(impressionQueryId, candidate.script_id); } catch { /* keep copy */ }
+      try { this.usage.markCopied(result.queryId); } catch { /* keep copy */ }
       let eventStatus: 'recorded' | 'unrecorded' | 'disabled' = result.telemetryStatus === 'collection_disabled' ? 'disabled' : 'unrecorded';
       if (eventStatus !== 'disabled') {
         try {

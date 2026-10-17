@@ -218,7 +218,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 .t-sub{font-size:12px;color:var(--mute)}
 .wb9 .t-sub.up{color:var(--ok)}
 .wb9 .t-sub.down{color:var(--warn)}
-.wb9 .charts{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;margin-top:16px}
+.wb9 .charts{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:16px}
 .wb9 .card{border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
 .wb9 .card.flush{padding:0;margin-top:16px}
 .wb9 .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}

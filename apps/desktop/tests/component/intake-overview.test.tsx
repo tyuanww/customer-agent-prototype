@@ -1,8 +1,10 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { IntakeOverview } from '../../src/renderer/features/dashboard/IntakeOverview';
-import { v9Headline } from '../../src/renderer/features/dashboard/v9-overview-model';
 import type { UsageSourceRow } from '../../src/shared/usage-log-csv';
 import type { DashboardIterationTask } from '../../src/shared/dashboard-iteration';
 import type { DashboardWordingEntry, DashboardWordingView } from '../../src/shared/dashboard-wording';
@@ -311,17 +313,49 @@ it('defers another cause only with a reason and does not rewrite the script', as
   expect(command).not.toHaveBeenCalled();
 });
 
-it('shows the v9 sample only while preview=intake and keeps SOP unwired', async () => {
+it('does not draw a sample trend on the intake preview', async () => {
   window.history.pushState({}, '', '/?preview=intake');
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(v9Headline(7).use)).not.toHaveLength(0);
-  expect(screen.getByText('运费谁承担')).toBeInTheDocument();
+  expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('话术类型占比')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('usage-trend')).not.toBeInTheDocument();
+  const overview = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../src/renderer/features/dashboard/IntakeOverview.tsx'), 'utf8');
+  expect(overview).not.toContain('v9Trend');
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: 'SOP 使用' }));
   const sop = document.querySelector('.pn:not([hidden])');
   expect(sop).toHaveTextContent('暂无记录');
   expect(screen.queryByText('打开次数')).not.toBeInTheDocument();
   expect(screen.queryByText('走完率')).not.toBeInTheDocument();
+});
+
+it('draws one empty frame when the signed-in list has no rows', async () => {
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })),
+    previewExport: vi.fn(async () => ({ ok: true as const, exportable: 0, redacted: 0, withoutConsent: 0 })),
+    export: vi.fn(async () => ({ ok: true as const, written: 0 })),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const frame = await screen.findByTestId('usage-trend-empty');
+  expect(frame.querySelector('path')).toBeNull();
+  expect(frame.querySelector('polyline')).toBeNull();
+  expect(screen.getAllByText('暂无使用记录').length).toBeGreaterThan(0);
+  expect(screen.queryByTestId('usage-trend')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('话术类型占比')).not.toBeInTheDocument();
+});
+
+it('asks a signed-out seat to log in and does not call the read a failure', async () => {
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED', message: '请先登录' })),
+    previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED', message: '请先登录' })),
+    export: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED', message: '请先登录' })),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const status = await screen.findByTestId('overview-usage-status');
+  expect(status).toHaveTextContent('请先登录');
+  expect(status).not.toHaveTextContent('使用记录暂时读不出来');
+  expect(status).not.toHaveTextContent('使用记录还不能在这里看');
+  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('—');
 });
 
 it('computes overview figures from the usage rows and still leaves SOP unwired', async () => {
@@ -341,13 +375,15 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
   expect(await screen.findByText('退货时效')).toBeInTheDocument();
   expect(screen.getByText('尺码怎么选')).toBeInTheDocument();
   expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();
-  expect(screen.queryByText(v9Headline(7).use)).not.toBeInTheDocument();
   const useTile = screen.getByText('话术使用次数').parentElement;
   expect(useTile).toHaveTextContent('2');
   expect(useTile).not.toHaveTextContent('较上期');
   expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('2');
   expect(screen.getByText('命中率').parentElement).toHaveTextContent('50.0%');
-  expect(screen.getByRole('table', { name: '使用与无命中趋势表' })).toHaveTextContent('2026-10-13');
+  const trend = screen.getByTestId('usage-trend');
+  expect(trend.innerHTML).toContain('10-13');
+  expect(trend.querySelectorAll('path').length).toBeGreaterThan(0);
+  expect(screen.queryByLabelText('话术类型占比')).not.toBeInTheDocument();
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: '无命中排行' }));
   const misses = screen.getByRole('region', { name: '无命中' });
