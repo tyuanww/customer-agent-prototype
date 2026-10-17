@@ -49,7 +49,8 @@ describe('AnnounceModule four library cards', () => {
     expect(screen.getByTestId('announce-library-count-presale')).not.toHaveTextContent('本版已更新');
     expect(screen.getByTestId('announce-library-count-product')).toHaveTextContent('106 条');
     expect(screen.getByTestId('announce-library-count-product')).not.toHaveTextContent('本版沿用');
-    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('当前发布 rel_25');
+    expect(screen.getByTestId('announce-release-footnote')).toHaveTextContent('当前发布');
+    expect(screen.getByTestId('announce-release-footnote')).not.toHaveTextContent('rel_25');
     expect(screen.getByTestId('announce-release-footnote')).not.toHaveTextContent('检索租约');
     expect(screen.queryByText('不是合成演练')).not.toBeInTheDocument();
   });

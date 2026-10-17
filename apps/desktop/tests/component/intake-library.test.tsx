@@ -36,7 +36,8 @@ it('shows entry dates and the read deadline in the same local time zone with an 
  f.command.mockResolvedValueOnce({ok:true,view});const {rerender}=render(<IntakeLibrary active="wording"/>);
  expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026年01月15日 10:00:00（UTC-05:00） · 失效 2026年01月15日 11:00:00（UTC-05:00）');
  rerender(<IntakeLibrary active="announce"/>);
- expect(screen.getByText(/当前发布 rel_synthetic/)).toHaveTextContent('资格截止 2026年01月15日 10:00:00（UTC-05:00）');
+ expect(screen.getByText(/当前发布/)).toHaveTextContent('资格截止 2026年01月15日 10:00:00（UTC-05:00）');
+ expect(screen.getByText(/当前发布/)).not.toHaveTextContent('rel_synthetic');
  expect(f.command).toHaveBeenCalledTimes(1);
 });
 it('shows missing and invalid entry times explicitly instead of inventing a date',async()=>{
@@ -65,7 +66,8 @@ it('browses four scoped domains and shares the same complete read with the avail
  expect(screen.queryByRole('button',{name:/复制|下架|导出/})).not.toBeInTheDocument();
  rerender(<IntakeLibrary active="announce"/>);
  expect(screen.getByRole('region',{name:'当前可用版本'})).toBeVisible();
- expect(screen.getByText(/当前发布 rel_synthetic/)).toBeVisible();
+ expect(screen.getByText(/当前发布/)).toBeVisible();
+ expect(screen.queryByText(/rel_synthetic/)).toBeNull();
  expect(screen.getByText('现在还没有可下载的安装包。')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(1);
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();

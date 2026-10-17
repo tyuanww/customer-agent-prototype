@@ -167,7 +167,7 @@ function WordingTab({ onOpenDomain }: { onOpenDomain?: (domain: DomainId) => voi
         })}
       </div>
       <p className="dash-footnote" data-testid="announce-release-footnote">
-        当前发布 {view.releaseId}
+        当前发布 {view.announcement?.createdAt ? view.announcement.createdAt.slice(0, 10) : ''}
       </p>
     </>
   );
@@ -206,8 +206,7 @@ function SoftwareTab() {
         setMessage(OPS_LOOP_COPY.noSoftwareCurrent);
         return;
       }
-      const signedLabel = current.signed ? '已签名' : '未签名';
-      setMessage(`${current.version} · ${signedLabel}`);
+      setMessage(current.signed ? current.version : '这个安装包不能在这里更新。');
     }).catch(() => {
       if (!liveRef.current) return;
       setCatalog(null);
@@ -265,12 +264,7 @@ function SoftwareTab() {
             tone={softwareBadgeTone(catalog)}
           />
         </div>
-        {catalog?.current ? (
-          <dl className="dash-dl">
-            <div><dt>平台</dt><dd>{catalog.current.platform}</dd></div>
-            <div><dt>签名</dt><dd>{catalog.current.signed ? '已签名' : '未签名'}</dd></div>
-          </dl>
-        ) : null}
+
         <div className="content-action-row">
           <button
             type="button"

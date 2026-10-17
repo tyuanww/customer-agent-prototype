@@ -100,6 +100,7 @@ export function IntakeOverview({
   const [message, setMessage] = useState('加载中…');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CloseHintCatalog | null>(null);
+  const [scriptTitles, setScriptTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [reminders, setReminders] = useState<readonly KnowledgeValidityReminder[]>([]);
   const [deskReminders, setDeskReminders] = useState<'unavailable' | 'ready'>('unavailable');
   const [deskRole, setDeskRole] = useState<'operator' | 'seat' | null>(null);
@@ -153,6 +154,9 @@ export function IntakeOverview({
     void api.list().then((result) => {
       if (!live) return;
       setCatalog(catalogFromWording(result));
+      if (result.ok) {
+        setScriptTitles(new Map(result.entries.map((entry) => [entry.scriptId, entry.title])));
+      }
     }).catch(() => {
       if (live) setCatalog(null);
     });
@@ -406,7 +410,7 @@ export function IntakeOverview({
       <tbody>
         {tasks === null ? <tr><td colSpan={4}>{message}</td></tr> : openTasks.length === 0 ? <tr><td colSpan={4}>{ITERATION_COPY.empty}</td></tr> : openTasks.map((task) => {
           const scriptId = inaccuracyScriptIdFromTask(task);
-          const title = scriptId ? `话术不准 · ${scriptId}` : task.clusterKey;
+          const title = (scriptId && scriptTitles.get(scriptId)) || task.clusterKey;
           const cause = causeById[task.taskId] ?? task.suspectedCause;
           return <tr key={task.taskId}>
             <td>{statusLabel(task.status)}</td>
