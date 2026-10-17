@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-1. 当前仓库 `VERSION`（现在是 0.3.26）对应的 UNSIGNED 产物，在 gitignored 的 `release/local-unsigned/`。如果目录里没有匹配版本，先运行对应平台的打包命令生成它。
+1. 安装包版本看 `apps/desktop/package.json`，并与根目录 `VERSION` 相同（现在是 0.3.28）。UNSIGNED 产物在 gitignored 的 `release/local-unsigned/`。如果目录里没有匹配版本，先运行对应平台的打包命令生成它。
 2. 先退出正在跑的「客服话术浮窗 Demo」。
 3. Windows 办公机勾选仍由人在那台机器上做，见 [办公机产品主链](how-to-office-machine-product-remote.md)。
 

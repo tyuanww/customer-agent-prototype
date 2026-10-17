@@ -1,6 +1,6 @@
 # 客服 Agent 产品 · Menokin 试点当前实现基线
 
-当前版本是 0.3.27。坐席打开的是查询胶囊和工作台。工作台上的字只告诉坐席下一步。没有数字时写「暂无记录」。没有登录时写「请先登录」。不要把「未接入」「冻结合同」「运行模式」写给坐席。
+当前版本是 0.3.28。坐席打开的是查询胶囊和工作台。工作台上的字只告诉坐席下一步。没有数字时写「暂无记录」。没有登录时写「请先登录」。不要把「未接入」「冻结合同」「运行模式」写给坐席。下载页和 GitHub Release 的最新包是 `v0.3.28`。杭州进程是 `ddeec390`。线上话术指针仍是 `rel_27`。
 
 本仓是客服 Agent 的产品实施仓，用来开发、测试、打包和上线。桌面可运行基线使用本地合成数据，用来验证输入法式桌面浮窗：
 
@@ -52,6 +52,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
 | 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
+| 发下一轮桌面安装包，并分清六条发布面 | [下一轮桌面大版本](docs/how-to-ship-the-next-desktop-cut.md) |
 | 从远端仓库开发、在 Windows WSL 测试并按 SHA 交付 | [远端开发与交付](docs/how-to-remote-development-and-deployment.md) |
 | 选择 Mac / API / WSL 开发端口并验证 | [开发端口 How-to](docs/how-to-development-ports.md) |
 | 查端口、环境边界、发布软链和远端磁盘占用 | [运行环境与发布目录参考](docs/reference-runtime-ports-and-release-layout.md) · [为什么要分环境](docs/explanation-environment-boundaries.md) |
