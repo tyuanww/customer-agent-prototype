@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { bindSessionSubject, forgetJobSnapshot, jobForToken, readFeishuJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { bindSessionSubject, forgetJobSnapshot, jobForToken, readFeishuJobSnapshot, rememberJobSnapshot, resetFeishuJobObservationForTests, subjectHash } from '../src/feishu-job-snapshot.js';
 
 const openId = 'ou_abcdef';
 
@@ -8,6 +8,8 @@ function json(body: unknown, status = 200): Response {
 }
 
 describe('feishu job snapshot', () => {
+  beforeEach(() => resetFeishuJobObservationForTests());
+
   it('keeps a resolved title only after the directory is read', async () => {
     const fetchImpl = (async (url: string) => {
       if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
@@ -26,7 +28,7 @@ describe('feishu job snapshot', () => {
     await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toBeNull();
   });
 
-  it('returns null when another page of job titles is still unread', async () => {
+  it('returns pending when another page of job titles is still unread', async () => {
     let jobs = 0;
     const fetchImpl = (async (url: string) => {
       if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
@@ -34,7 +36,31 @@ describe('feishu job snapshot', () => {
       jobs += 1;
       return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: true, page_token: `page-${jobs}` } });
     }) as typeof fetch;
-    await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toBeNull();
+    await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toBe('pending');
+  });
+
+  it('resumes the job-title list from the saved page and then publishes the title', async () => {
+    let jobs = 0;
+    const fetchImpl = (async (url: string) => {
+      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
+      if (url.includes('/users/')) return json({ code: 0, data: { user: { job_title: '客服总监' } } });
+      jobs += 1;
+      if (jobs === 9 && !url.includes('page_token=p8')) throw new Error('resume token was not sent');
+      if (jobs < 10) {
+        return json({ code: 0, data: { items: [{ name: `其他${jobs}`, status: true }], has_more: true, page_token: `p${jobs}` } });
+      }
+      return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: false } });
+    }) as typeof fetch;
+    const config = { clientId: 'cli_abc', clientSecret: 'secret' };
+    await expect(readFeishuJobSnapshot(openId, config, fetchImpl)).resolves.toBe('pending');
+    const token = 'd'.repeat(43);
+    bindSessionSubject(token, subjectHash(openId));
+    expect(jobForToken(token)).toBeNull();
+    const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
+    expect(snapshot).toMatchObject({ title: '客服总监' });
+    if (snapshot === 'pending' || snapshot === null) throw new Error('directory walk did not finish');
+    expect(snapshot.directory).toContainEqual({ name: '客服总监', enabled: true });
+    expect(jobForToken(token)?.title).toBe('客服总监');
   });
 
   it('keeps a later duplicate so the desktop can refuse it', async () => {
@@ -49,7 +75,8 @@ describe('feishu job snapshot', () => {
       return json({ code: 0, data: { items: [{ name: '客服总监', status: true }], has_more: false } });
     }) as typeof fetch;
     const snapshot = await readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl);
-    expect(snapshot?.directory).toEqual([
+    if (!snapshot || snapshot === 'pending') throw new Error('directory walk did not finish');
+    expect(snapshot.directory).toEqual([
       { name: '客服总监', enabled: true },
       { name: '客服总监', enabled: true },
     ]);
