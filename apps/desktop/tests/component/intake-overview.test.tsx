@@ -117,10 +117,13 @@ it('says 未接入 when unloaded', async () => {
   render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByRole('table', { name: '话术迭代' })).toHaveTextContent('暂无记录');
-  expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('使用记录暂时读不出来');
-  expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('使用记录暂时读不出来');
-  expect(screen.getByText('命中率').parentElement).toHaveTextContent('使用记录暂时读不出来');
-  expect(screen.getByLabelText('使用与无命中趋势')).toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getAllByTestId('overview-usage-status')).toHaveLength(1);
+  expect(screen.getByText('话术使用次数').parentElement).not.toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByText('无命中次数').parentElement).not.toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByText('命中率').parentElement).not.toHaveTextContent('使用记录暂时读不出来');
+  expect(screen.getByText('待处理迭代').parentElement).toHaveTextContent('0');
+  expect(screen.getByLabelText('使用与无命中趋势')).not.toHaveTextContent('使用记录暂时读不出来');
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: '无命中排行' }));
   expect(screen.getByRole('region', { name: '无命中' })).toHaveTextContent('暂无记录');

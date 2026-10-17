@@ -38,10 +38,10 @@ type UsagePhase = 'loading' | 'empty' | 'ready' | 'failed' | 'unmounted';
 
 function usageTile(phase: UsagePhase, value: string | undefined, synthetic: boolean): string {
   if (synthetic && value) return value;
-  if (phase === 'unmounted') return WORKBENCH_EMPTY.usageUnmounted;
-  if (phase === 'failed') return WORKBENCH_EMPTY.usageFailed;
+  if (phase === 'ready') return value ?? '0';
+  if (phase === 'empty') return '0';
   if (phase === 'loading') return '…';
-  return value ?? WORKBENCH_EMPTY.usageEmpty;
+  return '—';
 }
 
 function usageProse(phase: UsagePhase): string {
@@ -298,6 +298,7 @@ export function IntakeOverview({
         <button type="button" aria-pressed={days === 30} onClick={() => setDays(30)}>近 30 天</button>
       </div>
     </div>
+    {usagePhase === 'ready' ? null : <p className="notready" data-testid="overview-usage-status">{usageProse(usagePhase)}</p>}
     <div className="tiles">
       <div className="tile"><span className="t-lbl">话术使用次数</span><b>{usageTile(usagePhase, headline?.use, showSynthetic && sourceRows === null)}</b>{headline && !sourced ? <span className="t-sub up">较上期 ↑ 8%</span> : null}</div>
       <div className="tile"><span className="t-lbl">无命中次数</span><b>{usageTile(usagePhase, headline?.miss, showSynthetic && sourceRows === null)}</b>{headline && !sourced ? <span className="t-sub down">较上期 ↓ 5%</span> : null}</div>
@@ -312,7 +313,7 @@ export function IntakeOverview({
             ? <p className="notready">{WORKBENCH_EMPTY.usageEmpty}</p>
             : <table className="fixed" aria-label="使用与无命中趋势表"><thead><tr><th>日期</th><th>使用</th><th>无命中</th></tr></thead>
               <tbody>{liveTrend.map((point) => <tr key={point.day}><td>{point.day}</td><td>{point.use}</td><td>{point.miss}</td></tr>)}</tbody></table>)
-          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">{usageProse(usagePhase)}</p>)}</div>
+          : (showSynthetic ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: v9Trend(days) }} /> : <p className="notready">—</p>)}</div>
       </div>
       <div className="card" aria-label="话术类型占比">
         <div className="card-head"><h3>话术类型占比</h3></div>
@@ -323,7 +324,7 @@ export function IntakeOverview({
             <text x="70" y="86" textAnchor="middle" fontSize="11" fill="#6b6878">使用次数</text>
           </svg>
           <ul className="dlegend">{donut.parts.map((part) => <li key={part.type}><i style={{ background: part.color }} />{part.type}<span className="n">{part.total.toLocaleString('en-US')}</span><b>{part.pct}%</b></li>)}</ul>
-        </div> : <p className="notready">{usageProse(usagePhase)}</p>}
+        </div> : <p className="notready">—</p>}
       </div>
     </div>
     <div className="card flush">
@@ -351,13 +352,13 @@ export function IntakeOverview({
             <th><button type="button" className={`sort${usageDesc ? '' : ' asc'}`} aria-label="按使用次数排序" onClick={() => { setUsageDesc((value) => !value); setUsagePage(0); }}>使用次数<svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg></button></th>
             <th>{usageView === 'script' ? '近 7 天 · 使用人' : '最常用话术'}</th><th></th></tr></thead>
           <tbody>
-            {orderedRanks ? (orderedRanks.length === 0 ? <tr><td colSpan={5} className="empty">{usagePhase === 'empty' && usageQuery === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'}</td></tr> : orderedRanks.map((row, index) => <tr className="item" key={row.name}>
+            {orderedRanks ? (orderedRanks.length === 0 ? <tr><td colSpan={5} className="empty">{usagePhase === 'empty' && usageQuery === '' ? '—' : '没有符合条件的记录'}</td></tr> : orderedRanks.map((row, index) => <tr className="item" key={row.name}>
               <td><span className={index < 3 ? 'rk top' : 'rk'}>{index + 1}</span></td>
               <td>{row.name}</td>
               <td><div className="cnt"><b>{row.total}</b></div></td>
               <td><span className="who">{row.extra}</span></td>
               <td />
-            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">{usageProse(usagePhase)}</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
+            </tr>)) : !usage ? <tr><td colSpan={5} className="empty">—</td></tr> : usageRows.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : usageRows.map((row, index) => {
               const rank = usageDesc ? usage.page * V9_PAGE_SIZE + index + 1 : usage.count - (usage.page * V9_PAGE_SIZE + index);
               return <tr className="item" key={row.name}>
                 <td><span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span></td>

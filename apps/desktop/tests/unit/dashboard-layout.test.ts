@@ -46,7 +46,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('--dash-radius-dot: 50%');
     expect(css).toContain('--dash-surface: light-dark(#ffffff, #1c1b20)');
     expect(css).toContain('--dash-canvas: light-dark(#f4f4f6, #16151a)');
-    expect(css).toContain('--dash-sidebar-material: light-dark(rgba(242, 242, 246, 0.92), rgba(16, 15, 20, 0.92))');
+    expect(css).toContain('--dash-sidebar-material: light-dark(rgba(228, 227, 234, 0.94), rgba(12, 11, 16, 0.94))');
     expect(css).toContain('--dash-material-chrome: light-dark(rgba(242, 242, 246, 0.88), rgba(16, 15, 20, 0.88))');
     expect(css).toContain('--dash-material-panel: light-dark(#ffffff, #1c1b20)');
     expect(css).toContain('--dash-chrome-hover: light-dark(rgba(36, 33, 42, 0.055), rgba(255, 255, 255, 0.065))');
