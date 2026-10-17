@@ -212,4 +212,80 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
     expect((await app.inject({ url: '/v1/auth/me', headers: { authorization: `Bearer ${token}` } })).json())
       .toEqual({ user_id: 'synthetic-user', role: 'agent', auth_mode: 'feishu' });
   });
+
+  it('admits an unknown Feishu open id as agent and leaves an existing binding unchanged', async () => {
+    const openId = 'ou_newseat01abcd';
+    const ownerId = 'ou_ownerkeep01a';
+    const disabledId = 'ou_disabled01ab';
+    await admin.query(
+      `INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+       VALUES ($1,'feishu','feishu-tenant',$1,$2,$3,true,'owner'),
+              ($4,'feishu','feishu-tenant',$4,$5,$6,false,'agent')`,
+      [ownerId, `usr_${ownerId}`, '4ca5ada28acbc8303c7cdc3a98fd8bfa9c81a302b50e619aa8835e8620d6af16',
+        disabledId, `usr_${disabledId}`, '237e07279301dfa627524ac4bfbaaf876f9fdd22c5ff9912b1b0fe78417c4c50'],
+    );
+    await app.close();
+    app = await build({
+      authorizeUrl: state => `http://127.0.0.1:45000/authorize?state=${state}`,
+      exchange: async code => {
+        if (code === 'feishu-new') return openId;
+        if (code === 'feishu-owner') return ownerId;
+        if (code === 'feishu-disabled') return disabledId;
+        if (code === 'feishu-stranger') return 'synthetic_stranger';
+        throw new Error('rejected');
+      },
+      close: () => undefined,
+    });
+    async function finish(code: string) {
+      const login = await loginRequest();
+      const callback = await app.inject({ url: `/v1/auth/callback?state=${login.state}&code=${code}` });
+      return { login, callback };
+    }
+    const created = await finish('feishu-new');
+    expect(created.callback.statusCode).toBe(200);
+    const session = await exchange(created.login.id);
+    expect(session.statusCode).toBe(200);
+    expect((await app.inject({ url: '/v1/auth/me', headers: { authorization: `Bearer ${session.json().access_token}` } })).json())
+      .toEqual({ user_id: 'usr_ou_newseat01abcd', role: 'agent', auth_mode: 'mock' });
+    const again = await finish('feishu-new');
+    expect(again.callback.statusCode).toBe(200);
+    const seat = await admin.query(
+      `SELECT binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role
+       FROM backend_identity.subject_bindings WHERE binding_id=$1`,
+      [openId],
+    );
+    expect(seat.rows).toEqual([{
+      binding_id: 'ou_newseat01abcd',
+      provider: 'feishu',
+      tenant: 'feishu-tenant',
+      subject: 'ou_newseat01abcd',
+      user_id: 'usr_ou_newseat01abcd',
+      subject_hash: '1b4d64a6987f76938b73b52a1b6d76352b55fc294bcf78c2670f84d41006869e',
+      enabled: true,
+      role: 'agent',
+    }]);
+    const owner = await finish('feishu-owner');
+    expect(owner.callback.statusCode).toBe(200);
+    const ownerSession = await exchange(owner.login.id);
+    expect((await app.inject({ url: '/v1/auth/me', headers: { authorization: `Bearer ${ownerSession.json().access_token}` } })).json())
+      .toEqual({ user_id: 'usr_ou_ownerkeep01a', role: 'owner', auth_mode: 'mock' });
+    const ownerRow = await admin.query(
+      'SELECT role, enabled FROM backend_identity.subject_bindings WHERE binding_id=$1',
+      [ownerId],
+    );
+    expect(ownerRow.rows).toEqual([{ role: 'owner', enabled: true }]);
+    const disabled = await finish('feishu-disabled');
+    expect(disabled.callback.statusCode).toBe(403);
+    const disabledRow = await admin.query(
+      'SELECT role, enabled FROM backend_identity.subject_bindings WHERE binding_id=$1',
+      [disabledId],
+    );
+    expect(disabledRow.rows).toEqual([{ role: 'agent', enabled: false }]);
+    const stranger = await finish('feishu-stranger');
+    expect(stranger.callback.statusCode).toBe(403);
+    const strangerRow = await admin.query(
+      "SELECT count(*)::int AS n FROM backend_identity.subject_bindings WHERE binding_id='synthetic_stranger'",
+    );
+    expect(strangerRow.rows).toEqual([{ n: 0 }]);
+  });
 });

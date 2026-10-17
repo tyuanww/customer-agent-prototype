@@ -136,13 +136,13 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
     const repair = catalogue.compatibility.repairSuccessor;
-    const matchesRepair = repair != null && index === 39 && [40, 41, 42, 43, 44].includes(catalogue.migrations.length)
+    const matchesRepair = repair != null && index === 39 && [40, 41, 42, 43, 44, 45].includes(catalogue.migrations.length)
       && migration.id === '0040_intake_repair_successor_v1_28'
       && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
       && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
       && migration.sha256 === repair.migrationSha256;
     const readiness = catalogue.compatibility.readinessSuccessor;
-    const matchesReadiness = readiness != null && index === 40 && [41, 42, 43, 44].includes(catalogue.migrations.length)
+    const matchesReadiness = readiness != null && index === 40 && [41, 42, 43, 44, 45].includes(catalogue.migrations.length)
       && migration.id === '0041_intake_readiness_v1_29'
       && migration.contractSetId === readiness.contractSetId && migration.sourceGitSha === readiness.sourceGitSha
       && migration.sourceSchemaSha256 === readiness.sourceSchemaSha256 && migration.sha256 === readiness.migrationSha256
@@ -152,19 +152,24 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       && migration.sha256 !== FROZEN_OCCUPIED_SHA256) {
       catalogueError('Frozen occupied-domain migration 0042 drifted');
     }
-    const matchesOccupied = index === 41 && [42, 43, 44].includes(catalogue.migrations.length)
+    const matchesOccupied = index === 41 && [42, 43, 44, 45].includes(catalogue.migrations.length)
       && migration.id === '0042_intake_occupied_domain_publish'
       && migration.sha256 === FROZEN_OCCUPIED_SHA256
       && readiness != null
       && catalogue.migrations[40]?.id === '0041_intake_readiness_v1_29';
-    const matchesDefaultTenant = index === 42 && [43, 44].includes(catalogue.migrations.length)
+    const matchesDefaultTenant = index === 42 && [43, 44, 45].includes(catalogue.migrations.length)
       && migration.id === '0043_intake_publish_default_tenant'
       && catalogue.migrations[41]?.id === '0042_intake_occupied_domain_publish'
       && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
       && readiness != null;
-    const matchesRoleDefaults = index === 43 && catalogue.migrations.length === 44
+    const matchesRoleDefaults = index === 43 && [44, 45].includes(catalogue.migrations.length)
       && migration.id === '0044_intake_role_defaults'
       && catalogue.migrations[42]?.id === '0043_intake_publish_default_tenant'
+      && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
+      && readiness != null;
+    const matchesFeishuAdmit = index === 44 && catalogue.migrations.length === 45
+      && migration.id === '0045_feishu_agent_admit'
+      && catalogue.migrations[43]?.id === '0044_intake_role_defaults'
       && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
       && readiness != null;
     if (matchesReadiness && !successorSuffix) catalogueError('Readiness requires the preceding repair successor');
@@ -172,7 +177,8 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     if (matchesOccupied && !successorSuffix) catalogueError('Occupied-domain publication requires the readiness successor');
     if (matchesDefaultTenant && !successorSuffix) catalogueError('Default-tenant publication requires the occupied-domain successor');
     if (matchesRoleDefaults && !successorSuffix) catalogueError('Role defaults require the default-tenant successor');
-    if (matchesSuccessor || matchesRepair || matchesReadiness || matchesOccupied || matchesDefaultTenant || matchesRoleDefaults) successorSuffix = true;
+    if (matchesFeishuAdmit && !successorSuffix) catalogueError('Feishu agent admission requires the role-default successor');
+    if (matchesSuccessor || matchesRepair || matchesReadiness || matchesOccupied || matchesDefaultTenant || matchesRoleDefaults || matchesFeishuAdmit) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
       !matchesSuccessor && !matchesRepair && !matchesReadiness
