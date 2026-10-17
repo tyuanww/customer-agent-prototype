@@ -157,6 +157,7 @@ const JOB_RIGHTS: Readonly<Record<string, readonly [boolean, boolean, boolean, b
   客服组长: [true, false, true, true, true],
   AI赋能工程师: [true, true, true, true, true],
   普通客服: [false, false, false, true, true],
+  客服坐席: [false, false, false, true, true],
 };
 
 function isContentJob(value: unknown): boolean {

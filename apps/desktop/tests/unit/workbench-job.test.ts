@@ -48,6 +48,15 @@ it('lets an AI赋能工程师 publish and grant', () => {
   });
 });
 
+it('lets an unrecognized title sit as 客服坐席 without publishing', () => {
+  expect(resolveJobTitle('客服坐席', one('客服坐席'))).toEqual({
+    status: 'resolved',
+    title: '客服坐席',
+    role: 'agent',
+    rights: { publish: false, grant: false, uploadSop: false, search: true, readCatalog: true },
+  });
+});
+
 it('lets an agent search and read without publishing', () => {
   expect(resolveJobTitle('普通客服', one('普通客服'))).toEqual({
     status: 'resolved',

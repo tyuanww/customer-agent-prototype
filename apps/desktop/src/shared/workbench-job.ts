@@ -21,6 +21,7 @@ const TITLE_ROLE: Readonly<Record<string, BoardRole>> = {
   客服组长: 'lead',
   AI赋能工程师: 'engineer',
   普通客服: 'agent',
+  客服坐席: 'agent',
 };
 
 const RIGHTS: Readonly<Record<BoardRole, BoardRights>> = {
