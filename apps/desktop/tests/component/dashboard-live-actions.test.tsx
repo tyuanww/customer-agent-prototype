@@ -638,9 +638,10 @@ describe('dashboard live actions', () => {
     await user.click(screen.getByTestId('system-sync-tab-software'));
     await user.click(screen.getByTestId('software-check-update'));
     await waitFor(() => {
-      expect(screen.getByTestId('software-update-status')).toHaveTextContent('0.3.18');
+      expect(screen.getByTestId('software-update-status')).toHaveTextContent('这个安装包不能在这里更新。');
     });
-    expect(screen.getByTestId('software-update-status')).toHaveTextContent('未签名');
+    expect(screen.getByText('0.3.18')).toBeInTheDocument();
+    expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('未签名');
     expect(screen.getByTestId('software-update-status')).not.toHaveTextContent('latest.yml');
   });
 });
