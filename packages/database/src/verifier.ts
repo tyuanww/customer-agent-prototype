@@ -1059,37 +1059,54 @@ const OCCUPIED_FUNCTION_SHA256 = '57466bc6aee6b73f01f8ba3afdddedf47be12da01b0c5c
 const DEFAULT_TENANT_FUNCTION_SHA256 = 'b92de7433f8efba4373d3936032ff285796b45e92756e1b03fe65eac96fc946c';
 const ROLE_DEFAULT_FUNCTION_SHA256 = '65548958ec226c44b349c65657bade31590730cb7051341d89922bca85792ea3';
 const ROLE_DEFAULT_OBJECT_SHA256 = '32011d2d8211bd9a2a85516c877cbd6965dd444f39bcfd5c3f3b30760db99fbd';
+const FEISHU_ADMIT_OBJECT_SHA256 = '5651482547b91105ddbd2d458c27a2ecc3de1a4f45f9fa712d638a78624447b2';
+const FEISHU_ADMIT_FUNCTION_SHA256 = '11ab6026e5cbb12efd50d1a60c0374d16bd4bb35fe12235fe5c159a9d33e59f1';
+const FEISHU_ADMIT_ACL_SHA256 = '8b0b1f969ffa87f15a0c0d9598a71e3c2df3fd8ecec27b15a11d55b0d27c6088';
 
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44)
+  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
     && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
     && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
-  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44)
+  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
     && occupied
     && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
-  const roleDefaults = catalogue.migrations.length === 44
+  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
     && adopted
     && catalogue.migrations[43]?.id === ROLE_DEFAULT_MIGRATION_ID;
+  const feishuAdmit = catalogue.migrations.length === 45
+    && roleDefaults
+    && catalogue.migrations[44]?.id === '0045_feishu_agent_admit';
   if ((catalogue.migrations.length !== 41 && !occupied)
     || (catalogue.migrations.length === 43 && !adopted)
     || (catalogue.migrations.length === 44 && !roleDefaults)
+    || (catalogue.migrations.length === 45 && !feishuAdmit)
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
-  const inventory = roleDefaults
+  const inventory = feishuAdmit
+    ? {
+      ...READINESS_INVENTORY,
+      functions: 271,
+      objectEntries: 3319,
+      objectSha256: FEISHU_ADMIT_OBJECT_SHA256,
+      functionEntries: 271,
+      functionSha256: FEISHU_ADMIT_FUNCTION_SHA256,
+    }
+    : roleDefaults
     ? { ...READINESS_INVENTORY, objectEntries: 3318, objectSha256: ROLE_DEFAULT_OBJECT_SHA256, functionSha256: ROLE_DEFAULT_FUNCTION_SHA256 }
     : adopted
     ? { ...READINESS_INVENTORY, functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 }
     : occupied
       ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
       : READINESS_INVENTORY;
-  const base = await verifyCatalogueState(client, catalogue, {
-    entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c',
-  }, inventory, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
+  const base = await verifyCatalogueState(client, catalogue, feishuAdmit
+    ? { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 }
+    : { entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c' },
+  inventory, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
   const marker = await verifyQuery<{ schema_comment: string | null }>(client,
     `SELECT pg_catalog.obj_description('public'::pg_catalog.regnamespace, 'pg_namespace') AS schema_comment`);
   const publicExec = await verifyQuery<{ signature: string; public_exec: boolean }>(client, `

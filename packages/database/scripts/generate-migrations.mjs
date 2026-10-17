@@ -811,7 +811,12 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const roleDefaultMigration = defaultTenantMigration
     ? renderIntakeOverlay(projectRoot, snapshot, 44, '0044_intake_role_defaults')
     : null;
-  const publishedMigrations = Object.freeze(roleDefaultMigration
+  const feishuAdmitMigration = roleDefaultMigration
+    ? renderIntakeOverlay(projectRoot, snapshot, 45, '0045_feishu_agent_admit')
+    : null;
+  const publishedMigrations = Object.freeze(feishuAdmitMigration
+    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration]
+    : roleDefaultMigration
     ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration]
     : defaultTenantMigration
     ? [...migrations, occupiedMigration, defaultTenantMigration]
@@ -847,6 +852,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (occupiedMigration) outputs.set(`packages/database/migrations/${occupiedMigration.file}`, occupiedMigration.sql);
   if (defaultTenantMigration) outputs.set(`packages/database/migrations/${defaultTenantMigration.file}`, defaultTenantMigration.sql);
   if (roleDefaultMigration) outputs.set(`packages/database/migrations/${roleDefaultMigration.file}`, roleDefaultMigration.sql);
+  if (feishuAdmitMigration) outputs.set(`packages/database/migrations/${feishuAdmitMigration.file}`, feishuAdmitMigration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

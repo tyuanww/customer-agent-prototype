@@ -73,7 +73,7 @@ describe('database migration planner', () => {
     const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
     expect(prior.migrationCount).toBe(34);
     const prefix = deriveMigrationStatus(generatedMigrationCatalogue.migrations.slice(0,34).map((_,index)=>ledgerRow(index)),generatedMigrationCatalogue);
-    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults']);
+    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit']);
     for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: generatedMigrationCatalogue.migrations.length + 1 }]) {
       const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
         priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
@@ -94,20 +94,21 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 35-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 36-migration current suffix',
     );
   });
 
   it('keeps the applied 0042 checksum and rejects a rewritten occupied-domain ledger or catalogue', () => {
     const frozen = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
     const rewritten = '245e31b1993edc5017da5006f9f2e31062604d29c1189892fd8908d761d298fd';
-    expect(generatedMigrationCatalogue.migrations).toHaveLength(44);
+    expect(generatedMigrationCatalogue.migrations).toHaveLength(45);
     expect(generatedMigrationCatalogue.migrations[41]).toMatchObject({
       id: '0042_intake_occupied_domain_publish',
       sha256: frozen,
     });
     expect(generatedMigrationCatalogue.migrations[42]?.id).toBe('0043_intake_publish_default_tenant');
     expect(generatedMigrationCatalogue.migrations[43]?.id).toBe('0044_intake_role_defaults');
+    expect(generatedMigrationCatalogue.migrations[44]?.id).toBe('0045_feishu_agent_admit');
     const rows = generatedMigrationCatalogue.migrations.map((_, index) => ledgerRow(index));
     expect(deriveMigrationStatus(rows, generatedMigrationCatalogue).state).toBe('COMPLETE');
     const driftedLedger = rows.map((row, index) => index === 41 ? { ...row, migration_sha256: rewritten } : row);
@@ -145,7 +146,7 @@ describe('database migration planner', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24', '0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24', '0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -219,7 +220,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(44);
+    expect(status.pending).toHaveLength(45);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });
