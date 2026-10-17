@@ -20,7 +20,8 @@ import { registerProductCatalogIpc } from './product-catalog-ipc';
 import { registerDashboardWordingIpc } from './dashboard-wording-ipc';
 import { registerDashboardContentIpc } from './dashboard-content-ipc';
 import { registerDashboardIterationIpc } from './dashboard-iteration-ipc';
-import { bindUsageFeed, registerUsageLogIpc, setUsageMount } from './usage-log-ipc';
+import { serverUsageRows } from '../shared/usage-feed';
+import { bindRemoteUsage, bindUsageFeed, registerUsageLogIpc, setUsageMount } from './usage-log-ipc';
 import { createUsageJournal } from './usage-journal';
 import { registerSopWorkbookIpc } from './sop-workbook-ipc';
 import { registerDashboardOpsLoopIpc } from './dashboard-ops-loop-ipc';
@@ -291,13 +292,20 @@ if (!gotLock) {
     const usageJournal = createUsageJournal(join(userDataDirectory, 'usage-journal.json'));
     bindUsageFeed((actorId) => usageJournal.read(actorId));
     if (productSession) {
+      const session = productSession;
+      bindRemoteUsage(async () => {
+        const view = session.view();
+        if (!view.signedIn) throw Object.assign(new Error('signed out'), { code: 'UNAUTHORIZED' });
+        const result = await session.request(view.sessionEpoch, '/v1/events/usage');
+        return serverUsageRows(result.value);
+      });
       const applyUsage = () => {
-        const view = productSession?.view();
-        setUsageMount(view?.signedIn && view.userId
+        const view = session.view();
+        setUsageMount(view.signedIn && view.userId
           ? { kind: 'signed-in', actorId: view.userId }
           : { kind: 'signed-out' });
       };
-      productSession.subscribe(applyUsage);
+      session.subscribe(applyUsage);
       applyUsage();
     }
     registerUsageLogIpc(

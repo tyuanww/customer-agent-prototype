@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { usageReplyForMount } from '../../src/shared/usage-feed';
+import { serverUsageRows, usageReplyForMount, usageReplyFromSources } from '../../src/shared/usage-feed';
 import { WORKBENCH_EMPTY } from '../../src/shared/workbench-empty';
 import { createUsageJournal, rowsForActor, type UsageNote } from '../../src/main/usage-journal';
 
@@ -52,6 +52,47 @@ it('stores one seat and hides the other seat on the same machine', () => {
   journal.markCopied('1');
   expect(journal.read('usr_self')[0]?.result).toBe('copied');
   expect(journal.read('usr_self').some((row) => row.question === '别人的问题')).toBe(false);
+});
+
+it('reads the server list for a signed-in seat and keeps the local journal otherwise', async () => {
+  const remote = [{
+    id: 'q1', askedAt: '2026-10-01T00:00:00.000Z', agent: '坐席', question: '面膜',
+    scriptTitle: null, result: 'miss' as const, snapshotStale: false, consented: false,
+  }];
+  let localReads = 0;
+  const fromServer = await usageReplyFromSources(
+    { kind: 'signed-in', actorId: 'usr_self' },
+    () => { localReads += 1; return []; },
+    async () => remote,
+    filter,
+  );
+  expect(localReads).toBe(0);
+  expect(fromServer.ok && fromServer.rows.map((row) => row.question)).toEqual(['面膜']);
+  const local = await usageReplyFromSources(
+    { kind: 'signed-in', actorId: 'usr_self' },
+    (actorId) => rowsForActor(notes, actorId),
+    null,
+    filter,
+  );
+  expect(local.ok && local.rows.map((row) => row.question)).toEqual(['退货多久']);
+  const signedOut = await usageReplyFromSources(
+    { kind: 'signed-in', actorId: 'usr_self' },
+    () => [],
+    async () => { throw Object.assign(new Error('expired'), { code: 'UNAUTHORIZED' }); },
+    filter,
+  );
+  expect(signedOut).toEqual({ ok: false, code: 'UNAUTHORIZED', message: WORKBENCH_EMPTY.signedOut });
+});
+
+it('rejects a usage payload that is not the server list', () => {
+  expect(serverUsageRows({
+    rows: [{
+      id: 'q1', askedAt: '2026-10-01T00:00:00.000Z', agent: '坐席', question: null,
+      scriptTitle: null, result: 'viewed', snapshotStale: false, consented: true,
+    }],
+  })[0]?.question).toBeNull();
+  expect(() => serverUsageRows({ rows: [{ id: 'q1', result: 'sent' }] })).toThrow();
+  expect(() => serverUsageRows({})).toThrow();
 });
 
 it('treats a broken journal as a thrown read', () => {
