@@ -24,3 +24,16 @@
 .dashboard-shell .desk-save {
   font-weight: 600;
 }
+.dashboard-shell .desk-knowledge .ant-input,
+.dashboard-shell .desk-knowledge textarea,
+.dashboard-shell .desk-knowledge input,
+.dashboard-shell .desk-knowledge .ant-btn,
+.dashboard-shell .desk-permissions .ant-btn,
+.dashboard-shell .desk-permissions-page .ant-btn {
+  font-size: 14px;
+}
+.dashboard-shell .desk-knowledge .ant-btn,
+.dashboard-shell .desk-permissions .ant-btn,
+.dashboard-shell .desk-permissions-page .ant-btn {
+  font-weight: 600;
+}

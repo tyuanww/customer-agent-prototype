@@ -258,7 +258,7 @@ export function IntakeOverview({
   const [usageDesc, setUsageDesc] = useState(true);
   const [usagePage, setUsagePage] = useState(0);
   const [sourceRows, setSourceRows] = useState<UsageSourceRow[] | null>(null);
-  const [usageState, setUsageState] = useState<'absent' | 'loading' | 'failed' | 'ready' | 'empty' | 'signed-out'>(() => window.dashboardUsageLog ? 'loading' : 'absent');
+  const [usageState, setUsageState] = useState<'absent' | 'loading' | 'failed' | 'ready' | 'empty' | 'signed-out' | 'unmounted'>(() => window.dashboardUsageLog ? 'loading' : 'absent');
   const previewLocation = window.location;
   const showSynthetic = (previewLocation.hostname === '127.0.0.1' || previewLocation.hostname === 'localhost')
     && new URLSearchParams(previewLocation.search).get('preview') === 'intake';
@@ -389,7 +389,7 @@ export function IntakeOverview({
         if (!live) return;
         if (!reply.ok) {
           setSourceRows(null);
-          setUsageState(reply.code === 'UNAUTHORIZED' ? 'signed-out' : 'failed');
+          setUsageState(reply.code === 'UNAUTHORIZED' ? 'signed-out' : reply.code === 'UNAVAILABLE' ? 'unmounted' : 'failed');
           return;
         }
         if (cursor !== null && seen.has(cursor)) { setSourceRows(null); setUsageState('failed'); return; }
@@ -527,6 +527,8 @@ export function IntakeOverview({
         <div className="card-head"><h3>使用趋势</h3><span className="legend"><i style={{ background: 'var(--chart-use)' }} />使用<i style={{ background: 'var(--chart-miss)' }} />无命中</span></div>
         <div className="chart-wrap">{usageState === 'signed-out'
           ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.signedOut}</p>
+          : usageState === 'unmounted'
+          ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.usageUnmounted}</p>
           : liveTrend && liveTrend.length > 0
           ? <TrendLines points={liveTrend} />
           : usageState === 'empty'

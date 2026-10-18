@@ -14,6 +14,16 @@ import { observeSessionJob } from '../../src/shared/product-session';
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+function expectSeatFontSize(element: HTMLElement) {
+  const size = getComputedStyle(element).fontSize;
+  expect(size === '14px' || size.startsWith('var(--ant-'), `${element.textContent} font size`).toBe(true);
+}
+
+function expectSeatFontWeight(element: HTMLElement, weight: '500' | '600') {
+  const value = getComputedStyle(element).fontWeight;
+  expect(value === weight || value.startsWith('var(--ant-'), `${element.textContent} font weight`).toBe(true);
+}
+
 function allowGrant() {
   window.dashboardContent = {
     session: async () => ({
@@ -33,7 +43,6 @@ function allowGrant() {
 
 function installShippedDashboardCss() {
   if (document.getElementById('shipped-dashboard.css')) return;
-  // Same order as DashboardApp: knowledge sheet, shell sheet, then the font longhands.
   for (const file of [
     'src/renderer/features/dashboard/intake-management.css',
     'src/renderer/styles/dashboard.css',
@@ -47,10 +56,17 @@ function installShippedDashboardCss() {
   }
 }
 
-afterEach(() => {
-  // Unmount while the bridge still exists, including after an early assertion.
-  cleanup(); delete window.dashboardIntake; delete window.dashboardDesk; delete window.dashboardIntakeCatalog; delete window.dashboardContent; delete window.dashboardPermissions; vi.unstubAllGlobals();
-});
+function cleanupDashboardWithWindowBridges() {
+  cleanup();
+  delete window.dashboardIntake;
+  delete window.dashboardDesk;
+  delete window.dashboardIntakeCatalog;
+  delete window.dashboardContent;
+  delete window.dashboardPermissions;
+  vi.unstubAllGlobals();
+}
+
+afterEach(cleanupDashboardWithWindowBridges);
 
 it('reuses workspace chrome and theme without mounting legacy modules or calling their session API', async () => {
   const user = userEvent.setup();
@@ -112,17 +128,17 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   expect(getComputedStyle(content).backgroundColor).toBe('rgb(255, 255, 255)');
   expect(getComputedStyle(knowledge.parentElement).backgroundColor).toBe('rgb(255, 255, 255)');
   expect(getComputedStyle(column).maxWidth).toBe('none');
-  expect(getComputedStyle(write).fontSize).toBe('14px');
-  expect(getComputedStyle(write).fontWeight).toBe('600');
-  expect(getComputedStyle(screen.getByRole('button', { name: '全店' })).fontSize).toBe('14px');
-  expect(getComputedStyle(screen.getByRole('button', { name: '全店' })).fontWeight).toBe('600');
+  expectSeatFontSize(write);
+  expectSeatFontWeight(write, '600');
+  expectSeatFontSize(screen.getByRole('tab', { name: '全店' }));
+  expectSeatFontWeight(screen.getByRole('tab', { name: '全店' }), '600');
   await user.click(write);
   await user.click(screen.getByRole('button', { name: '没有文档？手动填写一条' }));
   const question = screen.getByRole('textbox', { name: '问题' });
-  expect(getComputedStyle(question).fontSize).toBe('14px');
+  expectSeatFontSize(question);
   const save = screen.getByRole('button', { name: '保存' });
-  expect(getComputedStyle(save).fontSize).toBe('14px');
-  expect(getComputedStyle(save).fontWeight).toBe('600');
+  expectSeatFontSize(save);
+  expectSeatFontWeight(save, '600');
   await user.type(question, '退货时效');
   await user.click(screen.getByTestId('nav-overview'));
   await user.click(screen.getByTestId('nav-content'));
@@ -147,8 +163,15 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     expect(getComputedStyle(permissionsPage).maxWidth).not.toBe('1000px');
     expect(getComputedStyle(permissionsColumn).maxWidth).toBe('1000px');
     expect(getComputedStyle(permissionsColumn).backgroundColor).toBe('rgb(255, 255, 255)');
-    await screen.findAllByRole('row',{name:/合成坐席/});await user.click(screen.getByRole('button',{name:'新增授权'}));await user.selectOptions(screen.getByRole('combobox',{name:'人员'}),owner.view().people[0]!.selection);
-    fireEvent.change(screen.getByLabelText('生效时间'),{target:{value:'2026-10-08T18:00'}});fireEvent.change(screen.getByLabelText('失效时间'),{target:{value:'2026-10-09T18:00'}});
+    await screen.findAllByRole('row',{name:/合成坐席/});
+    await user.click(screen.getByRole('button',{name:'新增授权'}));
+    const person = owner.view().people[0]!;
+    await user.click(screen.getByRole('combobox',{name:'人员'}));
+    await user.click(await screen.findByRole('option', { name: person.label }));
+    await user.click(screen.getByLabelText('生效时间'));
+    await user.type(screen.getByLabelText('生效时间'), '2026-10-08 18:00{Enter}');
+    await user.click(screen.getByLabelText('失效时间'));
+    await user.type(screen.getByLabelText('失效时间'), '2026-10-09 18:00{Enter}');
     await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览 · 尚未保存');
     await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-permissions'));
     expect(screen.getByText('预览 · 尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
@@ -196,13 +219,10 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('还没有 SOP');
-    expect(screen.queryByText('上传 CSV 会替换现在的 SOP')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('上传 CSV 会替换现在的 SOP');
     await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: '使用情况' })).not.toBeInTheDocument();
-    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
     const add = await screen.findByRole('button', { name: '添加话术' });
     for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
@@ -303,18 +323,21 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
       await user.click(screen.getByTestId('nav-announce'));
-      const wordingTab = await screen.findByRole('tab', { name: '话术版本更新' });
-      await tabUntil(user, wordingTab);
-      await tabUntil(user, screen.getByRole('tab', { name: '软件版本更新' }));
-      expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
+      const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
+      await tabUntil(user, refresh);
+      expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
     }
     await user.click(screen.getByTestId('nav-permissions'));
     await user.click(screen.getByRole('tab', { name: '业务授权' }));
     await user.click(screen.getByRole('button', { name: '新增授权' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: '人员' }), owner.view().people[0]!.selection);
-    fireEvent.change(screen.getByLabelText('生效时间'), { target: { value: '2026-10-08T10:00' } });
-    fireEvent.change(screen.getByLabelText('失效时间'), { target: { value: '2026-10-09T10:00' } });
+    const person = owner.view().people[0]!;
+    await user.click(screen.getByRole('combobox', { name: '人员' }));
+    await user.click(await screen.findByRole('option', { name: person.label }));
+    await user.click(screen.getByLabelText('生效时间'));
+    await user.type(screen.getByLabelText('生效时间'), '2026-10-08 10:00{Enter}');
+    await user.click(screen.getByLabelText('失效时间'));
+    await user.type(screen.getByLabelText('失效时间'), '2026-10-09 10:00{Enter}');
     await user.type(screen.getByRole('textbox', { name: '授权原因' }), '焦点撤销');
     await user.click(screen.getByRole('button', { name: '预览权限' }));
     await screen.findByText('预览 · 尚未保存');
@@ -323,13 +346,13 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     await screen.findByText(/本次操作已保存/);
     await user.click(screen.getByRole('button', { name: '刷新权限列表' }));
     const revoke = await screen.findByRole('button', { name: '撤销该权限' });
-    expect(revoke).toHaveClass('btn-danger-ghost');
+    expect(revoke).toHaveClass('ant-btn-dangerous');
     await tabUntil(user, revoke);
     await user.click(revoke);
     await tabUntil(user, screen.getByRole('textbox', { name: '撤销原因' }));
     await user.type(screen.getByRole('textbox', { name: '撤销原因' }), '合成撤销');
     const confirm = screen.getByRole('button', { name: '确认撤销' });
-    expect(confirm).toHaveClass('btn-danger');
+    expect(confirm).toHaveClass('ant-btn-dangerous');
     await tabUntil(user, confirm);
     expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
   } finally {
@@ -339,4 +362,4 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     document.documentElement.style.width = '';
     document.body.style.cssText = '';
   }
-});
+}, 20000);

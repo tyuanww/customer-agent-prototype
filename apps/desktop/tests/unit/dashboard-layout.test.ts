@@ -517,19 +517,17 @@ describe('dashboard layout contract', () => {
     expect(css).toContain("[data-nav-phase='collapsed'] .dashboard-brand-copy");
   });
 
-  it('binds six-page wording and announce to the published catalog', () => {
+  it('binds the intake wording and announce pages to the published catalog', () => {
+    expect(app).toContain('<IntakeLibrary active={active === \'wording\' || active === \'announce\' ? active : null} />');
     expect(app).toContain('<WordingLibraryModule');
     expect(app).toContain('<AnnounceModule');
-    expect(app).not.toContain('IntakeLibrary');
   });
 
   it('keeps announce simulation local, transient, and timer-cleaned', () => {
-    // 四卡只读 announce 投影；条数/状态来自发布 summary，不读 hydrate 目录。
     expect(announce).toContain('dashboardAnnounce');
     expect(announce).not.toContain('dashboardWording');
     expect(announce).not.toContain('MOCK_SOFTWARE_VERSIONS');
     expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
-    // 窗口可见时的 10s poll 必须自清，不能泄漏。
     if (announce.includes('window.setInterval')) {
       expect(announce).toContain('window.clearInterval');
     }
@@ -541,7 +539,7 @@ describe('dashboard layout contract', () => {
     expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');
     expect(sopLibrary).toContain('data-testid="sop-library-empty"');
-    expect(sopLibrary).toContain('还没有 SOP');
+    expect(sopLibrary).toContain('请先登录后再管理 SOP');
     expect(sopLibrary).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB/);
     expect(sopLibrary).not.toContain('publishDraft');
   });
@@ -581,7 +579,6 @@ describe('dashboard layout contract', () => {
     expect(publishBoxRule).toContain('flex: 0 1 auto');
     expect(publishBoxRule).toContain('max-width: 42%');
     expect(publishBoxRule).toContain('min-width: min-content');
-    // The reason/feedback line wraps instead of widening the header.
     const publishNoteRule = css.match(/\.content-publish-note\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(publishNoteRule).toContain('overflow-wrap: anywhere');
     expect(publishNoteRule).toContain('max-width: 100%');
@@ -605,10 +602,7 @@ describe('dashboard layout contract', () => {
     expect(previewRule).toContain('overflow: auto');
     expect(previewRule).toContain('margin: 0');
 
-    // The shell's base rule is `.dashboard-shell button.dash-reset` (0,2,1). A bare
-    // `.content-action-row .dash-reset` (0,2,0) loses to it, silently leaving the
-    // cancel button at 38px. Keep the shell prefix so the 40px CTA height holds.
-    expect(css).toContain('.dashboard-shell .content-action-row .dash-reset');
+    expect(css, 'shell prefix keeps the 40px reset above the 38px base rule').toContain('.dashboard-shell .content-action-row .dash-reset');
     expect(css).toContain('.dashboard-shell .content-upload-controls .dash-reset');
     expect(css).not.toMatch(/^\.content-action-row \.dash-reset\s*\{/m);
 
@@ -617,7 +611,6 @@ describe('dashboard layout contract', () => {
     expect(content).toContain('data-testid="content-replace-row"');
     expect(content).toContain('将替换');
 
-    // The decorative two-step wizard is gone, markup and CSS both.
     expect(css).not.toContain('.content-pipeline-steps');
     expect(content).not.toContain('content-pipeline-steps');
     expect(content).not.toContain('pipelineStepStatus');
