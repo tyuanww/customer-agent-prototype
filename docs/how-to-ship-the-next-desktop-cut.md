@@ -2,7 +2,9 @@
 
 发完一轮之后，下一轮按六条发布面分开做。合进 `main` 不会让坐席看到新包，也不会换杭州进程，也不会换线上话术。
 
-2026-10-18 这一轮的实测状态写在这里。根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.29`。GitHub Release `v0.3.29` 的三个 UNSIGNED 附件对应提交 `8b1bf7215f1a8b29301229107e61dbc2f09c799a`。下载页是 `v0.3.29`。应用内当前行是 `sw_0329_mac`。`main` 和杭州代码软链是 `8036766886799b052fcc690615671c2fb2b4006c`。公网 `https://agent-auth.jianghua.site/health` 在 2026-10-19 返回 `version` `0.3.29`。这个字符串来自杭州 `api.env` 的 `CUSTOMER_AGENT_BUILD_VERSION`。回滚软链是 `d66a9234f6c1de6ef45b16158523eb01e4580e91`。话术指针仍是 `rel_27`。`v0.3.27` 的三个附件没有被覆盖。已安装的 0.3.29 包不含 `8036766` 里的窗口标题修正。
+2026-10-19 仓库版本改成 `0.3.30`。根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.30`。GitHub Release 和下载页仍是 `v0.3.29`，三个 UNSIGNED 附件仍对应 `8b1bf72`。新包还没有发出。
+
+2026-10-18 已发布安装包的实测状态写在这里。当时根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.29`。GitHub Release `v0.3.29` 的三个 UNSIGNED 附件对应提交 `8b1bf7215f1a8b29301229107e61dbc2f09c799a`。下载页是 `v0.3.29`。应用内当前行是 `sw_0329_mac`。杭州代码软链是 `8036766886799b052fcc690615671c2fb2b4006c`。公网 `https://agent-auth.jianghua.site/health` 在 2026-10-19 返回 `version` `0.3.29`。这个字符串来自杭州 `api.env` 的 `CUSTOMER_AGENT_BUILD_VERSION`。回滚软链是 `d66a9234f6c1de6ef45b16158523eb01e4580e91`。话术指针仍是 `rel_27`。`v0.3.27` 的三个附件没有被覆盖。已安装的 0.3.29 包不含 `8036766` 里的窗口标题修正。
 
 ## How to 看现在跑的是哪一份
 
