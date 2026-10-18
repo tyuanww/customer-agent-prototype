@@ -35,3 +35,9 @@ electron-builder.env.*
 # gstack 的运行输出留在本机；仅跟踪产品版本清单定位，冻结验收证据放在 evidence/qa/。
 .gstack/*
 !.gstack/package-json-path
+
+# Local checkouts and agent debris. git add of a worktree path embeds that checkout.
+.worktrees/
+.pnpm-store/
+.context/
+.audit/
