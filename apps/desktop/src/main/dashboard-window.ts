@@ -44,10 +44,7 @@ export function createDashboardBrowserWindow(runningLine: string): BrowserWindow
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#16151a' : nativeChrome.backgroundColor,
     title,
     ...(icon ? { icon } : {}),
-    webPreferences: {
-      ...DASHBOARD_WEB_PREFERENCES,
-      additionalArguments: [`--running-line=${runningLine}`],
-    },
+    webPreferences: DASHBOARD_WEB_PREFERENCES,
   });
   win.setMenuBarVisibility(false);
   // The shared renderer document title is the overlay product name. Keep the

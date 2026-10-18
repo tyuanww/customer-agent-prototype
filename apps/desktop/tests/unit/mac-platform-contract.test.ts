@@ -227,6 +227,10 @@ describe('macOS distribution contract', () => {
           to: 'licenses/Electron-LICENSE.txt',
         },
         {
+          from: 'build/build-identity.json',
+          to: 'build-identity.json',
+        },
+        {
           from: 'node_modules/electron/dist/LICENSES.chromium.html',
           to: 'licenses/Chromium-LICENSES.html',
         },

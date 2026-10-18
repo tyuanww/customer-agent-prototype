@@ -6,6 +6,14 @@ export type RunningIdentity = Readonly<{
   point: RunningPoint;
 }>;
 
+export function runningPointFromResolvedSession(
+  profile: { readonly apiOrigin: string } | undefined,
+  packaged: boolean,
+): RunningPoint {
+  if (profile) return runningPointFromProfile(undefined, profile.apiOrigin);
+  return packaged ? 'offline' : 'unknown';
+}
+
 export function runningPointFromProfile(mode: string | undefined, apiOrigin: string | undefined): RunningPoint {
   if (mode === 'synthetic-offline') return 'offline';
   let hostname = '';

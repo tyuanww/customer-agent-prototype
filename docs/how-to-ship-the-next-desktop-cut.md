@@ -2,7 +2,11 @@
 
 发完一轮之后，下一轮按六条发布面分开做。合进 `main` 不会让坐席看到新包，也不会换杭州进程，也不会换线上话术。
 
-2026-10-18 这一轮的实测状态写在这里。根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.29`，提交是 `8b1bf7215f1a8b29301229107e61dbc2f09c799a`。GitHub Release `v0.3.29` 有三个 UNSIGNED 附件。下载页是 `v0.3.29`。应用内当前行是 `sw_0329_mac`。杭州没有换代码。公网健康检查在 2026-10-18 仍返回 `version` `0.3.28`。话术指针仍是 `rel_27`。`v0.3.27` 的三个附件没有被覆盖。
+2026-10-18 这一轮的实测状态写在这里。根目录 `VERSION` 和 `apps/desktop/package.json` 都是 `0.3.29`。GitHub Release `v0.3.29` 的三个 UNSIGNED 附件对应提交 `8b1bf7215f1a8b29301229107e61dbc2f09c799a`。下载页是 `v0.3.29`。应用内当前行是 `sw_0329_mac`。`main` 和杭州代码软链是 `d66a9234f6c1de6ef45b16158523eb01e4580e91`。公网 `https://agent-auth.jianghua.site/health` 在 2026-10-18 返回 `version` `0.3.29`。这个字符串来自杭州 `api.env` 的 `CUSTOMER_AGENT_BUILD_VERSION`。回滚软链是 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`。话术指针仍是 `rel_27`。`v0.3.27` 的三个附件没有被覆盖。已安装的 0.3.29 包不含 `d66a923` 里的窗口标题、`pnpm where` 和来源登记。
+
+## How to 看现在跑的是哪一份
+
+在仓库根目录运行 `pnpm where`。它打印三行。第一行是根目录 `VERSION`、当前提交前 7 位和分支。第二行读 Mac 上 `客服话术浮窗 Demo` 的 `synthetic-stack.json`，指向写成杭州、本机、离线或未知。文件损坏时写「读不了」，不会中断另外两行。第三行读本机未签名包或 `release/distribution` 里的 `build-identity.json`。印章只记录打包时的 `HEAD`。没有这份文件，或里面没有提交号时，版本号相同也不能当成同一次构建。工作台窗口标题用的是进程启动时已经解析的会话来源，不再另读一份磁盘 profile。这条命令只在这台 Mac 的仓库里用，不在杭州上跑。
 
 2026-10-17 上一轮的实测状态留在这里，方便对照。它不是现在的版本。根目录 `VERSION` 和 `apps/desktop/package.json` 当时都是 `0.3.28`。杭州代码软链是 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`。公网 `https://agent-auth.jianghua.site/health` 返回 `version` `0.3.28`。这个健康检查字符串来自 `api.env` 的 `CUSTOMER_AGENT_BUILD_VERSION`，不是根目录 `VERSION` 文件。话术指针仍是 `rel_27`。GitHub Release `v0.3.27` 的三个附件仍指向 `d09f7da354b1a72bc0e8f8126f6487c751fc99df`，不要覆盖。
 

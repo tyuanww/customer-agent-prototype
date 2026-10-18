@@ -86,6 +86,10 @@
       {
         "from": "node_modules/electron/dist/LICENSES.chromium.html",
         "to": "licenses/Chromium-LICENSES.html"
+      },
+      {
+        "from": "build/build-identity.json",
+        "to": "build-identity.json"
       }
     ],
     "asar": true,
@@ -124,12 +128,6 @@
         }
       ],
       "icon": "build/icon.icns",
-      "extraResources": [
-        {
-          "from": "build/build-identity.json",
-          "to": "build-identity.json"
-        }
-      ],
       "category": "public.app-category.business",
       "darkModeSupport": true,
       "minimumSystemVersion": "12.0",
