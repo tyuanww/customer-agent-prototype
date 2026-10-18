@@ -19,6 +19,12 @@ const WORDING_DOMAINS: readonly { id: DomainId; label: string }[] = [
   { id: 'aftersale', label: '售后流程' },
 ];
 
+const RISK_BADGE: Record<WordingEntry['risk'], string> = {
+  low: '风险低',
+  medium: '风险中',
+  high: '风险高',
+};
+
 function riskTone(risk: WordingEntry['risk']): 'ok' | 'warn' | 'danger' {
   if (risk === 'low') return 'ok';
   if (risk === 'medium') return 'warn';
@@ -181,7 +187,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
       expectedVersion: row.scriptVersion,
     }).then((result) => {
       setRetireConfirm(false);
-      setWriteMessage(result.ok ? `${OPS_LOOP_COPY.retirePending} ${result.mutationId}` : result.message);
+      setWriteMessage(result.ok ? OPS_LOOP_COPY.retirePending : result.message);
     }).catch(() => {
       setRetireConfirm(false);
       setWriteMessage(OPS_LOOP_COPY.unavailable);
@@ -343,7 +349,7 @@ export function WordingLibraryModule({ initialDomain, onDomainConsumed }: {
             <>
               <div className="dash-card-row">
                 <span className="dash-card-label" data-testid="wording-detail-owner">{selected.ownerRole}</span>
-                <StatusBadge label={`风险 ${selected.risk}`} tone={riskTone(selected.risk)} />
+                <StatusBadge label={RISK_BADGE[selected.risk]} tone={riskTone(selected.risk)} />
               </div>
               <h2>{selected.title}</h2>
               <p className="wording-preview">{selected.answerPreview}</p>

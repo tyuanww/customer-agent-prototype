@@ -24,7 +24,8 @@ function management(state: IntakeUploadView): IntakeManagementView {
     canConfirmSource: false, canPublish: false, canRevise: false, canCancel: false, review: null, workflowResult: null, pending: null, receipt: null, upload: state };
 }
 async function declare(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(screen.getByRole('combobox', { name: '整理责任人' }), 'self-handle');
+  await user.click(screen.getByRole('combobox', { name: '整理责任人' }));
+  await user.click(await screen.findByRole('option', { name: '合成整理人' }));
   await user.click(screen.getByRole('checkbox', { name: '实际改稿人 合成历史编辑' }));
   await user.click(screen.getByRole('checkbox', { name: '我已核对整理责任人及全部实际改稿人' }));
 }
@@ -48,7 +49,7 @@ it('preserves declarations on status reads but requires a fresh confirmation for
   rerender(<IntakeUpload view={structuredClone(view)} busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
   expect(screen.getByRole('button', { name: '上传并校验' })).toBeEnabled();
   rerender(<IntakeUpload view={{ ...view, draftRevision: 2 }} busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
-  expect(screen.getByRole('combobox', { name: '整理责任人' })).toHaveValue('');
+  expect(screen.getByRole('combobox', { name: '整理责任人' }).closest('.ant-select')).not.toHaveTextContent('合成整理人');
   expect(screen.getByRole('checkbox', { name: '实际改稿人 合成历史编辑' })).not.toBeChecked();
   expect(screen.getByRole('button', { name: '上传并校验' })).toBeDisabled();
 });
@@ -73,7 +74,7 @@ it('shows CSV record coordinates and offers a pathless choice for either support
     job: { state: 'failed', totalIssues: 1, excludedSheetCount: 0, excludedMediaCount: 0,
       issues: [{ code: 'REQUIRED', message: '补齐必填内容后整批重新上传', location: { sheet: 'CSV', row: 3, column: 8 } }] } })}
     busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
-  expect(screen.getByText(/标准 CSV（UTF-8）或 Excel（XLSX）模板/)).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('整批校验未通过');
   expect(screen.getByText(/CSV 行号按记录计算/)).toBeInTheDocument();
   expect(screen.getByRole('cell', { name: '3 / 8' })).toBeInTheDocument();
   expect(screen.getByRole('region', { name: '资料校验结果' })).toHaveTextContent('本批尚未形成候选');
@@ -111,15 +112,15 @@ it('stops a pending upload through the management controller and ignores its lat
   await screen.findByRole('combobox', { name: '整理责任人' }); await declare(user);
   await user.click(screen.getByRole('button', { name: '上传并校验' }));
   await user.click(await screen.findByRole('button', { name: '停止本机等待' }));
-  await screen.findByText('提交结果待确认');
+  await screen.findByText(/提交结果待确认/);
   await waitFor(() => expect(screen.getByRole('button', { name: '按原请求重试上传' })).toBeEnabled());
   await user.click(screen.getByRole('button', { name: '按原请求重试上传' }));
-  await screen.findByText('正在上传文件');
+  await screen.findByText(/正在上传文件/);
   await act(async () => resolve({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
-  expect(screen.queryByText('校验通过，候选已形成')).not.toBeInTheDocument();
+  expect(screen.queryByText(/校验通过，候选已形成/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '刷新上传权限' })).toBeDisabled();
   await act(async () => finishRetry({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
-  expect(await screen.findByText('校验通过，候选已形成')).toBeInTheDocument();
+  expect(await screen.findByText(/校验通过，候选已形成/)).toBeInTheDocument();
   expect(command.mock.calls.map(([c]) => c.action)).toEqual(['list', 'upload-submit', 'upload-stop', 'upload-retry']);
 });
 it('protects an already opened candidate from a new native file selection while allowing report reads', async () => {
@@ -175,7 +176,7 @@ it('re-reads Main after an upload IPC failure and preserves declarations only in
   await act(async () => fail());
   await screen.findByRole('alert');
   expect(current).toHaveBeenCalled();
-  expect(screen.getByRole('combobox', { name: '整理责任人' })).toHaveValue('self-handle');
+  expect(screen.getByRole('combobox', { name: '整理责任人' }).closest('.ant-select')).toHaveTextContent('合成整理人');
   expect(screen.getByRole('checkbox', { name: '我已核对整理责任人及全部实际改稿人' })).toBeChecked();
 });
 it('can refresh permissions without discarding an uncertain upload or requiring a new login', async () => {

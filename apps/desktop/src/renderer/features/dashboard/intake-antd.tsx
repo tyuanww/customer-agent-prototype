@@ -2,7 +2,7 @@ import { ConfigProvider, theme as antdTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, useState, type ReactNode } from 'react';
 
-const fontFamily = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Segoe UI", sans-serif';
+export const DASHBOARD_FONT_FAMILY = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Segoe UI", sans-serif';
 
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = ((query: string) => ({
@@ -37,11 +37,11 @@ function useDashboardMode(): 'light' | 'dark' {
   return mode;
 }
 
-/** Ant Design skinned to DESIGN.md. Native select and datetime stay, because
- * the desk tests fill them as real comboboxes and check their surface color. */
+/** Ant Design skin for the whole workbench. Font, ink, radius, control height,
+ * and table density live here. Pages replace their own selects as they move. */
 export function IntakeAntdTheme({ children }: { children: ReactNode }) {
   const dark = useDashboardMode() === 'dark';
-  return <ConfigProvider locale={zhCN} theme={{
+  return <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }} theme={{
     algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     token: {
       colorPrimary: '#6f4cc3',
@@ -50,7 +50,9 @@ export function IntakeAntdTheme({ children }: { children: ReactNode }) {
       colorWarning: dark ? '#e2b465' : '#97620b',
       colorError: dark ? '#f28b8b' : '#b84040',
       colorText: dark ? '#f5f3f7' : '#24212a',
-      colorTextSecondary: dark ? '#aaa4b1' : '#6e6878',
+      colorTextSecondary: dark ? '#d4d0dc' : '#6e6878',
+      colorTextDescription: dark ? '#d4d0dc' : '#6e6878',
+      colorLink: dark ? '#c4b5fd' : '#6f4cc3',
       colorBorder: dark ? '#8f8798' : '#8e8797',
       colorBgContainer: dark ? '#1c1b20' : '#ffffff',
       colorBgElevated: dark ? '#1c1b20' : '#ffffff',
@@ -59,9 +61,10 @@ export function IntakeAntdTheme({ children }: { children: ReactNode }) {
       colorErrorBg: dark ? '#351f25' : '#fbf1f1',
       colorErrorBorder: dark ? '#68404a' : '#e5c7c7',
       borderRadius: 8,
-      fontFamily,
+      fontFamily: DASHBOARD_FONT_FAMILY,
       fontSize: 14,
       controlHeight: 38,
+      motion: false,
       boxShadow: 'none',
       boxShadowSecondary: 'none',
       boxShadowTertiary: 'none',
@@ -75,6 +78,14 @@ export function IntakeAntdTheme({ children }: { children: ReactNode }) {
         defaultBg: dark ? '#1c1b20' : '#ffffff',
         defaultColor: dark ? '#f5f3f7' : '#24212a',
         defaultBorderColor: dark ? '#8f8798' : '#8e8797',
+      },
+      Table: {
+        headerBg: 'transparent',
+        headerColor: dark ? '#aaa4b1' : '#6b6878',
+        headerSplitColor: dark ? '#2e2c36' : '#ecebf1',
+        borderColor: dark ? '#2e2c36' : '#ecebf1',
+        cellPaddingBlock: 12,
+        cellPaddingInline: 12,
       },
     },
   }}>{children}</ConfigProvider>;

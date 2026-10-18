@@ -10,7 +10,9 @@ export default defineConfig({
     // unsigned package only ships out/** plus package.json.
     // `source` keeps retrieval-core on its TypeScript entry so packaging does
     // not need a separate dist build before electron-vite.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core'] })],
+    // dayjs subpath imports omit the .js extension. Electron's ESM loader
+    // rejects them when the main bundle leaves dayjs external.
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', 'dayjs'] })],
     resolve: {
       conditions: ['source'],
     },

@@ -68,6 +68,8 @@ describe('intake post actions', () => {
     expect(intakePostStatusForGrants([])).toEqual({ post: null, status: '未授权' });
     expect(intakePostStatusForGrants([{ action: 'rollback', revoked: false }])).toEqual({ post: null, status: '已授权' });
     expect(intakePostStatusForGrants([...live, ...live])).toEqual({ post: '客服', status: '已授权' });
+    expect(intakePostStatusForGrants([{ action: 'query', revoked: false, expiresAt: '2020-01-01T00:00:00.000Z' }])).toEqual({ post: '客服', status: '已过期' });
+    expect(intakePostStatusForGrants([{ action: 'query', revoked: false, expiresAt: '2099-01-01T00:00:00.000Z' }])).toEqual({ post: '客服', status: '已授权' });
   });
 
   it('does not import a UI runtime', () => {

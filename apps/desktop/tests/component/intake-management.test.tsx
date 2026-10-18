@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -21,20 +22,39 @@ function setup() {
   const user = userEvent.setup();
   return { data, main, command, user, listeners, confirmation };
 }
+async function choose(user: ReturnType<typeof userEvent.setup>, name: string, option: string) {
+  await user.click(screen.getByRole('combobox', { name }));
+  await user.click(await screen.findByRole('option', { name: option }));
+}
+it('loads after a development remount instead of sticking on 会话待确认', async () => {
+  const f = setup();
+  let release!: (value: { ok: true; view: ReturnType<ContentIntakeManagement['view']> }) => void;
+  const firstRead = new Promise<{ ok: true; view: ReturnType<ContentIntakeManagement['view']> }>((resolve) => { release = resolve; });
+  window.dashboardIntake!.command = vi.fn(async (command) => (
+    command.action === 'list' ? firstRead : { ok: true as const, view: f.main.view() }
+  ));
+  try {
+    render(<StrictMode><IntakeManagement /></StrictMode>);
+    await act(async () => { release({ ok: true, view: f.main.view() }); });
+    expect(await screen.findByText('合成审核员')).toBeInTheDocument();
+    expect(screen.queryByText('会话待确认')).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
 it('requires explicit human checks and blocks submitting an older saved judgment after editing it', async () => {
   const f = setup(); f.data.candidate.sourceEvidenceVersion = 1; render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
     await f.user.click(await screen.findByRole('button', { name: '冻结本次抽样' }));
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
     const submit = await screen.findByRole('button', { name: '提交本轮人工检查' });
     expect(submit).toBeDisabled();
-    const choice = screen.getByRole('combobox', { name: '检查结论 合成洁面 1' });
-    await f.user.selectOptions(choice, 'pass'); await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
+    expect(screen.getByRole('heading', { name: /合成洁面 1/ })).toBeInTheDocument();
+    expect(screen.queryByText('faq-0')).not.toBeInTheDocument();
+    await choose(f.user, '检查结论 合成洁面 1', '无缺陷'); await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
     await waitFor(() => expect(submit).toBeEnabled());
-    await f.user.selectOptions(choice, 'defect');
+    await choose(f.user, '检查结论 合成洁面 1', '有缺陷');
     expect(submit).toBeDisabled();
     await f.user.type(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' }), '合成缺陷');
     await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
@@ -45,20 +65,21 @@ it('requires explicit human checks and blocks submitting an older saved judgment
 it('rejects an invalidation read that arrives after a newer session notification', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await screen.findByRole('button', { name: /source-a/ });
+    await screen.findByRole('button', { name: /第 1 版/ });
     const old = f.main.view(); let resolve!: (r: Awaited<ReturnType<NonNullable<typeof window.dashboardIntake>['current']>>) => void;
     window.dashboardIntake!.current = vi.fn().mockImplementationOnce(() => new Promise(r => { resolve = r; })).mockResolvedValue({ ok: false, code: 'UNAUTHORIZED', message: '未登录', view: null });
     await act(async () => { f.listeners.forEach(f => f()); f.listeners.forEach(f => f()); });
     await act(async () => resolve({ ok: true, view: old }));
-    expect(screen.queryByRole('button', { name: /source-a/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /第 1 版/ })).not.toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
 it('submits source and publication human intent through Main and displays the published release', async () => {
   const f = setup(); f.data.status.state = 'passed'; render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
-    await f.user.selectOptions(screen.getByRole('combobox', { name: '来源版本类型' }), 'integer');
+    expect(screen.getByRole('combobox', { name: '来源版本类型' }).tagName).not.toBe('SELECT');
+    await choose(f.user, '来源版本类型', '递增整数');
     await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), '7');
     await f.user.type(screen.getByRole('textbox', { name: '来源确认说明' }), '人工核对合成导出');
     await f.user.click(screen.getByRole('button', { name: '确认来源版本' }));
@@ -77,7 +98,13 @@ it('submits source and publication human intent through Main and displays the pu
     f.confirmation.mockResolvedValue(true);
     await f.user.click(screen.getByRole('button', { name: '发布当前候选' }));
     expect(f.command).toHaveBeenCalledWith({ action: 'publish', title: '合成 FAQ 更新', summary: '新增已核对条目' });
-    await screen.findByText(/当前候选已发布：rel_2/);
+    const published = await screen.findByText('已发布。');
+    expect(published.closest('[role="status"]')?.textContent?.startsWith('已发布。')).toBe(true);
+    const publishedTitle = within(screen.getByRole('region', { name: '当前候选' })).getByRole('heading', { name: /第 1 版/ });
+    expect(publishedTitle.textContent).toContain('第');
+    expect(publishedTitle.textContent).toContain('版');
+    expect(publishedTitle.textContent).not.toMatch(/source-/);
+    expect(publishedTitle.textContent).not.toContain('rel_2');
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '发布标题', hidden: true })).toHaveValue('');
   } finally { f.main.dispose(); }
@@ -86,7 +113,7 @@ it('legacy candidates show read-only history and cannot bypass an explicit revis
   const f = setup(); f.data.historicalReview(); f.data.candidate.sourceEvidenceVersion = 1; f.data.candidate.state = 'ready';
   render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     expect(screen.queryByRole('button', { name: '发起组织审批' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '刷新审批结果' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
@@ -99,12 +126,12 @@ it('legacy candidates show read-only history and cannot bypass an explicit revis
 it('keeps an unsaved quality judgment isolated from source and publication mutations', async () => {
   const f = setup(); f.data.candidate.sourceEvidenceVersion = 1; render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
     await f.user.click(screen.getByRole('button', { name: '冻结本次抽样' }));
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
-    await f.user.selectOptions(screen.getByRole('combobox', { name: '检查结论 合成洁面 1' }), 'pass');
+    await choose(f.user, '检查结论 合成洁面 1', '无缺陷');
     expect(screen.queryByRole('textbox', { name: '来源版本' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
     await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
@@ -114,7 +141,7 @@ it('keeps an unsaved quality judgment isolated from source and publication mutat
 it('keeps source entry on its own step and opens quality only after confirmation', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
     await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'source-v2');
     await f.user.type(screen.getByRole('textbox', { name: '来源确认说明' }), '人工核对来源');
@@ -130,7 +157,7 @@ it('keeps source entry on its own step and opens quality only after confirmation
 it('preserves unsubmitted source input across a status read and clears that form when confirmation leaves the current step', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
     await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'export-v1');
     await f.user.type(screen.getByRole('textbox', { name: '来源确认说明' }), '人工确认');
@@ -152,7 +179,7 @@ it('explains candidate readiness and risk without exposing internal codes or pro
   f.data.candidate.readinessReasons = ['SOURCE_CONFIRMATION_REQUIRED', 'AWAITING_APPROVAL', 'constructor', 'NEW_REASON'];
   render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     expect(screen.getByText(/待确认来源版本 \/ 待组织审批通过 \/ 还有待核验事项，请刷新候选状态/)).toBeInTheDocument();
     expect(screen.queryByText(/SOURCE_CONFIRMATION_REQUIRED|constructor|NEW_REASON/)).not.toBeInTheDocument();
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
@@ -162,19 +189,27 @@ it('explains candidate readiness and risk without exposing internal codes or pro
 
 it.each(['revise', 'cancel-candidate'] as const)('requires explicit confirmation and a clean form before %s', async action => {
   const f = setup(); f.data.state.importer = true; f.data.state.canceller = true;
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   render(<IntakeManagement />);
-  try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
-    const label = action === 'revise' ? '修订当前候选' : '取消当前候选';
-    await f.user.click(screen.getByRole('button', { name: label }));
-    expect(f.command.mock.calls.some(([c]) => c.action === action)).toBe(false);
-    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    try {
+      await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
+      const label = action === 'revise' ? '修订当前候选' : '取消当前候选';
+      await f.user.click(screen.getByRole('button', { name: label }));
+      expect(f.command.mock.calls.some(([c]) => c.action === action)).toBe(false);
+      const sentence = action === 'revise'
+        ? '修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。'
+        : '确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。';
+      const note = await screen.findByText(sentence);
+      await f.user.click(within(note.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '取消' }));
+      await f.user.click(screen.getByRole('button', { name: '查看材料' }));
     const source = screen.getByRole('textbox', { name: '来源版本' });
     await f.user.type(source, '未提交来源');
     expect(screen.getByRole('button', { name: label })).toBeDisabled();
-    await f.user.clear(source); confirm.mockReturnValue(true);
+    await f.user.clear(source);
     await f.user.click(screen.getByRole('button', { name: label }));
+    const again = await screen.findByText(action === 'revise'
+      ? '修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。'
+      : '确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。');
+    await f.user.click(within(again.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '确认' }));
     expect(f.command).toHaveBeenLastCalledWith({ action });
     if (action === 'revise') {
       await screen.findByText(/正在准备修订：candidate-a · 原版本 1/);
@@ -186,13 +221,13 @@ it.each(['revise', 'cancel-candidate'] as const)('requires explicit confirmation
       expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
     }
-  } finally { confirm.mockRestore(); f.main.dispose(); }
+  } finally { f.main.dispose(); }
 });
 
 it('guides the existing material, source, quality and publish flow without issuing commands on navigation', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     const guide = () => within(screen.getByRole('region', { name: '当前步骤' }));
     expect(guide().getByRole('heading', { name: '1. 核对材料' })).toBeInTheDocument();
     const target = within(screen.getByRole('region', { name: '当前候选' })).getByRole('heading', { name: '1. 核对材料' });
@@ -211,7 +246,7 @@ it('guides the existing material, source, quality and publish flow without issui
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
     await f.user.click(screen.getByRole('button', { name: '冻结本次抽样' }));
     await f.user.click(screen.getByRole('button', { name: '读取初检' }));
-    await f.user.selectOptions(screen.getByRole('combobox', { name: '检查结论 合成洁面 1' }), 'pass');
+    await choose(f.user, '检查结论 合成洁面 1', '无缺陷');
     await f.user.click(screen.getByRole('button', { name: '保存本条判断' }));
     expect(guide().getByRole('heading', { name: '完成本轮质量检查' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
@@ -227,7 +262,7 @@ it('guides the existing material, source, quality and publish flow without issui
 it('directs an unknown publication to its original recovery and removes the guide on access invalidation', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     const pendingView = { ...f.main.view(), pending: { action: 'publish' as const, operationId: 'synthetic-unknown', recovery: 'receipt' as const } };
     window.dashboardIntake!.current = async () => ({ ok: true, view: pendingView });
     await act(async () => { f.listeners.forEach(listener => listener()); });
@@ -249,18 +284,15 @@ it('directs an unknown publication to its original recovery and removes the guid
 it('leaves rollback input, an active plan and unknown recovery with the rollback panel instead of candidate guidance', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
-    await f.user.click(await screen.findByRole('button', { name: /source-a/ }));
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
     const view = f.main.view(); view.rollback.available = true;
     if (view.selected) view.selected.state = 'published';
     for (const row of view.candidates) row.candidate.state = 'published';
     window.dashboardIntake!.current = async () => ({ ok: true, view: structuredClone(view) });
     await act(async () => { f.listeners.forEach(listener => listener()); });
     expect(screen.getByRole('region', { name: '当前步骤' })).toBeInTheDocument();
-    const input = screen.getByRole('combobox', { name: '当前发布版本' });
-    await f.user.type(input, 'rel_2');
-    expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
-    await f.user.clear(input);
-    expect(screen.getByRole('region', { name: '当前步骤' })).toBeInTheDocument();
+    expect(screen.getByText('请先读取当前版和上一版。')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /发布编号/ })).not.toBeInTheDocument();
     view.rollback.impact = { baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', scopes: [], requiresCorrectiveCandidate: false };
     await act(async () => { f.listeners.forEach(listener => listener()); });
     expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
@@ -279,23 +311,34 @@ it('opens the materials page as a candidate table and expands only the current s
   try {
     expect(await screen.findByRole('columnheader', { name: '名称' })).toBeInTheDocument();
     expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['名称', '范围', '状态', '下一步', '时间']);
-    expect(screen.getByRole('cell', { name: 'shop-a · 产品' })).toBeInTheDocument();
-    expect(within(screen.getByRole('group', { name: '候选筛选' })).getAllByRole('button').map(button => button.textContent)).toEqual(['待我处理', '已发布', '全部']);
-    expect(screen.getByRole('button', { name: '选择 CSV / Excel 文件' })).not.toHaveClass('dash-action-primary');
-    await f.user.click(screen.getByRole('button', { name: 'source-a' }));
+    expect(screen.getByRole('cell', { name: '该店铺 · 产品' })).toBeInTheDocument();
+    const candidateFilter = screen.getByRole('radiogroup', { name: '候选筛选' });
+    expect(within(candidateFilter).getByRole('radio', { name: '待我处理' })).toBeChecked();
+    expect(within(candidateFilter).getByRole('radio', { name: '已发布' })).toBeInTheDocument();
+    expect(within(candidateFilter).getByRole('radio', { name: '全部' })).toBeInTheDocument();
+    const candidateName = screen.getByRole('button', { name: /第 1 版/ });
+    expect(candidateName.textContent).toContain('第');
+    expect(candidateName.textContent).toContain('版');
+    expect(candidateName.textContent).not.toMatch(/source-/);
+    expect(candidateName.textContent).not.toMatch(/shop-/);
+    expect(screen.getByRole('button', { name: '选择 CSV / Excel 文件' })).not.toHaveClass('ant-btn-primary');
+    await f.user.click(candidateName);
     const open = within(screen.getByRole('region', { name: '当前候选' }));
+    expect(open.getByRole('heading', { name: /第 1 版/ }).textContent).not.toMatch(/source-/);
     expect(open.getByRole('heading', { name: '1. 核对材料' })).toBeInTheDocument();
     expect(open.queryByRole('heading', { name: '2. 确认来源' })).not.toBeInTheDocument();
     expect(open.queryByRole('heading', { name: '3. 质量检查' })).not.toBeInTheDocument();
     expect(open.queryByRole('heading', { name: '4. 确认发布' })).not.toBeInTheDocument();
-    expect(open.getAllByRole('button').filter(button => button.classList.contains('dash-action-primary')).map(button => button.textContent)).toEqual(['查看材料']);
+    expect(open.getAllByRole('button').filter(button => button.classList.contains('ant-btn-primary')).map(button => button.textContent)).toEqual(['查看材料']);
     await f.user.click(open.getByRole('button', { name: '查看材料' }));
     expect(open.queryByRole('heading', { name: '1. 核对材料' })).not.toBeInTheDocument();
     expect(open.getByRole('heading', { name: '2. 确认来源' })).toBeInTheDocument();
     expect(open.getByRole('heading', { name: '合成洁面' })).toBeInTheDocument();
+    expect(open.queryByText('faq-a')).not.toBeInTheDocument();
+    expect(open.getByRole('combobox', { name: '来源版本类型' }).tagName).not.toBe('SELECT');
     expect(open.getByText(/风险等级：常规内容/)).toBeInTheDocument();
-    expect(open.getByRole('button', { name: '下一页材料' })).not.toHaveClass('dash-action-primary');
-    expect(open.getAllByRole('button').filter(button => button.classList.contains('dash-action-primary')).map(button => button.textContent)).toEqual(['确认来源版本']);
+    expect(open.getByRole('button', { name: '下一页材料' })).not.toHaveClass('ant-btn-primary');
+    expect(open.getAllByRole('button').filter(button => button.classList.contains('ant-btn-primary')).map(button => button.textContent)).toEqual(['确认来源版本']);
   } finally { f.main.dispose(); }
 });
 
@@ -305,10 +348,10 @@ it('keeps rollback on the published row', async () => {
     await screen.findByRole('columnheader', { name: '名称' });
     expect(screen.getByText('这个筛选下没有候选。')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '回退' })).not.toBeInTheDocument();
-    await f.user.click(screen.getByRole('button', { name: '已发布' }));
+    await f.user.click(within(screen.getByRole('radiogroup', { name: '候选筛选' })).getByText('已发布'));
     expect(screen.getByRole('button', { name: '回退' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'source-a' })).toBeInTheDocument();
-    await f.user.click(screen.getByRole('button', { name: 'source-a' }));
+    expect(screen.getByRole('button', { name: /第 1 版/ })).toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: /第 1 版/ }));
     const named = await screen.findByRole('region', { name: '已发布目录纠正回退' });
     expect(named).not.toHaveFocus();
     await f.user.click(screen.getByRole('button', { name: '回退' }));
@@ -321,7 +364,7 @@ it('shows publishing as its status and does not offer a material check', async (
   f.data.candidate.state = 'publishing';
   render(<IntakeManagement />);
   try {
-    expect(await screen.findByRole('cell', { name: 'shop-a · 产品' })).toBeInTheDocument();
+    expect(await screen.findByRole('cell', { name: '该店铺 · 产品' })).toBeInTheDocument();
     expect(screen.getAllByRole('cell', { name: '发布中' })).toHaveLength(2);
     expect(screen.queryByRole('cell', { name: '核对材料' })).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: '质量检查' })).not.toBeInTheDocument();

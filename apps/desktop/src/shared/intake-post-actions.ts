@@ -48,11 +48,21 @@ export function intakePostsCoveredBy(scopeActions: readonly unknown[]): IntakePo
 
 export type IntakeGrantPostStatus = {
   post: IntakePost | null;
-  status: '未授权' | '已授权' | '已撤销';
+  status: '未授权' | '已授权' | '已撤销' | '已过期';
 };
 
-export function intakePostStatusForGrants(grants: readonly { action: unknown; revoked: boolean }[]): IntakeGrantPostStatus {
-  const live = grants.filter(grant => !grant.revoked);
-  if (live.length === 0) return { post: null, status: grants.length > 0 ? '已撤销' : '未授权' };
+function grantStillCovers(expiresAt: string | null | undefined, now: number): boolean {
+  if (!expiresAt) return true;
+  const expires = Date.parse(expiresAt);
+  return !Number.isFinite(expires) || expires > now;
+}
+
+export function intakePostStatusForGrants(grants: readonly { action: unknown; revoked: boolean; expiresAt?: string | null }[], now = Date.now()): IntakeGrantPostStatus {
+  const live = grants.filter(grant => !grant.revoked && grantStillCovers(grant.expiresAt, now));
+  if (live.length === 0) {
+    const expired = grants.filter(grant => !grant.revoked && !grantStillCovers(grant.expiresAt, now));
+    if (expired.length > 0) return { post: intakePostForActions([...new Set(expired.map(grant => grant.action))]), status: '已过期' };
+    return { post: null, status: grants.length > 0 ? '已撤销' : '未授权' };
+  }
   return { post: intakePostForActions([...new Set(live.map(grant => grant.action))]), status: '已授权' };
 }

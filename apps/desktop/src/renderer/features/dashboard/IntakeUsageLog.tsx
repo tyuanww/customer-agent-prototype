@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import { Button, Empty, Input, Segmented, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import {
+  isUsageLogResult,
   type UsageLogExportPreview,
   type UsageLogResult,
   type UsageLogRow,
@@ -18,6 +20,16 @@ const RESULT_LABEL: Readonly<Record<UsageLogResult, string>> = { copied: '已复
 
 type Load = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'failed' } | { kind: 'ready' };
 
+function LogButton(props: ButtonProps) {
+  return <Button {...props} autoInsertSpace={false} />;
+}
+
+/** rc-table copies aria-label onto the table. antd's prop type omits it. */
+function UsageTable(props: TableProps<UsageLogRow> & { 'aria-label': string }) {
+  return createElement(Table as ComponentType<typeof props>, props);
+}
+
+/** 系统同步页的使用情况。通道缺失时不画表。 */
 export function IntakeUsageLog() {
   const [result, setResult] = useState<UsageLogResult | ''>('');
   const [query, setQuery] = useState('');
@@ -65,9 +77,9 @@ export function IntakeUsageLog() {
     setNotice('');
     void api.previewExport().then(setPreview).catch(() => setNotice('导出暂时不可用，请重试。'));
   };
-  const resultClass = (result: UsageLogRow['result']) => {
-    if (result === 'copied') return ' is-copied';
-    if (result === 'viewed') return ' is-viewed';
+  const resultClass = (value: UsageLogRow['result']) => {
+    if (value === 'copied') return ' is-copied';
+    if (value === 'viewed') return ' is-viewed';
     return '';
   };
   const confirmExport = async () => {
@@ -86,53 +98,66 @@ export function IntakeUsageLog() {
       setExporting(false);
     }
   };
+  const columns: TableColumnsType<UsageLogRow> = [
+    { title: '时间', dataIndex: 'askedAt', width: 108, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (askedAt: UsageLogRow['askedAt']) => <span className="mute">{formatShortTime(askedAt)}</span> },
+    { title: '坐席', dataIndex: 'agent', width: 84, ellipsis: true },
+    { title: '客户问题', dataIndex: 'question', ellipsis: true, render: (question: UsageLogRow['question']) => (question === null ? <span className="redact">已脱敏</span> : question) },
+    { title: '命中话术', key: 'script', ellipsis: true, render: (_value: unknown, row) => <>
+      {row.scriptTitle ?? <span className="mute">—</span>}
+      {row.snapshotStale ? <span className="stale" title="坐席当时用的是旧快照">旧快照</span> : null}
+    </> },
+    { title: '结果', dataIndex: 'result', width: 96, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (value: UsageLogRow['result']) => <span className={`res intake-result${resultClass(value)}`}>{RESULT_LABEL[value]}</span> },
+  ];
 
   return <section className="sec intake-usage-log" aria-label="使用情况">
     <div className="sec-head">
       <h2>使用情况</h2>
-      {canExport && load.kind === 'ready' ? <button type="button" className="btn" onClick={startExport}>导出训练样本</button> : null}
+      {canExport && load.kind === 'ready' ? <LogButton onClick={startExport}>导出使用记录</LogButton> : null}
     </div>
     {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageUnmounted}</p> : <>
       <div className="filters2" style={{ paddingLeft: 0, paddingRight: 0 }}>
-        <div className="seg" role="group" aria-label="结果">
-          {RESULT_FILTERS.map((item) => <button key={item.id || 'all'} type="button" aria-pressed={result === item.id}
-            onClick={() => setResult(item.id)}>{item.label}</button>)}
-        </div>
+        <Segmented
+          aria-label="结果"
+          value={result || 'all'}
+          options={RESULT_FILTERS.map((item) => ({ label: item.label, value: item.id || 'all' }))}
+          onChange={(value) => {
+            if (value === 'all') setResult('');
+            else if (isUsageLogResult(value)) setResult(value);
+          }}
+        />
         <span className="grow" />
-        <div className="search"><svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-          <input aria-label="搜索问题或坐席" placeholder="搜索问题或坐席" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <Input aria-label="搜索问题或坐席" placeholder="搜索问题或坐席" style={{ width: 220 }} value={query} onChange={(event) => setQuery(event.target.value)} />
       </div>
-      {preview ? <div className="funnel" role="alertdialog" aria-label="导出训练样本" style={{ marginTop: 0, marginBottom: 12 }}>
+      {preview ? <div className="funnel" role="alertdialog" aria-label="导出使用记录" style={{ marginTop: 0, marginBottom: 12 }}>
         {preview.ok ? <>
           <p className="fn-note" style={{ margin: '0 0 12px' }}>将导出 {preview.exportable} 条记录。已脱敏的 {preview.redacted} 条和未同意采集的 {preview.withoutConsent} 条不会导出，同一条只记一次。“已复制”不等于已发送，训练时请按此理解。</p>
           <div className="acts">
-            <button type="button" className="btn btn-sm" disabled={exporting} onClick={() => setPreview(null)}>取消</button>
-            <button type="button" className="btn btn-sm btn-primary" disabled={exporting || preview.exportable === 0} onClick={() => void confirmExport()}>导出 CSV</button>
+            <LogButton disabled={exporting} onClick={() => setPreview(null)}>取消</LogButton>
+            <LogButton type="primary" disabled={exporting || preview.exportable === 0} onClick={() => void confirmExport()}>导出 CSV</LogButton>
           </div>
         </> : <>
           <p className="fn-note" style={{ margin: '0 0 12px' }}>导出暂时不可用，请重试。</p>
-          <div className="acts"><button type="button" className="btn btn-sm" onClick={() => setPreview(null)}>关闭</button></div>
+          <div className="acts">
+            <LogButton onClick={() => setPreview(null)}>关闭</LogButton>
+            <LogButton type="primary" onClick={startExport}>重试</LogButton>
+          </div>
         </>}
       </div> : null}
       {notice ? <p role="status" className="hint">{notice}</p> : null}
-      {load.kind === 'failed' ? <p role="alert">{WORKBENCH_EMPTY.usageFailed}，请重试。
-        <button type="button" className="btn btn-sm" onClick={() => fetchPage(null, result, query.trim())}>重试</button></p> : null}
+      {load.kind === 'failed' ? <p role="alert">{WORKBENCH_EMPTY.usageFailed}<LogButton onClick={() => fetchPage(null, result, query.trim())}>重试</LogButton></p> : null}
       {load.kind === 'loading' ? <p role="status">正在读取…</p> : null}
-      {load.kind === 'ready' ? <table className="fixed intake-usage-table" aria-label="使用情况">
-        <colgroup><col style={{ width: 120 }} /><col style={{ width: 84 }} /><col /><col style={{ width: 200 }} /><col style={{ width: 104 }} /></colgroup>
-        <thead><tr><th>时间</th><th>坐席</th><th>客户问题</th><th>命中话术</th><th>结果</th></tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td colSpan={5} className="empty">{result === '' && query.trim() === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'}</td></tr> : rows.map((row) => <tr className="item" key={row.id}>
-            <td className="mute">{formatShortTime(row.askedAt)}</td>
-            <td>{row.agent}</td>
-            <td>{row.question === null ? <span className="redact">已脱敏</span> : row.question}</td>
-            <td>{row.scriptTitle ?? <span className="mute">—</span>}{row.snapshotStale ? <span className="stale" title="坐席当时用的是旧快照">旧快照</span> : null}</td>
-            <td><span className={`res intake-result${resultClass(row.result)}`}>{RESULT_LABEL[row.result]}</span></td>
-          </tr>)}
-        </tbody>
-      </table> : null}
+      {load.kind === 'ready' ? <UsageTable
+        aria-label="使用情况"
+        pagination={false}
+        tableLayout="fixed"
+        rowKey="id"
+        rowClassName={() => 'item'}
+        dataSource={rows}
+        columns={columns}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={result === '' && query.trim() === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'} /> }}
+      /> : null}
       {load.kind === 'ready' && next !== null ? <div className="pager">
-        <button type="button" className="btn btn-sm" disabled={moreBusy} onClick={() => fetchPage(next, result, query.trim())}>加载更多</button></div> : null}
+        <LogButton disabled={moreBusy} onClick={() => fetchPage(next, result, query.trim())}>加载更多</LogButton></div> : null}
       {load.kind === 'ready' ? <p className="hint" style={{ marginTop: 10 }}>“已复制”表示话术进了输入框，系统不知道最后是否发送。</p> : null}
     </>}
   </section>;

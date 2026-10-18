@@ -1,5 +1,4 @@
-/* Loaded after the dashboard shell so these longhands beat `font: inherit`
-   on buttons and fields. Sizes stay the knowledge-page spec. */
+/* The shell owns the font family. These rules only keep size and weight. */
 .dashboard-shell .desk-text-button,
 .dashboard-shell .desk-personas button,
 .dashboard-shell .desk-add,
@@ -7,7 +6,6 @@
 .dashboard-shell .desk-delete-cancel,
 .dashboard-shell .desk-delete-confirm,
 .dashboard-shell .desk-row-actions button {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
   font-weight: 500;
 }
@@ -22,7 +20,6 @@
 .dashboard-shell .desk-field select,
 .dashboard-shell .desk-tacit-field select,
 .dashboard-shell .desk-tacit-field textarea {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
 }
 .dashboard-shell .desk-save {

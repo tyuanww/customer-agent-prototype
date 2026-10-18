@@ -1,7 +1,11 @@
-import { Button, Card, Form } from 'antd';
+import { Button, Checkbox, Form, Modal, Select, Space, Table, type ButtonProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { IntakeUploadCommand, IntakeUploadView } from '@shared/content-intake-upload';
 
+function ActionButton(props: ButtonProps) {
+  return <Button autoInsertSpace={false} {...props} />;
+}
+const domainWord = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
 const phases: Record<IntakeUploadView['phase'], string> = {
   idle: '请选择资料来源', selected: '等待选择文件', choosing: '正在选择文件', confirming: '请确认实际参与人',
   uploading: '正在上传文件', receiving: '正在提交校验任务', parsing: '正在校验资料', failed: '整批校验未通过',
@@ -33,58 +37,59 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
   const declaring = !!view.file && view.canSubmit;
   const ready = !!preparer && editors.length > 0 && confirmed;
   return <section className="intake-upload" aria-label="上传 FAQ 资料">
-    <Card className="intake-job" variant="borderless">
-    <h2>上传 FAQ 资料</h2>
-    <p>使用当前来源对应的标准 CSV（UTF-8）或 Excel（XLSX）模板。缺少某行不会删除已发布资料；有阻断错误时，请整批修正后重新选择文件。</p>
+    <Space wrap className="intake-upload-row" size={8}>
+      <Select aria-label="上传来源" value={view.sourceSelection ?? undefined} virtual={false} style={{ width: 280 }}
+        placeholder="请选择有权维护的来源" disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
+        onChange={selection => { if (selection) apply({ action: 'upload-source', selection }); }}
+        options={view.sources.map(source => ({ value: source.selection, label: `${domainWord[source.domain]} · ${source.label}` }))} />
+      <ActionButton disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</ActionButton>
+      {(view.sourceSelection || view.canReset) && <ActionButton disabled={disabled || !view.canReset} onClick={() => {
+        const run = () => apply({ action: 'upload-reset' });
+        if (!view.file && !view.revisionOf) run();
+        else Modal.confirm({
+          title: '请确认',
+          content: '放弃本地上传准备？已经提交的服务端任务不会因此撤销，原候选也不会因此取消。',
+          okText: '确认',
+          cancelText: '取消',
+          okButtonProps: { autoInsertSpace: false },
+          cancelButtonProps: { autoInsertSpace: false },
+          onOk: run,
+          transitionName: '',
+          maskTransitionName: '',
+        });
+      }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</ActionButton>}
+      <span className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}{view.file ? ` · ${view.file.name}` : ''}</span>
+    </Space>
     {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId} · 原版本 {view.revisionOf.version}。
       请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、完成质量检查与发布确认。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
-    {!view.authorized && <p>当前没有可上传的来源，请核对登录身份与来源授权。</p>}
-    <div className="intake-fields"><Form.Item label="上传来源"><select aria-label="上传来源" value={view.sourceSelection ?? ''}
-      disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
-      onChange={event => { if (event.target.value) apply({ action: 'upload-source', selection: event.target.value }); }}>
-      <option value="">请选择有权维护的来源</option>
-      {view.sources.map(source => <option key={source.selection} value={source.selection}>{({product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'})[source.domain]} · {source.label}</option>)}
-    </select></Form.Item></div>
-    <p className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}</p>
-    <div className="intake-toolbar">
-      <button disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</button>
-      {(view.sourceSelection || view.canReset) && <button disabled={disabled || !view.canReset} onClick={() => {
-        if ((!view.file && !view.revisionOf) || window.confirm('放弃本地上传准备？已经提交的服务端任务不会因此撤销，原候选也不会因此取消。')) apply({ action: 'upload-reset' });
-      }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</button>}
-    </div>
-    {view.file && <p className="intake-file">已选择：<strong>{view.file.name}</strong> · {(view.file.bytes / 1024).toFixed(1)} KB</p>}
+    {!view.authorized && <p>请核对登录与来源授权。</p>}
     {view.notice && <p role="status">{view.notice}</p>}
     {declaring && <fieldset className="intake-fields" disabled={disabled}>
       <legend>确认整理责任人与全部实际改稿人</legend>
       <p>请选择实际参与人。本人制作也须显式勾选本人；列入声明不会授予其操作权限。</p>
-      <Form.Item label="整理责任人"><select aria-label="整理责任人" value={preparer} onChange={event => { setPreparer(event.target.value); setConfirmed(false); }}>
-        <option value="">请选择整理责任人</option>
-        {view.principals.map(person => <option key={person.selection} value={person.selection}>{person.displayLabel}{person.enabled ? '' : '（当前未启用）'}</option>)}
-      </select></Form.Item>
+      <Form.Item label="整理责任人"><Select aria-label="整理责任人" value={preparer || undefined} placeholder="请选择整理责任人" disabled={disabled} virtual={false}
+        onChange={value => { setPreparer(value); setConfirmed(false); }}
+        options={view.principals.map(person => ({ value: person.selection, label: `${person.displayLabel}${person.enabled ? '' : '（当前未启用）'}` }))} /></Form.Item>
       <div className="intake-contributors" role="group" aria-label="全部实际改稿人">
-        {view.principals.map(person => <label key={person.selection}>
-          <input type="checkbox" aria-label={`实际改稿人 ${person.displayLabel}`} checked={editors.includes(person.selection)} onChange={event => {
+        {view.principals.map(person => <Checkbox key={person.selection}
+          aria-label={`实际改稿人 ${person.displayLabel}`} checked={editors.includes(person.selection)} onChange={event => {
             setEditors(current => event.target.checked ? [...current, person.selection] : current.filter(value => value !== person.selection)); setConfirmed(false);
-          }} />
-          <span>{person.displayLabel}{!person.enabled && <small>（当前未启用，可记录历史参与）</small>}</span>
-        </label>)}
+          }}>{person.displayLabel}{!person.enabled && <small>（当前未启用，可记录历史参与）</small>}</Checkbox>)}
       </div>
-      <label className="intake-confirmation"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
-        <span>我已核对整理责任人及全部实际改稿人</span></label>
-      <Button type="primary" className="dash-action-primary" disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</Button>
+      <Checkbox className="intake-confirmation" checked={confirmed} onChange={event => setConfirmed(event.target.checked)}>我已核对整理责任人及全部实际改稿人</Checkbox>
+      <ActionButton type="primary" disabled={!ready} onClick={() => apply({ action: 'upload-submit', preparerSelection: preparer, editorSelections: editors, confirmed: true })}>上传并校验</ActionButton>
     </fieldset>}
     {view.pending && <div className="intake-notice" role="status">
       <p>{view.pending === 'upload' ? '文件上传' : '校验任务提交'}结果尚未确定。重试沿用原文件和原请求，不会换一个操作编号。</p>
-      <button disabled={disabled || !view.canRetry} onClick={() => apply({ action: 'upload-retry' })}>按原请求重试上传</button>
+      <ActionButton disabled={disabled || !view.canRetry} onClick={() => apply({ action: 'upload-retry' })}>按原请求重试上传</ActionButton>
     </div>}
     <div className="intake-toolbar">
-      {view.canStop && <button disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</button>}
-      {view.canRefresh && <button disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</button>}
-      {view.canSaveReport && <button disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</button>}
-      {view.canOpen && <button disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</button>}
+      {view.canStop && <ActionButton disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</ActionButton>}
+      {view.canRefresh && (!!view.file || !!view.job) && <ActionButton disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</ActionButton>}
+      {view.canSaveReport && <ActionButton disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</ActionButton>}
+      {view.canOpen && <ActionButton disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</ActionButton>}
     </div>
-    </Card>
     {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；形成候选后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">
       <h3>校验结果</h3>
@@ -92,11 +97,17 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       <p>共 {view.job.totalIssues} 个问题，当前显示 {view.job.issues.length} 个。{view.job.totalIssues > view.job.issues.length && '完整问题请保存错误报告查看。'}</p>
       <p>已排除 {view.job.excludedSheetCount} 张说明或非业务工作表、{view.job.excludedMediaCount} 个媒体对象。</p>
       {view.job.issues.some(issue => issue.location.sheet === 'CSV') && <p>CSV 行号按记录计算，表头为第 1 行；引号内换行不另计一行。</p>}
-      {view.job.issues.length > 0 && <div className="intake-issues"><table><caption>问题位置与修正建议</caption>
-        <thead><tr><th scope="col">工作表 / 数据集</th><th scope="col">行 / 列</th><th scope="col">问题与修正建议</th></tr></thead>
-        <tbody>{view.job.issues.map((issue, index) => <tr key={`${issue.location.sheet}-${issue.location.row}-${issue.location.column}-${index}`}>
-          <th scope="row">{issue.location.sheet}</th><td>{issue.location.row} / {issue.location.column}</td><td>{issue.message}</td>
-        </tr>)}</tbody></table></div>}
+      {view.job.issues.length > 0 && <Table
+        pagination={false}
+        size="small"
+        rowKey={(issue) => `${issue.location.sheet}-${issue.location.row}-${issue.location.column}-${issue.message}`}
+        dataSource={[...view.job.issues]}
+        columns={[
+          { title: '工作表', dataIndex: ['location', 'sheet'] },
+          { title: '行 / 列', key: 'cell', render: (_value, issue) => `${issue.location.row} / ${issue.location.column}` },
+          { title: '问题与修正建议', dataIndex: 'message' },
+        ]}
+      />}
       {view.job.state === 'failed' && <p>本批尚未形成候选。请按报告修正资料中的全部阻断问题，再重新选择 CSV / Excel 文件。</p>}
     </section>}
   </section>;

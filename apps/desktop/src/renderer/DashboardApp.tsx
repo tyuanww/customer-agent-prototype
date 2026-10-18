@@ -1,3 +1,4 @@
+import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
 import { IntakeOverview } from './features/dashboard/IntakeOverview';
 import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
@@ -31,6 +32,7 @@ import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
 import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
+import { DASHBOARD_FONT_FAMILY, IntakeAntdTheme } from './features/dashboard/intake-antd';
 import {
   DASHBOARD_WINDOW_TITLE,
   dashboardChromeCssVars,
@@ -100,18 +102,11 @@ function intakeSidebarItems(canOpenPermissions: boolean): readonly SidebarItem[]
   return items;
 }
 
-function intakeShellLine(value: unknown): { profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  if (record.ok !== true || record.profileMode !== 'synthetic-local' || record.contentIntake !== 'faq-v2') return null;
-  return { profileMode: 'synthetic-local', contentIntake: 'faq-v2' };
-}
-
 function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
   return id === 'publish' ? 'content' : id;
 }
 
-const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions', 'publish']);
+const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions', 'publish', 'materials']);
 
 function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
   const location = window.location;
@@ -121,6 +116,15 @@ function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
   if (page === 'permissions' && !canOpenPermissions) return 'overview';
   if (page && PREVIEW_PAGES.has(page as SidebarDestination)) return page as SidebarDestination;
   return 'overview';
+}
+
+function rememberPreviewPage(id: SidebarDestination) {
+  const location = window.location;
+  const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return;
+  const url = new URL(location.href);
+  url.searchParams.set('page', id);
+  history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
@@ -170,7 +174,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     return item;
   });
   const navItems = remoteSeat ? PRODUCT_REMOTE_NAV : intakeNav;
-  const [shellLine, setShellLine] = useState<{ profileMode: 'synthetic-local'; contentIntake: 'faq-v2' } | null>(null);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [jobKnown, setJobKnown] = useState(false);
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
@@ -205,15 +208,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     : sessionJob?.status === 'resolved'
       ? (sessionJob.rights.grant ? '' : OPS_LOOP_COPY.grantJob)
       : '请重新登录后再查看职务。';
-  useEffect(() => {
-    if (profile !== 'intake') return;
-    const read = window.dashboardIntake?.shellLine;
-    if (!read) return;
-    let active = true;
-    void read().then(value => { if (active) setShellLine(intakeShellLine(value)); })
-      .catch(() => { if (active) setShellLine(null); });
-    return () => { active = false; };
-  }, [profile]);
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   useEffect(() => {
     if (!remoteSeat) return;
@@ -288,8 +282,8 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     }).catch(() => undefined);
     return () => { live = false; };
   }, [profile]);
-  const selectNav = (id: SidebarDestination) => { setBackStack([]); setActive(id); };
-  const jump = (id: SidebarDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); };
+  const selectNav = (id: SidebarDestination) => { setBackStack([]); setActive(id); rememberPreviewPage(id); };
+  const jump = (id: SidebarDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); rememberPreviewPage(id); };
   const goBack = () => {
     const previous = backStack[backStack.length - 1];
     if (!previous) return;
@@ -1167,6 +1161,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   });
 
   return (
+    <IntakeAntdTheme>
     <div
       ref={shellRef}
       className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''}${profile === 'intake' ? ' is-intake' : ''}`}
@@ -1190,6 +1185,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         '--dash-nav-rail-width': `${collapsedSurface}px`,
         ...dashboardChromeCssVars(chromeMode),
         colorScheme: resolvedTheme,
+        fontFamily: DASHBOARD_FONT_FAMILY,
       } as CSSProperties}
     >
       <aside id="dashboard-sidebar" className="dashboard-nav" aria-label="工作台模块">
@@ -1382,7 +1378,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             {profile === 'intake' ? <p className="intake-crumb">
               {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
               <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
-            {profile === 'intake' && shellLine ? <p className="intake-shell-line" data-testid="intake-shell-line">{shellLine.profileMode} {shellLine.contentIntake}</p> : null}
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
               {profile === 'intake' ? '' : refreshLabel}
             </p>
@@ -1402,13 +1397,14 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         >
           {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
           {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
-          {active === 'wording' && (
+          {profile === 'intake' ? <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} /> : null}
+          {profile !== 'intake' && active === 'wording' && (
             <WordingLibraryModule
               initialDomain={wordingDomain}
               onDomainConsumed={() => setWordingDomain(undefined)}
             />
           )}
-          {active === 'announce' && <AnnounceModule onOpenDomain={openWordingDomain} />}
+          {profile !== 'intake' && active === 'announce' && <AnnounceModule onOpenDomain={openWordingDomain} />}
           {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
           {keepPublish || active === 'publish' ? (
             <div hidden={active !== 'publish'}>
@@ -1420,5 +1416,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         </main>
       </div>
     </div>
+    </IntakeAntdTheme>
   );
 }
