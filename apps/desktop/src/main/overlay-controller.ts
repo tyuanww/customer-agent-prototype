@@ -92,6 +92,7 @@ import {
   type DashboardWindowSnapshot,
 } from './dashboard-window';
 import { readRunningLine } from './read-running-identity';
+import type { RunningPoint } from '../shared/running-identity';
 import { GuardedScheduler } from './guarded-scheduler';
 import {
   createShutdownFence,
@@ -119,6 +120,7 @@ export type OverlayControllerOptions = {
   rendererDevServerUrl?: string;
   onDispose?: () => void;
   onDashboardShown?: () => void;
+  runningPoint?: RunningPoint;
 };
 
 export class OverlayController {
@@ -182,8 +184,10 @@ export class OverlayController {
   private readonly onDashboardShown?: () => void;
   readonly dashboardEnabled: boolean;
   readonly rendererDevServerUrl: string | undefined;
+  private readonly runningLine: string;
 
   constructor(options: OverlayControllerOptions = {}) {
+    this.runningLine = readRunningLine(options.runningPoint ?? 'unknown');
     this.dashboardEnabled = options.dashboardEnabled !== false;
     this.preloadPath = options.preloadPath ?? join(__dirname, '../preload/index.cjs');
     this.accelerator = options.accelerator ?? DEFAULT_GLOBAL_ACCELERATOR;
@@ -394,7 +398,7 @@ export class OverlayController {
       return this.revealDashboardWindow(this.dashboard);
     }
 
-    const win = createDashboardBrowserWindow(readRunningLine());
+    const win = createDashboardBrowserWindow(this.runningLine);
     lockRendererWindow(win);
     this.dashboard = win;
     win.on('closed', () => {

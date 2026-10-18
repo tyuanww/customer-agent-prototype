@@ -37,6 +37,7 @@ afterEach(() => {
 describe('Linux local-unsigned packaging contract', () => {
   it('keeps package:linux as local-unsigned only and isolated from Windows/mac output', () => {
     expect(packageJson.scripts['package:linux']).toBe('node scripts/package-linux.mjs local');
+    expect(packageLinuxSource).toContain('scripts/write-build-identity.mjs');
     expect(packageJson.scripts['package:linux:distribution']).toBeUndefined();
     expect(rootPackageJson.scripts['package:linux']).toBe(
       'pnpm --filter @customer-agent/desktop package:linux',
@@ -144,10 +145,11 @@ describe('Linux local-unsigned packaging contract', () => {
   it.each([
     { stage: 'Electron distribution preparation', failAtCommand: 1 },
     { stage: 'icon generation', failAtCommand: 2 },
-    { stage: 'contracts runtime build', failAtCommand: 3 },
-    { stage: 'renderer build', failAtCommand: 4 },
-    { stage: 'electron-builder', failAtCommand: 5 },
-    { stage: 'package verifier', failAtCommand: 6 },
+    { stage: 'build identity', failAtCommand: 3 },
+    { stage: 'contracts runtime build', failAtCommand: 4 },
+    { stage: 'renderer build', failAtCommand: 5 },
+    { stage: 'electron-builder', failAtCommand: 6 },
+    { stage: 'package verifier', failAtCommand: 7 },
   ])('cleans the temporary CA state when $stage fails and stops later commands', async ({
     failAtCommand,
   }) => {
@@ -171,7 +173,7 @@ describe('Linux local-unsigned packaging contract', () => {
     })).toThrow(failure);
     expect(cleanup).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledTimes(failAtCommand);
-    if (failAtCommand < 5) {
+    if (failAtCommand < 6) {
       expect(resetOutput).not.toHaveBeenCalled();
     } else {
       expect(resetOutput).toHaveBeenCalledOnce();
@@ -195,7 +197,7 @@ describe('Linux local-unsigned packaging contract', () => {
       },
     })).toThrow(failure);
     expect(cleanup).toHaveBeenCalledOnce();
-    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(runCommand).toHaveBeenCalledTimes(5);
   });
 
   it('stops packaging when the main bundle still imports workspace packages', async () => {
@@ -215,7 +217,7 @@ describe('Linux local-unsigned packaging contract', () => {
       },
     })).toThrow('workspace import');
     expect(resetOutput).not.toHaveBeenCalled();
-    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(runCommand).toHaveBeenCalledTimes(5);
     expect(cleanup).toHaveBeenCalledOnce();
   });
 });

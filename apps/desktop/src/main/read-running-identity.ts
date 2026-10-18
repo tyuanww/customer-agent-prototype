@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatRunningIdentity, runningPointFromProfile } from '../shared/running-identity';
+import { formatRunningIdentity, type RunningPoint } from '../shared/running-identity';
 
 type Stamp = { productVersion: string; gitSha: string };
 
@@ -16,7 +16,7 @@ function readStamp(): Stamp {
       }
     }
   } catch {
-    // Unpackaged development has no baked stamp.
+    // No baked stamp. Fall through to the app version.
   }
   try {
     const version = app.getVersion();
@@ -27,21 +27,6 @@ function readStamp(): Stamp {
   return { productVersion: 'dev', gitSha: 'dev' };
 }
 
-function readPoint(): ReturnType<typeof runningPointFromProfile> {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(join(app.getPath('userData'), 'synthetic-stack.json'), 'utf8'));
-    if (parsed !== null && typeof parsed === 'object') {
-      const mode = 'mode' in parsed && typeof parsed.mode === 'string' ? parsed.mode : undefined;
-      const apiOrigin = 'apiOrigin' in parsed && typeof parsed.apiOrigin === 'string' ? parsed.apiOrigin : undefined;
-      return runningPointFromProfile(mode, apiOrigin);
-    }
-  } catch {
-    // A missing profile is already a packaged startup error elsewhere.
-  }
-  return 'unknown';
-}
-
-export function readRunningLine(): string {
-  const stamp = readStamp();
-  return formatRunningIdentity({ ...stamp, point: readPoint() });
+export function readRunningLine(point: RunningPoint): string {
+  return formatRunningIdentity({ ...readStamp(), point });
 }
