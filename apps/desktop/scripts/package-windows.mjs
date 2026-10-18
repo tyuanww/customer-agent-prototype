@@ -73,6 +73,11 @@ export function packageWindows(
       env: buildEnvironment,
       stdio: 'inherit',
     });
+    runCommand(process.execPath, ['scripts/write-build-identity.mjs'], {
+      cwd: desktopRoot,
+      env: buildEnvironment,
+      stdio: 'inherit',
+    });
 
     // Clean Windows checkouts have no packages/contracts/dist; Vite cannot
     // bundle the workspace export until the runtime build exists.

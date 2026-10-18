@@ -6,6 +6,7 @@ release/
 /apps/desktop/build/icon.icns
 /apps/desktop/build/icon.png
 /apps/desktop/build/icon.ico
+/apps/desktop/build/build-identity.json
 # W0 检出可能保留迁移前的忽略产物；继续忽略并由 workspace clean 精确清除。
 /build/icon.icns
 /build/icon.png

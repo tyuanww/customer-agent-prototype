@@ -30,8 +30,6 @@ function checkedBinding(raw: Binding): Binding {
 /** Versioned registration/provenance attachment. Registered rows are the only source
  * of open_id; a refresh caller supplies only a principal ID. Rebinding an active
  * registration is forbidden: revoke (including fact invalidation), then register.
- * A scan follows the whole job-title catalog up to the observer page budget.
- * Job-title reads wait out the published per-minute limit and retry.
  */
 export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: Scope, transport: OrganizationTransport) {
   const scope = { tenantId: id(rawScope.tenantId), appId: id(rawScope.appId) };
@@ -103,7 +101,6 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
       const result = await createFeishuOrganizationObserver(scope, transport, now)({ ...scope, principalId,
         openId: binding.openId, expectedFactsVersion: Number(facts.current_facts_version) }, signal);
       if (!result.ok) throw new Error(result.reason);
-      // The registration must outlive the complete fact lease. Never extend it.
       if (Date.parse(binding.validUntil) < Date.parse(result.snapshot.validUntil)) throw rejected();
       return { kind: 'observation', binding, snapshot: result.snapshot, provenance: result.provenance };
     },

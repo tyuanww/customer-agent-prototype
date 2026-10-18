@@ -160,6 +160,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageJson.build.nsis.differentialPackage).toBe(false);
 
     expect(packageWindows).toContain('scripts/generate-app-icons.mjs');
+    expect(packageWindows).toContain('scripts/write-build-identity.mjs');
     expect(packageWindows).toContain("node_modules/electron-vite/bin/electron-vite.js");
     expect(packageWindows).toContain("typescript/bin/tsc");
     expect(packageWindows).toContain('tsconfig.build.json');
@@ -324,10 +325,11 @@ describe('Windows local-unsigned packaging contract', () => {
   it.each([
     { stage: 'Electron distribution preparation', failAtCommand: 1 },
     { stage: 'icon generation', failAtCommand: 2 },
-    { stage: 'contracts runtime build', failAtCommand: 3 },
-    { stage: 'renderer build', failAtCommand: 4 },
-    { stage: 'electron-builder', failAtCommand: 5 },
-    { stage: 'package verifier', failAtCommand: 6 },
+    { stage: 'build identity', failAtCommand: 3 },
+    { stage: 'contracts runtime build', failAtCommand: 4 },
+    { stage: 'renderer build', failAtCommand: 5 },
+    { stage: 'electron-builder', failAtCommand: 6 },
+    { stage: 'package verifier', failAtCommand: 7 },
   ])('cleans the temporary CA state when $stage fails and stops later commands', async ({
     failAtCommand,
   }) => {
@@ -373,12 +375,12 @@ describe('Windows local-unsigned packaging contract', () => {
 
     expect(cleanup).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledTimes(failAtCommand);
-    if (failAtCommand < 5) {
+    if (failAtCommand < 6) {
       expect(resetOutput).not.toHaveBeenCalled();
     } else {
       expect(resetOutput).toHaveBeenCalledOnce();
     }
-    if (failAtCommand < 6) {
+    if (failAtCommand < 7) {
       expect(runCommand.mock.calls.some(([, args]) =>
         args.includes('scripts/verify-windows-package.mjs'))).toBe(false);
     }
@@ -419,7 +421,7 @@ describe('Windows local-unsigned packaging contract', () => {
     })).toThrow(failure);
 
     expect(cleanup).toHaveBeenCalledOnce();
-    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(runCommand).toHaveBeenCalledTimes(5);
   });
 
   it('stops packaging when the main bundle still imports workspace packages', async () => {
@@ -443,7 +445,7 @@ describe('Windows local-unsigned packaging contract', () => {
       },
     })).toThrow('workspace import');
     expect(resetOutput).not.toHaveBeenCalled();
-    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(runCommand).toHaveBeenCalledTimes(5);
     expect(cleanup).toHaveBeenCalledOnce();
   });
 

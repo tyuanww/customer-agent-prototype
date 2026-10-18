@@ -33,7 +33,6 @@ declare global {
     dashboardSopWorkbook?: { open(): Promise<SopWorkbookOpenReply> };
     loginWindow?: LoginWindowApi;
     sopWindow?: SopWindowApi;
-    runningLine?: string;
   }
 }
 

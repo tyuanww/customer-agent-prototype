@@ -26,6 +26,7 @@ import { createUsageJournal } from './usage-journal';
 import { registerSopWorkbookIpc } from './sop-workbook-ipc';
 import { registerDashboardOpsLoopIpc } from './dashboard-ops-loop-ipc';
 import { bundledOfflineProfilePath, resolveProductProfile } from './product-runtime-config';
+import { runningPointFromResolvedSession } from '../shared/running-identity';
 import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
@@ -215,6 +216,7 @@ if (!gotLock) {
       dashboardEnabled: true,
       fence: shuttingDown,
       rendererDevServerUrl,
+      runningPoint: runningPointFromResolvedSession(productProfile, app.isPackaged),
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
       onDispose: () => sopController?.destroy(),
       onDashboardShown: () => sopController?.hideRememberingProgress(),

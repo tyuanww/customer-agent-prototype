@@ -4,14 +4,9 @@ type Queryable = {
   query: <T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]) => Promise<QueryResult<T>>;
 };
 
-/** Wording domains already registered for this tenant. SOP stays legacy. */
 export const ADMITTED_WORDING_DOMAINS = ['aftersale', 'campaign', 'presale', 'product'] as const;
 
-/**
- * Promote existing legacy wording sources to v2-preview.
- * One mode_version step satisfies source_scope_guard. This writes no catalog,
- * candidate, lineage, or release row, and it does not read another database.
- */
+/** One mode_version step satisfies source_scope_guard. */
 export async function admitLegacyWordingSources(
   client: Queryable,
   scope: { tenantId: string; appId: string },

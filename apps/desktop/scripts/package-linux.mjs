@@ -74,6 +74,11 @@ export function packageLinux(
       env: buildEnvironment,
       stdio: 'inherit',
     });
+    runCommand(process.execPath, ['scripts/write-build-identity.mjs'], {
+      cwd: desktopRoot,
+      env: buildEnvironment,
+      stdio: 'inherit',
+    });
     runCommand(
       process.execPath,
       [typescriptCompiler, '-p', 'tsconfig.build.json'],
