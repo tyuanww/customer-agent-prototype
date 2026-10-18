@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ITERATION_COPY,
+  iterationMatterLabel,
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
 import {
@@ -92,8 +93,8 @@ function asModuleTask(task: DashboardIterationTask): IterationTask {
     resolutionNote: task.resolutionNote,
     owner: task.assigneeRole && task.assigneeRole.length > 0 ? task.assigneeRole : '未指派',
     evidenceCount: sampleCount,
-    title: scriptId ? `话术不准 · ${scriptId}` : task.clusterKey,
-    detail: scriptId ? `稿 ${scriptId} · 样本 ${sampleCount} 次` : task.signalId,
+    title: scriptId ? `话术不准 · ${scriptId}` : iterationMatterLabel(task.clusterKey),
+    detail: scriptId ? `稿 ${scriptId} · 样本 ${sampleCount} 次` : iterationMatterLabel(task.clusterKey),
     nextStep: '不自动改写 Answer。关闭待办不等于已发布。',
     createdAt: task.createdAt,
   };
@@ -101,7 +102,6 @@ function asModuleTask(task: DashboardIterationTask): IterationTask {
 
 export function IterationModule() {
   const [liveCapable] = useState(() => Boolean(window.dashboardIteration));
-  // 无 dashboardIteration 时保持合成演练；有该 API 时绝不回落到 DEMO 5 条。
   const [tasks, setTasks] = useState<readonly IterationTask[]>(() => (liveCapable ? [] : data.tasks));
   const [serverVersions, setServerVersions] = useState<Record<string, number>>(() => (
     liveCapable ? {} : initialServerVersions()
@@ -188,7 +188,6 @@ export function IterationModule() {
       ),
     [cause, status, tasks],
   );
-  // 详情独立于筛选：横幅点选后即使筛掉了该行，详情仍跟随选中项。
   const selected = tasks.find((task) => task.taskId === selectedId) ?? visible[0];
   const p0Open = listOpenP0IterationTasks(tasks);
   const inaccuracyCounts = useMemo(() => aggregateInaccuracyTodoCounts(tasks), [tasks]);
@@ -202,7 +201,6 @@ export function IterationModule() {
   function selectTask(taskId: string) {
     const task = tasks.find((item) => item.taskId === taskId);
     if (!task) return;
-    // 横幅只列 P0 / open，可能落在当前筛选之外；放宽筛选让被选中的那行留在队列里可见。
     if ((status !== 'all' && statusFacetOf(task.status) !== status) || (cause !== 'all' && task.cause !== cause)) {
       setStatus('all');
       setCause('all');
@@ -512,7 +510,7 @@ export function IterationModule() {
                 </p>
               ) : null}
               <p className="dash-footnote" data-testid="iteration-detail-meta">
-                聚类键 {selected.clusterKey} · 建议话术 {selected.suggestedScriptIds.join(' / ') || '暂无'} ·
+                {iterationMatterLabel(selected.clusterKey)} · 建议话术 {selected.suggestedScriptIds.join(' / ') || '暂无'} ·
                 样本 {selected.sampleQueryIds.length} {live ? '条查询' : '条脱敏合成查询'}
               </p>
 

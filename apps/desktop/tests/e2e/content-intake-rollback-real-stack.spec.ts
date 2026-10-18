@@ -85,7 +85,7 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     const rollback = dashboard.getByRole('region', { name: '已发布目录纠正回退' });
-    await dashboard.getByRole('button', { name: '已发布', exact: true }).click();
+    await dashboard.getByRole('radiogroup', { name: '候选筛选', exact: true }).getByText('已发布', { exact: true }).click();
     await dashboard.getByRole('button', { name: '回退', exact: true }).first().click();
     await expect(rollback).toBeVisible();
     await rollback.getByLabel('当前发布版本', { exact: true }).fill(base);

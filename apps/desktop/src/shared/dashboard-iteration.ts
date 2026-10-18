@@ -13,6 +13,27 @@ export const ITERATION_COPY = Object.freeze({
   missing: '指定待办不存在',
 });
 
+const PLATFORM_LABEL: Readonly<Record<string, string>> = Object.freeze({
+  douyin: '抖音',
+  qianniu: '千牛',
+  all: '全部平台',
+});
+
+export function iterationMatterLabel(clusterKey: string): string {
+  const [kind, ...rest] = clusterKey.split(':');
+  if (kind === 'no_hit' && rest.length >= 3) {
+    const type = rest[0] ?? '';
+    const ref = rest[1] ?? '';
+    const platform = rest.slice(2).join(':');
+    const place = type === 'none' || ref === 'storewide' ? '全店' : ref;
+    const channel = PLATFORM_LABEL[platform] ?? '';
+    return channel.length > 0 ? `${channel}${place}没有命中话术` : `${place}没有命中话术`;
+  }
+  if (kind === 'top1_skipped') return '没有采用排在第一的话术';
+  if (kind === 'stale') return '有话术已过期';
+  return '待处理事项';
+}
+
 const ITERATION_FAILURE_CODES = [
   'UNAUTHORIZED',
   'VALIDATION',

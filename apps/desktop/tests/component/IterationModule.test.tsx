@@ -259,7 +259,7 @@ describe('IterationModule live list', () => {
     expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
     expect(screen.getByTestId('iteration-filter-status')).toHaveTextContent('项待办');
     expect(screen.getByTestId('iteration-detail')).toHaveTextContent('未指派');
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('top1_skipped:shipping');
+    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('没有采用排在第一的话术');
 
     await user.click(screen.getByTestId('iteration-itask-ranking-001'));
     await user.click(screen.getByTestId('iteration-start'));

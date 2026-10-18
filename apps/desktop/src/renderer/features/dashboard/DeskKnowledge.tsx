@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState, type ComponentType } from 'react';
+import { Button, Empty, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import {
   DESK_CATEGORIES,
   type DeskCommand,
+  type DeskItemView,
   type DeskView,
+  type Validity,
 } from '@shared/desk-knowledge';
+import { formatShortTime } from './intake-time';
+import { IntakeAntdTheme } from './intake-antd';
+import { SeatDateTime } from './seat-date-time';
 import './intake-management.css';
 import './workbench-v9.css';
 
@@ -54,6 +60,51 @@ const EMPTY: DeskView = {
   items: [], delivered: [], tacit: [], revision: 0, notice: null, persistence: 'ok',
 };
 
+const VALIDITY_CHOICES: { label: string; value: Validity }[] = [
+  { label: '长期生效', value: 'always' },
+  { label: '不生效', value: 'inactive' },
+  { label: '定时生效', value: 'scheduled' },
+];
+
+const COMMAND_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function instantToLocalInput(value: string): string {
+  if (!COMMAND_INSTANT.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}T${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+}
+
+function localInputToInstant(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  const instant = parsed.toISOString();
+  return COMMAND_INSTANT.test(instant) ? instant : undefined;
+}
+
+function isValidity(value: string | number): value is Validity {
+  return VALIDITY_CHOICES.some((choice) => choice.value === value);
+}
+
+function DeskButton(props: ButtonProps) {
+  return <Button {...props} autoInsertSpace={false} />;
+}
+
+function KnowledgeEmpty({ description }: { description: string }) {
+  return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
+}
+
+/** rc-table copies aria-label onto the table. antd's prop type omits it. */
+function KnowledgeTable<RecordType extends object>(props: TableProps<RecordType> & { 'aria-label': string }) {
+  return createElement(Table as ComponentType<typeof props>, props);
+}
+
 /** Operator view edits one persona. A seat only sees knowledge that is already
  * effective for that persona, including the shared shop set. */
 export function DeskKnowledge({
@@ -72,12 +123,13 @@ export function DeskKnowledge({
   const [addMode, setAddMode] = useState<'upload' | 'manual'>('upload');
   const [csv, setCsv] = useState<CsvPreview | null>(null);
   const [confirmImport, setConfirmImport] = useState(false);
+  const closeWriting = () => { setWriting(false); setConfirmImport(false); };
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('product');
   const [customCategory, setCustomCategory] = useState('');
   const [text, setText] = useState('');
-  const [validity, setValidity] = useState('always');
+  const [validity, setValidity] = useState<Validity>('always');
   const [validFrom, setValidFrom] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const consumedDraft = useRef<string | null>(null);
@@ -129,47 +181,71 @@ export function DeskKnowledge({
     return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>知识库还不能在这里用。</p></div></section>;
   }
   const operator = view.role === 'operator';
-  const cards = view.role === null ? null : view.items;
-  const rows = !cards || cards.length === 0
-    ? <tr><td colSpan={5} className="desk-empty">{operator ? '还没有知识。' : '还没有生效知识。'}</td></tr>
-    : cards.map((item) => <tr key={item.id}>
-      <td>{item.name}</td>
-      <td><span className="desk-body" title={item.body}>{item.body}</span></td>
-      <td><span className="state"><i className={`dot${item.statusLabel === '生效中' ? ' ok' : item.statusLabel === '待生效' ? ' wait' : ''}`} />{item.statusLabel}</span></td>
-      <td>{item.updatedAt.slice(0, 16).replace('T', ' ')}</td>
-      <td>{operator ? <div className="acts">
+  const emptyCopy = view.role === null
+    ? (view.signedIn ? '正在读取知识库。' : '请先登录。')
+    : (operator ? '还没有知识。' : '还没有生效知识。');
+  const columns: TableColumnsType<DeskItemView> = [
+    { title: '话术名称', dataIndex: 'name', key: 'name', ellipsis: true },
+    { title: '话术内容', dataIndex: 'body', key: 'body', ellipsis: true, render: (body: string) => <span className="desk-body" title={body}>{body}</span> },
+    {
+      title: '状态', dataIndex: 'statusLabel', key: 'status', width: 96,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (label: string) => <span className="state"><i className={`dot${label === '生效中' ? ' ok' : label === '待生效' ? ' wait' : ''}`} />{label}</span>,
+    },
+    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 120, render: (value: string) => formatShortTime(value) },
+    {
+      title: '操作', key: 'actions', width: 188,
+      render: (_value, item) => operator ? <div className="acts">
         {item.validity !== 'always'
-          ? <button type="button" className="link" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'always' })}>改为长期生效</button>
-          : <button type="button" className="link" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'inactive' })}>改为不生效</button>}
-        {item.parseState !== 'ok' ? <button type="button" className="link" disabled={busy} onClick={() => void apply({ action: 'retry', id: item.id })}>重试</button> : null}
-        <button type="button" className="link danger" disabled={busy} onClick={() => setPendingDelete(item.id)}>删除</button>
-      </div> : null}</td>
-    </tr>);
-  return <section className="desk-knowledge wb9" aria-label="知识库">
+          ? <DeskButton type="link" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'always' })}>改为长期生效</DeskButton>
+          : <DeskButton type="link" disabled={busy} onClick={() => void apply({ action: 'set-validity', id: item.id, validity: 'inactive' })}>改为不生效</DeskButton>}
+        {item.parseState !== 'ok' ? <DeskButton type="link" disabled={busy} onClick={() => void apply({ action: 'retry', id: item.id })}>重试</DeskButton> : null}
+        <DeskButton type="link" danger disabled={busy} onClick={() => setPendingDelete(item.id)}>删除</DeskButton>
+      </div> : null,
+    },
+  ];
+  return <IntakeAntdTheme><section className="desk-knowledge wb9" aria-label="知识库">
     <div className="desk-column">
       <h1 className="desk-sr">知识库</h1>
       <div className="tabbar">
-        <div className="tabs" role="group" aria-label="人设">
-          {view.personas.map((persona) => <button key={persona.id} type="button" className="tab" aria-pressed={persona.id === view.selectedPersonaId} disabled={busy}
-            onClick={() => void apply({ action: 'select-persona', personaId: persona.id })}>{persona.name}</button>)}
+        <div className="tabs" role="tablist" aria-label="人设">
+          {view.personas.map((persona, index) => <DeskButton
+            key={persona.id}
+            type="text"
+            role="tab"
+            id={`desk-persona-${persona.id}`}
+            className="tab"
+            aria-selected={persona.id === view.selectedPersonaId}
+            tabIndex={persona.id === view.selectedPersonaId ? 0 : -1}
+            disabled={busy}
+            onClick={() => void apply({ action: 'select-persona', personaId: persona.id })}
+            onKeyDown={(event) => {
+              const next = event.key === 'ArrowRight' ? (index + 1) % view.personas.length
+                : event.key === 'ArrowLeft' ? (index + view.personas.length - 1) % view.personas.length
+                : null;
+              if (next === null) return;
+              event.preventDefault();
+              const id = view.personas[next]!.id;
+              void apply({ action: 'select-persona', personaId: id });
+              document.getElementById(`desk-persona-${id}`)?.focus();
+            }}
+          >{persona.name}</DeskButton>)}
         </div>
-        {operator ? <button type="button" className="btn btn-primary desk-add" onClick={() => { setAddMode('upload'); setCsv(null); setConfirmImport(false); setWriting(true); }}>添加话术</button> : null}
+        {operator ? <DeskButton type="primary" onClick={() => { setAddMode('upload'); setCsv(null); setConfirmImport(false); setWriting(true); }}>添加话术</DeskButton> : null}
       </div>
       {message ? <p role="status">{message}</p> : null}
       {view.notice && view.notice !== message ? <p role="status">{view.notice}</p> : null}
-      <table className="desk-table" aria-label="当前人设知识">
-        <thead><tr><th>话术名称</th><th>话术内容</th><th>状态</th><th>最后更新时间</th><th>操作</th></tr></thead>
-        <tbody>
-          {view.role === null
-            ? (!settled || message ? null : <tr><td colSpan={5} className="desk-empty">{view.signedIn ? '正在读取知识库。' : '请先登录。'}</td></tr>)
-            : rows}
-        </tbody>
-      </table>
+      {view.role === null && (!settled || message) ? null : <KnowledgeTable<DeskItemView>
+        aria-label="当前人设知识"
+        pagination={false}
+        rowKey="id"
+        tableLayout="fixed"
+        dataSource={view.items}
+        columns={columns}
+        locale={{ emptyText: <KnowledgeEmpty description={emptyCopy} /> }}
+      />}
     </div>
-    {operator && writing ? <div className="mask on" onClick={(event) => { if (event.target === event.currentTarget) setWriting(false); }}>
-      <div className="dialog wide" role="dialog" aria-modal="true" aria-labelledby="desk-write-title">
-        <header><h3 id="desk-write-title">添加话术</h3>
-          <button type="button" className="icon-btn" aria-label="关闭" onClick={() => setWriting(false)}><svg className="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button></header>
+    <Modal open={operator && writing} title="添加话术" width={520} footer={null} destroyOnHidden maskClosable transitionName="" maskTransitionName="" onCancel={closeWriting}>
         {addMode === 'upload' ? <>
           {!csv ? <label className="drop" tabIndex={0} onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
             event.preventDefault();
@@ -193,61 +269,77 @@ export function DeskKnowledge({
           </label> : <div className="file-card">
             <div className="file-row"><svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4v13H7z" /><path d="M14 3.5v4h4" /></svg>
               <div><b>{csv.fileName}</b><span className="hint">{formatSize(csv.size)}</span></div>
-              <button type="button" className="link" onClick={() => setCsv(null)}>移除</button></div>
+              <DeskButton type="text" onClick={() => setCsv(null)}>移除</DeskButton></div>
             <div className="result">识别到 <span className="ok">{csv.count} 条话术</span>。导入后状态是未生效。</div>
-            {csv.count > 0 ? <table className="mini"><thead><tr><th>问题</th><th>分类</th></tr></thead>
-              <tbody>{csv.sample.map(([question, category], index) => <tr key={index}><td>{question || '—'}</td><td>{category || '—'}</td></tr>)}</tbody></table> : null}
+            {csv.count > 0 ? <KnowledgeTable<{ key: number; question: string; category: string }>
+              aria-label="导入预览"
+              pagination={false}
+              size="small"
+              rowKey="key"
+              dataSource={csv.sample.map(([question, sampleCategory], index) => ({ key: index, question: question || '—', category: sampleCategory || '—' }))}
+              columns={[{ title: '问题', dataIndex: 'question' }, { title: '分类', dataIndex: 'category' }]}
+            /> : null}
             {csv.count > 3 ? <p className="hint" style={{ margin: '6px 0 0' }}>仅显示前 3 条</p> : null}
           </div>}
-          <p className="hint alt"><button type="button" className="link" onClick={() => { setAddMode('manual'); setCsv(null); }}>没有文档？手动填写一条</button></p>
-          <footer><button type="button" className="btn" onClick={() => setWriting(false)}>取消</button>
-            <button type="button" className="btn btn-primary" disabled={busy || !csv || csv.count === 0} onClick={() => setConfirmImport(true)}>{csv ? `导入 ${csv.count} 条` : '导入'}</button></footer>
+          <p className="hint alt"><DeskButton type="text" onClick={() => { setAddMode('manual'); setCsv(null); }}>没有文档？手动填写一条</DeskButton></p>
+          <footer><DeskButton onClick={closeWriting}>取消</DeskButton>
+            <DeskButton type="primary" disabled={busy || !csv || csv.count === 0} onClick={() => setConfirmImport(true)}>{csv ? `导入 ${csv.count} 条` : '导入'}</DeskButton></footer>
         </> : <>
           <div className="fields">
-            <label>问题<input aria-label="问题" value={name} onChange={(event) => setName(event.target.value)} /></label>
-            <label>分类<select aria-label="分类" value={category} onChange={(event) => setCategory(event.target.value)}>{DESK_CATEGORIES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
-            {category === 'custom' ? <label>自定分类<input aria-label="自定分类" value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} /></label> : null}
-            <label>答案<textarea aria-label="答案" value={text} onChange={(event) => setText(event.target.value)} /></label>
+            <label>问题<Input aria-label="问题" value={name} onChange={(event) => setName(event.target.value)} /></label>
+            <label>分类<Select<string> aria-label="分类" value={category} disabled={busy} virtual={false} style={{ width: '100%' }}
+              options={DESK_CATEGORIES.map((item) => ({ value: item.code, label: item.label }))} onChange={setCategory} /></label>
+            {category === 'custom' ? <label>自定分类<Input aria-label="自定分类" value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} /></label> : null}
+            <label>答案<Input.TextArea aria-label="答案" value={text} autoSize={{ minRows: 3, maxRows: 8 }} onChange={(event) => setText(event.target.value)} /></label>
             <div className="field-group"><span className="hint">有效期</span>
-              <div className="seg" role="group" aria-label="有效期">
-                {([['always', '长期生效'], ['inactive', '不生效'], ['scheduled', '定时生效']] as const).map(([value, label]) =>
-                  <button key={value} type="button" aria-pressed={validity === value} onClick={() => setValidity(value)}>{label}</button>)}
-              </div></div>
+              <Segmented aria-label="有效期" value={validity} disabled={busy} options={VALIDITY_CHOICES} onChange={(value) => { if (isValidity(value)) setValidity(value); }} />
+            </div>
             {validity === 'scheduled' ? <>
-              <label>开始<input aria-label="开始" value={validFrom} onChange={(event) => setValidFrom(event.target.value)} placeholder="2026-10-13T00:00:00.000Z" /></label>
-              <label>结束<input aria-label="结束" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} placeholder="2026-10-20T00:00:00.000Z" /></label>
+              <label>开始<SeatDateTime label="开始" placeholder="选择开始时间" value={instantToLocalInput(validFrom)} onChange={setValidFrom} disabled={busy} /></label>
+              <label>结束<SeatDateTime label="结束" placeholder="选择结束时间" value={instantToLocalInput(validUntil)} onChange={setValidUntil} disabled={busy} /></label>
             </> : null}
           </div>
-          <p className="hint alt"><button type="button" className="link" onClick={() => setAddMode('upload')}>改为上传文档</button></p>
-          <footer><button type="button" className="btn" onClick={() => setWriting(false)}>取消</button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void apply({
+          <p className="hint alt"><DeskButton type="text" onClick={() => setAddMode('upload')}>改为上传文档</DeskButton></p>
+          <footer><DeskButton onClick={closeWriting}>取消</DeskButton>
+            <DeskButton type="primary" disabled={busy} onClick={() => void apply({
               action: 'upload', personaId: view.selectedPersonaId, name, category, customCategory, fileName: '问答.txt', text, validity,
-              validFrom: validFrom || undefined, validUntil: validUntil || undefined,
-            })}>保存</button></footer>
+              validFrom: localInputToInstant(validFrom), validUntil: localInputToInstant(validUntil),
+            })}>保存</DeskButton></footer>
         </>}
-      </div>
-    </div> : null}
-    {confirmImport && csv ? <div className="mask on" style={{ background: 'rgba(29,27,38,.14)' }}>
-      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="desk-import-title">
-        <header><h3 id="desk-import-title">确认导入？</h3></header>
-        <p>将导入 {csv.count} 条话术，导入后状态是未生效，不会覆盖已有话术。</p>
-        <footer><button type="button" className="btn" disabled={busy} onClick={() => setConfirmImport(false)}>返回</button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void apply({
-            action: 'import-csv', personaId: view.selectedPersonaId, fileName: csv.fileName, csvText: csv.csvText, category, customCategory,
-          })}>{`确认导入 ${csv.count} 条`}</button></footer>
-      </div>
-    </div> : null}
-    {pendingDelete ? <div className="mask on" onClick={(event) => { if (event.target === event.currentTarget) setPendingDelete(null); }}>
-      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="desk-delete-title">
-        <header><h3 id="desk-delete-title">确认删除</h3></header>
-        <p className="desk-delete-copy">确定要删除吗？删除后将无法恢复。</p>
-        <footer><button type="button" className="btn desk-delete-cancel" onClick={() => setPendingDelete(null)}>取消</button>
-          <button type="button" className="btn btn-danger desk-delete-confirm" disabled={busy} onClick={() => {
-            const id = pendingDelete;
-            setPendingDelete(null);
-            void apply({ action: 'remove', id });
-          }}>确认删除</button></footer>
-      </div>
-    </div> : null}
-  </section>;
+    </Modal>
+    <Modal
+      open={writing && confirmImport && csv !== null}
+      title="确认导入？"
+      closable={false}
+      maskClosable={false}
+      destroyOnHidden
+      transitionName=""
+      maskTransitionName=""
+      onCancel={() => setConfirmImport(false)}
+      footer={csv ? [
+        <DeskButton key="back" disabled={busy} onClick={() => setConfirmImport(false)}>返回</DeskButton>,
+        <DeskButton key="ok" type="primary" disabled={busy} onClick={() => void apply({
+          action: 'import-csv', personaId: view.selectedPersonaId, fileName: csv.fileName, csvText: csv.csvText, category, customCategory,
+        })}>{`确认导入 ${csv.count} 条`}</DeskButton>,
+      ] : null}
+    >
+      <p>将导入 {csv?.count ?? 0} 条话术，导入后状态是未生效，不会覆盖已有话术。</p>
+    </Modal>
+    <Modal
+      open={pendingDelete !== null}
+      title="确认删除"
+      okText="确认删除"
+      cancelText="取消"
+      okButtonProps={{ danger: true, disabled: busy }}
+      onCancel={() => setPendingDelete(null)}
+      onOk={() => {
+        const id = pendingDelete;
+        if (!id) return;
+        setPendingDelete(null);
+        void apply({ action: 'remove', id });
+      }}
+    >
+      <p className="desk-delete-copy">确定要删除吗？删除后将无法恢复。</p>
+    </Modal>
+  </section></IntakeAntdTheme>;
 }

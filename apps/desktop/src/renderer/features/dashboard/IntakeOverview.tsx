@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
+import { createElement, useEffect, useState, type ComponentType, type KeyboardEvent } from 'react';
+import { Button, DatePicker, Empty, Input, Segmented, Select, Space, Table, type TableProps } from 'antd';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
+import dateZhCN from 'antd/es/date-picker/locale/zh_CN';
 import {
   ITERATION_COPY,
+  iterationMatterLabel,
   type DashboardIterationCause,
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
@@ -15,10 +20,13 @@ import {
   knowledgeValidityReminders,
   type KnowledgeValidityReminder,
 } from '@shared/query-action-ledger';
+import { v9Donut, v9DonutRings, v9Headline, v9Trend, v9UsageQuery, V9_MISS, V9_PAGE_SIZE } from './v9-overview-model';
 import { aggregateUsage, rankMissRows, rankUsageRows, trendFromUsage, type UsageSourceRow } from '@shared/usage-log-csv';
-import { usageTrendMarkup } from '@shared/usage-trend';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
+import { formatShortTime } from './intake-time';
 import './workbench-v9.css';
+
+dayjs.locale('zh-cn');
 
 const CAUSE_LABELS = {
   content_gap: '内容缺口',
@@ -34,28 +42,55 @@ const CAUSE_OPTIONS = [
   ['mixed', CAUSE_LABELS.mixed],
 ] as const;
 
-type UsagePhase = 'loading' | 'empty' | 'ready' | 'failed' | 'unmounted' | 'signed-out';
+const LOGIN_TODO = '请先登录后再查看待办。';
+const AFTER_QUERY = '坐席查询后会出现';
+const TREND_EMPTY = '坐席查询后，趋势会出现在这里。';
+const SHARE_EMPTY = '坐席查询后，占比会出现在这里。';
+const SHARE_UNTYPED = '这些记录还分不出话术类型。';
+const USAGE_EMPTY = '坐席查询后，排行会出现在这里。';
+const SOP_EMPTY = '坐席走完 SOP 后，次数会出现在这里。';
+const MISS_EMPTY = '坐席问到没有话术的问题后，会出现在这里。';
+const EXPIRE_EMPTY = '登录后可以看即将到期的知识。';
+const NO_ROWS = '没有符合条件的记录。换个词，或清空搜索后再看。';
 
-function usageTile(phase: UsagePhase, value: string | undefined): string {
-  if (phase === 'ready') return value ?? '0';
-  if (phase === 'empty') return '0';
-  if (phase === 'loading') return '…';
-  return '—';
-}
+const ROLE_OPTIONS = [
+  { value: '', label: '全部岗位' },
+  { value: '客服', label: '客服' },
+  { value: '客服主管', label: '客服主管' },
+];
 
-function usageProse(phase: UsagePhase): string {
-  if (phase === 'loading') return '…';
-  if (phase === 'empty') return WORKBENCH_EMPTY.usageEmpty;
-  if (phase === 'unmounted') return WORKBENCH_EMPTY.usageUnmounted;
-  if (phase === 'signed-out') return WORKBENCH_EMPTY.signedOut;
-  return WORKBENCH_EMPTY.usageFailed;
-}
+const TYPE_OPTIONS = ['', '产品', '活动', '售前', '售后'].map((type) => ({
+  label: type || '全部',
+  value: type,
+}));
 
-function usagePhaseFromReply(code: string): UsagePhase {
-  if (code === 'UNAVAILABLE') return 'unmounted';
-  if (code === 'UNAUTHORIZED') return 'signed-out';
-  return 'failed';
-}
+type OverviewPanel = 'usage' | 'sop' | 'miss' | 'expire' | 'todo';
+
+type UsageTableRow = {
+  key: string;
+  rank: number;
+  name: string;
+  tag?: string;
+  total: number;
+  extra: string;
+  person?: boolean;
+  trend?: { points: string; up: boolean } | null;
+  bar?: number;
+  library?: boolean;
+};
+
+type MissTableRow = {
+  key: string;
+  rank: number;
+  question: string;
+  count: number;
+  latest: string;
+};
+
+type TodoTableRow = {
+  key: string;
+  task: DashboardIterationTask;
+};
 
 function statusLabel(status: DashboardIterationTask['status']): string {
   if (status === 'open') return '待处理';
@@ -66,6 +101,83 @@ function statusLabel(status: DashboardIterationTask['status']): string {
 
 function isCause(value: string): value is DashboardIterationCause {
   return value === 'content_gap' || value === 'ranking' || value === 'stale' || value === 'mixed';
+}
+
+type DayWindow = { start: number; end: number };
+
+const OVERVIEW_PANELS: ReadonlyArray<{ id: OverviewPanel; label: string }> = [
+  { id: 'usage', label: '话术使用排行' },
+  { id: 'sop', label: 'SOP 使用' },
+  { id: 'miss', label: '无命中排行' },
+  { id: 'expire', label: '话术过期提醒' },
+  { id: 'todo', label: '迭代待办' },
+];
+
+function recentWindow(days: number, now = new Date()): DayWindow {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return { start: start.getTime(), end: end.getTime() };
+}
+
+function sameLocalDay(left: number, right: number): boolean {
+  const a = new Date(left);
+  const b = new Date(right);
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function presetDays(span: DayWindow, now = new Date()): 7 | 30 | null {
+  const seven = recentWindow(7, now);
+  const thirty = recentWindow(30, now);
+  if (sameLocalDay(span.start, seven.start) && sameLocalDay(span.end, seven.end)) return 7;
+  if (sameLocalDay(span.start, thirty.start) && sameLocalDay(span.end, thirty.end)) return 30;
+  return null;
+}
+
+function spanLabel(span: DayWindow): string {
+  const format = (ms: number) => {
+    const date = new Date(ms);
+    return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+  return `${format(span.start)} 至 ${format(span.end)}`;
+}
+
+function movePanel(event: KeyboardEvent<HTMLElement>, index: number, select: (id: OverviewPanel) => void) {
+  const next = event.key === 'ArrowRight' ? (index + 1) % OVERVIEW_PANELS.length
+    : event.key === 'ArrowLeft' ? (index + OVERVIEW_PANELS.length - 1) % OVERVIEW_PANELS.length
+    : event.key === 'Home' ? 0
+    : event.key === 'End' ? OVERVIEW_PANELS.length - 1
+    : null;
+  if (next === null) return;
+  event.preventDefault();
+  const id = OVERVIEW_PANELS[next]!.id;
+  select(id);
+  document.getElementById(`overview-tab-${id}`)?.focus();
+}
+
+function seatMessage(message: string): string {
+  return message === '未接入' ? LOGIN_TODO : message;
+}
+
+function todoTitle(task: DashboardIterationTask): string {
+  const scriptId = inaccuracyScriptIdFromTask(task);
+  return scriptId ? `话术不准 · ${scriptId}` : iterationMatterLabel(task.clusterKey);
+}
+
+function OverviewEmpty({ description }: { description: string }) {
+  return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
+}
+
+function tabLabel(label: string, count: number | null) {
+  return <span>{label}{count === null ? null : <b aria-hidden="true" style={{ marginLeft: 6 }}>{count}</b>}</span>;
+}
+
+const nowrapCell = () => ({ style: { whiteSpace: 'nowrap' as const } });
+
+/** rc-table copies aria-label onto the table element. antd's prop type omits it. */
+function A11yTable<RecordType extends object>(
+  props: TableProps<RecordType> & { 'aria-label': string },
+) {
+  return createElement(Table as ComponentType<typeof props>, props);
 }
 
 function catalogFromWording(result: DashboardWordingResult): CloseHintCatalog | null {
@@ -92,7 +204,33 @@ function judgedTask(task: DashboardIterationTask, cause: DashboardIterationCause
   };
 }
 
-/** faq-v2 overview lists open iteration tasks only. It does not invent rates. */
+function TrendLines({ points }: { points: ReadonlyArray<{ day: string; use: number; miss: number }> }) {
+  const width = 600;
+  const height = 200;
+  const left = 28;
+  const right = 12;
+  const top = 16;
+  const bottom = 28;
+  const innerW = width - left - right;
+  const innerH = height - top - bottom;
+  const max = Math.max(1, ...points.map((point) => Math.max(point.use, point.miss)));
+  const xAt = (index: number) => points.length === 1 ? left + innerW / 2 : left + (innerW * index) / (points.length - 1);
+  const yAt = (value: number) => top + innerH - (value / max) * innerH;
+  const line = (key: 'use' | 'miss') => points.map((point, index) => `${index ? 'L' : 'M'}${xAt(index).toFixed(1)} ${yAt(point[key]).toFixed(1)}`).join(' ');
+  const labelEvery = points.length > 8 ? Math.ceil(points.length / 6) : 1;
+  return <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="使用趋势图" style={{ width: '100%', height: 200 }}>
+    <path d={line('use')} fill="none" stroke="var(--chart-use)" strokeWidth="2.5" />
+    <path d={line('miss')} fill="none" stroke="var(--chart-miss)" strokeWidth="2.5" />
+    {points.map((point, index) => <g key={point.day}>
+      <circle cx={xAt(index)} cy={yAt(point.use)} r="4" fill="var(--chart-use)" />
+      <circle cx={xAt(index)} cy={yAt(point.miss)} r="4" fill="var(--chart-miss)" />
+      {index % labelEvery === 0 || index === points.length - 1
+        ? <text x={xAt(index)} y={height - 8} textAnchor="middle" fontSize="11" fill="currentColor">{point.day.slice(5)}</text>
+        : null}
+    </g>)}
+  </svg>;
+}
+
 export function IntakeOverview({
   onOpen,
   onTodoCount,
@@ -106,27 +244,30 @@ export function IntakeOverview({
   const [message, setMessage] = useState('加载中…');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CloseHintCatalog | null>(null);
-  const [scriptTitles, setScriptTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [reminders, setReminders] = useState<readonly KnowledgeValidityReminder[]>([]);
   const [deskReminders, setDeskReminders] = useState<'unavailable' | 'ready'>('unavailable');
   const [deskRole, setDeskRole] = useState<'operator' | 'seat' | null>(null);
   const [causeById, setCauseById] = useState<Record<string, DashboardIterationCause>>({});
   const [noteById, setNoteById] = useState<Record<string, string>>({});
-  const [panel, setPanel] = useState<'usage' | 'sop' | 'miss' | 'expire' | 'todo'>('usage');
-  const [days, setDays] = useState<7 | 30>(7);
+  const [panel, setPanel] = useState<OverviewPanel>('usage');
+  const [span, setSpan] = useState<DayWindow>(() => recentWindow(7));
   const [usageView, setUsageView] = useState<'script' | 'person'>('script');
+  const [usageType, setUsageType] = useState('');
+  const [usageRole, setUsageRole] = useState('');
   const [usageQuery, setUsageQuery] = useState('');
   const [usageDesc, setUsageDesc] = useState(true);
+  const [usagePage, setUsagePage] = useState(0);
   const [sourceRows, setSourceRows] = useState<UsageSourceRow[] | null>(null);
-  const [usagePhase, setUsagePhase] = useState<UsagePhase>(
-    () => (typeof window !== 'undefined' && window.dashboardUsageLog ? 'loading' : 'failed'),
-  );
+  const [usageState, setUsageState] = useState<'absent' | 'loading' | 'failed' | 'ready' | 'empty' | 'signed-out' | 'unmounted'>(() => window.dashboardUsageLog ? 'loading' : 'absent');
+  const previewLocation = window.location;
+  const showSynthetic = (previewLocation.hostname === '127.0.0.1' || previewLocation.hostname === 'localhost')
+    && new URLSearchParams(previewLocation.search).get('preview') === 'intake';
 
   useEffect(() => {
     const api = window.dashboardIteration;
     if (!api) {
       setTasks(null);
-      setMessage(WORKBENCH_EMPTY.noRecord);
+      setMessage(LOGIN_TODO);
       return undefined;
     }
     let live = true;
@@ -134,7 +275,7 @@ export function IntakeOverview({
       if (!live) return;
       if (!result.ok) {
         setTasks(null);
-        setMessage(result.message);
+        setMessage(LOGIN_TODO);
         return;
       }
       setTasks(result.items);
@@ -142,7 +283,7 @@ export function IntakeOverview({
     }).catch(() => {
       if (!live) return;
       setTasks(null);
-      setMessage(WORKBENCH_EMPTY.noRecord);
+      setMessage(LOGIN_TODO);
     });
     return () => { live = false; };
   }, []);
@@ -154,9 +295,6 @@ export function IntakeOverview({
     void api.list().then((result) => {
       if (!live) return;
       setCatalog(catalogFromWording(result));
-      if (result.ok) {
-        setScriptTitles(new Map(result.entries.map((entry) => [entry.scriptId, entry.title])));
-      }
     }).catch(() => {
       if (live) setCatalog(null);
     });
@@ -196,8 +334,8 @@ export function IntakeOverview({
     });
     if (!decision.ok) {
       setMessage(decision.reason === 'needs_newer_release'
-        ? '内容缺口要等这条话术有更新的已发布版本后才能标已处理。'
-        : '暂不处理需要填写原因。');
+        ? '等更新发布后再标已处理。'
+        : '请填写原因。');
       return;
     }
     const resolutionNote = decision.resolutionNote.length > 0
@@ -212,36 +350,36 @@ export function IntakeOverview({
     }).then((result) => {
       setBusyId(null);
       if (!result.ok) {
-        setMessage(result.message);
+        setMessage(seatMessage(result.message));
         return;
       }
       setTasks((current) => (current ?? []).map((row) => row.taskId === result.task.taskId ? result.task : row));
       setMessage('');
     }).catch(() => {
       setBusyId(null);
-      setMessage(WORKBENCH_EMPTY.noRecord);
+      setMessage(LOGIN_TODO);
     });
+  }
+
+  function startTask(task: DashboardIterationTask) {
+    const api = window.dashboardIteration;
+    if (!api) return;
+    setBusyId(task.taskId);
+    void api.start({ taskId: task.taskId, expectedVersion: task.version }).then((result) => {
+      setBusyId(null);
+      if (!result.ok) { setMessage(seatMessage(result.message)); return; }
+      setTasks((current) => (current ?? []).map((row) => row.taskId === result.task.taskId ? result.task : row));
+    }).catch(() => { setBusyId(null); setMessage(LOGIN_TODO); });
   }
 
   const openTasks = (tasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
   const openTaskCount = openTasks.length;
   useEffect(() => { onTodoCount?.(tasks === null ? 0 : openTaskCount); }, [tasks, openTaskCount, onTodoCount]);
-  const panels = [
-    ['usage', '话术使用排行'],
-    ['sop', 'SOP 使用'],
-    ['miss', '无命中排行'],
-    ['expire', '话术过期提醒'],
-    ['todo', '迭代待办'],
-  ] as const;
   useEffect(() => {
     const api = window.dashboardUsageLog;
-    if (!api) {
-      setSourceRows(null);
-      setUsagePhase('failed');
-      return undefined;
-    }
+    if (!api) { setUsageState('absent'); setSourceRows(null); return undefined; }
+    setUsageState('loading');
     let live = true;
-    setUsagePhase('loading');
     void (async () => {
       const collected: UsageSourceRow[] = [];
       const seen = new Set<string>();
@@ -249,168 +387,368 @@ export function IntakeOverview({
       do {
         const reply = await api.list({ result: '', query: '', cursor });
         if (!live) return;
-        if (!reply.ok || (cursor !== null && seen.has(cursor))) {
+        if (!reply.ok) {
           setSourceRows(null);
-          setUsagePhase(reply.ok ? 'failed' : usagePhaseFromReply(reply.code));
+          setUsageState(reply.code === 'UNAUTHORIZED' ? 'signed-out' : reply.code === 'UNAVAILABLE' ? 'unmounted' : 'failed');
           return;
         }
+        if (cursor !== null && seen.has(cursor)) { setSourceRows(null); setUsageState('failed'); return; }
         if (cursor !== null) seen.add(cursor);
         collected.push(...reply.rows);
         cursor = reply.nextCursor;
       } while (cursor);
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
       const windowed = collected.filter((row) => {
         const asked = Date.parse(row.askedAt);
-        return Number.isFinite(asked) && asked >= cutoff;
+        return Number.isFinite(asked) && asked >= span.start && asked <= span.end;
       });
-      if (!live) return;
-      setSourceRows(windowed);
-      setUsagePhase(windowed.length === 0 ? 'empty' : 'ready');
-    })().catch(() => {
-      if (!live) return;
-      setSourceRows(null);
-      setUsagePhase('failed');
-    });
+      if (live) { setSourceRows(windowed); setUsageState(windowed.length === 0 ? 'empty' : 'ready'); }
+    })().catch(() => { if (live) { setSourceRows(null); setUsageState('failed'); } });
     return () => { live = false; };
-  }, [days]);
+  }, [span.start, span.end]);
   const sourced = sourceRows === null ? null : aggregateUsage(sourceRows);
+  const sampleDays = presetDays(span);
+  const sampleHeadline = showSynthetic && usageState === 'absent' && sampleDays !== null;
   const headline = sourced
     ? { use: sourced.use.toLocaleString('en-US'), miss: sourced.miss.toLocaleString('en-US'), rate: sourced.rate }
-    : null;
+    : (sampleHeadline && sampleDays ? v9Headline(sampleDays) : null);
   const liveRanks = sourceRows === null ? null : rankUsageRows(sourceRows, usageView)
-    .filter((row) => usageQuery === '' || row.name.includes(usageQuery));
+    .filter((row) => {
+      const needle = usageQuery.trim();
+      return needle === '' || row.name.includes(needle);
+    });
   const orderedRanks = liveRanks === null ? null : (usageDesc ? liveRanks : [...liveRanks].reverse());
   const liveMisses = sourceRows === null ? null : rankMissRows(sourceRows);
   const liveTrend = sourceRows === null ? null : trendFromUsage(sourceRows);
+  const usage = sampleHeadline
+    ? v9UsageQuery({ view: usageView, type: usageType, role: usageRole, q: usageQuery.trim(), desc: usageDesc, page: usagePage })
+    : null;
+  const usageRows = usage?.rows ?? [];
+  const maxUsage = Math.max(...usageRows.map((row) => row.total), 1);
+  const showSampleCharts = sampleHeadline;
+  const rings = showSampleCharts ? v9DonutRings() : null;
+  const donut = showSampleCharts ? v9Donut() : null;
+  const usageTableRows: UsageTableRow[] = orderedRanks
+    ? orderedRanks.map((row, index) => ({
+      key: row.name,
+      rank: index + 1,
+      name: row.name,
+      total: row.total,
+      extra: row.extra,
+    }))
+    : usage
+      ? usageRows.map((row, index) => {
+        const rank = usageDesc ? usage.page * V9_PAGE_SIZE + index + 1 : usage.count - (usage.page * V9_PAGE_SIZE + index);
+        return {
+          key: row.name,
+          rank,
+          name: row.name,
+          tag: row.tag,
+          total: row.total,
+          extra: row.extra,
+          person: row.person,
+          trend: row.trend,
+          bar: Math.round(row.total / maxUsage * 100),
+          library: !row.person,
+        };
+      })
+      : [];
+  const usageCount = orderedRanks ? orderedRanks.length : usage ? usage.count : null;
+  const missRows: MissTableRow[] | null = liveMisses
+    ? liveMisses.map((row, index) => ({
+      key: row.question,
+      rank: index + 1,
+      question: row.question,
+      count: row.count,
+      latest: formatShortTime(row.latest),
+    }))
+    : sampleHeadline
+      ? V9_MISS.map(([question, count, when], index) => ({
+        key: question,
+        rank: index + 1,
+        question,
+        count,
+        latest: when,
+      }))
+      : null;
+  const missCount = liveMisses ? liveMisses.length : sampleHeadline ? V9_MISS.length : null;
+  const todoRows: TodoTableRow[] = (tasks === null ? [] : openTasks).map((task) => ({ key: task.taskId, task }));
+  const panelCounts: Record<OverviewPanel, number | null> = {
+    usage: usageCount,
+    sop: null,
+    miss: missCount,
+    expire: reminders.length,
+    todo: openTasks.length,
+  };
+
+  function supplyScript(question: string) {
+    return <Button
+      type="text"
+      disabled={deskRole !== 'operator'}
+      title={deskRole === 'seat' ? '坐席不能添加话术' : '仅运营可补充。'}
+      onClick={() => { if (onSupplyScript) onSupplyScript(question); else onOpen('content'); }}
+    >补充话术</Button>;
+  }
+
   return <section className="dash-module intake-management intake-overview wb9" data-testid="module-overview">
     <h1 className="desk-sr">概览</h1>
     <div className="ov-head"><span className="mute">数据范围</span>
-      <div className="seg" role="group" aria-label="时间范围">
-        <button type="button" aria-pressed={days === 7} onClick={() => setDays(7)}>近 7 天</button>
-        <button type="button" aria-pressed={days === 30} onClick={() => setDays(30)}>近 30 天</button>
-      </div>
+      <DatePicker.RangePicker
+        aria-label="时间范围"
+        allowClear={false}
+        format="YYYY-MM-DD"
+        inputReadOnly={false}
+        classNames={{ popup: { root: 'overview-range-popup' } }}
+        getPopupContainer={() => document.body}
+        locale={dateZhCN}
+        placeholder={['开始日期', '结束日期']}
+        placement="bottomRight"
+        style={{ width: 260 }}
+        value={[dayjs(span.start), dayjs(span.end)]}
+        presets={[
+          { label: '近 7 天', value: () => { const next = recentWindow(7); return [dayjs(next.start), dayjs(next.end)]; } },
+          { label: '近 30 天', value: () => { const next = recentWindow(30); return [dayjs(next.start), dayjs(next.end)]; } },
+        ]}
+        onChange={(dates) => {
+          const start = dates?.[0];
+          const end = dates?.[1];
+          if (!start || !end) return;
+          setSpan({ start: start.startOf('day').valueOf(), end: end.endOf('day').valueOf() });
+        }}
+      />
     </div>
-    {usagePhase === 'ready' ? null : <p className="notready" data-testid="overview-usage-status">{usageProse(usagePhase)}</p>}
     <div className="tiles">
-      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{usageTile(usagePhase, headline?.use)}</b></div>
-      <div className="tile"><span className="t-lbl">无命中次数</span><b>{usageTile(usagePhase, headline?.miss)}</b></div>
-      <div className="tile"><span className="t-lbl">命中率</span><b>{usageTile(usagePhase, headline?.rate)}</b></div>
-      <div className="tile"><span className="t-lbl">待处理迭代</span><b>{openTasks.length}</b><span className="t-sub">需要人工判断</span></div>
+      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{headline?.use ?? '—'}</b>{sampleHeadline ? <span className="t-sub up">较上期 ↑ 8%</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
+      <div className="tile"><span className="t-lbl">无命中次数</span><b>{headline?.miss ?? '—'}</b>{sampleHeadline ? <span className="t-sub down">较上期 ↓ 5%</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
+      <div className="tile"><span className="t-lbl">命中率</span><b>{headline?.rate ?? '—'}</b>{sampleHeadline ? <span className="t-sub up">较上期 ↑ 1.2 个百分点</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
+      <div className="tile"><span className="t-lbl">待办</span><b>{openTasks.length}</b><Button type="text" onClick={() => setPanel('todo')}>去处理</Button></div>
     </div>
     <div className="charts">
-      <div className="card" aria-label="使用与无命中趋势">
-        <div className="card-head"><h3>使用与无命中趋势</h3><span className="legend"><i style={{ background: 'var(--p)' }} />使用<i style={{ background: '#e0b050' }} />无命中</span></div>
-        <div className="chart-wrap">{liveTrend === null
-          ? <p className="notready">—</p>
-          : liveTrend.length === 0
+      <div className="card" aria-label="使用趋势">
+        <div className="card-head"><h3>使用趋势</h3><span className="legend"><i style={{ background: 'var(--chart-use)' }} />使用<i style={{ background: 'var(--chart-miss)' }} />无命中</span></div>
+        <div className="chart-wrap">{usageState === 'signed-out'
+          ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.signedOut}</p>
+          : usageState === 'unmounted'
+          ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.usageUnmounted}</p>
+          : liveTrend && liveTrend.length > 0
+          ? <TrendLines points={liveTrend} />
+          : usageState === 'empty'
             ? <div data-testid="usage-trend-empty">
               <svg viewBox="0 0 640 188" role="img" aria-label="暂无使用记录">
                 <rect x="0.5" y="0.5" width="639" height="187" fill="none" stroke="currentColor" strokeOpacity="0.12" />
                 <line x1="28" y1="142" x2="628" y2="142" stroke="currentColor" strokeOpacity="0.2" />
               </svg>
-              <p className="notready">{WORKBENCH_EMPTY.usageEmpty}</p>
+              <p>{WORKBENCH_EMPTY.usageEmpty}</p>
             </div>
-            : <svg viewBox="0 0 640 188" role="img" aria-label="使用与无命中趋势图" data-testid="usage-trend" dangerouslySetInnerHTML={{ __html: usageTrendMarkup(liveTrend) }} />}
-        </div>
+          : sampleHeadline
+            ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: sampleDays ? v9Trend(sampleDays) : '' }} />
+            : <OverviewEmpty description={TREND_EMPTY} />}</div>
+      </div>
+      <div className="card" aria-label="话术类型占比">
+        <div className="card-head"><h3>话术类型占比</h3></div>
+        {donut ? <div className="donut-wrap">
+          <svg viewBox="0 0 140 140" width="140" height="140">
+            {rings?.rings.map((ring) => <circle key={ring.color} cx="70" cy="70" r={rings.radius} fill="none" stroke={ring.color} strokeWidth="16" strokeDasharray={`${ring.dash} ${ring.gap}`} strokeDashoffset={ring.offset} transform="rotate(-90 70 70)" />)}
+            <text x="70" y="68" textAnchor="middle" fontSize="18" fontWeight="600" fill="currentColor">{donut.all.toLocaleString('en-US')}</text>
+            <text x="70" y="86" textAnchor="middle" fontSize="11" fill="currentColor">使用次数</text>
+          </svg>
+          <ul className="dlegend">{donut.parts.map((part) => <li key={part.type}><i style={{ background: part.color }} />{part.type}<span className="n">{part.total.toLocaleString('en-US')}</span><b>{part.pct}%</b></li>)}</ul>
+        </div> : sourceRows === null
+          ? <OverviewEmpty description={SHARE_EMPTY} />
+          : <OverviewEmpty description={SHARE_UNTYPED} />}
       </div>
     </div>
     <div className="card flush">
-      <div className="ptabs" role="tablist" aria-label="概览分栏">
-        {panels.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={panel === id} onClick={() => setPanel(id)}>{label}<b aria-hidden="true">{id === 'usage' ? (orderedRanks ? orderedRanks.length : '') : id === 'miss' ? (liveMisses ? liveMisses.length : '') : id === 'todo' ? openTasks.length : id === 'expire' ? reminders.length : ''}</b></button>)}
-      </div>
-      <div className="pn" hidden={panel !== 'usage'}>
-        <div className="filters2">
-          <div className="seg" role="group" aria-label="视图">
-            <button type="button" aria-pressed={usageView === 'script'} onClick={() => setUsageView('script')}>按话术</button>
-            <button type="button" aria-pressed={usageView === 'person'} onClick={() => setUsageView('person')}>按人员</button>
-          </div>
-          <span className="grow" />
-          <div className="search"><svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
-            <input aria-label="搜索人员" placeholder="搜索人员" value={usageQuery} onChange={(event) => setUsageQuery(event.target.value.trim())} /></div>
+      <div className="tabbar">
+        <div className="tabs" role="tablist" aria-label="概览分栏">
+          {OVERVIEW_PANELS.map((item, index) => <Button
+            type="text"
+            role="tab"
+            key={item.id}
+            id={`overview-tab-${item.id}`}
+            aria-selected={panel === item.id}
+            aria-controls="overview-panel"
+            tabIndex={panel === item.id ? 0 : -1}
+            className="tab"
+            onClick={() => setPanel(item.id)}
+            onKeyDown={(event) => movePanel(event, index, setPanel)}
+          >{tabLabel(item.label, panelCounts[item.id])}</Button>)}
         </div>
-        <table className="fixed">
-          <colgroup><col style={{ width: 96 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 300 }} /><col style={{ width: 112 }} /></colgroup>
-          <thead><tr><th>排名</th><th>{usageView === 'script' ? '话术名称' : '人员'}</th>
-            <th><button type="button" className={`sort${usageDesc ? '' : ' asc'}`} aria-label="按使用次数排序" onClick={() => setUsageDesc((value) => !value)}>使用次数<svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg></button></th>
-            <th>{usageView === 'script' ? '近 7 天 · 使用人' : '最常用话术'}</th><th></th></tr></thead>
-          <tbody>
-            {orderedRanks ? (orderedRanks.length === 0 ? <tr><td colSpan={5} className="empty">{usagePhase === 'empty' && usageQuery === '' ? '—' : '没有符合条件的记录'}</td></tr> : orderedRanks.map((row, index) => <tr className="item" key={row.name}>
-              <td><span className={index < 3 ? 'rk top' : 'rk'}>{index + 1}</span></td>
-              <td>{row.name}</td>
-              <td><div className="cnt"><b>{row.total}</b></div></td>
-              <td><span className="who">{row.extra}</span></td>
-              <td />
-            </tr>)) : <tr><td colSpan={5} className="empty">—</td></tr>}
-          </tbody>
-        </table>
       </div>
-      <div className="pn" hidden={panel !== 'sop'}>
-        <p className="notready" style={{ padding: '20px 12px' }}>{WORKBENCH_EMPTY.noRecord}</p>
-      </div>
-      <section className="pn" hidden={panel !== 'miss'} aria-label="无命中">
-        <h2 className="desk-sr">无命中</h2>
-        <table className="fixed">
-          <thead><tr><th>排名</th><th>用户问题</th><th>未命中次数</th><th>最近一次</th><th></th></tr></thead>
-          <tbody>{liveMisses ? (liveMisses.length === 0 ? <tr><td colSpan={5} className="empty">没有符合条件的记录</td></tr> : liveMisses.map((row, index) => <tr className="item" key={row.question}>
-            <td><span className={index < 3 ? 'rk top' : 'rk'}>{index + 1}</span></td>
-            <td>{row.question}</td>
-            <td><div className="cnt warn"><b>{row.count}</b></div></td>
-            <td className="mute">{row.latest}</td>
-            <td className="jump"><button type="button" className="link" disabled={deskRole !== 'operator'} title={deskRole === 'seat' ? '坐席不能添加话术' : '请先确认运营身份'} onClick={() => onSupplyScript ? onSupplyScript(row.question) : onOpen('content')}>补充话术</button></td>
-          </tr>)) : <tr><td colSpan={5} className="empty">{WORKBENCH_EMPTY.noRecord}</td></tr>}</tbody>
-        </table>
-
-      </section>
-      <section hidden={panel !== 'expire'} aria-label="知识有效期">
-        <h2 className="desk-sr">知识有效期</h2>
-        {deskReminders !== 'ready' ? <p>{WORKBENCH_EMPTY.noRecord}</p> : reminders.length === 0 ? <p>{ITERATION_COPY.empty}</p> : <table className="desk-table" aria-label="知识有效期提醒">
-          <thead><tr><th>状态</th><th>话术名称</th></tr></thead>
-          <tbody>{reminders.map((item) => <tr key={item.id}><td>{item.label}</td><td>{item.question}</td></tr>)}</tbody>
-        </table>}
-      </section>
-      <div hidden={panel !== 'todo'}>
-    <table className="desk-table" aria-label="话术迭代">
-      <thead><tr><th>状态</th><th>事项</th><th>原因</th><th>操作</th></tr></thead>
-      <tbody>
-        {tasks === null ? <tr><td colSpan={4}>{message}</td></tr> : openTasks.length === 0 ? <tr><td colSpan={4}>{ITERATION_COPY.empty}</td></tr> : openTasks.map((task) => {
-          const scriptId = inaccuracyScriptIdFromTask(task);
-          const title = (scriptId && scriptTitles.get(scriptId)) || task.clusterKey;
-          const cause = causeById[task.taskId] ?? task.suspectedCause;
-          return <tr key={task.taskId}>
-            <td>{statusLabel(task.status)}</td>
-            <td>{title}</td>
-            <td>
-              <select aria-label={`原因 ${title}`} value={cause} onChange={(event) => {
-                const value = event.target.value;
-                if (!isCause(value)) return;
-                setCauseById((current) => ({ ...current, [task.taskId]: value }));
-              }}>
-                {CAUSE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </td>
-            <td><div className="desk-row-actions">
-              {task.status === 'open' ? <button type="button" disabled={busyId === task.taskId} onClick={() => {
-                const api = window.dashboardIteration;
-                if (!api) return;
-                setBusyId(task.taskId);
-                void api.start({ taskId: task.taskId, expectedVersion: task.version }).then((result) => {
-                  setBusyId(null);
-                  if (!result.ok) { setMessage(result.message); return; }
-                  setTasks((current) => (current ?? []).map((row) => row.taskId === result.task.taskId ? result.task : row));
-                }).catch(() => { setBusyId(null); setMessage(WORKBENCH_EMPTY.noRecord); });
-              }}>开始处理</button> : null}
-              <input placeholder="处理说明" aria-label={`处理说明 ${title}`} value={noteById[task.taskId] ?? ''} onChange={(event) => {
-                const value = event.target.value;
-                setNoteById((current) => ({ ...current, [task.taskId]: value }));
-              }} />
-              <button type="button" className="dash-action-primary" disabled={busyId === task.taskId} onClick={() => closeTask(task, 'resolved')}>已处理</button>
-              <button type="button" disabled={busyId === task.taskId} onClick={() => closeTask(task, 'wont_fix')}>暂不处理</button>
-              <button type="button" onClick={() => onOpen('content')}>去知识库</button>
-            </div></td>
-          </tr>;
-        })}
-      </tbody>
-    </table>
+      <div id="overview-panel" role="tabpanel" aria-labelledby={`overview-tab-${panel}`}>
+      {panel === 'usage' ? <div className="pn">
+              <div className="filters2">
+                <Segmented
+                  aria-label="视图"
+                  value={usageView}
+                  onChange={(value) => {
+                    if (value !== 'script' && value !== 'person') return;
+                    setUsageView(value);
+                    setUsagePage(0);
+                  }}
+                  options={[{ label: '按话术', value: 'script' }, { label: '按人员', value: 'person' }]}
+                />
+                {sourceRows === null ? <Segmented
+                  aria-label="话术类型"
+                  value={usageType}
+                  onChange={(value) => { setUsageType(String(value)); setUsagePage(0); }}
+                  options={TYPE_OPTIONS}
+                /> : null}
+                <span className="grow" />
+                {sourceRows === null ? <Select
+                  aria-label="岗位"
+                  value={usageRole}
+                  style={{ width: 140 }}
+                  onChange={(value) => { setUsageRole(value); setUsagePage(0); }}
+                  options={ROLE_OPTIONS}
+                /> : null}
+                <Input aria-label={usageView === 'script' ? '搜索话术' : '搜索人员'} placeholder={usageView === 'script' ? '搜索话术' : '搜索人员'} style={{ width: 220 }} value={usageQuery} onChange={(event) => { setUsageQuery(event.target.value); setUsagePage(0); }} />
+              </div>
+              <A11yTable<UsageTableRow>
+                aria-label="话术使用排行"
+                pagination={false}
+                rowKey="key"
+                dataSource={usageTableRows}
+                locale={{ emptyText: <OverviewEmpty description={orderedRanks !== null || usage !== null ? NO_ROWS : USAGE_EMPTY} /> }}
+                columns={[
+                  {
+                    title: '排名',
+                    dataIndex: 'rank',
+                    width: 96,
+                    render: (rank: number) => <span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span>,
+                  },
+                  {
+                    title: usageView === 'script' ? '话术名称' : '人员',
+                    dataIndex: 'name',
+                    render: (_name, row) => <>
+                      {row.person
+                        ? <Button type="text" title={`只看${row.name}用过的话术`} onClick={() => { setUsageQuery(row.name); setUsageView('script'); setUsagePage(0); }}>{row.name}</Button>
+                        : row.name}
+                      {row.tag ? <span className="tag">{row.tag}</span> : null}
+                    </>,
+                  },
+                  {
+                    title: <Button type="text" aria-label="按使用次数排序" onClick={() => { setUsageDesc((value) => !value); setUsagePage(0); }}>使用次数</Button>,
+                    dataIndex: 'total',
+                    width: 140,
+                    render: (total: number, row) => <div className="cnt"><b>{total}</b>{row.bar === undefined ? null : <i style={{ width: `${row.bar}%` }} />}</div>,
+                  },
+                  {
+                    title: usageView === 'script' ? `${spanLabel(span)} · 使用人` : '最常用话术',
+                    dataIndex: 'extra',
+                    render: (extra: string, row) => row.trend
+                      ? <div className="trend"><svg viewBox="0 0 76 20" className={row.trend.up ? '' : 'down'} aria-label="近7天趋势"><polyline points={row.trend.points} /></svg><span className="who">{extra}</span></div>
+                      : <span className="who">{extra}</span>,
+                  },
+                  {
+                    title: '',
+                    key: 'jump',
+                    width: 112,
+                    render: (_value, row) => row.library ? <Button type="text" onClick={() => onOpen('content')}>去知识库</Button> : null,
+                  },
+                ]}
+              />
+              {usage ? <div className="pager"><span>共 {usage.count} 条{usageView === 'person' ? ` · ${usage.people} 位人员` : ''}</span><span className="grow" />
+                <Button disabled={usage.page === 0} onClick={() => setUsagePage(usage.page - 1)}>上一页</Button>
+                <span>{usage.page + 1} / {usage.pages}</span>
+                <Button disabled={usage.page >= usage.pages - 1} onClick={() => setUsagePage(usage.page + 1)}>下一页</Button></div> : null}
+            </div> : null}
+      {panel === 'sop' ? <div className="pn"><OverviewEmpty description={SOP_EMPTY} /></div> : null}
+      {panel === 'miss' ? <section className="pn" aria-label="无命中">
+              <h2 className="desk-sr">无命中</h2>
+              <A11yTable<MissTableRow>
+                aria-label="无命中排行"
+                pagination={false}
+                rowKey="key"
+                dataSource={missRows ?? []}
+                locale={{ emptyText: <OverviewEmpty description={missRows && missRows.length === 0 ? NO_ROWS : MISS_EMPTY} /> }}
+                columns={[
+                  {
+                    title: '排名',
+                    dataIndex: 'rank',
+                    render: (rank: number) => <span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span>,
+                  },
+                  { title: '用户问题', dataIndex: 'question' },
+                  {
+                    title: '未命中次数',
+                    dataIndex: 'count',
+                    render: (count: number) => <div className="cnt warn"><b>{count}</b></div>,
+                  },
+                  { title: '最近一次', dataIndex: 'latest', render: (latest: string) => <span className="mute">{latest}</span> },
+                  { title: '', key: 'supply', render: (_value, row) => supplyScript(row.question) },
+                ]}
+              />
+            </section> : null}
+      {panel === 'expire' ? <section aria-label="知识有效期">
+              <h2 className="desk-sr">知识有效期</h2>
+              {deskReminders !== 'ready'
+                ? <OverviewEmpty description={EXPIRE_EMPTY} />
+                : <A11yTable<KnowledgeValidityReminder>
+                  aria-label="知识有效期提醒"
+                  pagination={false}
+                  rowKey="id"
+                  dataSource={[...reminders]}
+                  locale={{ emptyText: <OverviewEmpty description={ITERATION_COPY.empty} /> }}
+                  columns={[
+                    { title: '状态', dataIndex: 'label' },
+                    { title: '话术名称', dataIndex: 'question' },
+                  ]}
+                />}
+            </section> : null}
+      {panel === 'todo' ? <A11yTable<TodoTableRow>
+              aria-label="话术迭代"
+              pagination={false}
+              rowKey="key"
+              dataSource={todoRows}
+              locale={{ emptyText: <OverviewEmpty description={tasks === null ? message : ITERATION_COPY.empty} /> }}
+              columns={[
+                {
+                  title: '状态',
+                  width: 88,
+                  onCell: nowrapCell,
+                  onHeaderCell: nowrapCell,
+                  render: (_value, row) => statusLabel(row.task.status),
+                },
+                { title: '事项', render: (_value, row) => todoTitle(row.task) },
+                {
+                  title: '原因',
+                  render: (_value, row) => {
+                    const cause = causeById[row.task.taskId] ?? row.task.suspectedCause;
+                    const title = todoTitle(row.task);
+                    return <Select
+                      aria-label={`原因 ${title}`}
+                      value={cause}
+                      onChange={(value) => {
+                        if (!isCause(value)) return;
+                        setCauseById((current) => ({ ...current, [row.task.taskId]: value }));
+                      }}
+                      options={CAUSE_OPTIONS.map(([value, label]) => ({ value, label }))}
+                    />;
+                  },
+                },
+                {
+                  title: '操作',
+                  render: (_value, row) => {
+                    const task = row.task;
+                    const title = todoTitle(task);
+                    const busy = busyId === task.taskId;
+                    if (task.status === 'open') {
+                      return <Space size={8}>
+                        <Button type="primary" disabled={busy} onClick={() => startTask(task)}>开始处理</Button>
+                        <Button type="text" onClick={() => onOpen('content')}>去知识库</Button>
+                      </Space>;
+                    }
+                    return <Space wrap size={8} align="center">
+                      <Input style={{ width: 180 }} placeholder="处理说明" aria-label={`处理说明 ${title}`} value={noteById[task.taskId] ?? ''} onChange={(event) => {
+                        const value = event.target.value;
+                        setNoteById((current) => ({ ...current, [task.taskId]: value }));
+                      }} />
+                      <Button type="primary" disabled={busy} onClick={() => closeTask(task, 'resolved')}>已处理</Button>
+                      <Button type="text" disabled={busy || (noteById[task.taskId] ?? '').trim().length === 0} onClick={() => closeTask(task, 'wont_fix')}>暂不处理</Button>
+                    </Space>;
+                  },
+                },
+              ]}
+            /> : null}
       </div>
     </div>
     {message && tasks !== null ? <p role="status">{message}</p> : null}
