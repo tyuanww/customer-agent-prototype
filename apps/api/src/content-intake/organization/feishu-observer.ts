@@ -25,7 +25,10 @@ class Rejected extends Error { constructor(readonly reason: Reason) { super(reas
 const MAX_RESPONSE_BYTES = 1_048_576;
 const MAX_PAGES = 100;
 const OBSERVATION_MS = 300_000;
-const TIMEOUT_MS = 180_000;
+const TIMEOUT_MS = 270_000;
+const JOB_TITLE_RATE_WINDOW_MS = 61_000;
+const JOB_TITLE_RATE_CODE = 99991400;
+const JOB_TITLE_RATE_ATTEMPTS = 8;
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Rejected('INVALID_RESPONSE');
@@ -92,12 +95,45 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
     function checkpoint() {
       if (signal.aborted) throw new Rejected('DEPENDENCY_UNAVAILABLE');
     }
+    function rateLimited(error: unknown): boolean {
+      return typeof error === 'object' && error !== null && 'code' in error
+        && (error as { code?: unknown }).code === 'RATE_LIMITED';
+    }
+    async function pause(): Promise<void> {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          signal.removeEventListener('abort', onAbort);
+          resolve();
+        }, JOB_TITLE_RATE_WINDOW_MS);
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(new Rejected('DEPENDENCY_UNAVAILABLE'));
+        };
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+      });
+    }
+    async function jobPage(pageToken: string | undefined): Promise<string> {
+      for (let attempt = 0; attempt < JOB_TITLE_RATE_ATTEMPTS; attempt++) {
+        checkpoint();
+        try {
+          const body = await transport.jobTitles(pageToken, signal);
+          let code: unknown;
+          try { code = (JSON.parse(body) as { code?: unknown }).code; } catch { return body; }
+          if (code !== JOB_TITLE_RATE_CODE) return body;
+        } catch (error) {
+          if (!rateLimited(error)) throw error;
+        }
+        await pause();
+      }
+      throw new Rejected('DEPENDENCY_UNAVAILABLE');
+    }
     async function directory(): Promise<Job[]> {
       const jobs = new Map<string, Job>(), tokens = new Set<string>();
       let token: string | undefined;
       for (let page = 0; page < maxDirectoryPages; page++) {
         checkpoint();
-        const raw = data(await transport.jobTitles(token, signal));
+        const raw = data(await jobPage(token));
         checkpoint();
         if (!Array.isArray(raw.items) || raw.items.length > 50 || typeof raw.has_more !== 'boolean') {
           throw new Rejected('INVALID_RESPONSE');

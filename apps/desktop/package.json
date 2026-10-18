@@ -124,6 +124,12 @@
         }
       ],
       "icon": "build/icon.icns",
+      "extraResources": [
+        {
+          "from": "build/build-identity.json",
+          "to": "build-identity.json"
+        }
+      ],
       "category": "public.app-category.business",
       "darkModeSupport": true,
       "minimumSystemVersion": "12.0",

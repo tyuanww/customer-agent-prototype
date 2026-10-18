@@ -47,6 +47,22 @@ loopback 只限制网络范围，不能证明请求者是谁。生产 API 当前
 
 Mac 人机验收和办公机 Windows 验收清单保持未观察。本文不把任何一项写成通过，也不把这次本地对齐称作上线。
 
+## 开发、测试和生产各用哪一套库
+
+Mac 只做两件事。开发用本机合成库 `customer_agent_synthetic`，端口 `43100` / `43101`。测试用同一台 Mac 上另一套可丢弃的库 `customer_agent_test`，数据目录 `~/.customer-agent-test-stack/pg15`，套接字端口 `43219`，不监听 TCP。这套库只跑到迁移 `0041_intake_readiness_v1_29`，没有演示话术，没有当前发布，没有训练告知。迁移自带的 5 条来源登记还在，发布目录是空的。建完后这套库已经停掉，数据还在，删掉 `~/.customer-agent-test-stack` 即可。它没有自己的 API，也不改 `43100` 上正在用的合成库。这两套库都不复制到杭州。
+
+杭州 WSL 上的 PostgreSQL 是唯一生产库。API 和身份服务只在那台机器的 `43115` / `43116` 监听。办公机经隧道访问 API，不连接数据库。
+
+## 训练样本从哪一张表来
+
+系统同步里的话术公告只表示有新版本，不承载训练。训练告知是 `privacy_notices` 里 `status = current` 的那一行，每个人的同意或拒绝写在 `notice_decisions`。
+
+旧工作台在坐席接受当前告知之后，查询改走 `POST /v1/search`，`collection_mode` 为 `pilot_recorded`，问题写入该 API 所连库的 `query_events`。没有当前告知、告知还没点、或者点了拒绝时，查询保持 `synthetic`，本机 hydrate 继续可用，不写这张训练账。
+
+六页 faq-v2 的查询和复制仍只读快照、只写剪贴板，不写 `query_events`。把六页也写进同一张训练账需要合同允许，这次没有改合同。
+
+杭州库里的告知正文要由人写出再入库。这次没有连接杭州，没有插入告知，也没有把采集模式改成无条件的 `pilot_recorded`。
+
 ## 相关
 
 - [运行环境、端口与发布目录参考](reference-runtime-ports-and-release-layout.md)

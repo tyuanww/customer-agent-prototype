@@ -35,15 +35,19 @@ const DASHBOARD_WEB_PREFERENCES: WebPreferences = {
   preload: join(__dirname, '../preload/dashboard.cjs'),
 };
 
-export function createDashboardBrowserWindow(): BrowserWindow {
+export function createDashboardBrowserWindow(runningLine: string): BrowserWindow {
   const nativeChrome = resolveDashboardNativeChrome(process.platform);
   const icon = loadBrandNativeImage();
+  const title = `${DASHBOARD_WINDOW_TITLE} · ${runningLine}`;
   const win = new BrowserWindow({
     ...nativeChrome,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#16151a' : nativeChrome.backgroundColor,
-    title: DASHBOARD_WINDOW_TITLE,
+    title,
     ...(icon ? { icon } : {}),
-    webPreferences: DASHBOARD_WEB_PREFERENCES,
+    webPreferences: {
+      ...DASHBOARD_WEB_PREFERENCES,
+      additionalArguments: [`--running-line=${runningLine}`],
+    },
   });
   win.setMenuBarVisibility(false);
   // The shared renderer document title is the overlay product name. Keep the
@@ -51,8 +55,8 @@ export function createDashboardBrowserWindow(): BrowserWindow {
   // without painting a second native title on macOS hiddenInset chrome.
   win.on('page-title-updated', (event) => {
     event.preventDefault();
-    if (win.getTitle() !== DASHBOARD_WINDOW_TITLE) {
-      win.setTitle(DASHBOARD_WINDOW_TITLE);
+    if (win.getTitle() !== title) {
+      win.setTitle(title);
     }
   });
   return win;

@@ -155,11 +155,14 @@ export function rankMissRows(rows: readonly UsageSourceRow[]): MissRankRow[] {
 
 export type UsageTrendPoint = { day: string; use: number; miss: number };
 
-/** Daily use and miss counts from the same rows. Day is the ISO date prefix. */
+/** Daily use and miss counts. The day is the local calendar day of askedAt. */
 export function trendFromUsage(rows: readonly UsageSourceRow[]): UsageTrendPoint[] {
   const days = new Map<string, { use: number; miss: number }>();
   for (const row of rows) {
-    const day = row.askedAt.slice(0, 10);
+    const parsed = new Date(row.askedAt);
+    const day = Number.isFinite(parsed.getTime())
+      ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+      : row.askedAt.slice(0, 10);
     const bucket = days.get(day) ?? { use: 0, miss: 0 };
     if (row.result === 'miss') bucket.miss += 1;
     else bucket.use += 1;

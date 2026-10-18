@@ -23,11 +23,11 @@ function options(value: unknown): value is IntakeQueryOption[] {
       && typeof v.label === 'string' && v.label.trim().length > 0 && [...v.label].length <= 256);
 }
 const messages = {
-  VALIDATION: '请检查输入；客户问题最多 500 字。',
-  STALE: '查询已取消或上下文已改变，请重新查询。',
+  VALIDATION: '请输入最多 500 字的客户问题。',
+  STALE: '请重新查询。',
   EXPIRED: '查询资格已到期，请重新查询。',
   UNAUTHORIZED: '请先登录后查询。',
-  FORBIDDEN: '当前店铺不可用或权限已失效，请重新选择店铺。',
+  FORBIDDEN: '请刷新店铺。',
   UNAVAILABLE: '查询服务暂不可用，请重试。',
   LIMIT: '资料超出读取限制，请联系管理员。',
   CLIPBOARD_FAILED: '复制失败，请重试。',

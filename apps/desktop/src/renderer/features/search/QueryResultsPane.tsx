@@ -69,7 +69,7 @@ export function QueryResultsPane({
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到可用话术</strong>
-                <span>请先让客户稍等，再联系话术师或运营核实；必要时升级客服经理。打开入口或复制联系方式只表示动作完成，不是转交回执。</span>
+                <span>请先让客户稍等，再联系话术师或运营，必要时升级客服经理。这不是转交回执。</span>
                 {errorMessage ? <span>{errorMessage}</span> : null}
                 {onCopyContact || onOpenHelp ? (
                   <div className="no-hit-help" data-testid="no-hit-help">
@@ -85,7 +85,7 @@ export function QueryResultsPane({
             {phase === 'ERROR' ? (
               <div ref={statusBannerRef} className="status-banner is-error" data-testid="error-state">
                 <strong>查询未完成</strong>
-                <span>{errorMessage || '出现可恢复错误，请重试。'}</span>
+                <span>{errorMessage || '请重试。'}</span>
                 <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
                   重试
                 </button>
