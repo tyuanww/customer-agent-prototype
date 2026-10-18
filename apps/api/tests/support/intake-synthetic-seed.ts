@@ -11,15 +11,19 @@ export const INTAKE_SYNTHETIC_IDENTITIES = [
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
  * intake catalog are never adopted by a production factory or an existing DB. */
-export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx', includeSopSource = false) {
+export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx', includeSopSource = false, factsLease: 'fresh' | 'expired' = 'fresh') {
   await admin.query('BEGIN');
   try {
     for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,$3)`, [id, `user-${id}`, id === 'agent' ? 'agent' : 'owner']);
       await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,'tenant-a','app-a','confirmed-synthetic',$1,1,0)`, [id, `user-${id}`]);
+      // Expired coverage is the inserted start state. Tests must not move valid_until later.
+      const factsWindow = factsLease === 'expired'
+        ? `statement_timestamp()-interval '2 minutes',statement_timestamp()-interval '1 second'`
+        : `statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds'`;
       await admin.query(`INSERT INTO content_intake.principal_facts VALUES ($1,1,ARRAY['dept-a'],$2,true,
-        statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id, `job-${role}`]);
+        ${factsWindow},repeat('a',64))`, [id, `job-${role}`]);
       await admin.query(`INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a',$1,1,$2) ON CONFLICT DO NOTHING`, [`job-${role}`, role]);
     }
     for (const suffix of ['a', 'b']) {

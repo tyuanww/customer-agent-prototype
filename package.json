@@ -13,6 +13,7 @@
     "dev": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/desktop dev",
     "start": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/desktop dev",
     "help:dev": "node scripts/dev-help.mjs",
+    "where": "node scripts/where-am-i.mjs",
     "dev:api": "pnpm --filter @customer-agent/api dev",
     "dev:intake:synthetic": "pnpm build:services && node scripts/intake-synthetic/run.ts",
     "test:intake:synthetic": "pnpm build:services && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --test scripts/intake-synthetic/host.test.ts scripts/intake-synthetic/cli.test.ts && CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST=1 node --experimental-transform-types --test scripts/intake-synthetic/sop-consumer.test.ts",

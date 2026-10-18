@@ -162,7 +162,7 @@ export function QueryCapsule({
                     className="deep-thinking-entry"
                     data-testid="deep-thinking-toggle"
                     role="switch"
-                    aria-label={`智能检索当前${smartEnabled ? '开启' : '关闭'}，点击切换。默认开启。`}
+                    aria-label={`智能检索${smartEnabled ? '开' : '关'}，点击切换。`}
                     aria-checked={smartEnabled}
                     aria-describedby="deep-thinking-description"
                     title="智能检索：MiniMax 规划检索式并重排已有话术，不生成正文"

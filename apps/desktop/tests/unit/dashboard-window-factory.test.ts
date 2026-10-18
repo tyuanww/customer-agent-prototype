@@ -38,7 +38,7 @@ describe('dashboard BrowserWindow factory', () => {
   });
 
   it('wires the final desktop window without renderer Node.js privileges', () => {
-    const created = createDashboardBrowserWindow();
+    const created = createDashboardBrowserWindow('0.3.26 · cd3879a · 杭州');
 
     expect(created).toBeDefined();
     expect(mocks.BrowserWindow).toHaveBeenCalledOnce();
@@ -61,6 +61,7 @@ describe('dashboard BrowserWindow factory', () => {
       },
     });
     expect(options?.webPreferences?.preload).toMatch(/preload\/dashboard\.cjs$/);
+    expect(options).toMatchObject({ title: '客服运营工作台 · 0.3.26 · cd3879a · 杭州' });
     expect(mocks.setMenuBarVisibility).toHaveBeenCalledWith(false);
     expect(mocks.on).toHaveBeenCalledWith('page-title-updated', expect.any(Function));
   });

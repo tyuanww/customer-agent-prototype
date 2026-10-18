@@ -36,6 +36,11 @@ try {
     env: buildEnvironment,
     stdio: 'inherit',
   });
+  execFileSync(process.execPath, ['scripts/write-build-identity.mjs'], {
+    cwd: desktopRoot,
+    env: buildEnvironment,
+    stdio: 'inherit',
+  });
   // extraResources copies Electron/Chromium licenses from dist/; a pnpm
   // workspace may not extract that zip until install.js runs.
   execFileSync(process.execPath, ['node_modules/electron/install.js'], {

@@ -24,7 +24,7 @@ function Terms({ label, options, selected, disabled, onChange, onLayoutChange }:
         </label>)}
         {!matches.length ? <span>暂无匹配{label}</span> : null}
       </div>
-      {matches.length > 100 ? <p>显示前 100 项，请输入名称缩小范围。</p> : null}
+      {matches.length > 100 ? <p>请输入名称缩小范围。</p> : null}
     </fieldset>
   </details>;
 }
@@ -87,14 +87,14 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onOpen, on
         </select>
         <button type="button" className="retry-btn" disabled={disabled} onClick={() => { void state.load(); }}>刷新店铺</button>
       </div>
-      {state.shops.length>0 && names.size!==state.shops.length ? <p role="status">店铺名称暂不可用，当前显示店铺编号；查询范围不变。</p> : null}
+      {state.shops.length>0 && names.size!==state.shops.length ? <p role="status">当前显示店铺编号。</p> : null}
       <div className="intake-condition-controls">
         <Terms onLayoutChange={onLayoutChange} label="商品" options={state.products} selected={state.productIds} disabled={disabled || !state.shopId}
           onChange={productIds => { void state.selectConditions({ productIds, scenarioIds: state.scenarioIds }); }} />
         <Terms onLayoutChange={onLayoutChange} label="场景" options={state.scenarios} selected={state.scenarioIds} disabled={disabled || !state.shopId}
           onChange={scenarioIds => { void state.selectConditions({ productIds: state.productIds, scenarioIds }); }} />
       </div>
-      <p role="status">未选择的维度仅查通用话术。切换条件保留问题，请点击查询。</p>
+      <p role="status">未选的只查通用话术。请点击查询。</p>
       {state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
     </div> : null}
   </div>;

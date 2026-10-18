@@ -91,6 +91,7 @@ import {
   readDashboardWindowSnapshot,
   type DashboardWindowSnapshot,
 } from './dashboard-window';
+import { readRunningLine } from './read-running-identity';
 import { GuardedScheduler } from './guarded-scheduler';
 import {
   createShutdownFence,
@@ -393,7 +394,7 @@ export class OverlayController {
       return this.revealDashboardWindow(this.dashboard);
     }
 
-    const win = createDashboardBrowserWindow();
+    const win = createDashboardBrowserWindow(readRunningLine());
     lockRendererWindow(win);
     this.dashboard = win;
     win.on('closed', () => {

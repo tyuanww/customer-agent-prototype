@@ -35,7 +35,7 @@ function managementView(): IntakeManagementView {
       sources: [{ selection: 'source-sel-a', label: 'source-a · shop-a', domain: 'product' }],
       sourceSelection: null, file: null, principals: [],
       preparerSelection: null, editorSelections: [], confirmed: false, pending: null, job: null,
-      canChoose: true, canSubmit: false, canRetry: false, canRefresh: true,
+      canChoose: true, canSubmit: false, canRetry: false, canRefresh: false,
       canStop: false, canSaveReport: false, canOpen: false, canReset: false, notice: null,
     },
     signedIn: true, displayName: '合成审核员', authorized: true, validUntil: '2099-01-01T00:00:00.000Z',
@@ -55,7 +55,7 @@ function permissionView(): IntakePermissionView {
   const until = '2099-01-01T00:00:00.000Z';
   return {
     signedIn: true, available: true, busy: false, validUntil: until,
-    sources: [{ selection: 'scope-1', label: 'shop-a · 产品 · source-a' }],
+    sources: [{ selection: 'scope-1', label: '该店铺 · 产品 · 该来源' }],
     source: 'scope-1',
     people: [
       { selection: 'person-a', label: '合成坐席' },
@@ -64,7 +64,7 @@ function permissionView(): IntakePermissionView {
     actions: ['query', 'content-manage', 'import', 'source-confirm', 'publish'],
     grants: [{
       selection: 'grant-1', reference: 'grant-demo', person: '合成坐席', personSelection: 'person-a',
-      action: 'query', scope: 'shop-a · 产品 · source-a', startsAt: '2026-10-08T02:00:00.000Z',
+      action: 'query', scope: '该店铺 · 产品 · 该来源', startsAt: '2026-10-08T02:00:00.000Z',
       reason: '预览夹具', expiresAt: '2026-10-09T02:00:00.000Z', revoked: false, canRevoke: true,
     }],
     preview: null, pending: false, resultUnknown: false, notice: null,
@@ -177,6 +177,18 @@ export function installIntakeReviewBridge(location: Location = window.location):
         materials = { ...materials, selected: row?.candidate ?? null };
       }
       if (command.action === 'discard') materials = { ...materials, selected: null };
+      if (command.action === 'upload-source') {
+        materials = {
+          ...materials,
+          upload: { ...materials.upload, sourceSelection: command.selection, phase: 'selected', canReset: true },
+        };
+      }
+      if (command.action === 'upload-reset') {
+        materials = {
+          ...materials,
+          upload: { ...materials.upload, sourceSelection: null, phase: 'idle', canReset: false },
+        };
+      }
       return { ok: true, view: materials };
     },
     onInvalidated: () => () => undefined,
