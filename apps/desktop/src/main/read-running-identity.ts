@@ -18,7 +18,13 @@ function readStamp(): Stamp {
   } catch {
     // Unpackaged development has no baked stamp.
   }
-  return { productVersion: app.getVersion(), gitSha: 'dev' };
+  try {
+    const version = app.getVersion();
+    if (typeof version === 'string' && version.length > 0) return { productVersion: version, gitSha: 'dev' };
+  } catch {
+    // Overlay unit tests stub a partial app that has no getVersion.
+  }
+  return { productVersion: 'dev', gitSha: 'dev' };
 }
 
 function readPoint(): ReturnType<typeof runningPointFromProfile> {
