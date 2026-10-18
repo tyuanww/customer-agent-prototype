@@ -72,7 +72,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/** The field shows a local datetime-local value. The upload command stores a UTC instant. */
 function instantToLocalInput(value: string): string {
   if (!COMMAND_INSTANT.test(value)) return value;
   const parsed = new Date(value);

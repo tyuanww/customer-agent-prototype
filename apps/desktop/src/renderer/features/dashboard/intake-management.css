@@ -279,7 +279,6 @@
   color: var(--dash-ink, #24212a);
 }
 
-/* overview: compact row actions, no native-looking controls */
 .intake-overview .desk-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .intake-overview .desk-row-actions input { flex: 0 1 180px; width: 180px; font-size: 14px; line-height: 22px; }
 .intake-overview td select { font-size: 14px; line-height: 22px; min-height: 38px; }

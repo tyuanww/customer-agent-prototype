@@ -119,7 +119,6 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('请先登录后再发布。');
     expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent('未接入');
     expect(screen.getByTestId('cancel-in-flight')).toBeDisabled();
-    // No API at all settles immediately as 未接入 — never as "still checking".
     expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
   });
 
@@ -148,7 +147,6 @@ describe('ContentModule publish gate', () => {
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.agent);
     expect(api.publishDraft).not.toHaveBeenCalled();
-    // The badge reports the product session, not the publish permission.
     expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
   });
 
@@ -242,7 +240,6 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => {
       expect(screen.getByTestId('publish-feedback')).toHaveTextContent(CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
     });
-    // Feedback owns the slot: the idle "请先导入草稿" reason gives way to it.
     expect(screen.queryByTestId('publish-disabled-reason')).not.toBeInTheDocument();
     expect(screen.getByTestId('publish-action')).toBeDisabled();
     result = { ok: true };
@@ -292,7 +289,6 @@ describe('ContentModule publish gate', () => {
     await user.click(screen.getByTestId('content-replace-confirm-action'));
     await waitFor(() => expect(api.publishDraft).toHaveBeenCalled());
     const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
-    // The override must reach the publish payload; the frozen CSV is built from these rows.
     expect(request?.rows).toEqual([{ scene: '面膜紫适用人群', script: '亲亲这是话术', domain: 'campaign' }]);
     expect(request?.sourceBindings).toEqual([{ domain: 'campaign', source_version_id: 'srcv_stack_campaign_v1' }]);
   });
@@ -333,7 +329,6 @@ describe('ContentModule publish gate', () => {
       '产品沿用 · 活动沿用 · 售前已更新（75 条）· 售后沿用',
     );
     expect(screen.getByTestId('publish-feedback')).toHaveTextContent('发布号 rel_25');
-    // 发布请求带上同一句 delta 作为 summary。
     const request = vi.mocked(api.publishDraft).mock.calls[0]?.[0];
     expect(request?.summary).toBe(composeLibraryDelta([{ domain: 'presale', count: null }]));
     expect(screen.getByTestId('publish-goto-announce')).toHaveTextContent('去系统同步');
@@ -638,7 +633,6 @@ describe('ContentModule import panel', () => {
     expect(screen.getByRole('combobox', { name: '将替换' })).toBeDisabled();
     expect(importHeading())
       .toHaveTextContent('coach-draft.csv · 待发布 1 行');
-    // Cancel is the in-flight escape hatch and must stay live.
     expect(screen.getByTestId('cancel-in-flight')).toBeEnabled();
   });
 
@@ -673,7 +667,6 @@ describe('ContentModule import panel', () => {
       .toHaveTextContent('coach-draft.csv · 待发布 1 行');
     expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
     expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
-    // Correcting the domain must not re-enable publish for the same round.
     await chooseLibrary(user, 'campaign');
     expect(screen.getByTestId('publish-action')).toBeDisabled();
   });
@@ -719,7 +712,6 @@ describe('ContentModule rollback to previous release', () => {
     await waitFor(() => expect(api.session).toHaveBeenCalled());
 
     await user.click(screen.getByTestId('content-rollback-previous'));
-    // First click only opens the confirmation; nothing is sent yet.
     expect(api.rollbackPrevious).not.toHaveBeenCalled();
     expect(screen.getByTestId('content-rollback-confirm')).toBeInTheDocument();
 
@@ -735,7 +727,6 @@ describe('ContentModule rollback to previous release', () => {
 
   it('reports the first-version case as no previous release instead of a raw error', async () => {
     const api = mockSession('owner');
-    // product-http maps the API's NOT_FOUND (404) onto GONE before it reaches the renderer.
     api.rollbackPrevious = vi.fn(async () => ({
       ok: false as const,
       code: 'GONE' as const,

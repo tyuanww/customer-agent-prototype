@@ -79,7 +79,6 @@ export function v9Donut() {
   return { all, parts: types.map((type, index) => ({ type, color: colors[index], total: totals[index], pct: (totals[index] / all * 100).toFixed(1) })) };
 }
 
-/* ---- full usage query (search / role / sort / pagination / sparkline) ---- */
 export type V9UsageQuery = { view: 'script' | 'person'; type: string; role: string; q: string; desc: boolean; page: number };
 export type V9UsageRow = { name: string; tag: string; total: number; extra: string; person: boolean; trend: { points: string; up: boolean } | null };
 const PAGE_SIZE = 8;

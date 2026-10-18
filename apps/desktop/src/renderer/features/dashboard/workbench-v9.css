@@ -164,7 +164,6 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 .kv td:first-child{width:180px;color:var(--mute)}
 
 
-/* ---------- modal ---------- */
 .wb9 .mask{position:fixed;inset:0;background:rgba(36,33,42,.32);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity 120ms;z-index:20}
 .wb9 .mask.on{opacity:1;pointer-events:auto}
 .wb9 .dialog{width:440px;background:var(--bg);border-radius:8px;padding:20px 24px 24px;box-shadow:0 12px 40px rgba(36,33,42,.16),0 0 0 1px rgba(36,33,42,.04)}
@@ -230,7 +229,6 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 #matrix tfoot td{font-weight:600}
 
 
-/* v5 overview */
 .wb9 .ov-head{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:24px}
 .wb9 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
 .wb9 .tile{border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:2px}
@@ -323,7 +321,6 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 .redact{color:var(--faint)}
 .wb9 .stale{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#fdf3df;color:#a8761a;font-size:11px;line-height:18px}
 .wb9 .res{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-/* ===== shell parity with v9 (intake profile only) ===== */
 .dashboard-shell.is-intake .dashboard-nav-item > button { height: 36px; min-height: 36px; font-size: 14px; font-weight: 500; color: #34313f; -webkit-text-fill-color: #34313f; }
 html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .dashboard-nav-item > button,
 .dashboard-shell.is-intake[data-theme='dark'] .dashboard-nav-item > button { color: #f5f3f7; -webkit-text-fill-color: #f5f3f7; }
@@ -356,7 +353,6 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .dashboard-nav-item
 .wb9 .desk-table th { background: transparent; font-size: 12px; font-weight: 500; color: #6b6878; padding: 10px 12px; }
 .wb9 .desk-table td { padding: 0 12px; height: 56px; }
 .wb9 .desk-table { background: transparent; margin-top: 0; }
-/* Workbench td and input rules target the old markup. Ant Design tables and select fields on this page keep their own box. */
 .desk-permissions .ant-table-tbody > tr > td { height: auto; padding-top: 12px; padding-bottom: 12px; }
 .desk-permissions .ant-table-measure-row > td { height: 0; padding: 0; border: 0; font-size: 0; line-height: 0; }
 .desk-permissions .ant-select-selection-search-input { height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

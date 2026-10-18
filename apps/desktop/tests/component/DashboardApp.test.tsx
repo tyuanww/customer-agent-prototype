@@ -1601,9 +1601,7 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
 
-    // iteration 模块已并入概览，通过概览双栏卡片验证
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
-    // 「话术优化待办」标题出现在双栏卡片里
     expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
 
     await user.click(screen.getByTestId('nav-announce'));

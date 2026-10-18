@@ -29,7 +29,6 @@ function UsageTable(props: TableProps<UsageLogRow> & { 'aria-label': string }) {
   return createElement(Table as ComponentType<typeof props>, props);
 }
 
-/** 系统同步页的使用情况。通道缺失时不画表。 */
 export function IntakeUsageLog() {
   const [result, setResult] = useState<UsageLogResult | ''>('');
   const [query, setQuery] = useState('');

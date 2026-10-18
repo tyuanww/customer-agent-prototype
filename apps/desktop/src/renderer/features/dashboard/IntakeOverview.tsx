@@ -543,7 +543,6 @@ export function IntakeOverview({
       </div>
       <div className="card" aria-label="话术类型占比">
         <div className="card-head"><h3>话术类型占比</h3></div>
-        {/* Live rows have no type mix. Say so instead of drawing an empty picture. */}
         {donut ? <div className="donut-wrap">
           <svg viewBox="0 0 140 140" width="140" height="140">
             {rings?.rings.map((ring) => <circle key={ring.color} cx="70" cy="70" r={rings.radius} fill="none" stroke={ring.color} strokeWidth="16" strokeDasharray={`${ring.dash} ${ring.gap}`} strokeDashoffset={ring.offset} transform="rotate(-90 70 70)" />)}

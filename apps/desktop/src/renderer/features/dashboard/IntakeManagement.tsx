@@ -313,7 +313,6 @@ export function IntakeManagement() {
     }
     const off = api.onInvalidated(() => {
       const gen = ++generation.current; setDirtyIds(new Set()); setView(null); setError('请重新读取当前状态。');
-      // Preserve only a Main-owned unknown receipt handle, never the old material.
       void api.current().then(reply => { if (generation.current === gen) setView(reply.view); })
         .catch(() => { if (generation.current === gen) setView(null); });
     });

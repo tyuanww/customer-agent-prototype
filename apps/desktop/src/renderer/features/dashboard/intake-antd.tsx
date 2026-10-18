@@ -37,8 +37,6 @@ function useDashboardMode(): 'light' | 'dark' {
   return mode;
 }
 
-/** Ant Design skin for the whole workbench. Font, ink, radius, control height,
- * and table density live here. Pages replace their own selects as they move. */
 export function IntakeAntdTheme({ children }: { children: ReactNode }) {
   const dark = useDashboardMode() === 'dark';
   return <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }} theme={{
