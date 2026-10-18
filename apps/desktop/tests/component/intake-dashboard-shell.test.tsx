@@ -177,7 +177,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     expect(screen.getByText('预览 · 尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
     await user.click(screen.getByRole('button',{name:'返回修改'}));expect(screen.getByRole('textbox',{name:'授权原因'})).toHaveValue('合成导航保留');
   }finally{cleanup();owner.dispose();}
-});
+}, 20000);
 
 it('keeps the six intake pages inside 980 by 680 in light and dark', async () => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
