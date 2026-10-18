@@ -2,6 +2,14 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.30] - 2026-10-19
+
+### Changed
+
+- 仓库版本是 `0.3.30`。根目录 `VERSION` 与 `apps/desktop/package.json` 是同一串。
+- 已发布的安装包仍是 `v0.3.29`，对应提交 `8b1bf72`。这一版包还没有发出。坐席要退出并安装新包之后，窗口标题才会使用启动时解析的会话来源。
+- 杭州进程仍是 `8036766`。健康检查仍是 `0.3.29`。话术指针仍是 `rel_27`。不要覆盖 `v0.3.29` 和 `v0.3.27` 的附件。
+
 ## [0.3.29] - 2026-10-18
 
 ### Changed
