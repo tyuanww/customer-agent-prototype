@@ -2,6 +2,16 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.29] - 2026-10-18
+
+### Changed
+
+- 你可以下载 `v0.3.29` 的 Windows、Mac、Linux 未签名包。`v0.3.27` 的三个旧附件还在。
+- 根目录 `VERSION` 与 `apps/desktop/package.json` 都是 `0.3.29`。提交是 `8b1bf72`。
+- 下载页是 `v0.3.29`。应用内下载目录的当前行是 `sw_0329_mac`。
+- 这一包相对已发布的 `0.3.28` 树，包含录入工作台的 Ant Design 皮肤，以及登录后从服务端读使用趋势。未登录仍读本机记录。
+- 杭州进程没有换。健康检查在 2026-10-18 仍是 `0.3.28`。话术指针仍是 `rel_27`。
+
 ## [0.3.28] - 2026-10-17
 
 ### Changed
