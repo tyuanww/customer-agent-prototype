@@ -101,7 +101,7 @@ describe('ContentModule publish gate', () => {
     const api = mockSession('owner');
     api.session = vi.fn()
       .mockResolvedValueOnce({
-        ok: true, enabled: true, signedIn: true, role: 'owner', displayName: '合成管理员',
+        ok: true, enabled: true, signedIn: true, role: 'owner', displayName: '合成管理员', job: null,
       })
       .mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
     window.dashboardContent = api;
@@ -109,7 +109,7 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入'));
     fireEvent.focus(window);
     expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
-    finishRefresh({ ok: true, enabled: true, signedIn: false, role: null, displayName: null });
+    finishRefresh({ ok: true, enabled: true, signedIn: false, role: null, displayName: null, job: null });
     await waitFor(() => expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录'));
   });
 
@@ -463,6 +463,7 @@ describe('ContentModule session badge', () => {
       signedIn: true,
       role: 'owner' as const,
       displayName: '合成管理员',
+      job: null,
     }));
     window.dashboardContent = api;
     render(<ContentModule />);
