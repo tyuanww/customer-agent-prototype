@@ -10,7 +10,8 @@ type Source = { selection: string; source: C['IntakeSource']; actions: C['Intake
 type Person = C['IntakePrincipalPage']['items'][number] & { selection: string; deadline: number };
 type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange']; uncertain: boolean };
 const reject = () => { throw new ProductHttpError('STALE'); };
-const label = (s: C['IntakeScope']) => `${s.shopId ?? '品牌通用'} · ${{product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain]} · ${s.sourceId ?? '该范围全部来源'}`;
+// IntakeScope has ids, not names. A missing name stays 该店铺 / 该来源, and the id never becomes the label.
+const label = (s: C['IntakeScope']) => `该店铺 · ${{product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain]} · 该来源`;
 
 /** Owns ephemeral selections, credential epochs and exact mutation recovery.
  * Renderer supplies intent; it never receives IDs to construct a grant request. */

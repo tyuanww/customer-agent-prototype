@@ -1,6 +1,12 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
+if (typeof window.matchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true, writable: true,
+    value: (query: string) => ({ matches: false, media: query, onchange: null, addListener: () => undefined, removeListener: () => undefined, addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => false }),
+  });
+}
 import { IntakeUsageLog } from '../../src/renderer/features/dashboard/IntakeUsageLog';
 import { formatShortTime } from '../../src/renderer/features/dashboard/intake-time';
 import type { DashboardUsageLogApi, UsageLogRow } from '../../src/shared/dashboard-usage-log';
@@ -23,46 +29,46 @@ function install(overrides: Partial<DashboardUsageLogApi> = {}) {
   return api;
 }
 
-it('states that usage is not mounted and draws no table when the interface is absent', () => {
+it('says login is required and draws no table when the interface is absent', () => {
   render(<IntakeUsageLog />);
   expect(screen.getByText('使用记录还不能在这里看。')).toBeVisible();
-  expect(screen.queryByText('使用记录暂时读不出来。请稍后再试。')).toBeNull();
-  expect(screen.queryByText('暂无使用记录')).toBeNull();
+  expect(screen.queryByText('未接入')).not.toBeInTheDocument();
   expect(screen.queryByRole('table')).toBeNull();
 });
 
-it('states that usage is not mounted when the source replies UNAVAILABLE and draws no table', async () => {
-  install({ list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '使用记录还不能在这里看。' })) });
+it('says login is required when the source replies UNAVAILABLE and draws no table', async () => {
+  install({ list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })) });
   render(<IntakeUsageLog />);
   expect(await screen.findByText('使用记录还不能在这里看。')).toBeVisible();
-  expect(screen.queryByText('使用记录暂时读不出来。请稍后再试。')).toBeNull();
-  expect(screen.queryByText('暂无使用记录')).toBeNull();
+  expect(screen.queryByText('未接入')).not.toBeInTheDocument();
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
-});
-
-it('says 暂无使用记录 when the log is empty', async () => {
-  install({ list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })) });
-  render(<IntakeUsageLog />);
-  expect(await screen.findByText('暂无使用记录')).toBeVisible();
-  expect(screen.queryByText('使用记录暂时读不出来。请稍后再试。')).toBeNull();
 });
 
 it('moves keyboard focus across the filter, search and export controls', async () => {
   install();
   const user = userEvent.setup();
   render(<IntakeUsageLog />);
-  const filter = await screen.findByRole('button', { name: '全部' });
+  const filter = await screen.findByRole('radio', { name: '全部' });
   const search = screen.getByRole('textbox', { name: '搜索问题或坐席' });
-  const exportButton = await screen.findByRole('button', { name: '导出训练样本' });
+  const exportButton = await screen.findByRole('button', { name: '导出使用记录' });
+  expect(screen.queryByRole('button', { name: '全部' })).toBeNull();
   filter.focus();
   expect(filter).toHaveFocus();
-  await user.tab();
-  expect(screen.getByRole('button', { name: '已复制' })).toHaveFocus();
   search.focus();
   expect(search).toHaveFocus();
   exportButton.focus();
   expect(exportButton).toHaveFocus();
+  filter.focus();
+  await user.keyboard('{ArrowRight}');
+  expect(screen.getByRole('radio', { name: '已复制' })).toBeChecked();
+});
+
+it('shows the empty sentence when no record matches', async () => {
+  install({ list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })) });
+  render(<IntakeUsageLog />);
+  expect(await screen.findByText('暂无使用记录')).toBeVisible();
+  expect(screen.getByRole('table', { name: '使用情况' })).toBeVisible();
 });
 
 it('renders redacted questions, stale snapshots, misses and result labels', async () => {
@@ -82,7 +88,7 @@ it('sends the chosen result filter to the interface', async () => {
   const api = install();
   render(<IntakeUsageLog />);
   await screen.findByText('孕妇能用吗');
-  await userEvent.click(screen.getByRole('button', { name: '未命中' }));
+  await userEvent.click(within(screen.getByRole('radiogroup', { name: '结果' })).getByText('未命中'));
   await waitFor(() => expect(api.list).toHaveBeenLastCalledWith({ result: 'miss', query: '', cursor: null }));
 });
 
@@ -95,13 +101,13 @@ it('shows a retry button when reading fails and recovers on retry', async () => 
   const retry = await screen.findByRole('button', { name: '重试' });
   await userEvent.click(retry);
   expect(await screen.findByText('孕妇能用吗')).toBeVisible();
-  expect(screen.queryByRole('button', { name: '导出训练样本' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '导出使用记录' })).toBeNull();
 });
 
 it('asks for confirmation with the excluded counts before exporting', async () => {
   const api = install();
   render(<IntakeUsageLog />);
-  await userEvent.click(await screen.findByRole('button', { name: '导出训练样本' }));
+  await userEvent.click(await screen.findByRole('button', { name: '导出使用记录' }));
   const dialog = await screen.findByRole('alertdialog');
   expect(dialog).toHaveTextContent('将导出 2 条');
   expect(dialog).toHaveTextContent('已脱敏的 1 条');

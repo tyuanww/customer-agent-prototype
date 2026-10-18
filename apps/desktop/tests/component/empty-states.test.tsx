@@ -22,7 +22,7 @@ afterEach(() => {
 
 it('splits an empty usage log from a failed usage read on 概览', async () => {
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageFailed)).not.toHaveLength(0);
+  expect(await screen.findAllByText('坐席查询后会出现')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
   cleanup();
   window.dashboardUsageLog = {
@@ -69,7 +69,7 @@ it('keeps the locked empty sentences on 话术库, SOP, 系统同步 and 知识�
   expect(await screen.findByText(WORKBENCH_EMPTY.wordingUnmounted)).toBeVisible();
   cleanup();
   render(<SopLibraryModule />);
-  expect(await screen.findByText(WORKBENCH_EMPTY.sopEmpty)).toBeVisible();
+  expect(await screen.findAllByText('请先登录后再管理 SOP。')).not.toHaveLength(0);
   cleanup();
   render(<AnnounceModule />);
   expect(await screen.findByText(WORKBENCH_EMPTY.announceUnmounted)).toBeVisible();

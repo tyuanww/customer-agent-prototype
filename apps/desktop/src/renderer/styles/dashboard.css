@@ -1937,7 +1937,8 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   gap: 2px;
 }
 
-.content-publish-delta {
+.content-publish-delta,
+.content-publish-release {
   color: var(--dash-muted);
 }
 
@@ -2857,6 +2858,18 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
 
 .dash-filter-toolbar input {
   min-width: min(320px, 55vw);
+}
+
+.dash-filter-toolbar input.ant-input {
+  min-width: 0;
+  width: 220px;
+  max-width: 100%;
+  padding: 4px 11px;
+  border-radius: 8px;
+}
+
+.dash-filter-toolbar input.ant-input:hover {
+  background: var(--dash-surface);
 }
 
 .dash-reset,

@@ -62,8 +62,8 @@ test('knowledge desk uploads through the sandbox preload and keeps the row on di
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await expect(dashboard.getByRole('heading', { name: '知识库' })).toBeVisible();
-    await dashboard.getByRole('button', { name: '售前客服' }).click();
-    await expect(dashboard.getByRole('button', { name: '售前客服' })).toHaveAttribute('aria-pressed', 'true');
+    await dashboard.getByRole('tab', { name: '售前客服' }).click();
+    await expect(dashboard.getByRole('tab', { name: '售前客服' })).toHaveAttribute('aria-selected', 'true');
     await dashboard.getByRole('button', { name: '添加话术' }).click();
     await dashboard.getByRole('textbox', { name: '问题' }).fill('退货时效');
     await dashboard.getByRole('combobox', { name: '分类' }).selectOption('aftersale');

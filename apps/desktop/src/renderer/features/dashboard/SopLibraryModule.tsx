@@ -1,4 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { Button, Empty, Input, type ButtonProps } from 'antd';
 import {
   isDashboardOpsFailure,
   OPS_LOOP_COPY,
@@ -8,6 +9,17 @@ import {
   type DashboardSopNode,
 } from '@shared/dashboard-ops-loop';
 import { StatusBadge } from './StatusBadge';
+
+const NO_CHANNEL_EMPTY = '请先登录后再管理 SOP。';
+const NO_STEPS = '当前没有 SOP 步骤。点上传，把 CSV 加进来。';
+
+function stepNotice(action: '已更新' | '已删除', title: string): string {
+  return `${action}「${title}」。`;
+}
+
+function SopButton(props: ButtonProps) {
+  return <Button type="default" {...props} autoInsertSpace={false} />;
+}
 
 function toCsv(items: readonly DashboardSopNode[]): string {
   const header = 'node_id,parent_node_id,title,body,sort_key';
@@ -31,14 +43,17 @@ export function SopLibraryModule({
   const [items, setItems] = useState<readonly DashboardSopNode[] | null>(null);
   const [message, setMessage] = useState('加载中…');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
   const uploadRef = useRef<HTMLInputElement>(null);
   const liveRef = useRef(true);
 
-  const load = () => {
+  const load = (notice?: string) => {
     const api = window.dashboardOps;
     if (!api) {
       setItems(null);
-      setMessage(OPS_LOOP_COPY.sopChannel);
+      setMessage(NO_CHANNEL_EMPTY);
       return;
     }
     void api.sopCatalog().then((result) => {
@@ -53,7 +68,7 @@ export function SopLibraryModule({
       setSelectedId((current) => current && active.some((item) => item.nodeId === current)
         ? current
         : active[0]?.nodeId ?? null);
-      setMessage(active.length === 0 ? '还没有 SOP。' : '');
+      setMessage(notice ?? (active.length === 0 ? NO_STEPS : ''));
     }).catch(() => {
       if (!liveRef.current) return;
       setItems(null);
@@ -70,6 +85,10 @@ export function SopLibraryModule({
   }, []);
 
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
+  useEffect(() => {
+    setDraftTitle(selected?.title ?? '');
+    setDraftBody(selected?.body ?? '');
+  }, [selected?.nodeId, selected?.version, selected?.title, selected?.body]);
 
   return (
     <div className="dash-module" data-testid="module-sop">
@@ -99,7 +118,7 @@ export function SopLibraryModule({
             }
             const api = window.dashboardOps;
             if (!file || !api) {
-              setMessage(file ? OPS_LOOP_COPY.noProduct : message);
+              setMessage(file ? NO_CHANNEL_EMPTY : message);
               return;
             }
             if (file.size > SOP_UPLOAD_MAX_BYTES) {
@@ -117,65 +136,68 @@ export function SopLibraryModule({
             });
           }}
         />
-        <button
-          type="button"
-          className="dash-reset"
+        <SopButton
           data-testid="sop-upload"
           disabled={!canUploadSop}
           onClick={() => uploadRef.current?.click()}
         >
           上传
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
+        </SopButton>
+        <SopButton
+          type={selected ? 'primary' : 'default'}
           data-testid="sop-update"
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(OPS_LOOP_COPY.sopChannel);
+              setMessage(NO_CHANNEL_EMPTY);
               return;
             }
             if (!selected) {
               setMessage(OPS_LOOP_COPY.selectSop);
               return;
             }
-            if (sopAllergyStepNeedsStopCopy(selected.title, selected.body)) {
+            if (!draftTitle.trim()) {
+              setMessage('请先填写步骤名称。');
+              return;
+            }
+            if (sopAllergyStepNeedsStopCopy(draftTitle, draftBody)) {
               setMessage(OPS_LOOP_COPY.allergyStop);
               return;
             }
+            const title = draftTitle.trim();
             void api.sopPatch({
               nodeId: selected.nodeId,
               expectedVersion: selected.version,
-              title: selected.title,
-              body: selected.body,
+              title,
+              body: draftBody,
               sortKey: selected.sortKey,
             }).then((result) => {
               if (isDashboardOpsFailure(result)) {
                 setMessage(result.message);
                 return;
               }
-              setMessage(`已更新 ${result.nodeId}`);
-              load();
+              const notice = stepNotice('已更新', title);
+              setMessage(notice);
+              load(notice);
             });
           }}
         >
           更新
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
+        </SopButton>
+        <SopButton
+          danger
           data-testid="sop-delete"
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(OPS_LOOP_COPY.sopChannel);
+              setMessage(NO_CHANNEL_EMPTY);
               return;
             }
             if (!selected) {
               setMessage(OPS_LOOP_COPY.selectSop);
               return;
             }
+            const title = selected.title;
             void api.sopDelete({
               nodeId: selected.nodeId,
               expectedVersion: selected.version,
@@ -184,20 +206,19 @@ export function SopLibraryModule({
                 setMessage(result.message);
                 return;
               }
-              setMessage(`已删除 ${result.nodeId}`);
-              load();
+              const notice = stepNotice('已删除', title);
+              setMessage(notice);
+              load(notice);
             });
           }}
         >
           删除
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
+        </SopButton>
+        <SopButton
           data-testid="sop-export"
           onClick={() => {
             if (!window.dashboardOps) {
-              setMessage(OPS_LOOP_COPY.sopChannel);
+              setMessage(NO_CHANNEL_EMPTY);
               return;
             }
             if (!items || items.length === 0) {
@@ -214,16 +235,26 @@ export function SopLibraryModule({
           }}
         >
           导出
-        </button>
-        <button
-          type="button"
-          className="dash-reset"
+        </SopButton>
+        <Input
+          aria-label="新步骤名称"
+          placeholder="新步骤的名称"
+          style={{ width: 220 }}
+          value={customTitle}
+          onChange={(event) => setCustomTitle(event.target.value)}
+        />
+        <SopButton
           data-testid="sop-custom-step"
           disabled={!canUploadSop}
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(OPS_LOOP_COPY.noProduct);
+              setMessage(NO_CHANNEL_EMPTY);
+              return;
+            }
+            const title = customTitle.trim();
+            if (!title) {
+              setMessage('请先填写新步骤的名称。');
               return;
             }
             const nodeId = `sop_${crypto.randomUUID()}`;
@@ -233,7 +264,7 @@ export function SopLibraryModule({
               {
                 nodeId,
                 parentNodeId: selected?.nodeId ?? null,
-                title: '自定义步骤',
+                title,
                 body: '待填写',
                 sortKey: current.length,
                 version: 1,
@@ -241,37 +272,51 @@ export function SopLibraryModule({
               },
             ]);
             void api.sopImport(csv).then((result) => {
-              setMessage(result.ok ? 'SOP 已更新。' : result.message);
-              if (result.ok) load();
+              if (!result.ok) {
+                setMessage(result.message);
+                return;
+              }
+              setCustomTitle('');
+              const notice = `已整树导入「${title}」。`;
+              setMessage(notice);
+              load(notice);
             });
           }}
         >
           自定义步骤
-        </button>
+        </SopButton>
       </div>
+      {selected ? <div className="fields" style={{ display: 'grid', gap: 8, maxWidth: 480, marginBottom: 16 }}>
+        <Input aria-label="步骤名称" value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} />
+        <Input.TextArea aria-label="步骤内容" rows={3} value={draftBody} onChange={(event) => setDraftBody(event.target.value)} />
+      </div> : null}
       {message ? <p className="dash-scope" data-testid="sop-write-status">{message}</p> : null}
       {items === null ? (
-        <div className="dash-empty-state" data-testid="sop-library-empty">
-          <strong>还没有 SOP。</strong>
-        </div>
+        <Empty
+          data-testid="sop-library-empty"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={window.dashboardOps ? message : NO_CHANNEL_EMPTY}
+        />
       ) : items.length === 0 ? (
-        <div className="dash-empty-state" data-testid="sop-library-empty">
-          <strong>还没有 SOP。</strong>
-        </div>
+        <Empty
+          data-testid="sop-library-empty"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={NO_STEPS}
+        />
       ) : (
         <ul className="dash-list" data-testid="sop-library-list">
           {items.map((item) => (
             <li key={item.nodeId}>
-              <button
-                type="button"
-                className={item.nodeId === selectedId ? 'is-active' : ''}
+              <SopButton
+                type="text"
+                className={item.nodeId === selectedId ? 'is-active' : undefined}
                 data-testid={`sop-node-${item.nodeId}`}
                 onClick={() => setSelectedId(item.nodeId)}
               >
                 <strong>{item.title}</strong>
                 <StatusBadge label={`v${item.version}`} tone="ok" />
                 <span>{item.body}</span>
-              </button>
+              </SopButton>
             </li>
           ))}
         </ul>

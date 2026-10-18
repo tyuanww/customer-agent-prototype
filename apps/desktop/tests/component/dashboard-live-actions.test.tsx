@@ -204,10 +204,10 @@ describe('dashboard live actions', () => {
 
     render(<SopLibraryModule />);
     await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
     await user.click(screen.getByTestId('sop-export'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('现在不能保存 SOP');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
+    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
   });
 
   it('does not render fixture content releases when there is no live publish', async () => {
@@ -414,7 +414,7 @@ describe('dashboard live actions', () => {
     expect(scriptDelete.mock.calls[0]?.[0]).toEqual({
       scriptId: 'script-1', expectedVersion: 2,
     });
-    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(`${OPS_LOOP_COPY.retirePending} smut_del`);
+    expect(screen.getByTestId('wording-write-status')).toHaveTextContent(OPS_LOOP_COPY.retirePending);
   });
 
   it('disables 确认下架 while the delete is in flight', async () => {

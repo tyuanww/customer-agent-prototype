@@ -143,8 +143,8 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('现在不能保存 SOP。请稍后再试。');
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP。');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
@@ -198,10 +198,8 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
     expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
     expect(screen.getByTestId('nav-announce')).toHaveAccessibleName('系统同步');
-    const line = await screen.findByTestId('intake-shell-line');
-    expect(line).toHaveTextContent('synthetic-local');
-    expect(line).toHaveTextContent('faq-v2');
-    expect(line.textContent).not.toMatch(/43100|password|DATABASE|secret|apiOrigin/i);
+    expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-topbar-drag-surface').parentElement).not.toHaveTextContent('synthetic-local');
     await user.click(materials);
     expect(await screen.findByRole('heading', { name: '资料管理' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '知识库' })).not.toBeInTheDocument();
@@ -1316,7 +1314,7 @@ describe('DashboardApp', () => {
     expect(screen.getByRole('heading', { name: '概览' })).toBeInTheDocument();
     expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
     expect(screen.getByTestId('module-overview')).toHaveTextContent('话术使用次数');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理迭代');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
   });
 
   it('navigates from a manager decision into the wording detail', async () => {
@@ -1329,7 +1327,7 @@ describe('DashboardApp', () => {
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
     expect(screen.getByTestId('module-overview')).toHaveTextContent('无命中次数');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('暂无记录');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('坐席查询后，排行会出现在这里。');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
@@ -1354,9 +1352,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
-    expect(screen.getByTestId('module-wording')).toBeInTheDocument();
-    expect(screen.getByTestId('wording-empty')).toHaveTextContent('还没有可查的话术');
-    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
   });
 
   it('supports roving keyboard navigation between modules', async () => {
@@ -1387,9 +1383,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     fireEvent.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
-    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
   });
 
   it('shows ledger details without a sent body and keeps publish disabled', async () => {
@@ -1438,7 +1432,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('content-replace-row').closest('[data-testid="content-pending-dev"]')).toBeNull();
     expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
       'title',
-      expect.stringContaining('请先登录后再导入和发布'),
+      expect.stringContaining('不会写入假发布'),
     );
     expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
     expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
@@ -1452,8 +1446,7 @@ describe('DashboardApp', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
-    // Reading a file transitions the disclosure open so the preview is never hidden.
-    expect(screen.getByTestId('content-pending-dev')).toHaveAttribute('open');
+    expect(screen.getByTestId('content-pending-dev').tagName).toBe('SECTION');
     expect(screen.getByTestId('content-staged-preview')).toBeVisible();
     const demoPreview = screen.getByTestId('content-staged-preview');
     expect(demoPreview).toHaveTextContent('场景');
@@ -1608,16 +1601,12 @@ describe('DashboardApp', () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
 
-    // iteration 模块已并入概览，通过概览双栏卡片验证
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
-    // 「话术优化待办」标题出现在双栏卡片里
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('待处理迭代');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
 
     await user.click(screen.getByTestId('nav-announce'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByTestId('module-announce')).toBeInTheDocument();
-    expect(await screen.findByText('还没有可查的话术。')).toBeInTheDocument();
-    expect(screen.queryByText('可用资料暂不可读取，请重试。')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
   });
 
   it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
