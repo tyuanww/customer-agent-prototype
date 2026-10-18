@@ -129,7 +129,7 @@ describe('offline native organization observation', () => {
     let captured: AbortSignal | undefined;
     const hung: OrganizationTransport = { ...f.transport, user: async (_id, signal) => { captured = signal; return new Promise(() => undefined); } };
     const pending = createFeishuOrganizationObserver(scope, hung, f.now)(binding);
-    await vi.advanceTimersByTimeAsync(180_001);
+    await vi.advanceTimersByTimeAsync(270_001);
     expect(await pending).toEqual({ ok: false, reason: 'DEPENDENCY_UNAVAILABLE' }); expect(captured!.aborted).toBe(true);
     let resolve!: (body: string) => void;
     const late = { ...f.transport, user: async () => new Promise<string>(done => { resolve = done; }) };

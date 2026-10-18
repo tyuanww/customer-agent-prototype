@@ -63,10 +63,16 @@ test('director previews without saving, grants a named seat query access, then r
       await dashboard.screenshot({ path: path.join(evidence, `permissions-${theme}.png`) });
     }
     const localTime = (offset: number) => {
-      const d = new Date(Date.now() + offset); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16);
+      const d = new Date(Date.now() + offset);
+      const pad = (value: number) => String(value).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
-    await panel.getByLabel('生效时间', { exact: true }).fill(localTime(-60_000));
-    await panel.getByLabel('失效时间', { exact: true }).fill(localTime(600_000));
+    const start = panel.getByRole('textbox', { name: '生效时间', exact: true });
+    const end = panel.getByRole('textbox', { name: '失效时间', exact: true });
+    await start.fill(localTime(-60_000));
+    await start.press('Enter');
+    await end.fill(localTime(600_000));
+    await end.press('Enter');
     await panel.getByLabel('授权原因', { exact: true }).fill('合成桌面验收授予查询');
     await panel.getByRole('button', { name: '预览权限', exact: true }).click();
     await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();

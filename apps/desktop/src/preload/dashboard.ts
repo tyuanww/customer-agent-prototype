@@ -29,6 +29,7 @@ const ANNOUNCE_CURRENT = 'dashboard:announce-current';
 const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
 const ANNOUNCE_CONTENT_UPDATED = 'product:announce-content-updated';
 const PRODUCT_SESSION_CHANGED = 'product:session-changed';
+const runningLine = process.argv.find((arg) => arg.startsWith('--running-line='))?.slice('--running-line='.length);
 
 const LIBRARY_DOMAINS = ['product', 'campaign', 'presale', 'aftersale'] as const;
 type LibraryDomain = (typeof LIBRARY_DOMAINS)[number];
@@ -583,3 +584,7 @@ contextBridge.exposeInMainWorld('dashboardIntakeCatalog', {
     return () => { ipcRenderer.removeListener('dashboard:intake-catalog-invalidated', handler); };
   },
 } satisfies IntakeCatalogApi);
+
+if (runningLine !== undefined && runningLine.length > 0) {
+  contextBridge.exposeInMainWorld('runningLine', runningLine);
+}

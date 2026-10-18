@@ -1027,7 +1027,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       const api = window.customerAgent.productSearch;
       const queryText = (inputRef.current?.value ?? query).trim();
       if (!api || !queryText || [...queryText].length > 500) {
-        setResults([]); setErrorMessage('请确认客户的问题；问题最多 500 字。'); reportPhase('ERROR'); return;
+        setResults([]); setErrorMessage('请输入最多 500 字的客户问题。'); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
@@ -1153,7 +1153,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       const api = window.customerAgent;
       const resultCount = results.length as ResultCount;
       if (!api) {
-        setErrorMessage('复制通道不可用，请重试');
+        setErrorMessage('复制失败，请重试');
         reportPhase('ERROR', resultCount);
         copyInFlightRef.current = false;
         return;
@@ -1162,7 +1162,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setCopying(true);
       try {
         const connected = !!api.product && !(productState?.ok && !productState.enabled);
-        const result = isIntakeRow(script) ? await api.intakeQuery?.copy({ key: script.key }) ?? { ok: false as const, message: '复制通道不可用' }
+        const result = isIntakeRow(script) ? await api.intakeQuery?.copy({ key: script.key }) ?? { ok: false as const, message: '复制失败，请重试' }
           : connected ? (script.productCopy && api.productSearch
           ? await api.productSearch.copyAdopt({
             ...script.productCopy,
@@ -1757,7 +1757,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {shortcutFailed ? (
           <p ref={shortcutBannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
-            {shortcutHint || '全局快捷键注册失败，请点击狐狸头打开。'}
+            {shortcutHint || '请点击狐狸头打开。'}
           </p>
         ) : null}
         <QueryAnnounceBanner

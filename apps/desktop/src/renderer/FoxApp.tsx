@@ -462,7 +462,7 @@ export function FoxApp() {
     const api = window.customerAgent;
     if (!api) {
       setShortcutFailed(true);
-      setHint('复制通道不可用，请重试');
+      setHint('复制失败，请重试');
       return;
     }
 

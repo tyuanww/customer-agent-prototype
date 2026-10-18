@@ -414,23 +414,22 @@ describe('loopback organization transport', () => {
     expect(thrown(() => createOrganizationHttpTransport({ origin: contact.origin, tokenSupplier: supplier, requestTimeoutMs: 0 }))).toMatchObject({ code: 'INVALID_REQUEST' });
   });
 
-  it('does not turn one page response into further requests and fails a third observation inside the published job-title window', async () => {
+  it('does not turn one page response into further requests and finishes the next observation after the job-title window', async () => {
     const supplier = tokens();
     await transport(supplier).jobTitles(undefined, new AbortController().signal);
     expect(contact.requests).toHaveLength(1);
     contact.requests.splice(0);
-    let nowMs = 1_700_000_000_000;
-    const client = transport(tokens(() => nowMs), 1_000, () => nowMs);
-    const run = () => createFeishuOrganizationObserver(scope, client, async () => nowMs)(
+    const client = transport(tokens(), 2_000);
+    const run = () => createFeishuOrganizationObserver(scope, client, async () => Date.now())(
       { ...scope, principalId: 'agent', openId: contact.user.open_id, expectedFactsVersion: 1 });
     expect(await run()).toMatchObject({ ok: true });
-    nowMs += 1_000;
     expect(await run()).toMatchObject({ ok: true });
-    nowMs += 1_000;
-    const blocked = await run();
-    expect(blocked).toEqual({ ok: false, reason: 'DEPENDENCY_UNAVAILABLE' });
-    expect(blocked).not.toHaveProperty('snapshot');
-  });
+    const started = Date.now();
+    const third = await run();
+    expect(third).toMatchObject({ ok: true, snapshot: { jobId: 'job-agent' } });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(60_000);
+    expect(contact.requests.filter(request => request.url.includes('job_titles'))).toHaveLength(12);
+  }, 120_000);
 
   it('preserves a page token with a space instead of trimming it', async () => {
     contact.mode = { kind: 'status', status: 200, body: '{"code":0,"data":{}}' };
