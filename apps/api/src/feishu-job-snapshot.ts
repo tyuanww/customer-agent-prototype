@@ -22,6 +22,10 @@ export function forgetJobSnapshot(openId: string): void {
   snapshots.delete(subjectHash(openId));
 }
 
+export function snapshotForOpenId(openId: string): FeishuJobSnapshot | null {
+  return snapshots.get(subjectHash(openId)) ?? null;
+}
+
 export function bindSessionSubject(token: string, hash: string): void {
   sessionSubjects.set(createHash('sha256').update(token).digest('hex'), hash);
 }

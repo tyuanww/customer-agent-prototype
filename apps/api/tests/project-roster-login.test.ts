@@ -1,7 +1,9 @@
 import type { QueryResult } from 'pg';
-import { describe, expect, it, vi } from 'vitest';
-import { projectRosterLogin, rosterPrincipalId } from '../src/project-roster-login.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { forgetJobSnapshot, rememberJobSnapshot } from '../src/feishu-job-snapshot.js';
 import { feishuUserId } from '../src/feishu-admit.js';
+import { rosterGrantActions, rosterJobId } from '../src/job-roster.js';
+import { projectRosterLogin, rosterPrincipalId } from '../src/project-roster-login.js';
 
 const openId = 'ou_abcdef';
 
@@ -9,46 +11,77 @@ function result(rows: unknown[]): QueryResult {
   return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] } as QueryResult;
 }
 
-function client(homes: { tenant_id: string; app_id: string }[], bound: 'bound' | 'missing' = 'bound') {
+function remember(title: string) {
+  rememberJobSnapshot(openId, { title, directory: [{ name: title, enabled: true }] });
+}
+
+function client(homes: { tenant_id: string; app_id: string }[], status = 'projected') {
   return {
-    query: vi.fn(async (sql: string, params?: unknown[]) => {
-      void params;
+    query: vi.fn(async (sql: string, _params?: unknown[]) => {
+      void _params;
       if (sql.startsWith('SELECT DISTINCT')) return result(homes);
-      if (sql.includes('INSERT INTO content_intake.grants')) return result([]);
-      if (sql.includes('subject_bindings')) return result([{ known: bound === 'bound', bound: bound === 'bound' }]);
+      if (sql.includes('project_feishu_roster')) return result([{ status }]);
       return result([]);
     }),
   };
 }
 
+afterEach(() => forgetJobSnapshot(openId));
+
 describe('roster login projection', () => {
   it('does not write when the title is off the roster', async () => {
+    remember('服务赋能师');
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
-    await expect(projectRosterLogin(db, openId, '服务赋能师')).resolves.toBe('unmatched');
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('unmatched');
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('does not write when login collected no title', async () => {
+    const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('unmatched');
     expect(db.query).not.toHaveBeenCalled();
   });
 
   it('skips when the library does not have exactly one tenant and app', async () => {
+    remember('客服坐席');
     const db = client([]);
-    await expect(projectRosterLogin(db, openId, '客服坐席')).resolves.toBe('skipped');
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('skipped');
     expect(db.query).toHaveBeenCalledTimes(1);
   });
 
-  it('projects one principal and the content-shop query grants for a matched title', async () => {
-    const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
-    await expect(projectRosterLogin(db, openId, '客服坐席')).resolves.toBe('projected');
-    const bind = db.query.mock.calls[1]?.[1] as unknown[];
-    expect(bind[0]).toBe(rosterPrincipalId(openId));
-    expect(bind[1]).toBe(feishuUserId(openId));
-    expect(bind[5]).toBe(openId);
-    expect(db.query.mock.calls.some((call) => String(call[0]).includes('content_intake.grants'))).toBe(true);
-    await expect(projectRosterLogin(db, openId, '客服坐席')).resolves.toBe('projected');
-    expect(rosterPrincipalId(openId)).toBe(rosterPrincipalId(openId));
+  it('projects a seat with query only and a director with publish and import', async () => {
+    remember('客服坐席');
+    const seat = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
+    await expect(projectRosterLogin(seat, openId)).resolves.toBe('projected');
+    const seatParams = seat.query.mock.calls[1]?.[1] as unknown[];
+    expect(seatParams[0]).toBe(rosterPrincipalId(openId));
+    expect(seatParams[1]).toBe(feishuUserId(openId));
+    expect(seatParams[5]).toBe(openId);
+    expect(seatParams[7]).toBe(rosterJobId('agent'));
+    expect(seatParams[8]).toBe('agent');
+    expect(seatParams[9]).toEqual(rosterGrantActions({
+      publish: false, grant: false, uploadSop: false, search: true, readCatalog: true,
+    }));
+    forgetJobSnapshot(openId);
+    remember('客服总监');
+    const director = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
+    await expect(projectRosterLogin(director, openId)).resolves.toBe('projected');
+    const directorParams = director.query.mock.calls[1]?.[1] as unknown[];
+    expect(directorParams[7]).toBe(rosterJobId('director'));
+    expect(directorParams[9]).toEqual(['query', 'publish', 'import']);
+    expect(rosterPrincipalId(openId)).toBe(seatParams[0]);
   });
 
-  it('stops before grants when the login binding is missing', async () => {
+  it('reports registration when the database has no single live steward', async () => {
+    remember('客服坐席');
+    const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }], 'registered');
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('registered');
+  });
+
+  it('stops when the login binding is missing', async () => {
+    remember('客服坐席');
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }], 'missing');
-    await expect(projectRosterLogin(db, openId, '客服坐席')).resolves.toBe('missing-binding');
-    expect(db.query.mock.calls.some((call) => String(call[0]).includes('INSERT INTO content_intake.grants'))).toBe(false);
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('missing-binding');
+    expect(db.query).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,7 +1,6 @@
 import { IdentityFailure, type SyntheticIdentityProvider } from './product-auth-service.js';
 import { persistOperatorDisplayName } from './operator-display-names.js';
 import { forgetJobSnapshot, readFeishuJobSnapshot, rememberJobSnapshot } from './feishu-job-snapshot.js';
-import { matchJobRoster } from './job-roster.js';
 
 /** Official Feishu OAuth endpoints. Not configurable: arbitrary URLs would be an SSRF seam. */
 export const FEISHU_AUTHORIZE_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
@@ -17,7 +16,6 @@ export type FeishuIdentityProviderConfig = Readonly<{
   clientSecret: string;
   redirectUri: string;
   observeJob?: boolean;
-  projectMatchedJob?: (openId: string, title: string) => Promise<void>;
 }>;
 
 type FetchLike = typeof fetch;
@@ -194,16 +192,8 @@ export function createFeishuIdentityProvider(
         if (config.observeJob === true) {
           try {
             const snapshot = await readFeishuJobSnapshot(openId, config, fetchImpl);
-            const matched = snapshot !== null && matchJobRoster(snapshot.title).status === 'matched';
-            if (snapshot && matched) rememberJobSnapshot(openId, snapshot);
+            if (snapshot) rememberJobSnapshot(openId, snapshot);
             else forgetJobSnapshot(openId);
-            if (snapshot && matched && config.projectMatchedJob) {
-              try { await config.projectMatchedJob(openId, snapshot.title); }
-              catch (error) {
-                const name = error instanceof Error ? error.name : 'unknown';
-                console.info(`[api] roster projection failed: ${name}`);
-              }
-            }
           } catch {
             forgetJobSnapshot(openId);
           }

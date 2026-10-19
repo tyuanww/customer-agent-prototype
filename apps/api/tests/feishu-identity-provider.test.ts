@@ -105,7 +105,7 @@ describe('feishu identity provider', () => {
     provider.close();
   });
 
-  it('remembers a roster title and drops a title that is not on the roster', async () => {
+  it('remembers the collected title and leaves an unknown title for the roster to reject', async () => {
     const token = 'd'.repeat(43);
     bindSessionSubject(token, subjectHash(openId));
     const fetchFor = (title: string) => vi.fn(async (input: string | URL | Request) => {
@@ -122,7 +122,7 @@ describe('feishu identity provider', () => {
     matched.close();
     const unknown = createFeishuIdentityProvider({ ...config, observeJob: true }, fetchFor('服务赋能师'));
     expect(await unknown.exchange('one-time-code')).toBe(openId);
-    expect(jobForToken(token)).toBeNull();
+    expect(jobForToken(token)?.title).toBe('服务赋能师');
     unknown.close();
   });
 

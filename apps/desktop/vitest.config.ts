@@ -9,6 +9,11 @@ function compiledEntry(name: string) {
 }
 
 export default defineConfig({
+  server: {
+    fs: {
+      allow: [resolve(__dirname), resolve(__dirname, '../api/src')],
+    },
+  },
   plugins: [react()],
   assetsInclude: ['**/*.png'],
   resolve: {

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Pool, type QueryResultRow } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { bearerToken, type ProductAuthService, type MockCredentials, type AuthenticatedUser } from './auth-service.js';
-import { feishuAdmitOpenId } from './feishu-admit.js';
+import { feishuAdmitOpenId, isFeishuOpenId } from './feishu-admit.js';
 import { bindSessionSubject } from './feishu-job-snapshot.js';
 import type { ApiDatabaseBootstrapConfig, AuthMode } from './runtime-config.js';
 
@@ -51,6 +51,7 @@ export async function createProductAuthService(
   config: ApiDatabaseBootstrapConfig,
   provider: SyntheticIdentityProvider,
   authMode: AuthMode,
+  afterLogin?: (openId: string) => Promise<void>,
 ): Promise<ProductAuthService> {
   const pool = new Pool({
     connectionString: config.connectionString,
@@ -161,6 +162,13 @@ export async function createProductAuthService(
         throw providerFailure;
       }
       if (binding === null) throw new IdentityFailure('LOGIN_INVALID');
+      if (afterLogin && isFeishuOpenId(binding)) {
+        try { await afterLogin(binding); }
+        catch (error) {
+          const name = error instanceof Error ? error.name : 'unknown';
+          console.info(`[api] roster projection failed: ${name}`);
+        }
+      }
     },
     async exchange(loginId: string, verifier: string) {
       const token = randomToken();

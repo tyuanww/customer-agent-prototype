@@ -89,7 +89,7 @@ export async function startApi(
     options,
     async (config, repository, policyAdminRepository, bootstrap) => {
       let auth;
-      const rosterProjection: { run: ((openId: string, title: string) => Promise<void>) | null } = { run: null };
+      let projectLogin: ((openId: string) => Promise<void>) | null = null;
       if (config.sessionMode === 'product') {
         if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
         if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
@@ -100,14 +100,18 @@ export async function startApi(
         const feishu = identity.kind === 'feishu' ? {
           ...identity.feishu,
           observeJob: true as const,
-          projectMatchedJob: (openId: string, title: string) => rosterProjection.run?.(openId, title) ?? Promise.resolve(),
         } : null;
         const provider = identity.kind === 'feishu'
           ? (identity.providerOrigin
             ? createWorkforceIdentityProvider(feishu!, identity.providerOrigin, callback)
             : createFeishuIdentityProvider(feishu!))
           : createSyntheticIdentityProvider(identity.providerOrigin, callback);
-        auth = await createProductAuthService(bootstrap.productIdentity.database, provider, config.authMode);
+        auth = await createProductAuthService(
+          bootstrap.productIdentity.database,
+          provider,
+          config.authMode,
+          async (openId) => { if (projectLogin) await projectLogin(openId); },
+        );
       }
       try {
         const contentImport = bootstrap.objectStoreDir === undefined ? undefined : {
@@ -145,9 +149,12 @@ export async function startApi(
         const intake = intakeRoutes(auth, bootstrap.objectStoreDir);
         if (intake?.business) {
           const business = intake.business;
-          rosterProjection.run = async (openId, title) => {
+          projectLogin = async (openId) => {
             const client = await business.connect();
-            try { await projectRosterLogin(client, openId, title); }
+            try {
+              const status = await projectRosterLogin(client, openId);
+              if (status !== 'projected') console.info(`[api] roster projection ${status}`);
+            }
             finally { client.release(); }
           };
         }

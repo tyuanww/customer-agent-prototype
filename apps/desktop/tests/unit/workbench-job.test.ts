@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { JOB_ROSTER } from '../../../api/src/job-roster';
 import { resolveJobTitle } from '../../src/shared/workbench-job';
 
 const one = (name: string) => [{ name, enabled: true }];
@@ -84,6 +88,18 @@ it('rejects two enabled directory rows with the same name', () => {
 it('does not treat inherited object keys as job titles', () => {
   for (const name of ['toString', 'constructor', '__proto__']) {
     expect(resolveJobTitle(name, one(name))).toEqual({ status: 'unresolved', reason: 'unknown' });
+  }
+});
+
+it('keeps the preload rights tuples equal to the shared roster', () => {
+  const source = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/dashboard.ts'), 'utf8');
+  const start = source.indexOf('const JOB_RIGHTS');
+  const end = source.indexOf('function isContentJob');
+  const block = source.slice(start, end);
+  expect(block.match(/: \[/g)).toHaveLength(JOB_ROSTER.length);
+  for (const row of JOB_ROSTER) {
+    const tuple = `[${[row.rights.publish, row.rights.grant, row.rights.uploadSop, row.rights.search, row.rights.readCatalog].join(', ')}]`;
+    expect(block).toContain(`${row.title}: ${tuple}`);
   }
 });
 

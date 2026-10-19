@@ -1062,32 +1062,48 @@ const ROLE_DEFAULT_OBJECT_SHA256 = '32011d2d8211bd9a2a85516c877cbd6965dd444f39bc
 const FEISHU_ADMIT_OBJECT_SHA256 = '5651482547b91105ddbd2d458c27a2ecc3de1a4f45f9fa712d638a78624447b2';
 const FEISHU_ADMIT_FUNCTION_SHA256 = '11ab6026e5cbb12efd50d1a60c0374d16bd4bb35fe12235fe5c159a9d33e59f1';
 const FEISHU_ADMIT_ACL_SHA256 = '8b0b1f969ffa87f15a0c0d9598a71e3c2df3fd8ecec27b15a11d55b0d27c6088';
+const ROSTER_PROJECTION_OBJECT_SHA256 = '1ae078512ece64522a84cc2c79bdb0595de404239835221502dcfbc3d859fd69';
+const ROSTER_PROJECTION_FUNCTION_SHA256 = '9581791ce9ae915100ffffe10cd104d4521ee1880dee099eb7813894e770139c';
+const ROSTER_PROJECTION_ACL_SHA256 = 'c754efe402f9b860a6962ca800ab4317525d99ff80a1de7ebdf3f31cf19435d2';
 
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
+  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
     && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
     && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
-  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
+  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
     && occupied
     && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
-  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
+  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
     && adopted
     && catalogue.migrations[43]?.id === ROLE_DEFAULT_MIGRATION_ID;
-  const feishuAdmit = catalogue.migrations.length === 45
+  const feishuAdmit = (catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
     && roleDefaults
     && catalogue.migrations[44]?.id === '0045_feishu_agent_admit';
+  const rosterProjection = catalogue.migrations.length === 46
+    && feishuAdmit
+    && catalogue.migrations[45]?.id === '0046_project_feishu_roster';
   if ((catalogue.migrations.length !== 41 && !occupied)
     || (catalogue.migrations.length === 43 && !adopted)
     || (catalogue.migrations.length === 44 && !roleDefaults)
     || (catalogue.migrations.length === 45 && !feishuAdmit)
+    || (catalogue.migrations.length === 46 && !rosterProjection)
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
-  const inventory = feishuAdmit
+  const inventory = rosterProjection
+    ? {
+      ...READINESS_INVENTORY,
+      functions: 272,
+      objectEntries: 3320,
+      objectSha256: ROSTER_PROJECTION_OBJECT_SHA256,
+      functionEntries: 272,
+      functionSha256: ROSTER_PROJECTION_FUNCTION_SHA256,
+    }
+    : feishuAdmit
     ? {
       ...READINESS_INVENTORY,
       functions: 271,
@@ -1103,7 +1119,9 @@ export async function verifyReadinessSuccessor(
     : occupied
       ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
       : READINESS_INVENTORY;
-  const base = await verifyCatalogueState(client, catalogue, feishuAdmit
+  const base = await verifyCatalogueState(client, catalogue, rosterProjection
+    ? { entries: 573, sha256: ROSTER_PROJECTION_ACL_SHA256 }
+    : feishuAdmit
     ? { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 }
     : { entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c' },
   inventory, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
