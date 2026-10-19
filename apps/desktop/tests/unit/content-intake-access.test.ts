@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest';
 import type { components } from '@customer-agent/contracts';
-import { loadIntakeAccess } from '../../src/main/content-intake-access';
+import { intakeAccessDenial, loadIntakeAccess } from '../../src/main/content-intake-access';
+import { ProductHttpError } from '../../src/main/product-http';
 import type { IntakeUsageSession } from '../../src/main/content-intake-usage';
 
 type C = components['schemas'];
@@ -141,4 +142,14 @@ it('does not extend the name lifetime when the local wall clock moves back durin
   const access=await loadIntakeAccess(f.session);expect(access.shopNames).toHaveLength(2);
   expect(access.shopNamesDeadline! - performance.now()).toBeLessThanOrEqual(1100);
  }finally{wall.mockRestore();}
+});
+
+it.each([
+  [new ProductHttpError('GONE', 'SCOPE_DENIED'), 'NO_PRINCIPAL'],
+  [new ProductHttpError('GONE', 'NOT_FOUND'), 'NO_PRINCIPAL'],
+  [new ProductHttpError('FORBIDDEN', 'ORG_FACTS_UNAVAILABLE'), 'FACTS_EXPIRED'],
+  [new ProductHttpError('FORBIDDEN', 'ROLE_CEILING'), 'ROLE_UNKNOWN'],
+  [new ProductHttpError('FORBIDDEN', 'LEASE_EXPIRED'), null],
+] as const)('maps intake HTTP failure %s', (error, code) => {
+  expect(intakeAccessDenial(error)?.code ?? null).toBe(code);
 });

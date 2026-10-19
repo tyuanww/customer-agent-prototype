@@ -92,7 +92,9 @@ export class ContentIntakeCatalog {
       this.menuDeadline = started + Math.max(0, Date.parse(access.validUntil)-startedAt);
       const shopId = command.action === 'select-shop' ? command.shopId
         : previous.shopId && access.shops.includes(previous.shopId) ? previous.shopId : access.shops.length === 1 ? access.shops[0]! : null;
-      if (shopId !== null && !access.shops.includes(shopId)) throw new IntakeUsageError('FORBIDDEN');
+      if (access.shops.length === 0 || (shopId !== null && !access.shops.includes(shopId))) {
+        throw new IntakeUsageError('NO_GRANT');
+      }
       const menus = shopId === null ? { products: [], scenarios: [] } : await loadIntakeVocabulary(this.session, access, shopId, controller.signal); check();
       if (Date.now() >= Date.parse(access.validUntil) || performance.now() >= this.menuDeadline) throw new IntakeUsageError('EXPIRED');
       const preserve = command.action === 'refresh' && shopId === previous.shopId;

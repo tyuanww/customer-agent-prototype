@@ -219,14 +219,14 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
-  it('defaults a missing, blank, unknown, or duplicate title to 客服坐席 without write rights', async () => {
-    const cases: Array<JobSnapshot | null> = [
-      null,
-      { title: '   ', directory: one('客服总监') },
-      { title: '服务赋能师', directory: one('服务赋能师') },
-      { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] },
+  it('keeps a missing, blank, unknown, or duplicate title unresolved with no rights', async () => {
+    const cases: Array<{ snapshot: JobSnapshot | null; reason: 'missing' | 'blank' | 'unknown' | 'duplicate' }> = [
+      { snapshot: null, reason: 'missing' },
+      { snapshot: { title: '   ', directory: one('客服总监') }, reason: 'blank' },
+      { snapshot: { title: '服务赋能师', directory: one('服务赋能师') }, reason: 'unknown' },
+      { snapshot: { title: '客服总监', directory: [{ name: '客服总监', enabled: true }, { name: '客服总监', enabled: true }] }, reason: 'duplicate' },
     ];
-    for (const snapshot of cases) {
+    for (const { snapshot, reason } of cases) {
       const f = fixture({
         identity: { user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'feishu' },
         jobSnapshotFor: () => snapshot,
@@ -238,11 +238,10 @@ describe('job observation from a signed-out session', () => {
         signedIn: true,
         role: 'owner',
         job: {
-          status: 'resolved',
-          title: '客服坐席',
-          role: 'agent',
-          label: '客服坐席',
-          rights: { publish: false, grant: false, uploadSop: false, search: true, readCatalog: true },
+          status: 'unresolved',
+          reason,
+          label: '职务未识别',
+          rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false },
         },
       });
       expect(isProductSessionResult(login)).toBe(true);

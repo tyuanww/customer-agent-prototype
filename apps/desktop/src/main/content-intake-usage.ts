@@ -10,7 +10,7 @@ export interface IntakeUsageSession {
   request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }): Promise<{value: unknown}>;
 }
 export class IntakeUsageError extends Error {
-  constructor(readonly code: 'VALIDATION' | 'STALE' | 'EXPIRED' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'UNAVAILABLE' | 'LIMIT' | 'CLIPBOARD_FAILED') {
+  constructor(readonly code: 'VALIDATION' | 'STALE' | 'EXPIRED' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'UNAVAILABLE' | 'LIMIT' | 'CLIPBOARD_FAILED' | 'NO_PRINCIPAL' | 'FACTS_EXPIRED' | 'NO_GRANT' | 'ROLE_UNKNOWN') {
     super(`INTAKE_USAGE_${code}`);
   }
 }
