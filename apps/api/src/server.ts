@@ -1,6 +1,7 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
-import { projectRosterLogin } from './project-roster-login.js';
+import { projectRosterLogin, rosterPreparation } from './project-roster-login.js';
+import { setJobPermissionState } from './feishu-job-snapshot.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -152,8 +153,9 @@ export async function startApi(
           projectLogin = async (openId) => {
             const client = await business.connect();
             try {
-              const status = await projectRosterLogin(client, openId);
-              if (status !== 'projected') console.info(`[api] roster projection ${status}`);
+              const preparation = rosterPreparation(await projectRosterLogin(client, openId));
+              setJobPermissionState(openId, preparation.state);
+              if (preparation.reason !== 'projected') console.info(`[api] roster projection ${preparation.reason}`);
             }
             finally { client.release(); }
           };

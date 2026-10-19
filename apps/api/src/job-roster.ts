@@ -11,6 +11,8 @@ export type BoardRights = Readonly<{
 export type RosterShops = 'content-shops';
 
 export type JobRosterRow = Readonly<{
+  /** Stable policy key. The display title is an input, never the identity key. */
+  jobId: string;
   title: string;
   role: BoardRole;
   rights: BoardRights;
@@ -27,23 +29,29 @@ const agent = { publish: false, grant: false, uploadSop: false, search: true, re
 
 /** Shared job-to-permission table. Desktop session checks and login projection both read these rows. */
 export const JOB_ROSTER: readonly JobRosterRow[] = [
-  { title: '客服总监', role: 'director', rights: all, shops: 'content-shops' },
-  { title: '客服经理', role: 'manager', rights: all, shops: 'content-shops' },
-  { title: '客服主管', role: 'supervisor', rights: lead, shops: 'content-shops' },
-  { title: '客服组长', role: 'lead', rights: lead, shops: 'content-shops' },
-  { title: 'AI赋能工程师', role: 'engineer', rights: all, shops: 'content-shops' },
-  { title: '普通客服', role: 'agent', rights: agent, shops: 'content-shops' },
-  { title: '客服坐席', role: 'agent', rights: agent, shops: 'content-shops' },
+  { jobId: 'job-customer-service-director', title: '客服总监', role: 'director', rights: all, shops: 'content-shops' },
+  { jobId: 'job-customer-service-manager', title: '客服经理', role: 'manager', rights: all, shops: 'content-shops' },
+  { jobId: 'job-customer-service-supervisor', title: '客服主管', role: 'supervisor', rights: lead, shops: 'content-shops' },
+  { jobId: 'job-customer-service-lead', title: '客服组长', role: 'lead', rights: lead, shops: 'content-shops' },
+  { jobId: 'job-ai-enablement-engineer', title: 'AI赋能工程师', role: 'engineer', rights: all, shops: 'content-shops' },
+  { jobId: 'job-customer-service-agent', title: '普通客服', role: 'agent', rights: agent, shops: 'content-shops' },
+  { jobId: 'job-customer-service-seat', title: '客服坐席', role: 'agent', rights: agent, shops: 'content-shops' },
 ];
 
 const byTitle = new Map<string, JobRosterRow>();
 for (const row of JOB_ROSTER) {
-  if (byTitle.has(row.title)) throw new Error(`duplicate roster title ${row.title}`);
-  byTitle.set(row.title, row);
+  const key = normalizeJobTitle(row.title);
+  if (byTitle.has(key)) throw new Error(`duplicate roster title ${row.title}`);
+  byTitle.set(key, row);
+}
+
+/** Finite tolerance for provider formatting noise; no fuzzy or substring matching. */
+export function normalizeJobTitle(title: string): string {
+  return title.normalize('NFKC').replace(/\p{White_Space}+/gu, ' ').trim();
 }
 
 export function matchJobRoster(title: string): RosterMatch {
-  const name = title.trim();
+  const name = normalizeJobTitle(title);
   if (name.length === 0) return { status: 'unmatched', reason: 'blank' };
   const row = byTitle.get(name);
   if (!row) return { status: 'unmatched', reason: 'unknown' };
@@ -59,6 +67,6 @@ export function rosterGrantActions(rights: BoardRights): readonly ('query' | 'pu
   return actions;
 }
 
-export function rosterJobId(role: BoardRole): string {
-  return `job-login-${role}`;
+export function rosterJobId(rowOrRole: JobRosterRow | BoardRole): string {
+  return typeof rowOrRole === 'string' ? `job-login-${rowOrRole}` : rowOrRole.jobId;
 }

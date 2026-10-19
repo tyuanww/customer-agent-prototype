@@ -109,3 +109,12 @@ it('ignores a disabled twin when one enabled row remains', () => {
     { name: '客服总监', enabled: true },
   ])).toMatchObject({ status: 'resolved', role: 'director', rights: { publish: true, grant: true } });
 });
+
+it('accepts finite Unicode formatting noise and returns the canonical roster title', () => {
+  expect(resolveJobTitle('　客服总监\u00a0', one('客服总监'))).toEqual({
+    status: 'resolved',
+    title: '客服总监',
+    role: 'director',
+    rights: { publish: true, grant: true, uploadSop: true, search: true, readCatalog: true },
+  });
+});

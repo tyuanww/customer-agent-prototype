@@ -1,13 +1,24 @@
 import { createHash } from 'node:crypto';
 
+export type RosterPermissionState = 'unknown' | 'pending' | 'ready' | 'denied';
+
 /** Job fact for the desktop rights table. Absence is unresolved, never a guessed title. */
 export type FeishuJobSnapshot = Readonly<{
   title: string;
   directory: readonly { readonly name: string; readonly enabled: boolean }[];
+  /** Trusted provider department ids, when the contact response includes them. */
+  departmentIds?: readonly string[];
+  /** Projection state is separate from the provider title and never grants by itself. */
+  permissionState?: RosterPermissionState;
 }>;
 
+/** Provider facts are a five-minute lease; stale desktop projections fail closed. */
+export const FEISHU_JOB_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
+
 const TENANT_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
-const snapshots = new Map<string, FeishuJobSnapshot>();
+type SnapshotEntry = Readonly<{ snapshot: FeishuJobSnapshot; validUntil: number }>;
+
+const snapshots = new Map<string, SnapshotEntry>();
 const sessionSubjects = new Map<string, string>();
 
 export function subjectHash(openId: string): string {
@@ -15,7 +26,20 @@ export function subjectHash(openId: string): string {
 }
 
 export function rememberJobSnapshot(openId: string, snapshot: FeishuJobSnapshot): void {
-  snapshots.set(subjectHash(openId), snapshot);
+  snapshots.set(subjectHash(openId), {
+    snapshot: { ...snapshot, permissionState: snapshot.permissionState ?? 'unknown' },
+    validUntil: Date.now() + FEISHU_JOB_SNAPSHOT_TTL_MS,
+  });
+}
+
+export function setJobPermissionState(openId: string, permissionState: RosterPermissionState): void {
+  const hash = subjectHash(openId);
+  const entry = snapshots.get(hash);
+  if (!entry || entry.validUntil <= Date.now()) {
+    if (entry) snapshots.delete(hash);
+    return;
+  }
+  snapshots.set(hash, { ...entry, snapshot: { ...entry.snapshot, permissionState } });
 }
 
 export function forgetJobSnapshot(openId: string): void {
@@ -23,7 +47,7 @@ export function forgetJobSnapshot(openId: string): void {
 }
 
 export function snapshotForOpenId(openId: string): FeishuJobSnapshot | null {
-  return snapshots.get(subjectHash(openId)) ?? null;
+  return liveSnapshot(subjectHash(openId));
 }
 
 export function bindSessionSubject(token: string, hash: string): void {
@@ -33,7 +57,17 @@ export function bindSessionSubject(token: string, hash: string): void {
 export function jobForToken(token: string): FeishuJobSnapshot | null {
   const hash = sessionSubjects.get(createHash('sha256').update(token).digest('hex'));
   if (!hash) return null;
-  return snapshots.get(hash) ?? null;
+  return liveSnapshot(hash);
+}
+
+function liveSnapshot(hash: string): FeishuJobSnapshot | null {
+  const entry = snapshots.get(hash);
+  if (!entry) return null;
+  if (entry.validUntil <= Date.now()) {
+    snapshots.delete(hash);
+    return null;
+  }
+  return entry.snapshot;
 }
 
 function text(value: unknown, max: number): string {
@@ -45,6 +79,12 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function stringArray(value: unknown, max: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(item => item.trim().slice(0, max)).slice(0, 100);
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -81,5 +121,10 @@ export async function readFeishuJobSnapshot(
   const user = userData ? record(userData.user) : null;
   const title = user ? text(user.job_title, 64) : '';
   if (!title) return null;
-  return { title, directory: [{ name: title, enabled: true }] };
+  const departmentIds = stringArray(user?.department_ids, 128);
+  return {
+    title,
+    directory: [{ name: title, enabled: true }],
+    ...(departmentIds.length > 0 ? { departmentIds } : {}),
+  };
 }

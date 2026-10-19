@@ -817,7 +817,12 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const rosterProjectionMigration = feishuAdmitMigration
     ? renderIntakeOverlay(projectRoot, snapshot, 46, '0046_project_feishu_roster')
     : null;
-  const publishedMigrations = Object.freeze(rosterProjectionMigration
+  const querySignerMigration = rosterProjectionMigration
+    ? renderIntakeOverlay(projectRoot, snapshot, 47, '0047_roster_query_signer')
+    : null;
+  const publishedMigrations = Object.freeze(querySignerMigration
+    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration, rosterProjectionMigration, querySignerMigration]
+    : rosterProjectionMigration
     ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration, rosterProjectionMigration]
     : feishuAdmitMigration
     ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration]
@@ -859,6 +864,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (roleDefaultMigration) outputs.set(`packages/database/migrations/${roleDefaultMigration.file}`, roleDefaultMigration.sql);
   if (feishuAdmitMigration) outputs.set(`packages/database/migrations/${feishuAdmitMigration.file}`, feishuAdmitMigration.sql);
   if (rosterProjectionMigration) outputs.set(`packages/database/migrations/${rosterProjectionMigration.file}`, rosterProjectionMigration.sql);
+  if (querySignerMigration) outputs.set(`packages/database/migrations/${querySignerMigration.file}`, querySignerMigration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

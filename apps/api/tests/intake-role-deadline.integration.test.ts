@@ -6,7 +6,7 @@ import { Pg15Harness } from '@customer-agent/database/testkit';
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const actions = ['query', 'content-manage', 'import', 'source-confirm', 'review', 'publish', 'candidate-cancel', 'rollback'] as const;
 
-describe.skipIf(!enabled)('authorization_deadline defaults through the installed function', () => {
+describe.skipIf(!enabled)('authorization_deadline requires an active business grant', () => {
   let harness: Pg15Harness;
   let admin: Client;
   beforeEach(async () => {
@@ -42,17 +42,14 @@ describe.skipIf(!enabled)('authorization_deadline defaults through the installed
     harness?.stop();
   }, 60_000);
 
-  it('returns a deadline with zero business grants for the default posts and refuses agent import', async () => {
+  it('returns no deadline when role rules exist but no business grant is active', async () => {
     const grants = await admin.query(`SELECT count(*)::int AS count FROM content_intake.grants WHERE kind='business'`);
     expect(grants.rows[0]?.count).toBe(0);
     const deadline = async (principal: string, action: string) => (await admin.query<{ until: Date | null }>(
       `SELECT content_intake.authorization_deadline($1,$2,'scope-menokin-product','src-menokin-faq',clock_timestamp()) AS until`,
       [principal, action])).rows[0]?.until ?? null;
-    for (const principal of ['director', 'manager', 'supervisor']) {
-      expect(await deadline(principal, 'import')).not.toBeNull();
-      expect(await deadline(principal, 'publish')).not.toBeNull();
+    for (const principal of ['director', 'manager', 'supervisor', 'engineer', 'agent']) {
+      for (const action of actions) expect(await deadline(principal, action)).toBeNull();
     }
-    for (const action of actions) expect(await deadline('engineer', action)).not.toBeNull();
-    expect(await deadline('agent', 'import')).toBeNull();
   });
 });

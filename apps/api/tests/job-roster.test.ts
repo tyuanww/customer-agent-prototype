@@ -8,7 +8,7 @@ describe('job roster', () => {
     const match = matchJobRoster('  AI赋能工程师  ');
     expect(match).toMatchObject({
       status: 'matched',
-      row: { title: 'AI赋能工程师', role: 'engineer', shops: 'content-shops', rights: { search: true, grant: true } },
+      row: { jobId: 'job-ai-enablement-engineer', title: 'AI赋能工程师', role: 'engineer', shops: 'content-shops', rights: { search: true, grant: true } },
     });
     expect(JOB_ROSTER.map((row) => row.title)).toEqual([
       '客服总监', '客服经理', '客服主管', '客服组长', 'AI赋能工程师', '普通客服', '客服坐席',
@@ -28,6 +28,14 @@ describe('job roster', () => {
   it('rejects a blank title and a title that is not on the roster', () => {
     expect(matchJobRoster('   ')).toEqual({ status: 'unmatched', reason: 'blank' });
     expect(matchJobRoster('服务赋能师')).toEqual({ status: 'unmatched', reason: 'unknown' });
+  });
+
+  it('normalizes only Unicode and whitespace formatting and keeps two agent jobs distinct', () => {
+    expect(matchJobRoster('\u3000客服坐席\u3000')).toMatchObject({ status: 'matched', row: { jobId: 'job-customer-service-seat' } });
+    const ordinary = matchJobRoster('普通客服');
+    const seat = matchJobRoster('客服坐席');
+    if (ordinary.status !== 'matched' || seat.status !== 'matched') throw new Error('roster titles missing');
+    expect(ordinary.row.jobId).not.toBe(seat.row.jobId);
   });
 });
 

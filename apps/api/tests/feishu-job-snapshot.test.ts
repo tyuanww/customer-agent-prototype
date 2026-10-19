@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bindSessionSubject, forgetJobSnapshot, jobForToken, readFeishuJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 
 const openId = 'ou_abcdef';
@@ -17,6 +17,8 @@ function userFetch(title: string | null): typeof fetch {
 }
 
 describe('feishu job snapshot', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('collects the person title as one enabled directory row', async () => {
     const snapshot = await readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, userFetch('AI赋能工程师'));
     expect(snapshot).toEqual({
@@ -41,6 +43,16 @@ describe('feishu job snapshot', () => {
     expect(jobForToken(token)?.title).toBe('客服经理');
     expect(jobForToken('b'.repeat(43))).toBeNull();
     forgetJobSnapshot(openId);
+    expect(jobForToken(token)).toBeNull();
+  });
+
+  it('expires the provider fact after the five-minute lease', () => {
+    vi.useFakeTimers();
+    rememberJobSnapshot(openId, { title: '客服经理', directory: [{ name: '客服经理', enabled: true }] });
+    const token = 'c'.repeat(43);
+    bindSessionSubject(token, subjectHash(openId));
+    expect(jobForToken(token)?.title).toBe('客服经理');
+    vi.advanceTimersByTime(5 * 60 * 1000);
     expect(jobForToken(token)).toBeNull();
   });
 });

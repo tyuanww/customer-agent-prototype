@@ -1065,36 +1065,52 @@ const FEISHU_ADMIT_ACL_SHA256 = '8b0b1f969ffa87f15a0c0d9598a71e3c2df3fd8ecec27b1
 const ROSTER_PROJECTION_OBJECT_SHA256 = '1ae078512ece64522a84cc2c79bdb0595de404239835221502dcfbc3d859fd69';
 const ROSTER_PROJECTION_FUNCTION_SHA256 = '9581791ce9ae915100ffffe10cd104d4521ee1880dee099eb7813894e770139c';
 const ROSTER_PROJECTION_ACL_SHA256 = 'c754efe402f9b860a6962ca800ab4317525d99ff80a1de7ebdf3f31cf19435d2';
+const QUERY_SIGNER_OBJECT_SHA256 = 'a77e7e553551d0dbc8858dec34bc0dc15efac61a9f080b95e4a029e8d64d610e';
+const QUERY_SIGNER_FUNCTION_SHA256 = '0270e8755b6dee94768a57a7fddcb3d439a496c41e737e7832dcea485f5763cc';
+const QUERY_SIGNER_ACL_SHA256 = '87f2fcf485dd05546eb9914d7a717b5a28f07da17cf35e25b9cdd73b1af611d8';
 
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
+  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46 || catalogue.migrations.length === 47)
     && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
     && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
-  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
+  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46 || catalogue.migrations.length === 47)
     && occupied
     && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
-  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
+  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45 || catalogue.migrations.length === 46 || catalogue.migrations.length === 47)
     && adopted
     && catalogue.migrations[43]?.id === ROLE_DEFAULT_MIGRATION_ID;
-  const feishuAdmit = (catalogue.migrations.length === 45 || catalogue.migrations.length === 46)
+  const feishuAdmit = (catalogue.migrations.length === 45 || catalogue.migrations.length === 46 || catalogue.migrations.length === 47)
     && roleDefaults
     && catalogue.migrations[44]?.id === '0045_feishu_agent_admit';
-  const rosterProjection = catalogue.migrations.length === 46
+  const rosterProjection = (catalogue.migrations.length === 46 || catalogue.migrations.length === 47)
     && feishuAdmit
     && catalogue.migrations[45]?.id === '0046_project_feishu_roster';
+  const querySigner = catalogue.migrations.length === 47
+    && rosterProjection
+    && catalogue.migrations[46]?.id === '0047_roster_query_signer';
   if ((catalogue.migrations.length !== 41 && !occupied)
     || (catalogue.migrations.length === 43 && !adopted)
     || (catalogue.migrations.length === 44 && !roleDefaults)
     || (catalogue.migrations.length === 45 && !feishuAdmit)
     || (catalogue.migrations.length === 46 && !rosterProjection)
+    || (catalogue.migrations.length === 47 && !querySigner)
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
-  const inventory = rosterProjection
+  const inventory = querySigner
+    ? {
+      ...READINESS_INVENTORY,
+      functions: 273,
+      objectEntries: 3321,
+      objectSha256: QUERY_SIGNER_OBJECT_SHA256,
+      functionEntries: 273,
+      functionSha256: QUERY_SIGNER_FUNCTION_SHA256,
+    }
+    : rosterProjection
     ? {
       ...READINESS_INVENTORY,
       functions: 272,
@@ -1119,7 +1135,9 @@ export async function verifyReadinessSuccessor(
     : occupied
       ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
       : READINESS_INVENTORY;
-  const base = await verifyCatalogueState(client, catalogue, rosterProjection
+  const base = await verifyCatalogueState(client, catalogue, querySigner
+    ? { entries: 574, sha256: QUERY_SIGNER_ACL_SHA256 }
+    : rosterProjection
     ? { entries: 573, sha256: ROSTER_PROJECTION_ACL_SHA256 }
     : feishuAdmit
     ? { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 }
