@@ -87,7 +87,7 @@ describe('content publish role gate', () => {
       const gate = contentPublishGate({
         productAvailable: true, signedIn: true, role: 'owner', job, rows: [productRow], sourceBindings: bindings,
       });
-      expect(gate).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
+      expect(gate).toEqual({ allowed: false, code: 'FORBIDDEN', message: '职务未识别' });
       expect(gate).not.toMatchObject({ message: CONTENT_PUBLISH_COPY.ownerPublish });
     }
   });
