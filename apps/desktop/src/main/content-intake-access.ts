@@ -13,7 +13,6 @@ export type IntakeAccess = {
   capabilities: C['IntakeAuthorization']['capabilities'];
 };
 
-/** Seat-visible denial for the intake read. Other HTTP failures stay on the old codes. */
 export function intakeAccessDenial(error: unknown): IntakeUsageError | null {
   if (!(error instanceof ProductHttpError)) return null;
   if (error.code === 'GONE' && (error.reason === 'NOT_FOUND' || error.reason === 'SCOPE_DENIED')) {
