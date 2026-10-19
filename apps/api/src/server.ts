@@ -1,5 +1,6 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
+import { projectRosterLogin } from './project-roster-login.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -88,6 +89,7 @@ export async function startApi(
     options,
     async (config, repository, policyAdminRepository, bootstrap) => {
       let auth;
+      const rosterProjection: { run: ((openId: string, title: string) => Promise<void>) | null } = { run: null };
       if (config.sessionMode === 'product') {
         if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
         if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
@@ -95,10 +97,15 @@ export async function startApi(
         }
         const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
         const identity = bootstrap.productIdentity;
+        const feishu = identity.kind === 'feishu' ? {
+          ...identity.feishu,
+          observeJob: true as const,
+          projectMatchedJob: (openId: string, title: string) => rosterProjection.run?.(openId, title) ?? Promise.resolve(),
+        } : null;
         const provider = identity.kind === 'feishu'
           ? (identity.providerOrigin
-            ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
-            : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
+            ? createWorkforceIdentityProvider(feishu!, identity.providerOrigin, callback)
+            : createFeishuIdentityProvider(feishu!))
           : createSyntheticIdentityProvider(identity.providerOrigin, callback);
         auth = await createProductAuthService(bootstrap.productIdentity.database, provider, config.authMode);
       }
@@ -136,6 +143,14 @@ export async function startApi(
           service: createNoticeServiceForPool(runtimePool, false),
         };
         const intake = intakeRoutes(auth, bootstrap.objectStoreDir);
+        if (intake?.business) {
+          const business = intake.business;
+          rosterProjection.run = async (openId, title) => {
+            const client = await business.connect();
+            try { await projectRosterLogin(client, openId, title); }
+            finally { client.release(); }
+          };
+        }
         const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
