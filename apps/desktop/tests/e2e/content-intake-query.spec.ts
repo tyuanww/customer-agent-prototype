@@ -124,7 +124,7 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect(query.getByTestId('no-hit')).toBeVisible();
     const fox = app.windows().find(w => w.url().includes('role=fox'))!;
     expect(await fox.evaluate(() => window.customerAgent!.intakeQuery!.access())).toMatchObject({ code: 'FORBIDDEN' });
-    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'other-shop' }))).toMatchObject({ code: 'FORBIDDEN' });
+    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'other-shop' }))).toMatchObject({ code: 'NO_GRANT' });
     expect(await query.evaluate(() => window.customerAgent!.copyText('forged'))).toMatchObject({ ok: false });
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);

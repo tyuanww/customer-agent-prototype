@@ -336,7 +336,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       const use = (await host.status()).purposeQueries;
       expect(use.business).toBeGreaterThan(10); expect(use.usage).toBeGreaterThan(10); expect(use.worker).toBeGreaterThan(10);
     }
-    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'FORBIDDEN' });
+    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'NO_GRANT' });
     const final = await host.status();
     expect(final.currentReleaseId).toBe(result.currentReleaseId);
     expect(final.reviewBindings).toBe(0); expect(final.approvalFacts).toBe(0); expect(final.directPublications).toBe(1);

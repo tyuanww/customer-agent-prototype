@@ -6,6 +6,8 @@ import { isTrustedMainFrameSender } from './sender-guard';
 const channels = ['dashboard:intake-catalog-current', 'dashboard:intake-catalog-command'] as const;
 const messages: Record<string, string> = {
   FORBIDDEN: '当前账号没有此范围的查询权限。', UNAUTHORIZED: '请重新登录后查看。',
+  NO_PRINCIPAL: '没有权限，请找人开通。', FACTS_EXPIRED: '资料资格过期了，请稍后重试。',
+  NO_GRANT: '没有权限，请找人开通。', ROLE_UNKNOWN: '没有权限，请找人开通。',
   VALIDATION: '查看条件无效，请重新选择。', STALE: '条件或会话已变化，请重新刷新。',
   EXPIRED: '查看资格已到期，请重新刷新。', LIMIT: '当前结果过多，请缩小条件后刷新。',
   UNAVAILABLE: '资料目录暂不可用，请稍后刷新。',

@@ -18,7 +18,7 @@ it('uses authorized shops, deterministic Top 3 and only Main-owned original text
   try {
     expect(await f.query.access()).toMatchObject({ shops: ['shop-a', 'shop-b'], shopId: null });
     await expect(f.query.search('洁面')).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(f.query.access('not-authorized')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(f.query.access('not-authorized')).rejects.toMatchObject({ code: 'NO_GRANT' });
     await f.query.access('shop-a');
     const rows = await f.query.search('洁面');
     expect(rows.map(r => r.title)).toEqual(['洁面用法 0', '洁面用法 1', '洁面用法 2']);
@@ -77,7 +77,10 @@ it('withdraws expired rows, rejects revoked permissions, and recovers without tr
 });
 it('returns zero shops and rechecks discovery after losing a scope', async () => {
   const f = setup();
-  try { f.state.empty = true; expect(await f.query.access()).toMatchObject({ shops: [], shopId: null }); }
+  try {
+    f.state.empty = true;
+    await expect(f.query.access()).rejects.toMatchObject({ code: 'NO_GRANT' });
+  }
   finally { f.query.dispose(); }
 });
 

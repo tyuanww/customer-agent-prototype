@@ -47,9 +47,8 @@ export class ContentIntakeQuery {
       const access = await loadIntakeAccess(this.session, controller.signal);
       if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
       const selected = shopId ?? previous.shopId ?? (access.shops.length === 1 ? access.shops[0]! : null);
-      if (selected !== null && !access.shops.includes(selected)) {
-        this.context = { ...emptyIntakeQueryContext(), shops: access.shops };
-        throw new IntakeUsageError('FORBIDDEN');
+      if (access.shops.length === 0 || (selected !== null && !access.shops.includes(selected))) {
+        throw new IntakeUsageError('NO_GRANT');
       }
       const menus = selected === null ? { products: [], scenarios: [] }
         : await loadIntakeVocabulary(this.session, access, selected, controller.signal);

@@ -37,7 +37,11 @@ it('reads complete qualified pages, projects domain from this entitlement, and e
 });
 it('does not promote upload/publish management rights to query',async()=>{
  const f=setup();f.auth.capabilities[0]!.actions=['import','publish'];
- try{expect(await f.owner.command({action:'refresh'})).toMatchObject({busy:false,rows:[],context:{shops:[],shopId:null}});expect(f.request.mock.calls.some(c=>c[1]==='/v1/intake/entitlements')).toBe(false);}finally{f.owner.dispose();}
+ try{
+  await expect(f.owner.command({action:'refresh'})).rejects.toMatchObject({code:'NO_GRANT'});
+  expect(f.owner.view()).toMatchObject({busy:false,rows:[],context:{shops:[],shopId:null}});
+  expect(f.request.mock.calls.some(c=>c[1]==='/v1/intake/entitlements')).toBe(false);
+ }finally{f.owner.dispose();}
 });
 it('isolates Dashboard selection from Query and other dashboards, and retracts on explicit selection',async()=>{
  const f=setup(2),other=new ContentIntakeCatalog(f.session),query=new ContentIntakeUsage(f.session,vi.fn());query.select({shopId:'shop-1',productIds:[],scenarioIds:[]});

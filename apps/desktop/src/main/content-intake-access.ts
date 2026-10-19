@@ -1,4 +1,5 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { ProductHttpError } from './product-http';
 import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
 
 type C = components['schemas'];
@@ -11,6 +12,17 @@ export type IntakeAccess = {
   sources: C['IntakeSource'][];
   capabilities: C['IntakeAuthorization']['capabilities'];
 };
+
+/** Seat-visible denial for the intake read. Other HTTP failures stay on the old codes. */
+export function intakeAccessDenial(error: unknown): IntakeUsageError | null {
+  if (!(error instanceof ProductHttpError)) return null;
+  if (error.code === 'GONE' && (error.reason === 'NOT_FOUND' || error.reason === 'SCOPE_DENIED')) {
+    return new IntakeUsageError('NO_PRINCIPAL');
+  }
+  if (error.reason === 'ORG_FACTS_UNAVAILABLE') return new IntakeUsageError('FACTS_EXPIRED');
+  if (error.reason === 'ROLE_CEILING') return new IntakeUsageError('ROLE_UNKNOWN');
+  return null;
+}
 
 /** Main-only discovery. All pages and both lists must agree before any menu is
  * returned. This is an expiring selection hint, never permission to read/copy;
@@ -140,6 +152,8 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
   } catch (error) {
     assertActive();
     if (error instanceof IntakeUsageError) throw error;
+    const denial = intakeAccessDenial(error);
+    if (denial) throw denial;
     const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
     throw new IntakeUsageError(code === 'UNAUTHORIZED' ? 'UNAUTHORIZED'
       : code === 'UNAVAILABLE' || code === 'OVERLOADED' || code === 'RATE_LIMITED' ? 'UNAVAILABLE' : 'FORBIDDEN');

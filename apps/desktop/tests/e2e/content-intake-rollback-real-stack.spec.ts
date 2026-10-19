@@ -135,7 +135,7 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
     const answer = await query.getByTestId('answer-text-1').textContent();
     await query.getByTestId('copy-button-1').click(); await expect(query.getByTestId('toast')).toContainText('已复制');
     expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(answer);
-    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'FORBIDDEN' });
+    expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-b' }))).toMatchObject({ code: 'NO_GRANT' });
     expect(errors).toEqual([]);
     console.info(JSON.stringify({ status: 'PASS', flow: 'rollback-confirmed-publication-ordinary-seat', http: 'actual', postgres: 15,
       target, base, newRelease: result.currentReleaseId, publicationPolicy: 'direct-v1', approvalRows: 0, screenshots: evidence }));
