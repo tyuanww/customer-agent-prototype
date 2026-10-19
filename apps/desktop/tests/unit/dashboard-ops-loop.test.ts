@@ -490,10 +490,10 @@ it('refuses SOP import for a signed-in owner whose job cannot upload', async () 
 
   const missing = await loginOwner(null);
   expect(missing.login).toMatchObject({
-    job: { status: 'resolved', title: '客服坐席', role: 'agent', rights: { uploadSop: false, search: true } },
+    job: { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { uploadSop: false, search: false } },
   });
   expect(await dashboardSopImport(missing.session, sopCsv)).toMatchObject({
-    ok: false, code: 'FORBIDDEN', message: OPS_LOOP_COPY.sopUploadJob,
+    ok: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL,
   });
   expect(missing.paths).not.toContain('/v1/sop/import');
   expect(JSON.stringify(await dashboardSopImport(missing.session, sopCsv))).not.toContain('一期发布仅管理员');

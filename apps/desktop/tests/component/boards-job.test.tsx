@@ -48,7 +48,7 @@ function install(job: SessionJobView) {
 it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席', async () => {
   const user = userEvent.setup();
   const engineer = observeSessionJob({ title: 'AI赋能工程师', directory: [{ name: 'AI赋能工程师', enabled: true }] });
-  const seat = observeSessionJob(null);
+  const seat = observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
   for (const job of [engineer, seat]) {
     cleanup();
     delete window.dashboardIntake;
@@ -79,5 +79,20 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
     } finally {
       owner.dispose();
     }
+  }
+});
+
+it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh login', async () => {
+  const user = userEvent.setup();
+  const owner = install(observeSessionJob(null));
+  try {
+    render(<DashboardApp />);
+    expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
+    await user.click(screen.getByTestId('nav-permissions'));
+    const grant = await screen.findByRole('button', { name: '新增授权' });
+    await waitFor(() => expect(grant).toBeDisabled());
+    expect(screen.getByText('请重新登录后再查看职务。')).toBeInTheDocument();
+  } finally {
+    owner.dispose();
   }
 });
