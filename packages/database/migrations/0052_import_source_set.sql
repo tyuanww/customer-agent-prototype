@@ -294,6 +294,15 @@ BEGIN
      OR pg_catalog.jsonb_array_length(p_source_bindings) < 1 THEN
     RAISE EXCEPTION USING ERRCODE = 'ZA001', MESSAGE = 'source bindings are required', DETAIL = 'VALIDATION';
   END IF;
+  -- Same first lock as the legacy publisher, then refuse any domain that intake already owns.
+  -- 0022 inserted this fence by rewriting the previous body; replacing the body has to keep it.
+  PERFORM backend_review.lock_content();
+  IF EXISTS (SELECT 1 FROM pg_catalog.jsonb_to_recordset(p_source_bindings) r(domain TEXT,source_version_id TEXT)
+    LEFT JOIN public.authoritative_source_versions a ON a.source_version_id=r.source_version_id AND a.domain=r.domain
+    WHERE a.source_version_id IS NULL OR a.use_class<>'canonical') THEN
+    RAISE EXCEPTION USING ERRCODE='ZA004',MESSAGE='source version is not registered for runtime use',DETAIL='SOURCE_NOT_ELIGIBLE';
+  END IF;
+  PERFORM content_intake.guard_legacy_domains(ARRAY(SELECT DISTINCT a.domain FROM pg_catalog.jsonb_to_recordset(p_source_bindings) r(domain TEXT,source_version_id TEXT) JOIN public.authoritative_source_versions a ON a.source_version_id=r.source_version_id));
   INSERT INTO public.source_snapshot_revisions(
     import_batch_id, source_version_id, domain, previous_sha256, new_sha256
   )
