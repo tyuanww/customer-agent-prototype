@@ -31,7 +31,7 @@ export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'afters
 export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
 /** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
  * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
-export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director';
+export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -208,6 +208,36 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
           clock_timestamp()-interval '1 minute',clock_timestamp()+interval '4 minutes','合成名单授权','director',$3)`,
       [`business-roster-${action}`, action, `root-${action}`]);
     }
+    // A second roster principal with the same director title but a query grant only. The
+    // workbench has to hide every write control for it and show the denial sentence, which is
+    // the review state the operator asked to see. Its own transaction defers the
+    // principal-current-facts foreign key the same way the first roster principal does.
+    await admin.query('BEGIN');
+    await admin.query('SET CONSTRAINTS ALL DEFERRED');
+    await admin.query(`INSERT INTO backend_identity.subject_bindings(
+        binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
+      VALUES ('roster-readonly','synthetic','tenant-a','roster-readonly','user-roster-readonly',repeat('a',64),true,'owner')`);
+    await admin.query(`INSERT INTO content_intake.principals VALUES
+        ('roster-readonly','user-roster-readonly','tenant-a','app-a','feishu-job-roster','roster-readonly',1,0)`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES
+        ('roster-readonly',1,ARRAY['dept-a'],'job-customer-service-director',true,
+         statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    // Allocations make the permission page list a scope, so the missing button can only be
+    // explained by the publish bit, not by an empty scope list.
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+        starts_at, expires_at, reason, steward_id)
+      SELECT 'alloc-roster-readonly-' || action, 'allocation', 'director', 'roster-readonly',
+        'tenant-a','app-a','scope-a', action,
+        clock_timestamp()-interval '2 days', clock_timestamp()+interval '1 hour','合成只读分配','director'
+      FROM unnest(ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback']::text[]) AS action`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+      VALUES ('business-roster-readonly-query','business','director','roster-readonly',
+        'tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成只读查询','director','root-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
     await admin.query('COMMIT');
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
     if (profile === 'purpose-runtime') {
@@ -289,7 +319,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: DesktopSyntheticIdentity) {
-        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
       async revokeSyntheticQuery() {
         if (closed || profile !== 'purpose-runtime') throw new Error('Synthetic runtime control unavailable');
