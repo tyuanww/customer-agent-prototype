@@ -13,6 +13,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import { createProductAuthService, IdentityFailure } from '../../dist/product-auth-service.js';
 import { registerProductAuthRoutes } from '../../dist/product-auth-routes.js';
 import { registerAuthRoutes } from '../../dist/auth-routes.js';
+import { readAuthorizationActions, readStoredRosterPermission } from '../../dist/project-roster-login.js';
 import { authenticateRequestHeaders } from '../../dist/auth-service.js';
 import { createContentObjectStore } from '../../dist/content-object-store.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
@@ -143,6 +144,57 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
     admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain, inputFormat, includeSopSource); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
+    // The workbench buttons read authorization_sources. Seed one approved store set and add
+    // live rows for the actions the workbench calls, without rewriting the shared intake fixture
+    // (grants are append-only, so a NULL policy version cannot be repaired in place).
+    await admin.query(`INSERT INTO content_intake.store_sets(tenant_id, app_id, version, approved_at, provenance)
+      VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic')
+      ON CONFLICT (tenant_id, app_id, version) DO NOTHING`);
+    await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
+      VALUES ('tenant-a','app-a',1)
+      ON CONFLICT (tenant_id, app_id) DO UPDATE SET version = 1`);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id, app_id, version, scope_id, source_id, content_valid_until)
+      VALUES
+        ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '1 day'),
+        ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '1 day')
+      ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`);
+    await admin.query('BEGIN');
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+      SELECT 'business-' || recipient || '-query-current', 'business', 'director', recipient,
+        'tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '30 minutes','合成回收资格','director','root-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1
+      FROM unnest(ARRAY['enabler','reviewer','agent']::text[]) AS recipient
+      ON CONFLICT (grant_id) DO NOTHING`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+        starts_at, expires_at, reason, steward_id)
+      SELECT 'alloc-reviewer-' || action, 'allocation', 'director', 'reviewer',
+        'tenant-a','app-a','scope-a', action,
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 hour','合成复核分配','director'
+      FROM unnest(ARRAY['query','import','publish','rollback']::text[]) AS action
+      ON CONFLICT (grant_id) DO NOTHING`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+      VALUES ('business-director-query-current','business','reviewer','director',
+        'tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '30 minutes','合成回收资格','director','alloc-reviewer-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)
+      ON CONFLICT (grant_id) DO NOTHING`);
+    for (const action of ['import', 'publish', 'rollback']) {
+      await admin.query(`INSERT INTO content_intake.grants(
+          grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+          starts_at, expires_at, reason, steward_id, parent_grant_id)
+        VALUES ($1,'business','reviewer','director','tenant-a','app-a','scope-a','source-a',$2,
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成回收资格','director',$3)
+        ON CONFLICT (grant_id) DO NOTHING`,
+      [`business-director-${action}`, action, `alloc-reviewer-${action}`]);
+    }
+    await admin.query('COMMIT');
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
     if (profile === 'purpose-runtime') {
       const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePool>;
@@ -177,7 +229,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       // Paths only: never retain credentials, auth codes, state or request bodies.
       if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
     });
-    registerProductAuthRoutes(app, auth); registerAuthRoutes(app, auth);
+    registerProductAuthRoutes(app, auth);
+    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (userId) => readAuthorizationActions(admin!, userId));
     app.get('/v1/notices/current', async (request, reply) => {
       if (!(await authenticateRequestHeaders(auth!, request.headers))) return reply.code(401).send();
       return reply.code(410).send({ error: { code: 'GONE', message: 'No notice in the synthetic fixture' } });
