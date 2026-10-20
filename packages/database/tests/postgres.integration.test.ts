@@ -532,7 +532,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(report).toMatchObject({
         status: 'PASS',
         migrationCount: 49,
-        inventory: { tables: 104, views: 7, functions: 273 },
+        inventory: { tables: 108, views: 7, functions: 276 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {

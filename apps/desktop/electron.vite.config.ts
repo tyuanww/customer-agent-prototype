@@ -69,6 +69,9 @@ export default defineConfig({
         '@shared': resolve(__dirname, 'src/shared'),
         '@renderer': resolve(__dirname, 'src/renderer'),
       },
+      // Renderer imports the roster through shared code. `source` resolves
+      // the TypeScript entry, so packaging does not need dist built first.
+      conditions: ['source'],
     },
     plugins: [
       react(),
