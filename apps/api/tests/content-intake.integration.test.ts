@@ -2197,9 +2197,25 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         SELECT 'capacity-'||lpad(i::text,4,'0'),'scope-a',1,'v2-preview' FROM generate_series(1,4999) i;
       INSERT INTO content_intake.source_mappings SELECT source_id,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64)
         FROM content_intake.sources WHERE source_id LIKE 'capacity-%';
-      INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+      INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+        VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic') ON CONFLICT DO NOTHING;
+      INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+        VALUES ('tenant-a','app-a',1) ON CONFLICT (tenant_id,app_id) DO UPDATE SET version=1;
+      INSERT INTO content_intake.store_set_members(tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        SELECT 'tenant-a','app-a',1,scope_id,source_id,clock_timestamp()+interval '1 hour'
+        FROM content_intake.sources WHERE source_id LIKE 'capacity-%' OR source_id='source-a'
+        ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING;
+      INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+        SELECT 'grant-capacity-base','business','director','agent','tenant-a','app-a','scope-a','source-a','query',
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成独立来源授权','director','root-query',
+          (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1
+        ON CONFLICT (grant_id) DO NOTHING;
+      -- A query grant is only live when it names its source and carries the current policy
+      -- and store set version, so the capacity rows have to be stamped like any other.
+      INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
         SELECT 'grant-'||source_id,'business','director','agent','tenant-a','app-a','scope-a',source_id,'query',
-          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成独立来源授权','director','root-query'
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成独立来源授权','director','root-query',
+          (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1
         FROM content_intake.sources WHERE source_id LIKE 'capacity-%'; COMMIT;
       ANALYZE content_intake.sources; ANALYZE content_intake.source_mappings; ANALYZE content_intake.grants`);
     const logged = await seat();
