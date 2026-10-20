@@ -61,6 +61,7 @@ import {
 } from './process.ts';
 import { loginAs, seedContentIfMissing } from './seed.ts';
 import { anomalyStatus, revokeSessions, suspendSource } from './anomaly.ts';
+import { identityProcessEnvironment } from './identity-admission.ts';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const API_ENTRY = path.join(repositoryRoot, 'apps/api/dist/main.js');
@@ -281,7 +282,7 @@ async function startProcesses(
       // operator set CUSTOMER_AGENT_STACK_ROOT: the child would otherwise look in the
       // default home path (and, with no fallback password, refuse to start).
       const processInfo = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
-        { PATH: process.env.PATH, CUSTOMER_AGENT_STACK_ROOT: STACK_ROOT }, mode);
+        identityProcessEnvironment(process.env, STACK_ROOT), mode);
       if (mode === 'foreground') children.push(processInfo);
       spawned.push('identity');
       messages.push(`identity pid ${String(processInfo.pid)}${feishu ? ' (password)' : ''}`);
