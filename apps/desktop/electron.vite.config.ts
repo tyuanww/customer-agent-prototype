@@ -31,7 +31,19 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    // product-session pulls the roster through workbench-job. Bundle it.
+    // A bare require fails in the unsigned package, and the query window
+    // then never receives the open command.
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster'] })],
+    resolve: {
+      conditions: ['source'],
+    },
+    ssr: {
+      noExternal: ['@customer-agent/job-roster'],
+      resolve: {
+        conditions: ['source'],
+      },
+    },
     build: {
       rollupOptions: {
         input: {
