@@ -158,9 +158,10 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
     }
   }
 
-  it('rejects rollback when the release domain is outside the rollback set', async () => {
-    const domains = ['aftersale', 'campaign', 'presale', 'product'] as const;
-    const joined = domains.map(domain => `${domain}:srcv_roll_${domain}`).join('|');
+  const releaseDomains = ['aftersale', 'campaign', 'presale', 'product'] as const;
+
+  async function seedFourDomainRelease(releaseId: string, seq: number): Promise<void> {
+    const joined = releaseDomains.map(domain => `${domain}:srcv_roll_${domain}`).join('|');
     await admin.query('BEGIN');
     await admin.query("SELECT set_config('app.publishing','on',true)");
     await admin.query(`INSERT INTO public.authoritative_source_versions(
@@ -168,30 +169,75 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
         use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at)
       SELECT 'srcv_roll_' || domain, 'SRC-ROLL-' || upper(domain), domain, 'v1', repeat('ef',32),
         'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z'
-      FROM unnest($1::text[]) AS domain`, [domains]);
+      FROM unnest($1::text[]) AS domain
+      ON CONFLICT (source_version_id) DO NOTHING`, [releaseDomains]);
     const hash = (await admin.query<{ hash: string }>(
       `SELECT encode(public.digest(convert_to($1,'UTF8'),'sha256'),'hex') AS hash`, [joined])).rows[0]?.hash;
     await admin.query(`INSERT INTO public.content_releases(release_id, release_seq, status, source_binding_hash)
-      VALUES ('rel_roll', 1, 'published', $1)`, [hash]);
+      VALUES ($1, $2, 'published', $3)`, [releaseId, seq, hash]);
     await admin.query(`INSERT INTO public.release_source_bindings(release_id, domain, source_version_id)
-      SELECT 'rel_roll', domain, 'srcv_roll_' || domain FROM unnest($1::text[]) AS domain`, [domains]);
+      SELECT $1, domain, 'srcv_roll_' || domain FROM unnest($2::text[]) AS domain`, [releaseId, releaseDomains]);
     await admin.query('COMMIT');
+  }
+
+  it('rejects rollback when the release domain is outside the rollback set', async () => {
+    await seedFourDomainRelease('rel_roll', 1);
     expect(await rollbackMessage('user-director', 'owner', 'rel_roll')).toBe('没有权限，请找人开通。');
   });
 
-  it('accepts rollback once the release domains are in the rollback set', async () => {
-    await admin.query(`INSERT INTO content_intake.grants(
-        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason)
-      VALUES ('grant-alloc-rollback','allocation','signer','signer','tenant-menokin','app-customer-agent','scope-product','rollback',
-        clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配回滚。')`);
-    await admin.query(`INSERT INTO content_intake.grants(
-        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
-        starts_at, expires_at, reason, parent_grant_id)
-      VALUES ('grant-rollback','business','signer','director','tenant-menokin','app-customer-agent','scope-product',NULL,'rollback',
-        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '回滚。','grant-alloc-rollback')`);
+  async function grantRollbackOnEveryDomain(): Promise<void> {
+    await admin.query('BEGIN');
+    await admin.query('SET CONSTRAINTS ALL DEFERRED');
+    for (const domain of releaseDomains) {
+      await admin.query(`INSERT INTO content_intake.scopes(scope_id, tenant_id, app_id, brand_id, domain)
+        VALUES ($1,'tenant-menokin','app-customer-agent','brand-a',$2)
+        ON CONFLICT (scope_id) DO NOTHING`, [`scope-${domain}`, domain]);
+      await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
+        VALUES ($1,$2,1,'v2-preview')
+        ON CONFLICT (source_id) DO NOTHING`, [`source-roll-${domain}`, `scope-${domain}`]);
+      await admin.query(`INSERT INTO content_intake.source_mappings(
+          source_id, version, template_version, rule_version, mapping_version, structure_digest)
+        VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ef',32))
+        ON CONFLICT (source_id, version) DO NOTHING`, [`source-roll-${domain}`]);
+      await admin.query(`INSERT INTO content_intake.grants(
+          grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason)
+        VALUES ($1,'allocation','signer','signer','tenant-menokin','app-customer-agent',$2,'rollback',
+          clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配回滚。')`,
+      [`grant-alloc-rollback-${domain}`, `scope-${domain}`]);
+      await admin.query(`INSERT INTO content_intake.grants(
+          grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+          starts_at, expires_at, reason, parent_grant_id)
+        VALUES ($1,'business','signer','director','tenant-menokin','app-customer-agent',$2,NULL,'rollback',
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '回滚。',$3)`,
+      [`grant-rollback-${domain}`, `scope-${domain}`, `grant-alloc-rollback-${domain}`]);
+    }
+    await admin.query('COMMIT');
+  }
+
+  it('passes the rollback gate once every release domain is in the rollback set', async () => {
+    await seedFourDomainRelease('rel_roll', 1);
+    await grantRollbackOnEveryDomain();
     const message = await rollbackMessage('user-director', 'agent', 'rel_roll');
     expect(message).not.toBe('没有权限，请找人开通。');
     expect(message).not.toBe('资料资格过期了，请稍后重试。');
+    expect(message).toBe('target release snapshot is empty');
+  });
+
+  async function resolvePreviousMessage(userId: string) {
+    try {
+      await admin.query('SELECT * FROM public.resolve_previous_content_release($1)', [userId]);
+      return 'accepted';
+    } catch (error) {
+      return error instanceof Error ? error.message : 'error';
+    }
+  }
+
+  it('rejects rollback previous when the target domains are outside the rollback set', async () => {
+    await seedFourDomainRelease('rel_roll', 1);
+    await seedFourDomainRelease('rel_after', 2);
+    await admin.query(`INSERT INTO public.content_current(id, current_release_id, updated_at)
+      VALUES (1, 'rel_after', now()) ON CONFLICT (id) DO UPDATE SET current_release_id = 'rel_after'`);
+    expect(await resolvePreviousMessage('user-signer')).toBe('没有权限，请找人开通。');
   });
 
   async function importMessage(userId: string, role: string, bindings: string) {

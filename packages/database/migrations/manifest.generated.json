@@ -822,8 +822,8 @@
       "id": "0051_publish_source_set",
       "file": "0051_publish_source_set.sql",
       "source_ranges": [],
-      "sha256": "ee221b5797615c32c194cb324c26fb9c34217a3b83d5c782f6b8130050c27e12",
-      "bytes": 44397,
+      "sha256": "958a78d494bf6b81a3c4fdda63813152564fc192bf38aefbe3f26fc18192efa3",
+      "bytes": 55288,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
