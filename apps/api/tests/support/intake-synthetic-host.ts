@@ -29,6 +29,9 @@ import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-s
 type C = components['schemas'];
 export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'aftersale';
 export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
+/** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
+ * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
+export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -84,9 +87,9 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
   const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
-  let apiOrigin = '', identityOrigin = '', selectedIdentity: IntakeSyntheticIdentity = 'enabler';
-  const loginCodes = new Map<string, { binding: IntakeSyntheticIdentity; expires: number }>();
-  const sessions = new Map<IntakeSyntheticIdentity, string>();
+  let apiOrigin = '', identityOrigin = '', selectedIdentity: DesktopSyntheticIdentity = 'enabler';
+  const loginCodes = new Map<string, { binding: DesktopSyntheticIdentity; expires: number }>();
+  const sessions = new Map<DesktopSyntheticIdentity, string>();
   const diagnostics: { id: string; reason: string }[] = [];
   const requests: string[] = [];
   const identity = createServer((request, response) => {
@@ -103,7 +106,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     callback.searchParams.set('state', url.searchParams.get('state')!); callback.searchParams.set('code', code);
     response.writeHead(302, { location: callback.href, 'cache-control': 'no-store' }); response.end();
   });
-  function issueCode(binding: IntakeSyntheticIdentity) {
+  function issueCode(binding: DesktopSyntheticIdentity) {
     for (const [key, value] of loginCodes) if (value.expires <= Date.now()) loginCodes.delete(key);
     if (loginCodes.size >= 100) throw new Error('Synthetic login budget exceeded');
     const code = randomBytes(32).toString('base64url');
@@ -122,7 +125,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     sessions.clear(); loginCodes.clear();
     if (failures.length) throw new AggregateError(failures, 'Synthetic host cleanup failed');
   }
-  async function requestAs(actor: IntakeSyntheticIdentity, pathname: string, options: RequestInit = {}) {
+  async function requestAs(actor: DesktopSyntheticIdentity, pathname: string, options: RequestInit = {}) {
     if (!/^\/v1\/[A-Za-z0-9/?=&%._-]+$/.test(pathname)) throw new Error('Only local v1 requests are accepted');
     let token = sessions.get(actor);
     if (!token) {
@@ -160,39 +163,46 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '1 day')
       ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`);
     await admin.query('BEGIN');
-    await admin.query(`INSERT INTO content_intake.grants(
-        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
-        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
-      SELECT 'business-' || recipient || '-query-current', 'business', 'director', recipient,
-        'tenant-a','app-a','scope-a','source-a','query',
-        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '30 minutes','合成回收资格','director','root-query',
-        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1
-      FROM unnest(ARRAY['enabler','reviewer','agent']::text[]) AS recipient
-      ON CONFLICT (grant_id) DO NOTHING`);
+    await admin.query('SET CONSTRAINTS ALL DEFERRED');
+    // /v1/auth/job only answers for a roster principal, and the intake routes only accept a
+    // confirmed-synthetic one. Keep the four intake identities as they are and add a single
+    // roster principal that the desktop lane signs in as.
+    await admin.query(`INSERT INTO backend_identity.subject_bindings(
+        binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
+      VALUES ('roster-director','synthetic','tenant-a','roster-director','user-roster-director',repeat('a',64),true,'owner')`);
+    await admin.query(`INSERT INTO content_intake.principals VALUES
+        ('roster-director','user-roster-director','tenant-a','app-a','feishu-job-roster','roster-director',1,0)`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES
+        ('roster-director',1,ARRAY['dept-a'],'job-customer-service-director',true,
+         statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.role_rules(
+        tenant_id, app_id, department_id, job_id, policy_version, role)
+      VALUES ('tenant-a','app-a','dept-a','job-customer-service-director',1,'director')
+      ON CONFLICT DO NOTHING`);
+    // The permission page lists a scope only when the signed-in principal may allocate there,
+    // so the roster principal gets its own allocation rows. Allocation may be self-held.
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
         starts_at, expires_at, reason, steward_id)
-      SELECT 'alloc-reviewer-' || action, 'allocation', 'director', 'reviewer',
+      SELECT 'alloc-roster-' || action, 'allocation', 'director', 'roster-director',
         'tenant-a','app-a','scope-a', action,
-        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 hour','合成复核分配','director'
-      FROM unnest(ARRAY['query','import','publish','rollback']::text[]) AS action
-      ON CONFLICT (grant_id) DO NOTHING`);
+        clock_timestamp()-interval '2 days', clock_timestamp()+interval '1 hour','合成名单分配','director'
+      FROM unnest(ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback']::text[]) AS action`);
+    // Query needs a policy version and a store set version; the other actions only need the grant.
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
         starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
-      VALUES ('business-director-query-current','business','reviewer','director',
+      VALUES ('business-roster-query','business','director','roster-director',
         'tenant-a','app-a','scope-a','source-a','query',
-        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '30 minutes','合成回收资格','director','alloc-reviewer-query',
-        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)
-      ON CONFLICT (grant_id) DO NOTHING`);
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成名单查询','director','root-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
     for (const action of ['import', 'publish', 'rollback']) {
       await admin.query(`INSERT INTO content_intake.grants(
           grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
           starts_at, expires_at, reason, steward_id, parent_grant_id)
-        VALUES ($1,'business','reviewer','director','tenant-a','app-a','scope-a','source-a',$2,
-          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成回收资格','director',$3)
-        ON CONFLICT (grant_id) DO NOTHING`,
-      [`business-director-${action}`, action, `alloc-reviewer-${action}`]);
+        VALUES ($1,'business','director','roster-director','tenant-a','app-a','scope-a','source-a',$2,
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '4 minutes','合成名单授权','director',$3)`,
+      [`business-roster-${action}`, action, `root-${action}`]);
     }
     await admin.query('COMMIT');
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
@@ -274,8 +284,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     return {
       apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
-      selectIdentity(value: IntakeSyntheticIdentity) {
-        if (!['director', 'enabler', 'reviewer', 'agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+      selectIdentity(value: DesktopSyntheticIdentity) {
+        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
       async revokeSyntheticQuery() {
         if (closed || profile !== 'purpose-runtime') throw new Error('Synthetic runtime control unavailable');
