@@ -37,8 +37,12 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
         VALUES ($1,'allocation','director','director','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成根资格','director')`, [`root-${action}`, action]);
       for (const recipient of ['enabler', 'reviewer', ...(action === 'query' ? ['agent'] : [])]) {
-        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-          VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`,
+        // A query row is live only with the current policy version and a store set member,
+        // so it is stamped here. Other actions keep those columns NULL.
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+          VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成业务授权','director',$4,
+            CASE WHEN $3='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
+            CASE WHEN $3='query' THEN 1 END)`,
         [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
     }

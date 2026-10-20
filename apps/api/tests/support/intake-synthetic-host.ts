@@ -146,22 +146,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, domain, inputFormat, includeSopSource); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
-    // The workbench buttons read authorization_sources. Seed one approved store set and add
-    // live rows for the actions the workbench calls, without rewriting the shared intake fixture
-    // (grants are append-only, so a NULL policy version cannot be repaired in place).
-    await admin.query(`INSERT INTO content_intake.store_sets(tenant_id, app_id, version, approved_at, provenance)
-      VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic')
-      ON CONFLICT (tenant_id, app_id, version) DO NOTHING`);
-    await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
-      VALUES ('tenant-a','app-a',1)
-      ON CONFLICT (tenant_id, app_id) DO UPDATE SET version = 1`);
-    await admin.query(`INSERT INTO content_intake.store_set_members(
-        tenant_id, app_id, version, scope_id, source_id, content_valid_until)
-      VALUES
-        ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '1 day'),
-        ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '1 day')
-      ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`);
+    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin);
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
     // /v1/auth/job only answers for a roster principal, and the intake routes only accept a
@@ -179,6 +164,25 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         tenant_id, app_id, department_id, job_id, policy_version, role)
       VALUES ('tenant-a','app-a','dept-a','job-customer-service-director',1,'director')
       ON CONFLICT DO NOTHING`);
+    await admin.query('COMMIT');
+    // The role rule above bumps the policy version, so it has to settle before the shared seed
+    // stamps any query grant with the version a reader will compare against.
+    await seedIntakeSyntheticHost(admin, domain, inputFormat, includeSopSource); await seedIntakeSyntheticDirectory(admin, { duplicateShopNames });
+    // The workbench buttons read authorization_sources. Seed one approved store set and add
+    // live rows for the actions the workbench calls, without rewriting the shared intake fixture
+    // (grants are append-only, so a NULL policy version cannot be repaired in place).
+    await admin.query(`INSERT INTO content_intake.store_sets(tenant_id, app_id, version, approved_at, provenance)
+      VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic')
+      ON CONFLICT (tenant_id, app_id, version) DO NOTHING`);
+    await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
+      VALUES ('tenant-a','app-a',1)
+      ON CONFLICT (tenant_id, app_id) DO UPDATE SET version = 1`);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id, app_id, version, scope_id, source_id, content_valid_until)
+      VALUES
+        ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '1 day'),
+        ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '1 day')
+      ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`);
     // The permission page lists a scope only when the signed-in principal may allocate there,
     // so the roster principal gets its own allocation rows. Allocation may be self-held.
     await admin.query(`INSERT INTO content_intake.grants(
