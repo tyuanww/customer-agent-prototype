@@ -12,12 +12,12 @@ export default defineConfig({
     // not need a separate dist build before electron-vite.
     // dayjs subpath imports omit the .js extension. Electron's ESM loader
     // rejects them when the main bundle leaves dayjs external.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', 'dayjs'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', '@customer-agent/job-roster', 'dayjs'] })],
     resolve: {
       conditions: ['source'],
     },
     ssr: {
-      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake'],
+      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake', '@customer-agent/job-roster'],
       resolve: {
         conditions: ['source'],
       },
@@ -54,7 +54,7 @@ export default defineConfig({
       port: 5173,
       strictPort: true,
       fs: {
-        allow: [resolve(__dirname)],
+        allow: [resolve(__dirname, '../..')],
       },
     },
     build: {

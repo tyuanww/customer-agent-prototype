@@ -168,7 +168,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageWindows).toContain('assertMainBundle(desktopRoot)');
     expect(packageWindows).toContain('assertMainBundleHasNoWorkspaceBareImports');
     expect(packageWindows).toContain("node_modules/electron-builder/out/cli/cli.js");
-    expect(electronViteConfig).toContain("externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', 'dayjs'] })");
+    expect(electronViteConfig).toContain("externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', '@customer-agent/job-roster', 'dayjs'] })");
     expect(packageWindows).not.toMatch(/execFileSync\(['"](?:pnpm|electron-builder)['"]/);
     expect(packageWindows).toContain("WINDOWS_LOCAL_UNSIGNED_OUTPUT = 'release/local-unsigned/windows'");
     expect(packageWindows).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");

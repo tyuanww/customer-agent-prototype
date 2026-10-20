@@ -11,7 +11,7 @@ function compiledEntry(name: string) {
 export default defineConfig({
   server: {
     fs: {
-      allow: [resolve(__dirname)],
+        allow: [resolve(__dirname, '../..')],
     },
   },
   plugins: [react()],

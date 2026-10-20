@@ -192,7 +192,7 @@ describe('job observation from a signed-out session', () => {
         title: 'AI赋能工程师',
         role: 'engineer',
         label: 'AI赋能工程师',
-        rights: { publish: true, grant: true, uploadSop: true, search: true, readCatalog: true },
+        rights: { publish: true, grant: true, uploadSop: true, search: false, readCatalog: false },
       },
     });
     expect(isProductSessionResult(login)).toBe(true);
@@ -205,15 +205,24 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
-  it('lets 普通客服 search and read without publish, authorize, or SOP upload', async () => {
-    const f = fixture({ jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服') }) });
-    expect(f.session.view().signedIn).toBe(false);
-    expect(await f.session.login()).toMatchObject({
+  it('keeps 普通客服 off publish and off query until the roster state is ready', async () => {
+    const closed = fixture({ jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服') }) });
+    expect(await closed.session.login()).toMatchObject({
       ok: true,
-      signedIn: true,
       job: {
         status: 'resolved',
         role: 'agent',
+        rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false },
+      },
+    });
+    const open = fixture({
+      jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服'), permissionState: 'ready' }),
+    });
+    expect(await open.session.login()).toMatchObject({
+      ok: true,
+      job: {
+        permission: 'ready',
+        notice: null,
         rights: { publish: false, grant: false, uploadSop: false, search: true, readCatalog: true },
       },
     });
@@ -231,7 +240,7 @@ describe('job observation from a signed-out session', () => {
         role: 'agent',
         permission: 'revoked',
         notice: '没有权限，请找人开通。',
-        rights: { search: true },
+        rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false },
       },
     });
   });

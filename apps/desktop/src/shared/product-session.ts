@@ -57,12 +57,17 @@ export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView 
   if (lookup.status === 'unresolved') {
     return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission, notice };
   }
+  const queryReady = snapshot.permissionState === 'ready';
   return {
     status: 'resolved',
     title: lookup.title,
     role: lookup.role,
     label: lookup.title,
-    rights: { ...lookup.rights },
+    rights: {
+      ...lookup.rights,
+      search: lookup.rights.search && queryReady,
+      readCatalog: lookup.rights.readCatalog && queryReady,
+    },
     permission,
     notice,
   };
@@ -115,7 +120,8 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
   if (![row.publish, row.grant, row.uploadSop, row.search, row.readCatalog].every((flag) => typeof flag === 'boolean')) return false;
   if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE) return false;
-  if (job.permission !== null && !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(String(job.permission))) return false;
+  if (job.permission !== null && (typeof job.permission !== 'string'
+    || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
   if (job.status === 'unresolved') {
     return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
@@ -126,13 +132,14 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights', 'permission', 'notice'])) return false;
   if (typeof job.title !== 'string' || job.label !== job.title) return false;
   const expected = resolveJobTitle(job.title, [{ name: job.title, enabled: true }]);
+  const queryReady = job.permission === 'ready';
   return expected.status === 'resolved'
     && expected.role === job.role
     && expected.rights.publish === row.publish
     && expected.rights.grant === row.grant
     && expected.rights.uploadSop === row.uploadSop
-    && expected.rights.search === row.search
-    && expected.rights.readCatalog === row.readCatalog;
+    && row.search === (queryReady && expected.rights.search)
+    && row.readCatalog === (queryReady && expected.rights.readCatalog);
 }
 export type ProductSessionApi = {
   sessionStatus(): Promise<ProductSessionResult>;

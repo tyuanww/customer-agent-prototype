@@ -1,5 +1,5 @@
 import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
-import type { ProductSessionResult } from '@shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -1022,6 +1022,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
       if (!(productState?.ok && productState.signedIn)) {
+        return;
+      }
+      if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
+        setResults([]);
+        setErrorMessage(PERMISSION_DENIAL_MESSAGE);
+        reportPhase('ERROR');
         return;
       }
       const api = window.customerAgent.productSearch;

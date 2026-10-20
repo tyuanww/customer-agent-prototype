@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { queryHandoffGeometry } from '../../src/shared/fox-motion';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
-import { PRODUCT_ERRORS } from '../../src/shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, PRODUCT_ERRORS } from '../../src/shared/product-session';
 import {
   COPY_FEEDBACK_MS,
   FORBIDDEN_INACCURACY_STATUS_PHRASES,
@@ -150,6 +150,26 @@ describe('session notice projection', () => {
       wasSignedIn: false,
       previous: null,
     })).toBeNull();
+  });
+
+  it('withholds the query-ready sentence when the resolved job is not ready', () => {
+    expect(sessionNoticeForResult({
+      value: {
+        ...signedIn,
+        job: {
+          status: 'resolved',
+          title: '客服坐席',
+          role: 'agent',
+          label: '客服坐席',
+          rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false },
+          permission: 'denied',
+          notice: PERMISSION_DENIAL_MESSAGE,
+        },
+      },
+      source: 'login',
+      wasSignedIn: false,
+      previous: null,
+    })).toEqual({ kind: 'failed', text: PERMISSION_DENIAL_MESSAGE });
   });
 
   it('shows success only for an explicit login, not for later status polls', () => {

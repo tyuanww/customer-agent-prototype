@@ -11,6 +11,7 @@ import { QUERY_WIDTH } from '@shared/overlay-geometry';
 import type { FoxVisualTransform, QueryAnchor } from '@shared/overlay-events';
 import type { OverlayPhase } from '@shared/overlay-machine';
 import {
+  PERMISSION_DENIAL_MESSAGE,
   sessionDisplayName,
   type ProductSessionResult,
   type ProductSessionView,
@@ -177,6 +178,10 @@ export function sessionNoticeForResult(input: {
   }
   if (value.signedIn) {
     if (source === 'login') {
+      const permission = value.job?.status === 'resolved' ? value.job.permission : null;
+      if (value.job?.status === 'resolved' && permission !== 'ready' && permission !== 'unknown') {
+        return { kind: 'failed', text: PERMISSION_DENIAL_MESSAGE };
+      }
       return { kind: 'success', text: SESSION_NOTICE_TEXT.success };
     }
     return previous?.kind === 'success' ? previous : null;
