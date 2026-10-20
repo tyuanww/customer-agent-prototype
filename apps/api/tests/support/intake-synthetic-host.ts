@@ -284,8 +284,14 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
     await app.register(contentIntakeManagementRoutes, { auth, pool, store, report, ...(terminalPool ? { terminalPool } : {}),
+      // Every principal that can appear in the grant-recipient directory needs a label, or the
+      // directory fails closed. The roster identities are added here for that reason only.
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
-        ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2] ?? null : null });
+        ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2]
+          ?? (principalId === 'roster-director' ? '合成名单总监'
+            : principalId === 'roster-readonly' ? '合成只读总监'
+            : null)
+        : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
     let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
     if (prepareCandidate) {
