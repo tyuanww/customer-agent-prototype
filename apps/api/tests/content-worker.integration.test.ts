@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { Client } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
+import { seedContentWriteAuthority } from './support/write-authority.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createApiApp } from '../src/app.js';
 import { createContentImportService } from '../src/content-import-service.js';
@@ -110,6 +111,19 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         `, [user, cap]);
       }
     }
+    // Import reads authorization_sources, so the synthetic reviewer must hold an import grant
+    // for every domain the worker fixture uploads.
+    await seedContentWriteAuthority(admin, {
+      tenantId: 'tenant-t3', appId: 'app-t3', brandId: 'brand-t3',
+      signer: { principalId: 't3-signer', userId: 'usr_t3_owner', jobId: 'job-t3-director', role: 'director' },
+      recipients: [
+        { principalId: 't3-lead', userId: 'usr_t3_lead', jobId: 'job-t3-lead', role: 'lead' },
+        { principalId: 't3-manager', userId: 'usr_t3_manager', jobId: 'job-t3-manager', role: 'manager' },
+        { principalId: 't3-quality', userId: 'usr_t3_quality', jobId: 'job-t3-quality', role: 'lead' },
+      ],
+      domains: ['aftersale', 'campaign', 'presale', 'product'],
+      actions: ['import'],
+    });
     const repository = createServiceRepository({
       connectionString: conn('t3_runtime'), poolMax: 4, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
     });

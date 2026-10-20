@@ -20,8 +20,12 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
   actions: readonly string[];
   /** Grant a query row stamped with the current policy and store set version. */
   query?: boolean;
+  /** Extra sources a fixture already registered and the recipients must reach. */
+  extraSources?: readonly { scopeId: string; sourceId: string; domain: string }[];
 }>): Promise<void> {
   const { tenantId, appId, brandId, signer, recipients, domains, actions } = input;
+  // Fixtures may already own a principal for a user id; grants must name that one.
+  const effective = new Map<string, string>();
   await admin.query('BEGIN');
   try {
     await admin.query(`INSERT INTO content_intake.policy_versions(tenant_id, app_id, version)
@@ -31,6 +35,14 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
           binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
         VALUES ($1,'synthetic','synthetic-tenant',$1,$2,repeat('a',64),true,$3)
         ON CONFLICT (user_id) DO NOTHING`, [person.principalId, person.userId, person.role === 'agent' ? 'agent' : 'owner']);
+      const known = await admin.query<{ principal_id: string }>(
+        'SELECT principal_id FROM content_intake.principals WHERE user_id = $1', [person.userId]);
+      if (known.rows[0]) {
+        // Reuse the principal the fixture already registered for this user.
+        effective.set(person.principalId, known.rows[0].principal_id);
+        continue;
+      }
+      effective.set(person.principalId, person.principalId);
       await admin.query(`INSERT INTO content_intake.principals(
           principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version, revocation_generation)
         VALUES ($1,$2,$3,$4,'confirmed-synthetic',$5,1,0)
@@ -51,23 +63,36 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
       await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
         VALUES ($1,$2,1) ON CONFLICT (tenant_id, app_id) DO UPDATE SET version = 1`, [tenantId, appId]);
     }
-    for (const domain of domains) {
-      await admin.query(`INSERT INTO content_intake.scopes(scope_id, tenant_id, app_id, brand_id, domain)
+    let policyVersion: string | null = null, storeSetVersion: string | null = null;
+    if (input.query === true) {
+      const stamped = await admin.query<{ policy_version: string | null; store_set_version: string | null }>(`
+        SELECT (SELECT version::text FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2) AS policy_version,
+               (SELECT version::text FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
+      [tenantId, appId]);
+      policyVersion = stamped.rows[0]?.policy_version ?? null;
+      storeSetVersion = stamped.rows[0]?.store_set_version ?? null;
+    }
+    const targets = [
+      ...domains.map((domain) => ({ domain, scopeId: `scope-${tenantId}-${domain}`, sourceId: `source-${tenantId}-${domain}`, own: true })),
+      ...(input.extraSources ?? []).map((extra) => ({ ...extra, own: false })),
+    ];
+    for (const { domain, scopeId, sourceId, own } of targets) {
+      if (own) await admin.query(`INSERT INTO content_intake.scopes(scope_id, tenant_id, app_id, brand_id, domain)
         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (scope_id) DO NOTHING`,
-      [`scope-${tenantId}-${domain}`, tenantId, appId, brandId, domain]);
-      await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
-        VALUES ($1,$2,1,'v2-preview') ON CONFLICT (source_id) DO NOTHING`,
-      [`source-${tenantId}-${domain}`, `scope-${tenantId}-${domain}`]);
-      await admin.query(`INSERT INTO content_intake.source_mappings(
-          source_id, version, template_version, rule_version, mapping_version, structure_digest)
-        VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32)) ON CONFLICT DO NOTHING`,
-      [`source-${tenantId}-${domain}`]);
+      [scopeId, tenantId, appId, brandId, domain]);
+      if (own) {
+        await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
+          VALUES ($1,$2,1,'v2-preview') ON CONFLICT (source_id) DO NOTHING`, [sourceId, scopeId]);
+        await admin.query(`INSERT INTO content_intake.source_mappings(
+            source_id, version, template_version, rule_version, mapping_version, structure_digest)
+          VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32)) ON CONFLICT DO NOTHING`, [sourceId]);
+      }
       if (input.query === true) {
         await admin.query(`INSERT INTO content_intake.store_set_members(
             tenant_id, app_id, version, scope_id, source_id, content_valid_until)
           VALUES ($1,$2,1,$3,$4,clock_timestamp()+interval '1 hour')
           ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`,
-        [tenantId, appId, `scope-${tenantId}-${domain}`, `source-${tenantId}-${domain}`]);
+        [tenantId, appId, scopeId, sourceId]);
       }
       for (const action of actions) {
         await admin.query(`INSERT INTO content_intake.grants(
@@ -76,22 +101,18 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
           VALUES ($1,'allocation',$2,$2,$3,$4,$5,$6,
             clock_timestamp()-interval '2 minutes',clock_timestamp()+interval '2 days','合成分配。',$2)
           ON CONFLICT (grant_id) DO NOTHING`,
-        [`alloc-${tenantId}-${domain}-${action}`, signer.principalId, tenantId, appId, `scope-${tenantId}-${domain}`, action]);
+        [`alloc-${tenantId}-${sourceId}-${action}`, effective.get(signer.principalId)!, tenantId, appId, scopeId, action]);
         for (const recipient of recipients) {
-          const stamp = input.query === true && action === 'query'
-            ? `(SELECT version FROM content_intake.policy_versions WHERE tenant_id=$3 AND app_id=$4)`
-            : 'NULL';
-          const setVersion = input.query === true && action === 'query'
-            ? `(SELECT version FROM content_intake.store_set_current WHERE tenant_id=$3 AND app_id=$4)`
-            : 'NULL';
+          const stampQuery = input.query === true && action === 'query';
           await admin.query(`INSERT INTO content_intake.grants(
               grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
               starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
             VALUES ($1,'business',$2,$5,$3,$4,$6,$7,
-              clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。',$2,$8,${stamp},${setVersion})
+              clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。',$2,$8,$9,$10)
             ON CONFLICT (grant_id) DO NOTHING`,
-          [`business-${tenantId}-${recipient.principalId}-${domain}-${action}`, signer.principalId, tenantId, appId,
-            recipient.principalId, `scope-${tenantId}-${domain}`, action, `alloc-${tenantId}-${domain}-${action}`]);
+          [`business-${tenantId}-${recipient.principalId}-${sourceId}-${action}`, effective.get(signer.principalId)!, tenantId, appId,
+            effective.get(recipient.principalId)!, scopeId, action, `alloc-${tenantId}-${sourceId}-${action}`,
+            stampQuery ? policyVersion : null, stampQuery ? storeSetVersion : null]);
         }
       }
     }
