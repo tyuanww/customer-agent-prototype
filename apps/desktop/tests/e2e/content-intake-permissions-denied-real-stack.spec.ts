@@ -24,7 +24,8 @@ test('a director title with a query grant only sees no write control and the den
     Reflect.apply(host.selectIdentity, host, ['roster-readonly']);
     app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
       apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
-    await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
+    // Recording starts a capture layer, so the first window can take longer to appear.
+    await expect.poll(() => app!.windows().some(w => w.url().includes('role=query')), { timeout: 30_000 }).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.product));
     await app.evaluate(({ app: electronApp }) => electronApp.focus({ steal: true }));
@@ -39,6 +40,7 @@ test('a director title with a query grant only sees no write control and the den
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await dashboard.screenshot({ path: path.join(evidence, 'denied-workbench.png') });
 
     // The session projection is the contract the renderer acts on, so read it first.
     const session = await dashboard.evaluate(async () => {
