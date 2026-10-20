@@ -62,6 +62,60 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     dbConfig = db.config;
     admin = await harness.connect(db.config);
     await applyDatabaseMigrations(admin);
+    // Import reads authorization_sources now, so the mock sessions need a principal and a
+    // per-domain import grant. The session role alone no longer admits an upload.
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`INSERT INTO content_intake.policy_versions(tenant_id, app_id, version)
+        VALUES ('tenant-t2','app-t2',1)`);
+      for (const [principal, user, job, role] of [
+        ['coach', 'usr_t2_coach', 'job-t2-lead', 'lead'],
+        ['owner', 'usr_t2_owner', 'job-t2-director', 'director'],
+        ['signer', 'usr_t2_signer', 'job-t2-director', 'director'],
+        ['agent', 'usr_t2_agent', 'job-t2-agent', 'agent'],
+      ] as const) {
+        await admin.query(`INSERT INTO backend_identity.subject_bindings(
+            binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
+          VALUES ($1,'synthetic','synthetic-tenant',$1,$2,repeat('a',64),true,$3)
+          ON CONFLICT (binding_id) DO NOTHING`, [principal, user, role === 'agent' ? 'agent' : 'owner']);
+        await admin.query(`INSERT INTO content_intake.principals(
+            principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version, revocation_generation)
+          VALUES ($1,$2,'tenant-t2','app-t2','confirmed-synthetic',$1,1,0)
+          ON CONFLICT (principal_id) DO NOTHING`, [principal, user]);
+        await admin.query(`INSERT INTO content_intake.principal_facts(
+            principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+          VALUES ($1,1,ARRAY['dept-t2'],$2,true,
+            statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))
+          ON CONFLICT (principal_id, facts_version) DO NOTHING`, [principal, job]);
+        await admin.query(`INSERT INTO content_intake.role_rules(
+            tenant_id, app_id, department_id, job_id, policy_version, role)
+          VALUES ('tenant-t2','app-t2','dept-t2',$1,1,$2) ON CONFLICT DO NOTHING`, [job, role]);
+      }
+      for (const { domain } of BINDINGS) {
+        await admin.query(`INSERT INTO content_intake.scopes(scope_id, tenant_id, app_id, brand_id, domain)
+          VALUES ($1,'tenant-t2','app-t2','brand-t2',$2)`, [`scope-t2-${domain}`, domain]);
+        await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
+          VALUES ($1,$2,1,'v2-preview')`, [`source-t2-${domain}`, `scope-t2-${domain}`]);
+        await admin.query(`INSERT INTO content_intake.source_mappings(
+            source_id, version, template_version, rule_version, mapping_version, structure_digest)
+          VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`, [`source-t2-${domain}`]);
+        await admin.query(`INSERT INTO content_intake.grants(
+            grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+            starts_at, expires_at, reason, steward_id)
+          VALUES ($1,'allocation','signer','signer','tenant-t2','app-t2',$2,'import',
+            clock_timestamp()-interval '2 minutes',clock_timestamp()+interval '2 days','合成分配。','signer')`,
+        [`alloc-t2-${domain}-import`, `scope-t2-${domain}`]);
+        for (const recipient of ['coach', 'owner'] as const) {
+          await admin.query(`INSERT INTO content_intake.grants(
+              grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+              starts_at, expires_at, reason, steward_id, parent_grant_id)
+            VALUES ($1,'business','signer',$2,'tenant-t2','app-t2',$3,'import',
+              clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。','signer',$4)`,
+          [`business-t2-${recipient}-${domain}`, recipient, `scope-t2-${domain}`, `alloc-t2-${domain}-import`]);
+        }
+      }
+      await admin.query('COMMIT');
+    } catch (error) { await admin.query('ROLLBACK'); throw error; }
     await admin.query('CREATE ROLE t2_runtime LOGIN; GRANT app_runtime TO t2_runtime');
     runtimeUrl = `postgresql://t2_runtime@localhost/${db.name}?${new URLSearchParams({
       host: harness.socket,
@@ -523,25 +577,20 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     });
     expect(missing.statusCode).toBe(403);
     expect(missing.json().error.details.reason).toBe('SOURCE_NOT_ELIGIBLE');
-    await seedSources('d'.repeat(64));
-    // A coach cannot advance the registered snapshot, so a mismatched table still
-    // fails closed and leaves the enqueue rolled back.
-    const coach = await login('coach');
-    const mismatch = await app.inject({
+    // A session without an import grant cannot advance the registered snapshot, so the
+    // upload fails closed and leaves no batch behind.
+    const seat = await login('agent');
+    const ungranted = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
-      headers: importHeaders(coach, '----t2boundary', 'idem-mismatch'),
+      headers: importHeaders(seat, '----t2boundary', 'idem-ungranted'),
       payload: multipart(CSV, 'text/csv'),
     });
-    expect(mismatch.statusCode).toBe(400);
-    expect(mismatch.json().error.details.reason).toBe('SOURCE_SNAPSHOT_MISMATCH');
+    expect(ungranted.statusCode).toBe(403);
+    expect((await admin.query("SELECT count(*)::int AS n FROM public.source_snapshot_revisions")).rows[0].n).toBe(0);
     const audits = await admin.query('SELECT reason_code, operation FROM public.source_denial_audits ORDER BY committed_at');
-    expect(audits.rows.map((row: { reason_code: string }) => row.reason_code).sort()).toEqual([
-      'SOURCE_NOT_ELIGIBLE',
-      'SOURCE_SNAPSHOT_MISMATCH',
-    ]);
-    expect(audits.rows.every((row: { operation: string }) => row.operation === 'content_import')).toBe(true);
-    expect((await admin.query('SELECT count(*)::int AS n FROM public.import_batches')).rows[0].n).toBe(0);
+    expect(audits.rows.map((row: { reason_code: string }) => row.reason_code)).toEqual(['SOURCE_NOT_ELIGIBLE']);
+    await seedSources(sha256(CSV));
     // An owner import registers the uploaded table as the new snapshot instead of
     // rejecting it, so the next owner import of the same file matches.
     const ownerImport = await app.inject({
