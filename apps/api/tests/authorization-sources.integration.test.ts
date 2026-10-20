@@ -142,6 +142,7 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
     await admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
       VALUES ('batch-covered','product','srcv_product'), ('batch-missing','aftersale','srcv_aftersale')`);
     expect(await publishMessage('user-director', 'agent', 'batch-missing')).toBe('没有权限，请找人开通。');
+    expect(await publishMessage('user-signer', 'owner', 'batch-covered')).toBe('没有权限，请找人开通。');
     const covered = await publishMessage('user-director', 'agent', 'batch-covered');
     expect(covered).not.toBe('没有权限，请找人开通。');
     expect(covered).not.toBe('资料资格过期了，请稍后重试。');
@@ -176,6 +177,21 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
       SELECT 'rel_roll', domain, 'srcv_roll_' || domain FROM unnest($1::text[]) AS domain`, [domains]);
     await admin.query('COMMIT');
     expect(await rollbackMessage('user-director', 'owner', 'rel_roll')).toBe('没有权限，请找人开通。');
+  });
+
+  it('accepts rollback once the release domains are in the rollback set', async () => {
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason)
+      VALUES ('grant-alloc-rollback','allocation','signer','signer','tenant-menokin','app-customer-agent','scope-product','rollback',
+        clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配回滚。')`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, parent_grant_id)
+      VALUES ('grant-rollback','business','signer','director','tenant-menokin','app-customer-agent','scope-product',NULL,'rollback',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '回滚。','grant-alloc-rollback')`);
+    const message = await rollbackMessage('user-director', 'agent', 'rel_roll');
+    expect(message).not.toBe('没有权限，请找人开通。');
+    expect(message).not.toBe('资料资格过期了，请稍后重试。');
   });
 
   async function importMessage(userId: string, role: string, bindings: string) {
