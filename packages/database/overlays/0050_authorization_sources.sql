@@ -102,3 +102,19 @@ GRANT SELECT ON
   content_intake.store_set_members,
   content_intake.store_set_current
   TO intake_usage, intake_worker, intake_org_writer;
+
+-- authorization_deadline runs with caller rights. SECURITY DEFINER functions owned by
+-- intake_runtime_fn_owner (for example read_sop_inherited_assets) call it, so that owner
+-- needs the same reads the definer role has; without them the call fails closed with a
+-- "permission denied for table policy_versions" instead of a decision.
+GRANT SELECT ON
+  content_intake.principals,
+  content_intake.principal_facts,
+  content_intake.grants,
+  content_intake.scopes,
+  content_intake.sources,
+  content_intake.policy_versions,
+  content_intake.store_set_current,
+  content_intake.store_set_members,
+  content_intake.role_rules
+  TO intake_runtime_fn_owner;

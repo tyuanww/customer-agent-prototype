@@ -1109,7 +1109,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   49: { entries: 580, sha256: 'b504cc0440d50a6d9648296ae29c18bf00caf1e7a700ce667c8540fc5c5741fd' },
   50: { entries: 584, sha256: 'd8f6db8cf446132e074a1f4eba46756974ee86ad982bc1fc46c700a29290d7fc' },
   51: { entries: 591, sha256: '46fc06421140bf3a1544b7eb8f8c5d46adf6e5cd2aa4f66e06ea7903baac2f76' },
-  52: { entries: 600, sha256: '2f94cd48ad0b7fbbad85805fd5d6b7474ceb3b287d29d82b867e461f727f6e96' },
+  52: { entries: 603, sha256: 'd666446cd61fb29983d3b97c87d193497f175d64c730a1f4ba63cae6a6e6d5c8' },
 };
 
 export async function verifyReadinessSuccessor(
