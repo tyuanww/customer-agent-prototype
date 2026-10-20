@@ -1093,7 +1093,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   46: { functions: 272, objectEntries: 3320, objectSha256: ROSTER_PROJECTION_OBJECT_SHA256, functionEntries: 272, functionSha256: ROSTER_PROJECTION_FUNCTION_SHA256 },
   47: { functions: 273, objectEntries: 3321, objectSha256: QUERY_SIGNER_OBJECT_SHA256, functionEntries: 273, functionSha256: QUERY_SIGNER_FUNCTION_SHA256 },
   48: { tables: 107, functions: 273, objectEntries: 3364, objectSha256: 'b6a14c317e821cd7d323a0523602c2e3acd66c10268613eefaadb0800d9558bf', functionEntries: 273, functionSha256: '38c0cddbc0dc081266bcb9dfa51d115f32c06478497d8a2a95a12784bc88dad3' },
-  49: { tables: 108, functions: 276, objectEntries: 3378, objectSha256: 'c90722894d60eb2ecafe756b4127ecbd5153cc0630cfb4af99b4feb52683f6eb', functionEntries: 276, functionSha256: '0882df3989f211985fb1482a8fd43cd7aec7d2d09e01cc5bd9acb1614646e76a' },
+  49: { tables: 108, functions: 276, objectEntries: 3378, objectSha256: 'c90722894d60eb2ecafe756b4127ecbd5153cc0630cfb4af99b4feb52683f6eb', functionEntries: 276, functionSha256: '97cd623f1005c0e70d315eb42449fb238ed69cde85666fa2fe23a900963aa4d6' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },

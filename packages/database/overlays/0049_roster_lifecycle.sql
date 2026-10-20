@@ -61,7 +61,10 @@ BEGIN
   ) THEN
     IF NOT EXISTS (
       SELECT 1 FROM content_intake.principals person
+      JOIN backend_identity.subject_bindings binding
+        ON binding.user_id = person.user_id AND binding.enabled
       WHERE person.principal_id = p_principal_id
+        AND person.user_id = p_user_id
         AND person.tenant_id = p_tenant_id AND person.app_id = p_app_id
     ) THEN
       RETURN 'policy-pending';
@@ -79,7 +82,7 @@ BEGIN
     INSERT INTO content_intake.principal_facts (
       principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest
     )
-    SELECT versioned.principal_id, versioned.current_facts_version, p_department_ids, p_job_id, true,
+    SELECT versioned.principal_id, versioned.current_facts_version, p_department_ids, p_job_id, false,
       v_checked, v_checked + interval '5 minutes', v_digest
     FROM versioned;
     INSERT INTO content_intake.roster_terms (principal_id, term)
@@ -158,7 +161,15 @@ BEGIN
   ) VALUES (
     v_binding, 'synthetic', p_tenant_id, left('content-intake-query-signer:' || p_app_id, 256), v_user,
     encode(pg_catalog.sha256(pg_catalog.convert_to(v_user, 'UTF8')), 'hex'), true, 'owner'
-  ) ON CONFLICT (binding_id) DO NOTHING;
+  ) ON CONFLICT DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM backend_identity.subject_bindings existing
+    WHERE existing.binding_id = v_binding AND existing.user_id = v_user AND existing.enabled
+      AND existing.provider = 'synthetic' AND existing.tenant = p_tenant_id
+      AND existing.subject = left('content-intake-query-signer:' || p_app_id, 256)
+  ) THEN
+    RETURN 'registered';
+  END IF;
   INSERT INTO content_intake.principals(
     principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version
   ) VALUES (
@@ -204,6 +215,9 @@ BEGIN
     SELECT 1 FROM content_intake.role_rules rule
     WHERE rule.tenant_id = p_tenant_id AND rule.app_id = p_app_id
       AND rule.department_id = ANY(v_departments) AND rule.job_id = v_job
+    HAVING count(DISTINCT rule.role) = 1
+      AND (min(rule.role) IN ('director','manager','supervisor','lead','engineer')
+        OR min(rule.role) IN ('agent','enabler'))
   ) THEN
     UPDATE content_intake.grants AS grant_row
     SET version = grant_row.version + 1, last_change_reason = '职位名单变更。', revoked_at = v_checked
@@ -421,6 +435,13 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog, public, pg_te
     AND live_grant.reason = '职位名单系统签发。'
     AND live_grant.revoked_at IS NULL AND live_grant.expires_at > pg_catalog.clock_timestamp()
     AND live_grant.policy_version = pol.version AND live_grant.store_set_version = cur.version
+    AND EXISTS (
+      SELECT 1 FROM content_intake.store_set_members member
+      WHERE member.tenant_id = cur.tenant_id AND member.app_id = cur.app_id
+        AND member.version = cur.version
+        AND member.scope_id = live_grant.scope_id
+        AND member.source_id = live_grant.source_id
+    )
   WHERE pol.tenant_id = p_tenant_id AND pol.app_id = p_app_id
 $$;
 

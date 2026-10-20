@@ -69,6 +69,12 @@ describe('roster permission authority boundary', () => {
     expect(sql).toContain('live_grant.issuer_id = v_signer');
     expect(sql).toContain('current_facts_version + 1');
     expect(sql).toContain('content_intake.roster_permission_for_user');
+    expect(sql).toContain('person.user_id = p_user_id');
+    expect(sql).toContain('p_department_ids, p_job_id, false');
+    expect(sql).toContain('count(DISTINCT rule.role) = 1');
+    expect(sql).toContain('(SELECT count(*) FROM written_members) >= 0');
+    expect(sql).toContain('member.source_id = live_grant.source_id');
+    expect(sql).toContain('existing.user_id = v_user');
     expect(sql).not.toContain('0033_intake_runtime');
     expect(sql).not.toContain('0044_intake_role_defaults');
   });

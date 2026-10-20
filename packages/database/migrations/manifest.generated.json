@@ -800,8 +800,8 @@
       "id": "0049_roster_lifecycle",
       "file": "0049_roster_lifecycle.sql",
       "source_ranges": [],
-      "sha256": "01d6500a21d1d4c329bf432ed52aceac32e5bc8eced7e05b4967355541545b68",
-      "bytes": 24700,
+      "sha256": "33c1f31d268fb581b168daf0bcda65a1695eb601877a5d881756fbc989ef8dd2",
+      "bytes": 25695,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
