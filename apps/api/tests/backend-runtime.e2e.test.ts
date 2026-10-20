@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Client } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
+import { seedContentWriteAuthority } from './support/write-authority.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -145,6 +146,14 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
         `, [user, cap]);
       }
     }
+    // Import, publish, and rollback read authorization_sources in the dist processes too.
+    await seedContentWriteAuthority(admin, {
+      tenantId: 'tenant-t6', appId: 'app-t6', brandId: 'brand-t6',
+      signer: { principalId: 't6-signer', userId: 'usr_t6_signer', jobId: 'job-t6-director', role: 'director' },
+      recipients: [{ principalId: 't6-owner', userId: 'usr_t6_owner', jobId: 'job-t6-director', role: 'director' }],
+      domains: BINDINGS.map((binding) => binding.domain),
+      actions: ['import', 'publish', 'rollback'],
+    });
     provider = createServer((request, response) => {
       if (request.method !== 'POST' || request.url !== '/exchange') {
         response.writeHead(404);
