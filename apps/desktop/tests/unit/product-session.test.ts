@@ -219,6 +219,23 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
+  it('shows the fixed denial sentence when the permission state is not ready', async () => {
+    const f = fixture({
+      jobSnapshotFor: () => ({ title: '客服坐席', directory: one('客服坐席'), permissionState: 'revoked' }),
+    });
+    expect(await f.session.login()).toMatchObject({
+      ok: true,
+      role: 'agent',
+      job: {
+        status: 'resolved',
+        role: 'agent',
+        permission: 'revoked',
+        notice: '没有权限，请找人开通。',
+        rights: { search: true },
+      },
+    });
+  });
+
   it('keeps a missing, blank, unknown, or duplicate title unresolved with no rights', async () => {
     const cases: Array<{ snapshot: JobSnapshot | null; reason: 'missing' | 'blank' | 'unknown' | 'duplicate' }> = [
       { snapshot: null, reason: 'missing' },

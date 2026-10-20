@@ -170,13 +170,15 @@ function isContentJob(value: unknown): boolean {
   if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
   const flags = [row.publish, row.grant, row.uploadSop, row.search, row.readCatalog];
   if (!flags.every((flag) => typeof flag === 'boolean')) return false;
+  if (job.notice !== null && job.notice !== '没有权限，请找人开通。') return false;
+  if (job.permission !== null && !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(String(job.permission))) return false;
   if (job.status === 'unresolved') {
-    return exactKeys(job, ['status', 'reason', 'label', 'rights'])
+    return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
       && job.label === '职务未识别'
       && flags.every((flag) => flag === false);
   }
-  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights'])) return false;
+  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights', 'permission', 'notice'])) return false;
   if (typeof job.title !== 'string' || job.label !== job.title) return false;
   const expected = JOB_RIGHTS[job.title];
   return expected !== undefined

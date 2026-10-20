@@ -1,7 +1,6 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
-import { projectRosterLogin, rosterPreparation } from './project-roster-login.js';
-import { setJobPermissionState } from './feishu-job-snapshot.js';
+import { projectRosterLogin, rosterHomeFromEnv } from './project-roster-login.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -36,15 +35,18 @@ import {
   type ServiceRepository,
 } from './service-repository.js';
 
-function intakeRoutes(
-  auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined,
-  objectStoreDir: string | undefined,
-) {
+function intakeEnvPresent(): boolean {
+  return Boolean(process.env.INTAKE_BUSINESS_DATABASE_URL
+    || process.env.INTAKE_USAGE_DATABASE_URL
+    || process.env.INTAKE_WORKER_DATABASE_URL);
+}
+
+function intakeRoutes(objectStoreDir: string | undefined) {
   const business = process.env.INTAKE_BUSINESS_DATABASE_URL;
   const usage = process.env.INTAKE_USAGE_DATABASE_URL;
   const worker = process.env.INTAKE_WORKER_DATABASE_URL;
   if (!business && !usage && !worker) return undefined;
-  if (auth?.kind !== 'product' || objectStoreDir === undefined || !business || !usage || !worker) {
+  if (objectStoreDir === undefined || !business || !usage || !worker) {
     throw new Error('Intake HTTP pools are incomplete');
   }
   const report = (error: unknown): void => {
@@ -90,7 +92,10 @@ export async function startApi(
     options,
     async (config, repository, policyAdminRepository, bootstrap) => {
       let auth;
-      let projectLogin: ((openId: string) => Promise<void>) | null = null;
+      let intake: ReturnType<typeof intakeRoutes> | undefined;
+      if (config.sessionMode !== 'product' && intakeEnvPresent()) {
+        throw new Error('Intake HTTP pools are incomplete');
+      }
       if (config.sessionMode === 'product') {
         if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
         if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
@@ -98,20 +103,28 @@ export async function startApi(
         }
         const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
         const identity = bootstrap.productIdentity;
-        const feishu = identity.kind === 'feishu' ? {
-          ...identity.feishu,
-          observeJob: true as const,
-        } : null;
         const provider = identity.kind === 'feishu'
           ? (identity.providerOrigin
-            ? createWorkforceIdentityProvider(feishu!, identity.providerOrigin, callback)
-            : createFeishuIdentityProvider(feishu!))
+            ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
+            : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
           : createSyntheticIdentityProvider(identity.providerOrigin, callback);
+        intake = intakeRoutes(bootstrap.objectStoreDir);
+        const business = intake?.business;
         auth = await createProductAuthService(
           bootstrap.productIdentity.database,
           provider,
           config.authMode,
-          async (openId) => { if (projectLogin) await projectLogin(openId); },
+          async (openId) => {
+            if (!business) {
+              console.info('[api] roster projection skipped');
+              return;
+            }
+            const client = await business.connect();
+            try {
+              const reason = await projectRosterLogin(client, openId, rosterHomeFromEnv(process.env));
+              if (reason !== 'projected') console.info(`[api] roster projection ${reason}`);
+            } finally { client.release(); }
+          },
         );
       }
       try {
@@ -147,19 +160,6 @@ export async function startApi(
         const notice = runtimePool === undefined ? undefined : {
           service: createNoticeServiceForPool(runtimePool, false),
         };
-        const intake = intakeRoutes(auth, bootstrap.objectStoreDir);
-        if (intake?.business) {
-          const business = intake.business;
-          projectLogin = async (openId) => {
-            const client = await business.connect();
-            try {
-              const preparation = rosterPreparation(await projectRosterLogin(client, openId));
-              setJobPermissionState(openId, preparation.state);
-              if (preparation.reason !== 'projected') console.info(`[api] roster projection ${preparation.reason}`);
-            }
-            finally { client.release(); }
-          };
-        }
         const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
@@ -197,6 +197,9 @@ export async function startApi(
         return app;
       } catch (error) {
         await auth?.close();
+        await intake?.business.end().catch(() => undefined);
+        await intake?.usage.end().catch(() => undefined);
+        await intake?.worker.end().catch(() => undefined);
         throw error;
       }
     },

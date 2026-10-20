@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
-
-export type RosterPermissionState = 'unknown' | 'pending' | 'ready' | 'denied';
+import type { RosterPermissionState } from '@customer-agent/job-roster';
 
 /** Job fact for the desktop rights table. Absence is unresolved, never a guessed title. */
 export type FeishuJobSnapshot = Readonly<{
@@ -8,9 +7,18 @@ export type FeishuJobSnapshot = Readonly<{
   directory: readonly { readonly name: string; readonly enabled: boolean }[];
   /** Trusted provider department ids, when the contact response includes them. */
   departmentIds?: readonly string[];
+  /** The provider says this person has left. Login must not keep their query grant. */
+  departed?: boolean;
   /** Projection state is separate from the provider title and never grants by itself. */
   permissionState?: RosterPermissionState;
 }>;
+
+export function employmentDeparted(status: unknown): boolean {
+  if (status === null || typeof status !== 'object' || Array.isArray(status)) return false;
+  const flags = status as Record<string, unknown>;
+  if (flags.is_resigned === true || flags.is_exited === true || flags.is_frozen === true || flags.is_unjoin === true) return true;
+  return flags.is_activated === false;
+}
 
 /** Provider facts are a five-minute lease; stale desktop projections fail closed. */
 export const FEISHU_JOB_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
@@ -27,19 +35,9 @@ export function subjectHash(openId: string): string {
 
 export function rememberJobSnapshot(openId: string, snapshot: FeishuJobSnapshot): void {
   snapshots.set(subjectHash(openId), {
-    snapshot: { ...snapshot, permissionState: snapshot.permissionState ?? 'unknown' },
+    snapshot,
     validUntil: Date.now() + FEISHU_JOB_SNAPSHOT_TTL_MS,
   });
-}
-
-export function setJobPermissionState(openId: string, permissionState: RosterPermissionState): void {
-  const hash = subjectHash(openId);
-  const entry = snapshots.get(hash);
-  if (!entry || entry.validUntil <= Date.now()) {
-    if (entry) snapshots.delete(hash);
-    return;
-  }
-  snapshots.set(hash, { ...entry, snapshot: { ...entry.snapshot, permissionState } });
 }
 
 export function forgetJobSnapshot(openId: string): void {
@@ -122,9 +120,11 @@ export async function readFeishuJobSnapshot(
   const title = user ? text(user.job_title, 64) : '';
   if (!title) return null;
   const departmentIds = stringArray(user?.department_ids, 128);
+  const departed = employmentDeparted(user?.status);
   return {
     title,
-    directory: [{ name: title, enabled: true }],
+    directory: [{ name: title, enabled: !departed }],
     ...(departmentIds.length > 0 ? { departmentIds } : {}),
+    ...(departed ? { departed: true } : {}),
   };
 }

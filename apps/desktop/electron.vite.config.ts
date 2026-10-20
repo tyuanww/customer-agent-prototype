@@ -54,7 +54,7 @@ export default defineConfig({
       port: 5173,
       strictPort: true,
       fs: {
-        allow: [resolve(__dirname), resolve(__dirname, '../api/src')],
+        allow: [resolve(__dirname)],
       },
     },
     build: {

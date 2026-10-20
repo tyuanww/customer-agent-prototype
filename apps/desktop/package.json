@@ -30,6 +30,7 @@
   "dependencies": {
     "@customer-agent/content-intake": "workspace:*",
     "@customer-agent/contracts": "workspace:*",
+    "@customer-agent/job-roster": "workspace:*",
     "@customer-agent/retrieval-core": "workspace:*",
     "antd": "^6.6.6",
     "dayjs": "1.11.23",

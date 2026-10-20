@@ -1,10 +1,8 @@
-import type { Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { forgetJobSnapshot, rememberJobSnapshot } from '../src/feishu-job-snapshot.js';
-import { feishuUserId } from '../src/feishu-admit.js';
 import { projectRosterLogin, rosterPrincipalId } from '../src/project-roster-login.js';
+import { publishLineage, seedLibrary } from './support/roster-library.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const seat = 'ou_rosterseat01';
@@ -12,47 +10,6 @@ const director = 'ou_rosterdirector1';
 
 function remember(openId: string, title: string) {
   rememberJobSnapshot(openId, { title, directory: [{ name: title, enabled: true }], departmentIds: ['dept-a'] });
-}
-
-async function seedLibrary(client: Client, liveAllocation = true) {
-  await applyDatabaseMigrations(client);
-  await client.query('BEGIN');
-  try {
-  await client.query(`INSERT INTO backend_identity.subject_bindings
-    (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
-    VALUES ('director','synthetic','tenant-a','director','user-director',repeat('ab',32),true,'owner')`);
-  await client.query(`INSERT INTO content_intake.principals
-    VALUES ('director','user-director','tenant-a','app-a','confirmed-synthetic','director',1,0)`);
-  await client.query(`INSERT INTO content_intake.principal_facts
-    VALUES ('director',1,ARRAY['dept-a'],'job-director',true,
-      statement_timestamp()-interval '1 second', statement_timestamp()+interval '4 minutes', repeat('a',64))`);
-  await client.query(`INSERT INTO content_intake.role_rules
-    VALUES
-      ('tenant-a','app-a','dept-a','job-customer-service-director',1,'director'),
-      ('tenant-a','app-a','dept-a','job-customer-service-seat',1,'agent')`);
-  await client.query(`INSERT INTO content_intake.scopes
-    VALUES ('scope-a','tenant-a','app-a','brand-a','shop-a','product')`);
-  await client.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
-    VALUES ('source-a','scope-a',1,'v2-preview')`);
-  await client.query(`INSERT INTO content_intake.source_mappings
-    VALUES ('source-a',1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))`);
-  for (const action of ['query', 'publish', 'import']) {
-    await client.query(`INSERT INTO content_intake.grants(
-      grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
-      VALUES ($1,'allocation','director','director','tenant-a','app-a','scope-a',$2,
-        clock_timestamp()-interval '1 hour', clock_timestamp() + $3::interval,'合成根资格','director')`,
-    [`root-${action}`, action, liveAllocation ? '1 day' : '-1 minute']);
-  }
-  for (const openId of [seat, director]) {
-    await client.query(`INSERT INTO backend_identity.subject_bindings
-      (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
-      VALUES ($1,'feishu','feishu-tenant',$1,$2,repeat('cd',32),true,'agent')`,     [openId, feishuUserId(openId)]);
-  }
-  await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  }
 }
 
 describe.skipIf(!enabled)('roster projection writes one principal and only content-backed query grants', () => {
@@ -137,7 +94,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
     }
   }, 60_000);
 
-  it('opens query only while a system-issued grant is live', async () => {
+  it('keeps a query grant outside the current store set closed', async () => {
     const database = harness.createDatabase('roster_deadline');
     const client = await harness.connect(database.config);
     try {
@@ -165,12 +122,118 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
         JOIN content_intake.principals p ON p.principal_id = g.issuer_id
         WHERE g.grant_id = 'grant-system-query'`);
       expect(issued.rows).toEqual([{ issuer_scope: 'content-intake-system', parent_grant_id: null, action: 'query' }]);
-      expect(await deadline('query')).not.toBeNull();
+      expect(await deadline('query')).toBeNull();
       expect(await deadline('publish')).toBeNull();
       await client.query(`UPDATE content_intake.grants
         SET version = version + 1, last_change_reason = '撤销。', revoked_at = clock_timestamp()
         WHERE grant_id = 'grant-system-query'`);
       expect(await deadline('query')).toBeNull();
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      await client.end();
+    }
+  }, 60_000);
+
+  it('issues one system query grant when the current release names the source', async () => {
+    const database = harness.createDatabase('roster_lineage');
+    const client = await harness.connect(database.config);
+    try {
+      await seedLibrary(client, false);
+      await publishLineage(client);
+      await client.query('SET ROLE intake_business');
+      remember(seat, '客服坐席');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await client.query('RESET ROLE');
+      const grants = await client.query<{ action: string; parent_grant_id: string | null; issuer_scope: string; policy_version: string; store_set_version: string }>(`
+        SELECT g.action, g.parent_grant_id, p.identity_scope AS issuer_scope,
+          g.policy_version::text AS policy_version, g.store_set_version::text AS store_set_version
+        FROM content_intake.grants g
+        JOIN content_intake.principals p ON p.principal_id = g.issuer_id
+        WHERE g.recipient_id = $1 AND g.kind = 'business' AND g.revoked_at IS NULL
+        ORDER BY g.action`, [rosterPrincipalId(seat)]);
+      expect(grants.rows).toEqual([{
+        action: 'query', parent_grant_id: null, issuer_scope: 'content-intake-system',
+        policy_version: '2', store_set_version: '1',
+      }]);
+      const until = await client.query<{ until: Date | null }>(
+        `SELECT content_intake.authorization_deadline($1,'query','scope-a','source-a',clock_timestamp()) AS until`,
+        [rosterPrincipalId(seat)]);
+      expect(until.rows[0]?.until).not.toBeNull();
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      await client.end();
+    }
+  }, 60_000);
+
+  it('revokes the system query grant when the source leaves the current release', async () => {
+    const database = harness.createDatabase('roster_remove');
+    const client = await harness.connect(database.config);
+    try {
+      await seedLibrary(client, false);
+      await publishLineage(client);
+      await client.query('SET ROLE intake_business');
+      remember(seat, '客服坐席');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await client.query('RESET ROLE');
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.publishing','on',true)");
+      const hash = (await client.query<{ source_binding_hash: string }>(
+        "SELECT source_binding_hash FROM public.content_releases WHERE release_id='rel-roster'")).rows[0]!.source_binding_hash;
+      await client.query(`INSERT INTO public.content_releases(release_id,release_seq,title,status,source_binding_hash,tenant_id)
+        VALUES('rel-empty',2,'空发布','published',$1,'tenant-a')`, [hash]);
+      await client.query(`INSERT INTO public.release_source_bindings(release_id,domain,source_version_id)
+        SELECT 'rel-empty', domain, source_version_id FROM public.release_source_bindings WHERE release_id='rel-roster'`);
+      await client.query("INSERT INTO content_intake.release_catalogs(release_id,format_version) VALUES('rel-empty','intake-v2.1')");
+      await client.query("UPDATE public.content_current SET current_release_id='rel-empty', updated_at=clock_timestamp() WHERE id=1");
+      await client.query('COMMIT');
+      await client.query('SET ROLE intake_business');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('revoked');
+      await client.query('RESET ROLE');
+      const live = await client.query(
+        `SELECT 1 FROM content_intake.grants WHERE recipient_id=$1 AND kind='business' AND action='query' AND revoked_at IS NULL`,
+        [rosterPrincipalId(seat)]);
+      expect(live.rowCount).toBe(0);
+      const until = await client.query<{ until: Date | null }>(
+        `SELECT content_intake.authorization_deadline($1,'query','scope-a','source-a',clock_timestamp()) AS until`,
+        [rosterPrincipalId(seat)]);
+      expect(until.rows[0]?.until).toBeNull();
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      await client.end();
+    }
+  }, 60_000);
+
+  it('does not treat a human query grant as a system projection', async () => {
+    const database = harness.createDatabase('roster_human');
+    const client = await harness.connect(database.config);
+    try {
+      await seedLibrary(client, true);
+      await client.query('SET ROLE intake_business');
+      remember(seat, '客服坐席');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
+      await client.query('RESET ROLE');
+      await client.query(`
+        INSERT INTO content_intake.grants(
+          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)
+        VALUES ('grant-human-query','business','director',$1,'tenant-a','app-a','scope-a','source-a','query',
+          clock_timestamp(), clock_timestamp()+interval '1 hour','人工查询。','root-query')`, [rosterPrincipalId(seat)]);
+      await client.query('SET ROLE intake_business');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
+      await client.query('RESET ROLE');
+      await publishLineage(client);
+      await client.query('SET ROLE intake_business');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await client.query('RESET ROLE');
+      const grants = await client.query<{ parent_grant_id: string | null; issuer_scope: string }>(`
+        SELECT g.parent_grant_id, p.identity_scope AS issuer_scope
+        FROM content_intake.grants g
+        JOIN content_intake.principals p ON p.principal_id = g.issuer_id
+        WHERE g.recipient_id = $1 AND g.kind = 'business' AND g.action = 'query' AND g.revoked_at IS NULL
+        ORDER BY g.parent_grant_id NULLS LAST`, [rosterPrincipalId(seat)]);
+      expect(grants.rows).toEqual([
+        { parent_grant_id: 'root-query', issuer_scope: 'confirmed-synthetic' },
+        { parent_grant_id: null, issuer_scope: 'content-intake-system' },
+      ]);
     } finally {
       await client.query('ROLLBACK').catch(() => undefined);
       await client.end();

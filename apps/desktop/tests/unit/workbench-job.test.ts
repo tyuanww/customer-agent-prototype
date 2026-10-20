@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
-import { JOB_ROSTER } from '../../../api/src/job-roster';
+import { JOB_ROSTER } from '@customer-agent/job-roster';
 import { resolveJobTitle } from '../../src/shared/workbench-job';
 
 const one = (name: string) => [{ name, enabled: true }];

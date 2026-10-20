@@ -1,5 +1,5 @@
-export type { BoardRights, BoardRole } from '../../../api/src/job-roster';
-import { matchJobRoster, normalizeJobTitle, type BoardRole, type BoardRights } from '../../../api/src/job-roster';
+export type { BoardRights, BoardRole } from '@customer-agent/job-roster';
+import { matchJobRoster, normalizeJobTitle, type BoardRole, type BoardRights } from '@customer-agent/job-roster';
 
 export type JobDirectoryEntry = { readonly name: string; readonly enabled: boolean };
 

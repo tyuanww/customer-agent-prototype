@@ -27,6 +27,24 @@ describe('feishu job snapshot', () => {
     });
   });
 
+  it('marks a resigned person as departed', async () => {
+    const fetchImpl = (async (url: string) => {
+      if (url.includes('tenant_access_token')) return json({ code: 0, tenant_access_token: 'tenant-token' });
+      if (url.includes('/users/')) return json({ code: 0, data: { user: {
+        job_title: '客服坐席',
+        department_ids: ['od-1'],
+        status: { is_activated: false, is_frozen: false, is_resigned: true, is_exited: false, is_unjoin: false },
+      } } });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, fetchImpl)).resolves.toEqual({
+      title: '客服坐席',
+      directory: [{ name: '客服坐席', enabled: false }],
+      departmentIds: ['od-1'],
+      departed: true,
+    });
+  });
+
   it('returns null when the person has no job title', async () => {
     await expect(readFeishuJobSnapshot(openId, { clientId: 'cli_abc', clientSecret: 'secret' }, userFetch(null))).resolves.toBeNull();
   });
@@ -37,10 +55,14 @@ describe('feishu job snapshot', () => {
   });
 
   it('finds the collected title for the session that hashed the same open id', () => {
-    rememberJobSnapshot(openId, { title: '客服经理', directory: [{ name: '客服经理', enabled: true }] });
+    rememberJobSnapshot(openId, { title: '客服经理', directory: [{ name: '客服经理', enabled: true }], departmentIds: ['od-1'] });
     const token = 'a'.repeat(43);
     bindSessionSubject(token, subjectHash(openId));
-    expect(jobForToken(token)?.title).toBe('客服经理');
+    expect(jobForToken(token)).toEqual({
+      title: '客服经理',
+      directory: [{ name: '客服经理', enabled: true }],
+      departmentIds: ['od-1'],
+    });
     expect(jobForToken('b'.repeat(43))).toBeNull();
     forgetJobSnapshot(openId);
     expect(jobForToken(token)).toBeNull();

@@ -1,3 +1,4 @@
+import type { RosterPermissionState } from '@customer-agent/job-roster';
 import { resolveJobTitle, type BoardRights, type BoardRole, type JobDirectoryEntry } from './workbench-job';
 
 /** Public session projection. Credentials never cross preload. Epoch is owned by main. */
@@ -10,6 +11,12 @@ export type ProductSessionView = {
 };
 
 export const UNRESOLVED_JOB_LABEL = '职务未识别';
+export const PERMISSION_DENIAL_MESSAGE = '没有权限，请找人开通。';
+
+export function permissionNotice(state: RosterPermissionState | undefined): string | null {
+  if (!state || state === 'ready' || state === 'unknown') return null;
+  return PERMISSION_DENIAL_MESSAGE;
+}
 
 const NO_JOB_RIGHTS: BoardRights = {
   publish: false, grant: false, uploadSop: false, search: false, readCatalog: false,
@@ -22,26 +29,33 @@ export type SessionJobView =
     readonly role: BoardRole;
     readonly label: string;
     readonly rights: BoardRights;
+    readonly permission: RosterPermissionState | null;
+    readonly notice: string | null;
   }
   | {
     readonly status: 'unresolved';
     readonly reason: 'blank' | 'unknown' | 'duplicate' | 'missing';
     readonly label: typeof UNRESOLVED_JOB_LABEL;
     readonly rights: BoardRights;
+    readonly permission: RosterPermissionState | null;
+    readonly notice: string | null;
   };
 
 export type JobSnapshot = {
   readonly title: string;
   readonly directory: readonly JobDirectoryEntry[];
+  readonly permissionState?: RosterPermissionState;
 };
 
 export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
   if (snapshot === null) {
-    return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
+    return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission: null, notice: null };
   }
   const lookup = resolveJobTitle(snapshot.title, snapshot.directory);
+  const permission = snapshot.permissionState ?? null;
+  const notice = permissionNotice(snapshot.permissionState);
   if (lookup.status === 'unresolved') {
-    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS } };
+    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission, notice };
   }
   return {
     status: 'resolved',
@@ -49,6 +63,8 @@ export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView 
     role: lookup.role,
     label: lookup.title,
     rights: { ...lookup.rights },
+    permission,
+    notice,
   };
 }
 export const PRODUCT_ERRORS = {
@@ -98,14 +114,16 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   const row = rights as Record<string, unknown>;
   if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
   if (![row.publish, row.grant, row.uploadSop, row.search, row.readCatalog].every((flag) => typeof flag === 'boolean')) return false;
+  if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE) return false;
+  if (job.permission !== null && !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(String(job.permission))) return false;
   if (job.status === 'unresolved') {
-    return exactKeys(job, ['status', 'reason', 'label', 'rights'])
+    return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
       && job.label === UNRESOLVED_JOB_LABEL
       && row.publish === false && row.grant === false && row.uploadSop === false
       && row.search === false && row.readCatalog === false;
   }
-  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights'])) return false;
+  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights', 'permission', 'notice'])) return false;
   if (typeof job.title !== 'string' || job.label !== job.title) return false;
   const expected = resolveJobTitle(job.title, [{ name: job.title, enabled: true }]);
   return expected.status === 'resolved'
