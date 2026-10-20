@@ -44,8 +44,7 @@ describe('roster permission authority boundary', () => {
     const issue = sql.slice(sql.indexOf('CREATE FUNCTION content_intake.issue_roster_query'));
     expect(issue).toContain("'职位名单系统签发。'");
     expect(issue).toContain('content_intake.release_lineage');
-    expect(issue).toContain('live_grant.issuer_id = v_signer');
-    expect(issue).toContain('current_facts_version + 1');
+    expect(issue).not.toContain('live_grant.issuer_id = v_signer');
     expect(issue).not.toContain("'publish'");
     expect(issue).not.toContain("'import'");
     expect(issue).not.toContain('kind IN (\'allocation\'');
@@ -67,6 +66,9 @@ describe('roster permission authority boundary', () => {
     expect(sql).toContain('provenance');
     expect(sql).toContain('content_intake.withdraw_roster_query');
     expect(sql).toContain('content_intake.roster_day_one');
+    expect(sql).toContain('live_grant.issuer_id = v_signer');
+    expect(sql).toContain('current_facts_version + 1');
+    expect(sql).toContain('content_intake.roster_permission_for_user');
     expect(sql).not.toContain('0033_intake_runtime');
     expect(sql).not.toContain('0044_intake_role_defaults');
   });
