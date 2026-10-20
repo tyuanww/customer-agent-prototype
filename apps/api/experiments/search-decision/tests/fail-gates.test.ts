@@ -37,7 +37,7 @@ function mutateAndRun(target: 'MX01' | 'N01'): { status: number; reportDir: stri
   const file = target === 'MX01'
     ? join(EXPERIMENT_ROOT, 'tests/interface.test.ts')
     : join(EXPERIMENT_ROOT, 'tests/round1-scope.test.ts');
-  const result = spawnSync(process.execPath, [vitest, 'run', file], {
+  const result = spawnSync(process.execPath, [vitest, 'run', '--maxWorkers=1', '--no-file-parallelism', file], {
     cwd: API_ROOT,
     env: {
       ...process.env,

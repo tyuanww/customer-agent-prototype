@@ -274,6 +274,19 @@ export async function applyMigrationCatalogue(
   return result;
 }
 
+export function applyMigrationPrefix(
+  client: DatabaseClient,
+  throughPosition: number,
+): Promise<ApplyMigrationsResult> {
+  const migrations = generatedMigrationCatalogue.migrations.filter((migration) => migration.position <= throughPosition);
+  if (migrations.length !== throughPosition || migrations.at(-1)?.position !== throughPosition) {
+    throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Migration prefix is not a contiguous leading catalogue');
+  }
+  return withExclusiveDatabaseClient(client, (lockedClient) => (
+    applyMigrationCatalogue(lockedClient, { ...generatedMigrationCatalogue, migrations })
+  ));
+}
+
 export function applyDatabaseMigrations(
   client: DatabaseClient,
   options?: Readonly<{ lockTimeoutMs?: number }>,

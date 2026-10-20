@@ -1378,6 +1378,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             {profile === 'intake' ? <p className="intake-crumb">
               {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
               <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
+            {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
               {profile === 'intake' ? '' : refreshLabel}
             </p>

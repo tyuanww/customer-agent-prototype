@@ -53,6 +53,9 @@ importers:
       '@customer-agent/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@customer-agent/job-roster':
+        specifier: workspace:*
+        version: link:../../packages/job-roster
       fastify:
         specifier: 5.12.1
         version: 5.12.1
@@ -84,6 +87,9 @@ importers:
       '@customer-agent/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@customer-agent/job-roster':
+        specifier: workspace:*
+        version: link:../../packages/job-roster
       '@customer-agent/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core
@@ -220,6 +226,12 @@ importers:
       vitest:
         specifier: 3.2.7
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(supports-color@10.2.2)(yaml@2.9.0)
+
+  packages/job-roster:
+    devDependencies:
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
 
   packages/retrieval-core:
     devDependencies:

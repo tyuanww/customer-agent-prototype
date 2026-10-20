@@ -2,6 +2,14 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.31] - 2026-10-20
+
+### Changed
+
+- 登录只登记人，并只让系统签发人签发查询。发布、导入和授权不会跟着登录出现。
+- 职务查询状态来自 `roster_permission_for_user`。没有查询权时，桌面顶栏写「没有权限，请找人开通。」
+- 这一版没有打安装包，也没有换杭州进程。健康检查仍是 `0.3.29`。
+
 ## [0.3.30] - 2026-10-19
 
 ### Changed

@@ -105,6 +105,27 @@ describe('feishu identity provider', () => {
     provider.close();
   });
 
+  it('remembers the collected title and leaves an unknown title for the roster to reject', async () => {
+    const token = 'd'.repeat(43);
+    bindSessionSubject(token, subjectHash(openId));
+    const fetchFor = (title: string) => vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === FEISHU_TOKEN_URL) return jsonResponse({ code: 0, token_type: 'Bearer', access_token: 'user-access-token' }, FEISHU_TOKEN_URL);
+      if (url === FEISHU_USER_INFO_URL) return jsonResponse({ code: 0, data: { open_id: openId, name: '合成姓名' } }, FEISHU_USER_INFO_URL);
+      if (url.includes('tenant_access_token')) return jsonResponse({ code: 0, tenant_access_token: 'tenant-token' }, url);
+      if (url.includes('/contact/v3/users/')) return jsonResponse({ code: 0, data: { user: { job_title: title } } }, url);
+      throw new Error(`unexpected ${url}`);
+    }) as unknown as typeof fetch;
+    const matched = createFeishuIdentityProvider({ ...config, observeJob: true }, fetchFor('客服经理'));
+    expect(await matched.exchange('one-time-code')).toBe(openId);
+    expect(jobForToken(token)?.title).toBe('客服经理');
+    matched.close();
+    const unknown = createFeishuIdentityProvider({ ...config, observeJob: true }, fetchFor('服务赋能师'));
+    expect(await unknown.exchange('one-time-code')).toBe(openId);
+    expect(jobForToken(token)?.title).toBe('服务赋能师');
+    unknown.close();
+  });
+
   it('treats rejected codes as LOGIN_INVALID and transport faults as unavailable', async () => {
     const unauthorized = createFeishuIdentityProvider(config, async () => statusResponse(401, FEISHU_TOKEN_URL));
     try { await expect(unauthorized.exchange('code')).rejects.toMatchObject({ reason: 'LOGIN_INVALID' }); }

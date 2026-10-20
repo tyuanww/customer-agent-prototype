@@ -1062,50 +1062,65 @@ const ROLE_DEFAULT_OBJECT_SHA256 = '32011d2d8211bd9a2a85516c877cbd6965dd444f39bc
 const FEISHU_ADMIT_OBJECT_SHA256 = '5651482547b91105ddbd2d458c27a2ecc3de1a4f45f9fa712d638a78624447b2';
 const FEISHU_ADMIT_FUNCTION_SHA256 = '11ab6026e5cbb12efd50d1a60c0374d16bd4bb35fe12235fe5c159a9d33e59f1';
 const FEISHU_ADMIT_ACL_SHA256 = '8b0b1f969ffa87f15a0c0d9598a71e3c2df3fd8ecec27b15a11d55b0d27c6088';
+const ROSTER_PROJECTION_OBJECT_SHA256 = '1ae078512ece64522a84cc2c79bdb0595de404239835221502dcfbc3d859fd69';
+const ROSTER_PROJECTION_FUNCTION_SHA256 = '9581791ce9ae915100ffffe10cd104d4521ee1880dee099eb7813894e770139c';
+const ROSTER_PROJECTION_ACL_SHA256 = 'c754efe402f9b860a6962ca800ab4317525d99ff80a1de7ebdf3f31cf19435d2';
+const QUERY_SIGNER_OBJECT_SHA256 = 'a77e7e553551d0dbc8858dec34bc0dc15efac61a9f080b95e4a029e8d64d610e';
+const QUERY_SIGNER_FUNCTION_SHA256 = 'e6650197736d220fdad210d5d00652dcbccf65fcc69fc6ec38ac7d633c182fa3';
+const QUERY_SIGNER_ACL_SHA256 = '87f2fcf485dd05546eb9914d7a717b5a28f07da17cf35e25b9cdd73b1af611d8';
+const READINESS_SUFFIX = [
+  { length: 42, index: 41, id: OCCUPIED_DOMAIN_MIGRATION_ID, sha256: FROZEN_OCCUPIED_SHA256 },
+  { length: 43, index: 42, id: DEFAULT_TENANT_MIGRATION_ID },
+  { length: 44, index: 43, id: ROLE_DEFAULT_MIGRATION_ID },
+  { length: 45, index: 44, id: '0045_feishu_agent_admit' },
+  { length: 46, index: 45, id: '0046_project_feishu_roster' },
+  { length: 47, index: 46, id: '0047_roster_query_signer' },
+  { length: 48, index: 47, id: '0048_roster_store_set' },
+  { length: 49, index: 48, id: '0049_roster_lifecycle' },
+] as const;
+const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
+  tables?: number;
+  functions?: number;
+  objectEntries?: number;
+  objectSha256?: string;
+  functionEntries?: number;
+  functionSha256?: string;
+}>> = {
+  42: { functionSha256: OCCUPIED_FUNCTION_SHA256 },
+  43: { functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 },
+  44: { objectEntries: 3318, objectSha256: ROLE_DEFAULT_OBJECT_SHA256, functionSha256: ROLE_DEFAULT_FUNCTION_SHA256 },
+  45: { functions: 271, objectEntries: 3319, objectSha256: FEISHU_ADMIT_OBJECT_SHA256, functionEntries: 271, functionSha256: FEISHU_ADMIT_FUNCTION_SHA256 },
+  46: { functions: 272, objectEntries: 3320, objectSha256: ROSTER_PROJECTION_OBJECT_SHA256, functionEntries: 272, functionSha256: ROSTER_PROJECTION_FUNCTION_SHA256 },
+  47: { functions: 273, objectEntries: 3321, objectSha256: QUERY_SIGNER_OBJECT_SHA256, functionEntries: 273, functionSha256: QUERY_SIGNER_FUNCTION_SHA256 },
+  48: { tables: 107, functions: 273, objectEntries: 3364, objectSha256: 'b6a14c317e821cd7d323a0523602c2e3acd66c10268613eefaadb0800d9558bf', functionEntries: 273, functionSha256: '38c0cddbc0dc081266bcb9dfa51d115f32c06478497d8a2a95a12784bc88dad3' },
+  49: { tables: 108, functions: 276, objectEntries: 3378, objectSha256: 'c90722894d60eb2ecafe756b4127ecbd5153cc0630cfb4af99b4feb52683f6eb', functionEntries: 276, functionSha256: '97cd623f1005c0e70d315eb42449fb238ed69cde85666fa2fe23a900963aa4d6' },
+};
+const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
+  45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
+  46: { entries: 573, sha256: ROSTER_PROJECTION_ACL_SHA256 },
+  47: { entries: 574, sha256: QUERY_SIGNER_ACL_SHA256 },
+  48: { entries: 577, sha256: '1b5a521c21b28ecafd4bc80aa948eba059a2cefee02f47a2a6279f1c541178a2' },
+  49: { entries: 580, sha256: 'b504cc0440d50a6d9648296ae29c18bf00caf1e7a700ce667c8540fc5c5741fd' },
+};
 
 export async function verifyReadinessSuccessor(
   client: DatabaseQueryClient,
   catalogue: ExecutableMigrationCatalogue,
 ): Promise<DatabaseVerificationReport> {
-  const occupied = (catalogue.migrations.length === 42 || catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
-    && catalogue.migrations[41]?.id === OCCUPIED_DOMAIN_MIGRATION_ID
-    && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256;
-  const adopted = (catalogue.migrations.length === 43 || catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
-    && occupied
-    && catalogue.migrations[42]?.id === DEFAULT_TENANT_MIGRATION_ID;
-  const roleDefaults = (catalogue.migrations.length === 44 || catalogue.migrations.length === 45)
-    && adopted
-    && catalogue.migrations[43]?.id === ROLE_DEFAULT_MIGRATION_ID;
-  const feishuAdmit = catalogue.migrations.length === 45
-    && roleDefaults
-    && catalogue.migrations[44]?.id === '0045_feishu_agent_admit';
-  if ((catalogue.migrations.length !== 41 && !occupied)
-    || (catalogue.migrations.length === 43 && !adopted)
-    || (catalogue.migrations.length === 44 && !roleDefaults)
-    || (catalogue.migrations.length === 45 && !feishuAdmit)
+  const length = catalogue.migrations.length;
+  const suffixOk = READINESS_SUFFIX.filter((step) => step.length <= length).every((step) => {
+    const migration = catalogue.migrations[step.index];
+    return migration?.id === step.id && (!('sha256' in step) || migration.sha256 === step.sha256);
+  });
+  const knownLength = length === 41 || READINESS_SUFFIX.some((step) => step.length === length);
+  if (!knownLength || !suffixOk
     || catalogue.migrations[40]?.id !== '0041_intake_readiness_v1_29'
     || catalogue.compatibility.readinessSuccessor?.sourceSchemaSha256 !== '04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771') {
     throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', 'Exact approved readiness successor required');
   }
-  const inventory = feishuAdmit
-    ? {
-      ...READINESS_INVENTORY,
-      functions: 271,
-      objectEntries: 3319,
-      objectSha256: FEISHU_ADMIT_OBJECT_SHA256,
-      functionEntries: 271,
-      functionSha256: FEISHU_ADMIT_FUNCTION_SHA256,
-    }
-    : roleDefaults
-    ? { ...READINESS_INVENTORY, objectEntries: 3318, objectSha256: ROLE_DEFAULT_OBJECT_SHA256, functionSha256: ROLE_DEFAULT_FUNCTION_SHA256 }
-    : adopted
-    ? { ...READINESS_INVENTORY, functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 }
-    : occupied
-      ? { ...READINESS_INVENTORY, functionSha256: OCCUPIED_FUNCTION_SHA256 }
-      : READINESS_INVENTORY;
-  const base = await verifyCatalogueState(client, catalogue, feishuAdmit
-    ? { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 }
-    : { entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c' },
+  const inventory = { ...READINESS_INVENTORY, ...READINESS_INVENTORY_BY_LENGTH[length] };
+  const base = await verifyCatalogueState(client, catalogue,
+    READINESS_ACL_BY_LENGTH[length] ?? { entries: 571, sha256: '04f03f0b0245f97c6b5948a57d3535c258e099dcde1b9a3378521bff4ba4e00c' },
   inventory, ['schema.v1.29', 'runtime activation and production NOT_CERTIFIED']);
   const marker = await verifyQuery<{ schema_comment: string | null }>(client,
     `SELECT pg_catalog.obj_description('public'::pg_catalog.regnamespace, 'pg_namespace') AS schema_comment`);

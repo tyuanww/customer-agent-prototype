@@ -64,6 +64,19 @@ function deskItem(id: string, name: string, statusLabel: string): DeskItemView {
   };
 }
 
+function insideRecentWeek(hour: number, minute = 0): string {
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
+function localMonthDay(iso: string): string {
+  const date = new Date(iso);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}-${day}`;
+}
+
 function deskView(items: DeskItemView[]): DeskView {
   return {
     signedIn: true, role: 'operator', displayName: '运营', personas: [], selectedPersonaId: 'shop',
@@ -370,11 +383,15 @@ it('shows the v9 sample only while preview=intake and keeps SOP unwired', async 
 
 it('computes overview figures from the usage rows and still leaves SOP unwired', async () => {
   window.history.pushState({}, '', '/?preview=intake');
+  const copiedAt = insideRecentWeek(9);
+  const viewedAt = insideRecentWeek(10);
+  const missAt = insideRecentWeek(11);
+  const blankMissAt = insideRecentWeek(12);
   const rows: UsageSourceRow[] = [
-    { id: '1', askedAt: '2026-10-13T01:00:00.000Z', agent: '坐席甲', question: '退货多久', scriptTitle: '退货时效', result: 'copied', snapshotStale: false, consented: true },
-    { id: '2', askedAt: '2026-10-13T02:00:00.000Z', agent: '坐席甲', question: '尺码', scriptTitle: '尺码怎么选', result: 'viewed', snapshotStale: false },
-    { id: '3', askedAt: '2026-10-13T03:00:00.000Z', agent: '坐席乙', question: '改地址', scriptTitle: null, result: 'miss', snapshotStale: false, consented: false },
-    { id: '4', askedAt: '2026-10-13T04:00:00.000Z', agent: '坐席乙', question: null, scriptTitle: null, result: 'miss', snapshotStale: false },
+    { id: '1', askedAt: copiedAt, agent: '坐席甲', question: '退货多久', scriptTitle: '退货时效', result: 'copied', snapshotStale: false, consented: true },
+    { id: '2', askedAt: viewedAt, agent: '坐席甲', question: '尺码', scriptTitle: '尺码怎么选', result: 'viewed', snapshotStale: false },
+    { id: '3', askedAt: missAt, agent: '坐席乙', question: '改地址', scriptTitle: null, result: 'miss', snapshotStale: false, consented: false },
+    { id: '4', askedAt: blankMissAt, agent: '坐席乙', question: null, scriptTitle: null, result: 'miss', snapshotStale: false },
   ];
   window.dashboardUsageLog = {
     list: vi.fn(async () => ({ ok: true as const, rows, nextCursor: null, canExport: true })),
@@ -397,7 +414,7 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
   expect(useTile).not.toHaveTextContent('较上期');
   expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('2');
   expect(screen.getByText('命中率').parentElement).toHaveTextContent('50.0%');
-  expect(screen.getByRole('img', { name: '使用趋势图' })).toHaveTextContent('10-13');
+  expect(screen.getByRole('img', { name: '使用趋势图' })).toHaveTextContent(localMonthDay(copiedAt));
   expect(screen.getByLabelText('话术类型占比')).toHaveTextContent('这些记录还分不出话术类型。');
   const user = userEvent.setup();
   await user.click(screen.getByRole('tab', { name: '无命中排行' }));
@@ -411,7 +428,7 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
 });
 
 it('shows a short local time for a live miss instead of the raw timestamp', async () => {
-  const askedAt = '2026-10-13T07:31:00.000Z';
+  const askedAt = insideRecentWeek(15, 31);
   window.dashboardUsageLog = {
     list: vi.fn(async () => ({
       ok: true as const,

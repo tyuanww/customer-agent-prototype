@@ -10,6 +10,7 @@ import {
   sendValidationError,
 } from './contract-http-errors.js';
 import { jobForToken } from './feishu-job-snapshot.js';
+import { composeRosterJob, type RosterJobResponse, type StoredRosterPermission } from './project-roster-login.js';
 
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -22,6 +23,7 @@ function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
 export function registerAuthRoutes(
   app: FastifyInstance,
   authService: AuthService,
+  readPermission?: (userId: string) => Promise<StoredRosterPermission | null>,
 ): void {
   if (authService.kind === 'mock') app.post('/v1/auth/mock-login', async (request, reply) => {
     if (!hasExactKeys(request.body, ['user_id', 'role'])) return sendValidationError(reply);
@@ -60,7 +62,17 @@ export function registerAuthRoutes(
     if (user === null) return sendUnauthorized(reply);
     const token = bearerToken(request.headers.authorization);
     const snapshot = token ? jobForToken(token) : null;
-    if (!snapshot) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
-    return { title: snapshot.title, directory: snapshot.directory };
+    let stored: StoredRosterPermission | null = null;
+    if (readPermission) {
+      try {
+        stored = await readPermission(user.user_id);
+      } catch {
+        request.log.warn('[api] roster permission read failed');
+        stored = snapshot ? { title: snapshot.title, state: 'denied' } : null;
+      }
+    }
+    const job: RosterJobResponse | null = composeRosterJob(snapshot, stored, readPermission !== undefined);
+    if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
+    return job;
   });
 }
