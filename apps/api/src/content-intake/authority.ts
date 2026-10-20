@@ -224,14 +224,23 @@ export async function mayManageGrant(client: IntakeTransaction, actor: Principal
 
 export async function createGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']): Promise<C['IntakeGrantList']> {
   const prepared = await prepareGrants(client, issuer, request);
+  // A query grant is read against the policy and store set version current at insert time.
+  // Without them authorization_sources drops the row, so a granted query never takes effect.
+  const stamped = await client.query<{ policy_version: string; store_set_version: string | null }>(`
+    SELECT (SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2) AS policy_version,
+           (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
+  [issuer.tenantId, issuer.appId]);
+  const queryStamp = stamped.rows[0] ?? { policy_version: null, store_set_version: null };
   const results: Grant[] = [], affected = new Set<string>();
   for (const { item, parent } of prepared) {
     const id = `grant_${randomUUID()}`;
     await client.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,
-      scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3,$13)`,
+      scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3,$13,$14,$15)`,
     [id, item.kind, issuer.id, item.recipientPrincipalId, issuer.tenantId, issuer.appId, await scopeId(client, item.scope),
-      item.scope.sourceId, item.action, item.startsAt, item.expiresAt, item.reason, parent]);
+      item.scope.sourceId, item.action, item.startsAt, item.expiresAt, item.reason, parent,
+      item.action === 'query' ? queryStamp.policy_version : null,
+      item.action === 'query' ? queryStamp.store_set_version : null]);
     results.push(await readGrant(client, id));
     affected.add(item.recipientPrincipalId);
   }

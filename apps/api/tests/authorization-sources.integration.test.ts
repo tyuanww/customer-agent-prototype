@@ -2,7 +2,7 @@ import type { Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { previewGrants } from '../src/content-intake/authority.js';
+import { createGrants, previewGrants } from '../src/content-intake/authority.js';
 import { readAuthorizationActions } from '../src/project-roster-login.js';
 import { IntakeRejection, principal, type IntakeTransaction } from '../src/content-intake/transaction.js';
 
@@ -378,6 +378,43 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
     expect(await grantRejection('director', 'signer', 'source-missing')).toBe('SCOPE_DENIED');
     expect(await grantRejection('director', 'signer', 'source-a')).not.toBe('SCOPE_DENIED');
     expect(await grantRejection('stale', 'director', 'source-a')).toBe('ORG_FACTS_UNAVAILABLE');
+  });
+
+  it('stamps a created query grant so the deadline keeps it live', async () => {
+    const client = intakeClient();
+    const issuer = await principal(client, { id: 'director' });
+    const recipient = await principal(client, { id: 'signer' });
+    const policy = await admin.query<{ version: string }>(
+      'SELECT version::text AS version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2',
+      [issuer.tenantId, issuer.appId]);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason, steward_id)
+      VALUES ('grant-alloc-director-query','allocation','signer','director',
+        'tenant-menokin','app-customer-agent','scope-product','query',
+        clock_timestamp()-interval '1 day', clock_timestamp()+interval '1 day', '分配查询。','signer')`);
+    const created = await createGrants(client, issuer, {
+      operationId: 'grant-created-query',
+      issuerFactsVersion: issuer.factsVersion,
+      policyVersion: Number(policy.rows[0]?.version),
+      items: [{
+        kind: 'business',
+        recipientPrincipalId: recipient.id,
+        recipientFactsVersion: recipient.factsVersion,
+        action: 'query',
+        scope: {
+          tenantId: issuer.tenantId, appId: issuer.appId, brandId: 'brand-a',
+          shopId: null, domain: 'product', sourceId: 'source-a',
+        },
+        startsAt: new Date(Date.now() - 30_000).toISOString(),
+        expiresAt: new Date(Date.now() + 120_000).toISOString(),
+        reason: '合成授权',
+      }],
+    });
+    expect(created.items).toHaveLength(1);
+    expect(created.items[0]).toMatchObject({ action: 'query', recipientPrincipalId: 'signer' });
+    // The insert must carry the current policy and store set version, or this row stays dead.
+    const live = await sources('signer', 'query');
+    expect(live.map(row => row.source_id)).toEqual(['source-a']);
   });
 
   it('reads action bits from the source set', async () => {
