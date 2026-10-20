@@ -149,6 +149,54 @@ describe.skipIf(!enabled)('authorization_sources returns one row per live grant 
     expect(await publishMessage('user-stale', 'owner', 'batch-covered')).toBe('资料资格过期了，请稍后重试。');
   });
 
+  it('refuses 过敏 and 赔付 text for every publisher that passes the domain gate', async () => {
+    await admin.query(`INSERT INTO public.authoritative_source_versions(
+        source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
+        use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at)
+      VALUES ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),
+        'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')
+      ON CONFLICT (source_version_id) DO NOTHING`);
+    await admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
+      VALUES ('batch-allergy','csv',repeat('ef',32),'validating')`);
+    await admin.query("SELECT set_config('app.import_binding_write','on',false)");
+    await admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
+      VALUES ('batch-allergy','product','srcv_product')`);
+    await admin.query(`WITH q AS (
+        SELECT jsonb_build_object(
+          'question_id','q_allergy_0001',
+          'question_version',1,
+          'question_text','过敏了怎么办',
+          'semantic_family_id','sf_allergy',
+          'origin_fingerprint',repeat('ab',32),
+          'origin_fingerprint_key_version','v1',
+          'source_asset_id','sa_allergy',
+          'source','import',
+          'intent_taxonomy_version','itax_v1',
+          'intent_id','intent_allergy') AS base
+      ), h AS (
+        SELECT base, public.content_question_hash(base) AS hash FROM q
+      )
+      INSERT INTO public.staging_scripts(
+        staging_id, import_batch_id, script_id, category, title, answer_text, content_hash,
+        source_ref, source_version_id, owner_role, review_due_at, platform_scope,
+        product_scope_type, product_scope_refs, effective_from, intent_taxonomy_version, intent_id,
+        risk_level, risk_categories, has_conflict, review_mode,
+        primary_reviewer_id, primary_reviewer_role, primary_review_evd, placeholder_keys,
+        questions_json, search_document, search_fallback_text,
+        validation_ok, quality_status, quality_gate_passed)
+      SELECT 'stg_allergy','batch-allergy','sc_allergy','product','过敏了怎么办','先停用并观察',repeat('ab',32),
+        'SRC-PRODUCT','srcv_product','ROLE-CONTENT-LEAD','2099-01-01T00:00:00Z',ARRAY['qianniu'],
+        'storewide',ARRAY[]::text[],'2020-01-01T00:00:00Z','itax_v1','intent_allergy',
+        'low',ARRAY[]::text[],false,'single',
+        repeat('a',64),'ROLE-CONTENT-LEAD','EVD',ARRAY[]::text[],
+        jsonb_build_array(jsonb_set(base,'{question_hash}',to_jsonb(hash))),to_tsvector('simple','过敏 处理'),'过敏 处理',
+        true,'clean',true
+      FROM h`);
+    await admin.query(`UPDATE public.import_batches SET status='staged' WHERE import_batch_id='batch-allergy'`);
+    expect(await publishMessage('user-director', 'coach', 'batch-allergy'))
+      .toBe('product and campaign scripts refuse 过敏 and 赔付');
+  });
+
   async function rollbackMessage(userId: string, role: string, releaseId: string) {
     try {
       await admin.query('SELECT * FROM public.rollback_content_release($1,$2,$3,$4,$5)', [releaseId, '标题', '摘要', userId, role]);
