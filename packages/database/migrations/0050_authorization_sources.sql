@@ -97,3 +97,13 @@ GRANT SELECT ON
   content_intake.store_set_members,
   content_intake.role_rules
   TO cs_ai_definer;
+
+-- authorization_deadline runs with caller rights and reads the current store set for every
+-- query grant. 0048 granted those reads only to intake_business, so the usage pool that serves
+-- /v1/intake/authorization and discovery failed with "permission denied for table
+-- store_set_current" as soon as a query grant carried a policy version.
+GRANT SELECT ON
+  content_intake.store_sets,
+  content_intake.store_set_members,
+  content_intake.store_set_current
+  TO intake_usage, intake_worker, intake_org_writer;
