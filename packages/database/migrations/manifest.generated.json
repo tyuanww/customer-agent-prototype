@@ -811,8 +811,8 @@
       "id": "0050_authorization_sources",
       "file": "0050_authorization_sources.sql",
       "source_ranges": [],
-      "sha256": "0e225e2bfccca9b3c2e07cc498bf7bb1f0f048ac1d9c0246a3b068ae47a37577",
-      "bytes": 5011,
+      "sha256": "90293c19d793da5bd3262adc46aff0aa652b7dc5c796d608f9af72f5a22b7451",
+      "bytes": 5029,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
