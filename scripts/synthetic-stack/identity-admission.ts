@@ -35,6 +35,27 @@ const ALLOWED_HOSTS_ENV = 'CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS';
  * CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS (comma separated) to add one deliberately,
  * e.g. a temporary probe hostname. It must never contain the production hostname.
  */
+/**
+ * Environment for the password identity child. The parent may name one extra
+ * Host, such as the public identity origin the desktop posts to. The child
+ * does not inherit the parent environment, so an unset copy leaves that Host
+ * rejected and the desktop shows account login as unavailable.
+ */
+export function identityProcessEnvironment(
+  parent: NodeJS.ProcessEnv,
+  stackRoot: string,
+): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {
+    PATH: parent.PATH,
+    CUSTOMER_AGENT_STACK_ROOT: stackRoot,
+  };
+  const allowed = parent.CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS;
+  if (typeof allowed === 'string' && allowed.trim().length > 0) {
+    environment.CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS = allowed;
+  }
+  return environment;
+}
+
 export function allowedIdentityHostnames(environment: NodeJS.ProcessEnv = process.env): readonly string[] {
   const configured = (environment[ALLOWED_HOSTS_ENV] ?? '')
     .split(',')
