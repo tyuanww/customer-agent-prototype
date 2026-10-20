@@ -114,15 +114,40 @@ export async function readGrant(client: IntakeTransaction, id: string): Promise<
 async function prepareGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']) {
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [issuer.tenantId, issuer.appId]);
   if (issuer.factsVersion !== request.issuerFactsVersion || Number(policy.rows[0]?.version) !== request.policyVersion) throw new IntakeRejection('PERMISSION_CHANGED');
+  const stamped = await client.query<{ at: Date }>('SELECT clock_timestamp() AS at');
+  const at = stamped.rows[0]!.at;
+  requireFresh(issuer, at.getTime());
+  const allowedByAction = new Map<string, Set<string>>();
   const prepared: { item: C['IntakeGrantItem']; parent: string | null }[] = [];
   for (const item of request.items) {
     const recipient = await principal(client, { id: item.recipientPrincipalId });
-    requireFresh(recipient, await clock(client));
+    requireFresh(recipient, at.getTime());
     client.validUntil(recipient.validUntil);
     if (issuer.tenantId !== recipient.tenantId || issuer.appId !== recipient.appId) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
     if (samePerson(issuer, recipient)) throw new IntakeRejection('SELF_ESCALATION', 'FORBIDDEN');
     if (recipient.factsVersion !== item.recipientFactsVersion) throw new IntakeRejection('PERMISSION_CHANGED');
     if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
+    let allowed = allowedByAction.get(item.action);
+    if (!allowed) {
+      const rows = await client.query<{ source_id: string }>(
+        'SELECT source_id FROM content_intake.authorization_sources($1,$2,$3)',
+        [issuer.id, item.action, at]);
+      allowed = new Set(rows.rows.map(row => row.source_id));
+      allowedByAction.set(item.action, allowed);
+    }
+    if (item.scope.sourceId) {
+      if (!allowed.has(item.scope.sourceId)) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+    } else {
+      const scopeSources = await client.query<{ source_id: string }>(`
+        SELECT src.source_id FROM content_intake.sources src
+        JOIN content_intake.scopes scope ON scope.scope_id = src.scope_id
+        WHERE scope.tenant_id=$1 AND scope.app_id=$2 AND scope.brand_id=$3
+          AND scope.shop_id IS NOT DISTINCT FROM $4 AND scope.domain=$5`,
+        [item.scope.tenantId, item.scope.appId, item.scope.brandId, item.scope.shopId, item.scope.domain]);
+      if (scopeSources.rows.length === 0 || scopeSources.rows.some(row => !allowed.has(row.source_id))) {
+        throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+      }
+    }
     if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const parent = await issuingParent(client, issuer, item.kind, item.action, item.scope, item);
     prepared.push({ item, parent });

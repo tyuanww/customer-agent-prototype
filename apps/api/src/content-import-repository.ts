@@ -297,12 +297,10 @@ export function createContentImportRepository(
           return failure(claim.code, commitCertaintyAfterError(rolledBack));
         }
         await client.query('SELECT public.assert_no_in_flight_content_import($1)', [request.actor.user_id]);
-        if (request.actor.role === 'owner') {
-          await client.query(
-            'SELECT public.advance_source_snapshots($1::jsonb, $2, $3, $4)',
-            [JSON.stringify(request.sourceBindings), request.sourceSha256, request.actor.role, request.importBatchId],
-          );
-        }
+        await client.query(
+          'SELECT public.advance_source_snapshots($1::jsonb, $2, $3, $4)',
+          [JSON.stringify(request.sourceBindings), request.sourceSha256, request.actor.user_id, request.importBatchId],
+        );
         const result = await client.query<EnqueueRow>(
           `SELECT * FROM public.enqueue_content_import($1, $2, $3, $4, $5, $6::jsonb, $7, $8)`,
           [
