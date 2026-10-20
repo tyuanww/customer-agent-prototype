@@ -6,7 +6,7 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createIdentityProvider } from './identity-provider.ts';
 import { createPasswordIdentityServer } from './password-identity-server.ts';
-import { buildAccount, isAdmittedHost, loadPasswordAccounts } from './identity-admission.ts';
+import { buildAccount, identityProcessEnvironment, isAdmittedHost, loadPasswordAccounts } from './identity-admission.ts';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
 import {
   DEFAULT_STACK_ROOT,
@@ -571,6 +571,17 @@ describe('identity admission', () => {
     assert.equal(isAdmittedHost('probe.example.test', environment), true);
     assert.equal(isAdmittedHost('probe.example.test:443', environment), true);
     assert.equal(isAdmittedHost('agent-pass.jianghua.site', environment), false);
+  });
+
+  it('forwards an explicit identity host into the password process environment', () => {
+    const plain = identityProcessEnvironment({ PATH: '/bin' }, '/srv/customer-agent/stack');
+    assert.equal(plain.CUSTOMER_AGENT_STACK_ROOT, '/srv/customer-agent/stack');
+    assert.equal(plain.CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS, undefined);
+    const named = identityProcessEnvironment({
+      PATH: '/bin',
+      CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS: 'agent-pass.jianghua.site',
+    }, '/srv/customer-agent/stack');
+    assert.equal(named.CUSTOMER_AGENT_IDENTITY_ALLOWED_HOSTS, 'agent-pass.jianghua.site');
   });
 
   it('refuses to load accounts from a missing file instead of seeding a default', () => {
