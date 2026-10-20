@@ -24,10 +24,12 @@ async function fixture(t) {
   rmSync(path.join(product,upstream,READINESS_LOCK),{force:true});
   const priorManifestPath=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(priorManifestPath));
-  if(priorManifest.migrations.length===41) {
-    const last=priorManifest.migrations.pop(); delete priorManifest.compatibility.readiness_successor;
-    writeFileSync(priorManifestPath,json(priorManifest));rmSync(path.join(product,'packages/database/migrations',last.file));
+  while (priorManifest.migrations.length > 40) {
+    const last=priorManifest.migrations.pop();
+    rmSync(path.join(product,'packages/database/migrations',last.file),{force:true});
   }
+  delete priorManifest.compatibility.readiness_successor;
+  writeFileSync(priorManifestPath,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   const original=verifyContractSetDirectory(input);
   const descriptors=[original.manifest.openapi,original.manifest.database,...Object.values(original.manifest.readiness)];
@@ -47,7 +49,9 @@ async function fixture(t) {
 test('compact intake reconstructs exact contracts, preserves forty migrations and replays after generation',async t=>{
   const f=await fixture(t);const original=readFileSync(path.join(f.product,upstream,'repair-contract-set.lock.json'));
   assert.equal(f.run().status,'CREATED');assert.equal(f.run().status,'REUSED');
-  const built=await generateDatabaseMigrations({projectRoot:f.product});assert.equal(built.migrations.length,41);
+  const built=await generateDatabaseMigrations({projectRoot:f.product});assert.equal(built.migrations.length,49);
+  assert.equal(built.migrations[40].id,'0041_intake_readiness_v1_29');
+  assert.equal(built.migrations[48].id,'0049_roster_lifecycle');
   assert.equal(f.run().status,'REUSED');await generateDatabaseMigrations({projectRoot:f.product,check:true});
   assert.deepEqual(readFileSync(path.join(f.product,upstream,'repair-contract-set.lock.json')),original);
   const generated=await buildGeneratedArtifacts({projectRoot:f.product});assert.equal(generated.contract_set_id,f.manifest.contract_set_id);

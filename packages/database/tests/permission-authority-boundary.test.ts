@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readOverlay = (name: string) => readFileSync(path.join(packageRoot, 'overlays', name), 'utf8');
+const readMigration = (name: string) => readFileSync(path.join(packageRoot, 'migrations', name), 'utf8');
 
 describe('roster permission authority boundary', () => {
   it('keeps the applied 0044 bytes free of the system signer', () => {
@@ -43,8 +44,36 @@ describe('roster permission authority boundary', () => {
     const issue = sql.slice(sql.indexOf('CREATE FUNCTION content_intake.issue_roster_query'));
     expect(issue).toContain("'职位名单系统签发。'");
     expect(issue).toContain('content_intake.release_lineage');
+    expect(issue).toContain('live_grant.issuer_id = v_signer');
+    expect(issue).toContain('current_facts_version + 1');
     expect(issue).not.toContain("'publish'");
     expect(issue).not.toContain("'import'");
     expect(issue).not.toContain('kind IN (\'allocation\'');
+  });
+
+  it('binds query grants to the current policy version and store set', () => {
+    const sql = readOverlay('0048_roster_store_set.sql');
+    expect(sql).toContain('content_intake.store_set_members');
+    expect(sql).toContain('g.policy_version');
+    expect(sql).toContain('g.store_set_version');
+    expect(sql).toContain("p_action='query' AND g.source_id=p_source");
+    expect(sql).not.toContain('0033_intake_runtime');
+    expect(sql).not.toContain('0044_intake_role_defaults');
+  });
+
+  it('records the job, the store provenance, and a read-only day-one report', () => {
+    const sql = readOverlay('0049_roster_lifecycle.sql');
+    expect(sql).toContain('roster_job_id');
+    expect(sql).toContain('provenance');
+    expect(sql).toContain('content_intake.withdraw_roster_query');
+    expect(sql).toContain('content_intake.roster_day_one');
+    expect(sql).not.toContain('0033_intake_runtime');
+    expect(sql).not.toContain('0044_intake_role_defaults');
+  });
+
+  it('keeps generated 0047, 0048, and 0049 migrations equal to their overlays', () => {
+    for (const name of ['0047_roster_query_signer.sql', '0048_roster_store_set.sql', '0049_roster_lifecycle.sql']) {
+      expect(readMigration(name)).toContain(readOverlay(name).trim());
+    }
   });
 });

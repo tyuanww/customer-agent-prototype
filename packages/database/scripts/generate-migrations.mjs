@@ -799,38 +799,22 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   // 0042 bytes are the migration already applied on the Mac ledger. Re-rendering
   // the restored overlay must reproduce that checksum; the tenant adoption is 0043.
   const FROZEN_OCCUPIED_SHA256 = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
-  const occupiedMigration = readiness
-    ? renderIntakeOverlay(projectRoot, snapshot, 42, '0042_intake_occupied_domain_publish')
-    : null;
+  const productOverlays = [
+    [42, '0042_intake_occupied_domain_publish'],
+    [43, '0043_intake_publish_default_tenant'],
+    [44, '0044_intake_role_defaults'],
+    [45, '0045_feishu_agent_admit'],
+    [46, '0046_project_feishu_roster'],
+    [47, '0047_roster_query_signer'],
+    [48, '0048_roster_store_set'],
+    [49, '0049_roster_lifecycle'],
+  ];
+  const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
+  const occupiedMigration = productTail[0] ?? null;
   if (occupiedMigration && occupiedMigration.sha256 !== FROZEN_OCCUPIED_SHA256) {
     throw new Error('Frozen occupied-domain migration 0042 drifted');
   }
-  const defaultTenantMigration = occupiedMigration
-    ? renderIntakeOverlay(projectRoot, snapshot, 43, '0043_intake_publish_default_tenant')
-    : null;
-  const roleDefaultMigration = defaultTenantMigration
-    ? renderIntakeOverlay(projectRoot, snapshot, 44, '0044_intake_role_defaults')
-    : null;
-  const feishuAdmitMigration = roleDefaultMigration
-    ? renderIntakeOverlay(projectRoot, snapshot, 45, '0045_feishu_agent_admit')
-    : null;
-  const rosterProjectionMigration = feishuAdmitMigration
-    ? renderIntakeOverlay(projectRoot, snapshot, 46, '0046_project_feishu_roster')
-    : null;
-  const querySignerMigration = rosterProjectionMigration
-    ? renderIntakeOverlay(projectRoot, snapshot, 47, '0047_roster_query_signer')
-    : null;
-  const publishedMigrations = Object.freeze(querySignerMigration
-    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration, rosterProjectionMigration, querySignerMigration]
-    : rosterProjectionMigration
-    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration, rosterProjectionMigration]
-    : feishuAdmitMigration
-    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration, feishuAdmitMigration]
-    : roleDefaultMigration
-    ? [...migrations, occupiedMigration, defaultTenantMigration, roleDefaultMigration]
-    : defaultTenantMigration
-    ? [...migrations, occupiedMigration, defaultTenantMigration]
-    : occupiedMigration ? [...migrations, occupiedMigration] : migrations);
+  const publishedMigrations = Object.freeze([...migrations, ...productTail]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -859,12 +843,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (registrationMigration) outputs.set(`packages/database/migrations/${registrationMigration.file}`, registrationMigration.sql);
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
   if (readinessMigration) outputs.set(`packages/database/migrations/${readinessMigration.file}`, readinessMigration.sql);
-  if (occupiedMigration) outputs.set(`packages/database/migrations/${occupiedMigration.file}`, occupiedMigration.sql);
-  if (defaultTenantMigration) outputs.set(`packages/database/migrations/${defaultTenantMigration.file}`, defaultTenantMigration.sql);
-  if (roleDefaultMigration) outputs.set(`packages/database/migrations/${roleDefaultMigration.file}`, roleDefaultMigration.sql);
-  if (feishuAdmitMigration) outputs.set(`packages/database/migrations/${feishuAdmitMigration.file}`, feishuAdmitMigration.sql);
-  if (rosterProjectionMigration) outputs.set(`packages/database/migrations/${rosterProjectionMigration.file}`, rosterProjectionMigration.sql);
-  if (querySignerMigration) outputs.set(`packages/database/migrations/${querySignerMigration.file}`, querySignerMigration.sql);
+  for (const overlay of productTail) outputs.set(`packages/database/migrations/${overlay.file}`, overlay.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
