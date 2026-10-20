@@ -22,10 +22,14 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
   query?: boolean;
   /** Extra sources a fixture already registered and the recipients must reach. */
   extraSources?: readonly { scopeId: string; sourceId: string; domain: string }[];
+  /** Grant id prefix, so a fixture can name the live rows it revokes later. */
+  idPrefix?: string;
 }>): Promise<void> {
   const { tenantId, appId, brandId, signer, recipients, domains, actions } = input;
+  const prefix = input.idPrefix ?? `business-${tenantId}`;
   // Fixtures may already own a principal for a user id; grants must name that one.
   const effective = new Map<string, string>();
+  let policyVersion: string | null = null, storeSetVersion: string | null = null;
   await admin.query('BEGIN');
   try {
     await admin.query(`INSERT INTO content_intake.policy_versions(tenant_id, app_id, version)
@@ -63,15 +67,6 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
       await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
         VALUES ($1,$2,1) ON CONFLICT (tenant_id, app_id) DO UPDATE SET version = 1`, [tenantId, appId]);
     }
-    let policyVersion: string | null = null, storeSetVersion: string | null = null;
-    if (input.query === true) {
-      const stamped = await admin.query<{ policy_version: string | null; store_set_version: string | null }>(`
-        SELECT (SELECT version::text FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2) AS policy_version,
-               (SELECT version::text FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
-      [tenantId, appId]);
-      policyVersion = stamped.rows[0]?.policy_version ?? null;
-      storeSetVersion = stamped.rows[0]?.store_set_version ?? null;
-    }
     const targets = [
       ...domains.map((domain) => ({ domain, scopeId: `scope-${tenantId}-${domain}`, sourceId: `source-${tenantId}-${domain}`, own: true })),
       ...(input.extraSources ?? []).map((extra) => ({ ...extra, own: false })),
@@ -94,6 +89,18 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
           ON CONFLICT (tenant_id, app_id, version, scope_id, source_id) DO NOTHING`,
         [tenantId, appId, scopeId, sourceId]);
       }
+    }
+    // Every row that can bump the policy version is written before this read, so the query
+    // grants below carry the version the reader will actually compare against.
+    if (input.query === true) {
+      const stamped = await admin.query<{ policy_version: string | null; store_set_version: string | null }>(`
+        SELECT (SELECT version::text FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2) AS policy_version,
+               (SELECT version::text FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
+      [tenantId, appId]);
+      policyVersion = stamped.rows[0]?.policy_version ?? null;
+      storeSetVersion = stamped.rows[0]?.store_set_version ?? null;
+    }
+    for (const { scopeId, sourceId } of targets) {
       for (const action of actions) {
         await admin.query(`INSERT INTO content_intake.grants(
             grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
@@ -104,15 +111,18 @@ export async function seedContentWriteAuthority(admin: Client, input: Readonly<{
         [`alloc-${tenantId}-${sourceId}-${action}`, effective.get(signer.principalId)!, tenantId, appId, scopeId, action]);
         for (const recipient of recipients) {
           const stampQuery = input.query === true && action === 'query';
+          // A query row must name its source: the deadline compares source_id for equality,
+          // so a scope-wide query grant can never match. Other actions may stay scope-wide.
           await admin.query(`INSERT INTO content_intake.grants(
-              grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+              grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
               starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
-            VALUES ($1,'business',$2,$5,$3,$4,$6,$7,
+            VALUES ($1,'business',$2,$5,$3,$4,$6,$11,$7,
               clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。',$2,$8,$9,$10)
             ON CONFLICT (grant_id) DO NOTHING`,
-          [`business-${tenantId}-${recipient.principalId}-${sourceId}-${action}`, effective.get(signer.principalId)!, tenantId, appId,
+          [`${prefix}-${recipient.principalId}-${sourceId}-${action}`, effective.get(signer.principalId)!, tenantId, appId,
             effective.get(recipient.principalId)!, scopeId, action, `alloc-${tenantId}-${sourceId}-${action}`,
-            stampQuery ? policyVersion : null, stampQuery ? storeSetVersion : null]);
+            stampQuery ? policyVersion : null, stampQuery ? storeSetVersion : null,
+            stampQuery ? sourceId : null]);
         }
       }
     }
