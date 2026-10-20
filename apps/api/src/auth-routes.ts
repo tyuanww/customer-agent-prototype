@@ -62,7 +62,15 @@ export function registerAuthRoutes(
     if (user === null) return sendUnauthorized(reply);
     const token = bearerToken(request.headers.authorization);
     const snapshot = token ? jobForToken(token) : null;
-    const stored = readPermission ? await readPermission(user.user_id) : null;
+    let stored: StoredRosterPermission | null = null;
+    if (readPermission) {
+      try {
+        stored = await readPermission(user.user_id);
+      } catch {
+        request.log.warn('[api] roster permission read failed');
+        stored = snapshot ? { title: snapshot.title, state: 'denied' } : null;
+      }
+    }
     const job: RosterJobResponse | null = composeRosterJob(snapshot, stored, readPermission !== undefined);
     if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
     return job;

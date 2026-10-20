@@ -286,6 +286,43 @@ describe('GET /v1/auth/job', () => {
   });
 
   // Value: protects=unknown permission when business reader absent; fails_when=mock profile invents denied without SQL; why_new=no intake pool in unit app; seam=none; no_claim=product session remote path
+  it('denies a known title when the permission read fails', async () => {
+    const readPermission = vi.fn().mockRejectedValue(new Error('db down'));
+    const app = await appWithPermission(readPermission);
+    try {
+      const login = await app.inject({
+        method: 'POST',
+        url: '/v1/auth/mock-login',
+        payload: { user_id: 'usr_ou_abcdef', role: 'agent' },
+      });
+      const token = login.json<{ token: string }>().token;
+      const unread = await app.inject({
+        method: 'GET',
+        url: '/v1/auth/job',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(unread.statusCode).toBe(404);
+      expect(unread.json()).toEqual({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
+
+      remember('客服坐席');
+      bindSessionSubject(token, subjectHash(openId));
+      const denied = await app.inject({
+        method: 'GET',
+        url: '/v1/auth/job',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(denied.statusCode).toBe(200);
+      expect(denied.json()).toEqual({
+        title: '客服坐席',
+        directory: [{ name: '客服坐席', enabled: true }],
+        permission_state: 'denied',
+        message: ROSTER_DENIAL_MESSAGE,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
   it('keeps unknown permission when the business reader is not wired', async () => {
     const app = await appWithPermission();
     try {
