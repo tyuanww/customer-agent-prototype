@@ -1,5 +1,6 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
+import { projectRosterLogin, rosterHomeFromEnv } from './project-roster-login.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -34,15 +35,18 @@ import {
   type ServiceRepository,
 } from './service-repository.js';
 
-function intakeRoutes(
-  auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined,
-  objectStoreDir: string | undefined,
-) {
+function intakeEnvPresent(): boolean {
+  return Boolean(process.env.INTAKE_BUSINESS_DATABASE_URL
+    || process.env.INTAKE_USAGE_DATABASE_URL
+    || process.env.INTAKE_WORKER_DATABASE_URL);
+}
+
+function intakeRoutes(objectStoreDir: string | undefined) {
   const business = process.env.INTAKE_BUSINESS_DATABASE_URL;
   const usage = process.env.INTAKE_USAGE_DATABASE_URL;
   const worker = process.env.INTAKE_WORKER_DATABASE_URL;
   if (!business && !usage && !worker) return undefined;
-  if (auth?.kind !== 'product' || objectStoreDir === undefined || !business || !usage || !worker) {
+  if (objectStoreDir === undefined || !business || !usage || !worker) {
     throw new Error('Intake HTTP pools are incomplete');
   }
   const report = (error: unknown): void => {
@@ -88,6 +92,10 @@ export async function startApi(
     options,
     async (config, repository, policyAdminRepository, bootstrap) => {
       let auth;
+      let intake: ReturnType<typeof intakeRoutes> | undefined;
+      if (config.sessionMode !== 'product' && intakeEnvPresent()) {
+        throw new Error('Intake HTTP pools are incomplete');
+      }
       if (config.sessionMode === 'product') {
         if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
         if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
@@ -100,7 +108,24 @@ export async function startApi(
             ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
             : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
           : createSyntheticIdentityProvider(identity.providerOrigin, callback);
-        auth = await createProductAuthService(bootstrap.productIdentity.database, provider, config.authMode);
+        intake = intakeRoutes(bootstrap.objectStoreDir);
+        const business = intake?.business;
+        auth = await createProductAuthService(
+          bootstrap.productIdentity.database,
+          provider,
+          config.authMode,
+          async (openId) => {
+            if (!business) {
+              console.info('[api] roster projection skipped');
+              return;
+            }
+            const client = await business.connect();
+            try {
+              const reason = await projectRosterLogin(client, openId, rosterHomeFromEnv(process.env));
+              if (reason !== 'projected') console.info(`[api] roster projection ${reason}`);
+            } finally { client.release(); }
+          },
+        );
       }
       try {
         const contentImport = bootstrap.objectStoreDir === undefined ? undefined : {
@@ -135,7 +160,6 @@ export async function startApi(
         const notice = runtimePool === undefined ? undefined : {
           service: createNoticeServiceForPool(runtimePool, false),
         };
-        const intake = intakeRoutes(auth, bootstrap.objectStoreDir);
         const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
           { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
@@ -173,6 +197,9 @@ export async function startApi(
         return app;
       } catch (error) {
         await auth?.close();
+        await intake?.business.end().catch(() => undefined);
+        await intake?.usage.end().catch(() => undefined);
+        await intake?.worker.end().catch(() => undefined);
         throw error;
       }
     },

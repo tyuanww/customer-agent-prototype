@@ -60,6 +60,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 查看本轮开发体验、安全、架构和远端仓库诊断 | [2026-10-02 审计](docs/reviews/2026-10-02-docs-architecture-security-audit.md) · [2026-10-01 审计](docs/reviews/2026-10-01-devex-security-audit.md) |
 | 合成 FAQ 上传、二次确认直发、按店与商品/场景查询及回退 | [开发与验收入口](docs/how-to-develop-content-intake.md) · [当前合同交接](docs/reference-content-intake-p2-contract-handoff.md) · [解析包](packages/content-intake/README.md) |
 | 操作 faq-v2 六个页签：知识库、权限、本机 SOP 原表、使用情况 | [怎么操作](docs/how-to-operate-intake-pages.md) · [字段](docs/reference-intake-pages.md) · [规格](DESIGN.md) |
+| 核对登录后的职务查询权，分清按钮可见和服务端放行 | [怎么核对](docs/how-to-check-roster-permission.md) · [模型](docs/reference-job-roster-permission-model.md) |
 | 商品/场景选择与对象容量核对 | [选择器验收](evidence/qa/content-intake-p2-query-filters/README.md) · [容量验收](evidence/qa/content-intake-p2-capacity/README.md) |
 | 资料接入当前范围与阶段证据 | [资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md) · [同题覆盖验收](evidence/qa/content-intake-p2-family/README.md) |
 | 当前一期任务与延后债 | [执行清单](docs/plans/2026-09-06-execution-goal.md) · [TODOS](TODOS.md) · [CHANGELOG](CHANGELOG.md) |

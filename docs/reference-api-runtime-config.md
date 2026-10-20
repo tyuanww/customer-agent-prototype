@@ -32,6 +32,8 @@
 | `FEISHU_APP_ID` | `AUTH_MODE=feishu` 必填；`cli_` 前缀的应用 ID | 不回显原值 |
 | `FEISHU_APP_SECRET` | `AUTH_MODE=feishu` 必填；只进私有 bootstrap | 不回显、不记录 |
 | `FEISHU_REDIRECT_URI` | `AUTH_MODE=feishu` 必填；精确 `https://…/v1/auth/callback`，无 userinfo / query / fragment | 不回显原值 |
+| `ROSTER_TENANT_ID` | 可省略。必须与 `ROSTER_APP_ID` 成对，且去掉空白后非空。空库第一次登记职位名单时作为 tenant。只设一个、库里有多对 tenant/app，或与库里唯一一对不一致，登录投影跳过，不从历史主体猜测 | 不回显原值 |
+| `ROSTER_APP_ID` | 可省略。与 `ROSTER_TENANT_ID` 成对。空库第一次登记时作为 app。库里已经只有一对时，用那一对 | 不回显原值 |
 | `AUTH_SESSION_MODE` | 可省略或 `mock` 保留进程内合成登录；`product` 显式启用持久产品会话。其它值、未选择 product 却提供产品身份配置均拒启 | 合法 product 模式可进入公开 config |
 | `AUTH_DATABASE_URL` | product 必填；独立无特权登录账号仅属于 app_backend_auth，与 runtime/admin 同库且登录名不同 | 仅私有 bootstrap |
 | `AUTH_DB_POOL_MAX` | product 默认 2；runtime 此时默认 16（配置审核池时改为 12），admin 默认 2；API 进程启用的池合计最多 20，并给独立 worker 进程预留 2 | 不进入公开 config |

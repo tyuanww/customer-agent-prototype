@@ -51,6 +51,142 @@ function catalogueError(message: string): never {
   throw new DatabaseMigrationError('MIGRATION_CATALOGUE_INVALID', message);
 }
 
+interface CatalogueSuccessorStep {
+  index: number;
+  minimumCatalogueLength: number;
+  id: string;
+  predecessorId?: string;
+  requiresPredecessor: string;
+}
+
+type CatalogueMigration = ExecutableMigrationCatalogue['migrations'][number];
+type SignedSuccessor = ExecutableMigrationCatalogue['compatibility']['repairSuccessor'];
+
+// Named steps after the additive suffix. Repair has no predecessor id.
+// Repair and readiness carry signed provenance; every later step also pins the frozen 0042 checksum.
+const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
+  {
+    index: 39,
+    minimumCatalogueLength: 40,
+    id: '0040_intake_repair_successor_v1_28',
+    requiresPredecessor: 'Repair requires the preceding additive successor',
+  },
+  {
+    index: 40,
+    minimumCatalogueLength: 41,
+    id: '0041_intake_readiness_v1_29',
+    predecessorId: '0040_intake_repair_successor_v1_28',
+    requiresPredecessor: 'Readiness requires the preceding repair successor',
+  },
+  {
+    index: 41,
+    minimumCatalogueLength: 42,
+    id: '0042_intake_occupied_domain_publish',
+    predecessorId: '0041_intake_readiness_v1_29',
+    requiresPredecessor: 'Occupied-domain publication requires the readiness successor',
+  },
+  {
+    index: 42,
+    minimumCatalogueLength: 43,
+    id: '0043_intake_publish_default_tenant',
+    predecessorId: '0042_intake_occupied_domain_publish',
+    requiresPredecessor: 'Default-tenant publication requires the occupied-domain successor',
+  },
+  {
+    index: 43,
+    minimumCatalogueLength: 44,
+    id: '0044_intake_role_defaults',
+    predecessorId: '0043_intake_publish_default_tenant',
+    requiresPredecessor: 'Role defaults require the default-tenant successor',
+  },
+  {
+    index: 44,
+    minimumCatalogueLength: 45,
+    id: '0045_feishu_agent_admit',
+    predecessorId: '0044_intake_role_defaults',
+    requiresPredecessor: 'Feishu agent admission requires the role-default successor',
+  },
+  {
+    index: 45,
+    minimumCatalogueLength: 46,
+    id: '0046_project_feishu_roster',
+    predecessorId: '0045_feishu_agent_admit',
+    requiresPredecessor: 'Roster projection requires the Feishu agent admission',
+  },
+  {
+    index: 46,
+    minimumCatalogueLength: 47,
+    id: '0047_roster_query_signer',
+    predecessorId: '0046_project_feishu_roster',
+    requiresPredecessor: 'Query signer requires the roster projection',
+  },
+  {
+    index: 47,
+    minimumCatalogueLength: 48,
+    id: '0048_roster_store_set',
+    predecessorId: '0047_roster_query_signer',
+    requiresPredecessor: 'Store set requires the query signer',
+  },
+  {
+    index: 48,
+    minimumCatalogueLength: 49,
+    id: '0049_roster_lifecycle',
+    predecessorId: '0048_roster_store_set',
+    requiresPredecessor: 'Roster lifecycle requires the store set',
+  },
+];
+
+function requiredSuccessorStep(
+  predicate: (step: CatalogueSuccessorStep) => boolean,
+  label: string,
+): CatalogueSuccessorStep {
+  const step = CATALOGUE_SUCCESSOR_STEPS.find(predicate);
+  if (step === undefined) throw new Error(`Catalogue successor table is missing ${label}`);
+  return step;
+}
+
+const repairSuccessorStep = requiredSuccessorStep((step) => step.predecessorId === undefined, 'repair');
+const readinessSuccessorStep = requiredSuccessorStep((step) => step.predecessorId === repairSuccessorStep.id, 'readiness');
+const occupiedSuccessorStep = requiredSuccessorStep((step) => step.predecessorId === readinessSuccessorStep.id, 'occupied-domain');
+
+function sameSignedSuccessor(migration: CatalogueMigration, signed: SignedSuccessor): boolean {
+  return signed != null
+    && migration.contractSetId === signed.contractSetId
+    && migration.sourceGitSha === signed.sourceGitSha
+    && migration.sourceSchemaSha256 === signed.sourceSchemaSha256
+    && migration.sha256 === signed.migrationSha256;
+}
+
+function matchesCatalogueSuccessorStep(
+  step: CatalogueSuccessorStep,
+  index: number,
+  migration: CatalogueMigration,
+  catalogue: ExecutableMigrationCatalogue,
+  repair: SignedSuccessor,
+  readiness: SignedSuccessor,
+): boolean {
+  if (
+    index !== step.index
+    || catalogue.migrations.length < step.minimumCatalogueLength
+    || migration.id !== step.id
+    || (step.predecessorId !== undefined && catalogue.migrations[step.index - 1]?.id !== step.predecessorId)
+  ) {
+    return false;
+  }
+  if (step === repairSuccessorStep) return sameSignedSuccessor(migration, repair);
+  if (step === readinessSuccessorStep) {
+    const repairMigration = catalogue.migrations[repairSuccessorStep.index];
+    return sameSignedSuccessor(migration, readiness)
+      && repair != null
+      && repairMigration?.sha256 === repair.migrationSha256;
+  }
+  if (readiness == null) return false;
+  const occupiedChecksum = step === occupiedSuccessorStep
+    ? migration.sha256
+    : catalogue.migrations[occupiedSuccessorStep.index]?.sha256;
+  return occupiedChecksum === FROZEN_OCCUPIED_SHA256;
+}
+
 export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue): void {
   const prior = catalogue.compatibility.priorSignedBaseline;
   const reviewedUpgrades = catalogue.compatibility.priorReviewedUpgrades;
@@ -104,6 +240,9 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
 
   const ids = new Set<string>();
   let successorSuffix = false;
+  const repair = catalogue.compatibility.repairSuccessor;
+  const readiness = catalogue.compatibility.readinessSuccessor;
+  const successor = catalogue.compatibility.additiveSuccessor ?? null;
   for (const [index, migration] of catalogue.migrations.entries()) {
     if (
       migration.position !== index + 1
@@ -129,56 +268,27 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     const expectedProvenance = prior !== null && index < prior.migrationCount
       ? prior
       : reviewedUpgrades.find(({ migrationCount }) => index < migrationCount) ?? catalogue;
-    const successor = catalogue.compatibility.additiveSuccessor ?? null;
     const matchesSuccessor = successor !== null
       && migration.contractSetId === successor.contractSetId
       && migration.sourceGitSha === successor.sourceGitSha
       && migration.sourceSchemaSha256 === successor.sourceSchemaSha256
       && successor.contractSetId !== catalogue.contractSetId;
-    const repair = catalogue.compatibility.repairSuccessor;
-    const matchesRepair = repair != null && index === 39 && [40, 41, 42, 43, 44, 45].includes(catalogue.migrations.length)
-      && migration.id === '0040_intake_repair_successor_v1_28'
-      && migration.contractSetId === repair.contractSetId && migration.sourceGitSha === repair.sourceGitSha
-      && migration.sourceSchemaSha256 === repair.sourceSchemaSha256
-      && migration.sha256 === repair.migrationSha256;
-    const readiness = catalogue.compatibility.readinessSuccessor;
-    const matchesReadiness = readiness != null && index === 40 && [41, 42, 43, 44, 45].includes(catalogue.migrations.length)
-      && migration.id === '0041_intake_readiness_v1_29'
-      && migration.contractSetId === readiness.contractSetId && migration.sourceGitSha === readiness.sourceGitSha
-      && migration.sourceSchemaSha256 === readiness.sourceSchemaSha256 && migration.sha256 === readiness.migrationSha256
-      && repair != null && catalogue.migrations[39]?.id === '0040_intake_repair_successor_v1_28'
-      && catalogue.migrations[39]?.sha256 === repair.migrationSha256;
-    if (index === 41 && migration.id === '0042_intake_occupied_domain_publish'
-      && migration.sha256 !== FROZEN_OCCUPIED_SHA256) {
+    if (
+      index === occupiedSuccessorStep.index
+      && migration.id === occupiedSuccessorStep.id
+      && migration.sha256 !== FROZEN_OCCUPIED_SHA256
+    ) {
       catalogueError('Frozen occupied-domain migration 0042 drifted');
     }
-    const matchesOccupied = index === 41 && [42, 43, 44, 45].includes(catalogue.migrations.length)
-      && migration.id === '0042_intake_occupied_domain_publish'
-      && migration.sha256 === FROZEN_OCCUPIED_SHA256
-      && readiness != null
-      && catalogue.migrations[40]?.id === '0041_intake_readiness_v1_29';
-    const matchesDefaultTenant = index === 42 && [43, 44, 45].includes(catalogue.migrations.length)
-      && migration.id === '0043_intake_publish_default_tenant'
-      && catalogue.migrations[41]?.id === '0042_intake_occupied_domain_publish'
-      && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
-      && readiness != null;
-    const matchesRoleDefaults = index === 43 && [44, 45].includes(catalogue.migrations.length)
-      && migration.id === '0044_intake_role_defaults'
-      && catalogue.migrations[42]?.id === '0043_intake_publish_default_tenant'
-      && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
-      && readiness != null;
-    const matchesFeishuAdmit = index === 44 && catalogue.migrations.length === 45
-      && migration.id === '0045_feishu_agent_admit'
-      && catalogue.migrations[43]?.id === '0044_intake_role_defaults'
-      && catalogue.migrations[41]?.sha256 === FROZEN_OCCUPIED_SHA256
-      && readiness != null;
-    if (matchesReadiness && !successorSuffix) catalogueError('Readiness requires the preceding repair successor');
-    if (matchesRepair && !successorSuffix) catalogueError('Repair requires the preceding additive successor');
-    if (matchesOccupied && !successorSuffix) catalogueError('Occupied-domain publication requires the readiness successor');
-    if (matchesDefaultTenant && !successorSuffix) catalogueError('Default-tenant publication requires the occupied-domain successor');
-    if (matchesRoleDefaults && !successorSuffix) catalogueError('Role defaults require the default-tenant successor');
-    if (matchesFeishuAdmit && !successorSuffix) catalogueError('Feishu agent admission requires the role-default successor');
-    if (matchesSuccessor || matchesRepair || matchesReadiness || matchesOccupied || matchesDefaultTenant || matchesRoleDefaults || matchesFeishuAdmit) successorSuffix = true;
+    const step = CATALOGUE_SUCCESSOR_STEPS.find((candidate) => candidate.index === index);
+    let matchesRepair = false;
+    let matchesReadiness = false;
+    if (step !== undefined && matchesCatalogueSuccessorStep(step, index, migration, catalogue, repair, readiness)) {
+      if (!successorSuffix) catalogueError(step.requiresPredecessor);
+      matchesRepair = step === repairSuccessorStep;
+      matchesReadiness = step === readinessSuccessorStep;
+      successorSuffix = true;
+    } else if (matchesSuccessor) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
       !matchesSuccessor && !matchesRepair && !matchesReadiness

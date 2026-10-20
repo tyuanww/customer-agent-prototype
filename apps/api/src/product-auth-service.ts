@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Pool, type QueryResultRow } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { bearerToken, type ProductAuthService, type MockCredentials, type AuthenticatedUser } from './auth-service.js';
+import { feishuAdmitOpenId, isFeishuOpenId } from './feishu-admit.js';
 import { bindSessionSubject } from './feishu-job-snapshot.js';
 import type { ApiDatabaseBootstrapConfig, AuthMode } from './runtime-config.js';
 
@@ -50,6 +51,7 @@ export async function createProductAuthService(
   config: ApiDatabaseBootstrapConfig,
   provider: SyntheticIdentityProvider,
   authMode: AuthMode,
+  afterLogin?: (openId: string) => Promise<void>,
 ): Promise<ProductAuthService> {
   const pool = new Pool({
     connectionString: config.connectionString,
@@ -140,9 +142,10 @@ export async function createProductAuthService(
         await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
       } catch (error) {
         const failure = identityFailure(error);
-        if (failure.reason === 'CAPABILITY_DENIED' && binding && /^ou_[A-Za-z0-9]{6,64}$/.test(binding)) {
+        const admitOpenId = feishuAdmitOpenId(failure.reason, binding);
+        if (admitOpenId) {
           try {
-            await query('SELECT backend_identity.admit_feishu_agent($1)', [binding]);
+            await query('SELECT backend_identity.admit_feishu_agent($1)', [admitOpenId]);
             await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
           } catch (retryError) {
             throw identityFailure(retryError);
@@ -159,6 +162,13 @@ export async function createProductAuthService(
         throw providerFailure;
       }
       if (binding === null) throw new IdentityFailure('LOGIN_INVALID');
+      if (afterLogin && isFeishuOpenId(binding)) {
+        try { await afterLogin(binding); }
+        catch (error) {
+          const name = error instanceof Error ? error.name : 'unknown';
+          console.info(`[api] roster projection failed: ${name}`);
+        }
+      }
     },
     async exchange(loginId: string, verifier: string) {
       const token = randomToken();

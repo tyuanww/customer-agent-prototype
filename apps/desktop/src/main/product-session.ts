@@ -11,6 +11,7 @@ import {
   type SessionJobView,
 } from '../shared/product-session';
 import { parseContractSchema } from '@customer-agent/contracts';
+import { parseRosterJobResponse } from '@customer-agent/job-roster';
 import {
   isNoticeDecision,
   noticeFailure,
@@ -77,19 +78,9 @@ export class ProductSession {
       const { value } = await this.http.request('/v1/auth/job', {
         token: this.token.access_token, timeoutMs: 8_000,
       });
-      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-      const title = Reflect.get(value, 'title');
-      const directory = Reflect.get(value, 'directory');
-      if (typeof title !== 'string' || !Array.isArray(directory)) return null;
-      const entries: { name: string; enabled: boolean }[] = [];
-      for (const row of directory) {
-        if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
-        const name = Reflect.get(row, 'name');
-        const enabled = Reflect.get(row, 'enabled');
-        if (typeof name !== 'string' || typeof enabled !== 'boolean') return null;
-        entries.push({ name, enabled });
-      }
-      return { title, directory: entries };
+      const parsed = parseRosterJobResponse(value);
+      if (!parsed) return null;
+      return { title: parsed.title, directory: parsed.directory, permissionState: parsed.permission_state };
     } catch { return null; }
   }
   private invalidate() {

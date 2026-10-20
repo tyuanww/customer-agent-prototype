@@ -3,6 +3,7 @@ import { registerProductAuthRoutes, sendIdentityFailure } from './product-auth-r
 import fastify, { type FastifyInstance } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { registerAuthRoutes } from './auth-routes.js';
+import { readStoredRosterPermission } from './project-roster-login.js';
 import {
   createMockAuthService,
   type AuthService,
@@ -152,7 +153,11 @@ export function createApiApp(
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'API resource shutdown failed');
   });
 
-  registerAuthRoutes(app, authService);
+  registerAuthRoutes(app, authService, intakeDependencies ? async (userId) => {
+    const client = await intakeDependencies.business.connect();
+    try { return await readStoredRosterPermission(client, userId); }
+    finally { client.release(); }
+  } : undefined);
   registerNoticeRoutes(app, authService, noticeDependencies);
   if (authService.kind === 'product') registerProductAuthRoutes(app, authService);
   registerPolicyReadRoute(app, config, repository, authService);
