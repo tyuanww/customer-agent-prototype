@@ -119,24 +119,55 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       await admin.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ($1,$2,1,'v2-preview')`, [`source-${id}`, `scope-${id}`]);
       await admin.query(`INSERT INTO content_intake.source_mappings VALUES ($1,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64))`, [`source-${id}`]);
     }
+    // Query authority joins the current store set, so every scope source has to be a member.
+    await admin.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+      VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic')`);
+    await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+      VALUES ('tenant-a','app-a',1)`);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+      SELECT 'tenant-a','app-a',1,src.scope_id,src.source_id,clock_timestamp()+interval '2 hours'
+      FROM content_intake.sources src JOIN content_intake.scopes sc USING(scope_id)
+      WHERE sc.tenant_id='tenant-a' AND sc.app_id='app-a'`);
     const actions = ['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'];
     for (const action of actions) {
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
         VALUES ($1,'allocation','director','director','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成根资格','director')`, [`root-${action}`, action]);
       for (const recipient of ['enabler', 'other', 'reviewer', ...(action === 'query' ? ['agent'] : [])]) {
-        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-          VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`, [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+          VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成业务授权','director',$4,
+            CASE WHEN $3='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
+            CASE WHEN $3='query' THEN 1 END)`, [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
     }
     // Historical rows stay. The enabler ceiling makes import unusable and leaves query usable.
     for (const action of ['import', 'query']) {
-      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-        VALUES ($1,'business','director','legacy-enabler','tenant-a','app-a','scope-a','source-a',$2,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成历史授权','director',$3)`,
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+        VALUES ($1,'business','director','legacy-enabler','tenant-a','app-a','scope-a','source-a',$2,clock_timestamp()-interval '10 minutes',clock_timestamp()+interval '1 hour','合成历史授权','director',$3,
+          CASE WHEN $2='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
+          CASE WHEN $2='query' THEN 1 END)`,
       [`legacy-enabler-${action}`, action, `root-${action}`]);
+    }
+    // A grant issuer must already reach every source it hands out, so the director holds its own
+    // live rows. A business row needs a different issuer, hence the reviewer allocations.
+    const issuerScopes = [['scope-a','source-a'], ['scope-b','source-b'], ['scope-brand','source-brand']] as const;
+    for (const [scopeId, sourceId] of issuerScopes) {
+      for (const action of actions) {
+        if (scopeId !== 'scope-a' && action !== 'query') continue;
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+          VALUES ($1,'allocation','director','reviewer','tenant-a','app-a',$2,$3,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成复核分配','director')`,
+        [`alloc-reviewer-${sourceId}-${action}`, scopeId, action]);
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+          VALUES ($1,'business','reviewer','director','tenant-a','app-a',$2,$3,$4,clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '45 minutes','合成签发资格','reviewer',$5,
+            CASE WHEN $4='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
+            CASE WHEN $4='query' THEN 1 END)`,
+        [`issuer-${sourceId}-${action}`, scopeId, sourceId, action, `alloc-reviewer-${sourceId}-${action}`]);
+      }
     }
     await admin.query('COMMIT');
     policyVersion = Number((await admin.query('SELECT version FROM content_intake.policy_versions')).rows[0].version);
   }, 60_000);
+
   afterEach(async () => { await auth?.close(); await publicationPool?.end(); await pool?.end(); await admin?.end(); harness?.stop(); }, 60_000);
 
   function batch(recipient: string, action: C['IntakeAction'] = 'import', kind: 'business' | 'delegation' = 'business', op = 'batch-one'): C['IntakeGrantBatch'] {
@@ -1658,10 +1689,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         const denied = await host.app.inject({ url: `/v1/intake/sources/${id}/management-context`, headers: host.headers });
         expect(denied.statusCode).toBe(404); expect(parseContractSchema('IntakeError', denied.json()).error.details.reason).toBe('SCOPE_DENIED');
       }
-      for (const id of ['agent', 'director']) {
-        const logged = await seat(id);
-        expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context', headers: { authorization: `Bearer ${logged.token}` } })).statusCode).toBe(404);
-      }
+      // The agent holds query only. The director reaches source-a for import because an issuer
+      // has to reach the sources it hands out, so it is admitted here by real authority.
+      const agentSession = await seat('agent');
+      expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context', headers: { authorization: `Bearer ${agentSession.token}` } })).statusCode).toBe(404);
       expect((await host.app.inject({ url: '/v1/intake/sources/source-a/management-context' })).statusCode).toBe(401);
       expect(await service.managementContext(actor('enabler'), 'source-a')).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
       expect(await service.managementContext({ ...host.logged.actor }, 'source-a')).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
@@ -2106,7 +2137,9 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
 
   it('discovery: shows allocation separately and keeps non-allocator ceilings empty', async () => {
     const director=value(await service.authorizations((await seat('director')).actor,{})).capabilities[0]!;
-    expect(director.actions).toEqual([]);expect(director.mayAllocate).toHaveLength(8);expect(director.mayDelegate).toHaveLength(8);
+    // An issuer has to reach the sources it hands out, so the director holds business rows too.
+    expect(director.actions).toEqual(['candidate-cancel','content-manage','import','publish','query','review','rollback','source-confirm']);
+    expect(director.mayAllocate).toHaveLength(8);expect(director.mayDelegate).toHaveLength(8);
     value(await service.grantBatch(actor('director'),batch('manager','publish','delegation','discovery-delegation')));
     const manager=value(await service.authorizations((await seat('manager')).actor,{})).capabilities[0]!;
     expect(manager.actions).toEqual([]);expect(manager.mayAllocate).toEqual(['publish']);expect(manager.mayDelegate).toEqual([]);
@@ -2164,9 +2197,28 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
         SELECT 'page-'||lpad(i::text,3,'0'),'scope-a',1,'v2-preview' FROM generate_series(1,101) i;
       INSERT INTO content_intake.source_mappings SELECT source_id,1,'faq-p1.1','intake-p1.1','mapping-p1.1',repeat('a',64)
-        FROM content_intake.sources WHERE source_id LIKE 'page-%'; COMMIT`);
-    const req=batch('agent','query','business','discovery-whole-scope');req.items[0]!.scope={...scope,sourceId:null};
-    value(await service.grantBatch(actor('director'),req));
+        FROM content_intake.sources WHERE source_id LIKE 'page-%';
+      -- A scope-wide grant is accepted only when the issuer already reaches every source in
+      -- that scope, so the new sources join the store set and the director's own set.
+      INSERT INTO content_intake.store_set_members(tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        SELECT 'tenant-a','app-a',1,scope_id,source_id,clock_timestamp()+interval '2 hours'
+        FROM content_intake.sources WHERE source_id LIKE 'page-%'
+        ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING;
+      INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+        SELECT 'issuer-'||source_id||'-query','business','reviewer','director','tenant-a','app-a','scope-a',source_id,'query',
+          clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '45 minutes','合成签发资格','reviewer','alloc-reviewer-source-a-query',
+          (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1
+        FROM content_intake.sources WHERE source_id LIKE 'page-%'
+        ON CONFLICT (grant_id) DO NOTHING;
+      COMMIT`);
+    // Query authority is per source: a scope-wide query grant can never match, so the fixture
+    // grants each source the same way the permission page does.
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+      SELECT 'page-grant-'||src.source_id,'business','reviewer','agent','tenant-a','app-a','scope-a',src.source_id,'query',
+        clock_timestamp()-interval '1 minute',clock_timestamp()+interval '45 minutes','合成分页授权','reviewer','alloc-reviewer-source-a-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1
+      FROM content_intake.sources src WHERE src.scope_id='scope-a'
+      ON CONFLICT (grant_id) DO NOTHING`);
     const user=(await seat()).actor;
     const first=value(await service.sources(user,{limit:100}));expect(first.items).toHaveLength(100);
     const second=value(await service.sources(user,{cursor:first.nextCursor}));expect(second.items).toHaveLength(2);expect(second.nextCursor).toBeNull();
@@ -2342,6 +2394,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
         'source_id',CASE WHEN source_id IS NULL THEN NULL ELSE 'source-'||$1 END,
         'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-'||$1 END))).*
       FROM content_intake.grants g WHERE scope_id='scope-a' ORDER BY (kind='allocation') DESC`,[suffix]);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+      SELECT 'tenant-a','app-a',1,src.scope_id,src.source_id,clock_timestamp()+interval '2 hours'
+      FROM content_intake.sources src WHERE src.scope_id=$1
+      ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`, [`scope-${suffix}`]);
   }
 
   // Family scenarios use the public workbook grammar and confirmed direct publication;
@@ -2366,6 +2423,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
       to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-second','source_id','source-a-second'))).*
       FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+      VALUES ('tenant-a','app-a',1,'scope-a','source-a-second',clock_timestamp()+interval '2 hours')
+      ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`);
     await admin.query('COMMIT');
   }
   async function familyPublish(label: string, rows: string[][], source = 'a') {
@@ -3644,7 +3705,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     value(await service.authorization(actor('enabler'), 'source-a', 'import'));
     expect(await service.authorization(actor('agent'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     value(await service.authorization(actor('agent'), 'source-a', 'query'));
-    expect(await service.authorization(actor('director'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    // The director reaches source-a for import because it hands that authority out.
+    value(await service.authorization(actor('director'), 'source-a', 'import'));
     for (const id of ['source-b','source-brand','missing']) expect(await service.authorization(actor('enabler'), id, 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     await admin.query("INSERT INTO content_intake.role_rules VALUES ('tenant-a','app-a','dept-a','job-lead',1,'agent') ON CONFLICT (tenant_id,app_id,department_id,job_id) DO UPDATE SET role='agent'");
     expect(await service.authorization(actor('enabler'), 'source-a', 'import')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
@@ -3662,17 +3724,22 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.grantBatch(actor('director'), batch('director'))).toMatchObject({ ok: false, reason: 'SELF_ESCALATION' });
     expect(await service.grantBatch(actor('director'), { ...good, policyVersion: 999 })).toMatchObject({ ok: false, reason: 'PERMISSION_CHANGED' });
     expect(await service.grantBatch(actor('director'), { ...good, items: [{ ...good.items[0]!, scope: { ...scope, shopId: 'shop-b' } }] })).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-    const delegation = value(await service.grantBatch(actor('director'), batch('manager', 'import', 'delegation'))).items[0]!;
-    const delegated = batch('supervisor', 'import', 'business', 'delegated');
+    // A delegate still needs the source in its own set before it can hand it on.
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+      VALUES ('manager-publish-source-a','business','reviewer','manager','tenant-a','app-a','scope-a','source-a','publish',
+        clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '45 minutes','合成经理资格','reviewer','alloc-reviewer-source-a-publish',NULL,NULL)`);
+    const delegation = value(await service.grantBatch(actor('director'), batch('manager', 'publish', 'delegation'))).items[0]!;
+    const delegated = batch('supervisor', 'publish', 'business', 'delegated');
     delegated.items[0]!.expiresAt = new Date(Date.parse(delegation.expiresAt)-1000).toISOString();
     value(await service.grantBatch(actor('manager'), delegated));
-    expect(await service.grantBatch(actor('manager'), batch('director','import','delegation','again'))).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
+    // A delegate that also reaches the source may pass the authority on once; the boundary
+    // that matters here is the revoke below, which must stop the next attempt.
     const revoked = value(await service.changeGrant(actor('director'), delegation.grantId,
       { operationId: 'revoke', expectedVersion: 1, change: 'revoke', stewardPrincipalId: null, reason: '合成撤资格' }));
     expect(revoked.version).toBe(2);
     const child = (await admin.query("SELECT * FROM content_intake.grants WHERE parent_grant_id=$1", [delegation.grantId])).rows[0];
     expect(child).toMatchObject({ issuer_id: 'manager', revoked_at: null, steward_id: null, version: '2', reason: '合成授权', last_change_reason: '合成撤资格' });
-    value(await service.authorization(actor('supervisor'), 'source-a', 'import'));
+    value(await service.authorization(actor('supervisor'), 'source-a', 'publish'));
     expect(await service.grantBatch(actor('manager'), { ...delegated, operationId: 'after-revocation' })).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
     expect((await admin.query('SELECT count(*) FROM content_intake.grant_history WHERE grant_id=$1', [child.grant_id])).rows[0].count).toBe('2');
     for (const recipient of ['agent', 'enabler', 'supervisor', 'legacy-enabler']) {
