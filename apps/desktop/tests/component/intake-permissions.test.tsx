@@ -244,6 +244,14 @@ it('keeps an unsaved permission preview open when discard fails',async()=>{
  expect(screen.getByRole('dialog',{name:'预览 · 尚未保存'})).toHaveTextContent('这次没有放弃预览。');
 });
 
+it('hides 新增授权 when the server publish bit is false', async () => {
+  const view = { signedIn: true, available: true, busy: false, validUntil: null, sources: [{ selection: 'scope-1', label: '合成范围' }], source: 'scope-1', people: [], actions: ['query' as const], grants: [], preview: null, pending: false, resultUnknown: false, notice: null };
+  window.dashboardPermissions = { current: async () => ({ ok: true, view }), command: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
+  render(<IntakePermissions canGrant={false} grantBlock="没有权限，请找人开通。" active />);
+  expect(await screen.findByRole('status')).toHaveTextContent('没有权限，请找人开通。');
+  expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
+});
+
 it('does not say the read window expired when no countdown is running',async()=>{
  const view={signedIn:true,available:false,busy:false,validUntil:null,sources:[],source:null,people:[],actions:[],grants:[],preview:null,pending:false,resultUnknown:false,notice:null};
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async()=>({ok:true,view}),onInvalidated:()=>()=>undefined};

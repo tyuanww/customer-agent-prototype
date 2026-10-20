@@ -147,8 +147,11 @@ async function mapFailure(response: Response): Promise<{ code: ProductErrorCode;
   let mapped = codes[response.status] ?? 'UNAVAILABLE';
   let reason: string | undefined;
   try {
-    const parsed = JSON.parse(await readBounded(response)) as { error?: { details?: { reason?: unknown } } };
+    const parsed = JSON.parse(await readBounded(response)) as { error?: { message?: unknown; details?: { reason?: unknown } } };
     if (typeof parsed?.error?.details?.reason === 'string') reason = parsed.error.details.reason;
+    if (parsed?.error?.message === '没有权限，请找人开通。' || parsed?.error?.message === '资料资格过期了，请稍后重试。') {
+      reason = parsed.error.message;
+    }
     if (reason === 'SOURCE_GATE_NOT_READY') mapped = 'SOURCE_GATE_NOT_READY';
   } catch { await response.body?.cancel().catch(() => undefined); }
   return reason === undefined ? { code: mapped } : { code: mapped, reason };

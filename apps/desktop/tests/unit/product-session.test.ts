@@ -180,7 +180,11 @@ describe('product session lifetime', () => {
 });
 describe('job observation from a signed-out session', () => {
   it('starts signed out and resolves AI赋能工程师 on login and restore', async () => {
-    const snapshot: JobSnapshot = { title: 'AI赋能工程师', directory: one('AI赋能工程师') };
+    const snapshot: JobSnapshot = {
+      title: 'AI赋能工程师',
+      directory: one('AI赋能工程师'),
+      actions: { query: false, import: false, publish: true, rollback: false },
+    };
     const loggedIn = fixture({ jobSnapshotFor: () => snapshot });
     expect(loggedIn.session.view()).toMatchObject({ signedIn: false, job: null });
     const login = await loggedIn.session.login();
@@ -205,6 +209,25 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
+  it('keeps SOP upload on the job title when the server publish bit is false', async () => {
+    const f = fixture({
+      identity: { user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'feishu' },
+      jobSnapshotFor: () => ({
+        title: '客服总监',
+        directory: one('客服总监'),
+        actions: { query: true, import: false, publish: false, rollback: false },
+      }),
+    });
+    expect(await f.session.login()).toMatchObject({
+      ok: true,
+      job: {
+        status: 'resolved',
+        rights: { publish: false, grant: false, uploadSop: true, search: true, readCatalog: true },
+        actions: { query: true, import: false, publish: false, rollback: false },
+      },
+    });
+  });
+
   it('keeps 普通客服 off publish and off query until the roster state is ready', async () => {
     const closed = fixture({ jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服') }) });
     expect(await closed.session.login()).toMatchObject({
@@ -216,7 +239,12 @@ describe('job observation from a signed-out session', () => {
       },
     });
     const open = fixture({
-      jobSnapshotFor: () => ({ title: '普通客服', directory: one('普通客服'), permissionState: 'ready' }),
+      jobSnapshotFor: () => ({
+        title: '普通客服',
+        directory: one('普通客服'),
+        permissionState: 'ready',
+        actions: { query: true, import: false, publish: false, rollback: false },
+      }),
     });
     expect(await open.session.login()).toMatchObject({
       ok: true,

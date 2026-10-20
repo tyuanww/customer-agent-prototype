@@ -26,7 +26,7 @@ it('warns about losing an uncertain grant request and permits an explicit close 
  const win=Object.assign(new EventEmitter(),{isDestroyed:()=>false});native.window=win;native.choice=0;native.show.mockClear();
  const session=f.session as unknown as ProductSession;
  const inner=session.view.bind(session);
- session.view=()=>({...inner(),job:observeSessionJob({title:'客服总监',directory:[{name:'客服总监',enabled:true}]})}) as ReturnType<ProductSession['view']>;
+ session.view=()=>({...inner(),job:observeSessionJob({title:'客服总监',directory:[{name:'客服总监',enabled:true}],actions:{query:true,import:true,publish:true,rollback:true}})}) as ReturnType<ProductSession['view']>;
  const owned=registerContentIntakePermissionsIpc(session,()=>wc,()=> 'http://127.0.0.1:5173/');
  const event={sender:wc,senderFrame:frame} as IpcMainInvokeEvent;
  try{

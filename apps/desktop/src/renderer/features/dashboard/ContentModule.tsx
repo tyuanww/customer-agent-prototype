@@ -347,9 +347,8 @@ export function ContentModule({
   // The cancel sweep is the in-flight escape hatch, so submitting must not grey it.
   const cancelDisabled = sessionView?.signedIn !== true;
   const rollbackDisabled = sessionView?.signedIn !== true
-    || sessionView?.role !== 'owner'
     || sessionView.job?.status !== 'resolved'
-    || sessionView.job.rights.grant !== true
+    || sessionView.job.actions.rollback !== true
     || rollbackBusy
     || submitting;
 
@@ -465,6 +464,9 @@ export function ContentModule({
         </div>
         <div className="dash-publish-box">
           <div className="content-action-row">
+            {sessionView?.signedIn && sessionView.job?.status === 'resolved' && !sessionView.job.actions.rollback ? (
+              <span data-testid="content-rollback-denied">没有权限，请找人开通。</span>
+            ) : (
             <Button
               autoInsertSpace={false}
               data-testid="content-rollback-previous"
@@ -474,6 +476,7 @@ export function ContentModule({
             >
               回滚上一版
             </Button>
+            )}
             <Button
               autoInsertSpace={false}
               data-testid="cancel-in-flight"
@@ -483,6 +486,9 @@ export function ContentModule({
             >
               取消未完成导入
             </Button>
+            {sessionView?.signedIn && sessionView.job?.status === 'resolved' && !sessionView.job.actions.publish ? (
+              <span data-testid="content-publish-denied">没有权限，请找人开通。</span>
+            ) : (
             <Button
               autoInsertSpace={false}
               type="primary"
@@ -493,6 +499,7 @@ export function ContentModule({
             >
               发布
             </Button>
+            )}
           </div>
           <span id="content-publish-note" className="content-publish-note">
             {notice ? (
@@ -619,6 +626,9 @@ export function ContentModule({
               disabled={upload.status === 'reading' || submitting}
               onChange={onFileChange}
             />
+            {sessionView?.signedIn && sessionView.job?.status === 'resolved' && !sessionView.job.actions.import ? (
+              <span data-testid="content-import-denied">没有权限，请找人开通。</span>
+            ) : (
             <Button
               autoInsertSpace={false}
               data-testid="content-upload-pick"
@@ -628,6 +638,7 @@ export function ContentModule({
             >
               选择 CSV 或 xlsx
             </Button>
+            )}
             {upload.status === 'ready' || upload.status === 'reading' ? (
               <span data-testid="content-upload-filename">
                 {upload.status === 'reading' ? upload.sourceName : uploadSourceName(upload)}
