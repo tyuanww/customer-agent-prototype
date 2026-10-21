@@ -4,7 +4,7 @@ import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule'
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
-import { type SessionJobView } from '../shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, type SessionJobView } from '../shared/product-session';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
 import { PRODUCT_REMOTE_NAV } from '../shared/workbench-mode';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
@@ -206,7 +206,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const grantBlock = !jobKnown
     ? ''
     : sessionJob?.status === 'resolved'
-      ? (sessionJob.rights.grant ? '' : OPS_LOOP_COPY.grantJob)
+      ? (sessionJob.rights.grant ? '' : PERMISSION_DENIAL_MESSAGE)
       : '请重新登录后再查看职务。';
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   useEffect(() => {

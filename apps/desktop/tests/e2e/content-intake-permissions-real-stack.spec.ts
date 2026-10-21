@@ -25,7 +25,7 @@ test('director previews without saving, grants a named seat query access, then r
     const revokeInitial = Reflect.get(host, 'revokeSyntheticQuery');
     expect(typeof revokeInitial).toBe('function');
     await Reflect.apply(revokeInitial, host, []);
-    Reflect.apply(host.selectIdentity, host, ['director']);
+    Reflect.apply(host.selectIdentity, host, ['roster-director']);
     let generation = 0;
     const entitlement = () => host.requestAs('agent', '/v1/intake/entitlements', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -50,53 +50,65 @@ test('director previews without saving, grants a named seat query access, then r
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.getByRole('tab', { name: '权限', exact: true }).click();
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
-    await panel.getByRole('combobox', { name: '人员', exact: true }).selectOption({ label: '合成坐席' });
-    await expect(panel.getByRole('combobox', { name: '岗位', exact: true })).toHaveValue('客服');
+    // Appearance is judged on the panel before the modal opens, because an antd mask owns the
+    // pointer and would intercept the chrome menu.
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.setSize(980, 680));
     for (const theme of ['light','dark'] as const) {
       await dashboard.getByTestId('dashboard-theme-trigger').click();
       await dashboard.getByTestId(`dashboard-theme-${theme}`).click();
       await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', theme);
-      await expect.poll(() => panel.getByRole('combobox', { name: '人员', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(28, 27, 32)':'rgb(255, 255, 255)');
-      await expect(panel.getByRole('combobox', { name: '岗位', exact: true })).toBeVisible();
       expect(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await dashboard.screenshot({ path: path.join(evidence, `permissions-${theme}.png`) });
     }
+    // The grant form is an antd Modal portalled to body, so the dialog owns the fields while the
+    // panel keeps the entry button, the grant list, and the status sentence.
+    await panel.getByRole('button', { name: '新增授权', exact: true }).click();
+    const dialog = dashboard.getByRole('dialog', { name: '新增业务权限', exact: true });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('combobox', { name: '人员', exact: true }).click();
+    await dashboard.getByRole('option', { name: '合成坐席', exact: true }).click();
+    await expect(dialog.getByRole('combobox', { name: '岗位', exact: true })
+      .locator('xpath=ancestor::*[contains(@class,"ant-select")][1]')).toContainText('客服');
+    await dialog.screenshot({ path: path.join(evidence, 'permissions-grant-dialog.png') });
     const localTime = (offset: number) => {
       const d = new Date(Date.now() + offset);
       const pad = (value: number) => String(value).padStart(2, '0');
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
-    const start = panel.getByRole('textbox', { name: '生效时间', exact: true });
-    const end = panel.getByRole('textbox', { name: '失效时间', exact: true });
+    const start = dialog.getByRole('textbox', { name: '生效时间', exact: true });
+    const end = dialog.getByRole('textbox', { name: '失效时间', exact: true });
     await start.fill(localTime(-60_000));
     await start.press('Enter');
-    await end.fill(localTime(600_000));
+    // The issuer facts window is capped at five minutes by a database check, so the granted
+    // window has to stay inside it or the server refuses to preview a longer grant.
+    await end.fill(localTime(180_000));
     await end.press('Enter');
-    await panel.getByLabel('授权原因', { exact: true }).fill('合成桌面验收授予查询');
-    await panel.getByRole('button', { name: '预览权限', exact: true }).click();
-    await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();
+    await dialog.getByLabel('授权原因', { exact: true }).fill('合成桌面验收授予查询');
+    await dialog.getByRole('button', { name: '预览权限', exact: true }).click();
+    const preview = dashboard.getByRole('dialog', { name: '预览 · 尚未保存', exact: true });
+    await expect(preview).toBeVisible();
     expect((await entitlement()).ok).toBe(false);
-    await dashboard.getByTestId('nav-overview').click();
-    await dashboard.getByTestId('nav-sop').click();
-    await dashboard.getByTestId('nav-content').click();
-    // Other destinations keep the page mounted and hidden. Come back before judging the preview.
-    await dashboard.getByTestId('nav-permissions').click();
-    await expect(panel.getByRole('heading', { name: '预览 · 尚未保存' })).toBeVisible();
+    // While the preview is open the mask owns the pointer, so an outer tab click cannot move the
+    // page. The preview has to survive that blocked attempt, not be dropped by it.
+    await dashboard.getByTestId('nav-overview').click({ timeout: 1_000 }).catch(() => undefined);
+    await expect(preview).toBeVisible();
     expect((await entitlement()).ok).toBe(false);
-    await panel.getByRole('button', { name: '返回修改', exact: true }).click();
-    await expect(panel.getByRole('region', { name: '权限预览', exact: true })).toHaveCount(0);
+    await preview.getByRole('button', { name: '返回修改', exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dashboard.getByRole('region', { name: '权限预览', exact: true })).toHaveCount(0);
     expect((await entitlement()).ok).toBe(false);
-    await panel.getByRole('button', { name: '预览权限', exact: true }).click();
-    await panel.getByRole('button', { name: '确认保存权限', exact: true }).click();
+    await dialog.getByRole('button', { name: '预览权限', exact: true }).click();
+    await preview.getByRole('button', { name: '确认保存权限', exact: true }).click();
+    await expect(dashboard.getByRole('dialog', { name: '预览 · 尚未保存', exact: true })).toHaveCount(0);
     await expect(panel.getByRole('status')).toContainText('已保存');
     const granted = await entitlement(); expect(granted.status).toBe(200);
     await panel.getByRole('button', { name: '刷新权限列表', exact: true }).click();
-    const record = panel.getByRole('article').filter({ hasText: '合成桌面验收授予查询' });
+    const grants = panel.getByRole('table', { name: '已有业务权限', exact: true });
+    const record = grants.getByRole('row').filter({ hasText: '合成桌面验收授予查询' });
     await expect(record).toHaveCount(1);
     await record.getByRole('button', { name: '撤销该权限', exact: true }).click();
-    await record.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
-    await record.getByRole('button', { name: '确认撤销', exact: true }).click();
+    await panel.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
+    await panel.getByRole('button', { name: '确认撤销', exact: true }).click();
     await expect(panel.getByRole('status')).toContainText('已保存');
     expect((await entitlement()).ok).toBe(false);
     console.info(JSON.stringify({status:'PASS',flow:'director-named-seat-preview-cancel-save-revoke',profile:'purpose-runtime',entitlements:'denied-enabled-denied',appearance:'980x680-light-dark',screenshots:evidence}));

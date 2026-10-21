@@ -1,6 +1,5 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { ProductHttpError } from './product-http';
-import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
+import { intakeAccessDenial, IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
 
 type C = components['schemas'];
 export type IntakeAccess = {
@@ -13,15 +12,7 @@ export type IntakeAccess = {
   capabilities: C['IntakeAuthorization']['capabilities'];
 };
 
-export function intakeAccessDenial(error: unknown): IntakeUsageError | null {
-  if (!(error instanceof ProductHttpError)) return null;
-  if (error.code === 'GONE' && (error.reason === 'NOT_FOUND' || error.reason === 'SCOPE_DENIED')) {
-    return new IntakeUsageError('NO_PRINCIPAL');
-  }
-  if (error.reason === 'ORG_FACTS_UNAVAILABLE') return new IntakeUsageError('FACTS_EXPIRED');
-  if (error.reason === 'ROLE_CEILING') return new IntakeUsageError('ROLE_UNKNOWN');
-  return null;
-}
+export { intakeAccessDenial };
 
 /** Main-only discovery. All pages and both lists must agree before any menu is
  * returned. This is an expiring selection hint, never permission to read/copy;

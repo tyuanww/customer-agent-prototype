@@ -9,6 +9,33 @@ export interface IntakeUsageSession {
   subscribe(listener: () => void): () => void;
   request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }): Promise<{value: unknown}>;
 }
+import { ProductHttpError } from './product-http';
+
+/** The server distinguishes a closed facts window from a missing grant, and the two tell the
+ * operator to do different things. Every path that turns a refusal into a local error has to
+ * go through this mapping, or the distinction is lost on the way to the window. */
+export function intakeAccessDenial(error: unknown): IntakeUsageError | null {
+  if (!(error instanceof ProductHttpError)) return null;
+  if (error.code === 'GONE' && (error.reason === 'NOT_FOUND' || error.reason === 'SCOPE_DENIED')) {
+    return new IntakeUsageError('NO_PRINCIPAL');
+  }
+  if (error.reason === 'ORG_FACTS_UNAVAILABLE') return new IntakeUsageError('FACTS_EXPIRED');
+  // The shop directory rewrites a closed window to its own expiry reason.
+  if (error.reason === 'SHOP_DIRECTORY_EXPIRED') return new IntakeUsageError('FACTS_EXPIRED');
+  if (error.reason === 'ROLE_CEILING') return new IntakeUsageError('ROLE_UNKNOWN');
+  return null;
+}
+
+/** Only the reasons that mean "the facts window closed". The catalog refresh must not borrow
+ * the principal and session mappings: a 404 on a page is not a missing principal. */
+function intakeFactsDenial(error: unknown): IntakeUsageError | null {
+  if (!(error instanceof ProductHttpError)) return null;
+  if (error.reason === 'ORG_FACTS_UNAVAILABLE' || error.reason === 'SHOP_DIRECTORY_EXPIRED') {
+    return new IntakeUsageError('FACTS_EXPIRED');
+  }
+  return null;
+}
+
 export class IntakeUsageError extends Error {
   constructor(readonly code: 'VALIDATION' | 'STALE' | 'EXPIRED' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'UNAVAILABLE' | 'LIMIT' | 'CLIPBOARD_FAILED' | 'NO_PRINCIPAL' | 'FACTS_EXPIRED' | 'NO_GRANT' | 'ROLE_UNKNOWN') {
     super(`INTAKE_USAGE_${code}`);
@@ -202,6 +229,9 @@ export class ContentIntakeUsage {
       // Only that exact refusal is local; permission/session failures still revoke all handles.
       if (code === 'FORBIDDEN' && reason === 'LEASE_EXPIRED') throw new IntakeUsageError('EXPIRED');
       if (code === 'UNAVAILABLE' || code === 'OVERLOADED' || code === 'RATE_LIMITED') throw new IntakeUsageError('UNAVAILABLE');
+      // Keep the server's reason before the generic fallback flattens it.
+      const denial = intakeFactsDenial(error);
+      if (denial) { this.invalidate(); throw denial; }
       this.invalidate();
       if (error instanceof IntakeUsageError) throw error;
       throw new IntakeUsageError(code === 'UNAUTHORIZED' ? 'UNAUTHORIZED' : 'FORBIDDEN');

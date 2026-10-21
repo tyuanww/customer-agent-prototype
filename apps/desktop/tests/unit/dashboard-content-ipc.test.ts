@@ -10,7 +10,7 @@ import {
   dashboardContentSession,
 } from '../../src/main/dashboard-content';
 import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
-import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
+import { observeSessionJob, PERMISSION_DENIAL_MESSAGE, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
 import { IPC_CHANNELS } from '../../src/shared/ipc-channels';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
@@ -28,8 +28,12 @@ const csv = 'scene,script,domain\n洁面用量确认,先确认产品版本,produ
 const aftersaleCsv = 'scene,script,domain\n过敏安抚,先停用并观察,aftersale\n';
 const productBinding = { domain: 'product' as const, source_version_id: 'srcv_product_v1' };
 
-const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
-const directorJob = titled('客服总监');
+const titled = (title: string, allowed = false) => observeSessionJob({
+  title,
+  directory: [{ name: title, enabled: true }],
+  ...(allowed ? { actions: { query: true, import: true, publish: true, rollback: true } } : {}),
+});
+const directorJob = titled('客服总监', true);
 const agentJob = titled('普通客服');
 
 function fakeSession(
@@ -94,7 +98,7 @@ it('blocks agent publish and coach aftersale before any product HTTP', async () 
   expect(await dashboardContentPublish(agent, publishPayload())).toMatchObject({
     ok: false,
     code: 'FORBIDDEN',
-    message: CONTENT_PUBLISH_COPY.agent,
+    message: PERMISSION_DENIAL_MESSAGE,
   });
   expect(agent.request).not.toHaveBeenCalled();
   expect(await dashboardContentPublish(coach, publishPayload(aftersaleCsv))).toMatchObject({
@@ -156,8 +160,34 @@ it('refuses a content import when the signed-in job cannot publish', async () =>
     sourceName: 'draft.csv',
     csvText: csv,
     sourceBindings: [productBinding],
-  })).toMatchObject({ ok: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
+  })).toMatchObject({ ok: false, code: 'FORBIDDEN', message: PERMISSION_DENIAL_MESSAGE });
   expect(owner.request).not.toHaveBeenCalled();
+});
+
+// The plan gives a closed facts window its own sentence. A caller that reports the generic
+// denial instead would tell the operator to ask for access when waiting would have worked.
+const STALE_SENTENCE = '资料资格过期了，请稍后重试。';
+
+it('shows the stale sentence when the server refuses a publish for a closed facts window', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', STALE_SENTENCE));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: STALE_SENTENCE });
+  // It must not collapse into the other two refusals that share the same code.
+  expect(result).not.toMatchObject({ message: PERMISSION_DENIAL_MESSAGE });
+  expect(result).not.toMatchObject({ message: '当前身份不能执行此操作' });
+});
+
+it('shows the stale sentence when the server refuses an import for a closed facts window', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', STALE_SENTENCE));
+  const result = await dashboardContentImport(owner, {
+    sourceName: 'draft.csv',
+    csvText: csv,
+    sourceBindings: [productBinding],
+  });
+  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: STALE_SENTENCE });
+  expect(result).not.toMatchObject({ message: PERMISSION_DENIAL_MESSAGE });
 });
 
 it('does not invent source bindings and never returns a fake success', async () => {

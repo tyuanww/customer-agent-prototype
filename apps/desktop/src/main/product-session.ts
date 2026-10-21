@@ -80,7 +80,7 @@ export class ProductSession {
       });
       const parsed = parseRosterJobResponse(value);
       if (!parsed) return null;
-      return { title: parsed.title, directory: parsed.directory, permissionState: parsed.permission_state };
+      return { title: parsed.title, directory: parsed.directory, permissionState: parsed.permission_state, actions: parsed.actions };
     } catch { return null; }
   }
   private invalidate() {
