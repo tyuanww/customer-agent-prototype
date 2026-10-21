@@ -1,6 +1,10 @@
 import type { Client } from 'pg';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { createMockAuthService } from '../../src/auth-service.js';
+import { createContentReleaseService } from '../../src/content-release-service.js';
+import { registerContentReleaseRoutes } from '../../src/content-release-routes.js';
 import { previewGrants } from '../../src/content-intake/authority.js';
 import { IntakeRejection, principal, type IntakeTransaction } from '../../src/content-intake/transaction.js';
 
@@ -25,12 +29,17 @@ export type AuthorizationFixture = Readonly<{
   grantRollbackOnEveryDomain: () => Promise<void>;
   intakeClient: () => IntakeTransaction;
   grantRejection: (issuerId: string, recipientId: string, sourceId: string) => Promise<string>;
+  /** Mount the real release routes on this fixture. The plan's refusal sentence is what the
+   * operator reads in an HTTP body, so at least one test has to read it there instead of from
+   * a caught SQL message. Returns one mock agent session for the caller to sign requests with. */
+  mountReleaseRoutes: () => Promise<{ app: FastifyInstance; agentToken: string; close: () => Promise<void> }>;
 }>;
 
 export async function createAuthorizationFixture(databaseName = 'authorization_sources'): Promise<AuthorizationFixture> {
   const harness = new Pg15Harness();
   harness.start();
-  const admin = await harness.connect(harness.createDatabase(databaseName).config);
+  const database = harness.createDatabase(databaseName);
+  const admin = await harness.connect(database.config);
   try {
     await applyDatabaseMigrations(admin);
     await admin.query('BEGIN');
@@ -232,6 +241,30 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     }
   };
 
+  const mountReleaseRoutes = async () => {
+    // The release service admits only a login that is a member of app_content_admin and is not
+    // itself a capability role. Granting app_runtime here would be refused at admission, before
+    // the source-set gate, and the refusal would show the generic sentence.
+    await admin.query('CREATE ROLE publish_route_login LOGIN NOINHERIT; GRANT app_content_admin TO publish_route_login');
+    const connectionString = `postgresql://publish_route_login@localhost/${database.name}?${new URLSearchParams({
+      host: harness.socket, port: String(harness.port),
+    })}`;
+    const release = createContentReleaseService({
+      connectionString, poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
+    }, { currentVersion: 'hmac-idempotency-v1', keys: { 'hmac-idempotency-v1': 'synthetic-route-idempotency-0001' } },
+    { version: 'hmac-log-v1', key: 'synthetic-route-log-hash-material-00001' });
+    const auth = createMockAuthService();
+    const app = Fastify({ logger: false });
+    registerContentReleaseRoutes(app, auth, { service: release });
+    await app.ready();
+    const agentToken = auth.createMockSession({ user_id: 'user-agent', role: 'agent' }).token;
+    return {
+      app,
+      agentToken,
+      close: async () => { await app.close(); await release.close(); await auth.close(); },
+    };
+  };
+
   return Object.freeze({
     admin,
     close: async () => { await admin.end(); harness.stop(); },
@@ -244,5 +277,6 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     grantRollbackOnEveryDomain,
     intakeClient,
     grantRejection,
+    mountReleaseRoutes,
   });
 }

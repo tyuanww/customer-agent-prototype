@@ -109,4 +109,34 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
       VALUES (1, 'rel_after', now()) ON CONFLICT (id) DO UPDATE SET current_release_id = 'rel_after'`);
     expect(await fixture.resolvePreviousMessage('user-signer')).toBe(DENIED);
   });
+
+  it('sends the denial sentence in the HTTP body, not only in the SQL message', async () => {
+    // The operator reads a response, so the sentence has to survive the route. A route that
+    // dropped it would still pass every SQL-level test above.
+    await fixture.admin.query(`INSERT INTO public.authoritative_source_versions(
+        source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
+        use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at)
+      VALUES ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),
+        'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')
+      ON CONFLICT (source_version_id) DO NOTHING`);
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
+      VALUES ('batch_http_denied','csv',repeat('ab',32),'staged') ON CONFLICT DO NOTHING`);
+    await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
+    await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
+      VALUES ('batch_http_denied','product','srcv_product') ON CONFLICT DO NOTHING`);
+
+    const mounted = await fixture.mountReleaseRoutes();
+    try {
+      const response = await mounted.app.inject({
+        method: 'POST', url: '/v1/content/publish',
+        headers: { authorization: `Bearer ${mounted.agentToken}`, 'idempotency-key': 'denial-sentence', 'content-type': 'application/json' },
+        payload: { import_batch_id: 'batch_http_denied', title: '标题', summary: '摘要' },
+      });
+      // An agent holds query only, so the domain gate refuses this publish.
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ error: { code: 'FORBIDDEN', message: DENIED } });
+    } finally {
+      await mounted.close();
+    }
+  });
 });
