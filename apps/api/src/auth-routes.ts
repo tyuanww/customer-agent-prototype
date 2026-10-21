@@ -72,7 +72,15 @@ export function registerAuthRoutes(
         stored = snapshot ? { title: snapshot.title, state: 'denied' } : null;
       }
     }
-    const actions = readActions ? await readActions(user.user_id).catch(() => NO_AUTHORIZATION_ACTIONS) : NO_AUTHORIZATION_ACTIONS;
+    // A failed read is not "this person has no permissions": presenting it that way hides an
+    // ACL or migration fault behind every button saying 没有权限. Log it and keep the response
+    // shape, the same way the roster permission read above is handled.
+    const actions = readActions
+      ? await readActions(user.user_id).catch(() => {
+        request.log.warn('[api] authorization actions read failed');
+        return NO_AUTHORIZATION_ACTIONS;
+      })
+      : NO_AUTHORIZATION_ACTIONS;
     const job: RosterJobResponse | null = composeRosterJob(snapshot, stored, readPermission !== undefined, actions);
     if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
     return job;

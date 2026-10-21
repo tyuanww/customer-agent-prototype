@@ -233,6 +233,13 @@ export async function createGrants(client: IntakeTransaction, issuer: Principal,
            (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
   [issuer.tenantId, issuer.appId]);
   const queryStamp = stamped.rows[0] ?? { policy_version: null, store_set_version: null };
+  // A query grant without both stamps is dead on arrival: authorization_sources compares them
+  // with the current values and drops the row, so the operator would see a 201 and the
+  // recipient would keep getting refused.
+  if (prepared.some(({ item }) => item.action === 'query')
+    && (queryStamp.policy_version === null || queryStamp.store_set_version === null)) {
+    throw new IntakeRejection('PERMISSION_CHANGED', 'FORBIDDEN');
+  }
   const results: Grant[] = [], affected = new Set<string>();
   for (const { item, parent } of prepared) {
     const id = `grant_${randomUUID()}`;
