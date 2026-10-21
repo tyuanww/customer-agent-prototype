@@ -2810,8 +2810,13 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
 
   it('usage: another agent consumes only its selected shop and separately authorized brand, with safe durable pages', async () => {
     await publicationBase();await cloneScopeGrants('b');await cloneScopeGrants('brand');
+    // A brand-level source has no shop, and a selected shop no longer shows its blank generic
+    // rows, so the brand row carries one product condition to stay visible.
+    await admin.query("INSERT INTO content_intake.vocabulary VALUES ('prod-brand','scope-brand','product',repeat('a',64),true)");
+    await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ('prod-brand',1,'合成标签')");
     for (const source of ['a','b','brand']) {
-      const c=await publishable(`usage-${source}`,[['faq-one','相同标题',`${source} 第一行。\n第二行。`,'','','分类','适用说明','启用','','','','管理内部说明','','','false']],source);
+      const products = source === 'brand' ? 'prod-brand' : '';
+      const c=await publishable(`usage-${source}`,[['faq-one','相同标题',`${source} 第一行。\n第二行。`,products,'','分类','适用说明','启用','','','','管理内部说明','','','false']],source);
       value(await service.publish(actor('enabler'),c.request));
     }
     const ent=value(await issue());
@@ -3102,7 +3107,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(page.vocabulary.map(v=>v.displayName)).toEqual(['原始标签','原始标签']);
     expect(await snapshot(ent.entitlementId,{productIds:[]})).toMatchObject({ok:false,code:'VALIDATION'});
     expect((await admin.query('SELECT product_ids,scenario_ids FROM content_intake.entitlement_contexts WHERE entitlement_hash=$1',[digest(ent.entitlementId)])).rows).toEqual([{product_ids:['prod-one'],scenario_ids:['scene-one']}]);
-    const unselected=value(await issue());expect(value(await snapshot(unselected.entitlementId)).faq).toEqual([]);
+    // A selection filters: another product does not match a row that requires prod-one.
+    await admin.query("INSERT INTO content_intake.vocabulary VALUES ('prod-other','scope-a','product',repeat('a',64),true)");
+    await admin.query("INSERT INTO content_intake.vocabulary_displays VALUES ('prod-other',1,'合成标签')");
+    const other=value(await issue({...usage,productIds:['prod-other'],scenarioIds:['scene-one']}));
+    expect(value(await snapshot(other.entitlementId)).faq).toEqual([]);
+    // An empty selection is no filter at all, so the unconditional row is the only one left
+    // once the future and expired rows are removed by time.
+    const unselected=value(await issue());
+    expect(value(await snapshot(unselected.entitlementId)).faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
   });
 
   it('usage: does not renew or return a page after its immutable deadline, even when facts are refreshed', async () => {
@@ -3149,13 +3162,15 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       await admin.query(`INSERT INTO content_intake.vocabulary_displays SELECT id,1,'合成标签' FROM unnest($1::text[]) id`,[ids]);
     }
     const row=(id:string,prod:string[],scene:string[])=>[id,'合成词项','完整正文',prod.join(','),scene.join(','),'分类','','启用','','','','','','','false'];
-    const c=await publishable('vocabulary-budget',[row('faq-one',products,scenarios.slice(0,20)),row('faq-two',[],scenarios.slice(20))]);
+    // A selected product no longer matches an empty product condition, so the second row
+    // keeps one product beside its own scenarios instead of none.
+    const c=await publishable('vocabulary-budget',[row('faq-one',products,scenarios.slice(0,20)),row('faq-two',products.slice(0,1),scenarios.slice(20))]);
     value(await service.publish(actor('enabler'),c.request));
     const ctx={...usage,productIds:products,scenarioIds:scenarios};const ent=value(await issue(ctx));
     const first=value(await snapshot(ent.entitlementId));expect(first.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-one']);
     expect(first.vocabulary).toHaveLength(80);expect(first.nextCursor).not.toBeNull();
     const second=value(await snapshot(ent.entitlementId,{cursor:first.nextCursor}));
-    expect(second.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-two']);expect(second.vocabulary).toHaveLength(31);expect(second.nextCursor).toBeNull();
+    expect(second.faq.map(f=>f.entry.businessEntryId)).toEqual(['faq-two']);expect(second.vocabulary).toHaveLength(32);expect(second.nextCursor).toBeNull();
     const bad=await input('unpageable',null,[row('faq-one',products,scenarios)]);bad.baseReleaseId=ent.releaseId;
     const job=value(await service.receive(actor('enabler'),'source-a',bad));
     expect(await service.parse(actor('enabler'),job.jobId)).toMatchObject({ok:false,reason:'FILE_LIMIT'});
