@@ -37,7 +37,7 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // allowed to make the source budget fail.
 // Approved 2026-10-09: each retained input remains budgeted. A group cannot
 // borrow unused space from another group, even with a larger aggregate override.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45.5 * 1024 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 46.25 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
@@ -47,7 +47,12 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // 2026-10-20: roster source, migrations, and tests put GitHub's clean
   // checkout 128 KiB over 19.25 MiB and 364 KiB over 45 MiB. 19.5 and 45.5
   // cover that reading.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 19.5 * 1024 * 1024 }),
+  // 2026-10-21: four product migrations (0054 replaces four function bodies at
+  // 57 KiB, 0055-0057 add the steward clause, owner-only cancel and the role
+  // ceiling) plus their generated copies and seven test files measured 19.88
+  // MiB and 45.53 MiB. 20.5 and 46.25 cover that reading. A further migration
+  // should make this a conversation, not an increment.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 20.5 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
