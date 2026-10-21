@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { forgetJobSnapshot, rememberJobSnapshot } from '../src/feishu-job-snapshot.js';
-import { projectRosterLogin, rosterPrincipalId } from '../src/project-roster-login.js';
+import { projectRosterLogin, composeRosterJob, readStoredRosterPermission, rosterPrincipalId } from '../src/project-roster-login.js';
+import { ROSTER_PENDING_MESSAGE } from '@customer-agent/job-roster';
 import { publishLineage, seedLibrary } from './support/roster-library.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -108,6 +109,14 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
         [rosterPrincipalId(seat), action])).rows[0]?.until ?? null;
       expect(await deadline('query')).toBeNull();
       expect(await deadline('publish')).toBeNull();
+      // The seat is registered and eligible; what it lacks is content. The projection must
+      // say that, because the denial sentence would send the operator to ask for a grant
+      // that cannot help.
+      const stored = await readStoredRosterPermission(client, `usr_${seat}`);
+      expect(stored?.state).toBe('pending');
+      const job = composeRosterJob(null, stored, true);
+      expect(job?.permission_state).toBe('pending');
+      expect(job?.message).toBe(ROSTER_PENDING_MESSAGE);
       await client.query(`
         INSERT INTO content_intake.grants(
           grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)

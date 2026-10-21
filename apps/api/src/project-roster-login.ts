@@ -5,6 +5,7 @@ import { snapshotForOpenId } from './feishu-job-snapshot.js';
 import {
   JOB_ROSTER,
   matchJobRoster,
+  rosterMessageFor,
   type RosterPermissionState,
   type parseRosterJobResponse,
 } from '@customer-agent/job-roster';
@@ -44,7 +45,7 @@ export type RosterProjectionStatus =
   | 'revoked'
   | 'denied';
 
-export const ROSTER_DENIAL_MESSAGE = '没有权限，请找人开通。';
+export { ROSTER_DENIAL_MESSAGE } from '@customer-agent/job-roster';
 
 type DatabasePermissionState = 'pending' | 'ready' | 'expired' | 'revoked';
 
@@ -138,7 +139,7 @@ export function composeRosterJob(
       enabled: row.enabled,
     })),
     permission_state: permissionState,
-    message: permissionState === 'ready' || permissionState === 'unknown' ? null : ROSTER_DENIAL_MESSAGE,
+    message: rosterMessageFor(permissionState),
     actions,
   };
 }
@@ -169,7 +170,7 @@ export function rosterPreparation(status: RosterProjectionStatus): {
   message: string | null;
 } {
   const state = rosterPermissionState(status);
-  return { state, reason: status, message: state === 'ready' ? null : ROSTER_DENIAL_MESSAGE };
+  return { state, reason: status, message: rosterMessageFor(state) };
 }
 
 function selectedHome(

@@ -6,6 +6,7 @@ import { registerAuthRoutes } from '../src/auth-routes.js';
 import { bindSessionSubject, forgetJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 import { feishuUserId } from '../src/feishu-admit.js';
 import { composeRosterJob, NO_AUTHORIZATION_ACTIONS, projectRosterLogin, readStoredRosterPermission, rosterHomeFromEnv, rosterPermissionState, rosterPreparation, rosterPrincipalId, ROSTER_DENIAL_MESSAGE } from '../src/project-roster-login.js';
+import { FACTS_EXPIRED_MESSAGE, ROSTER_PENDING_MESSAGE } from '@customer-agent/job-roster';
 import { JOB_ROSTER } from '@customer-agent/job-roster';
 
 const openId = 'ou_abcdef';
@@ -113,20 +114,24 @@ describe('roster login projection', () => {
     await expect(projectRosterLogin(db, openId)).resolves.toBe('registered');
   });
 
-  it('keeps the fixed denial sentence and the internal reason apart', () => {
+  it('gives each refusal the sentence its cause needs', () => {
+    // These three are not interchangeable. A missing grant needs a person. An expired
+    // facts window needs a refresh. An empty tenant needs someone to publish, and no
+    // amount of granting or refreshing changes that.
     expect(rosterPreparation('projected')).toEqual({ state: 'ready', reason: 'projected', message: null });
     expect(rosterPreparation('registered')).toEqual({
-      state: 'pending', reason: 'registered', message: ROSTER_DENIAL_MESSAGE,
+      state: 'pending', reason: 'registered', message: ROSTER_PENDING_MESSAGE,
     });
     expect(rosterPreparation('unmatched')).toEqual({
       state: 'denied', reason: 'unmatched', message: ROSTER_DENIAL_MESSAGE,
     });
     expect(rosterPreparation('expired')).toEqual({
-      state: 'expired', reason: 'expired', message: ROSTER_DENIAL_MESSAGE,
+      state: 'expired', reason: 'expired', message: FACTS_EXPIRED_MESSAGE,
     });
     expect(rosterPreparation('revoked')).toEqual({
       state: 'revoked', reason: 'revoked', message: ROSTER_DENIAL_MESSAGE,
     });
+    expect(new Set([ROSTER_PENDING_MESSAGE, ROSTER_DENIAL_MESSAGE, FACTS_EXPIRED_MESSAGE]).size).toBe(3);
   });
 
   it('does not invent a department when the provider omits one', async () => {
