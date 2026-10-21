@@ -8,53 +8,77 @@ import { launchIntakeElectron } from '../support/intake-electron';
 
 /** PR-A search lanes, driven through real Electron, preload, Main, HTTP and PostgreSQL.
  *
- * The plan asked for ten cloud VM lanes. This machine has no VM fleet, so three of those
- * lanes are expressed as repeatable cases here instead: the states they name are produced by
- * real database writes and read back from the rendered capsule, not from a stub. Each case
- * saves its own screenshot so the review can see the state the operator would see.
+ * The plan asked for ten cloud VM lanes. This machine has no VM fleet, so the states it names
+ * that are reachable through the shipped capsule are expressed here as repeatable cases. Each
+ * one is produced by a real database write and read back from the rendered capsule, and each
+ * saves a screenshot so a reviewer sees the state the operator sees.
  *
- * Covered here: a live query grant, and a grant revoked before the session exists. Not
- * covered, and deliberately so:
+ * The capsule answers through the intake usage surface rather than /v1/search. That surface
+ * now reads the same source set, at one captured instant, so these lanes exercise the same
+ * authorization the search door uses.
  *
- * - The stale-facts lane. The shipped capsule profile (contentIntake: faq-v2) answers through
- *   /v1/intake/query, whose expired-facts refusal is the denial sentence. The plan's
- *   "资料资格过期了" sentence belongs to the /v1/search door, which that profile does not call;
- *   it is proven at the HTTP level in search-query-deadline.integration.test.ts instead of
- *   being asserted here against a door the operator never reaches.
- * - The trunk-versus-head regression comparison and the ten-VM isolation, which need an
- *   environment this repository cannot create.
+ * Not expressed here, and why:
+ * - The trunk-versus-head regression comparison and the ten-VM isolation need an environment
+ *   this repository cannot create.
+ * - The plan's "owner holds only query" and "owner session without a grant" reduce to the
+ *   same refusal here: every roster identity signs in with the session role `owner`, and the
+ *   lanes below vary what the grant and the facts window say instead.
  */
-const LANES = [
-  // A live grant: the door answers, it does not refuse.
-  { slug: 'pr-a-grant', identity: 'roster-readonly', expect: 'granted', before: null },
-  // The grant is withdrawn before the session exists, which is the "second login after the
-  // grant was revoked" state: the session projection carries no query bit at all.
-  { slug: 'pr-a-revoked', identity: 'roster-readonly', expect: 'denied', before: 'revoke' },
-  // The window closes while the session is live, so the request reaches the door and the
-  // database is what refuses it. This is the only path that can show the stale sentence: a
-  // session that starts closed cannot tell "expired" from "never granted".
-  { slug: 'pr-a-stale-facts', identity: 'roster-readonly', expect: 'stale', before: 'expire' },
-] as const;
+type Lane = Readonly<{
+  slug: string;
+  identity: 'roster-readonly' | 'roster-agent' | 'roster-nogrant';
+  /** State written before sign-in, or after sign-in for `expire`. */
+  before: 'revoke' | 'expire' | 'empty' | null;
+  expect: 'granted' | 'denied' | 'stale';
+}>;
 
-test('the search door tells a session apart from its grant and from its facts window', async () => {
+const LANES: readonly Lane[] = [
+  // A live grant: the door answers instead of refusing.
+  { slug: 'pr-a-grant', identity: 'roster-readonly', before: null, expect: 'granted' },
+  // The grant is withdrawn before the session exists: the projection carries no query bit, so
+  // the capsule refuses without asking the server.
+  { slug: 'pr-a-revoked', identity: 'roster-readonly', before: 'revoke', expect: 'denied' },
+  // A director title, a fresh window, and no grant at all. The session role is `owner`, so
+  // this is the state where the role alone does not open the door.
+  { slug: 'pr-a-no-grant', identity: 'roster-nogrant', before: null, expect: 'denied' },
+  // A seat title with role `agent` and a live query grant: the role ceiling permits reading,
+  // so the grant still decides and the door answers.
+  { slug: 'pr-a-agent-grant', identity: 'roster-agent', before: null, expect: 'granted' },
+  // The window closes while the session is live, so the request reaches the door and the
+  // database refuses it. This is the only path that can show the stale sentence: a session
+  // that starts closed cannot tell "expired" from "never granted".
+  { slug: 'pr-a-stale-facts', identity: 'roster-readonly', before: 'expire', expect: 'stale' },
+  // No membership in the current store set, so no query grant is live. Last, because it
+  // changes the answer for every principal at once, and on a principal whose window is still
+  // fresh: an expired window would take precedence and hide the store-set cause.
+  { slug: 'pr-a-empty-stores', identity: 'roster-agent', before: 'empty', expect: 'denied' },
+];
+
+test('the search door tells a session apart from its grant, its facts and its store set', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
-  test.setTimeout(300_000);
+  test.setTimeout(600_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
   const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime' });
-  const directory = mkdtempSync(path.join(tmpdir(), 'intake-search-lane-'));
-  const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
-  const evidence = path.resolve(desktopRoot, '../../.gstack/pr-a-search-lanes',
+  const evidence = path.resolve(fileURLToPath(new URL('../..', import.meta.url)), '../../.gstack/pr-a-search-lanes',
     new Date().toISOString().replaceAll(':', '-'));
   mkdirSync(evidence, { recursive: true });
   let app: ElectronApplication | undefined;
+  const directories: string[] = [];
   try {
     for (const lane of LANES) {
+      // State that must exist before the session is created.
       if (lane.before === 'revoke') {
-        expect(await host.revokeQueryFor(lane.identity)).toBeGreaterThan(0);
+        expect(await host.revokeQueryFor(lane.identity), `${lane.slug}: revoke`).toBeGreaterThan(0);
+      }
+      if (lane.before === 'empty') {
+        expect(await host.emptyStoreSet(), `${lane.slug}: empty store set`).toBeGreaterThan(0);
       }
       Reflect.apply(host.selectIdentity, host, [lane.identity]);
-      app = await launchIntakeElectron({ desktopRoot, userDataDirectory: mkdtempSync(path.join(directory, `${lane.slug}-`)),
-        apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
+      const userData = mkdtempSync(path.join(tmpdir(), `${lane.slug}-`));
+      directories.push(userData);
+      app = await launchIntakeElectron({ desktopRoot: fileURLToPath(new URL('../..', import.meta.url)),
+        userDataDirectory: userData, apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin,
+        evidenceDirectory: evidence });
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=query')), { timeout: 30_000 }).toBe(true);
       const query = app.windows().find(w => w.url().includes('role=query'))!;
       await query.waitForFunction(() => Boolean(window.customerAgent?.product));
@@ -67,9 +91,9 @@ test('the search door tells a session apart from its grant and from its facts wi
         const status = await window.customerAgent!.product!.sessionStatus();
         return status.ok && status.signedIn;
       }), { timeout: 30_000 }).toBe(true);
-      // The stale lane closes the window after sign-in. The window reports what the client's
-      // current projection says, so wait until the session has learned the new state rather
-      // than racing the poll.
+
+      // The window closes after sign-in. The capsule reports what its current projection says,
+      // so wait for the session to learn the new state rather than racing the poll.
       if (lane.before === 'expire') {
         expect(await host.expireFactsFor(lane.identity)).toBe(true);
         await expect.poll(() => query.evaluate(async () => {
@@ -78,27 +102,46 @@ test('the search door tells a session apart from its grant and from its facts wi
         }), { timeout: 20_000 }).toBe('expired');
       }
 
-
       await query.getByTestId('question-input').fill('合成');
       await query.getByTestId('search-button').click();
 
       if (lane.expect === 'granted') {
-        // No release has been published in this fixture, so a live grant answers with no hit
-        // rather than a refusal. The point of this lane is that it is not refused.
+        // No release is published in this fixture, so a live grant answers with no hit rather
+        // than a refusal. The point of the lane is that it is not refused.
         await expect(query.getByTestId('error-state')).toHaveCount(0);
-        await expect.poll(async () => query.getByTestId('no-hit').isVisible()).toBe(true);
+        await expect.poll(async () => await query.getByTestId('no-hit').isVisible()).toBe(true);
       } else {
         const sentence = lane.expect === 'stale' ? '资料资格过期了，请稍后重试。' : '没有权限，请找人开通。';
-        // The sentence has to reach the rendered state, not just the HTTP body.
         await expect(query.getByTestId('error-state')).toContainText(sentence);
+        // The two refusals must not be confused for one another: whichever sentence shows,
+        // the other one must not.
+        await expect(query.getByTestId('error-state')).not.toContainText(
+          lane.expect === 'stale' ? '没有权限，请找人开通。' : '资料资格过期了，请稍后重试。');
+        // A session the door refuses has no shop it may read, so the capsule offers no shop
+        // control at all. Asserting the control is absent is stronger than asserting an empty
+        // list: an empty picker could still mean "no shops named yet".
+        await expect(query.getByRole('button', { name: '筛选', exact: true })).toHaveCount(0);
+        // The control may still render as an inert shell; what matters is that it offers no
+        // shop the search could never use. A placeholder carries an empty value.
+        expect(await query.evaluate(() => {
+          const select = document.querySelector<HTMLSelectElement>('select[aria-label="当前店铺"]');
+          return select === null ? 0 : [...select.options].filter(option => option.value !== '').length;
+        })).toBe(0);
       }
-      await query.screenshot({ path: path.join(evidence, `${lane.slug}.png`) });
-      console.info(JSON.stringify({ status: 'PASS', lane: lane.slug, screenshot: path.join(evidence, `${lane.slug}.png`) }));
+      // Re-focus before capturing: a background window never finishes a screenshot, and this
+      // loop opens a new window per lane.
+      await app.evaluate(({ app: electronApp }) => electronApp.focus({ steal: true }));
+      await query.screenshot({ path: path.join(evidence, `${lane.slug}.png`), animations: 'disabled', timeout: 20_000 });
+      console.info(JSON.stringify({ status: 'PASS', lane: lane.slug, expect: lane.expect,
+        screenshot: path.join(evidence, `${lane.slug}.png`) }));
       await closeOwnedElectron(app);
       app = undefined;
     }
   } finally {
     try { if (app) await closeOwnedElectron(app); }
-    finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }
+    finally {
+      try { await host.close(); }
+      finally { for (const directory of directories) rmSync(directory, { recursive: true, force: true }); }
+    }
   }
 });
