@@ -46,4 +46,34 @@ describe.skipIf(!enabled)('import reads the source set by domain', () => {
     expect(accepted).not.toBe(DENIED);
     expect(accepted).not.toBe('资料资格过期了，请稍后重试。');
   });
+
+  it('sends the denial sentence in the HTTP body of a refused import', async () => {
+    // The operator reads a response. A route that replaced this sentence with the generic
+    // forbidden copy would still pass the SQL-level tests above.
+    const mounted = await fixture.mountImportRoutes();
+    try {
+      const form = new FormData();
+      form.set('file', new Blob([Buffer.from('script_id,category,title,answer_text\nx,product,标题,正文\n')], { type: 'text/csv' }), 'denied.csv');
+      form.set('source_bindings', JSON.stringify([{ domain: 'product', source_version_id: 'srcv_product' }]));
+      const response = await mounted.app.inject({
+        method: 'POST', url: '/v1/content/import',
+        headers: { authorization: `Bearer ${mounted.tokenFor('user-agent', 'agent')}`, 'idempotency-key': 'import-denial-sentence' },
+        payload: form,
+      });
+      // The agent holds no import grant, so the source set refuses before any batch is created.
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ error: { message: DENIED } });
+
+      // A closed facts window on the same door gets the other sentence, not this one.
+      const stale = await mounted.app.inject({
+        method: 'POST', url: '/v1/content/import',
+        headers: { authorization: `Bearer ${mounted.tokenFor('user-stale', 'owner')}`, 'idempotency-key': 'import-stale-sentence' },
+        payload: form,
+      });
+      expect(stale.statusCode).toBe(403);
+      expect(stale.json()).toMatchObject({ error: { message: '资料资格过期了，请稍后重试。' } });
+    } finally {
+      await mounted.close();
+    }
+  });
 });

@@ -1,12 +1,25 @@
 import type { Client } from 'pg';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createMockAuthService } from '../../src/auth-service.js';
+import { createContentImportService } from '../../src/content-import-service.js';
+import { registerContentImportRoutes } from '../../src/content-import-routes.js';
+import { createContentObjectStore } from '../../src/content-object-store.js';
 import { createContentReleaseService } from '../../src/content-release-service.js';
 import { registerContentReleaseRoutes } from '../../src/content-release-routes.js';
+import { createServiceRepository } from '../../src/service-repository.js';
 import { previewGrants } from '../../src/content-intake/authority.js';
 import { IntakeRejection, principal, type IntakeTransaction } from '../../src/content-intake/transaction.js';
+
+const IDEMPOTENCY = Object.freeze({
+  currentVersion: 'hmac-idempotency-v1',
+  keys: Object.freeze({ 'hmac-idempotency-v1': 'synthetic-fixture-idempotency-0001' }),
+});
+const LOG_HASH = Object.freeze({ version: 'hmac-log-v1', key: 'synthetic-fixture-log-hash-material-00001' });
 
 /** One live two-source scope, four principals, and the grants the overlay tests need.
  * Every write-deadline test file (publish, import, grant issuer) and the source-set test file
@@ -33,6 +46,8 @@ export type AuthorizationFixture = Readonly<{
    * operator reads in an HTTP body, so at least one test has to read it there instead of from
    * a caught SQL message. Returns one mock agent session for the caller to sign requests with. */
   mountReleaseRoutes: () => Promise<{ app: FastifyInstance; agentToken: string; close: () => Promise<void> }>;
+  /** Same idea for the import door, on the real service and a real object store. */
+  mountImportRoutes: () => Promise<{ app: FastifyInstance; tokenFor: (userId: string, role: 'agent' | 'coach' | 'owner') => string; close: () => Promise<void> }>;
 }>;
 
 export async function createAuthorizationFixture(databaseName = 'authorization_sources'): Promise<AuthorizationFixture> {
@@ -265,6 +280,30 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     };
   };
 
+  const mountImportRoutes = async () => {
+    // The import service connects as the runtime capability, which may execute the enqueue and
+    // snapshot functions. The refusal under test comes from inside those functions.
+    await admin.query('CREATE ROLE import_route_runtime LOGIN; GRANT app_runtime TO import_route_runtime');
+    const connectionString = `postgresql://import_route_runtime@localhost/${database.name}?${new URLSearchParams({
+      host: harness.socket, port: String(harness.port),
+    })}`;
+    const repository = createServiceRepository({
+      connectionString, poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
+    });
+    const store = createContentObjectStore(mkdtempSync(path.join(tmpdir(), 'authorization-fixture-store-')));
+    const auth = createMockAuthService();
+    const app = Fastify({ logger: false });
+    registerContentImportRoutes(app, auth, {
+      service: createContentImportService(store, repository.contentImport, IDEMPOTENCY, LOG_HASH),
+    });
+    await app.ready();
+    return {
+      app,
+      tokenFor: (userId: string, role: 'agent' | 'coach' | 'owner') => auth.createMockSession({ user_id: userId, role }).token,
+      close: async () => { await app.close(); await repository.close(); await auth.close(); },
+    };
+  };
+
   return Object.freeze({
     admin,
     close: async () => { await admin.end(); harness.stop(); },
@@ -278,5 +317,6 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     intakeClient,
     grantRejection,
     mountReleaseRoutes,
+    mountImportRoutes,
   });
 }
