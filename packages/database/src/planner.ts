@@ -134,6 +134,34 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0048_roster_store_set',
     requiresPredecessor: 'Roster lifecycle requires the store set',
   },
+  {
+    index: 49,
+    minimumCatalogueLength: 50,
+    id: '0050_authorization_sources',
+    predecessorId: '0049_roster_lifecycle',
+    requiresPredecessor: 'Authorization sources require the roster lifecycle',
+  },
+  {
+    index: 50,
+    minimumCatalogueLength: 51,
+    id: '0051_publish_source_set',
+    predecessorId: '0050_authorization_sources',
+    requiresPredecessor: 'Publish source set requires authorization sources',
+  },
+  {
+    index: 51,
+    minimumCatalogueLength: 52,
+    id: '0052_import_source_set',
+    predecessorId: '0051_publish_source_set',
+    requiresPredecessor: 'Import source set requires the publish source set',
+  },
+  {
+    index: 52,
+    minimumCatalogueLength: 53,
+    id: '0053_search_source_set',
+    predecessorId: '0052_import_source_set',
+    requiresPredecessor: 'Search source set requires the import source set',
+  },
 ];
 
 function requiredSuccessorStep(

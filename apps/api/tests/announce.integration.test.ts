@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Client } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
+import { seedContentWriteAuthority } from './support/write-authority.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createAnnounceServiceForPool } from '../src/announce-service.js';
 import { createApiApp } from '../src/app.js';
@@ -111,6 +112,14 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         `, [user, cap]);
       }
     }
+    // Announce stages a batch through the real import path, which reads authorization_sources.
+    await seedContentWriteAuthority(admin, {
+      tenantId: 'tenant-t5', appId: 'app-t5', brandId: 'brand-t5',
+      signer: { principalId: 't5-signer', userId: 'usr_t5_signer', jobId: 'job-t5-director', role: 'director' },
+      recipients: [{ principalId: 't5-owner', userId: 'usr_t5_owner', jobId: 'job-t5-director', role: 'director' }],
+      domains: BINDINGS.map((binding) => binding.domain),
+      actions: ['import', 'publish', 'rollback'],
+    });
     const repository = createServiceRepository({
       connectionString: conn('t5_runtime'), poolMax: 4, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
     });

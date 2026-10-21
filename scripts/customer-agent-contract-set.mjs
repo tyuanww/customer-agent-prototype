@@ -694,7 +694,7 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length === 39 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Repair predecessor manifest drift');
   if (actual.migrations.length >= 41 && !existsSync(path.join(projectRoot, UPSTREAM_ROOT, READINESS_LOCK))) throw new Error('Readiness lock required for 41 migrations');
   if (actual.migrations.length >= 42 && actual.migrations[41]?.id !== '0042_intake_occupied_domain_publish') throw new Error('Unrecognized occupied-domain publication');
@@ -769,7 +769,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length === 40 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Readiness predecessor manifest drift');
   for (const expected of predecessor.migrations) {
     const found = actual.migrations[expected.position - 1];
@@ -778,7 +778,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
     assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness predecessor migration');
     if (sha256(file)!==expected.sha256 || lstatSync(file).size!==expected.bytes) throw new Error(`Readiness predecessor bytes drift: ${expected.file}`);
   }
-  if (actual.migrations.length === 41 || actual.migrations.length === 42 || actual.migrations.length === 43 || actual.migrations.length === 44 || actual.migrations.length === 45 || actual.migrations.length === 46 || actual.migrations.length === 47 || actual.migrations.length === 48 || actual.migrations.length === 49) {
+  if (actual.migrations.length === 41 || actual.migrations.length === 42 || actual.migrations.length === 43 || actual.migrations.length === 44 || actual.migrations.length === 45 || actual.migrations.length === 46 || actual.migrations.length === 47 || actual.migrations.length === 48 || actual.migrations.length === 49 || actual.migrations.length === 50 || actual.migrations.length === 51 || actual.migrations.length === 52) {
     const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
     assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
     const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));

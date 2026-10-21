@@ -47,17 +47,20 @@ const request = Object.freeze({
 describe('search repository', () => {
   it('executes one parameterized ranking statement and maps only the internal candidate tuple', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [candidateRow()] });
-    const repository = createSearchRepository({ query } as never);
+    const repository = createSearchRepository({ query } as never, 'user-search');
 
     const result = await repository.search(request);
 
     expect(query).toHaveBeenCalledOnce();
+    // The session is bound first, so a caller cannot swap it out of a request body.
     expect(query).toHaveBeenCalledWith(SEARCH_CANDIDATES_SQL, [
-      'qianniu', null, null, false, 512,
+      'user-search', 'qianniu', null, null, false, 512,
     ]);
-    expect(SEARCH_CANDIDATES_SQL).toContain('LIMIT $5::integer');
-    expect(SEARCH_CANDIDATES_SQL).toContain('AND NOT $4::boolean');
-    expect(SEARCH_CANDIDATES_SQL).toContain('search_recommendable_scripts($1::text, $2::text, $3::text)');
+    expect(SEARCH_CANDIDATES_SQL).toContain('LIMIT $6::integer');
+    expect(SEARCH_CANDIDATES_SQL).toContain('AND NOT $5::boolean');
+    expect(SEARCH_CANDIDATES_SQL).toContain(
+      'search_recommendable_scripts($1::text, $2::text, $3::text, $4::text)',
+    );
     expect(result.ok && result.candidates[0]?.questionTexts).toEqual(['合成发货时效']);
     expect(result).toMatchObject({
       ok: true,
@@ -80,7 +83,7 @@ describe('search repository', () => {
           'questions', 'search_fallback_text',
         ].map((key) => [key, null])),
       }] }),
-    } as never);
+    } as never, 'user-search');
     await expect(noHit.search(request)).resolves.toEqual({
       ok: true,
       releaseId: context.release_id,
@@ -90,7 +93,7 @@ describe('search repository', () => {
 
     const denied = createSearchRepository({
       query: vi.fn().mockResolvedValue({ rows: [] }),
-    } as never);
+    } as never, 'user-search');
     await expect(denied.search(request)).resolves.toEqual({
       ok: false,
       code: 'SOURCE_GATE_NOT_READY',
@@ -100,7 +103,7 @@ describe('search repository', () => {
   it('fails closed when PostgreSQL returns a partial candidate projection', async () => {
     const repository = createSearchRepository({
       query: vi.fn().mockResolvedValue({ rows: [{ ...candidateRow(), content_hash: null }] }),
-    } as never);
+    } as never, 'user-search');
     await expect(repository.search(request)).rejects.toThrow(/partial candidate row/);
   });
 });

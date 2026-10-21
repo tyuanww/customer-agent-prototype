@@ -48,12 +48,12 @@ export const SEARCH_RELATION_GRANTS = Object.freeze([
 
 export const SEARCH_FUNCTION_GRANTS = Object.freeze([
   'public.record_runtime_source_denial_audit(text,text,text,text,text,text,text,text,text,text)',
-  'public.search_recommendable_scripts(text,text,text)',
+  'public.search_recommendable_scripts(text,text,text,text)',
 ] as const satisfies readonly RuntimeFunctionGrant[]);
 
 /** Functions whose bodies are hashed into the search-boundary manifest. */
 export const SEARCH_BOUNDARY_FUNCTIONS = Object.freeze([
-  'public.search_recommendable_scripts(text,text,text)',
+  'public.search_recommendable_scripts(text,text,text,text)',
   'public.content_scope_matches(text[],text,text[],text,text,text)',
   'public.content_questions_source_assets_are_active(jsonb)',
   'public.content_questions_are_valid(jsonb)',
@@ -77,10 +77,10 @@ export const SEARCH_BOUNDARY_VIEWS = Object.freeze([
 export const SEARCH_BOUNDARY_MANIFEST_SIZE = SEARCH_BOUNDARY_FUNCTIONS.length
   + SEARCH_BOUNDARY_VIEWS.length;
 
-export const SEARCH_BOUNDARY_MANIFEST_SHA256 = 'cf33ad08f0e6ef34dfa6f212e69aaac151a69603d69ee52db32c9e7bd02333ec';
+export const SEARCH_BOUNDARY_MANIFEST_SHA256 = '4731d2e57c047846b871e37a2dcb5e64bf16d8c4ca403c2bd770c5511a76787f';
 
 export type SearchRuntime = Readonly<{
-  searchCandidates: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
+  searchCandidates: (request: SearchRepositoryRequest, actorUserId: string) => Promise<SearchRepositoryResult>;
   executeSearch: EventRepository['executeSearch'];
   recordAdoption: EventRepository['recordAdoption'];
   recordEscalation: EventRepository['recordEscalation'];
@@ -91,13 +91,12 @@ export function createSearchRuntime(
   diagnosticSink: ApiRuntimeDiagnosticSink,
   isClosed: () => boolean,
 ): SearchRuntime {
-  const searchRepository = createSearchRepository(pool);
   // undefined keeps lease-id generation inside the event repository.
   const eventRepository = createEventRepository(pool, undefined, diagnosticSink);
   return Object.freeze({
-    async searchCandidates(request) {
+    async searchCandidates(request, actorUserId) {
       if (isClosed()) throw closedRead();
-      return searchRepository.search(request);
+      return createSearchRepository(pool, actorUserId).search(request);
     },
     async executeSearch(request) {
       if (isClosed()) return closedWrite();

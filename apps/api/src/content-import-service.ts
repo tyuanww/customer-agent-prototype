@@ -98,9 +98,6 @@ export function createContentImportService(
 ): ContentImportService {
   return Object.freeze({
     async acceptUpload(request) {
-      if (request.actor.role !== 'coach' && request.actor.role !== 'owner') {
-        return Object.freeze({ ok: false, code: 'FORBIDDEN', commit: 'rolled_back' });
-      }
       let persisted: Awaited<ReturnType<ContentObjectStore['persist']>> | undefined;
       let committed = false;
       try {

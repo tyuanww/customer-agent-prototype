@@ -3,7 +3,7 @@ import { registerProductAuthRoutes, sendIdentityFailure } from './product-auth-r
 import fastify, { type FastifyInstance } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { registerAuthRoutes } from './auth-routes.js';
-import { readStoredRosterPermission } from './project-roster-login.js';
+import { readAuthorizationActions, readStoredRosterPermission } from './project-roster-login.js';
 import {
   createMockAuthService,
   type AuthService,
@@ -156,6 +156,10 @@ export function createApiApp(
   registerAuthRoutes(app, authService, intakeDependencies ? async (userId) => {
     const client = await intakeDependencies.business.connect();
     try { return await readStoredRosterPermission(client, userId); }
+    finally { client.release(); }
+  } : undefined, intakeDependencies ? async (userId) => {
+    const client = await intakeDependencies.business.connect();
+    try { return await readAuthorizationActions(client, userId); }
     finally { client.release(); }
   } : undefined);
   registerNoticeRoutes(app, authService, noticeDependencies);

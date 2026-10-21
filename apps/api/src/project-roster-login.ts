@@ -83,10 +83,37 @@ function snapshotTitleForUser(userId: string): string | null {
 
 export type RosterJobResponse = NonNullable<ReturnType<typeof parseRosterJobResponse>>;
 
+export type AuthorizationActions = Readonly<{
+  query: boolean;
+  import: boolean;
+  publish: boolean;
+  rollback: boolean;
+}>;
+
+export const NO_AUTHORIZATION_ACTIONS: AuthorizationActions = {
+  query: false, import: false, publish: false, rollback: false,
+};
+
+const ACTION_SQL = `WITH stamp AS (SELECT clock_timestamp() AS at),
+person AS (SELECT principal_id FROM content_intake.principals WHERE user_id = $1 LIMIT 1)
+SELECT
+  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'query', stamp.at))), false) AS query,
+  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'import', stamp.at))), false) AS import,
+  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'publish', stamp.at))), false) AS publish,
+  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'rollback', stamp.at))), false) AS rollback`;
+
+export async function readAuthorizationActions(client: Queryable, userId: string): Promise<AuthorizationActions> {
+  const found = await client.query<AuthorizationActions>(ACTION_SQL, [userId]);
+  const row = found.rows[0];
+  if (!row) return NO_AUTHORIZATION_ACTIONS;
+  return { query: row.query, import: row.import, publish: row.publish, rollback: row.rollback };
+}
+
 export function composeRosterJob(
   snapshot: { readonly title: string; readonly directory: readonly { readonly name: string; readonly enabled: boolean }[]; readonly permissionState?: RosterPermissionState } | null,
   stored: StoredRosterPermission | null,
   databaseBacked: boolean,
+  actions: AuthorizationActions = NO_AUTHORIZATION_ACTIONS,
 ): RosterJobResponse | null {
   if (!stored && !snapshot) return null;
   const title = stored?.title ?? snapshot!.title;
@@ -104,6 +131,7 @@ export function composeRosterJob(
     })),
     permission_state: permissionState,
     message: permissionState === 'ready' || permissionState === 'unknown' ? null : ROSTER_DENIAL_MESSAGE,
+    actions,
   };
 }
 

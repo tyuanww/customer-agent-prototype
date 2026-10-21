@@ -58,7 +58,8 @@ describe('content intake role ceiling', () => {
       beforeCommit() {},
       query: (async (sql: string, params?: unknown[]) => {
         if (sql.includes('policy_versions')) return { rows: [{ version: '1' }] };
-        if (sql.includes('clock_timestamp() AS time')) return { rows: [{ time: new Date(now) }] };
+        if (sql.includes('clock_timestamp() AS at') || sql.includes('clock_timestamp() AS time')) return { rows: [{ at: new Date(now), time: new Date(now) }] };
+        if (sql.includes('content_intake.authorization_sources')) return { rows: [{ source_id: 'source-a' }] };
         if (sql.includes('AS roles')) {
           const id = String(params?.[0]);
           const role = id === 'issuer' ? issuerRole : recipientRole;

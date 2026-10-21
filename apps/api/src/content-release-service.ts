@@ -23,6 +23,7 @@ export type ContentReleaseFailure = Readonly<{
   ok: false;
   code: OperationFailureCode;
   reason?: SourceContractReason;
+  notice?: string;
   commit: CommitCertainty;
 }>;
 
@@ -119,8 +120,16 @@ function sqlState(error: unknown): string {
   return String(Reflect.get(error, 'code') ?? '');
 }
 
+function noticeOf(error: unknown): string {
+  if (error === null || typeof error !== 'object') return '';
+  const message = String(Reflect.get(error, 'message') ?? '');
+  return message === '没有权限，请找人开通。' || message === '资料资格过期了，请稍后重试。' ? message : '';
+}
+
 function releaseFailure(error: unknown, commit: CommitCertainty): ContentReleaseFailure {
   if (error instanceof PreviousReleaseMissingError) return failure('NOT_FOUND', commit);
+  const notice = noticeOf(error);
+  if (notice) return Object.freeze({ ok: false, code: 'FORBIDDEN', commit, notice });
   const detail = detailOf(error);
   if (FORBIDDEN_REASONS.has(detail) || sqlState(error) === 'ZA004') {
     return failure('FORBIDDEN', commit, AUDITED.has(detail) ? detail as SourceContractReason : undefined);
@@ -259,7 +268,6 @@ export function createContentReleaseServiceForPool(
     execute: (client: PoolClient) => Promise<unknown>,
     parse: (row: unknown) => unknown,
   ): Promise<Readonly<{ ok: true; response: unknown }> | ContentReleaseFailure> {
-    if (actor.role !== 'owner') return failure('FORBIDDEN', 'rolled_back');
     const client = await pool.connect().catch(() => null);
     if (client === null) return failure('OVERLOADED', 'rolled_back');
     let broken = false;
@@ -383,7 +391,7 @@ export function createContentReleaseServiceForPool(
       const result = await run(ROLLBACK_PREVIOUS_SCOPE, request.actor, request.idempotencyKey, hashes, async (client) => {
         const resolved = await client.query<PreviousReleaseRow>(
           'SELECT release_id, release_seq FROM public.resolve_previous_content_release($1)',
-          [request.actor.role],
+          [request.actor.user_id],
         );
         const targetId = resolved.rows[0]?.release_id;
         // The resolver returns one row with a NULL release_id when nothing older exists. Treat

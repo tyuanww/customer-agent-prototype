@@ -5,7 +5,7 @@ import { createMockAuthService } from '../src/auth-service.js';
 import { registerAuthRoutes } from '../src/auth-routes.js';
 import { bindSessionSubject, forgetJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 import { feishuUserId } from '../src/feishu-admit.js';
-import { composeRosterJob, projectRosterLogin, readStoredRosterPermission, rosterHomeFromEnv, rosterPermissionState, rosterPreparation, rosterPrincipalId, ROSTER_DENIAL_MESSAGE } from '../src/project-roster-login.js';
+import { composeRosterJob, NO_AUTHORIZATION_ACTIONS, projectRosterLogin, readStoredRosterPermission, rosterHomeFromEnv, rosterPermissionState, rosterPreparation, rosterPrincipalId, ROSTER_DENIAL_MESSAGE } from '../src/project-roster-login.js';
 import { JOB_ROSTER } from '@customer-agent/job-roster';
 
 const openId = 'ou_abcdef';
@@ -185,6 +185,7 @@ describe('roster login projection', () => {
       directory: [{ name: '客服坐席', enabled: true }],
       permission_state: 'revoked',
       message: ROSTER_DENIAL_MESSAGE,
+      actions: NO_AUTHORIZATION_ACTIONS,
     });
     expect(composeRosterJob(
       { title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }], permissionState: 'ready' },
@@ -235,10 +236,11 @@ describe('roster login projection', () => {
 describe('GET /v1/auth/job', () => {
   async function appWithPermission(
     readPermission?: (userId: string) => Promise<{ title: string; state: 'pending' | 'ready' | 'expired' | 'revoked' | 'denied' } | null>,
+    readActions?: (userId: string) => Promise<{ query: boolean; import: boolean; publish: boolean; rollback: boolean }>,
   ) {
     const auth = createMockAuthService(() => 'tok_' + 'a'.repeat(40));
     const app = fastify();
-    registerAuthRoutes(app, auth, readPermission);
+    registerAuthRoutes(app, auth, readPermission, readActions);
     await app.ready();
     return app;
   }
@@ -279,6 +281,7 @@ describe('GET /v1/auth/job', () => {
         directory: [{ name: '客服坐席', enabled: true }],
         permission_state: 'revoked',
         message: ROSTER_DENIAL_MESSAGE,
+        actions: NO_AUTHORIZATION_ACTIONS,
       });
     } finally {
       await app.close();
@@ -317,6 +320,7 @@ describe('GET /v1/auth/job', () => {
         directory: [{ name: '客服坐席', enabled: true }],
         permission_state: 'denied',
         message: ROSTER_DENIAL_MESSAGE,
+        actions: NO_AUTHORIZATION_ACTIONS,
       });
     } finally {
       await app.close();
@@ -340,7 +344,43 @@ describe('GET /v1/auth/job', () => {
         headers: { authorization: `Bearer ${token}` },
       });
       expect(job.statusCode).toBe(200);
-      expect(job.json()).toMatchObject({ permission_state: 'unknown', message: null });
+      expect(job.json()).toMatchObject({
+        permission_state: 'unknown',
+        message: null,
+        actions: NO_AUTHORIZATION_ACTIONS,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns query, import, publish, and rollback from authorization_sources', async () => {
+    const readPermission = vi.fn().mockResolvedValue({ title: '客服总监', state: 'ready' });
+    const readActions = vi.fn().mockResolvedValue({
+      query: true, import: false, publish: true, rollback: false,
+    });
+    const app = await appWithPermission(readPermission, readActions);
+    try {
+      const login = await app.inject({
+        method: 'POST',
+        url: '/v1/auth/mock-login',
+        payload: { user_id: 'usr_ou_abcdef', role: 'owner' },
+      });
+      const token = login.json<{ token: string }>().token;
+      remember('客服总监');
+      bindSessionSubject(token, subjectHash(openId));
+      const job = await app.inject({
+        method: 'GET',
+        url: '/v1/auth/job',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(job.statusCode).toBe(200);
+      expect(job.json()).toMatchObject({
+        permission_state: 'ready',
+        message: null,
+        actions: { query: true, import: false, publish: true, rollback: false },
+      });
+      expect(readActions).toHaveBeenCalledWith('usr_ou_abcdef');
     } finally {
       await app.close();
     }

@@ -38,7 +38,7 @@ describe.skipIf(!enabled)('Versioned SOP media capacity and purpose boundaries o
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_media_capacity'); config = db.config;
     admin = await pg.connect(db.config); await applyDatabaseMigrations(admin);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 40 });
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
     await admin.query(`CREATE ROLE capacity_business LOGIN NOINHERIT; GRANT intake_business TO capacity_business;
       CREATE ROLE capacity_usage LOGIN NOINHERIT; GRANT intake_usage TO capacity_usage;
       CREATE ROLE capacity_worker LOGIN NOINHERIT; GRANT intake_worker TO capacity_worker;

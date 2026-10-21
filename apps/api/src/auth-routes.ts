@@ -10,7 +10,7 @@ import {
   sendValidationError,
 } from './contract-http-errors.js';
 import { jobForToken } from './feishu-job-snapshot.js';
-import { composeRosterJob, type RosterJobResponse, type StoredRosterPermission } from './project-roster-login.js';
+import { composeRosterJob, NO_AUTHORIZATION_ACTIONS, type AuthorizationActions, type RosterJobResponse, type StoredRosterPermission } from './project-roster-login.js';
 
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -24,6 +24,7 @@ export function registerAuthRoutes(
   app: FastifyInstance,
   authService: AuthService,
   readPermission?: (userId: string) => Promise<StoredRosterPermission | null>,
+  readActions?: (userId: string) => Promise<AuthorizationActions>,
 ): void {
   if (authService.kind === 'mock') app.post('/v1/auth/mock-login', async (request, reply) => {
     if (!hasExactKeys(request.body, ['user_id', 'role'])) return sendValidationError(reply);
@@ -71,7 +72,8 @@ export function registerAuthRoutes(
         stored = snapshot ? { title: snapshot.title, state: 'denied' } : null;
       }
     }
-    const job: RosterJobResponse | null = composeRosterJob(snapshot, stored, readPermission !== undefined);
+    const actions = readActions ? await readActions(user.user_id).catch(() => NO_AUTHORIZATION_ACTIONS) : NO_AUTHORIZATION_ACTIONS;
+    const job: RosterJobResponse | null = composeRosterJob(snapshot, stored, readPermission !== undefined, actions);
     if (!job) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '职务未识别' } });
     return job;
   });

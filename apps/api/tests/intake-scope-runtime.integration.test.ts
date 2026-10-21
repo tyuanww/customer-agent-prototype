@@ -27,7 +27,8 @@ describe.skipIf(!enabled)('intake scope runtime assembly refusals (synthetic onl
     const db = harness.createDatabase('intake_scope_runtime');
     admin = await harness.connect(db.config);
     await applyHistoricalIntakeMigrations(admin);
-    await seedIntakeSyntheticHost(admin);
+    // Pre-0048 schema: the store-set tables and the grant policy columns do not exist yet.
+    await seedIntakeSyntheticHost(admin, 'product', 'xlsx', false, 'fresh', false);
     await admin.query(`CREATE ROLE synthetic_usage_probe LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOINHERIT;
       CREATE ROLE synthetic_facts_writer LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOINHERIT;
       GRANT USAGE ON SCHEMA content_intake, backend_review TO synthetic_facts_writer;
