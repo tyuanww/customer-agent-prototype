@@ -14,12 +14,6 @@ const STALE = '资料资格过期了，请稍后重试。';
 const ACTOR = 'usr_synthetic_search_deadline';
 const DOMAINS = ['presale', 'campaign', 'aftersale', 'product'] as const;
 
-/**
- * PR-A unit: search reads the query source set at one clock and returns only items whose
- * registered source version belongs to an allowed domain. The plan's lineage join was
- * replaced by this domain gate because release_items and release_lineage are written by
- * two disjoint publishers; the tests below pin the behaviour that decision produces.
- */
 describe.skipIf(!enabled)('search reads the query source set by domain', () => {
   let harness: Pg15Harness;
   let admin: Client;
@@ -142,7 +136,6 @@ describe.skipIf(!enabled)('search reads the query source set by domain', () => {
 
   it('refuses a session with no principal and a session with no query grant', async () => {
     await seedQueryPrincipal(admin, { userId: ACTOR, domains: ['product'] });
-    // A user id with no principal row cannot be resolved into an allowed set.
     expect(await search('usr_missing_principal')).toEqual({ message: DENIED });
     // A principal with facts and a role but no grant is refused on the same rule. The
     // principals/facts foreign key is deferred, so both rows go in one transaction.
@@ -173,7 +166,6 @@ describe.skipIf(!enabled)('search reads the query source set by domain', () => {
     const allowed = await search(ACTOR);
     expect(allowed).toEqual({ scriptIds: ['script_dl_product'] });
 
-    // Both EXCEPT directions: the returned ids equal the product item, and nothing else.
     const difference = await admin.query<{ missing: string[] | null; extra: string[] | null }>(`
       WITH returned AS (
         SELECT script_id FROM public.search_recommendable_scripts($1::text, 'qianniu', NULL, NULL)
@@ -216,7 +208,6 @@ describe.skipIf(!enabled)('search reads the query source set by domain', () => {
         expect(stale.statusCode).toBe(403);
         expect(stale.json()).toMatchObject({ error: { message: STALE } });
 
-        // Revoke the only query grant, then ask again as the same session.
         await http.admin.query(`UPDATE content_intake.grants SET version = version + 1,
           revoked_at = clock_timestamp(), last_change_reason = 'synthetic lane revoke'
           WHERE recipient_id = $1 AND action = 'query' AND revoked_at IS NULL`, [`prn-search-${ACTOR}`]);

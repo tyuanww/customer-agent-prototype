@@ -6,7 +6,7 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-/** PR-E denial lane. A director title whose only live grant is query must see no write control,
+/** A director title whose only live grant is query must see no write control,
  * and the sentence the operator specified. This is the review state the plan asks for, driven
  * through real Electron, HTTP and PG, with no renderer stub. */
 test('a director title with a query grant only sees no write control and the denial sentence', async () => {
@@ -42,7 +42,6 @@ test('a director title with a query grant only sees no write control and the den
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.screenshot({ path: path.join(evidence, 'denied-workbench.png') });
 
-    // The session projection is the contract the renderer acts on, so read it first.
     const session = await dashboard.evaluate(async () => {
       const api = (window as unknown as { dashboardContent?: { session: () => Promise<unknown> } }).dashboardContent;
       return api ? await api.session() : null;
@@ -57,7 +56,6 @@ test('a director title with a query grant only sees no write control and the den
     await dashboard.getByTestId('nav-publish').click();
     const module = dashboard.getByTestId('module-content');
     await expect(module).toBeVisible();
-    // Every write control is absent, and each absent control explains itself with one sentence.
     await expect(module.getByTestId('publish-action')).toHaveCount(0);
     await expect(module.getByTestId('content-publish-denied')).toHaveText('没有权限，请找人开通。');
     await expect(module.getByTestId('content-rollback-previous')).toHaveCount(0);
@@ -70,8 +68,6 @@ test('a director title with a query grant only sees no write control and the den
     // an empty list.
     await dashboard.getByTestId('nav-permissions').click();
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
-    // Read the projection the panel renders from, so "no scope" cannot be mistaken for "no bit".
-    // The first read is asynchronous, so wait for the panel to finish before judging it.
     const readPermission = () => dashboard.evaluate(async () => {
       const api = (window as unknown as { dashboardPermissions?: { current: () => Promise<unknown> } }).dashboardPermissions;
       return api ? await api.current() : null;

@@ -3,27 +3,12 @@
 -- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
--- Search reads the query source set at one clock, by domain.
---
--- The plan's first shape joined content_intake.release_lineage on
--- business_entry_id. That join cannot be built: public.release_items and
--- content_intake.release_lineage are written by two disjoint publishers.
--- publish_content_release writes release_items from staging_scripts and no
--- lineage row, while the intake direct publishers write lineage and only copy
--- release_items from the base release. Their keys differ as well,
--- (release_id, script_id) against (release_id, source_id, business_entry_id),
--- so every lineage-filtered read would return zero scripts for every release
--- published through the import door.
---
--- The operator chose to gate search at the granularity both doors actually
--- carry: a grant names a scope, a scope names a domain, and an item's domain
--- comes from its authoritative source version. Publish and import already
--- gate on exactly this value, so the four doors now agree.
+-- Search is gated at the granularity the other doors already use: a grant names a scope, a
+-- scope names a domain, and an item's domain comes from its authoritative source version.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 -- The three-argument function stays as a signature because historical migrations verify their
--- own step against a signature list that names it. It must not remain a way to read scripts
--- without a source set, so its body is replaced with a refusal and the runtime loses EXECUTE.
+-- own step against a signature list that names it.
 CREATE OR REPLACE FUNCTION public.search_recommendable_scripts(
   p_platform TEXT,
   p_product_context_type TEXT DEFAULT NULL,
@@ -59,8 +44,6 @@ STABLE
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
-  -- No caller may read scripts through the signature that cannot name the caller. The gated
-  -- four-argument form below is the only way in.
   RAISE EXCEPTION USING ERRCODE = 'ZA005', MESSAGE = '没有权限，请找人开通。', DETAIL = 'FORBIDDEN';
 END;
 $$;
@@ -69,8 +52,9 @@ REVOKE ALL ON FUNCTION public.search_recommendable_scripts(TEXT, TEXT, TEXT) FRO
 REVOKE ALL ON FUNCTION public.search_recommendable_scripts(TEXT, TEXT, TEXT) FROM app_runtime;
 ALTER FUNCTION public.search_recommendable_scripts(TEXT, TEXT, TEXT) OWNER TO cs_ai_definer;
 
--- No defaults on the last two parameters: a three-argument call must resolve to the refusing
--- three-argument signature, never to this one with arguments filled in.
+-- No defaults on the last two parameters. With defaults, a three-argument call is ambiguous
+-- between this form and the shim and PostgreSQL fails it with "is not unique", so the shim
+-- would stop refusing cleanly.
 CREATE FUNCTION public.search_recommendable_scripts(
   p_actor_user_id TEXT,
   p_platform TEXT,
@@ -127,7 +111,6 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'ZA001', MESSAGE = 'product context type and ref must be supplied together', DETAIL = 'SEARCH_SCOPE_INVALID';
   END IF;
 
-  -- One timestamp for the principal lookup, the facts window and the source set.
   v_at := pg_catalog.clock_timestamp();
   SELECT person.principal_id INTO v_principal
   FROM content_intake.principals person
@@ -142,9 +125,9 @@ BEGIN
       AND facts.checked_at <= v_at
       AND facts.valid_until <= v_at
   ) THEN
-    -- A missing principal and a closed facts window are different refusals, and
-    -- the plan gives them different sentences. A closed window is checked first
-    -- so a known person sees why, instead of being told to ask for access.
+    -- A missing principal and a closed facts window are different refusals. A closed
+    -- window is checked first so a known person sees why, instead of being told to ask
+    -- for access.
     IF v_principal IS NOT NULL THEN
       RAISE EXCEPTION USING ERRCODE = 'ZA005', MESSAGE = '资料资格过期了，请稍后重试。', DETAIL = 'FORBIDDEN';
     END IF;
@@ -158,7 +141,7 @@ BEGIN
 
   -- The permitted source versions are resolved once, not per candidate row: the pool is
   -- read every keystroke and a correlated EXISTS would repeat the whole grant expansion
-  -- for each script. The array is built from the same timestamp as the gate above.
+  -- for each script.
   SELECT coalesce(
     pg_catalog.array_agg(DISTINCT source_version.source_version_id), ARRAY[]::text[])
   INTO v_permitted

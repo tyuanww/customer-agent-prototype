@@ -130,13 +130,11 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
     harness?.stop();
   }, 60_000);
 
-  /** Seed one generated case in a transaction, compare the two functions, roll back. */
   async function runCase(spec: CaseSpec): Promise<readonly string[]> {
     const client = await harness.connect(database.config);
     try {
       await client.query('BEGIN');
       await client.query('SET CONSTRAINTS ALL DEFERRED');
-      // Fixed shape: identities and scopes exist once per run inside the transaction.
       await client.query(
         `INSERT INTO backend_identity.subject_bindings(
            binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)

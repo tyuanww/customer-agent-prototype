@@ -11,7 +11,7 @@ function bindingsFor(domains: readonly string[]): string {
   return JSON.stringify(domains.map(domain => ({ domain, source_version_id: `srcv_${domain}` })));
 }
 
-/** PR-C unit: import reads the import set by domain, and a missing domain denies the whole
+/** Import reads the import set by domain, and a missing domain denies the whole
  * call before any snapshot revision is written. */
 describe.skipIf(!enabled)('import reads the source set by domain', () => {
   let fixture: AuthorizationFixture;
@@ -115,8 +115,6 @@ describe.skipIf(!enabled)('import reads the source set by domain', () => {
   });
 
   it('sends the denial sentence in the HTTP body of a refused import', async () => {
-    // The operator reads a response. A route that replaced this sentence with the generic
-    // forbidden copy would still pass the SQL-level tests above.
     const mounted = await fixture.mountImportRoutes();
     try {
       const form = new FormData();

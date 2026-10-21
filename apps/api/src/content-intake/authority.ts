@@ -127,9 +127,9 @@ async function prepareGrants(client: IntakeTransaction, issuer: Principal, reque
     if (samePerson(issuer, recipient)) throw new IntakeRejection('SELF_ESCALATION', 'FORBIDDEN');
     if (recipient.factsVersion !== item.recipientFactsVersion) throw new IntakeRejection('PERMISSION_CHANGED');
     if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
+    if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     // Authority to grant this action in this scope comes before the source set, so a caller
     // without a parent still sees REDELEGATION_DENIED rather than a scope denial.
-    if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const parent = await issuingParent(client, issuer, item.kind, item.action, item.scope, item);
     let allowed = allowedByAction.get(item.action);
     if (!allowed) {

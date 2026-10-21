@@ -1,5 +1,3 @@
--- Import reads authorization_sources at one clock. One missing domain rejects
--- the batch and does not advance snapshots.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 CREATE OR REPLACE FUNCTION enqueue_content_import(

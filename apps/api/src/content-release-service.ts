@@ -10,6 +10,7 @@ import {
   type ApiRuntimeDiagnosticSink,
 } from './runtime-diagnostics.js';
 import type { ApiDatabaseBootstrapConfig, ApiHmacKeyRing } from './runtime-config.js';
+import { sourceRefusalOf } from './source-refusal-notice.js';
 
 type PublishRequest = components['schemas']['PublishRequest'];
 type PublishResponse = components['schemas']['PublishResponse'];
@@ -120,15 +121,9 @@ function sqlState(error: unknown): string {
   return String(Reflect.get(error, 'code') ?? '');
 }
 
-function noticeOf(error: unknown): string {
-  if (error === null || typeof error !== 'object') return '';
-  const message = String(Reflect.get(error, 'message') ?? '');
-  return message === '没有权限，请找人开通。' || message === '资料资格过期了，请稍后重试。' ? message : '';
-}
-
 function releaseFailure(error: unknown, commit: CommitCertainty): ContentReleaseFailure {
   if (error instanceof PreviousReleaseMissingError) return failure('NOT_FOUND', commit);
-  const notice = noticeOf(error);
+  const notice = sourceRefusalOf(error);
   if (notice) return Object.freeze({ ok: false, code: 'FORBIDDEN', commit, notice });
   const detail = detailOf(error);
   if (FORBIDDEN_REASONS.has(detail) || sqlState(error) === 'ZA004') {

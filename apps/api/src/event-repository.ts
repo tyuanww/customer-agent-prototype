@@ -17,6 +17,7 @@ import {
 import { createSearchRepository } from './search-repository.js';
 import { createSearchBackend } from './search-service.js';
 import type { PreparedSearchOperation } from './search-routes.js';
+import { sourceRefusalOf } from './source-refusal-notice.js';
 
 type SearchResponse = components['schemas']['SearchResponse'];
 type AdoptionEventRequest = components['schemas']['AdoptionEventRequest'];
@@ -70,19 +71,6 @@ const ESCALATION_SCOPE = '/v1/events/escalate';
 const IDEMPOTENCY_LEASE_SECONDS = 60;
 
 type FailureCode = Exclude<OperationResult<never>, { ok: true }>['code'];
-
-const REFUSAL_SENTENCES = new Set([
-  '没有权限，请找人开通。',
-  '资料资格过期了，请稍后重试。',
-]);
-
-/** The two source-set refusals arrive as ZA005 with the sentence in MESSAGE and a DETAIL
- * that does not distinguish them, so they are recognised by their text. */
-function noticeOf(error: unknown): string | undefined {
-  if (error === null || typeof error !== 'object') return undefined;
-  const message = String(Reflect.get(error, 'message') ?? '');
-  return REFUSAL_SENTENCES.has(message) ? message : undefined;
-}
 
 function failure(code: FailureCode, notice?: string) {
   return Object.freeze(notice === undefined
@@ -292,8 +280,6 @@ export function createEventRepository(
           if (search.code === 'SOURCE_GATE_NOT_READY') {
             sourceDenied = true;
           } else {
-            // A source-set refusal is not a gate denial: it says the caller may read nothing
-            // here, and it keeps the sentence the database chose.
             return failure(search.code, search.notice);
           }
         } else {
@@ -398,9 +384,7 @@ export function createEventRepository(
             }),
           });
         } else {
-          // A source-set refusal is not a source-gate denial: it says the caller may not read
-          // anything, and it carries its own sentence past the generic forbidden copy.
-          const notice = noticeOf(error);
+          const notice = sourceRefusalOf(error);
           if (notice !== undefined) {
             releaseAsBroken = !(await rollback(client));
             return failure('FORBIDDEN', notice);

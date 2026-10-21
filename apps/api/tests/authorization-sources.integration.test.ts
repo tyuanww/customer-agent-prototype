@@ -5,9 +5,6 @@ import { createAuthorizationFixture, type AuthorizationFixture } from './support
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
-/** PR-B overlay unit: the set function itself, and the one property createGrants owes it.
- * Card-specific behaviour lives in publish-deadline, import-deadline, and
- * grant-issuer-deadline, so each card's unit box reads on its own file. */
 describe.skipIf(!enabled)('authorization_sources returns one row per live grant source', () => {
   let fixture: AuthorizationFixture;
 

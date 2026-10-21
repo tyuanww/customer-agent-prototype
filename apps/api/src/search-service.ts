@@ -14,6 +14,7 @@ import {
   isEntityFreeGenericSearchText,
   normalizeSearchText,
 } from './search-text.js';
+import { sourceRefusalOf } from './source-refusal-notice.js';
 
 type SearchCandidate = components['schemas']['SearchCandidate'];
 
@@ -44,19 +45,6 @@ export type SearchBackend = Readonly<{
 type SearchRepositoryPort = Readonly<{
   searchCandidates: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
 }>;
-
-const REFUSAL_SENTENCES = new Set([
-  '没有权限，请找人开通。',
-  '资料资格过期了，请稍后重试。',
-]);
-
-/** The source set and the facts check raise ZA005 with their sentence in MESSAGE, while the
- * DETAIL does not tell them apart. Recognising the text is the only way to keep it. */
-function refusalSentenceOf(error: unknown): string | undefined {
-  if (error === null || typeof error !== 'object') return undefined;
-  const message = String(Reflect.get(error, 'message') ?? '');
-  return REFUSAL_SENTENCES.has(message) ? message : undefined;
-}
 
 function isoTimestamp(value: Date | string): string {
   const timestamp = value instanceof Date ? value : new Date(value);
@@ -100,7 +88,7 @@ export function createSearchBackend(repository: SearchRepositoryPort): SearchBac
       try {
         result = await repository.searchCandidates(repositoryRequest);
       } catch (error: unknown) {
-        const notice = refusalSentenceOf(error);
+        const notice = sourceRefusalOf(error);
         return Object.freeze(notice === undefined
           ? { ok: false, code: mapDatabaseContractError(error) }
           : { ok: false, code: 'FORBIDDEN' as const, notice });

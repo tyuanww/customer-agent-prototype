@@ -6,7 +6,7 @@ import { IntakeRejection, principal } from '../src/content-intake/transaction.js
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
-/** PR-D unit: a grant issuer must already reach every source it hands out. A source outside
+/** A grant issuer must already reach every source it hands out. A source outside
  * that set rejects the batch, and an issuer whose own facts have closed cannot issue at all. */
 describe.skipIf(!enabled)('a grant issuer is checked against its own source set', () => {
   let fixture: AuthorizationFixture;

@@ -822,8 +822,8 @@
       "id": "0051_publish_source_set",
       "file": "0051_publish_source_set.sql",
       "source_ranges": [],
-      "sha256": "8e65b5b6d3564168a7c770c057b8a77a7164be05e2d1b658ef699f0311bf68c9",
-      "bytes": 44475,
+      "sha256": "f686c2cc611c154fa2c19e8301e2b8fe8bdf4ecae3cb11a41d7b7b696d82d33a",
+      "bytes": 44339,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
@@ -833,8 +833,8 @@
       "id": "0052_import_source_set",
       "file": "0052_import_source_set.sql",
       "source_ranges": [],
-      "sha256": "44d01a54ba83df7c8444381a4a761b4229bdb4b98db7ac719905843f80cba6f3",
-      "bytes": 16326,
+      "sha256": "1a7c66ef72444b45933e7a74a471a6de51052716891c3b6fe9b9d3e1d88cc850",
+      "bytes": 16202,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
@@ -844,8 +844,8 @@
       "id": "0053_search_source_set",
       "file": "0053_search_source_set.sql",
       "source_ranges": [],
-      "sha256": "9441873c6574bf8637cae6905cc6dc5d205dbdb0118d2506aac7d67394065b45",
-      "bytes": 9167,
+      "sha256": "83a31649a88acadc356154024d969f59c9b16070e25b2e95cabe519862e3b5b8",
+      "bytes": 7943,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"

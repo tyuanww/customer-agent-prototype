@@ -11,6 +11,7 @@ import {
 } from './runtime-diagnostics.js';
 import type { ContentSourceType } from './content-object-store.js';
 import { ACTOR_IN_FLIGHT_IMPORT_ID } from './content-object-store.js';
+import { sourceRefusalOf } from './source-refusal-notice.js';
 
 type ImportAcceptedResponse = components['schemas']['ImportAcceptedResponse'];
 type ImportStatusResponse = components['schemas']['ImportStatusResponse'];
@@ -140,20 +141,6 @@ function failure(
   const base = { ok: false as const, code, commit };
   if (notice !== undefined) return Object.freeze({ ...base, notice });
   return Object.freeze(reason === undefined ? base : { ...base, reason });
-}
-
-const REFUSAL_SENTENCES = new Set([
-  '没有权限，请找人开通。',
-  '资料资格过期了，请稍后重试。',
-]);
-
-/** The plan gives these two refusals their own sentences. The database raises them as ZA005 with
- * that exact MESSAGE, while DETAIL is a generic FORBIDDEN or absent, so a detail-based classifier
- * misses them and the operator would read the generic copy instead. */
-function noticeOf(error: unknown): string | undefined {
-  if (error === null || typeof error !== 'object') return undefined;
-  const message = String(Reflect.get(error, 'message') ?? '');
-  return REFUSAL_SENTENCES.has(message) ? message : undefined;
 }
 
 async function rollback(client: PoolClient): Promise<boolean> {
@@ -355,7 +342,7 @@ export function createContentImportRepository(
       } catch (error: unknown) {
         const rolledBack = await rollback(client);
         broken = !rolledBack;
-        const notice = noticeOf(error);
+        const notice = sourceRefusalOf(error);
         if (notice !== undefined) {
           // Raised by the source-set or facts check. Send the sentence as-is and do not record it
           // as a source denial: it is not one of the audited source reasons.

@@ -3,7 +3,6 @@
 -- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
--- Publish and rollback read authorization_sources at one clock.
 -- A missing domain rejects the whole call. Session role is not a gate.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
@@ -399,7 +398,6 @@ BEGIN
     WHERE ib.import_batch_id = p_import_batch_id AND ib.domain = sc.category
   );
 
-  -- Upsert live scripts from staging upserts only.
   INSERT INTO public.scripts AS sc (
     script_id, category, title, answer_text, status, version, content_hash,
     source_ref, source_version_id, platform_scope, product_scope_type, product_scope_refs,
@@ -557,7 +555,6 @@ BEGIN
     x.placeholder_keys, x.questions_json,
     x.search_document, x.search_fallback_text
   FROM (
-    -- upsert wins
     SELECT
       s.script_id, sc.version AS script_version, s.content_hash, s.answer_text, s.title, s.category,
       s.source_ref, s.source_version_id, s.owner_role, s.review_due_at,

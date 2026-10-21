@@ -31,8 +31,6 @@ function sendImportFailure(reply: FastifyReply, result: ContentImportFailure): F
     return sendValidationError(reply, result.reason === undefined ? undefined : { reason: result.reason });
   }
   if ((result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') && result.notice) {
-    // The plan gives these refusals their own sentence. Sending the generic copy instead would
-    // tell the operator to ask for access when the real problem is a closed facts window.
     return reply.code(403).send(parseContractSchema('ForbiddenOrPolicyDeniedErrorEnvelope', {
       error: { code: result.code, message: result.notice },
     }));

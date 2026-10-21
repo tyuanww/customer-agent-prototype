@@ -277,9 +277,6 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     //   role is owner, so this is the "role alone does not open the door" state.
     // - roster-agent: a seat title, role agent, with a live query grant. The role ceiling lets
     //   agent read, so this lane proves the grant still decides.
-    //
-    // Role rules precede the grants that need their policy version: inserting a rule records
-    // policy history and bumps the current version.
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
     for (const [identity, userId] of [['roster-nogrant', 'user-roster-nogrant'],

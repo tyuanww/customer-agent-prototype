@@ -37,7 +37,6 @@ const T = Object.freeze({
   release: 'rel_probe', user: 'usr_probe_reader', actor: 'prn_probe_reader',
   issuer: 'prn_probe_issuer', issuerUser: 'usr_probe_issuer',
 });
-/** A release carries exactly one source version per domain, so the fixture has all four. */
 const DOMAINS = ['presale', 'campaign', 'aftersale', 'product'];
 const versionOf = (domain) => `srcv_probe_${domain}`;
 const sha = (value) => createHash('sha256').update(value).digest('hex');
@@ -122,8 +121,6 @@ try {
      ON CONFLICT (id) DO UPDATE SET current_release_id=$1`, [T.release]);
   await admin.query('COMMIT');
 
-  // The intake rows the query source set reads on head. Trunk ignores them, but writing them
-  // on both sides keeps the fixture identical.
   await admin.query('BEGIN');
   await admin.query('SET CONSTRAINTS ALL DEFERRED');
   for (const [binding, user] of [['binding_probe', T.user], ['binding_probe_issuer', T.issuerUser]]) {
@@ -142,7 +139,6 @@ try {
   await admin.query(
     `INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
      VALUES ($1,$2,1,'v2-preview')`, [T.source, T.scope]);
-  // A source's current mapping version has to exist, so the mapping row comes with it.
   await admin.query(
     `INSERT INTO content_intake.source_mappings(
        source_id,version,template_version,rule_version,mapping_version,structure_digest)

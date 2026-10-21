@@ -471,15 +471,14 @@ describe('QueryApp', () => {
   });
 
   it('shows the denial sentence and no results when the query bit is false', async () => {
-    // The plan's fourth button is search. A closed query source set must not run a search at
-    // all, and it must say why instead of showing the ordinary no-hit sentence.
+    // A closed query source set must not run a search at all, and it must say why instead of
+    // showing the ordinary no-hit sentence.
     // prepareProductQuery waits for a search call, so this drives the two steps itself.
     const f = connectProduct({ searchAllowed: false });
     render(<QueryApp />); await screen.findByRole('button', { name: /· 退出$/ });
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
     fireEvent.click(screen.getByTestId('search-button'));
     expect(await screen.findByText('没有权限，请找人开通。')).toBeInTheDocument();
-    // The IPC search never ran, so nothing could leak from an unfiltered read.
     expect(f.search).not.toHaveBeenCalled();
     expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
     expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();

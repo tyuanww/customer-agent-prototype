@@ -5,7 +5,7 @@ const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const DENIED = '没有权限，请找人开通。';
 const STALE = '资料资格过期了，请稍后重试。';
 
-/** PR-B unit: publish and rollback read authorization_sources at one clock, compare domains
+/** Publish and rollback read authorization_sources at one clock, compare domains
  * only, and refuse the whole call when one domain is missing. The session role is never the
  * gate, so an owner or coach session without a grant is refused like anyone else. */
 describe.skipIf(!enabled)('publish and rollback read the source set by domain', () => {
@@ -152,8 +152,6 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
   });
 
   it('sends the denial sentence in the HTTP body, not only in the SQL message', async () => {
-    // The operator reads a response, so the sentence has to survive the route. A route that
-    // dropped it would still pass every SQL-level test above.
     await fixture.admin.query(`INSERT INTO public.authoritative_source_versions(
         source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
         use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at)

@@ -1096,12 +1096,12 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   45: { functions: 271, objectEntries: 3319, objectSha256: FEISHU_ADMIT_OBJECT_SHA256, functionEntries: 271, functionSha256: FEISHU_ADMIT_FUNCTION_SHA256 },
   46: { functions: 272, objectEntries: 3320, objectSha256: ROSTER_PROJECTION_OBJECT_SHA256, functionEntries: 272, functionSha256: ROSTER_PROJECTION_FUNCTION_SHA256 },
   47: { functions: 273, objectEntries: 3321, objectSha256: QUERY_SIGNER_OBJECT_SHA256, functionEntries: 273, functionSha256: QUERY_SIGNER_FUNCTION_SHA256 },
-  48: { tables: 107, functions: 273, objectEntries: 3364, objectSha256: 'b6a14c317e821cd7d323a0523602c2e3acd66c10268613eefaadb0800d9558bf', functionEntries: 273, functionSha256: '38c0cddbc0dc081266bcb9dfa51d115f32c06478497d8a2a95a12784bc88dad3' },
-  49: { tables: 108, functions: 276, objectEntries: 3378, objectSha256: 'c90722894d60eb2ecafe756b4127ecbd5153cc0630cfb4af99b4feb52683f6eb', functionEntries: 276, functionSha256: '97cd623f1005c0e70d315eb42449fb238ed69cde85666fa2fe23a900963aa4d6' },
-  50: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: 'dbdc7ee8aff2ddd132569a733025f51dbe0fee3067e2eb824e8da386e43cd81a', functionEntries: 277, functionSha256: '0de1a50d5d1ffc621f222ff0eb63c437a8087260e649c7f2c193264df4a82291' },
-  51: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: 'befac3ed07875074d7e9422df3488940da9bfacc6caa4b35a6efebae235558f5', functionEntries: 277, functionSha256: '68d973edff9f17b88be896e0a1e0513acf2e3b486629dc7e167531ad60d257c6' },
-  52: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: '29f296ccc99ecdd706af218a9de865e54bad1952870cad455d91d0b2d7e9ad85', functionEntries: 277, functionSha256: '192b36277ae85b55b3d19324253aa3367e565b8fcea0069283d3f5768fba9752' },
-  53: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '61eb92ef2dfc405f8066f0e521e7df6dd023599e4bb96fabacf762f0ef19261b' },
+  48: { tables: 107, functions: 273, objectEntries: 3364, objectSha256: 'b6a14c317e821cd7d323a0523602c2e3acd66c10268613eefaadb0800d9558bf', functionEntries: 273, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
+  49: { tables: 108, functions: 276, objectEntries: 3378, objectSha256: 'c90722894d60eb2ecafe756b4127ecbd5153cc0630cfb4af99b4feb52683f6eb', functionEntries: 276, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
+  50: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: 'dbdc7ee8aff2ddd132569a733025f51dbe0fee3067e2eb824e8da386e43cd81a', functionEntries: 277, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
+  51: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: 'befac3ed07875074d7e9422df3488940da9bfacc6caa4b35a6efebae235558f5', functionEntries: 277, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
+  52: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: '29f296ccc99ecdd706af218a9de865e54bad1952870cad455d91d0b2d7e9ad85', functionEntries: 277, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
+  53: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '42bed3a16179d533c7e7bb1b0d45cd19c0eb121256be1564d2412db8f9315e40' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },

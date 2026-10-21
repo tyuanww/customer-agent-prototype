@@ -30,8 +30,6 @@ export function sendOperationFailure(
 ): FastifyReply {
   if (result.code === 'VALIDATION') return sendValidationError(reply);
   if ((result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') && result.notice) {
-    // The source-set and facts refusals have their own sentences. Sending the generic copy
-    // would tell the operator to ask for access when the real problem is a closed window.
     return reply.code(403).send(parseContractSchema('ForbiddenOrPolicyDeniedErrorEnvelope', {
       error: { code: result.code, message: result.notice },
     }));

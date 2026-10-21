@@ -59,11 +59,8 @@ function binding(ctx: IntakeUsageContext, scopes: ScopeRow[]): string {
 }
 
 async function scopesFor(client: IntakeTransaction, actor: Principal, shop: string, hash?: string): Promise<ScopeRow[]> {
-  // One instant for the whole read. The facts guard and the source set have to judge the same
-  // moment: with a clock expression inside the row projection a grant that expired mid-query
-  // authorized the rows read before it and refused the rows read after it. The set function
-  // also keeps this door on the same shape as search, publish and import, so the agreement
-  // check in packages/database/tests/authorization-set-agreement.test.ts covers it.
+  // One instant for the whole read. With a clock expression inside the row projection, a grant
+  // that expired mid-query authorized the rows read before it and refused the rows after.
   const stamped = await client.query<{ at: Date }>('SELECT clock_timestamp() AS at');
   const at = stamped.rows[0]!.at;
   // A closed facts window is not a missing grant. Raising it here, before the set is read,

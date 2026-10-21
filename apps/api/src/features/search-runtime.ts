@@ -77,7 +77,7 @@ export const SEARCH_BOUNDARY_VIEWS = Object.freeze([
 export const SEARCH_BOUNDARY_MANIFEST_SIZE = SEARCH_BOUNDARY_FUNCTIONS.length
   + SEARCH_BOUNDARY_VIEWS.length;
 
-export const SEARCH_BOUNDARY_MANIFEST_SHA256 = '4731d2e57c047846b871e37a2dcb5e64bf16d8c4ca403c2bd770c5511a76787f';
+export const SEARCH_BOUNDARY_MANIFEST_SHA256 = 'e150cce71cfc238b2a9131aadcd4ccc08c482f91a62e256d1cf4f26383b7af04';
 
 export type SearchRuntime = Readonly<{
   searchCandidates: (request: SearchRepositoryRequest, actorUserId: string) => Promise<SearchRepositoryResult>;
