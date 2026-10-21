@@ -30,6 +30,10 @@ const LANES = [
   // The grant is withdrawn before the session exists, which is the "second login after the
   // grant was revoked" state: the session projection carries no query bit at all.
   { slug: 'pr-a-revoked', identity: 'roster-readonly', expect: 'denied', before: 'revoke' },
+  // The window closes while the session is live, so the request reaches the door and the
+  // database is what refuses it. This is the only path that can show the stale sentence: a
+  // session that starts closed cannot tell "expired" from "never granted".
+  { slug: 'pr-a-stale-facts', identity: 'roster-readonly', expect: 'stale', before: 'expire' },
 ] as const;
 
 test('the search door tells a session apart from its grant and from its facts window', async () => {
@@ -63,6 +67,16 @@ test('the search door tells a session apart from its grant and from its facts wi
         const status = await window.customerAgent!.product!.sessionStatus();
         return status.ok && status.signedIn;
       }), { timeout: 30_000 }).toBe(true);
+      // The stale lane closes the window after sign-in. The window reports what the client's
+      // current projection says, so wait until the session has learned the new state rather
+      // than racing the poll.
+      if (lane.before === 'expire') {
+        expect(await host.expireFactsFor(lane.identity)).toBe(true);
+        await expect.poll(() => query.evaluate(async () => {
+          const status = await window.customerAgent!.product!.sessionStatus();
+          return status.ok && status.signedIn ? status.job?.permission ?? null : null;
+        }), { timeout: 20_000 }).toBe('expired');
+      }
 
 
       await query.getByTestId('question-input').fill('合成');
@@ -74,8 +88,9 @@ test('the search door tells a session apart from its grant and from its facts wi
         await expect(query.getByTestId('error-state')).toHaveCount(0);
         await expect.poll(async () => query.getByTestId('no-hit').isVisible()).toBe(true);
       } else {
+        const sentence = lane.expect === 'stale' ? '资料资格过期了，请稍后重试。' : '没有权限，请找人开通。';
         // The sentence has to reach the rendered state, not just the HTTP body.
-        await expect(query.getByTestId('error-state')).toContainText('没有权限，请找人开通。');
+        await expect(query.getByTestId('error-state')).toContainText(sentence);
       }
       await query.screenshot({ path: path.join(evidence, `${lane.slug}.png`) });
       console.info(JSON.stringify({ status: 'PASS', lane: lane.slug, screenshot: path.join(evidence, `${lane.slug}.png`) }));

@@ -13,8 +13,14 @@ export type ProductSessionView = {
 export const UNRESOLVED_JOB_LABEL = '职务未识别';
 export const PERMISSION_DENIAL_MESSAGE = '没有权限，请找人开通。';
 
+/** The two refusals have different causes and different owners: an expired facts window
+ * needs a refresh, a missing grant needs a person to open access. The server already tells
+ * them apart in the roster projection, so this must not flatten them. */
+export const FACTS_EXPIRED_MESSAGE = '资料资格过期了，请稍后重试。';
+
 export function permissionNotice(state: RosterPermissionState | undefined): string | null {
   if (!state || state === 'ready' || state === 'unknown') return null;
+  if (state === 'expired') return FACTS_EXPIRED_MESSAGE;
   return PERMISSION_DENIAL_MESSAGE;
 }
 
@@ -140,7 +146,8 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   const row = rights as Record<string, unknown>;
   if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
   if (![row.publish, row.grant, row.uploadSop, row.search, row.readCatalog].every((flag) => typeof flag === 'boolean')) return false;
-  if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE) return false;
+  if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE
+    && job.notice !== FACTS_EXPIRED_MESSAGE) return false;
   if (job.permission !== null && (typeof job.permission !== 'string'
     || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
   if (!isSessionActions(job.actions)) return false;

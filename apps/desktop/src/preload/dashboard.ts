@@ -175,7 +175,8 @@ function isContentJob(value: unknown): boolean {
   if (!exactKeys(actions, ['query', 'import', 'publish', 'rollback'])) return false;
   const bits = actions as Record<string, unknown>;
   if (![bits.query, bits.import, bits.publish, bits.rollback].every((flag) => typeof flag === 'boolean')) return false;
-  if (job.notice !== null && job.notice !== '没有权限，请找人开通。') return false;
+  if (job.notice !== null && job.notice !== '没有权限，请找人开通。'
+    && job.notice !== '资料资格过期了，请稍后重试。') return false;
   if (job.permission !== null && (typeof job.permission !== 'string'
     || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
   if (job.status === 'unresolved') {

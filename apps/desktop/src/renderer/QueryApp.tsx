@@ -1002,7 +1002,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       // A session with no query grant has no shops either, so the shop prompt would say the
       // wrong thing: the reason is the missing grant, not an unselected shop.
       if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
-        setResults([]); setErrorMessage(PERMISSION_DENIAL_MESSAGE); reportPhase('ERROR'); return;
+        // Trust the projection's own sentence: it distinguishes a closed facts window from a
+        // missing grant, and those tell the operator to do different things.
+        setResults([]); setErrorMessage(productState.job.notice ?? PERMISSION_DENIAL_MESSAGE);
+        reportPhase('ERROR'); return;
       }
       const text = (inputRef.current?.value ?? query).trim();
       const blocked = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
@@ -1031,7 +1034,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
         setResults([]);
-        setErrorMessage(PERMISSION_DENIAL_MESSAGE);
+        setErrorMessage(productState.job.notice ?? PERMISSION_DENIAL_MESSAGE);
         reportPhase('ERROR');
         return;
       }

@@ -3,7 +3,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import type { AuthenticatedUser } from '../auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
 import { listPreviews, previewApplies, type LinkedPreview } from './linked-preview.js';
-import { clock, createIntakeTransactions, lockProductSession, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
+import { clock, createIntakeTransactions, lockProductSession, requireFresh, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 
 type C = components['schemas'];
 /** Immutable server-owned context, reconstructed from storage for every page.
@@ -59,13 +59,28 @@ function binding(ctx: IntakeUsageContext, scopes: ScopeRow[]): string {
 }
 
 async function scopesFor(client: IntakeTransaction, actor: Principal, shop: string, hash?: string): Promise<ScopeRow[]> {
+  // One instant for the whole read. The facts guard and the source set have to judge the same
+  // moment: with a clock expression inside the row projection a grant that expired mid-query
+  // authorized the rows read before it and refused the rows read after it. The set function
+  // also keeps this door on the same shape as search, publish and import, so the agreement
+  // check in packages/database/tests/authorization-set-agreement.test.ts covers it.
+  const stamped = await client.query<{ at: Date }>('SELECT clock_timestamp() AS at');
+  const at = stamped.rows[0]!.at;
+  // A closed facts window is not a missing grant. Raising it here, before the set is read,
+  // lets the operator read 资料资格过期了 instead of being told to ask for access.
+  requireFresh(actor, at.getTime());
   const { rows } = await client.query<ScopeRow>(`SELECT src.source_id,src.revocation_generation AS generation,src.mode_version,src.mode,
     jsonb_build_object('tenantId',s.tenant_id,'appId',s.app_id,'brandId',s.brand_id,'shopId',s.shop_id,'domain',s.domain,'sourceId',src.source_id) AS scope,
-    content_intake.authorization_deadline($1,'query',s.scope_id,src.source_id,clock_timestamp()) AS until
+    granted.until
     FROM content_intake.sources src JOIN content_intake.scopes s USING(scope_id)
+    JOIN LATERAL (
+      SELECT pg_catalog.max(allowed.valid_until) AS until
+      FROM content_intake.authorization_sources($1,'query',$6) allowed
+      WHERE allowed.scope_id=s.scope_id AND allowed.source_id=src.source_id
+    ) granted ON TRUE
     WHERE s.tenant_id=$2 AND s.app_id=$3 AND (s.shop_id=$4 OR s.shop_id IS NULL)
       AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM content_intake.entitlement_scopes es WHERE es.entitlement_hash=$5 AND es.source_id=src.source_id))
-    ORDER BY src.source_id COLLATE "C"`, [actor.id, actor.tenantId, actor.appId, shop, hash ?? null]);
+    ORDER BY src.source_id COLLATE "C"`, [actor.id, actor.tenantId, actor.appId, shop, hash ?? null, at]);
   if (hash) {
     const count = await client.query<{ count: string }>('SELECT count(*) FROM content_intake.entitlement_scopes WHERE entitlement_hash=$1', [hash]);
     if (Number(count.rows[0]!.count) !== rows.length || rows.some(s => !s.until || s.mode !== 'v2-preview')) {
