@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { clock, IntakeRejection, principal, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
+import { roleAllows, roleMayAllocate, roleMayDelegate } from './role-ceiling.js';
 
 type C = components['schemas'];
 type Scope = C['IntakeScope'];
@@ -50,18 +51,16 @@ export function samePerson(a: Principal, b: Principal): boolean {
     && a.identityScope === b.identityScope && a.personKey === b.personKey);
 }
 
-/** The directory and the grant transaction share this role ceiling. Historical
- * grant rows stay; new operations are rechecked here and in SQL. */
+/** The directory and the grant transaction share this role ceiling, which is owned by
+ * `content_intake.role_ceiling` and mirrored in `role-ceiling.ts`. Historical grant rows
+ * stay; new operations are rechecked here and in SQL. */
 export function recipientRoleAllows(role: Principal['role'], kind: 'business' | 'delegation', action: C['IntakeAction']): boolean {
-  if (role === null) return false;
-  if (role === 'engineer') return true;
-  if (kind === 'delegation') return role === 'director' || role === 'manager';
-  if (action === 'query') return true;
-  return role === 'director' || role === 'manager' || role === 'supervisor' || role === 'lead';
+  if (kind === 'delegation') return roleMayDelegate(role);
+  return roleAllows(role, action);
 }
 
 export function allocationKinds(actor: Principal, kind: 'business' | 'delegation'): ('allocation' | 'delegation')[] {
-  if (actor.role !== 'director' && actor.role !== 'manager' && actor.role !== 'engineer') return [];
+  if (!roleMayAllocate(actor.role)) return [];
   if (kind === 'delegation') return ['allocation'];
   return ['allocation', 'delegation'];
 }

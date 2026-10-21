@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from './auth-service.js';
+import { mayOperateLegacyContentBatch } from './content-batch-admission.js';
 import { mapDatabaseContractError } from './database-contract-errors.js';
 import { hmacSafeValue, prepareIdempotencyHashes, type PreparedIdempotencyHashes } from './idempotency.js';
 import type { OperationFailureCode } from './operation-result.js';
@@ -330,6 +331,9 @@ export function createContentReleaseServiceForPool(
 
   return Object.freeze({
     async publish(request) {
+      // The historical publish rewrites a whole domain from one staged batch. Only an
+      // operator drives it; a domain grant on its own must not reach this path.
+      if (!mayOperateLegacyContentBatch(request.actor)) return failure('FORBIDDEN', 'rolled_back');
       const hashes = prepareIdempotencyHashes({
         import_batch_id: request.body.import_batch_id,
         title: request.body.title,
@@ -353,6 +357,7 @@ export function createContentReleaseServiceForPool(
       return result as Readonly<{ ok: true; response: PublishResponse }> | ContentReleaseFailure;
     },
     async rollback(request) {
+      if (!mayOperateLegacyContentBatch(request.actor)) return failure('FORBIDDEN', 'rolled_back');
       const hashes = prepareIdempotencyHashes({
         target_release_id: request.body.target_release_id,
         title: request.body.title,
@@ -377,6 +382,7 @@ export function createContentReleaseServiceForPool(
       return result as Readonly<{ ok: true; response: RollbackResponse }> | ContentReleaseFailure;
     },
     async rollbackPrevious(request) {
+      if (!mayOperateLegacyContentBatch(request.actor)) return failure('FORBIDDEN', 'rolled_back');
       // The target is resolved inside the same admin transaction as the rollback, so a concurrent
       // publish cannot slip between "pick the previous release" and "roll back to it". Resolving
       // outside the transaction and passing a target in would reopen that window.

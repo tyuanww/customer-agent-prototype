@@ -1081,6 +1081,10 @@ const READINESS_SUFFIX = [
   { length: 51, index: 50, id: '0051_publish_source_set' },
   { length: 52, index: 51, id: '0052_import_source_set' },
   { length: 53, index: 52, id: '0053_search_source_set' },
+  { length: 54, index: 53, id: '0054_legacy_batch_owner_only' },
+  { length: 55, index: 54, id: '0055_grant_steward_required' },
+  { length: 56, index: 55, id: '0056_cancel_import_owner_only' },
+  { length: 57, index: 56, id: '0057_role_ceiling' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1102,6 +1106,15 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   51: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: 'befac3ed07875074d7e9422df3488940da9bfacc6caa4b35a6efebae235558f5', functionEntries: 277, functionSha256: '68d973edff9f17b88be896e0a1e0513acf2e3b486629dc7e167531ad60d257c6' },
   52: { tables: 108, functions: 277, objectEntries: 3379, objectSha256: '29f296ccc99ecdd706af218a9de865e54bad1952870cad455d91d0b2d7e9ad85', functionEntries: 277, functionSha256: '192b36277ae85b55b3d19324253aa3367e565b8fcea0069283d3f5768fba9752' },
   53: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '2819e0f428e13dbf63a2b16c2589b7e4315019ad17baf4dac7965e58abba6e6a' },
+  // 0054 replaces four function bodies in place plus a column-level SELECT grant, so the ACL
+  // count moves (607 -> 609) while the table and function counts do not.
+  54: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '319665ff714e5f52cafacf2348685c6ad400dbc32f9b12440e8418b682e530fe' },
+  // 0055 replaces the two decision functions in place, so only their digest moves.
+  55: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '8aa046bcb3454577967e09bc335ee1967c211ec9b30baedf7313036b0ca88612' },
+  // 0056 replaces one function body in place.
+  56: { tables: 108, functions: 278, objectEntries: 3380, objectSha256: 'ba3fe81a507f5721e47f5891763c149cfb70259205cf6675b44d1e21975a9c69', functionEntries: 278, functionSha256: '8ba5e6ed481ffcd41c47aa2d7754c0b9070f709641f87fd696cadf71ad82c1e3' },
+  // 0057 adds the ceiling table and four predicate functions.
+  57: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: 'a3342744cd796d124e67a3d88cf2617b4f6c547281c56fe5bdab7d16360c90e5' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1113,6 +1126,10 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   51: { entries: 591, sha256: '46fc06421140bf3a1544b7eb8f8c5d46adf6e5cd2aa4f66e06ea7903baac2f76' },
   52: { entries: 606, sha256: 'da8436f3126bc9f745ae992ac1022f0674a74be468ca7205688a382ba9075a33' },
   53: { entries: 605, sha256: '5eef21b62c1fabc735de9f10ea950a4a669de44dfd2901ad42be96582a40e674' },
+  54: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
+  55: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
+  56: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
+  57: { entries: 638, sha256: '3d9fc6d6b4f69c60adeb6abf7eb2bbd2a8edd03440372f1cdb2c0a8e128584e8' },
 };
 
 export async function verifyReadinessSuccessor(

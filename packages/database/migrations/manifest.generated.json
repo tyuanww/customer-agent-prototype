@@ -849,6 +849,50 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 54,
+      "id": "0054_legacy_batch_owner_only",
+      "file": "0054_legacy_batch_owner_only.sql",
+      "source_ranges": [],
+      "sha256": "ece8db6c463686b2f13e1384606a47066940d8d18d36a0afa425f16569b1bb1d",
+      "bytes": 57693,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 55,
+      "id": "0055_grant_steward_required",
+      "file": "0055_grant_steward_required.sql",
+      "source_ranges": [],
+      "sha256": "4d68c4d150bc1c0ded321fd3b7c6b1e36dc78992996586fe3137234ab2a47bb1",
+      "bytes": 6575,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 56,
+      "id": "0056_cancel_import_owner_only",
+      "file": "0056_cancel_import_owner_only.sql",
+      "source_ranges": [],
+      "sha256": "7a2224b82212183e24e492636998ba03b0a5f1a5b4aec6221ef52501b13356d0",
+      "bytes": 3965,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 57,
+      "id": "0057_role_ceiling",
+      "file": "0057_role_ceiling.sql",
+      "source_ranges": [],
+      "sha256": "066bb721eca1610e3b2a1428be2ec069990230d31fa51e6c922719d03ce9ed87",
+      "bytes": 11486,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

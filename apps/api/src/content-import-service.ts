@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { parseContractSchema, validateContractSchema, type components } from '@customer-agent/contracts';
 import { Readable } from 'node:stream';
 import type { AuthenticatedUser } from './auth-service.js';
+import { mayOperateLegacyContentBatch } from './content-batch-admission.js';
 import { parseContentImportMultipart } from './content-import-multipart.js';
 import {
   CONTENT_IMPORT_BATCH_ID_PATTERN,
@@ -98,6 +99,11 @@ export function createContentImportService(
 ): ContentImportService {
   return Object.freeze({
     async acceptUpload(request) {
+      // Refuse before persisting: an upload that cannot enqueue must not leave an object
+      // behind that only a later reclaim would clean up.
+      if (!mayOperateLegacyContentBatch(request.actor)) {
+        return Object.freeze({ ok: false, code: 'FORBIDDEN', commit: 'rolled_back' });
+      }
       let persisted: Awaited<ReturnType<ContentObjectStore['persist']>> | undefined;
       let committed = false;
       try {
@@ -248,7 +254,9 @@ export function createContentImportService(
     },
 
     async cancel(request) {
-      if (request.actor.role !== 'coach' && request.actor.role !== 'owner') {
+      // Cancelling mutates a batch, so it follows the same operator-only rule as the
+      // upload that created it. readStatus stays readable to coach: it only reports.
+      if (!mayOperateLegacyContentBatch(request.actor)) {
         return Object.freeze({ ok: false, code: 'FORBIDDEN', commit: 'rolled_back' });
       }
       if (!CONTENT_IMPORT_BATCH_ID_PATTERN.test(request.importBatchId)) {

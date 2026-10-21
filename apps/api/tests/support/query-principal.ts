@@ -141,11 +141,12 @@ export async function seedQueryPrincipal(admin: Client, seed: QueryPrincipalSeed
       await admin.query(
         `INSERT INTO content_intake.grants(
            grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id,
-           action, starts_at, expires_at, reason, policy_version, store_set_version, parent_grant_id)
+           action, starts_at, expires_at, reason, policy_version, store_set_version, parent_grant_id,
+           steward_id)
          VALUES ($1, 'business', $2, $3, $4, $5, $6, $7, 'query',
            clock_timestamp() - interval '1 minute',
            clock_timestamp() + interval '1 day',
-           '合成查询授权', $8::bigint, $9::bigint, $10)
+           '合成查询授权', $8::bigint, $9::bigint, $10, $2)
          ON CONFLICT (grant_id) DO NOTHING`,
         [`grant-search-${userId}-${domain}`, issuerId, principalId, TENANT, APP,
           `scope-search-${domain}`, `source-search-${domain}`, policyVersion, storeSetVersion,

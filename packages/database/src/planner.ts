@@ -162,6 +162,34 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0052_import_source_set',
     requiresPredecessor: 'Search source set requires the import source set',
   },
+  {
+    index: 53,
+    minimumCatalogueLength: 54,
+    id: '0054_legacy_batch_owner_only',
+    predecessorId: '0053_search_source_set',
+    requiresPredecessor: 'Batch operator admission requires the search source set',
+  },
+  {
+    index: 54,
+    minimumCatalogueLength: 55,
+    id: '0055_grant_steward_required',
+    predecessorId: '0054_legacy_batch_owner_only',
+    requiresPredecessor: 'Steward requirement requires the batch operator admission',
+  },
+  {
+    index: 55,
+    minimumCatalogueLength: 56,
+    id: '0056_cancel_import_owner_only',
+    predecessorId: '0055_grant_steward_required',
+    requiresPredecessor: 'Cancel admission requires the steward requirement',
+  },
+  {
+    index: 56,
+    minimumCatalogueLength: 57,
+    id: '0057_role_ceiling',
+    predecessorId: '0056_cancel_import_owner_only',
+    requiresPredecessor: 'Role ceiling requires the cancel admission',
+  },
 ];
 
 function requiredSuccessorStep(

@@ -40,7 +40,10 @@ const UNIVERSE = Object.freeze([
   { scope: 'scope-agreement-b', domain: 'campaign', sources: ['source-agreement-c'] as const },
 ]);
 
-const ACTIONS = ['query', 'import', 'publish', 'rollback'] as const;
+/** Every action the contract defines. The two functions admit them in two ceiling bands
+ *  (query-only for agent/enabler, all for the rest), so leaving four out would leave the
+ *  band boundary untested for the exact actions that differ. */
+const ACTIONS = ['query', 'content-manage', 'import', 'source-confirm', 'review', 'publish', 'candidate-cancel', 'rollback'] as const;
 type Action = (typeof ACTIONS)[number];
 
 /** A grant is generated in the vocabulary of the two functions, so a counterexample reads
@@ -53,13 +56,20 @@ type GrantSpec = Readonly<{
   startsOffsetMs: number;
   expiresOffsetMs: number;
   revoked: boolean;
+  /** A parented grant authorizes only while it keeps a steward. Without this dimension the
+   *  generated business rows always carried one, so the predicate could be inverted or
+   *  deleted without the property noticing. */
+  hasSteward: boolean;
+  /** Revokes the parent allocation after the child is inserted, which is the second
+   *  revocation shape: the child keeps its steward while its parent is dead. */
+  parentRevoked: boolean;
 }>;
 
 type CaseSpec = Readonly<{
   factsEnabled: boolean;
   factsCheckedOffsetMs: number;
   factsValidOffsetMs: number;
-  role: 'director' | 'agent' | 'lead' | 'enabler' | 'manager' | null;
+  role: 'director' | 'agent' | 'lead' | 'enabler' | 'manager' | 'supervisor' | 'engineer' | null;
   grants: readonly GrantSpec[];
   /** When false the grant carries no policy version, so a query grant is not live. */
   policyCurrent: boolean;
@@ -78,6 +88,8 @@ const grantArb: fc.Arbitrary<GrantSpec> = fc.record({
   startsOffsetMs: secondsArb(-120, 30).map(seconds => seconds * 1_000),
   expiresOffsetMs: secondsArb(-30, 240).map(seconds => seconds * 1_000),
   revoked: fc.boolean(),
+  hasSteward: fc.boolean(),
+  parentRevoked: fc.boolean(),
 });
 
 const caseArb: fc.Arbitrary<CaseSpec> = fc.record({
@@ -87,7 +99,9 @@ const caseArb: fc.Arbitrary<CaseSpec> = fc.record({
   factsValidOffsetMs: secondsArb(-60, 290).map(seconds => seconds * 1_000),
   // role_rules is keyed by (tenant, app, department, job), so a job carries at most one
   // current role. Zero roles is the interesting case: the ceiling then rejects every action.
-  role: fc.option(fc.constantFrom('director', 'agent', 'lead', 'enabler', 'manager'), { nil: null }),
+  // Every role the ceiling mentions. supervisor and engineer were missing, and they are
+  // exactly the roles the two functions band differently from the rest.
+  role: fc.option(fc.constantFrom('director', 'agent', 'lead', 'enabler', 'manager', 'supervisor', 'engineer'), { nil: null }),
   grants: fc.array(grantArb, { maxLength: 4 }),
   policyCurrent: fc.boolean(),
   storeSetCurrent: fc.boolean(),
@@ -241,26 +255,55 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
             grant.revoked ? new Date(at.getTime() - 1_000) : null,
             grant.action === 'query' && spec.policyCurrent ? currentPolicy : null,
             grant.action === 'query' && spec.storeSetCurrent ? '1' : null,
-            parentId, ISSUER]);
+            parentId, grant.hasSteward ? ISSUER : null]);
+        // Revoking the parent after the child exists is the only way to reach the "child keeps
+        // its steward, parent is dead" state: the insert guard requires a live parent.
+        if (parentId !== null && grant.parentRevoked) {
+          await client.query(
+            `UPDATE content_intake.grants SET revoked_at=$2, version=version+1,
+               last_change_reason='agreement parent revoke' WHERE grant_id=$1`,
+            [parentId, new Date(at.getTime() - 1_500)]);
+        }
       }
 
       // Compare over the whole universe, for every action, at the one instant.
       const found: string[] = [];
       for (const action of ACTIONS) {
-        const set = await client.query<{ scope_id: string; source_id: string }>(
-          `SELECT scope_id, source_id FROM content_intake.authorization_sources($1, $2, $3)`,
+        const set = await client.query<{ scope_id: string; source_id: string; valid_until: Date }>(
+          `SELECT scope_id, source_id, valid_until FROM content_intake.authorization_sources($1, $2, $3)`,
           [ACTOR, action, at]);
-        const rows = new Set(set.rows.map(row => `${row.scope_id}\u0000${row.source_id}`));
+        // The deadline collapses a principal's grants into one expiry while the set emits a row
+        // per grant, so the two timestamps are compared through the same reduction the callers
+        // use: max over the set. Without this the property would pass while the set ignored a
+        // grant's expiry, which is how every consumer bounds a lease.
+        const expiries = new Map<string, number>();
+        for (const row of set.rows) {
+          const key = `${row.scope_id}\u0000${row.source_id}`;
+          expiries.set(key, Math.max(expiries.get(key) ?? 0, new Date(row.valid_until).getTime()));
+        }
         for (const entry of UNIVERSE) {
           for (const source of entry.sources) {
             const deadline = await client.query<{ until: Date | null }>(
               `SELECT content_intake.authorization_deadline($1, $2, $3, $4, $5) AS until`,
               [ACTOR, action, entry.scope, source, at]);
-            const live = deadline.rows[0]?.until !== null && deadline.rows[0]?.until !== undefined;
-            const inSet = rows.has(`${entry.scope}\u0000${source}`);
+            const until = deadline.rows[0]?.until;
+            const live = until !== null && until !== undefined;
+            const key = `${entry.scope}\u0000${source}`;
+            const inSet = expiries.has(key);
+            if (live && inSet && expiries.get(key) !== new Date(until).getTime()) {
+              const shape = spec.grants.map(g => `${g.kind}/${g.action}/${g.source}`
+                + `${g.revoked ? '/revoked' : ''}`
+                + `${g.hasSteward ? '' : '/no-steward'}`
+                + `${g.parentRevoked ? '/parent-revoked' : ''}`).join(', ') || 'no grants';
+              found.push(`${action} ${key.replace('\u0000', '/')}: deadline until`
+                + ` ${new Date(until).toISOString()} set until`
+                + ` ${new Date(expiries.get(key)!).toISOString()} [${shape}]`);
+            }
             if (live !== inSet) {
               const shape = spec.grants.map(g => `${g.kind}/${g.action}/${g.source}`
-                + `${g.revoked ? '/revoked' : ''}`).join(', ') || 'no grants';
+                + `${g.revoked ? '/revoked' : ''}`
+                + `${g.hasSteward ? '' : '/no-steward'}`
+                + `${g.parentRevoked ? '/parent-revoked' : ''}`).join(', ') || 'no grants';
               found.push(`${action} ${entry.scope}/${source}: deadline=${live ? 'live' : 'null'}`
                 + ` set=${inSet ? 'present' : 'absent'} [${shape}]`
                 + ` facts=${spec.factsEnabled ? 'enabled' : 'disabled'}`
@@ -382,6 +425,7 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
       grants: [{
         action: 'publish', source: 'source-agreement-a', kind: 'business',
         startsOffsetMs: -30_000, expiresOffsetMs: 180_000, revoked: false,
+        hasSteward: true, parentRevoked: false,
       }],
       policyCurrent: true, storeSetCurrent: true, memberListed: true,
     };
@@ -424,6 +468,42 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
       await client.end();
     }
     // Restored: the same case agrees again, so the failure above was the drift, not noise.
+    await expect(runCase(spec)).resolves.toEqual([]);
+  }, 180_000);
+
+  it('fails when the set function drops the parent-liveness check', async () => {
+    // The steward and parent dimensions exist because a revocation can leave a child with a
+    // live steward under a dead parent. Prove the property sees that drift: take the real
+    // definition, remove the parent clause, and require a disagreement naming the shape.
+    const client = await harness.connect(database.config);
+    const original = await client.query<{ definition: string }>(
+      `SELECT pg_catalog.pg_get_functiondef(
+         'content_intake.authorization_sources(text,text,timestamptz)'::pg_catalog.regprocedure) AS definition`);
+    const parentClause = /AND \(g\.parent_grant_id IS NULL OR \(g\.steward_id IS NOT NULL AND EXISTS \([\s\S]*?revoked_at IS NULL\)\)\)/;
+    const real = original.rows[0]?.definition ?? '';
+    if (!parentClause.test(real)) throw new Error('the installed function no longer carries the parent clause');
+    // A parented grant whose parent is revoked, keeping its steward: the state a second
+    // revocation leaves behind.
+    const spec: CaseSpec = {
+      factsEnabled: true, factsCheckedOffsetMs: -1_000, factsValidOffsetMs: 240_000,
+      role: 'director',
+      grants: [{
+        action: 'publish', source: 'source-agreement-a', kind: 'business',
+        startsOffsetMs: -30_000, expiresOffsetMs: 180_000, revoked: false,
+        hasSteward: true, parentRevoked: true,
+      }],
+      policyCurrent: true, storeSetCurrent: true, memberListed: true,
+    };
+    try {
+      await expect(runCase(spec)).resolves.toEqual([]);
+      await client.query(real.replace(parentClause, 'AND (g.parent_grant_id IS NULL OR g.steward_id IS NOT NULL)'));
+      const broken = await runCase(spec);
+      expect(broken.length, 'dropping the parent check must produce a disagreement').toBeGreaterThan(0);
+      expect(broken.join('\n')).toContain('parent-revoked');
+    } finally {
+      if (real) await client.query(real);
+      await client.end();
+    }
     await expect(runCase(spec)).resolves.toEqual([]);
   }, 180_000);
 

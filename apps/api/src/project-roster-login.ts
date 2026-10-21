@@ -94,13 +94,21 @@ export const NO_AUTHORIZATION_ACTIONS: AuthorizationActions = {
   query: false, import: false, publish: false, rollback: false,
 };
 
+/** The historical batch chain admits only an owner binding, so advertising import, publish or
+ *  rollback to anyone else would offer a button that can only answer 403. `query` stays
+ *  grant-based because the candidate path still serves granted seats. */
 const ACTION_SQL = `WITH stamp AS (SELECT clock_timestamp() AS at),
-person AS (SELECT principal_id FROM content_intake.principals WHERE user_id = $1 LIMIT 1)
+person AS (SELECT principal_id, user_id FROM content_intake.principals WHERE user_id = $1 LIMIT 1),
+binding AS (SELECT (role = 'owner') AS is_owner FROM backend_identity.subject_bindings
+  WHERE user_id = (SELECT user_id FROM person))
 SELECT
   COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'query', stamp.at))), false) AS query,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'import', stamp.at))), false) AS import,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'publish', stamp.at))), false) AS publish,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'rollback', stamp.at))), false) AS rollback`;
+  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+    AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'import', stamp.at))), false) AS import,
+  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+    AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'publish', stamp.at))), false) AS publish,
+  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+    AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'rollback', stamp.at))), false) AS rollback`;
 
 export async function readAuthorizationActions(client: Queryable, userId: string): Promise<AuthorizationActions> {
   const found = await client.query<AuthorizationActions>(ACTION_SQL, [userId]);
