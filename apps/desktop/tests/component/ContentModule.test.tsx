@@ -415,6 +415,36 @@ describe('ContentModule publish gate', () => {
     expect(screen.queryByTestId('publish-feedback-headline')).not.toBeInTheDocument();
   });
 
+  it('renders the stale sentence when the publish is refused for a closed facts window', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'presale.xlsx',
+      rows: [{ scene: '发货时效', script: '亲亲这是话术', domain: 'presale' as const }],
+      csvText: 'scene,script,domain\n发货时效,亲亲这是话术,presale\n',
+    }));
+    // The server distinguishes a closed facts window from a missing grant. Showing the generic
+    // denial here would tell the operator to request access when waiting would have worked.
+    api.publishDraft = vi.fn(async () => ({
+      ok: false as const,
+      code: 'FORBIDDEN' as const,
+      message: '资料资格过期了，请稍后重试。',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'presale.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await chooseLibrary(user, 'presale');
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('资料资格过期了，请稍后重试。'));
+    expect(screen.getByTestId('publish-feedback')).not.toHaveTextContent('没有权限，请找人开通。');
+  });
+
   it('fail-closes the cancel button when the preload has no cancel channel', async () => {
     const api = mockSession('owner');
     window.dashboardContent = {

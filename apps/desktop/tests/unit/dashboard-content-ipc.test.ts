@@ -164,6 +164,32 @@ it('refuses a content import when the signed-in job cannot publish', async () =>
   expect(owner.request).not.toHaveBeenCalled();
 });
 
+// The plan gives a closed facts window its own sentence. A caller that reports the generic
+// denial instead would tell the operator to ask for access when waiting would have worked.
+const STALE_SENTENCE = '资料资格过期了，请稍后重试。';
+
+it('shows the stale sentence when the server refuses a publish for a closed facts window', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', STALE_SENTENCE));
+  const result = await dashboardContentPublish(owner, publishPayload(csv, [productBinding]));
+  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: STALE_SENTENCE });
+  // It must not collapse into the other two refusals that share the same code.
+  expect(result).not.toMatchObject({ message: PERMISSION_DENIAL_MESSAGE });
+  expect(result).not.toMatchObject({ message: '当前身份不能执行此操作' });
+});
+
+it('shows the stale sentence when the server refuses an import for a closed facts window', async () => {
+  const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockRejectedValueOnce(new ProductHttpError('FORBIDDEN', STALE_SENTENCE));
+  const result = await dashboardContentImport(owner, {
+    sourceName: 'draft.csv',
+    csvText: csv,
+    sourceBindings: [productBinding],
+  });
+  expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', message: STALE_SENTENCE });
+  expect(result).not.toMatchObject({ message: PERMISSION_DENIAL_MESSAGE });
+});
+
 it('does not invent source bindings and never returns a fake success', async () => {
   const owner = fakeSession('owner');
   expect(dashboardContentSession(null)).toEqual({
