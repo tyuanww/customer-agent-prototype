@@ -23,11 +23,11 @@ For the same principal, action and instant, `authorization_sources` must list ex
 
 ## Why a drift harms users
 
-Four doors ask this one question in two shapes. Search and the workbench button bits read
-the set. The intake query surface that the shipped capsule actually calls reads the
-deadline (`apps/api/src/content-intake/usage.ts`, `scopesFor`). If the two implementations
-drift, one door serves a source another door refuses: an operator sees a script in one
-window and is told they have no access in the next, for the same person at the same moment.
+Search, publish, import, the workbench button bits and the intake query surface the shipped
+capsule calls all read the set. The deadline still guards the grant-issuer path and the
+intake runtime's own checks, so both shapes remain load-bearing. If they drift, one door
+serves a source another door refuses: an operator sees a script in one window and is told
+they have no access in the next, for the same person at the same moment.
 
 ## What the check covers
 
@@ -36,11 +36,11 @@ window and is told they have no access in the next, for the same person at the s
 | `content_intake.authorization_sources(text,text,timestamptz)` | `packages/database/overlays/0050_authorization_sources.sql` |
 | `content_intake.authorization_deadline(text,text,text,text,timestamptz)` | `packages/database/migrations/0048_roster_store_set.sql` (body), `0044_intake_role_defaults.sql` (ceiling) |
 | Tables both read | `principals`, `principal_facts`, `grants`, `scopes`, `sources`, `role_rules`, `policy_versions`, `store_sets`, `store_set_current`, `store_set_members` |
-| Doors that depend on the agreement | `apps/api/src/content-intake/usage.ts` (deadline); `overlays/0051_publish_source_set.sql`, `0052_import_source_set.sql`, `0053_search_source_set.sql`, `apps/api/src/project-roster-login.ts` (set) |
+| Doors that depend on the agreement | `apps/api/src/content-intake/usage.ts` (now the set, one clock per request), `overlays/0051_publish_source_set.sql`, `0052_import_source_set.sql`, `0053_search_source_set.sql`, `apps/api/src/project-roster-login.ts` (set); grant issuance through `apps/api/src/content-intake/authority.ts` (deadline) |
 
-**Last confirmed against the code at commit `6cd0472d`.** Move that commit forward only
+**Last confirmed against the code at commit `fe360e59`.** Move that commit forward only
 after running the check and confirming both function bodies are the ones you just read. If
-`git log 6cd0472d..HEAD -- packages/database/overlays/0050_authorization_sources.sql packages/database/migrations/0048_roster_store_set.sql packages/database/migrations/0044_intake_role_defaults.sql packages/database/tests/authorization-set-agreement.test.ts`
+`git log fe360e59..HEAD -- packages/database/overlays/0050_authorization_sources.sql packages/database/migrations/0048_roster_store_set.sql packages/database/migrations/0044_intake_role_defaults.sql packages/database/tests/authorization-set-agreement.test.ts`
 prints anything, look again before trusting a green run.
 
 ## How to read a failure
@@ -98,10 +98,9 @@ After an intended change passes, move the sync commit above to the new HEAD.
 ## What it does not cover
 
 - **One clock per request at the call site.** The property calls both functions with one
-  `p_at`, so it says nothing about callers. `apps/api/src/content-intake/usage.ts` currently
-  writes `clock_timestamp()` inside a row-level expression, so a single query can evaluate
-  two different instants; that is a call-site defect, not a disagreement between the
-  functions, and this check will not see it.
+  `p_at`, so it says nothing about callers. Every door now captures its instant before
+  reading a set; if you add a call site, capture one instant and pass it, never
+  `clock_timestamp()` inside a row projection. This check will not catch a mistake there.
 - **Cross-door behaviour.** It does not publish, search or import. It only proves the two
   authorization shapes agree; whether each door applies its shape correctly is covered by
   `apps/api/tests/search-query-deadline.integration.test.ts`, `publish-deadline`,
