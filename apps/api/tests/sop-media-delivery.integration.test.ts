@@ -66,7 +66,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
       idPrefix: 'sop',
       extraSources: [{ scopeId: 'scope-a', sourceId: 'source-sop', domain: 'product' }],
     });
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 52 });
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
     await admin.query(`CREATE ROLE sop_media_business LOGIN NOINHERIT; GRANT intake_business TO sop_media_business;
       CREATE ROLE sop_media_usage LOGIN NOINHERIT; GRANT intake_usage TO sop_media_usage;
       CREATE ROLE sop_media_auth LOGIN NOINHERIT; GRANT app_backend_auth TO sop_media_auth`);

@@ -811,6 +811,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     [50, '0050_authorization_sources'],
     [51, '0051_publish_source_set'],
     [52, '0052_import_source_set'],
+    [53, '0053_search_source_set'],
   ];
   const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
   const occupiedMigration = productTail[0] ?? null;

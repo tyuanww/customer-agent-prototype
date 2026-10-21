@@ -3,6 +3,7 @@ import type { Client, ClientConfig } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createSearchRepository } from '../src/search-repository.js';
+import { seedQueryPrincipal } from './support/query-principal.js';
 import { createSearchBackend, type SearchBackend } from '../src/search-service.js';
 import {
   readSyntheticG1aCases,
@@ -30,8 +31,10 @@ describeRunner('DEV-M1 synthetic G1a runner', () => {
     await owner.query('CREATE ROLE g1a_synthetic_runtime LOGIN');
     await owner.query('GRANT app_runtime TO g1a_synthetic_runtime');
     await seedSyntheticG1aRelease(owner);
+    await seedQueryPrincipal(owner, { userId: 'usr_synthetic_g1a_runtime',
+      domains: ['presale', 'campaign', 'aftersale', 'product'] });
     runtime = await harness.connect({ ...database.config, user: 'g1a_synthetic_runtime' });
-    const repository = createSearchRepository(runtime as never);
+    const repository = createSearchRepository(runtime as never, 'usr_synthetic_g1a_runtime');
     backend = createSearchBackend({ searchCandidates: repository.search });
   }, 120_000);
 

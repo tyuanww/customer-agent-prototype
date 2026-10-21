@@ -155,6 +155,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0051_publish_source_set',
     requiresPredecessor: 'Import source set requires the publish source set',
   },
+  {
+    index: 52,
+    minimumCatalogueLength: 53,
+    id: '0053_search_source_set',
+    predecessorId: '0052_import_source_set',
+    requiresPredecessor: 'Search source set requires the import source set',
+  },
 ];
 
 function requiredSuccessorStep(

@@ -79,12 +79,12 @@ interface SearchRow extends QueryResultRow {
 export const SEARCH_CANDIDATES_SQL = `
 WITH scoped AS MATERIALIZED (
   SELECT *
-  FROM public.search_recommendable_scripts($1::text, $2::text, $3::text)
+  FROM public.search_recommendable_scripts($1::text, $2::text, $3::text, $4::text)
 ),
 search_input AS MATERIALIZED (
   SELECT CASE
-    WHEN $4::text IS NULL THEN NULL::tsquery
-    ELSE pg_catalog.to_tsquery('simple', $4::text)
+    WHEN $5::text IS NULL THEN NULL::tsquery
+    ELSE pg_catalog.to_tsquery('simple', $5::text)
   END AS ts_query
 ),
 candidate_pool AS MATERIALIZED (
@@ -103,7 +103,7 @@ fallback_matches AS MATERIALIZED (
   SELECT candidate_pool.*, NULL::tsquery AS ts_query
   FROM candidate_pool
   WHERE NOT EXISTS (SELECT 1 FROM primary_matches)
-    AND candidate_pool.search_fallback_text ILIKE $5::text ESCAPE '\\'
+    AND candidate_pool.search_fallback_text ILIKE $6::text ESCAPE '\\'
 ),
 matches AS MATERIALIZED (
   SELECT * FROM primary_matches
@@ -116,15 +116,15 @@ scored AS (
     EXISTS (
       SELECT 1
       FROM pg_catalog.jsonb_array_elements(matches.questions) AS question(value)
-      WHERE pg_catalog.lower(question.value ->> 'question_text') = $6::text
+      WHERE pg_catalog.lower(question.value ->> 'question_text') = $7::text
     ) AS exact_question,
-    pg_catalog.lower(matches.title) = $6::text AS exact_title,
+    pg_catalog.lower(matches.title) = $7::text AS exact_title,
     EXISTS (
       SELECT 1
       FROM pg_catalog.jsonb_array_elements(matches.questions) AS question(value)
-      WHERE pg_catalog.strpos(pg_catalog.lower(question.value ->> 'question_text'), $6::text) > 0
+      WHERE pg_catalog.strpos(pg_catalog.lower(question.value ->> 'question_text'), $7::text) > 0
     ) AS phrase_question,
-    pg_catalog.strpos(pg_catalog.lower(matches.title), $6::text) > 0 AS phrase_title,
+    pg_catalog.strpos(pg_catalog.lower(matches.title), $7::text) > 0 AS phrase_title,
     CASE
       WHEN matches.ts_query IS NULL THEN 0::real
       ELSE pg_catalog.ts_rank_cd(matches.search_document, matches.ts_query)
@@ -151,7 +151,7 @@ ranked AS (
     scored.phrase_title DESC,
     scored.text_rank DESC,
     scored.script_id ASC
-  LIMIT $7::integer
+  LIMIT $8::integer
 ),
 current_context AS (
   SELECT scoped.release_id, scoped.source_binding_hash
@@ -229,12 +229,18 @@ function requireCandidateRow(row: SearchRow): SearchRepositoryCandidate {
   });
 }
 
-export function createSearchRepository(client: SearchQueryClient): Readonly<{
+export function createSearchRepository(
+  client: SearchQueryClient,
+  actorUserId: string,
+): Readonly<{
   search: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
 }> {
   return Object.freeze({
     async search(request): Promise<SearchRepositoryResult> {
+      // The baseline reads through the same gated function as the product backend, so it
+      // has to name the session it runs as.
       const result = await client.query<SearchRow>(SEARCH_CANDIDATES_SQL, [
+        actorUserId,
         request.platform,
         request.productContextType,
         request.productContextRef,

@@ -267,7 +267,7 @@ export function createEventRepository(
 
         const startedAt = performance.now();
         const backend = createSearchBackend({
-          searchCandidates: createSearchRepository(client).search,
+          searchCandidates: createSearchRepository(client, request.actor.user_id).search,
         });
         const search = await backend.search(request.search);
         if (!search.ok) {

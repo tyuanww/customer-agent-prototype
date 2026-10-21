@@ -136,14 +136,14 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('database
     }>(`
       SELECT
         pg_catalog.has_function_privilege('app_runtime', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS runtime_issue,
-        pg_catalog.has_function_privilege('intake_business', 'public.search_recommendable_scripts(text,text,text)', 'EXECUTE') AS business_search,
-        pg_catalog.has_function_privilege('app_runtime', 'public.search_recommendable_scripts(text,text,text)', 'EXECUTE') AS runtime_search,
+        pg_catalog.has_function_privilege('intake_business', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS business_search,
+        pg_catalog.has_function_privilege('app_runtime', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS runtime_search,
         pg_catalog.has_function_privilege('intake_business', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS business_issue,
         pg_catalog.has_function_privilege('public', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS public_issue,
-        pg_catalog.has_function_privilege('public', 'public.search_recommendable_scripts(text,text,text)', 'EXECUTE') AS public_search,
+        pg_catalog.has_function_privilege('public', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS public_search,
         pg_catalog.pg_get_userbyid(p.proowner) AS search_owner
       FROM pg_catalog.pg_proc p
-      WHERE p.oid = 'public.search_recommendable_scripts(text,text,text)'::pg_catalog.regprocedure`);
+      WHERE p.oid = 'public.search_recommendable_scripts(text,text,text,text)'::pg_catalog.regprocedure`);
     expect(privileges.rows[0]).toEqual({
       runtime_issue: false,
       business_search: false,
