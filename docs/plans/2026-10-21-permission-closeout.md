@@ -327,3 +327,78 @@ F3 的扩展通过了属性测试，但我尝试的变异验证（只改一个�
 `pnpm --filter @customer-agent/database build:runtime`。
 只跑 `generate` 会继续使用旧 catalogue，表现为「改了没生效」，
 本轮为此浪费了一轮排查。
+
+## 入口可用性修复（2026-10-21 晚）
+
+前一节记录的六项修复让权限**判定**正确。实测发现入口仍然关着：预登记合成账号的授权是预先写好的，
+所以从未暴露这个洞。
+
+### 实测：全新飞书账号零权限
+
+真实 PG15 上跑完整链路：
+
+```
+project_feishu_roster  → registered
+issue_roster_query     → registered     （不是 projected）
+store_set_members      → 0
+grants                 → []
+有效 query 授权行数     → 0
+/v1/auth/job actions   → 全 false
+```
+
+根因：`issue_roster_query` 的 `desired` 要求当前 release 的 lineage 里有 v2-preview 来源。
+没有已发布内容 → 店铺集为空 → 签不出 query 授权。账号被正确识别身份，然后一个动作都做不了。
+
+同一个原因还让「权限页保存手工 query 授权」静默失效。
+
+### 修了什么
+
+**A · 三种拒绝不再共用一个句子**
+
+改动前 `pending`（已登记、尚无内容）和 `denied`（真的需要开通）都说「没有权限，请找人开通。」，
+把运营引向一个解决不了问题的动作。
+
+句子归属收进 `@customer-agent/job-roster` 的 `rosterMessageFor`：
+
+| 状态 | 文案 | 该做什么 |
+| --- | --- | --- |
+| `pending` | 资料尚未发布，暂时没有可查询内容。发布后重新登录即可。 | 等发布，然后重新登录 |
+| `expired` | 资料资格过期了，请稍后重试。 | 刷新 |
+| `denied` / `revoked` | 没有权限，请找人开通。 | 找人开通 |
+
+三处调用方统一到它：API 的 `composeRosterJob`、`rosterPreparation`，以及桌面的 `permissionNotice`。
+桌面此前自己维护一份映射，且对 `expired` 给出与 API 不同的句子；现在两者不可能再分叉，
+`isSessionJob` 也改为直接比对 `rosterMessageFor(permission)`。
+
+**B · 新建坐席真的写授权主体**
+
+坐席创建此前只写 `subject_bindings`（role 硬编码 `'agent'`）和口令文件。
+不写 `principals`、不写 `role_rules`，所以岗位上选「客服主管」只是 UI 文案，
+而且该账号永远无法被授权——`authorization_deadline` 要 join `role_rules`。
+
+现在 `insert` 复用可信的 `bindKnownPrincipal`（它显式不写 grant），并按岗位写角色规则：
+
+| 岗位 | job_id | role_rules.role | 会话 role |
+| --- | --- | --- | --- |
+| 客服 | `job-seat` | `agent` | `agent` |
+| 客服主管 | `job-seat-supervisor` | `supervisor` | `coach` |
+
+坐席**不写 grant**：能访问哪些店铺和来源是运营在权限页的授权决定，不是建号表单能推断的。
+
+顺带修掉两个连带问题：`list()` 原以 `role='agent'` 过滤，会把主管坐席从列表里藏掉，已改为
+`role IN ('agent','coach')`；`protect` 的两个返回分支共用一个泛型，推断会把失败值收窄，
+改为两个类型参数。
+
+### 验证
+
+| 项 | 结果 |
+| --- | --- |
+| 全新账号实测 | `pending` + `资料尚未发布…`，校验器接受 |
+| 坐席写入实测 | 两个岗位各写出 principal / facts / role_rules / 会话 role |
+| `seat-provisioning.integration.test.ts`（新增） | 1/1 |
+| `project-roster-login.integration` 增补 pending 断言 | 7/7 |
+| roster 单测（含改写后的文案契约用例） | 29/29 |
+| API 集成 13 个文件 | 280/281，唯一失败仍是 SOP |
+| 桌面单测 + 组件 | 1649/1650（`customer-agent-contract-set` 在沙箱内因写 `/private/var/folders` 被拒，沙箱外 87/87） |
+| API / database / desktop / 根 tsc | 通过 |
+| 改动文件 lint | 通过 |
