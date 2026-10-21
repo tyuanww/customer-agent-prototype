@@ -165,7 +165,7 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   return expected.status === 'resolved'
     && expected.role === job.role
     && row.publish === actions.publish
-    && row.grant === actions.publish
+    && row.grant === expected.rights.grant
     && expected.rights.uploadSop === row.uploadSop
     && row.search === actions.query
     && row.readCatalog === (expected.rights.readCatalog && actions.query);
