@@ -96,6 +96,10 @@ export const PRODUCT_ERRORS = {
   OVERLOADED: '服务繁忙，请稍后重试', RATE_LIMITED: '操作过于频繁，请稍后重试',
   CANCELLED: '操作已取消', STALE: '内容已变化，请重新查询',
   CLIPBOARD_FAILED: '复制失败，请重试', SOURCE_GATE_NOT_READY: '内容暂不可用，请联系话术师核实',
+  // The two refusals the search door states in its own words. They are their own codes rather
+  // than FORBIDDEN copies so the sentence an operator reads is the sentence the server sent.
+  NO_GRANT: '没有权限，请找人开通。',
+  FACTS_EXPIRED: '资料资格过期了，请稍后重试。',
 } as const;
 export type ProductErrorCode = keyof typeof PRODUCT_ERRORS;
 export type ProductFailure = { ok: false; sessionEpoch: number; code: ProductErrorCode; message: string };

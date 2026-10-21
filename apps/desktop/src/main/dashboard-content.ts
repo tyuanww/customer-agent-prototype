@@ -20,7 +20,7 @@ import {
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { ProductHttpError } from './product-http';
-import { PERMISSION_DENIAL_MESSAGE, UNRESOLVED_JOB_LABEL } from '../shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL } from '../shared/product-session';
 import type { ProductSession } from './product-session';
 import { LIBRARY_DOMAINS, composeLibraryDelta, type LibraryDomainCounts } from '../shared/library-delta';
 
@@ -59,6 +59,11 @@ function asFailure(error: unknown): DashboardContentFailure {
       return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.sourceIneligible);
     }
     return dashboardContentFailure('FORBIDDEN');
+  }
+  // The search door's sentences are the same two refusals this plate already states, and
+  // this plate carries its own copy for them.
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+    return dashboardContentFailure('FORBIDDEN', PRODUCT_ERRORS[error.code]);
   }
   return dashboardContentFailure(error.code);
 }
