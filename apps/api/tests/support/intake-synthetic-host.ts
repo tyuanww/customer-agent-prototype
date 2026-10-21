@@ -382,6 +382,32 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
            RETURNING grant_id`, [principalId]);
         return revoked.rowCount ?? 0;
       },
+      /** Close one principal's facts window without waiting out its lease. Fact history is
+       * append-only, so this appends a new version whose window has already passed and points
+       * the principal at it, which is what a real refresh would have produced. */
+      async expireFactsFor(principalId: string) {
+        if (closed) throw new Error('Synthetic host is closed');
+        const current = await admin!.query<{ current_facts_version: string }>(
+          'SELECT current_facts_version FROM content_intake.principals WHERE principal_id = $1', [principalId]);
+        const version = Number(current.rows[0]?.current_facts_version);
+        if (!Number.isSafeInteger(version) || version < 1) return false;
+        await admin!.query('BEGIN');
+        try {
+          await admin!.query(`INSERT INTO content_intake.principal_facts(
+              principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+            VALUES ($1, $2, ARRAY['dept-a'], 'job-customer-service-director', true,
+              statement_timestamp()-interval '4 minutes', statement_timestamp()-interval '1 minute', repeat('a',64))
+            ON CONFLICT (principal_id, facts_version) DO NOTHING`, [principalId, version + 1]);
+          await admin!.query(
+            'UPDATE content_intake.principals SET current_facts_version = $2 WHERE principal_id = $1',
+            [principalId, version + 1]);
+          await admin!.query('COMMIT');
+          return true;
+        } catch (error) {
+          await admin!.query('ROLLBACK').catch(() => undefined);
+          throw error;
+        }
+      },
       async revokeSyntheticQuery() {
         if (closed || profile !== 'purpose-runtime') throw new Error('Synthetic runtime control unavailable');
         await admin!.query(`UPDATE content_intake.grants SET version=version+1,revoked_at=clock_timestamp(),last_change_reason='synthetic acceptance revoke'

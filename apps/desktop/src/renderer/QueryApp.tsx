@@ -999,6 +999,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (!(productState?.ok && productState.signedIn)) return;
       const api = window.customerAgent?.intakeQuery;
       if (!api) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); return; }
+      // A session with no query grant has no shops either, so the shop prompt would say the
+      // wrong thing: the reason is the missing grant, not an unselected shop.
+      if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
+        setResults([]); setErrorMessage(PERMISSION_DENIAL_MESSAGE); reportPhase('ERROR'); return;
+      }
       const text = (inputRef.current?.value ?? query).trim();
       const blocked = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
         : !intakeShops.shopId ? '请先选择有权限的店铺。'
