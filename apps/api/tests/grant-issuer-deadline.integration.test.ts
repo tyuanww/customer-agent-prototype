@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuthorizationFixture, type AuthorizationFixture } from './support/authorization-sources-fixture.js';
+import { previewGrants } from '../src/content-intake/authority.js';
+import { IntakeRejection, principal } from '../src/content-intake/transaction.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
@@ -19,6 +21,50 @@ describe.skipIf(!enabled)('a grant issuer is checked against its own source set'
     expect(await fixture.grantRejection('director', 'signer', 'source-a')).not.toBe('SCOPE_DENIED');
     // A closed facts window is a different refusal than "you do not reach that source".
     expect(await fixture.grantRejection('stale', 'director', 'source-a')).toBe('ORG_FACTS_UNAVAILABLE');
+  });
+
+  it('rejects a missing parent action even when the same source is reachable for another action', async () => {
+    // The director holds publish on this scope and no import. Granting the same source under
+    // publish passes the source-set check; switching only the action to import empties the
+    // issuer's import set, so the same source is now outside it.
+    const attempt = async (action: 'publish' | 'import'): Promise<string> => {
+      const client = fixture.intakeClient();
+      const issuer = await principal(client, { id: 'director' });
+      const recipient = await principal(client, { id: 'signer' });
+      const policy = await fixture.admin.query<{ version: string }>(
+        'SELECT version::text AS version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2',
+        [issuer.tenantId, issuer.appId]);
+      try {
+        await previewGrants(client, issuer, {
+          operationId: `grant-${action}-probe`,
+          issuerFactsVersion: issuer.factsVersion,
+          policyVersion: Number(policy.rows[0]?.version),
+          items: [{
+            kind: 'business',
+            recipientPrincipalId: recipient.id,
+            recipientFactsVersion: recipient.factsVersion,
+            action,
+            scope: {
+              tenantId: issuer.tenantId,
+              appId: issuer.appId,
+              brandId: 'brand-a',
+              shopId: null,
+              domain: 'product',
+              sourceId: 'source-a',
+            },
+            startsAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            reason: '合成授权',
+          }],
+        });
+        return 'accepted';
+      } catch (error) {
+        return error instanceof IntakeRejection ? error.reason : 'error';
+      }
+    };
+
+    expect(await attempt('publish')).not.toBe('SCOPE_DENIED');
+    expect(await attempt('import')).toBe('SCOPE_DENIED');
   });
 });
 

@@ -110,6 +110,47 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
     expect(await fixture.resolvePreviousMessage('user-signer')).toBe(DENIED);
   });
 
+  it('matches the batch domains to the allowed set in both directions', async () => {
+    // A pass/fail assertion alone cannot tell an over-wide set from a correct one. Comparing
+    // both EXCEPT directions proves the allowed domains are exactly the batch domains for a
+    // covered batch, and that the missing domain is the only difference for a refused one.
+    await fixture.admin.query(`INSERT INTO public.authoritative_source_versions(
+        source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
+        use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at)
+      VALUES
+        ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z'),
+        ('srcv_aftersale','SRC-AFTERSALE','aftersale','v1',repeat('cd',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')`);
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
+      VALUES ('batch-covered','csv',repeat('ab',32),'staged'), ('batch-missing','csv',repeat('cd',32),'staged')
+      ON CONFLICT (import_batch_id) DO NOTHING`);
+    await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
+    await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
+      VALUES ('batch-covered','product','srcv_product'), ('batch-missing','aftersale','srcv_aftersale')
+      ON CONFLICT DO NOTHING`);
+
+    const difference = async (batchId: string) => {
+      const result = await fixture.admin.query<{ allowed_minus_batch: string[] | null; batch_minus_allowed: string[] | null }>(`
+        WITH allowed AS (
+          SELECT DISTINCT scope.domain
+          FROM content_intake.authorization_sources('director', 'publish', clock_timestamp()) allowed_row
+          JOIN content_intake.scopes scope ON scope.scope_id = allowed_row.scope_id
+        ), batch AS (
+          SELECT domain FROM public.import_batch_source_bindings WHERE import_batch_id = $1
+        )
+        SELECT
+          (SELECT array_agg(domain ORDER BY domain) FROM (SELECT domain FROM allowed EXCEPT SELECT domain FROM batch) x) AS allowed_minus_batch,
+          (SELECT array_agg(domain ORDER BY domain) FROM (SELECT domain FROM batch EXCEPT SELECT domain FROM allowed) x) AS batch_minus_allowed`,
+        [batchId]);
+      return result.rows[0];
+    };
+
+    expect(await difference('batch-covered')).toEqual({ allowed_minus_batch: null, batch_minus_allowed: null });
+    expect(await difference('batch-missing')).toEqual({
+      allowed_minus_batch: ['product'],
+      batch_minus_allowed: ['aftersale'],
+    });
+  });
+
   it('sends the denial sentence in the HTTP body, not only in the SQL message', async () => {
     // The operator reads a response, so the sentence has to survive the route. A route that
     // dropped it would still pass every SQL-level test above.

@@ -10,8 +10,12 @@ export const INTAKE_SYNTHETIC_IDENTITIES = [
 ] as const;
 
 /** Explicit throwaway bootstrap. These synthetic identities and the empty
- * intake catalog are never adopted by a production factory or an existing DB. */
-export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx', includeSopSource = false, factsLease: 'fresh' | 'expired' = 'fresh') {
+ * intake catalog are never adopted by a production factory or an existing DB.
+ *
+ * `storeSetGrants` is false only for the pre-0048 historical fixture, whose schema has neither
+ * the store-set tables nor the grant policy columns. A live query grant cannot be expressed
+ * there, so the seed writes the plain rows those tests need and nothing else. */
+export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' | 'campaign' | 'presale' | 'aftersale' = 'product', inputFormat: 'xlsx' | 'csv' = 'xlsx', includeSopSource = false, factsLease: 'fresh' | 'expired' = 'fresh', storeSetGrants = true) {
   await admin.query('BEGIN');
   try {
     for (const [id, role] of INTAKE_SYNTHETIC_IDENTITIES) {
@@ -38,7 +42,14 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
         VALUES ($1,'allocation','director','director','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成根资格','director')`, [`root-${action}`, action]);
       for (const recipient of ['enabler', 'reviewer', ...(action === 'query' ? ['agent'] : [])]) {
         // A query row is live only with the current policy version and a store set member,
-        // so it is stamped here. Other actions keep those columns NULL.
+        // so it is stamped here. Other actions keep those columns NULL. The pre-0048 fixture
+        // has no such columns, so it writes the unstamped shape instead.
+        if (!storeSetGrants) {
+          await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+            VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成业务授权','director',$4)`,
+          [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
+          continue;
+        }
         await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
           VALUES ($1,'business','director',$2,'tenant-a','app-a','scope-a','source-a',$3,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成业务授权','director',$4,
             CASE WHEN $3='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
@@ -46,26 +57,28 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
         [`business-${recipient}-${action}`, recipient, action, `root-${action}`]);
       }
     }
-    // An issuer must already reach every source it hands out, so the root director holds its
-    // own business rows. A business row needs a different issuer, hence the reviewer allocation.
-    // Query rows are only live with a source, the current policy version and a store set member.
-    await admin.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
-      VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic') ON CONFLICT DO NOTHING`);
-    await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
-      VALUES ('tenant-a','app-a',1) ON CONFLICT (tenant_id,app_id) DO UPDATE SET version=1`);
-    await admin.query(`INSERT INTO content_intake.store_set_members(
-        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
-      VALUES ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '2 hours')
-      ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`);
-    for (const action of ['query', 'content-manage', 'import', 'source-confirm', 'review', 'publish', 'candidate-cancel', 'rollback']) {
-      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
-        VALUES ($1,'allocation','director','reviewer','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成复核分配','director')
-        ON CONFLICT (grant_id) DO NOTHING`, [`alloc-reviewer-${action}`, action]);
-      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
-        VALUES ($1,'business','reviewer','director','tenant-a','app-a','scope-a','source-a',$2,clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '45 minutes','合成签发资格','reviewer',$3,
-          CASE WHEN $2='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
-          CASE WHEN $2='query' THEN 1 END)
-        ON CONFLICT (grant_id) DO NOTHING`, [`issuer-director-${action}`, action, `alloc-reviewer-${action}`]);
+    if (storeSetGrants) {
+      // An issuer must already reach every source it hands out, so the root director holds its
+      // own business rows. A business row needs a different issuer, hence the reviewer allocation.
+      // Query rows are only live with a source, the current policy version and a store set member.
+      await admin.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+        VALUES ('tenant-a','app-a',1,clock_timestamp(),'synthetic') ON CONFLICT DO NOTHING`);
+      await admin.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+        VALUES ('tenant-a','app-a',1) ON CONFLICT (tenant_id,app_id) DO UPDATE SET version=1`);
+      await admin.query(`INSERT INTO content_intake.store_set_members(
+          tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '2 hours')
+        ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`);
+      for (const action of ['query', 'content-manage', 'import', 'source-confirm', 'review', 'publish', 'candidate-cancel', 'rollback']) {
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+          VALUES ($1,'allocation','director','reviewer','tenant-a','app-a','scope-a',$2,clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 day','合成复核分配','director')
+          ON CONFLICT (grant_id) DO NOTHING`, [`alloc-reviewer-${action}`, action]);
+        await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+          VALUES ($1,'business','reviewer','director','tenant-a','app-a','scope-a','source-a',$2,clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '45 minutes','合成签发资格','reviewer',$3,
+            CASE WHEN $2='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a') END,
+            CASE WHEN $2='query' THEN 1 END)
+          ON CONFLICT (grant_id) DO NOTHING`, [`issuer-director-${action}`, action, `alloc-reviewer-${action}`]);
+      }
     }
     // Test-only sibling source: exercise the same SOP opt-in as the API suite.
     if (includeSopSource) {

@@ -31,7 +31,9 @@ describe.skipIf(!enabled)('intake runtime session-lock permission boundary (synt
     const db = harness.createDatabase('intake_runtime_boundary');
     admin = await harness.connect(db.config);
     await applyHistoricalIntakeMigrations(admin);
-    await seedIntakeSyntheticHost(admin);
+    // Pre-0048 schema: no store-set tables and no grant policy columns, so the seed cannot
+    // express a live query grant here. These tests cover the lock boundary, not grant liveness.
+    await seedIntakeSyntheticHost(admin, 'product', 'xlsx', false, 'fresh', false);
     // These grants exist only in a newly initialized disposable cluster.
     await admin.query(`CREATE ROLE synthetic_usage_probe LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
       GRANT USAGE ON SCHEMA backend_identity,backend_review TO synthetic_usage_probe;
