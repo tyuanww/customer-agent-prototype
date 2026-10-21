@@ -269,7 +269,7 @@ describe.skipIf(!enabled)('authorization reachability', () => {
     expect(seen, 'search did not reach the guarded region').toEqual({
       authorized: true, revokedDelegation: true, orphanedSteward: true,
     });
-    // eslint-disable-next-line no-console
+    // Coverage numbers stay visible so a future reader can see the search actually branched.
     console.log(`reachability: ${states} distinct states, deepest path ${deepest}`);
   }, 300_000);
 });
