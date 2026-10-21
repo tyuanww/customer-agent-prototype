@@ -4,6 +4,7 @@ import { Pg15Harness } from '@customer-agent/database/testkit';
 import type { Client } from 'pg';
 import { createHash } from 'node:crypto';
 import { seedQueryPrincipal } from './support/query-principal.js';
+import { createAuthorizationFixture } from './support/authorization-sources-fixture.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 
@@ -189,6 +190,45 @@ describe.skipIf(!enabled)('search reads the query source set by domain', () => {
     // The facts history is immutable, so the window is seeded closed instead of edited later.
     await seedQueryPrincipal(admin, { userId: ACTOR, domains: ['product'], factsWindow: 'expired' });
     expect(await search(ACTOR)).toEqual({ message: STALE });
+  });
+
+  it('sends both refusal sentences over the real HTTP search door', async () => {
+    // The operator reads a response body, not a caught SQL message. A route that dropped the
+    // sentence would still pass every SQL-level case above, and would tell an operator whose
+    // facts window closed to go ask for access.
+    const http = await createAuthorizationFixture('search_http');
+    try {
+      await seedQueryPrincipal(http.admin, { userId: ACTOR, domains: ['product'] });
+      await seedQueryPrincipal(http.admin, { userId: `${ACTOR}-stale`, domains: ['product'], factsWindow: 'expired' });
+      const mounted = await http.mountSearchRoutes();
+      try {
+        const ask = (userId: string, queryId: string) => mounted.app.inject({
+          method: 'POST', url: '/v1/search',
+          headers: { authorization: `Bearer ${mounted.tokenFor(userId)}` },
+          payload: {
+            query_id: queryId, parent_query_id: null, interaction_reason: 'original',
+            query_text: '合成查询', collection_mode: 'synthetic',
+            detected_platform: 'qianniu', platform: 'qianniu', platform_source: 'manual',
+            product_context_type: null, product_context_ref: null, top_k: 3,
+          },
+        });
+        const stale = await ask(`${ACTOR}-stale`, '0f0f0f0f-1111-2222-3333-444444444451');
+        expect(stale.statusCode).toBe(403);
+        expect(stale.json()).toMatchObject({ error: { message: STALE } });
+
+        // Revoke the only query grant, then ask again as the same session.
+        await http.admin.query(`UPDATE content_intake.grants SET version = version + 1,
+          revoked_at = clock_timestamp(), last_change_reason = 'synthetic lane revoke'
+          WHERE recipient_id = $1 AND action = 'query' AND revoked_at IS NULL`, [`prn-search-${ACTOR}`]);
+        const denied = await ask(ACTOR, '0f0f0f0f-1111-2222-3333-444444444452');
+        expect(denied.statusCode).toBe(403);
+        expect(denied.json()).toMatchObject({ error: { message: DENIED } });
+      } finally {
+        await mounted.close();
+      }
+    } finally {
+      await http.close();
+    }
   });
 
   it('refuses the ungated three-argument signature for every caller', async () => {

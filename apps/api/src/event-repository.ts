@@ -69,8 +69,25 @@ const ADOPTION_SCOPE = '/v1/events/adoption';
 const ESCALATION_SCOPE = '/v1/events/escalate';
 const IDEMPOTENCY_LEASE_SECONDS = 60;
 
-function failure(code: Exclude<OperationResult<never>, { ok: true }>['code']) {
-  return Object.freeze({ ok: false as const, code });
+type FailureCode = Exclude<OperationResult<never>, { ok: true }>['code'];
+
+const REFUSAL_SENTENCES = new Set([
+  '没有权限，请找人开通。',
+  '资料资格过期了，请稍后重试。',
+]);
+
+/** The two source-set refusals arrive as ZA005 with the sentence in MESSAGE and a DETAIL
+ * that does not distinguish them, so they are recognised by their text. */
+function noticeOf(error: unknown): string | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  const message = String(Reflect.get(error, 'message') ?? '');
+  return REFUSAL_SENTENCES.has(message) ? message : undefined;
+}
+
+function failure(code: FailureCode, notice?: string) {
+  return Object.freeze(notice === undefined
+    ? { ok: false as const, code }
+    : { ok: false as const, code, notice });
 }
 
 function isSourceGateFailure(error: unknown): boolean {
@@ -275,7 +292,9 @@ export function createEventRepository(
           if (search.code === 'SOURCE_GATE_NOT_READY') {
             sourceDenied = true;
           } else {
-            return failure(search.code);
+            // A source-set refusal is not a gate denial: it says the caller may read nothing
+            // here, and it keeps the sentence the database chose.
+            return failure(search.code, search.notice);
           }
         } else {
           searchResponse = parseContractSchema('SearchResponse', {
@@ -379,6 +398,13 @@ export function createEventRepository(
             }),
           });
         } else {
+          // A source-set refusal is not a source-gate denial: it says the caller may not read
+          // anything, and it carries its own sentence past the generic forbidden copy.
+          const notice = noticeOf(error);
+          if (notice !== undefined) {
+            releaseAsBroken = !(await rollback(client));
+            return failure('FORBIDDEN', notice);
+          }
           const code = mapDatabaseContractError(error);
           if (code === 'INTERNAL') reportFailure(error);
           return failure(code);

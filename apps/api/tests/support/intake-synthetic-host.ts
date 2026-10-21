@@ -19,6 +19,8 @@ import { createContentObjectStore } from '../../dist/content-object-store.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
+import { createEventRepository } from '../../dist/event-repository.js';
+import { registerSearchRoute } from '../../dist/search-routes.js';
 import { IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
 import { createIntakePurposePool, type IntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
 import { createRegisteredOrganizationRefresh } from '../../dist/content-intake/organization/registered-refresh.js';
@@ -31,7 +33,7 @@ export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'afters
 export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
 /** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
  * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
-export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly';
+export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly' | 'roster-stale';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -238,6 +240,33 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         'tenant-a','app-a','scope-a','source-a','query',
         clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成只读查询','director','root-query',
         (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
+    // A third roster principal with the same title and a live query grant, but a facts window
+    // that has already closed. The source set drops every row for it, so search must report the
+    // stale sentence rather than the denial: the two refusals have different causes and
+    // different owners.
+    await admin.query('BEGIN');
+    await admin.query('SET CONSTRAINTS ALL DEFERRED');
+    await admin.query(`INSERT INTO backend_identity.subject_bindings(
+        binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
+      VALUES ('roster-stale','synthetic','tenant-a','roster-stale','user-roster-stale',repeat('a',64),true,'owner')`);
+    await admin.query(`INSERT INTO content_intake.principals VALUES
+        ('roster-stale','user-roster-stale','tenant-a','app-a','feishu-job-roster','roster-stale',1,0)`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES
+        ('roster-stale',1,ARRAY['dept-a'],'job-customer-service-director',true,
+         statement_timestamp()-interval '4 minutes',statement_timestamp()-interval '1 minute',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+        starts_at, expires_at, reason, steward_id)
+      VALUES ('alloc-roster-stale-query','allocation','director','roster-stale',
+        'tenant-a','app-a','scope-a','query',
+        clock_timestamp()-interval '2 days', clock_timestamp()+interval '1 hour','合成过期分配','director')`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+      VALUES ('business-roster-stale-query','business','director','roster-stale',
+        'tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成过期查询','director','root-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
     await admin.query('COMMIT');
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
     if (profile === 'purpose-runtime') {
@@ -275,6 +304,20 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     });
     registerProductAuthRoutes(app, auth);
     registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (userId) => readAuthorizationActions(admin!, userId));
+    // The real search door, on a real app_runtime LOGIN: the search function is executable
+    // only by that capability, so the lanes cannot borrow the intake pools. The keys are
+    // throwaway fixture material and are never printed. The login inherits app_runtime
+    // rather than taking it with SET ROLE, because the event repository runs as the session.
+    await admin!.query('CREATE ROLE synthetic_search_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO synthetic_search_runtime');
+    const searchPool = new Pool({ ...database.config, user: 'synthetic_search_runtime', max: 4 });
+    ownedPools.push(searchPool);
+    const searchEvents = createEventRepository(searchPool, 'synthetic_host_search');
+    registerSearchRoute(app, auth, {
+      operation: { execute: (request) => searchEvents.executeSearch(request) },
+      logHash: { version: 'hmac-log-v1', key: 'synthetic-host-log-hash-material-0001' },
+      idempotencyHmac: { currentVersion: 'hmac-idempotency-v1',
+        keys: { 'hmac-idempotency-v1': 'synthetic-host-idempotency-material-0001' } },
+    });
     app.get('/v1/notices/current', async (request, reply) => {
       if (!(await authenticateRequestHeaders(auth!, request.headers))) return reply.code(401).send();
       return reply.code(410).send({ error: { code: 'GONE', message: 'No notice in the synthetic fixture' } });
@@ -325,7 +368,19 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: DesktopSyntheticIdentity) {
-        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly', 'roster-stale'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+      },
+      /** Revoke one principal's live query grant. The grant history is append-only, so this
+       * is a versioned revoke rather than a delete, exactly like the product path. */
+      async revokeQueryFor(principalId: string) {
+        if (closed) throw new Error('Synthetic host is closed');
+        const revoked = await admin!.query(
+          `UPDATE content_intake.grants
+             SET version = version + 1, revoked_at = clock_timestamp(),
+                 last_change_reason = 'synthetic lane revoke'
+           WHERE recipient_id = $1 AND action = 'query' AND revoked_at IS NULL
+           RETURNING grant_id`, [principalId]);
+        return revoked.rowCount ?? 0;
       },
       async revokeSyntheticQuery() {
         if (closed || profile !== 'purpose-runtime') throw new Error('Synthetic runtime control unavailable');

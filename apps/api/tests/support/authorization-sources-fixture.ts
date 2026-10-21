@@ -1,4 +1,4 @@
-import type { Client } from 'pg';
+import { Pool, type Client } from 'pg';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -12,6 +12,8 @@ import { createContentObjectStore } from '../../src/content-object-store.js';
 import { createContentReleaseService } from '../../src/content-release-service.js';
 import { registerContentReleaseRoutes } from '../../src/content-release-routes.js';
 import { createServiceRepository } from '../../src/service-repository.js';
+import { createEventRepository } from '../../src/event-repository.js';
+import { registerSearchRoute } from '../../src/search-routes.js';
 import { previewGrants } from '../../src/content-intake/authority.js';
 import { IntakeRejection, principal, type IntakeTransaction } from '../../src/content-intake/transaction.js';
 
@@ -48,6 +50,9 @@ export type AuthorizationFixture = Readonly<{
   mountReleaseRoutes: () => Promise<{ app: FastifyInstance; agentToken: string; close: () => Promise<void> }>;
   /** Same idea for the import door, on the real service and a real object store. */
   mountImportRoutes: () => Promise<{ app: FastifyInstance; tokenFor: (userId: string, role: 'agent' | 'coach' | 'owner') => string; close: () => Promise<void> }>;
+  /** The real search door, on a real app_runtime LOGIN, so the two refusal sentences can be
+   * read from an HTTP body rather than from a caught SQL message. */
+  mountSearchRoutes: () => Promise<{ app: FastifyInstance; tokenFor: (userId: string) => string; close: () => Promise<void> }>;
 }>;
 
 export async function createAuthorizationFixture(databaseName = 'authorization_sources'): Promise<AuthorizationFixture> {
@@ -304,6 +309,31 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     };
   };
 
+  const mountSearchRoutes = async () => {
+    // The search function is executable only by the runtime capability, so this door needs its
+    // own login. It inherits app_runtime rather than taking it with SET ROLE.
+    await admin.query('CREATE ROLE search_route_runtime LOGIN; GRANT app_runtime TO search_route_runtime');
+    const connectionString = `postgresql://search_route_runtime@localhost/${database.name}?${new URLSearchParams({
+      host: harness.socket, port: String(harness.port),
+    })}`;
+    const pool = new Pool({ connectionString, max: 2 });
+    const events = createEventRepository(pool, 'authorization_fixture_search');
+    const auth = createMockAuthService();
+    const app = Fastify({ logger: false });
+    registerSearchRoute(app, auth, {
+      operation: { execute: (request) => events.executeSearch(request) },
+      logHash: { version: 'hmac-log-v1', key: 'synthetic-fixture-log-hash-material-00001' },
+      idempotencyHmac: { currentVersion: 'hmac-idempotency-v1',
+        keys: { 'hmac-idempotency-v1': 'synthetic-fixture-idempotency-0001' } },
+    });
+    await app.ready();
+    return {
+      app,
+      tokenFor: (userId: string) => auth.createMockSession({ user_id: userId, role: 'agent' }).token,
+      close: async () => { await app.close(); await pool.end(); await auth.close(); },
+    };
+  };
+
   return Object.freeze({
     admin,
     close: async () => { await admin.end(); harness.stop(); },
@@ -318,5 +348,6 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     grantRejection,
     mountReleaseRoutes,
     mountImportRoutes,
+    mountSearchRoutes,
   });
 }

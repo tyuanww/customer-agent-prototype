@@ -75,14 +75,16 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
   const request: ProductSearchRequest = { sessionEpoch: session.view().sessionEpoch, generation: 1, queryText: '合成发货问题', platform: 'qianniu', platformSource: 'manual', productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null };
   const result = await search.search(1, request);
   // A refusal fixture is expected to fail its first search, so it reports the failure rather
-  // than throwing the way the happy-path fixtures do.
+  // than throwing the way the happy-path fixtures do. `copy` stays typed so the other cases
+  // need no narrowing; it is never read on the refusal path.
   if (!result.ok) {
     if (!options.forbid) throw Error(result.code);
-    return { search, session, request, copy: null, write, events, transport, announce, help, queryId: null, first: result };
+    return { search, session, request, copy: {} as never, write, events,
+      transport, announce, help, queryId: '', first: result };
   }
   const copy = { sessionEpoch: request.sessionEpoch, generation: 1, queryId: result.queryId, rank: 1, scriptId: candidate.script_id,
     scriptVersion: 1, contentHash: candidate.content_hash, placeholderValues: { order_id: 'SYNTHETIC-001' } };
-  return { search, session, request, copy, write, events, transport, announce, help, queryId: result.queryId };
+  return { search, session, request, copy, write, events, transport, announce, help, queryId: result.queryId, first: undefined };
 }
 describe('product query and native copy provenance', () => {
   function recordedModes(transport: { mock: { calls: unknown[][] } }): string[] {
