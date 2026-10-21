@@ -51,7 +51,12 @@ BEGIN
   ) THEN
     RAISE EXCEPTION USING ERRCODE = 'ZA005', MESSAGE = '资料资格过期了，请稍后重试。', DETAIL = 'FORBIDDEN';
   END IF;
-  IF v_principal IS NULL OR EXISTS (
+  -- An empty batch has no domain to check, so it must be refused explicitly rather than
+  -- passing the comparison vacuously.
+  IF v_principal IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.import_batch_source_bindings batch
+    WHERE batch.import_batch_id = p_import_batch_id
+  ) OR EXISTS (
     SELECT 1 FROM public.import_batch_source_bindings batch
     WHERE batch.import_batch_id = p_import_batch_id
       AND NOT EXISTS (

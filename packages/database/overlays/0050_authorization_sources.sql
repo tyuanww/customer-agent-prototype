@@ -79,8 +79,11 @@ $$;
 
 ALTER FUNCTION content_intake.authorization_sources(TEXT, TEXT, TIMESTAMPTZ) OWNER TO cs_ai_definer;
 REVOKE ALL ON FUNCTION content_intake.authorization_sources(TEXT, TEXT, TIMESTAMPTZ) FROM PUBLIC;
+-- app_content_admin is not a caller: it reaches this function only through the SECURITY
+-- DEFINER release functions, which run as their owner. Granting it EXECUTE here would be a
+-- dead privilege that fails on the missing table reads.
 GRANT EXECUTE ON FUNCTION content_intake.authorization_sources(TEXT, TEXT, TIMESTAMPTZ)
-  TO intake_usage, intake_business, intake_runtime_fn_owner, app_content_admin;
+  TO intake_usage, intake_business, intake_runtime_fn_owner;
 GRANT SELECT ON
   content_intake.principals,
   content_intake.principal_facts,

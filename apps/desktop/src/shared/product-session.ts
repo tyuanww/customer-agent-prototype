@@ -86,7 +86,7 @@ export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView 
     rights: {
       ...lookup.rights,
       publish: actions.publish,
-      grant: actions.publish,
+      grant: lookup.rights.grant,
       search: actions.query,
       readCatalog: lookup.rights.readCatalog && actions.query,
     },

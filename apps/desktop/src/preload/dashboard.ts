@@ -191,7 +191,7 @@ function isContentJob(value: unknown): boolean {
   const expected = JOB_RIGHTS[job.title];
   return expected !== undefined
     && flags[0] === bits.publish
-    && flags[1] === bits.publish
+    && flags[1] === expected[1]
     && flags[2] === expected[2]
     && flags[3] === bits.query
     && flags[4] === (expected[4] && bits.query);

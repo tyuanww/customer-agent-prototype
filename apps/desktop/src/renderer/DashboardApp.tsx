@@ -200,13 +200,14 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canGrant = jobKnown
     && contentSignedIn === true
     && sessionJob?.status === 'resolved'
-    && sessionJob.rights.grant === true;
+    && sessionJob.rights.grant === true
+    && sessionJob.actions.publish === true;
   const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
   const grantBlock = !jobKnown
     ? ''
     : sessionJob?.status === 'resolved'
-      ? (sessionJob.rights.grant ? '' : PERMISSION_DENIAL_MESSAGE)
+      ? (sessionJob.rights.grant && sessionJob.actions.publish ? '' : PERMISSION_DENIAL_MESSAGE)
       : '请重新登录后再查看职务。';
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   useEffect(() => {
