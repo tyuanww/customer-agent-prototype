@@ -47,7 +47,11 @@ function install(job: SessionJobView) {
 
 it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席', async () => {
   const user = userEvent.setup();
-  const engineer = observeSessionJob({ title: 'AI赋能工程师', directory: [{ name: 'AI赋能工程师', enabled: true }] });
+  const engineer = observeSessionJob({
+    title: 'AI赋能工程师',
+    directory: [{ name: 'AI赋能工程师', enabled: true }],
+    actions: { query: true, import: true, publish: true, rollback: true },
+  });
   const seat = observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
   for (const job of [engineer, seat]) {
     cleanup();
@@ -61,20 +65,27 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
       expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料管理');
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
-      const grant = await screen.findByRole('button', { name: '新增授权' });
-      if (job.rights.grant) {
+      const grant = job.rights.grant
+        ? await screen.findByRole('button', { name: '新增授权' })
+        : null;
+      if (job.rights.grant && grant) {
         await waitFor(() => expect(grant).toBeEnabled());
         expect(screen.queryByText(UNRESOLVED_JOB_LABEL)).not.toBeInTheDocument();
       } else {
         await waitFor(() => {
-          expect(grant).toBeDisabled();
-          expect(screen.getByText(/当前职务不能授权/)).toBeInTheDocument();
+          expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
+          expect(screen.getByText('没有权限，请找人开通。')).toBeInTheDocument();
         });
       }
       await user.click(screen.getByTestId('nav-materials'));
       expect(await screen.findByRole('heading', { name: '资料管理' })).toBeInTheDocument();
       await user.click(screen.getByTestId('nav-publish'));
-      expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
+      if (job.actions.publish) {
+        expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole('button', { name: '发布' })).toBeNull();
+        expect(screen.getByTestId('content-publish-denied')).toHaveTextContent('没有权限，请找人开通。');
+      }
       expect(screen.queryByText(CONTENT_PUBLISH_COPY.ownerPublish)).not.toBeInTheDocument();
     } finally {
       owner.dispose();
@@ -89,8 +100,7 @@ it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh
     render(<DashboardApp />);
     expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
     await user.click(screen.getByTestId('nav-permissions'));
-    const grant = await screen.findByRole('button', { name: '新增授权' });
-    await waitFor(() => expect(grant).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull());
     expect(screen.getByText('请重新登录后再查看职务。')).toBeInTheDocument();
   } finally {
     owner.dispose();

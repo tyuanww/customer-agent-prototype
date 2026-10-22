@@ -6,6 +6,7 @@ import type { ProductSession } from './product-session';
 import { queryFailure, type ProductCandidate, type ProductSearchRequest, type ProductCopyRequest,
   type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity,
   type ProductInaccuracyRequest, type ProductInaccuracyResult } from '../shared/product-search';
+import { PRODUCT_ERRORS } from '../shared/product-session';
 import type { AnnounceGate } from '../shared/product-announce';
 import { SYNTHETIC_HELP_CONTACT, type ProductEscalateRequest, type ProductEscalateResult,
   type ProductTerminalRequest, type ProductTerminalResult } from '../shared/product-help';
@@ -201,6 +202,17 @@ export class ProductSearch {
     if (!this.session.view().signedIn) throw new ProductHttpError('UNAUTHORIZED');
   }
   private failure(error: unknown, identity: QueryIdentity) {
+    // The search door refuses with the sentence itself, not the generic forbidden copy. Carry
+    // it through as its own code so the operator reads the server's words, and the preload
+    // validator still sees message === PRODUCT_ERRORS[code].
+    if (error instanceof ProductHttpError) {
+      if (error.code === 'FORBIDDEN' && error.reason === PRODUCT_ERRORS.NO_GRANT) {
+        return queryFailure('NO_GRANT', identity);
+      }
+      if (error.code === 'FORBIDDEN' && error.reason === PRODUCT_ERRORS.FACTS_EXPIRED) {
+        return queryFailure('FACTS_EXPIRED', identity);
+      }
+    }
     return queryFailure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', identity);
   }
   cancel(sender: number, identity: QueryIdentity): ProductCancelResult {

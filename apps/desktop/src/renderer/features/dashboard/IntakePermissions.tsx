@@ -234,7 +234,9 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '' }:
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
           {job==='grants'
-            ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source || !canGrant} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
+            ? (canGrant
+              ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
+              : null)
             : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建坐席</DeskButton>}
         </span>
       </div>

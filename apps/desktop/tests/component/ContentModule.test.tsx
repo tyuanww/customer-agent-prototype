@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentModule } from '../../src/renderer/features/dashboard/ContentModule';
-import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_PUBLISH_COPY, CONTENT_ROLLBACK_COPY } from '../../src/shared/dashboard-content';
+import { CONTENT_IMPORT_FAILURE_COPY, CONTENT_ROLLBACK_COPY } from '../../src/shared/dashboard-content';
 import { composeLibraryDelta } from '../../src/shared/library-delta';
 import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
 import type {
@@ -42,12 +42,16 @@ async function chooseLibrary(user: UserEvent, domain: DashboardContentDomain) {
   await user.click(await screen.findByRole('option', { name: LIBRARY_LABEL[domain] }));
 }
 
-const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
+const titled = (title: string, allowed = false) => observeSessionJob({
+  title,
+  directory: [{ name: title, enabled: true }],
+  ...(allowed ? { actions: { query: true, import: true, publish: true, rollback: true } } : {}),
+});
 
 function mockSession(
   role: 'agent' | 'coach' | 'owner',
   signedIn = true,
-  job: SessionJobView | null = !signedIn ? null : role === 'agent' ? titled('普通客服') : role === 'owner' ? titled('客服总监') : null,
+  job: SessionJobView | null = !signedIn ? null : role === 'agent' ? titled('普通客服') : role === 'owner' ? titled('客服总监', true) : null,
 ): DashboardContentApi {
   return {
     session: vi.fn(async () => ({
@@ -144,8 +148,8 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => {
       expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
     });
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(CONTENT_PUBLISH_COPY.agent);
+    expect(screen.queryByTestId('publish-action')).toBeNull();
+    expect(screen.getByTestId('content-publish-denied')).toHaveTextContent('没有权限，请找人开通。');
     expect(api.publishDraft).not.toHaveBeenCalled();
     expect(screen.getByTestId('content-session-badge')).toHaveTextContent('已接入');
   });
@@ -409,6 +413,36 @@ describe('ContentModule publish gate', () => {
     await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('服务暂不可用'));
     expect(screen.queryByTestId('publish-feedback-delta')).not.toBeInTheDocument();
     expect(screen.queryByTestId('publish-feedback-headline')).not.toBeInTheDocument();
+  });
+
+  it('renders the stale sentence when the publish is refused for a closed facts window', async () => {
+    const api = mockSession('owner');
+    api.parseUpload = vi.fn(async () => ({
+      ok: true as const,
+      sourceName: 'presale.xlsx',
+      rows: [{ scene: '发货时效', script: '亲亲这是话术', domain: 'presale' as const }],
+      csvText: 'scene,script,domain\n发货时效,亲亲这是话术,presale\n',
+    }));
+    // The server distinguishes a closed facts window from a missing grant. Showing the generic
+    // denial here would tell the operator to request access when waiting would have worked.
+    api.publishDraft = vi.fn(async () => ({
+      ok: false as const,
+      code: 'FORBIDDEN' as const,
+      message: '资料资格过期了，请稍后重试。',
+    }));
+    window.dashboardContent = api;
+    const user = userEvent.setup();
+    render(<ContentModule />);
+    await waitFor(() => expect(api.session).toHaveBeenCalled());
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'presale.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
+    await waitFor(() => expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready'));
+    await chooseLibrary(user, 'presale');
+    await user.click(screen.getByTestId('publish-action'));
+    await waitFor(() => expect(screen.getByTestId('publish-feedback')).toHaveTextContent('资料资格过期了，请稍后重试。'));
+    expect(screen.getByTestId('publish-feedback')).not.toHaveTextContent('没有权限，请找人开通。');
   });
 
   it('fail-closes the cancel button when the preload has no cancel channel', async () => {
@@ -687,15 +721,22 @@ describe('ContentModule rollback to previous release', () => {
     render(<ContentModule />);
     expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
 
-    for (const role of ['agent', 'coach'] as const) {
-      cleanup();
-      const api = mockSession(role);
-      window.dashboardContent = api;
-      render(<ContentModule />);
-      await waitFor(() => expect(api.session).toHaveBeenCalled());
-      expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
-      expect(api.rollbackPrevious).not.toHaveBeenCalled();
-    }
+    cleanup();
+    const agent = mockSession('agent');
+    window.dashboardContent = agent;
+    render(<ContentModule />);
+    await waitFor(() => expect(agent.session).toHaveBeenCalled());
+    expect(screen.queryByTestId('content-rollback-previous')).toBeNull();
+    expect(screen.getByTestId('content-rollback-denied')).toHaveTextContent('没有权限，请找人开通。');
+    expect(agent.rollbackPrevious).not.toHaveBeenCalled();
+
+    cleanup();
+    const coach = mockSession('coach');
+    window.dashboardContent = coach;
+    render(<ContentModule />);
+    await waitFor(() => expect(coach.session).toHaveBeenCalled());
+    expect(screen.getByTestId('content-rollback-previous')).toBeDisabled();
+    expect(coach.rollbackPrevious).not.toHaveBeenCalled();
   });
 
   it('requires a confirmation click before calling the API, then reports the copied release', async () => {

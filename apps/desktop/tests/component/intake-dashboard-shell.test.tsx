@@ -32,7 +32,11 @@ function allowGrant() {
       signedIn: true,
       role: 'owner',
       displayName: '合成管理员',
-      job: observeSessionJob({ title: '客服总监', directory: [{ name: '客服总监', enabled: true }] }),
+      job: observeSessionJob({
+        title: '客服总监',
+        directory: [{ name: '客服总监', enabled: true }],
+        actions: { query: true, import: true, publish: true, rollback: true },
+      }),
     }),
     parseUpload: async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用，请重试' }),
     publishDraft: async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用，请重试' }),

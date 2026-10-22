@@ -12,10 +12,16 @@ import {
   rowRequiresOwner,
 } from '../../src/shared/dashboard-content';
 import { observeSessionJob } from '../../src/shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE } from '../../src/shared/product-session';
 
-const titled = (title: string) => observeSessionJob({ title, directory: [{ name: title, enabled: true }] });
-const director = titled('客服总监');
-const engineer = titled('AI赋能工程师');
+const allowedActions = { query: true, import: true, publish: true, rollback: true };
+const titled = (title: string, allowed = false) => observeSessionJob({
+  title,
+  directory: [{ name: title, enabled: true }],
+  ...(allowed ? { actions: allowedActions } : {}),
+});
+const director = titled('客服总监', true);
+const engineer = titled('AI赋能工程师', true);
 const agentJob = titled('普通客服');
 const unresolved = observeSessionJob(null);
 const productRow = { scene: '洁面用量确认', script: '先确认产品版本', domain: 'product' as const };
@@ -77,7 +83,7 @@ describe('content publish role gate', () => {
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'owner', job: agentJob, rows: [productRow],
       sourceBindings: bindings,
-    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.agent });
+    })).toEqual({ allowed: false, code: 'FORBIDDEN', message: PERMISSION_DENIAL_MESSAGE });
     expect(CONTENT_PUBLISH_COPY.agent).not.toBe(CONTENT_PUBLISH_COPY.ownerPublish);
   });
 
@@ -93,14 +99,21 @@ describe('content publish role gate', () => {
   });
 
   it('keeps a publishing job without grant away from sensitive drafts', () => {
-    const supervisor = observeSessionJob({ title: '客服主管', directory: [{ name: '客服主管', enabled: true }] });
+    const supervisor = observeSessionJob({
+      title: '客服主管',
+      directory: [{ name: '客服主管', enabled: true }],
+      actions: allowedActions,
+    });
+    const withoutGrant = supervisor.status === 'resolved'
+      ? { ...supervisor, rights: { ...supervisor.rights, grant: false } }
+      : supervisor;
     const bindings = [{ domain: 'product' as const, source_version_id: 'srcv_a' }];
     expect(contentPublishGate({
       productAvailable: true, signedIn: true, role: 'coach', job: supervisor, rows: [productRow],
       sourceBindings: bindings,
     })).toEqual({ allowed: true });
     expect(contentPublishGate({
-      productAvailable: true, signedIn: true, role: 'coach', job: supervisor, rows: [aftersaleRow],
+      productAvailable: true, signedIn: true, role: 'coach', job: withoutGrant, rows: [aftersaleRow],
       sourceBindings: [{ domain: 'aftersale', source_version_id: 'srcv_a' }],
     })).toEqual({ allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive });
   });
