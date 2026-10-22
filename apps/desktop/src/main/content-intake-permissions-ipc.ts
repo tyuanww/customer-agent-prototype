@@ -37,7 +37,12 @@ export function registerContentIntakePermissionsIpc(session: ProductSession | nu
       wc.once('destroyed',()=>{win.removeListener('close',closing);owners.delete(wc);owned.dispose();});
     }
     try{return {ok:true,view:channel==='dashboard:permissions-current'?owner.view():await owner.command(args[0] as Parameters<ContentIntakePermissions['command']>[0])};}
-    catch(error){return {ok:false,message:error instanceof ProductHttpError && error.reason==='ROLE_CEILING'?'所选人员不能执行这些动作，请调整权限。':owner.view().pending?'操作结果待确认，请按原请求重试。':'权限、人员状态或输入已变化，请刷新后核对。',view:owner.view()};}
+    catch(error){
+      // A refusal that named its own cause keeps that wording; the fallback sentence below
+      // asks the operator to refresh, which is wrong when the state will not change.
+      const named = owner.view().notice;
+      return {ok:false,message:named ?? (error instanceof ProductHttpError && error.reason==='ROLE_CEILING'?'所选人员不能执行这些动作，请调整权限。':owner.view().pending?'操作结果待确认，请按原请求重试。':'权限、人员状态或输入已变化，请刷新后核对。'),view:owner.view()};
+    }
   });
   const allowClose=()=>{
     if(![...owners.values()].some(owner=>owner.closeRisk()))return true;

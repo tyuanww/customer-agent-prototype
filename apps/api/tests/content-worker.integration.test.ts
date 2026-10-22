@@ -111,12 +111,21 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         `, [user, cap]);
       }
     }
-    // Import reads authorization_sources, so the synthetic reviewer must hold an import grant
-    // for every domain the worker fixture uploads.
+    // The historical batch chain is operator-only, so the identity that uploads and cancels
+    // is a separate owner binding. The three reviewer identities stay coach: their capability
+    // bindings drive the review queue, and none of them may drive the batch chain.
+    await admin.query(`
+      INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ('synthetic_t3_importer','synthetic','synthetic-tenant','synthetic_t3_importer','usr_t3_importer',
+        encode(sha256(convert_to('synthetic_t3_importer','UTF8')),'hex'),true,'owner')
+    `);
+    // Import reads authorization_sources, so the importer must hold an import grant for every
+    // domain the worker fixture uploads.
     await seedContentWriteAuthority(admin, {
       tenantId: 'tenant-t3', appId: 'app-t3', brandId: 'brand-t3',
       signer: { principalId: 't3-signer', userId: 'usr_t3_owner', jobId: 'job-t3-director', role: 'director' },
       recipients: [
+        { principalId: 't3-importer', userId: 'usr_t3_importer', jobId: 'job-t3-director', role: 'director' },
         { principalId: 't3-lead', userId: 'usr_t3_lead', jobId: 'job-t3-lead', role: 'lead' },
         { principalId: 't3-manager', userId: 'usr_t3_manager', jobId: 'job-t3-manager', role: 'manager' },
         { principalId: 't3-quality', userId: 'usr_t3_quality', jobId: 'job-t3-quality', role: 'lead' },
@@ -189,7 +198,7 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
   }
 
   async function importBatch(key: string): Promise<string> {
-    const owner = await productToken('synthetic_lead');
+    const owner = await productToken('synthetic_t3_importer');
     const imported = await app.inject({
       method: 'POST', url: '/v1/content/import',
       headers: {
@@ -221,8 +230,9 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         'EVD-SCALE-SOURCE','synthetic-owner',clock_timestamp(),clock_timestamp()+interval '365 days')
     `, [b.source_version_id,b.source_ref,b.domain,sha('sha256').update(file).digest('hex')]);
     const lead = await productToken('synthetic_lead');
+    const importer = await productToken('synthetic_t3_importer');
     const uploaded = await app.inject({ method: 'POST', url: '/v1/content/import',
-      headers: { authorization: `Bearer ${lead}`, 'idempotency-key': 'scale-import',
+      headers: { authorization: `Bearer ${importer}`, 'idempotency-key': 'scale-import',
         'content-type': 'multipart/form-data; boundary=----t3boundary' }, payload: multipart(file, bindings) });
     expect(uploaded.statusCode, uploaded.body).toBe(202);
     const batchId = uploaded.json().import_batch_id as string;
@@ -247,7 +257,7 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
   });
 
   it('cancels a staged import', async () => {
-    const owner = await productToken('synthetic_lead');
+    const owner = await productToken('synthetic_t3_importer');
     const batchId = await importBatch('idem-t3-cancel');
     expect(await worker.runOnce()).toBe('finished');
     const cancelled = await app.inject({

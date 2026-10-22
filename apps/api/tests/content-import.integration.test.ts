@@ -71,13 +71,16 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
       for (const [principal, user, job, role] of [
         ['coach', 'usr_t2_coach', 'job-t2-lead', 'lead'],
         ['owner', 'usr_t2_owner', 'job-t2-director', 'director'],
+        // A second operator, so the actor-isolation cases still compare two distinct
+        // sessions now that the historical chain is operator-only.
+        ['owner2', 'usr_t2_owner2', 'job-t2-director', 'director'],
         ['signer', 'usr_t2_signer', 'job-t2-director', 'director'],
         ['agent', 'usr_t2_agent', 'job-t2-agent', 'agent'],
       ] as const) {
         await admin.query(`INSERT INTO backend_identity.subject_bindings(
             binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
           VALUES ($1,'synthetic','synthetic-tenant',$1,$2,repeat('a',64),true,$3)
-          ON CONFLICT (binding_id) DO NOTHING`, [principal, user, role === 'agent' ? 'agent' : 'owner']);
+          ON CONFLICT (binding_id) DO NOTHING`, [principal, user, role === 'agent' ? 'agent' : role === 'lead' ? 'coach' : 'owner']);
         await admin.query(`INSERT INTO content_intake.principals(
             principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version, revocation_generation)
           VALUES ($1,$2,'tenant-t2','app-t2','confirmed-synthetic',$1,1,0)
@@ -105,7 +108,7 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
           VALUES ($1,'allocation','signer','signer','tenant-t2','app-t2',$2,'import',
             clock_timestamp()-interval '2 minutes',clock_timestamp()+interval '2 days','合成分配。','signer')`,
         [`alloc-t2-${domain}-import`, `scope-t2-${domain}`]);
-        for (const recipient of ['coach', 'owner'] as const) {
+        for (const recipient of ['coach', 'owner', 'owner2'] as const) {
           await admin.query(`INSERT INTO content_intake.grants(
               grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
               starts_at, expires_at, reason, steward_id, parent_grant_id)
@@ -168,11 +171,14 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     }
   }
 
-  async function login(role: 'coach' | 'owner' | 'agent' = 'coach') {
+  /** `seat` names the fixture principal; `role` is the contract Role it logs in with.
+   *  owner2 is a second operator seat, not a fourth role. */
+  async function login(seat: 'coach' | 'owner' | 'owner2' | 'agent' = 'coach') {
+    const role = seat === 'owner2' ? 'owner' : seat;
     const session = await app.inject({
       method: 'POST',
       url: '/v1/auth/mock-login',
-      payload: { user_id: `usr_t2_${role}`, role },
+      payload: { user_id: `usr_t2_${seat}`, role },
     });
     expect(session.statusCode).toBe(200);
     return { authorization: `Bearer ${session.json().token}` };
@@ -342,19 +348,19 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
   it('keeps the sweep honest when a different actor enqueues while this actor sweeps', async () => {
     await seedSources(sha256(CSV));
     const owner = await login('owner');
-    const coach = await login('coach');
+    const otherOperator = await login('owner2');
 
-    // Coach holds the in-flight slot before the owner even looks.
-    const coachBatch = await app.inject({
+    // The other operator holds the in-flight slot before this owner even looks.
+    const otherBatch = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
-      headers: importHeaders(coach, '----t2boundary', 'idem-t2-coach-holds'),
+      headers: importHeaders(otherOperator, '----t2boundary', 'idem-t2-coach-holds'),
       payload: multipart(CSV, 'text/csv'),
     });
-    expect(coachBatch.statusCode).toBe(202);
+    expect(otherBatch.statusCode).toBe(202);
 
-    // Owner's sweep must not report someone else's queue as its own success, and must
-    // not touch the coach's batch.
+    // The sweep must not report someone else's queue as its own success, and must
+    // not touch the other operator's batch.
     const emptySweep = await app.inject({
       method: 'POST',
       url: '/v1/content/import/imp_actor_in_flight_01/cancel',
@@ -362,11 +368,11 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
       payload: { reason: 'synthetic-revise' },
     });
     expect(emptySweep.statusCode).toBe(404);
-    const coachStill = await admin.query(
+    const otherStill = await admin.query(
       'SELECT status FROM public.import_batches WHERE import_batch_id = $1',
-      [coachBatch.json().import_batch_id],
+      [otherBatch.json().import_batch_id],
     );
-    expect(coachStill.rows[0].status).toBe('validating');
+    expect(otherStill.rows[0].status).toBe('validating');
 
     // Now the owner has its own in-flight batch behind the coach's. Both are live at once.
     const ownerBatch = await app.inject({
@@ -377,7 +383,7 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     });
     expect(ownerBatch.statusCode).toBe(202);
 
-    // The owner's sweep must retire exactly its own batch and leave the coach's alone.
+    // The owner's sweep must retire exactly its own batch and leave the other operator's alone.
     const ownerSweep = await app.inject({
       method: 'POST',
       url: '/v1/content/import/imp_actor_in_flight_01/cancel',
@@ -387,11 +393,11 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     expect(ownerSweep.statusCode).toBe(200);
     const after = await admin.query(
       'SELECT import_batch_id, status FROM public.import_batches WHERE import_batch_id = ANY($1::text[])',
-      [[coachBatch.json().import_batch_id, ownerBatch.json().import_batch_id]],
+      [[otherBatch.json().import_batch_id, ownerBatch.json().import_batch_id]],
     );
     const byId = new Map(after.rows.map((row: { import_batch_id: string; status: string }) => [row.import_batch_id, row.status]));
     expect(byId.get(ownerBatch.json().import_batch_id)).toBe('failed');
-    expect(byId.get(coachBatch.json().import_batch_id)).toBe('validating');
+    expect(byId.get(otherBatch.json().import_batch_id)).toBe('validating');
   });
 
   it('serializes actor cancellation and upload on the same first lock without taking the admission lock early', async () => {
@@ -466,12 +472,12 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
 
   it('refuses the sweep for an actor with nothing in flight without touching another actor batch', async () => {
     await seedSources(sha256(CSV));
-    const coach = await login('coach');
+    const otherOperator = await login('owner2');
     const owner = await login('owner');
     const accepted = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
-      headers: importHeaders(coach, '----t2boundary', 'idem-t2-coach-in-flight'),
+      headers: importHeaders(otherOperator, '----t2boundary', 'idem-t2-coach-in-flight'),
       payload: multipart(CSV, 'text/csv'),
     });
     expect(accepted.statusCode).toBe(202);
@@ -510,7 +516,7 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
 
   it('accepts a declared XLSX payload after persist and digest verification', async () => {
     await seedSources(sha256(XLSX));
-    const auth = await login();
+    const auth = await login('owner');
     const accepted = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
@@ -523,7 +529,7 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
 
   it('rejects oversized, truncated, unauthenticated, agent, and Feishu JSON uploads without creating a batch', async () => {
     await seedSources(sha256(CSV));
-    const auth = await login();
+    const auth = await login('owner');
     const oversized = await app.inject({
       method: 'POST',
       url: '/v1/content/import',
@@ -621,6 +627,21 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
     const store = createContentObjectStore(storeRoot);
     const leftover = await store.readReceipt('imp_doesnotexist0001');
     expect(leftover).toBeNull();
+  });
+
+  it('refuses a non-owner legacy upload even when the principal holds an import grant', async () => {
+    await seedSources(sha256(CSV));
+    // The snapshot fixture gives coach an import grant and a lead role, so the
+    // only thing that should stand between this request and a batch is owner-only.
+    const coach = await login('coach');
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/content/import',
+      headers: importHeaders(coach, '----t2boundary', 'idem-owner-only-upload'),
+      payload: multipart(CSV, 'text/csv'),
+    });
+    expect(refused.statusCode).toBe(403);
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.import_batches')).rows[0].n).toBe(0);
   });
 
   it('replays the same idempotency key and rejects a different body', async () => {

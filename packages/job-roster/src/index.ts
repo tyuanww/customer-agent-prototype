@@ -88,8 +88,6 @@ export function matchJobRoster(
 
 export type RosterPermissionState = 'unknown' | 'pending' | 'ready' | 'denied' | 'expired' | 'revoked';
 
-const ROSTER_DENIAL_MESSAGE = '没有权限，请找人开通。';
-
 function exactKeys(value: object, keys: readonly string[]): value is Record<string, unknown> {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
@@ -110,7 +108,21 @@ function readPermissionState(value: unknown): RosterPermissionState | null {
   }
 }
 
-/** `/v1/auth/job` body. Extra keys fail closed. Ready and unknown carry no message. */
+export const ROSTER_DENIAL_MESSAGE = '没有权限，请找人开通。';
+/** An expired facts window needs a refresh, not a person to open access. */
+export const FACTS_EXPIRED_MESSAGE = '资料资格过期了，请稍后重试。';
+/** A registered seat whose tenant has nothing published yet. It reaches `pending`, and the
+ *  denial sentence would be wrong there: no one can grant around missing content. */
+export const ROSTER_PENDING_MESSAGE = '资料尚未发布，暂时没有可查询内容。发布后重新登录即可。';
+
+/** The one owner of which sentence a state carries. The three refusals have different
+ *  causes and different owners, so they must not flatten into one string. */
+export function rosterMessageFor(state: RosterPermissionState): string | null {
+  if (state === 'ready' || state === 'unknown') return null;
+  if (state === 'expired') return FACTS_EXPIRED_MESSAGE;
+  if (state === 'pending') return ROSTER_PENDING_MESSAGE;
+  return ROSTER_DENIAL_MESSAGE;
+}
 export function parseRosterJobResponse(value: unknown): {
   title: string;
   directory: readonly { name: string; enabled: boolean }[];
@@ -133,11 +145,9 @@ export function parseRosterJobResponse(value: unknown): {
   const permission_state = readPermissionState(value.permission_state);
   if (!permission_state) return null;
   const message = value.message;
-  if (permission_state === 'ready' || permission_state === 'unknown') {
-    if (message !== null) return null;
-  } else if (message !== ROSTER_DENIAL_MESSAGE) {
-    return null;
-  }
+  // Exactly the sentence this state owns. An unknown string still fails closed.
+  const expectedMessage = rosterMessageFor(permission_state);
+  if (message !== expectedMessage) return null;
   const actions = value.actions;
   if (!actions || typeof actions !== 'object' || Array.isArray(actions)) return null;
   if (!exactKeys(actions, ['query', 'import', 'publish', 'rollback'])) return null;
@@ -147,7 +157,7 @@ export function parseRosterJobResponse(value: unknown): {
     title,
     directory,
     permission_state,
-    message,
+    message: expectedMessage,
     actions: {
       query: flags.query as boolean,
       import: flags.import as boolean,

@@ -47,7 +47,7 @@ export type AuthorizationFixture = Readonly<{
   /** Mount the real release routes on this fixture. The plan's refusal sentence is what the
    * operator reads in an HTTP body, so at least one test has to read it there instead of from
    * a caught SQL message. Returns one mock agent session for the caller to sign requests with. */
-  mountReleaseRoutes: () => Promise<{ app: FastifyInstance; agentToken: string; close: () => Promise<void> }>;
+  mountReleaseRoutes: () => Promise<{ app: FastifyInstance; agentToken: string; ownerToken: string; close: () => Promise<void> }>;
   /** Same idea for the import door, on the real service and a real object store. */
   mountImportRoutes: () => Promise<{ app: FastifyInstance; tokenFor: (userId: string, role: 'agent' | 'coach' | 'owner') => string; close: () => Promise<void> }>;
   /** The real search door, on a real app_runtime LOGIN, so the two refusal sentences can be
@@ -116,20 +116,20 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
           clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配发布。')`);
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
-        starts_at, expires_at, reason, parent_grant_id, policy_version, store_set_version)
+        starts_at, expires_at, reason, parent_grant_id, policy_version, store_set_version, steward_id)
       VALUES
         ('grant-query-a','business','signer','director','tenant-menokin','app-customer-agent','scope-product','source-a','query',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '查询甲。','grant-alloc-query',3,1),
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '查询甲。','grant-alloc-query',3,1,'signer'),
         ('grant-query-b','business','signer','director','tenant-menokin','app-customer-agent','scope-product','source-b','query',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '180 seconds', '查询乙。','grant-alloc-query',3,1),
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '180 seconds', '查询乙。','grant-alloc-query',3,1,'signer'),
         ('grant-publish','business','signer','director','tenant-menokin','app-customer-agent','scope-product',NULL,'publish',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '发布。','grant-alloc-publish',NULL,NULL),
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '发布。','grant-alloc-publish',NULL,NULL,'signer'),
         ('grant-agent-publish','business','signer','agent','tenant-menokin','app-customer-agent','scope-product',NULL,'publish',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '客服发布。','grant-alloc-publish',NULL,NULL),
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '客服发布。','grant-alloc-publish',NULL,NULL,'signer'),
         ('grant-agent-query','business','signer','agent','tenant-menokin','app-customer-agent','scope-product','source-a','query',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '客服查询。','grant-alloc-query',3,1),
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '客服查询。','grant-alloc-query',3,1,'signer'),
         ('grant-stale','business','signer','stale','tenant-menokin','app-customer-agent','scope-product','source-a','query',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '过期查询。','grant-alloc-query',3,1)`);
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '60 seconds', '过期查询。','grant-alloc-query',3,1,'signer')`);
     await admin.query('COMMIT');
   } catch (error) {
     await admin.end();
@@ -215,9 +215,9 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
       [`grant-alloc-rollback-${domain}`, `scope-${domain}`]);
       await admin.query(`INSERT INTO content_intake.grants(
           grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
-          starts_at, expires_at, reason, parent_grant_id)
+          starts_at, expires_at, reason, parent_grant_id, steward_id)
         VALUES ($1,'business','signer','director','tenant-menokin','app-customer-agent',$2,NULL,'rollback',
-          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','回滚。',$3)`,
+          clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','回滚。',$3,'signer')`,
       [`grant-rollback-${domain}`, `scope-${domain}`, `grant-alloc-rollback-${domain}`]);
     }
     await admin.query('COMMIT');
@@ -278,9 +278,13 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
     registerContentReleaseRoutes(app, auth, { service: release });
     await app.ready();
     const agentToken = auth.createMockSession({ user_id: 'user-agent', role: 'agent' }).token;
+    // The historical publish chain is operator-only, so a denial that must come from the
+    // source-set gate needs an owner session; the agent session now stops at admission.
+    const ownerToken = auth.createMockSession({ user_id: 'user-signer', role: 'owner' }).token;
     return {
       app,
       agentToken,
+      ownerToken,
       close: async () => { await app.close(); await release.close(); await auth.close(); },
     };
   };

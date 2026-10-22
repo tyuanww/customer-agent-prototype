@@ -12,6 +12,8 @@ export type SeatPerson = {
   username: string;
   bindingId: string;
   userId: string;
+  /** The post decides the job and the role band the seat is registered under. */
+  post: IntakePost;
 };
 
 export type PreparedPassword = {
@@ -78,7 +80,7 @@ export function seatUsername(username: unknown): { ok: true; username: string; b
   return { ok: true, username, bindingId: `synthetic_${username}` };
 }
 
-export function seatPerson(displayName: unknown, username: unknown): { ok: true; person: SeatPerson } | { ok: false; error: 'missing-person' } {
+export function seatPerson(displayName: unknown, username: unknown, post: IntakePost): { ok: true; person: SeatPerson } | { ok: false; error: 'missing-person' } {
   const login = seatUsername(username);
   if (!login.ok) return login;
   if (typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.trim().length > 256) {
@@ -91,6 +93,7 @@ export function seatPerson(displayName: unknown, username: unknown): { ok: true;
       username: login.username,
       bindingId: login.bindingId,
       userId: `usr_${login.bindingId}`,
+      post,
     },
   };
 }
@@ -112,10 +115,10 @@ export async function createSeatAccount(people: SeatPeople, passwords: SeatPassw
   password: unknown;
   post: unknown;
 }): Promise<SeatCreateResult> {
-  const person = seatPerson(input.displayName, input.username);
-  if (!person.ok) return person;
   const post = knownPost(input.post);
   if (!post) return { ok: false, error: 'missing-post' };
+  const person = seatPerson(input.displayName, input.username, post);
+  if (!person.ok) return person;
   const password = passwordText(input.password);
   if (!password) return { ok: false, error: 'missing-hash' };
   const prepared = await passwords.prepare(person.person.username, person.person.bindingId, password);

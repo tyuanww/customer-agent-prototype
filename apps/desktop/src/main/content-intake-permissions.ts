@@ -127,6 +127,15 @@ export class ContentIntakePermissions {
         // Only the current attempt may settle recovery. An aborted/old-session
         // failure can arrive after a retry or a new session has started writing.
         check();
+        // A query grant can fail on the store set, and it can also fail because the issuer or
+        // recipient facts changed between preview and save. Both arrive as PERMISSION_CHANGED,
+        // so the hint names both causes and asks for the check the operator can actually make
+        // instead of asserting one cause the client cannot prove.
+        const body = pending.body as { items?: { action?: unknown }[] };
+        const queryGrant = Array.isArray(body?.items) && body.items.some(item => item.action === 'query');
+        if(error instanceof ProductHttpError && error.reason === 'PERMISSION_CHANGED' && queryGrant) {
+          this.notice='查询授权未保存。可能是当前店铺还没有已发布内容（需先完成一次发布），也可能是资格在预览后已变化。请先确认店铺已有已发布内容，再刷新重试。';
+        }
         // A transport/cancellation/malformed response cannot prove no COMMIT.
         const definitive = error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason);
         if(definitive && !pending.uncertain)this.pending=null;

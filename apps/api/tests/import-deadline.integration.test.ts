@@ -37,9 +37,9 @@ describe.skipIf(!enabled)('import reads the source set by domain', () => {
         [`grant-alloc-import-${domain}`, `scope-${domain}`]);
       await fixture.admin.query(`INSERT INTO content_intake.grants(
           grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
-          starts_at, expires_at, reason, parent_grant_id)
+          starts_at, expires_at, reason, parent_grant_id, steward_id)
         VALUES ($1,'business','signer','director','tenant-menokin','app-customer-agent',$2,NULL,'import',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '导入。',$3)`,
+          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day', '导入。',$3,'signer')`,
         [`grant-import-${domain}`, `scope-${domain}`, `grant-alloc-import-${domain}`]);
     }
   };
@@ -124,10 +124,12 @@ describe.skipIf(!enabled)('import reads the source set by domain', () => {
       form.set('source_bindings', JSON.stringify([{ domain: 'product', source_version_id: 'srcv_product' }]));
       const response = await mounted.app.inject({
         method: 'POST', url: '/v1/content/import',
-        headers: { authorization: `Bearer ${mounted.tokenFor('user-agent', 'agent')}`, 'idempotency-key': 'import-denial-sentence' },
+        headers: { authorization: `Bearer ${mounted.tokenFor('user-signer', 'owner')}`, 'idempotency-key': 'import-denial-sentence' },
         payload: form,
       });
-      // The agent holds no import grant, so the source set refuses before any batch is created.
+      // The historical batch chain is operator-only, so the caller must be an owner to reach
+      // the source-set gate at all. This owner holds no import grant, so the source set still
+      // refuses before any batch is created — which is the sentence this case pins.
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({ error: { message: DENIED } });
 
