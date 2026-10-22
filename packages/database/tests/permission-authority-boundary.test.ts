@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import type { Client } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { applyDatabaseMigrations } from '../src/runner.js';
+import { Pg15Harness } from '../src/testkit/index.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readOverlay = (name: string) => readFileSync(path.join(packageRoot, 'overlays', name), 'utf8');
@@ -83,5 +86,72 @@ describe('roster permission authority boundary', () => {
     for (const name of ['0047_roster_query_signer.sql', '0048_roster_store_set.sql', '0049_roster_lifecycle.sql']) {
       expect(readMigration(name)).toContain(readOverlay(name).trim());
     }
+  });
+
+  it('keeps the 0049 body and the 0047 execute grant on intake_business only', () => {
+    const replaced = readOverlay('0049_roster_lifecycle.sql');
+    expect(replaced).toContain('CREATE OR REPLACE FUNCTION content_intake.issue_roster_query');
+    expect(replaced).not.toContain('GRANT EXECUTE ON FUNCTION content_intake.issue_roster_query');
+    const signer = readOverlay('0047_roster_query_signer.sql');
+    const grants = signer.split('\n').filter(line => line.includes('GRANT EXECUTE ON FUNCTION content_intake.issue_roster_query'));
+    expect(grants).toEqual(['GRANT EXECUTE ON FUNCTION content_intake.issue_roster_query(TEXT, TEXT, TEXT) TO intake_business;']);
+  });
+});
+
+describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('database role split on PostgreSQL 15', () => {
+  let harness: Pg15Harness;
+  let client: Client;
+  beforeAll(async () => {
+    harness = new Pg15Harness();
+    harness.start();
+    client = await harness.connect(harness.createDatabase('role_split').config);
+    await applyDatabaseMigrations(client);
+  }, 120_000);
+  afterAll(async () => {
+    await client?.end();
+    harness?.stop();
+  }, 60_000);
+
+  it('denies the crossed execute privileges', async () => {
+    const shared = await client.query<{ rolname: string }>(`
+      SELECT login.rolname
+      FROM pg_catalog.pg_roles login
+      WHERE login.rolcanlogin
+        AND NOT login.rolsuper
+        AND EXISTS (
+          SELECT 1 FROM pg_catalog.pg_auth_members grant_row
+          WHERE grant_row.member = login.oid
+            AND grant_row.roleid = 'app_runtime'::pg_catalog.regrole
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_catalog.pg_auth_members grant_row
+          WHERE grant_row.member = login.oid
+            AND grant_row.roleid = 'intake_business'::pg_catalog.regrole
+        )
+      ORDER BY login.rolname`);
+    expect(shared.rows).toEqual([]);
+    const privileges = await client.query<{
+      runtime_issue: boolean; business_search: boolean; runtime_search: boolean; business_issue: boolean;
+      public_issue: boolean; public_search: boolean; search_owner: string;
+    }>(`
+      SELECT
+        pg_catalog.has_function_privilege('app_runtime', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS runtime_issue,
+        pg_catalog.has_function_privilege('intake_business', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS business_search,
+        pg_catalog.has_function_privilege('app_runtime', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS runtime_search,
+        pg_catalog.has_function_privilege('intake_business', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS business_issue,
+        pg_catalog.has_function_privilege('public', 'content_intake.issue_roster_query(text,text,text)', 'EXECUTE') AS public_issue,
+        pg_catalog.has_function_privilege('public', 'public.search_recommendable_scripts(text,text,text,text)', 'EXECUTE') AS public_search,
+        pg_catalog.pg_get_userbyid(p.proowner) AS search_owner
+      FROM pg_catalog.pg_proc p
+      WHERE p.oid = 'public.search_recommendable_scripts(text,text,text,text)'::pg_catalog.regprocedure`);
+    expect(privileges.rows[0]).toEqual({
+      runtime_issue: false,
+      business_search: false,
+      runtime_search: true,
+      business_issue: true,
+      public_issue: false,
+      public_search: false,
+      search_owner: 'cs_ai_definer',
+    });
   });
 });
