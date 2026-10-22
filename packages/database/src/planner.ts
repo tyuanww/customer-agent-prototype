@@ -197,6 +197,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0057_role_ceiling',
     requiresPredecessor: 'One-way steward requires the role ceiling',
   },
+  {
+    index: 58,
+    minimumCatalogueLength: 59,
+    id: '0059_query_grant_restamp',
+    predecessorId: '0058_grant_steward_no_restore',
+    requiresPredecessor: 'Query restamp requires the one-way steward guard',
+  },
 ];
 
 function requiredSuccessorStep(

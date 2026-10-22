@@ -159,6 +159,10 @@ const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
 const READINESS_TRIGGER_ENTRIES = 112;
 const READINESS_TRIGGER_SHA256 = '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a';
+// 0059 adds the restamp trigger, so the newest length carries one more than every older one.
+// It is a separate pair rather than a new shared default: lengths 40 through 58 predate it.
+const LATEST_TRIGGER_ENTRIES = 113;
+const LATEST_TRIGGER_SHA256 = 'ff7ccb999ee509dc1134475e26ab791e29b8827ae6b563cd008992914a427f44';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -890,6 +894,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === READINESS_TRIGGER_ENTRIES
     && expectedTriggerSha === READINESS_TRIGGER_SHA256
+  ) || (
+    expectedTriggerEntries === LATEST_TRIGGER_ENTRIES
+    && expectedTriggerSha === LATEST_TRIGGER_SHA256
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -1086,6 +1093,7 @@ const READINESS_SUFFIX = [
   { length: 56, index: 55, id: '0056_cancel_import_owner_only' },
   { length: 57, index: 56, id: '0057_role_ceiling' },
   { length: 58, index: 57, id: '0058_grant_steward_no_restore' },
+  { length: 59, index: 58, id: '0059_query_grant_restamp' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1094,6 +1102,8 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   objectSha256?: string;
   functionEntries?: number;
   functionSha256?: string;
+  triggerEntries?: number;
+  triggerSha256?: string;
 }>> = {
   42: { functionSha256: OCCUPIED_FUNCTION_SHA256 },
   43: { functionSha256: DEFAULT_TENANT_FUNCTION_SHA256 },
@@ -1119,6 +1129,10 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   57: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: 'ec51c4a71ecd49c0cc7b6601d9237c191c713a43af6d11597d1c62cd8cc70828' },
   // 0058 replaces the version guard in place, so only its digest moves.
   58: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: '68d598888268ac314a8981d243137fba475245ade22423d6574267481a96e6da' },
+  // 0059 adds the restamp trigger with its function, and replaces the version guard in place.
+  // The guard now lets the two approval stamps move on query grants, so the ACL is unchanged:
+  // the new function carries no PUBLIC entry and owner grants are excluded from the manifest.
+  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '2e8d2889db8671424b6723d89e8b9bd81012f0f8657fa634a9aff7653a6e36d3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1138,6 +1152,9 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   57: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
   // 0058 replaces one function body, so the ACL manifest is unchanged.
   58: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
+  // 0059 adds one function owned by the definer and revokes PUBLIC, plus the column-level
+  // UPDATE on the four columns the restamp writes. 635 -> 639.
+  59: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
 };
 
 export async function verifyReadinessSuccessor(
