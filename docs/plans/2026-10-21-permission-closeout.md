@@ -140,6 +140,27 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 `sop_candidate_rows` 与 `sop_asset_registrations`。而 0040 的发布触发器按 source mapping
 把该来源判为 SOP，强制要求这两份登记，于是 publish 必然 409。
 
+2026-10-22 复核（逐层实测，补强上述结论）：
+
+- 失败点是 `content-intake.integration.test.ts:878` 的 publish 断言，**不是** receive。
+  receive 返回 202 且 job 落到 `validated`；409 只在 publish 出现。
+- HTTP 409 由 `apps/api/src/content-intake/publication.ts:78` 把 SQL 的 `ZA003` 转成
+  `IntakeRejection(error.message, 'CONFLICT')`。同文件 74-77 行说明这是刻意让发布期的
+  资源变更与「候选不存在」不可区分。
+- SQL 抛点是 `0040:1397-1399`（`project_sop_release_media` 触发器）：来源命中
+  `s.domain='sop' OR template_version='sop-v1' OR rule_version='sop-not-imported'
+  OR mapping_version='sop-not-imported'` 时，要求同时存在 `sop_asset_registrations`
+  与本次 lineage 对应的 `sop_candidate_rows`，否则 `MATERIAL_CHANGED`。
+- `candidate.ts` 的 `freezeParsed` 里三处 `MATERIAL_CHANGED` 都不是抛点；探针确认过。
+
+**修复成本修正**：文档此前把「补调 `stage_sop_candidate_assets`」记为「可行但需小心」。
+实测读该函数（`0040:972`）后可以确定它比记录的更重：`p_media` 是一份严格校验的
+bundle，要求 `sourceId/sourceVersion/fileSha256/materialDigest/contentVersion/
+freshRowIds/items` 全部齐备，且每个 item 的 `payloadObjectId` 必须是
+`obj_<64hex>`、对应的 `object_reservations` 必须已 `adopted` 且 `purpose='sop-media'`。
+也就是说 TS 侧要先为每张图创建 payload object 与 reservation 并采用，才能凑出这个
+bundle。这不是补一次调用，而是一段新的媒体准备流程。
+
 关键证据：`tryParseSopAsFaq` 其实已经返回了 `rowBindings`
 （`packages/content-intake/src/sop.ts:185,211`），正是 `stage_sop_candidate_assets` 需要的
 `p_rows` 主体；但 `apps/api/src/content-intake/service.ts:203-210` 只取了 `parsed` 与
@@ -166,7 +187,7 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 **修复方向**
 - 可行（更正确）：`service.ts` 的 SOP 分支改走 `freeze_sop_parsed_candidate`，
   用 `sop.rowBindings` + 组装的 media payload 调用；通用路径只保留给非 SOP。
-- 可行但需小心：在通用 freeze 之后补调 `stage_sop_candidate_assets`。风险是 job 已被推进到
+- 可行但需小心（2026-10-22 复核后成本上调，见上）：在通用 freeze 之后补调 `stage_sop_candidate_assets`。风险是 job 已被推进到
   `validated`，且 `purpose='sop-media'` 的 reservation 采用逻辑只在 `freeze_sop_parsed_candidate`
   内（`0040:1247`），漏掉会让触发器第 4 条校验（`0040:1413-1418`）继续 409。
 - 有风险：放宽触发器。会让未登记行/媒体的 SOP 候选进入发布，削弱图片安全门禁。
