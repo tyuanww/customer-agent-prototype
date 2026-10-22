@@ -1,4 +1,5 @@
 import type { FastifyReply } from 'fastify';
+import { parseContractSchema } from '@customer-agent/contracts';
 import {
   sendConflict,
   sendForbiddenOrPolicyDenied,
@@ -21,13 +22,20 @@ export type OperationFailureCode =
 
 export type OperationResult<T> =
   | Readonly<{ ok: true; response: T }>
-  | Readonly<{ ok: false; code: OperationFailureCode }>;
+  | Readonly<{ ok: false; code: OperationFailureCode; notice?: string }>;
 
 export function sendOperationFailure(
   reply: FastifyReply,
-  result: Readonly<{ ok: false; code: OperationFailureCode }>,
+  result: Readonly<{ ok: false; code: OperationFailureCode; notice?: string }>,
 ): FastifyReply {
   if (result.code === 'VALIDATION') return sendValidationError(reply);
+  if ((result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') && result.notice) {
+    // The source-set and facts refusals have their own sentences. Sending the generic copy
+    // would tell the operator to ask for access when the real problem is a closed window.
+    return reply.code(403).send(parseContractSchema('ForbiddenOrPolicyDeniedErrorEnvelope', {
+      error: { code: result.code, message: result.notice },
+    }));
+  }
   if (result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') {
     return sendForbiddenOrPolicyDenied(reply, result.code);
   }

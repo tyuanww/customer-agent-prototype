@@ -6,8 +6,8 @@ import { createSearchBackend } from './search-service.js';
 /** Historical ranking is isolated from current judgeSearch and generic-query policy.
  * The decision added here describes search display only, never downstream action.
  */
-export function createKeywordBaseline(client: Client): SearchBackend {
-  const repository = createSearchRepository(client as never);
+export function createKeywordBaseline(client: Client, actorUserId: string): SearchBackend {
+  const repository = createSearchRepository(client as never, actorUserId);
   const baseline = createSearchBackend({ searchCandidates: repository.search });
   return Object.freeze({
     async search(request) {

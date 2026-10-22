@@ -29,7 +29,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_stage');
     admin = await pg.connect(db.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 40 });
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
     await admin.query('CREATE ROLE sop_stage_business LOGIN NOINHERIT; GRANT intake_business TO sop_stage_business');
     business = createIntakePurposePool({ ...db.config, user: 'sop_stage_business', max: 4 }, 'business');
     setupPool = new Pool(db.config); store = createContentObjectStore(path.join(pg.root, 'objects'));

@@ -33,7 +33,9 @@ export type SearchBackendResult =
       decision: SearchDisplayDecision;
       candidates: readonly SearchCandidate[];
     }>
-  | Readonly<{ ok: false; code: 'SOURCE_GATE_NOT_READY' | DatabaseContractFailure }>;
+  /** `notice` carries the source-set refusal sentence through unchanged. Without it the
+   * route can only send the generic forbidden copy, which names the wrong cause. */
+  | Readonly<{ ok: false; code: 'SOURCE_GATE_NOT_READY' | DatabaseContractFailure; notice?: string }>;
 
 export type SearchBackend = Readonly<{
   search: (request: SearchBackendRequest) => Promise<SearchBackendResult>;
@@ -42,6 +44,19 @@ export type SearchBackend = Readonly<{
 type SearchRepositoryPort = Readonly<{
   searchCandidates: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
 }>;
+
+const REFUSAL_SENTENCES = new Set([
+  '没有权限，请找人开通。',
+  '资料资格过期了，请稍后重试。',
+]);
+
+/** The source set and the facts check raise ZA005 with their sentence in MESSAGE, while the
+ * DETAIL does not tell them apart. Recognising the text is the only way to keep it. */
+function refusalSentenceOf(error: unknown): string | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  const message = String(Reflect.get(error, 'message') ?? '');
+  return REFUSAL_SENTENCES.has(message) ? message : undefined;
+}
 
 function isoTimestamp(value: Date | string): string {
   const timestamp = value instanceof Date ? value : new Date(value);
@@ -85,7 +100,10 @@ export function createSearchBackend(repository: SearchRepositoryPort): SearchBac
       try {
         result = await repository.searchCandidates(repositoryRequest);
       } catch (error: unknown) {
-        return Object.freeze({ ok: false, code: mapDatabaseContractError(error) });
+        const notice = refusalSentenceOf(error);
+        return Object.freeze(notice === undefined
+          ? { ok: false, code: mapDatabaseContractError(error) }
+          : { ok: false, code: 'FORBIDDEN' as const, notice });
       }
       if (!result.ok) return result;
 

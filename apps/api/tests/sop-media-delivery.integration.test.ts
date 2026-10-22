@@ -24,6 +24,7 @@ import { createSopRowDeletionCandidate } from '../experiments/sop-row-deletion/c
 import { createSopPreviewReader } from '../experiments/sop-row-deletion/persistent-media.js';
 import { parseImportFile, parkedRowPayload, qualityTargets, selectionManifestHash } from '../src/content-normalize.js';
 import { seedIntakeSyntheticHost } from './support/intake-synthetic-seed.js';
+import { seedContentWriteAuthority } from './support/write-authority.js';
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -49,7 +50,23 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     admin = await pg.connect(db.config);
     await applyDatabaseMigrations(admin);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 40 });
+    // The intake read path and the legacy publisher both read authorization_sources now.
+    await seedContentWriteAuthority(admin, {
+      tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a',
+      signer: { principalId: 'media-signer', userId: 'user-media-signer', jobId: 'job-media-director', role: 'director' },
+      recipients: [
+        { principalId: 'media-director', userId: 'user-director', jobId: 'job-media-director', role: 'director' },
+        { principalId: 'media-enabler', userId: 'user-enabler', jobId: 'job-media-lead', role: 'lead' },
+        { principalId: 'media-reviewer', userId: 'user-reviewer', jobId: 'job-media-supervisor', role: 'supervisor' },
+        { principalId: 'media-agent', userId: 'user-agent', jobId: 'job-media-agent', role: 'agent' },
+      ],
+      domains: ['aftersale', 'campaign', 'presale', 'product'],
+      actions: ['query', 'import', 'source-confirm', 'content-manage', 'publish', 'rollback'],
+      query: true,
+      idPrefix: 'sop',
+      extraSources: [{ scopeId: 'scope-a', sourceId: 'source-sop', domain: 'product' }],
+    });
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
     await admin.query(`CREATE ROLE sop_media_business LOGIN NOINHERIT; GRANT intake_business TO sop_media_business;
       CREATE ROLE sop_media_usage LOGIN NOINHERIT; GRANT intake_usage TO sop_media_usage;
       CREATE ROLE sop_media_auth LOGIN NOINHERIT; GRANT app_backend_auth TO sop_media_auth`);
@@ -357,7 +374,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
         await admin.query("SET LOCAL lock_timeout='100ms'");
         await admin.query('SELECT backend_review.lock_content()');
         lockAcquired = true;
-        if (change === 'revoked') await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成读图间撤权' WHERE grant_id='business-agent-query-sop'");
+        if (change === 'revoked') await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成读图间撤权' WHERE grant_id='sop-media-agent-source-sop-query'");
         await admin.query('COMMIT');
       } catch (error) { await admin.query('ROLLBACK'); throw error; }
     });
@@ -383,7 +400,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     const lease = await entitlement();
     const listed = await preview(lease.entitlementId);
     expect(listed.statusCode, listed.body).toBe(200);
-    await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成撤权' WHERE grant_id='business-agent-query-sop'");
+    await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成撤权' WHERE grant_id='sop-media-agent-source-sop-query'");
     const response = await preview(lease.entitlementId, listed.json().items[0].objectId);
     expect(response.statusCode).toBe(403);
     expect(response.body).not.toContain('bytesBase64');
@@ -443,11 +460,11 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     const { candidate } = await freeze(`read-deadline-${expiry}`);
     await publish(candidate.key, `read-deadline-${expiry}`);
     if (expiry === 'grant') {
-      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成短授权' WHERE grant_id='business-agent-query-sop'");
+      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成短授权' WHERE grant_id='sop-media-agent-source-sop-query'");
       await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
         to_jsonb(g)||jsonb_build_object('grant_id','short-media-query','version',1,'last_change_reason',NULL,'revoked_at',NULL,
           'expires_at',clock_timestamp()+interval '2 seconds'))).*
-        FROM content_intake.grants g WHERE grant_id='business-agent-query-sop'`);
+        FROM content_intake.grants g WHERE grant_id='sop-media-agent-source-sop-query'`);
     } else {
       await admin.query(`INSERT INTO content_intake.principal_facts VALUES ('agent',2,ARRAY['dept-a'],'job-agent',true,
         clock_timestamp(),clock_timestamp()+interval '2 seconds',repeat('b',64))`);

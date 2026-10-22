@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, Pool, type ClientConfig } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
+import { seedQueryPrincipal } from './support/query-principal.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createApiApp } from '../src/app.js';
 import {
@@ -282,13 +283,19 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
     await owner.query('CREATE ROLE w34_stateless_runtime LOGIN');
     await owner.query('GRANT USAGE ON SCHEMA public TO w34_stateless_runtime');
     await owner.query(`GRANT EXECUTE ON FUNCTION
-      public.search_recommendable_scripts(TEXT,TEXT,TEXT),
+      public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT),
       public.idempotency_lookup(TEXT,TEXT,TEXT,TEXT,TEXT),
       public.idempotency_request_hash_version(TEXT,TEXT,TEXT),
       public.idempotency_claim(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,INT),
       public.idempotency_complete(TEXT,TEXT,TEXT,BIGINT,INT,JSONB,BOOLEAN)
       TO w34_stateless_runtime`);
     await seedEventRelease(owner);
+    // Search now refuses a session with no live query source set, so the actor this suite
+    // signs as has to be a principal with a grant on the release's domains.
+    await seedQueryPrincipal(owner, {
+      userId: ACTOR.user_id,
+      domains: SOURCE_BINDINGS.map(([domain]) => domain),
+    });
     runtimePool = new Pool({ ...database.config, user: 'w34_event_runtime', max: 6 });
     statelessPool = new Pool({ ...database.config, user: 'w34_stateless_runtime', max: 2 });
     repository = createEventRepository(runtimePool, 'instance_synthetic_events');
@@ -626,6 +633,10 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     owner = await harness.connect(database.config);
     await applyDatabaseMigrations(owner);
     await seedEventRelease(owner);
+    await seedQueryPrincipal(owner, {
+      userId: ACTOR.user_id,
+      domains: SOURCE_BINDINGS.map(([domain]) => domain),
+    });
     pool = new Pool({ ...database.config, max: 2 });
   }, 120_000);
 

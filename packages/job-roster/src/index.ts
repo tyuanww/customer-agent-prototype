@@ -116,9 +116,10 @@ export function parseRosterJobResponse(value: unknown): {
   directory: readonly { name: string; enabled: boolean }[];
   permission_state: RosterPermissionState;
   message: string | null;
+  actions: { query: boolean; import: boolean; publish: boolean; rollback: boolean };
 } | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (!exactKeys(value, ['title', 'directory', 'permission_state', 'message'])) return null;
+  if (!exactKeys(value, ['title', 'directory', 'permission_state', 'message', 'actions'])) return null;
   const title = value.title;
   if (typeof title !== 'string' || title.length < 1 || title.length > 64) return null;
   if (!Array.isArray(value.directory)) return null;
@@ -137,5 +138,21 @@ export function parseRosterJobResponse(value: unknown): {
   } else if (message !== ROSTER_DENIAL_MESSAGE) {
     return null;
   }
-  return { title, directory, permission_state, message };
+  const actions = value.actions;
+  if (!actions || typeof actions !== 'object' || Array.isArray(actions)) return null;
+  if (!exactKeys(actions, ['query', 'import', 'publish', 'rollback'])) return null;
+  const flags = actions as Record<string, unknown>;
+  if (![flags.query, flags.import, flags.publish, flags.rollback].every((flag) => typeof flag === 'boolean')) return null;
+  return {
+    title,
+    directory,
+    permission_state,
+    message,
+    actions: {
+      query: flags.query as boolean,
+      import: flags.import as boolean,
+      publish: flags.publish as boolean,
+      rollback: flags.rollback as boolean,
+    },
+  };
 }

@@ -805,6 +805,50 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 50,
+      "id": "0050_authorization_sources",
+      "file": "0050_authorization_sources.sql",
+      "source_ranges": [],
+      "sha256": "90293c19d793da5bd3262adc46aff0aa652b7dc5c796d608f9af72f5a22b7451",
+      "bytes": 5029,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 51,
+      "id": "0051_publish_source_set",
+      "file": "0051_publish_source_set.sql",
+      "source_ranges": [],
+      "sha256": "958a78d494bf6b81a3c4fdda63813152564fc192bf38aefbe3f26fc18192efa3",
+      "bytes": 55288,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 52,
+      "id": "0052_import_source_set",
+      "file": "0052_import_source_set.sql",
+      "source_ranges": [],
+      "sha256": "44d01a54ba83df7c8444381a4a761b4229bdb4b98db7ac719905843f80cba6f3",
+      "bytes": 16326,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 53,
+      "id": "0053_search_source_set",
+      "file": "0053_search_source_set.sql",
+      "source_ranges": [],
+      "sha256": "9441873c6574bf8637cae6905cc6dc5d205dbdb0118d2506aac7d67394065b45",
+      "bytes": 9167,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

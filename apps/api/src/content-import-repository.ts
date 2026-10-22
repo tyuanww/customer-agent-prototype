@@ -23,6 +23,9 @@ export type ContentImportFailure = Readonly<{
   code: OperationFailureCode;
   reason?: SourceContractReason;
   commit: CommitCertainty;
+  /** The server's own refusal sentence, when the database raised one. The route sends this text
+   * verbatim so the operator reads why, instead of the generic forbidden copy. */
+  notice?: string;
 }>;
 
 export type ContentImportEnqueueRequest = Readonly<{
@@ -132,8 +135,25 @@ function failure(
   code: OperationFailureCode,
   commit: CommitCertainty,
   reason?: SourceContractReason,
+  notice?: string,
 ): ContentImportFailure {
-  return Object.freeze(reason === undefined ? { ok: false, code, commit } : { ok: false, code, commit, reason });
+  const base = { ok: false as const, code, commit };
+  if (notice !== undefined) return Object.freeze({ ...base, notice });
+  return Object.freeze(reason === undefined ? base : { ...base, reason });
+}
+
+const REFUSAL_SENTENCES = new Set([
+  '没有权限，请找人开通。',
+  '资料资格过期了，请稍后重试。',
+]);
+
+/** The plan gives these two refusals their own sentences. The database raises them as ZA005 with
+ * that exact MESSAGE, while DETAIL is a generic FORBIDDEN or absent, so a detail-based classifier
+ * misses them and the operator would read the generic copy instead. */
+function noticeOf(error: unknown): string | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  const message = String(Reflect.get(error, 'message') ?? '');
+  return REFUSAL_SENTENCES.has(message) ? message : undefined;
 }
 
 async function rollback(client: PoolClient): Promise<boolean> {
@@ -297,12 +317,10 @@ export function createContentImportRepository(
           return failure(claim.code, commitCertaintyAfterError(rolledBack));
         }
         await client.query('SELECT public.assert_no_in_flight_content_import($1)', [request.actor.user_id]);
-        if (request.actor.role === 'owner') {
-          await client.query(
-            'SELECT public.advance_source_snapshots($1::jsonb, $2, $3, $4)',
-            [JSON.stringify(request.sourceBindings), request.sourceSha256, request.actor.role, request.importBatchId],
-          );
-        }
+        await client.query(
+          'SELECT public.advance_source_snapshots($1::jsonb, $2, $3, $4)',
+          [JSON.stringify(request.sourceBindings), request.sourceSha256, request.actor.user_id, request.importBatchId],
+        );
         const result = await client.query<EnqueueRow>(
           `SELECT * FROM public.enqueue_content_import($1, $2, $3, $4, $5, $6::jsonb, $7, $8)`,
           [
@@ -337,6 +355,12 @@ export function createContentImportRepository(
       } catch (error: unknown) {
         const rolledBack = await rollback(client);
         broken = !rolledBack;
+        const notice = noticeOf(error);
+        if (notice !== undefined) {
+          // Raised by the source-set or facts check. Send the sentence as-is and do not record it
+          // as a source denial: it is not one of the audited source reasons.
+          return failure('FORBIDDEN', commitCertaintyAfterError(rolledBack), undefined, notice);
+        }
         denied = sourceReason(error);
         if (denied) deniedSource = request.sourceBindings[0]?.source_version_id ?? null;
         if (!denied) {

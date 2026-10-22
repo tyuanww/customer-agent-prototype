@@ -189,7 +189,7 @@ ${renderSearchBoundaryFunctions()}
       ''
     ) AS ops_loop_comment,
     pg_catalog.to_regprocedure(
-      'public.search_recommendable_scripts(text,text,text)'
+      'public.search_recommendable_scripts(text,text,text,text)'
     ) IS NOT NULL
       AS repository_boundary_present,
     coalesce(
@@ -595,7 +595,7 @@ ${renderSearchBoundaryFunctions()}
         JOIN pg_catalog.pg_roles runtime_role
           ON runtime_role.rolname = 'app_runtime'
         WHERE procedure.oid = pg_catalog.to_regprocedure(
-          'public.search_recommendable_scripts(text,text,text)'
+          'public.search_recommendable_scripts(text,text,text,text)'
         )
       ),
       false

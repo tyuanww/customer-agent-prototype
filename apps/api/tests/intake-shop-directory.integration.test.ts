@@ -54,8 +54,13 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION!=='1')('shop dir
  it('rejects an entire missing-name set and invalidates pagination on rename and revocation',async()=>{
   await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
    VALUES ('directory-root-b','allocation','director','director','tenant-a','app-a','scope-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成目录范围','director')`);
-  await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-   VALUES ('directory-query-b','business','director','agent','tenant-a','app-a','scope-b','source-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成目录范围','director','directory-root-b')`);
+  // A query row is live only with the current policy version and a store set member.
+  await admin.query(`INSERT INTO content_intake.store_set_members(tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+   VALUES ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '2 hours')
+   ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`);
+  await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+   VALUES ('directory-query-b','business','director','agent','tenant-a','app-a','scope-b','source-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成目录范围','director','directory-root-b',
+     (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1)`);
   expect(await get()).toMatchObject({status:409,body:{error:{details:{reason:'SHOP_DISPLAY_MISSING'}}}});
   await admin.query("SELECT content_intake.upsert_shop_display('director','tenant-a','app-a','shop-b','合成示例店',1)");
   const first=parseContractSchema('IntakeShopDirectory',(await get('?limit=1')).body);expect(first.items).toHaveLength(1);expect(first.nextCursor).toBeTruthy();

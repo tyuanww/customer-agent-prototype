@@ -69,7 +69,10 @@ describe.skipIf(!enabled)('business permission HTTP and PG15 (synthetic)',()=>{
    const response=await http(`/v1/intake/grants?limit=1${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`);expect(response.status).toBe(200);
    expect(parseContractSchema('IntakeGrantList',response.value).items).toHaveLength(1);expect(parseContractSchema('IntakeGrantList',response.value).items[0]!.scope.shopId).toBe('shop-a');count++;
    cursor=parseContractSchema('IntakeGrantList',response.value).nextCursor;if(cursor){firstCursor ||= cursor;expect(Buffer.from(cursor.split('.')[0]!,'base64url').toString()).not.toContain('hidden-grant');}
-  }while(cursor);expect(count).toBe(17);
+  }while(cursor);
+  // 17 rows were visible before the shared seed also gave the director its own eight business
+  // rows, which an issuer needs in order to reach the sources it hands out.
+  expect(count).toBe(25);
   await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成撤资格' WHERE grant_id='root-query'");
   expect((await http(`/v1/intake/grants?limit=1&cursor=${encodeURIComponent(firstCursor)}`)).status).toBe(409);
   expect(parseContractSchema('IntakeGrantList',(await http('/v1/intake/grants','GET',undefined,'agent')).value).items).toEqual([]);

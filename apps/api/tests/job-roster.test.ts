@@ -68,11 +68,13 @@ describe('job roster', () => {
 
   // Value: protects=parseRosterJobResponse exact-key contract; fails_when=extra top-level or directory keys slip through desktop main; why_new=desktop main is the only caller test for strict parsing; seam=none; no_claim=preload copy parity
   it('rejects extra keys and wrong denial messages on the job route body', () => {
+    const actions = { query: false, import: false, publish: false, rollback: false };
     const valid = {
       title: '客服坐席',
       directory: [{ name: '客服坐席', enabled: true }],
       permission_state: 'revoked',
       message: '没有权限，请找人开通。',
+      actions,
     };
     expect(parseRosterJobResponse(valid)).toEqual(valid);
     expect(parseRosterJobResponse({ ...valid, trace: 'x' })).toBeNull();
@@ -86,7 +88,12 @@ describe('job roster', () => {
       directory: [{ name: '客服坐席', enabled: true }],
       permission_state: 'ready',
       message: null,
-    })).toMatchObject({ permission_state: 'ready', message: null });
+      actions: { query: true, import: false, publish: true, rollback: false },
+    })).toMatchObject({
+      permission_state: 'ready',
+      message: null,
+      actions: { query: true, import: false, publish: true, rollback: false },
+    });
   });
 });
 

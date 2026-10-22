@@ -8,6 +8,7 @@ import {
 } from 'vitest';
 import type { Client, ClientConfig } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
+import { seedQueryPrincipal } from './support/query-principal.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import {
   createSearchRepository,
@@ -28,6 +29,9 @@ const SOURCE_BINDINGS = Object.freeze([
   ['presale', 'srcv_synth_presale_v1', 'SRC-SYNTH-PRESALE'],
   ['product', 'srcv_synth_product_v1', 'SRC-SYNTH-PRODUCT'],
 ] as const);
+
+const SEARCH_ACTOR = 'usr_synthetic_search_reader';
+const SEARCH_DOMAINS = SOURCE_BINDINGS.map(([domain]) => domain);
 
 type CandidateFixture = Readonly<{
   id: string;
@@ -306,8 +310,9 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     await owner.query('CREATE ROLE w2_search_runtime LOGIN');
     await owner.query('GRANT app_runtime TO w2_search_runtime');
     await seedSearchRelease(owner);
+    await seedQueryPrincipal(owner, { userId: SEARCH_ACTOR, domains: SEARCH_DOMAINS });
     runtime = await harness.connect({ ...database.config, user: 'w2_search_runtime' });
-    const repository = createSearchRepository(runtime as never);
+    const repository = createSearchRepository(runtime as never, SEARCH_ACTOR);
     backend = createSearchBackend({ searchCandidates: repository.search });
   }, 120_000);
 
@@ -324,9 +329,15 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     await expect(runtime.query('SELECT * FROM public.v_scripts_recommendable')).rejects.toMatchObject({
       code: '42501',
     });
+    // The runtime may reach the gated form only, and only for a session with a query source
+    // set; the three-argument form it used to call now refuses every caller.
+    await expect(runtime.query(
+      'SELECT pg_catalog.count(*) FROM public.search_recommendable_scripts($1::text, $2::text, NULL, NULL)',
+      [SEARCH_ACTOR, 'qianniu'],
+    )).resolves.toMatchObject({ rows: [{ count: '14' }] });
     await expect(runtime.query(
       "SELECT pg_catalog.count(*) FROM public.search_recommendable_scripts('qianniu', NULL, NULL)",
-    )).resolves.toMatchObject({ rows: [{ count: '14' }] });
+    )).rejects.toMatchObject({ code: '42501' });
   });
 
   it('ranks exact question, exact title and phrase question deterministically inside database Top 3', async () => {
@@ -445,6 +456,7 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
     const explained = await runtime.query<{ 'QUERY PLAN': ExplainResult[] }>(
       `EXPLAIN (ANALYZE, FORMAT JSON) ${SEARCH_CANDIDATES_SQL}`,
       [
+        SEARCH_ACTOR,
         'qianniu',
         null,
         null,
@@ -536,8 +548,9 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
         fallback: '合成粉扑R接触说明', answer,
         productScopeType: 'sku', productScopeRefs: ['sku-synthetic-negation'],
       }]);
+      await seedQueryPrincipal(writer, { userId: SEARCH_ACTOR, domains: SEARCH_DOMAINS });
       reader = await isolated.connect({ ...db.config, user: 'negation_runtime' });
-      const repository = createSearchRepository(reader as never);
+      const repository = createSearchRepository(reader as never, SEARCH_ACTOR);
       const scoped = createSearchBackend({ searchCandidates: repository.search });
       const request = {
         normalizedQuery: '合成粉扑R不接触面板吗', platform: 'qianniu' as const,
@@ -580,8 +593,9 @@ describePg15('Search backend PostgreSQL 15 boundary', () => {
         question: vague, searchable: '合成 收纳 拉链 维修',
         fallback: '合成收纳袋拉链维修', answer: '合成收纳袋拉链卡住时请停止拉扯。',
       }]);
+      await seedQueryPrincipal(writer, { userId: SEARCH_ACTOR, domains: SEARCH_DOMAINS });
       reader = await isolated.connect({ ...db.config, user: 'support_runtime' });
-      const repository = createSearchRepository(reader as never);
+      const repository = createSearchRepository(reader as never, SEARCH_ACTOR);
       const scoped = createSearchBackend({ searchCandidates: repository.search });
       const request = {
         normalizedQuery: vague, platform: 'qianniu' as const,

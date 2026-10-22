@@ -115,6 +115,53 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
         `, [user, cap]);
       }
     }
+    // Publish, import, and rollback now read authorization_sources. The session role is no
+    // longer the gate, so this fixture has to grant the four domains explicitly.
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`INSERT INTO content_intake.policy_versions(tenant_id, app_id, version)
+        VALUES ('tenant-t4','app-t4',1)`);
+      await admin.query(`INSERT INTO backend_identity.subject_bindings(
+          binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
+        VALUES ('synthetic_signer','synthetic','synthetic-tenant','synthetic_signer','usr_t4_signer',
+          encode(sha256(convert_to('synthetic_signer','UTF8')),'hex'),true,'owner')`);
+      for (const [id, person] of [['owner','owner-t4'], ['signer','signer-t4']] as const) {
+        await admin.query(`INSERT INTO content_intake.principals(
+            principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version, revocation_generation)
+          VALUES ($1,$2,'tenant-t4','app-t4','confirmed-synthetic',$3,1,0)`,
+        [id, id === 'owner' ? 'usr_t4_owner' : 'usr_t4_signer', person]);
+        await admin.query(`INSERT INTO content_intake.principal_facts(
+            principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+          VALUES ($1,1,ARRAY['dept-t4'],'job-t4-director',true,
+            statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id]);
+      }
+      await admin.query(`INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
+        VALUES ('tenant-t4','app-t4','dept-t4','job-t4-director',1,'director')`);
+      for (const { domain } of BINDINGS) {
+        await admin.query(`INSERT INTO content_intake.scopes(scope_id, tenant_id, app_id, brand_id, domain)
+          VALUES ($1,'tenant-t4','app-t4','brand-t4',$2)`, [`scope-t4-${domain}`, domain]);
+        await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
+          VALUES ($1,$2,1,'v2-preview')`, [`source-t4-${domain}`, `scope-t4-${domain}`]);
+        await admin.query(`INSERT INTO content_intake.source_mappings(
+            source_id, version, template_version, rule_version, mapping_version, structure_digest)
+          VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`, [`source-t4-${domain}`]);
+        for (const action of ['import', 'publish', 'rollback']) {
+          await admin.query(`INSERT INTO content_intake.grants(
+              grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+              starts_at, expires_at, reason, steward_id)
+            VALUES ($1,'allocation','signer','signer','tenant-t4','app-t4',$2,$3,
+              clock_timestamp()-interval '2 minutes',clock_timestamp()+interval '2 days','合成分配。','signer')`,
+          [`alloc-t4-${domain}-${action}`, `scope-t4-${domain}`, action]);
+          await admin.query(`INSERT INTO content_intake.grants(
+              grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+              starts_at, expires_at, reason, steward_id, parent_grant_id)
+            VALUES ($1,'business','signer','owner','tenant-t4','app-t4',$2,$3,
+              clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。','signer',$4)`,
+          [`business-t4-${domain}-${action}`, `scope-t4-${domain}`, action, `alloc-t4-${domain}-${action}`]);
+        }
+      }
+      await admin.query('COMMIT');
+    } catch (error) { await admin.query('ROLLBACK'); throw error; }
     const repository = createServiceRepository({
       connectionString: conn('t4_runtime'), poolMax: 4, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
     });
@@ -361,7 +408,7 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
   it.each(['mode-first','snapshot-first'] as const)('serializes the earlier snapshot mutation and mode admission: %s', async order => {
     await intakeSource('product','legacy');
     const bindings = JSON.stringify(BINDINGS.filter(b => b.domain==='product').map(({domain,source_version_id}) => ({domain,source_version_id})));
-    const advance = (client: Client) => client.query("SELECT public.advance_source_snapshots($1::jsonb,repeat('b',64),'owner','synthetic-reservation')",[bindings]);
+    const advance = (client: Client) => client.query("SELECT public.advance_source_snapshots($1::jsonb,repeat('b',64),'usr_t4_owner','synthetic-reservation')",[bindings]);
     const activate = (client: Client) => client.query("UPDATE content_intake.sources SET mode='v2-active',mode_version=mode_version+1 WHERE source_id='source-fence'");
     await admin.query('BEGIN');
     let pending: Promise<unknown> | undefined;

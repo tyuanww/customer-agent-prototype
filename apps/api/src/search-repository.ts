@@ -83,15 +83,15 @@ interface SearchRow extends QueryResultRow {
 export const SEARCH_CANDIDATES_SQL = `
 WITH scoped AS MATERIALIZED (
   SELECT *
-  FROM public.search_recommendable_scripts($1::text, $2::text, $3::text)
+  FROM public.search_recommendable_scripts($1::text, $2::text, $3::text, $4::text)
 ),
 candidate_pool AS MATERIALIZED (
   SELECT scoped.*
   FROM scoped
   WHERE scoped.is_candidate
-    AND NOT $4::boolean
+    AND NOT $5::boolean
   ORDER BY scoped.script_id ASC
-  LIMIT $5::integer
+  LIMIT $6::integer
 ),
 current_context AS (
   SELECT scoped.release_id, scoped.source_binding_hash
@@ -187,12 +187,16 @@ function requireCandidateRow(row: SearchRow): SearchRepositoryCandidate {
   });
 }
 
-export function createSearchRepository(client: SearchQueryClient): Readonly<{
+/** The caller is bound here rather than carried on every request: the database resolves the
+ * principal from it and refuses a session with no live query source set, so it must not be
+ * something a request body can choose. */
+export function createSearchRepository(client: SearchQueryClient, actorUserId: string): Readonly<{
   search: (request: SearchRepositoryRequest) => Promise<SearchRepositoryResult>;
 }> {
   return Object.freeze({
     async search(request): Promise<SearchRepositoryResult> {
       const result = await client.query<SearchRow>(SEARCH_CANDIDATES_SQL, [
+        actorUserId,
         request.platform,
         request.productContextType,
         request.productContextRef,

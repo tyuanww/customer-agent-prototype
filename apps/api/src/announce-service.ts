@@ -721,10 +721,14 @@ export function createAnnounceServiceForPool(
 
     async readiness() {
       try {
-        await pool.query(
-          `SELECT 1 FROM public.search_recommendable_scripts('qianniu', NULL, NULL) LIMIT 1`,
+        // The search function refuses a caller with no live query source set, so a plain
+        // SELECT on it can no longer answer "is the schema ready". Ask whether the gated
+        // signature exists instead; that is the shape readiness is about.
+        const probe = await pool.query<{ present: boolean }>(
+          `SELECT pg_catalog.to_regprocedure(
+             'public.search_recommendable_scripts(text,text,text,text)') IS NOT NULL AS present`,
         );
-        return 'ok';
+        return probe.rows[0]?.present === true ? 'ok' : 'not_ready';
       } catch {
         return 'not_ready';
       }
