@@ -18,7 +18,10 @@ import { runVerifiedG1aComparison } from './support/g1a-e0/runner.js';
 import { readG1aDelivery, serializeG1aDelivery } from './support/g1a-e0/report-contract.js';
 
 const suite = process.env.CUSTOMER_AGENT_API_G1A_E0_SYNTHETIC === '1' ? describe : describe.skip;
-suite('same-session G1a comparison', () => {
+// Every case starts a throwaway cluster, applies the full migration set, loads a release and
+// then runs both algorithms. That reads about 2.2s on the maintainer Mac and crossed the 5s
+// default on the Linux runner, which is a budget written for a unit test, not a cluster.
+suite('same-session G1a comparison', { timeout: 120_000 }, () => {
   it('evaluates both algorithms with one transaction, zero events and verified cleanup', async () => {
     const fixture = await createSyntheticG1aE0Package();
     try {
