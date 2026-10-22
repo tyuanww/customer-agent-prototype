@@ -1211,7 +1211,17 @@ M1 身份与范围授权 -------------------覆盖所有敏感操作------------
 
 ### 12.1 M1 权限矩阵与运维责任
 
-> 以下保留旧审批合同的规划与实现边界；当前四岗上传发布、两岗权限配置的需求以§0.52为准。旧表中的话术师、主管分配、委派及人工审批不能被当作最新默认目标，历史合同/记录需版本化兼容。
+> **已被取代（2026-10-21）：** 本表及本节后续段落描述的是旧审批合同的规划边界，不是当前实现口径。现行规则以代码为准，三点差异必须按下面读：
+>
+> 1. **只有 director / manager / engineer 能配置他人。** 表中「客服主管 → 分配业务权限：可」已作废；supervisor / lead / enabler / agent 的 `mayAllocate` 与 `mayDelegate` 为空。见 `apps/api/src/content-intake/authority.ts` 的 `allocationKinds`，以及 `0044_intake_role_defaults.sql` 的 role CHECK。
+> 2. **supervisor / lead 发布必须有有效 business grant。** 岗位只划能力上限，不产生授权。表中「不因委派自动增加」仍然成立，但同样不能反推「有岗位就能发布」。
+> 3. **agent / enabler 只剩 query。** 表中「服务赋能师 → 发布：可」已作废；`recipientRoleAllows` 对非 query 动作拒绝这两岗。
+> 4. **委派产生的子授权还要求父行存活。** 撤销 delegation 后子授权停止生效，即使它仍带着 steward。见 `0055_grant_steward_required.sql`。
+>
+> 当前口径的完整表述见 `TODOS.md` 的「最新角色口径」。SSOT 是代码与迁移账本，不是任何单一 overlay：
+> 决策函数的最新定义在 `packages/database/overlays/0055_grant_steward_required.sql`
+> （它覆盖了 0050 的 `authorization_sources` 与 0048 的 `authorization_deadline`）。
+> 迁移是累积覆盖的，读旧 overlay 会读到已被取代的口径。本表保留作历史记录，不再据此施工。
 
 所有“可”都只在已配置的应用、品牌、店铺和内容域内成立。岗位不代表拥有全公司；店铺可多选，品牌通用内容需独立品牌范围，管理一家店不等于能改整个品牌。凭据管理与岗位映射配置属于受控运维职责，不从发布或分配权限中继承。
 

@@ -9,7 +9,9 @@ const hmac = Object.freeze({
   keys: Object.freeze({ 'hmac-idempotency-v1': 'synthetic-import-idempotency-material-01' }),
 });
 const logHash = Object.freeze({ version: 'hmac-log-v1', key: 'synthetic-import-log-hash-material-0001' });
-const actor = Object.freeze({ user_id: 'usr_coach', role: 'coach' as const, auth_mode: 'mock' as const });
+// The historical batch chain is operator-only, so a caller that reaches the reclaim policy
+// has to pass admission. A coach would stop before anything persisted.
+const actor = Object.freeze({ user_id: 'usr_owner', role: 'owner' as const, auth_mode: 'mock' as const });
 const persisted: PersistedContentObject = Object.freeze({
   objectId: `obj_${'ab'.repeat(32)}`,
   sha256: 'c'.repeat(64),
@@ -131,5 +133,42 @@ describe('content import receive policy', () => {
       body: Readable.from(form()),
     });
     expect(reclaim).toHaveBeenCalledWith(persisted.objectId);
+  });
+
+  it('refuses a coach before persisting anything', async () => {
+    // The refusal has to happen before `persist`, or the object survives as garbage that
+    // only a later reclaim would clean up.
+    const persist = vi.fn(async () => persisted);
+    const reclaim = vi.fn(async () => 'reclaimed' as const);
+    const store = {
+      persist,
+      readPayload: async () => Buffer.from('a,b\n'),
+      verify: async () => true,
+      writeReceipt: async () => undefined,
+      readReceipt: async () => null,
+      reclaim,
+      readiness: async () => 'ok' as const,
+      rootDirectory: '/tmp/unused',
+    } satisfies ContentObjectStore;
+    const enqueue = vi.fn(async () => Object.freeze({
+      ok: false as const, code: 'INTERNAL' as const, commit: 'rolled_back' as const,
+    }));
+    const repository = {
+      enqueue,
+      readStatus: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+      cancel: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
+      readSourceRefs: async () => [],
+    } satisfies ContentImportRepository;
+    const service = createContentImportService(store, repository, hmac, logHash);
+    const result = await service.acceptUpload({
+      actor: Object.freeze({ user_id: 'usr_coach', role: 'coach' as const, auth_mode: 'mock' as const }),
+      idempotencyKey: 'idem-coach-refused',
+      contentType: 'multipart/form-data; boundary=----svc',
+      body: Readable.from(form()),
+    });
+    expect(result).toEqual({ ok: false, code: 'FORBIDDEN', commit: 'rolled_back' });
+    expect(persist).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(reclaim).not.toHaveBeenCalled();
   });
 });

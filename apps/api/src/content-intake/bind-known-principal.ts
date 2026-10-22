@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { QueryResult, QueryResultRow } from 'pg';
 
-type Queryable = {
-  query: <T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]) => Promise<QueryResult<T>>;
+/** Only the row projection is used, so callers may adapt any driver to this. */
+export type Queryable = {
+  query: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<{ rows: readonly T[] }>;
 };
 
 export type KnownPrincipalBind = {

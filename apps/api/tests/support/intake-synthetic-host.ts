@@ -371,7 +371,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
             : principalId === 'roster-readonly' ? '合成只读总监'
             : principalId === 'roster-stale' ? '合成过期总监'
             : principalId === 'roster-nogrant' ? '合成无授权总监'
-            : principalId === 'roster-agent' ? '合成坐席'
+            : principalId === 'roster-agent' ? '合成名单坐席'
             : null)
         : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });

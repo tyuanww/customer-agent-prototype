@@ -249,6 +249,36 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
     return batchId;
   }
 
+  async function grantNonOwner(action: 'publish' | 'rollback') {
+    // Same department and fresh facts as the owner fixture, but a non-owner
+    // binding role. Only the owner-only gate should refuse this principal.
+    // principals.current_facts_version is a deferred FK, so both rows commit together.
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`INSERT INTO content_intake.principals(
+          principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version, revocation_generation)
+        VALUES ('lead','usr_t4_lead','tenant-t4','app-t4','confirmed-synthetic','lead-t4',1,0)
+        ON CONFLICT (principal_id) DO NOTHING`);
+      await admin.query(`INSERT INTO content_intake.principal_facts(
+          principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+        VALUES ('lead',1,ARRAY['dept-t4'],'job-t4-lead',true,
+          statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))
+        ON CONFLICT (principal_id, facts_version) DO NOTHING`);
+      await admin.query(`INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
+        VALUES ('tenant-t4','app-t4','dept-t4','job-t4-lead',1,'lead')
+        ON CONFLICT (tenant_id, app_id, department_id, job_id) DO NOTHING`);
+      for (const { domain } of BINDINGS) {
+        await admin.query(`INSERT INTO content_intake.grants(
+            grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+            starts_at, expires_at, reason, steward_id, parent_grant_id)
+          VALUES ($1,'business','signer','lead','tenant-t4','app-t4',$2,$3,
+            clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 day','合成授权。','signer',$4)`,
+        [`business-t4-lead-${domain}-${action}`, `scope-t4-${domain}`, action, `alloc-t4-${domain}-${action}`]);
+      }
+      await admin.query('COMMIT');
+    } catch (error) { await admin.query('ROLLBACK'); throw error; }
+  }
+
   async function intakeSource(domain: string, mode = 'v2-active') {
     // Synthetic mode fixture only. No application role gains a mode setter.
     await admin.query('BEGIN');
@@ -472,6 +502,64 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
       payload: { target_release_id: 'rel_does_not_exist', title: '回滚缺失', summary: 'missing' },
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it('refuses a non-owner legacy publish even when the principal holds publish grants', async () => {
+    await grantNonOwner('publish');
+    const batch = await stageBatch('idem-owner-only-publish');
+    const coach = await productToken('synthetic_lead');
+    const refused = await app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${coach}`, 'idempotency-key': 'pub-owner-only', 'content-type': 'application/json' },
+      payload: { import_batch_id: batch, title: '非 owner 发布', summary: 'owner-only' },
+    });
+    expect(refused.statusCode).toBe(403);
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.content_releases')).rows[0].n).toBe(0);
+  });
+
+  it('refuses a non-owner legacy rollback even when the principal holds rollback grants', async () => {
+    await grantNonOwner('rollback');
+    const owner = await productToken('synthetic_owner');
+    const publish = (batch: string, key: string) => app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': key, 'content-type': 'application/json' },
+      payload: { import_batch_id: batch, title: '合成发布', summary: 'owner-only' },
+    });
+    const firstBatch = await stageBatch('idem-owner-only-rb1');
+    const first = await publish(firstBatch, 'pub-owner-only-rb1');
+    expect(first.statusCode, first.body).toBe(200);
+    const secondBatch = await stageBatch('idem-owner-only-rb2');
+    const second = await publish(secondBatch, 'pub-owner-only-rb2');
+    expect(second.statusCode, second.body).toBe(200);
+    const coach = await productToken('synthetic_lead');
+    const refused = await app.inject({
+      method: 'POST', url: '/v1/content/rollback',
+      headers: { authorization: `Bearer ${coach}`, 'idempotency-key': 'rb-owner-only', 'content-type': 'application/json' },
+      payload: { target_release_id: (first.json() as { release_id: string }).release_id, title: '非 owner 回退', summary: 'owner-only' },
+    });
+    expect(refused.statusCode).toBe(403);
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.content_releases')).rows[0].n).toBe(2);
+  });
+
+  it('refuses a non-owner previous-release rollback even when the principal holds rollback grants', async () => {
+    await grantNonOwner('rollback');
+    const owner = await productToken('synthetic_owner');
+    const publish = (batch: string, key: string) => app.inject({
+      method: 'POST', url: '/v1/content/publish',
+      headers: { authorization: `Bearer ${owner}`, 'idempotency-key': key, 'content-type': 'application/json' },
+      payload: { import_batch_id: batch, title: '合成发布', summary: 'owner-only' },
+    });
+    const firstBatch = await stageBatch('idem-owner-only-rbp1');
+    expect((await publish(firstBatch, 'pub-owner-only-rbp1')).statusCode).toBe(200);
+    const secondBatch = await stageBatch('idem-owner-only-rbp2');
+    expect((await publish(secondBatch, 'pub-owner-only-rbp2')).statusCode).toBe(200);
+    const coach = await productToken('synthetic_lead');
+    const refused = await app.inject({
+      method: 'POST', url: '/v1/content/rollback-previous',
+      headers: { authorization: `Bearer ${coach}`, 'idempotency-key': 'rbp-owner-only' },
+    });
+    expect(refused.statusCode).toBe(403);
+    expect((await admin.query('SELECT count(*)::int AS n FROM public.content_releases')).rows[0].n).toBe(2);
   });
 
   it('reimports identical content and rolls back to a new release sequence', async () => {

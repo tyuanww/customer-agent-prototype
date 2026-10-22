@@ -3753,8 +3753,11 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       { operationId: 'revoke', expectedVersion: 1, change: 'revoke', stewardPrincipalId: null, reason: '合成撤资格' }));
     expect(revoked.version).toBe(2);
     const child = (await admin.query("SELECT * FROM content_intake.grants WHERE parent_grant_id=$1", [delegation.grantId])).rows[0];
+    // A delegated business grant survives its parent only while it has a steward. Revoking
+    // without naming one leaves the child marked as awaiting takeover, and that state must
+    // stop authorizing: otherwise "撤资格" removes the record while the holder keeps publishing.
     expect(child).toMatchObject({ issuer_id: 'manager', revoked_at: null, steward_id: null, version: '2', reason: '合成授权', last_change_reason: '合成撤资格' });
-    value(await service.authorization(actor('supervisor'), 'source-a', 'publish'));
+    expect(await service.authorization(actor('supervisor'), 'source-a', 'publish')).toMatchObject({ ok: false, code: 'NOT_FOUND' });
     expect(await service.grantBatch(actor('manager'), { ...delegated, operationId: 'after-revocation' })).toMatchObject({ ok: false, reason: 'GRANT_AUTHORITY_DENIED' });
     expect((await admin.query('SELECT count(*) FROM content_intake.grant_history WHERE grant_id=$1', [child.grant_id])).rows[0].count).toBe('2');
     for (const recipient of ['agent', 'enabler', 'supervisor', 'legacy-enabler']) {

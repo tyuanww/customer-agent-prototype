@@ -209,7 +209,9 @@ describe('job observation from a signed-out session', () => {
     });
   });
 
-  it('keeps SOP upload on the job title when the server publish bit is false', async () => {
+  it('keeps SOP upload and the job-table rights when the server publish bit is false', async () => {
+    // `grant` is the job-table right and `publish` is the server bit. 客服总监 holds the job-table
+    // right even when the server bit is false, and the sensitive-content gate reads that right.
     const f = fixture({
       identity: { user_id: 'usr_synthetic_owner', role: 'owner', auth_mode: 'feishu' },
       jobSnapshotFor: () => ({
@@ -222,7 +224,7 @@ describe('job observation from a signed-out session', () => {
       ok: true,
       job: {
         status: 'resolved',
-        rights: { publish: false, grant: false, uploadSop: true, search: true, readCatalog: true },
+        rights: { publish: false, grant: true, uploadSop: true, search: true, readCatalog: true },
         actions: { query: true, import: false, publish: false, rollback: false },
       },
     });

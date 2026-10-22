@@ -170,10 +170,12 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
     try {
       const response = await mounted.app.inject({
         method: 'POST', url: '/v1/content/publish',
-        headers: { authorization: `Bearer ${mounted.agentToken}`, 'idempotency-key': 'denial-sentence', 'content-type': 'application/json' },
+        headers: { authorization: `Bearer ${mounted.ownerToken}`, 'idempotency-key': 'denial-sentence', 'content-type': 'application/json' },
         payload: { import_batch_id: 'batch_http_denied', title: '标题', summary: '摘要' },
       });
-      // An agent holds query only, so the domain gate refuses this publish.
+      // The chain is operator-only, so reaching the domain gate requires an owner session.
+      // This owner holds no publish grant, so the domain gate itself refuses — the sentence
+      // this case pins. An agent session would stop earlier at admission with other wording.
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({ error: { code: 'FORBIDDEN', message: DENIED } });
     } finally {
