@@ -8,13 +8,8 @@
 -- whenever the roster projection sees a different release lineage, so every query grant
 -- written before that moment goes stale on a value nobody can see.
 --
--- The roster path already repairs its own grants: it revokes the stale rows and inserts fresh
--- ones stamped with the new version. A grant written through the permission page carried an
--- operator reason and a different issuer, so it matched neither half of that filter and was
--- left behind. Measured before this migration: the source stayed approved, the set advanced,
--- and `authorization_sources` returned zero rows while the grant list still showed the grant.
---
--- The invariant belongs to the store set, not to whoever advances it, so it is enforced with a
+-- The roster path repairs its own grants; grants written elsewhere never were. The invariant
+-- belongs to the store set rather than to whoever advances it, so it is enforced with a
 -- trigger on the pointer. Every live manual query grant is re-stamped when its source is still
 -- a member of the new set, and revoked when it is not. Roster-issued grants are skipped
 -- because that path owns them and would otherwise be maintained twice.

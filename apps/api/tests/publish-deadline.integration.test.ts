@@ -5,7 +5,7 @@ const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const DENIED = '没有权限，请找人开通。';
 const STALE = '资料资格过期了，请稍后重试。';
 
-/** PR-B unit: publish and rollback read authorization_sources at one clock, compare domains
+/** Publish and rollback read authorization_sources at one clock, compare domains
  * only, and refuse the whole call when one domain is missing. The session role is never the
  * gate, so an owner or coach session without a grant is refused like anyone else. */
 describe.skipIf(!enabled)('publish and rollback read the source set by domain', () => {

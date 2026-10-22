@@ -10,9 +10,8 @@ actually touches: Electron windows, the real HTTP API, and a disposable PostgreS
 Playwright attached to the Electron app. Nothing here is stubbed — the host is the same one the
 product e2e gates use.
 
-The gap this closes: permission work has passed every service-level test while the entry point was
-still shut. A brand-new Feishu account projected to zero permissions, and a created seat could never
-be granted, and no unit test could see either.
+Service-level tests cannot see whether the entry point admits the operator. This skill drives
+what the operator actually touches.
 
 ## Launch
 

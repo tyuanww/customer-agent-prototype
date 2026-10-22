@@ -204,13 +204,30 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
   因此知道一条存活委派的人可以直接插一条子授权。这与 O1 属同一类「绕过 changeGrant
   直接写表」，修法需要把签发资格判定搬进 SQL，另开一轮，不在 0058 范围内。
 
-### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 待验证
+### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 已修（0059）
 
 `0049:288-330` 的刷新逻辑只撤销/重发 `reason='职位名单系统签发。'` 且 `issuer_id = v_signer`
 的授权。通过 `createGrants` 手动签发、带操作者自定义 reason 的 query 授权，
 在 store set 版本变化后不会被重签也不会被撤销，于是永久失效却仍留在 `grants` 表里。
 
-与 P1a 叠加，正是「保存了、列表里也有、刷新也没用」的完整成因。此结论为代码推断，未运行验证。
+与 P1a 叠加，正是「保存了、列表里也有、刷新也没用」的完整成因。
+
+- 实测（2026-10-22，真实 PG15）：source 仍在批准的 store_set_members 里，集合从 1 推进到 2，
+  `authorization_sources` 返回 0 行，而授权列表仍显示这条授权存在。坐席被静默拒绝。
+- 修法：`0059_query_grant_restamp` 把不变量落到 store set 指针上。`store_set_current` 上的
+  触发器 `restamp_query_grants`（SECURITY DEFINER，owner `cs_ai_definer`）在版本推进时
+  维护手动签发的 query 授权：source 仍在新版本成员里就重戳，离开了就撤销。
+- 名单行按 `issuer_id` 跳过，而不是按 reason 文本。签发者 id 由 tenant/app 推导，是结构性
+  判据；用自由文本会让操作者输入保留句后把自己这条授权永久排除在维护之外。
+- `grant_version_guard` 因此允许两个审批戳在 query 授权上随 version 递增改动，其余身份列
+  仍冻结。这不给任何登录角色新能力：`intake_business` 的列级 UPDATE 只有
+  `version,last_change_reason,steward_id,revoked_at`，两个戳从来不在其中；且
+  `authorization_sources` 仍要求新戳对应的版本真的包含该 source。
+- `revocation_generation` 刻意不动。它是 `read_sop_release_assets` 绑定 entitlement 与
+  principal 的等值连接键（`0040:1444`），递增会让已签发的 SOP 凭证租约全部失效，而重戳
+  本身不改变任何权限。
+- 验收：`apps/api/tests/query-grant-store-set.integration.test.ts` 两条，旧迁移下都失败，
+  新迁移下通过。
 
 ### O3 · P7 实际覆盖 41 条路由，intake 的 19 条未覆盖 · 已修
 

@@ -10,11 +10,9 @@ const APP = 'app-restamp';
 const BRAND = 'brand-restamp';
 const ACTION = 'query';
 
-/** A query grant names the policy and store set current when it was written, and
- *  `authorization_sources` compares both against the live values. When the approved store set
- *  advances, a grant written by the operator therefore stops authorizing even though its source
- *  is still approved. The roster path re-stamps its own grants; a manual one was left behind,
- *  which is the silent failure this suite pins. */
+/** Pins the invariant `0059_query_grant_restamp` owns: an approved set that advances must not
+ *  silently de-authorize a grant whose source it still contains. The two cases differ only in
+ *  whether the source stays a member. */
 describe.skipIf(!enabled)('query grant follows the store set', () => {
   it('keeps a manual query grant working when the same source stays approved', async () => {
     const harness = new Pg15Harness();

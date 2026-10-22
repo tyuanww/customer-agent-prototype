@@ -189,9 +189,6 @@ describe('route admission', () => {
     { profile: 'mock' as const, allowlist: MOCK_PUBLIC },
     { profile: 'product' as const, allowlist: PRODUCT_PUBLIC },
   ])('keeps the public allowlist free of anything that mutates state ($profile profile)', ({ profile, allowlist }) => {
-    // A public route that writes would be a worse defect than a missing 401, and reviewers
-    // read the allowlist as the complete public surface. Only the named login handshake may
-    // write; anything else appearing here has to be argued for explicitly.
     const mutating = allowlist.filter(entry => !entry.startsWith('GET '));
     expect([...mutating].sort()).toEqual([...PUBLIC_WRITES[profile]].sort());
   });

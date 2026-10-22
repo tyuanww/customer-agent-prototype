@@ -4,7 +4,7 @@ import { queryFailure, isProductQueryResult } from '../../src/shared/product-sea
 import { PERMISSION_DENIAL_MESSAGE } from '../../src/shared/product-session';
 
 /**
- * PR-A unit: the search door states its two refusals in its own words, and they have to reach
+ * The search door states its two refusals in its own words, and they have to reach
  * the operator as those words rather than as a generic forbidden copy.
  *
  * These cases pin the contract between the API sentence, the desktop failure code, and the
