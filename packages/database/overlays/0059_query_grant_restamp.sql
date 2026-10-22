@@ -86,8 +86,10 @@ BEGIN
   WHERE grant_row.grant_id = l.grant_id;
   -- `revocation_generation` is deliberately untouched. A restamp changes no authority, and
   -- bumping the counter would invalidate every issued entitlement lease through the equality
-  -- join in `read_sop_release_assets`. A withdrawn grant already fails that function's own
-  -- `authorization_deadline` check, so the counter buys nothing here.
+  -- join in `read_sop_release_assets` (0040). A withdrawn grant already fails that function's
+  -- own `authorization_deadline` check, so the counter buys nothing here. This decision is
+  -- coupled to that join: if the function stops keying on `revocation_generation`, revisit
+  -- whether this trigger should start bumping it.
   RETURN NULL;
 END;
 $$;

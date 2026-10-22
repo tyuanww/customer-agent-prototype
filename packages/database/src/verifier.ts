@@ -1131,7 +1131,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   58: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: '68d598888268ac314a8981d243137fba475245ade22423d6574267481a96e6da' },
   // 0059 adds the restamp trigger and its function, and replaces the version guard in place.
   // The guard now lets the two approval stamps move on query grants.
-  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '6e9c95ea1d44b2d68b3470c4baf2a2a3d51494bad0058c462f469898c07c50e0', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1808f6f0512cc051840bd74fc8db1c604af167e6590cc6e840026d072524dceb', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1146,13 +1146,12 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   54: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
   55: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
   56: { entries: 609, sha256: '712de21df06cff230ccf04637d94f167f76613d2143707df04482aa4dc07d7c1' },
-  // Measured after 0057: the four grants add 26 entries, the PUBLIC revokes take 3 off per
-  // function for the ones PUBLIC held, and the net is 609 -> 635.
+  // Each row is the manifest measured after that migration, never derived from the row above.
   57: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
-  // 0058 replaces one function body, so the ACL manifest is unchanged.
+  // 0058 replaces one function body, so the manifest is unchanged.
   58: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
   // 0059 adds one function owned by the definer and revokes PUBLIC, plus the read and
-  // column-level write grants the restamp needs. The count is measured, not derived.
+  // column-level write grants the restamp needs.
   59: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
 };
 

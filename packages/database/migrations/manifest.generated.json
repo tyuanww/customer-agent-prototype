@@ -910,8 +910,8 @@
       "id": "0059_query_grant_restamp",
       "file": "0059_query_grant_restamp.sql",
       "source_ranges": [],
-      "sha256": "59da7046ff565cab345f33ddc47661f9e50ad5d1e898c5b28f3f4ba5568d6a42",
-      "bytes": 6764,
+      "sha256": "335a8599ead936b818d1c24b9a550cf8d1b213656fed0a08b8cad9a2b8c4b917",
+      "bytes": 6931,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
