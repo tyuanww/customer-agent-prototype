@@ -1095,6 +1095,7 @@ const READINESS_SUFFIX = [
   { length: 58, index: 57, id: '0058_grant_steward_no_restore' },
   { length: 59, index: 58, id: '0059_query_grant_restamp' },
   { length: 60, index: 59, id: '0060_grant_issuer_authority' },
+  { length: 61, index: 60, id: '0061_sop_entry_code_identity' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1134,6 +1135,9 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1808f6f0512cc051840bd74fc8db1c604af167e6590cc6e840026d072524dceb', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
   // 0060 replaces the parent guard in place; no table, function or trigger is added.
   60: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: 'c95865a4e59f5810534e543b27a5c87287fac33d8b043e990ba643ddfd7347f8', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  // 0061 replaces the SOP asset-staging body in place; no table, function or
+  // trigger is added, so only the function digest moves.
+  61: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1c28c57e878bbcc19fc5a019e7a02f4144964be3e17f797255ddb173ef79c925', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1157,6 +1161,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   59: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0060 replaces one function body.
   60: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
+  // 0061 changes a function body only, so the ACL grant list is unchanged.
+  61: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
 };
 
 export async function verifyReadinessSuccessor(

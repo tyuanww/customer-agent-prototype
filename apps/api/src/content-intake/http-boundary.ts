@@ -58,3 +58,13 @@ export function intakePageQuery(request: FastifyRequest): Record<string, unknown
   if (typeof query.limit === 'string' && /^(?:[1-9][0-9]{0,2})$/.test(query.limit)) query.limit = Number(query.limit);
   return query;
 }
+
+/** Only the material list pages backwards. Keeping this out of `intakePageQuery`
+ * means a future list that forgets to reject unknown keys cannot silently accept a
+ * key it never implemented. */
+export function materialPageQuery(request: FastifyRequest): Record<string, unknown> {
+  const query = intakePageQuery(request);
+  if (query.previous === 'true') query.previous = true;
+  else if (query.previous === 'false') query.previous = false;
+  return query;
+}

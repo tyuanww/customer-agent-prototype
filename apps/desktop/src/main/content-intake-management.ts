@@ -46,6 +46,10 @@ export class ContentIntakeManagement {
   private cursor: string | null = null;
   private selected: C['IntakeCandidate'] | null = null;
   private material: C['IntakeCandidatePage'] | null = null;
+  /** Page 0 is represented by an empty trail. trail[k] is the cursor that moved from
+   * page k to page k+1, so the page on screen is the trail length. A cursor signature
+   * is server-owned, so a backward step re-sends a cursor this client already received. */
+  private materialTrail: string[] = [];
   private receipt: C['IntakeQualityReceipt'] | null = null;
   private offset = 0;
   private review: C['IntakeReview'] | null = null;
@@ -75,7 +79,7 @@ export class ContentIntakeManagement {
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private invalidate() {
-    this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null;
+    this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null; this.materialTrail = [];
     this.quality.cancelRead(); this.review = null; this.rollback.invalidate();
     this.upload.invalidate(false);
     if (this.timer) clearTimeout(this.timer); this.timer = null;
@@ -89,7 +93,7 @@ export class ContentIntakeManagement {
     return this.validAccess()?.capabilities.some(c => (!sourceId || c.scope.sourceId === sourceId) && c.actions.includes(action)) ?? false;
   }
   private clearSelection() {
-    this.quality.cancelRead(); this.selected = null; this.material = null; this.receipt = null;
+    this.quality.cancelRead(); this.selected = null; this.material = null; this.materialTrail = []; this.receipt = null;
     this.review = null; this.workflowResult = null; this.offset = 0;
   }
   private unresolved(): IntakeManagementView['pending'] {
@@ -115,6 +119,7 @@ export class ContentIntakeManagement {
       candidates: this.rows.map(row => ({ ...row, scopeLabel: scopeLabel(this.access?.sources ?? [], row.candidate.sourceId) })),
       moreCandidates: this.cursor !== null,
       selected: canRead ? this.selected : null, material: canRead ? this.material : null,
+      materialPage: canRead ? this.materialTrail.length : 0,
       canReview, quality: canReview ? this.quality.page(this.offset) : null, hasDraft: canReview && this.quality.hasDraft(),
       canConfirmSource: canRead && this.can('source-confirm', this.selected!.sourceId),
       canPublish: canRead && this.can('publish', this.selected!.sourceId),
@@ -123,8 +128,16 @@ export class ContentIntakeManagement {
       review: canRead ? this.review : null, workflowResult: canRead ? this.workflowResult : null,
       pending: session.signedIn ? this.unresolved() : null, receipt: canRead ? this.receipt : null, upload: this.upload.view(access) });
   }
-  private async refreshAccess(signal: AbortSignal) {
-    const access = await loadIntakeAccess(this.session, signal);
+  /** The renderer polls `current` while an upload command is in flight, and that tick
+   * is where a still-running parse job gets its next observation. The manual refresh
+   * button sends the same `upload-refresh` command, so this is the automatic path, not
+   * the only one. A failed tick keeps the last known phase and the next tick retries. */
+  async settleUpload(): Promise<void> {
+    if (this.disposed || !this.session.view().signedIn || !this.upload.needsSettle()) return;
+    try { await this.upload.command({ action: 'upload-refresh' }, this.validAccess()); }
+    catch { /* The next poll tick retries; the view keeps its last known phase. */ }
+  }
+  private async refreshAccess(signal: AbortSignal) {    const access = await loadIntakeAccess(this.session, signal);
     if (signal.aborted) return reject('STALE');
     this.access = access; this.deadline = performance.now() + Math.max(0, Date.parse(access.validUntil) - Date.now());
     if (this.timer) clearTimeout(this.timer);
@@ -276,10 +289,16 @@ export class ContentIntakeManagement {
             // A successful response or historical replay is not a current status.
             if (!this.workflowPending) await this.readCandidate(request);
           } else if (c.action === 'material') {
-            if (c.next && !this.material?.nextCursor) return reject('STALE');
-            const q = new URLSearchParams({ limit: '20', ...(c.next && this.material?.nextCursor ? { cursor: this.material.nextCursor } : {}) });
+            // `next:false` without `previous` is a fresh first-page load, exactly as
+            // before this change; only a real step re-sends a cursor.
+            const cursor = c.previous ? this.materialTrail.at(-1) ?? null : c.next ? this.material?.nextCursor ?? null : null;
+            if ((c.previous || c.next) && !cursor) return reject('STALE');
+            const q = new URLSearchParams({ limit: '20', ...(cursor ? { cursor } : {}), ...(c.previous ? { previous: 'true' } : {}) });
             const page = parseContractSchema('IntakeCandidatePage', await request(`${this.address(selected)}/material?${q}`));
             if (!sameKey(page.key, selected.key) || page.materialHeader.scope.sourceId !== selected.sourceId) return reject('STALE');
+            if (c.previous) this.materialTrail.pop();
+            else if (c.next) this.materialTrail.push(cursor!);
+            else this.materialTrail = [];
             this.material = page;
           } else {
             if (!this.can('review', selected.sourceId)) return reject('FORBIDDEN');
@@ -307,7 +326,7 @@ export class ContentIntakeManagement {
     if (!sameKey(next.key, selected.key) || next.sourceId !== selected.sourceId) return reject('STALE');
     if (next.approvalEvidenceVersion !== this.review?.evidenceVersion) this.review = null;
     if (!['awaiting-evidence','ready'].includes(next.state)) {
-      this.quality.cancelRead(); this.material = null; this.review = null; this.receipt = null;
+      this.quality.cancelRead(); this.material = null; this.materialTrail = []; this.review = null; this.receipt = null;
     }
     this.selected = next;
   }

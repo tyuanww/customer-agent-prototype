@@ -4,7 +4,7 @@ import net from 'node:net';
 import tls from 'node:tls';
 import dgram from 'node:dgram';
 import dns from 'node:dns';
-import { INTAKE_POLICY, failedParse, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, type IntakeParseContext } from './policy.js';
+import { INTAKE_POLICY, failedParse, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, SOP_TEMPLATE_VERSION, type IntakeParseContext } from './policy.js';
 
 // Instrument supported Node network entry points BEFORE loading the parsing dependency.
 // This proves observed library behaviour, not an OS sandbox or native-code isolation.
@@ -27,6 +27,7 @@ try {
   }
   const context = JSON.parse(process.argv[2] ?? 'null') as IntakeParseContext;
   policyVersion = context?.templateVersion === CSV_TEMPLATE_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version;
+  if (context?.templateVersion === SOP_TEMPLATE_VERSION) throw new Error('SOP_WORKBOOK_NOT_AN_FAQ_PARSE');
   const bytes = Buffer.concat(chunks);
   const result = context?.templateVersion === CSV_TEMPLATE_VERSION
     ? (await import('./csv.js')).parseCsv(bytes, context)

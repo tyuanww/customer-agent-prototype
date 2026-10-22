@@ -32,12 +32,14 @@ function ScriptTable<RecordType extends object>(props: TableProps<RecordType> & 
   return createElement(Table as ComponentType<typeof props>, props);
 }
 
+// `sop` is a real bucket now: the main process files an entry whose source carries the
+// SOP mapping marker under it, so the tab renders rows instead of a fixed empty state.
 const domains: readonly { id: IntakeCatalogRow['domain']; label: string }[] = [
   { id: 'product', label: '产品' }, { id: 'campaign', label: '活动' },
-  { id: 'presale', label: '售前' }, { id: 'aftersale', label: '售后' },
+  { id: 'presale', label: '售前' }, { id: 'aftersale', label: '售后' }, { id: 'sop', label: 'SOP' },
 ];
-type LibraryTab = IntakeCatalogRow['domain'] | 'sop';
-const libraryTabs: readonly { id: LibraryTab; label: string }[] = [...domains, { id: 'sop', label: 'SOP' }];
+type LibraryTab = IntakeCatalogRow['domain'];
+const libraryTabs: readonly { id: LibraryTab; label: string }[] = domains;
 
 function Conditions({ label, options, selected, disabled, change }: {
   label: string; options: IntakeQueryOption[]; selected: string[]; disabled: boolean; change: (ids: string[]) => void;
@@ -120,7 +122,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
   const shopLabel=(id:string) => names.has(id) ? `${names.get(id)}${counts.get(names.get(id)!)!>1 ? `（${id}）` : ''}` : id;
   const changeDomain=(id:LibraryTab) => setDomain(id);
   const needle=question.trim();
-  const visible=domain==='sop' ? [] : rows.filter(row => row.domain===domain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
+  const visible=rows.filter(row => row.domain===domain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
   const domainKey=(event:KeyboardEvent<HTMLElement>,index:number) => {
     const next=event.key==='ArrowRight' ? (index+1)%libraryTabs.length : event.key==='ArrowLeft' ? (index+libraryTabs.length-1)%libraryTabs.length : event.key==='Home' ? 0 : event.key==='End' ? libraryTabs.length-1 : null;
     if(next===null)return;event.preventDefault();changeDomain(libraryTabs[next].id);document.getElementById(`intake-domain-${libraryTabs[next].id}`)?.focus();
@@ -192,7 +194,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
             className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</LibraryButton>)}
         </div></div>
         <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>
-          {domain==='sop' ? <CatalogEmpty description="这一栏还没有 SOP 目录。" /> : fresh ? <ScriptTable<IntakeCatalogRow>
+          {fresh ? <ScriptTable<IntakeCatalogRow>
             aria-label="可用话术" pagination={false} tableLayout="fixed" rowKey="id" rowClassName={() => 'item'}
             dataSource={visible} columns={scriptColumns}
             locale={{ emptyText: <CatalogEmpty description="当前条件下没有此类可用话术。" /> }} />

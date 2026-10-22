@@ -64,12 +64,22 @@ function workflowPane(target: string | undefined, policy: string | undefined): '
   if (target === 'candidate' && policy === 'approval-v1') return 'legacy';
   return 'none';
 }
-function MaterialPage({ material, disabled, apply }: { material: NonNullable<IntakeManagementView['material']>; disabled: boolean; apply: (command: IntakeManagementCommand) => void }) {
+function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonNullable<IntakeManagementView['material']>; disabled: boolean; apply: (command: IntakeManagementCommand) => void; pageIndex: number }) {
   return <section aria-label="当前页材料与差异">
-    <p>来源版本：{material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{riskLabels[material.materialHeader.risk.level]}</p>
-    <ActionButton disabled={disabled || !material.nextCursor} onClick={() => apply({ action: 'material', next: true })}>下一页材料</ActionButton>
-    {material.entries.map(entry => <article className="intake-card" key={entry.businessEntryId}><h3>{entry.title}</h3><p className="intake-answer">{entry.answerText}</p><EntryDetails entry={entry} /></article>)}
-    <h3>当前页差异</h3>{material.differences.map(difference => <p key={difference.businessEntryId}>{differenceTitle(material.entries, difference.businessEntryId)} · {({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[difference.change]} · {difference.previousVersion ?? '无前版'} → {difference.nextVersion}</p>)}
+    <p>来源版本：{material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{riskLabels[material.materialHeader.risk.level]} · 第 {pageIndex + 1} 页</p>
+    <div className="intake-toolbar">
+      <ActionButton disabled={disabled || pageIndex === 0} onClick={() => apply({ action: 'material', next: false, previous: true })}>上一页材料</ActionButton>
+      <ActionButton disabled={disabled || !material.nextCursor} onClick={() => apply({ action: 'material', next: true })}>下一页材料</ActionButton>
+    </div>
+    {/* The workbook code is the entry's identity, so the reviewer has to see it;
+        without it 266 SOP cards share six sheet-name titles. */}
+    {material.entries.map(entry => <article className="intake-card" key={entry.businessEntryId}>
+      <h3>{entry.title}</h3>
+      <p className="intake-entry-code"><code>{entry.businessEntryId}</code></p>
+      <p className="intake-answer">{entry.answerText}</p>
+      <EntryDetails entry={entry} />
+    </article>)}
+    <h3>当前页差异</h3>{material.differences.map(difference => <p key={difference.businessEntryId}><code>{difference.businessEntryId}</code> · {differenceTitle(material.entries, difference.businessEntryId)} · {({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[difference.change]} · {difference.previousVersion ?? '无前版'} → {difference.nextVersion}</p>)}
   </section>;
 }
 /** An instance can be bound before the first observation exists. The frozen
@@ -145,7 +155,7 @@ function CandidateWorkflow({ view, disabled, apply, onDirty, sectionId, open, ch
   return <section aria-label="来源确认与发布">
     <div hidden={open !== 'source'}>
     <h2 id={`${sectionId}-source`} tabIndex={-1}>2. 确认来源</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。请核对原资料版本与当前候选材料。</p>
-    {view.material && <MaterialPage material={view.material} disabled={disabled} apply={apply} />}
+    {view.material && <MaterialPage material={view.material} disabled={disabled} apply={apply} pageIndex={view.materialPage} />}
     {view.canConfirmSource ? <fieldset disabled={disabled || view.hasDraft || publishDirty || !mutable || !view.material}>
       <legend>确认本次导出对应的来源版本</legend>
       {!view.material && <p>请先查看材料，核对本次上传内容。</p>}
@@ -290,8 +300,9 @@ export function IntakeManagement() {
     if (!busy || !uploadRequest) return;
     let active = true, reading = false;
     const gen = generation.current;
-    // current() projects Main memory only. Keep stop/progress visible while the
-    // original command is pending; never start overlapping HTTP refresh writes.
+    // current() now also settles a running parse job through one HTTP read per tick
+    // (Main serialises it), so this loop is what advances 解析中 to its final state.
+    // Manual refresh sends the same command. Every other state still comes from memory.
     const read = async () => {
       if (reading) return;
       reading = true;

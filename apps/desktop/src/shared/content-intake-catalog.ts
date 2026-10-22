@@ -1,7 +1,10 @@
 import { exactKeys } from './product-session';
 import { isIntakeSelection, isIntakeShopRequest, type IntakeQueryContext } from './content-intake-query';
 export type IntakeCatalogRow = {
-  id: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale';
+  /** `sop` is a presentation bucket derived from the source's registered tuple, not a
+   * scope domain: the frozen contract has no `sop` domain, so SOP workbooks are
+   * registered under an existing scope and flagged by their mapping version. */
+  id: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale' | 'sop';
   title: string; answerText: string; applicabilityNote: string; riskNote: string; category: string;
   scriptVersion: number; effectiveFrom: string; effectiveTo: string | null;
 };

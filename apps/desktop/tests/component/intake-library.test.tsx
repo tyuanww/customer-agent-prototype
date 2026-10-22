@@ -88,7 +88,9 @@ it('browses four scoped domains and shares the same complete read with the avail
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  rerender(<IntakeLibrary active="wording"/>);
  await user.click(screen.getByRole('tab',{name:'SOP'}));
- expect(screen.getByRole('tabpanel')).toHaveTextContent('这一栏还没有 SOP 目录。');
+ // SOP is a real tab now, rendered by the same table as the other four.
+ expect(screen.getByRole('tabpanel')).toHaveTextContent('当前条件下没有此类可用话术。');
+ expect(screen.getByRole('tabpanel')).not.toHaveTextContent('这一栏还没有 SOP 目录。');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('未接入');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();

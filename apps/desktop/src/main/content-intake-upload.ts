@@ -206,8 +206,12 @@ export class ContentIntakeUpload {
     }) };
     await this.transmit(request, false);
   }
-  private acceptJob(job: C['IntakeParseJob']) {
-    if (this.job && (job.jobId !== this.job.jobId || job.generation < this.job.generation
+  /** True while the server job has not reached a terminal state, so a renderer
+   * poll tick has something real to fetch. */
+  needsSettle(): boolean {
+    return !this.disposed && !!this.file && parsing(this.job);
+  }
+  private acceptJob(job: C['IntakeParseJob']) {    if (this.job && (job.jobId !== this.job.jobId || job.generation < this.job.generation
       || (!parsing(this.job) && JSON.stringify(job) !== JSON.stringify(this.job)))) return reject('STALE');
     if (job.state === 'validated' && (!job.candidateId || job.candidateVersion === null)) return reject('STALE');
     if (job.state === 'validated' && this.priorKey && (job.candidateId !== this.priorKey.candidateId

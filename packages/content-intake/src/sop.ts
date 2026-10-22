@@ -14,8 +14,22 @@ export const SOP_POLICY_VERSION = 'sop-xlsx-v1';
 export const SOP_SHEET_NAMES = [
   '过敏流程SOP', '少错破SOP', '品质售后SOP', '税收相关规则', '品牌对接资源汇总', '长痘痘SOP',
 ] as const;
+/** The registered SOP source tuple (0038_menokin_sop_domain_v1_27). A SOP source
+ * declares this tuple instead of the FAQ template/rule pair, so the registry —
+ * not a filename, MIME or sheet list from the client — selects the parser. */
+export { SOP_TEMPLATE_VERSION } from './policy.js';
+export const SOP_RULE_VERSION = 'sop-not-imported';
+export const SOP_MAPPING_VERSION = 'not-imported';
+export const SOP_STRUCTURE_SHA256 = '55db62261cb6eee8bb0327ffb4bf8eac1f30a667e6821f640431d4be47c3a925';
 const IMAGE_EXTENSIONS = ['jpeg', 'png', 'gif'] as const;
 type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
+
+/** The workbook column that carries a row's stable identity. The header row is
+ * row 1 on every sheet; a sheet without this column is refused rather than
+ * falling back to position, because position silently rewrites published text. */
+export const SOP_ENTRY_CODE_HEADER = '条目编码';
+const ENTRY_CODE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
+export const isEntryCode = (value: string): boolean => ENTRY_CODE.test(value);
 
 export type SopParseContext = Readonly<{
   sourceId: string;
@@ -39,6 +53,9 @@ export type SopAttachment = Readonly<{
 
 export type SopRow = Readonly<{
   id: string;
+  /** Stable business identity the operator writes in the workbook. Position is
+   * not identity: inserting a row above must not renumber every entry below it. */
+  code: string;
   sheet: string;
   row: number;
   text: string;
@@ -146,8 +163,34 @@ function imageBuffer(image: ExcelJS.Image): Buffer | undefined {
 
 const SYNTHETIC_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=', 'base64');
 
+/** A blank workbook the business fills in. Row 1 is the header and every data row
+ * must carry its own code, because the code — not the row number — is the entry's
+ * identity. `samples` are written as example rows the operator deletes. */
+export async function createSopTemplate(samples: readonly (readonly string[])[] = []): Promise<Buffer> {
+  const book = new ExcelJS.Workbook();
+  for (const [index, name] of SOP_SHEET_NAMES.entries()) {
+    const sheet = book.addWorksheet(name);
+    sheet.getCell('A1').value = SOP_ENTRY_CODE_HEADER;
+    sheet.getCell('B1').value = '答案';
+    sheet.getCell('A1').font = { bold: true };
+    sheet.getCell('B1').font = { bold: true };
+    sheet.getColumn(1).width = 18;
+    sheet.getColumn(2).width = 60;
+    // Only the first sheet carries examples; the rest stay empty so an untouched
+    // sheet cannot look like content the operator meant to publish.
+    if (index === 0) {
+      samples.forEach((cells, offset) => {
+        // Row 1 is the header; examples start at row 2 and must not overwrite it.
+        sheet.getCell(offset + 2, 1).value = `DEMO-${offset + 1}`;
+        cells.forEach((value, cell) => { sheet.getCell(offset + 2, cell + 2).value = value; });
+      });
+    }
+  }
+  return Buffer.from(await book.xlsx.writeBuffer());
+}
+
 /** One synthetic six-sheet workbook with text and a same-row PNG. Not a real customer file. */
-export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: boolean; imageOnLastTextRow?: boolean; imageOnFinalRow?: boolean; sameImageOnLastTextRow?: boolean; omitFirstImage?: boolean; replaceFirstImage?: boolean; textSuffix?: string; declaredVersion?: string; tailRows?: number; tailImageStart?: number; tailImageCount?: number } = {}): Promise<{ bytes: Buffer; png: Buffer }> {
+export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: boolean; imageOnLastTextRow?: boolean; imageOnFinalRow?: boolean; sameImageOnLastTextRow?: boolean; omitFirstImage?: boolean; replaceFirstImage?: boolean; textSuffix?: string; declaredVersion?: string; tailRows?: number; tailImageStart?: number; tailImageCount?: number; firstSheetRows?: readonly { code: string; text: string }[] } = {}): Promise<{ bytes: Buffer; png: Buffer }> {
   const book = new ExcelJS.Workbook();
   if (options.tailRows !== undefined && (!Number.isInteger(options.tailRows) || options.tailRows < 1 || options.tailRows > 501)) throw new Error('SYNTHETIC_TAIL_ROWS');
   const imageStart = options.tailImageStart ?? 0, imageCount = options.tailImageCount ?? 0;
@@ -155,12 +198,28 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
     || imageStart + imageCount > (options.tailRows ?? 0)) throw new Error('SYNTHETIC_TAIL_IMAGES');
   for (const [index, name] of SOP_SHEET_NAMES.entries()) {
     const sheet = book.addWorksheet(name);
-    sheet.addRow(options.omitLastTextRow && index === SOP_SHEET_NAMES.length - 1 ? [] : ['答案']);
-    if (index < 3) sheet.getCell('A2').value = `${name}合成文字${options.textSuffix ?? ''}`;
-    if (index === SOP_SHEET_NAMES.length - 1 && options.tailRows !== undefined) {
-      for (let row = 0; row < options.tailRows; row++) sheet.getCell(row + 2, 1).value = `合成规模答案${row + 1}`;
+    // Row 1 is the header on every sheet; the code column is what makes a row's
+    // identity survive an insertion above it.
+    sheet.addRow([SOP_ENTRY_CODE_HEADER, '答案']);
+    const lastSheet = index === SOP_SHEET_NAMES.length - 1;
+    // Without explicit rows this fixture numbers by physical row, which is fine
+    // for a single version. A caller that inserts a row must pass codes, because
+    // a row-derived code would move with the insertion and prove nothing.
+    const explicit = index === 0 ? options.firstSheetRows : undefined;
+    const writeRow = (row: number, text: string) => {
+      sheet.getCell(row, 1).value = `${index + 1}-${row}`;
+      sheet.getCell(row, 2).value = text;
+    };
+    if (explicit) {
+      explicit.forEach((entry, offset) => {
+        sheet.getCell(offset + 2, 1).value = entry.code;
+        sheet.getCell(offset + 2, 2).value = entry.text;
+      });
+    } else if (index < 3) writeRow(2, `${name}合成文字${options.textSuffix ?? ''}`);
+    if (lastSheet && options.tailRows !== undefined) {
+      for (let row = 0; row < options.tailRows; row++) writeRow(row + 2, `合成规模答案${row + 1}`);
     }
-    if (index === 0 && options.declaredVersion !== undefined) { sheet.getCell('C1').value = '版本'; sheet.getCell('C2').value = options.declaredVersion; }
+    if (index === 0 && options.declaredVersion !== undefined) { sheet.getCell('D1').value = '版本'; sheet.getCell('D2').value = options.declaredVersion; }
   }
   const imageId = book.addImage(options.replaceFirstImage
     ? { buffer: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') as unknown as ExcelJS.Buffer, extension: 'gif' }
@@ -191,8 +250,10 @@ export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId
   if (!sop.ok) {
     return { contentVersion: { kind: sop.versionKind, value: sop.version }, parsed: { ok: false, policyVersion: P.version, rows: [], questions: [], issues: sop.issues, excluded: [], expandedBytes: 0, mediaCount: sop.attachments.length }, rowBindings: [], previews: [] };
   }
-  const shaped = sop.rows.map((row, index) => {
-    const id = `sop${index + 1}`;
+  const shaped = sop.rows.map((row) => {
+    // The operator's code is the identity. A position-derived id renumbered every
+    // entry below an inserted row, which silently rewrote published answers.
+    const id = row.code;
     const values = [id, row.sheet, row.text, '', '', '分类', '', '启用', '', '', '', '', '', '', 'false'];
     const family = values[10] ?? '';
     return {
@@ -247,8 +308,17 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
     const attachments: SopAttachment[] = [];
     let normalizedTextChars = 0;
     const versionValues = new Set<string>();
+    const seenCodes = new Set<string>();
     for (const name of selected) {
       const sheet = book.getWorksheet(name)!;
+      let codeColumn = 0;
+      for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
+        if (cellText(sheet.getCell(1, column).value) === SOP_ENTRY_CODE_HEADER) { codeColumn = column; break; }
+      }
+      if (!codeColumn) {
+        issue('MISSING_ENTRY_CODE_HEADER', name, 1, 'A', '第一行表头必须包含「条目编码」列，为每行填写稳定编码');
+        continue;
+      }
       for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
         const header = cellText(sheet.getCell(1, column).value);
         if (header !== '版本' && header !== '版本号') continue;
@@ -261,13 +331,21 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
           }
         }
       }
-      const byRow = new Map<number, string[]>();
+      const byRow = new Map<number, { values: string[]; code: string }>();
       sheet.eachRow((row, rowNumber) => {
+        // Row 1 is the header on every sheet. Treating it as content published a
+        // template instruction as if it were an answer.
+        if (rowNumber === 1) return;
         const values: string[] = [];
+        let code = '';
         for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
           const value = cellText(row.getCell(column).value);
           if (value === undefined) {
             issue('NON_TEXT_CELL', name, rowNumber, columnName(column), 'SOP 文字必须是纯文本或富文本；移除公式、日期和数值单元格');
+            continue;
+          }
+          if (column === codeColumn) {
+            if (value !== '') code = value.trim();
             continue;
           }
           if (value !== '') {
@@ -277,8 +355,23 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
             values.push(value);
           }
         }
-        if (values.length) byRow.set(rowNumber, values);
+        if (!code && !values.length) return;
+        if (!code) {
+          issue('MISSING_ENTRY_CODE', name, rowNumber, columnName(codeColumn), '每行必须填写条目编码；编码是这一行的稳定身份');
+          return;
+        }
+        if (!isEntryCode(code)) {
+          issue('ENTRY_CODE_INVALID', name, rowNumber, columnName(codeColumn), '条目编码只能用字母、数字和 . _ : -，且以字母或数字开头，最长 64');
+          return;
+        }
+        byRow.set(rowNumber, { values, code });
       });
+      for (const [, entry] of byRow) {
+        if (entry.code && seenCodes.has(entry.code)) {
+          issue('ENTRY_CODE_DUPLICATE', name, 1, 'A', '条目编码在整册内必须唯一');
+        }
+        seenCodes.add(entry.code);
+      }
 
       const rowAttachments = new Map<number, string[]>();
       for (const [index, entry] of sheet.getImages().entries()) {
@@ -304,13 +397,13 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
         linked.push(id); rowAttachments.set(row, linked);
       }
 
-      for (const [row, values] of byRow) {
+      for (const [row, entry] of byRow) {
         const attachmentIds = rowAttachments.get(row) ?? [];
-        rows.push({ id: `sop:${name}:${row}`, sheet: name, row, text: values.join('\n'), attachmentIds });
+        rows.push({ id: `sop:${name}:${row}`, code: entry.code, sheet: name, row, text: entry.values.join('\n'), attachmentIds });
       }
       for (const [row, attachmentIds] of rowAttachments) {
         if (!byRow.has(row)) issue('IMAGE_WITHOUT_TEXT', name, row, 'A', '图片所在行必须补齐文字答案后再导入');
-        else if (attachmentIds.length > 0 && !byRow.get(row)!.join('\n').trim()) issue('IMAGE_WITHOUT_TEXT', name, row, 'A', '图片所在行必须补齐文字答案后再导入');
+        else if (attachmentIds.length > 0 && !byRow.get(row)!.values.join('\n').trim()) issue('IMAGE_WITHOUT_TEXT', name, row, 'A', '图片所在行必须补齐文字答案后再导入');
       }
     }
     if (versionValues.size > 1) issue('VERSION_CONFLICT', selected[0]!, 1, 'A', '所有工作表的版本字段必须一致');

@@ -1,5 +1,5 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { qualityTargets } from '../content-normalize.js';
+
 import { candidateContext } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { requireIndependentReviewer } from './reviewer.js';
@@ -59,11 +59,26 @@ export function qualityPopulation(rawKey: unknown, rawMaterial: unknown) {
       risk_level: material.risk.level === 'critical' ? 'high' : 'low', has_conflict: false, quality_status: 'clean' });
   }
   const ordinaryCount = material.risk.level === 'routine' ? population.length : 0;
-  const targets = qualityTargets(ordinaryCount);
+  const targets = intakeQualityTargets(ordinaryCount);
   return { purpose: 'synthetic-quality-preview' as const, key, sourceId: material.scope.sourceId,
     population, entries, withdrawals, ordinaryCount, mandatoryCount: population.length - ordinaryCount,
     initialTarget: targets.initial, expandedTarget: targets.expanded,
     seedHash: digest(canonical({ encoding: 'intake-quality-seed-v1', key })) };
+}
+
+/** Sampling policy for the intake path (`intake-quality-v1`). It is deliberately
+ * separate from `content-normalize.qualityTargets`: that one belongs to the legacy
+ * batch chain and is pinned by the `quality_plan_initial_target` CHECK in 0004, so
+ * relaxing it would need a migration and would also weaken the CSV import gate.
+ *
+ * A small catalog is still checked in full. Above that the sample is bounded, so a
+ * 266-row SOP workbook asks for 100 human judgments instead of every row. The
+ * expanded phase never asks for fewer items than the initial phase. */
+export const INTAKE_FULL_CHECK_LIMIT = 100;
+export function intakeQualityTargets(ordinaryCount: number): Readonly<{ initial: number; expanded: number }> {
+  if (ordinaryCount <= INTAKE_FULL_CHECK_LIMIT) return Object.freeze({ initial: ordinaryCount, expanded: ordinaryCount });
+  const initial = Math.min(300, Math.max(100, Math.ceil(ordinaryCount * 0.10)));
+  return Object.freeze({ initial, expanded: Math.min(ordinaryCount, Math.max(initial, Math.ceil(ordinaryCount * 0.30))) });
 }
 
 /** Internal read-only consumer for the sealed synthetic service. The database

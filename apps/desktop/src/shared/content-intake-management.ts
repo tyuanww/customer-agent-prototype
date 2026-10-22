@@ -8,7 +8,7 @@ export type IntakeManagementCommand =
   | IntakeRollbackCommand
   | { action: 'list'; next: boolean }
   | { action: 'select'; selection: string }
-  | { action: 'material'; next: boolean }
+  | { action: 'material'; next: boolean; previous?: boolean }
   | { action: 'quality'; phase: 'initial' | 'expanded' }
   | { action: 'quality-page'; offset: number }
   | { action: 'check'; scriptId: string; defect: boolean; reason: string }
@@ -37,6 +37,9 @@ export type IntakeManagementView = {
   signedIn: boolean; displayName: string; authorized: boolean; validUntil: string | null;
   candidates: { selection: string; scopeLabel: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
   selected: C['IntakeCandidate'] | null; material: C['IntakeCandidatePage'] | null;
+  /** Zero-based page index of the material page on screen; the renderer only uses
+   * it to label the page and enable the backward button. */
+  materialPage: number;
   canReview: boolean; quality: QualityPage | null; hasDraft: boolean;
   canConfirmSource: boolean; canPublish: boolean; canRevise: boolean; canCancel: boolean;
   review: C['IntakeReview'] | null;
@@ -64,7 +67,9 @@ export function isIntakeManagementCommand(raw: unknown): raw is IntakeManagement
   const r = raw as Record<string, unknown>;
   if (r.action === 'rollback-preview') return exactKeys(r, ['action','baseReleaseId','targetReleaseId']) && text(r.baseReleaseId, 128) && text(r.targetReleaseId, 128) && r.baseReleaseId !== r.targetReleaseId;
   if (['rollback-request-review','rollback-read-review','rollback-refresh-review','rollback-execute','rollback-recover','rollback-retry','rollback-discard','rollback-correct'].includes(r.action as string)) return exactKeys(r, ['action']);
-  if (r.action === 'list' || r.action === 'material') return exactKeys(r, ['action','next']) && typeof r.next === 'boolean';
+  if (r.action === 'list') return exactKeys(r, ['action','next']) && typeof r.next === 'boolean';
+  if (r.action === 'material') return (exactKeys(r, ['action','next']) && typeof r.next === 'boolean')
+    || (exactKeys(r, ['action','next','previous']) && typeof r.next === 'boolean' && typeof r.previous === 'boolean' && r.next !== r.previous);
   if (r.action === 'select') return exactKeys(r, ['action','selection']) && typeof r.selection === 'string' && r.selection.length <= 128 && r.selection.length > 0;
   if (r.action === 'quality') return exactKeys(r, ['action','phase']) && (r.phase === 'initial' || r.phase === 'expanded');
   if (r.action === 'quality-page') return exactKeys(r, ['action','offset']) && Number.isSafeInteger(r.offset) && (r.offset as number) >= 0;

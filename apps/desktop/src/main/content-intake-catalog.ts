@@ -17,6 +17,7 @@ export class ContentIntakeCatalog {
   private epoch: number;
   private menuDeadline = 0;
   private namesDeadline = 0;
+  private sopSources = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
   constructor(private readonly session: IntakeUsageSession) {
@@ -60,7 +61,8 @@ export class ContentIntakeCatalog {
     const rows: IntakeCatalogRow[] = snapshot?.faq.map(({ sourceId, entry }, i) => {
       const scope = scopes.get(sourceId);
       if (!scope) throw new IntakeUsageError('FORBIDDEN');
-      return { id: `entry-${i}`, domain: scope.domain, title: entry.title, answerText: entry.answerText,
+      return { id: `entry-${i}`, domain: this.sopSources.has(sourceId) ? 'sop' : scope.domain,
+        title: entry.title, answerText: entry.answerText,
         applicabilityNote: entry.applicabilityNote, riskNote: entry.riskNote, category: entry.category,
         scriptVersion: entry.scriptVersion, effectiveFrom: entry.effectiveFrom, effectiveTo: entry.effectiveTo };
     }) ?? [];
@@ -103,6 +105,14 @@ export class ContentIntakeCatalog {
       // A disappearing condition must not silently broaden a previously selected read.
       if (productIds.some(id => !menus.products.some(p => p.id === id)) || scenarioIds.some(id => !menus.scenarios.some(p => p.id === id))) throw new IntakeUsageError('STALE');
       this.namesDeadline = access.shopNamesDeadline ?? 0;
+      // The registered tuple, not the scope domain, decides which board a row belongs
+      // to: a SOP workbook is registered under an existing product scope because the
+      // frozen contract's domain enum has no `sop`, so `domain` alone would file every
+      // SOP entry under 产品 while the SOP tab stayed empty. Only the mapping marker is
+      // reachable here; the contract types the template and rule fields as FAQ literals.
+      this.sopSources = new Set(access.sources
+        .filter(source => source.mappingVersion === 'sop-not-imported')
+        .map(source => source.scope.sourceId));
       this.context = { ...emptyIntakeQueryContext(), ...menus, shops: access.shops, shopId, productIds, scenarioIds,
         shopNames: access.shopNames ?? [], shopNamesValidUntil: access.shopNamesValidUntil ?? null, validUntil: access.validUntil };
       if (shopId !== null) {
