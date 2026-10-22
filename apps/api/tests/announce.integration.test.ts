@@ -118,7 +118,10 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
       signer: { principalId: 't5-signer', userId: 'usr_t5_signer', jobId: 'job-t5-director', role: 'director' },
       recipients: [{ principalId: 't5-owner', userId: 'usr_t5_owner', jobId: 'job-t5-director', role: 'director' }],
       domains: BINDINGS.map((binding) => binding.domain),
-      actions: ['import', 'publish', 'rollback'],
+      // Search reads the same reader as import. Without the query row the door answers 403
+      // before it ever looks for a matching release.
+      actions: ['import', 'publish', 'rollback', 'query'],
+      query: true,
     });
     const repository = createServiceRepository({
       connectionString: conn('t5_runtime'), poolMax: 4, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,

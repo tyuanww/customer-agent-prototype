@@ -21,6 +21,7 @@ import {
   runVerifiedG1aEvaluation,
 } from './support/g1a-e0/runner.js';
 import { createSyntheticG1aE0Package } from './support/g1a-e0/synthetic-package.js';
+import { seedQueryPrincipal } from './support/query-principal.js';
 
 const describeSyntheticRunner = process.env.CUSTOMER_AGENT_API_G1A_E0_SYNTHETIC === '1'
   ? describe.sequential
@@ -97,7 +98,12 @@ describeSyntheticRunner('G1A-E0 full synthetic substitute', () => {
         expect(await loadedRowCount(owner)).toBe(0);
       }
       await loadG1aEvaluationRelease(owner, input);
-      const search = () => owner!.query("SELECT * FROM public.search_recommendable_scripts('qianniu',NULL,NULL)");
+      // Search resolves the caller to a principal and reads a query grant, so the door needs
+      // one. The three-argument shim refuses every caller by design and is not a valid probe.
+      await seedQueryPrincipal(owner, { userId: 'usr_synthetic_owner_load',
+        domains: [...new Set(input.manifest.source_bindings.map((b) => b.domain))] });
+      const search = () => owner!.query(
+        "SELECT * FROM public.search_recommendable_scripts('usr_synthetic_owner_load','qianniu',NULL,NULL)");
       expect((await search()).rowCount).toBeGreaterThan(0);
       await owner.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
       expect((await search()).rowCount).toBe(0);
