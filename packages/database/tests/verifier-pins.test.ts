@@ -58,4 +58,22 @@ describe('verifier digests', () => {
     expect(new Set(pins.map(pin => pin.sha)).size, 'counts with the same function total but '
       + 'different bodies must not collapse to one digest').toBe(pins.length);
   });
+
+  /** A comment that reconciles a pin against the row above it turns a measurement into
+   *  arithmetic. A maintainer raising a pin reads the sum, gets a plausible answer, and skips
+   *  the run; two of those comments in this very table were wrong at once, each disagreeing
+   *  with the pin on the next line. The values are measured, so nothing here may be derived. */
+  it('states no pin as a computed delta over another row', () => {
+    const pins = section('const READINESS_INVENTORY_BY_LENGTH', 'const READINESS_ACL_BY_LENGTH')
+      + section('const READINESS_ACL_BY_LENGTH', 'export async function verifyReadinessSuccessor');
+    const derived = pins.split('\n')
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => /^\s*\/\//.test(line))
+      .filter(({ line }) => /\d+\s*(->|→)\s*\d+/.test(line)
+        || /\b(adds?|takes?)\s+\d+\s+(entries|rows|grants)/i.test(line)
+        || /\b(net|delta)\b.*\b\d+\b/i.test(line))
+      .map(({ line, index }) => `line ${index + 1}: ${line.trim()}`);
+    expect(derived, 'a pin comment must say which migration it was measured after, never how '
+      + 'the count changed; the number is measured, not derived').toEqual([]);
+  });
 });

@@ -89,13 +89,10 @@ function appWith(
   operation?: SearchOperation,
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>,
 ): FastifyInstance {
-  const app = createApiApp(
-    config(),
-    repository(),
-    undefined,
-    undefined,
-    undefined,
-    operation === undefined ? undefined : {
+  const app = createApiApp({
+    config: config(),
+    repository: repository(),
+    searchDependencies: operation === undefined ? undefined : {
       operation,
       logHash: { version: 'hmac-log-v1', key: 'synthetic-search-route-key-000001' },
       idempotencyHmac: {
@@ -104,7 +101,7 @@ function appWith(
       },
       ...(hasAcceptedCurrentNotice === undefined ? {} : { hasAcceptedCurrentNotice }),
     },
-  );
+  });
   openApps.push(app);
   return app;
 }

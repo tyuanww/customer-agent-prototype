@@ -199,10 +199,18 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 - 验收：`apps/api/tests/grant-steward-restore.integration.test.ts` 两条，
   一条钉住「清空后写回被拒且授权仍为 0」，一条钉住「接管仍可替换 steward 且授权仍为 1」。
 
-- 未修的相邻问题（O1b）：`intake_business` 也持有 `INSERT` on grants，而
-  `grant_parent_guard` 只校验父子关系一致，不校验签发人当下是否具备该动作的授权。
-  因此知道一条存活委派的人可以直接插一条子授权。这与 O1 属同一类「绕过 changeGrant
-  直接写表」，修法需要把签发资格判定搬进 SQL，另开一轮，不在 0058 范围内。
+- 相邻问题（O1b）· 已修（0060）：`intake_business` 也持有 `INSERT` on grants，而
+  `grant_parent_guard` 原只校验父子关系一致。父行证明签发人**曾经**拿到该动作，
+  但证明不了**当下**还够格：facts 窗口关闭、被停用、被降级，父行都还活着。
+  知道一条存活委派的人可以直接插一条子授权，绕过 `createGrants` 的资格判定。
+  - 修法：`0060_grant_issuer_authority` 在同一个守卫里加一次资格查询，条件与
+    `authorization_sources` 用的那组一致（facts 未过期且 enabled、`role_allows` 允许该动作）。
+    不新建第二个谓词，也不引入第二个角色定义。
+  - 为什么不用 `authorization_sources` 本身：它只返回 business 授权行，而父行通常是
+    allocation，永远不会出现在结果里。父行存在性已由 `parent_grant_id` 加本守卫校验，
+    缺的只是资格这一半。
+  - 验收：`apps/api/tests/grant-issuer-authority.integration.test.ts` 两条，
+    一条钉住 facts 关闭后子授权被拒，一条钉住正常签发仍然通过。
 
 ### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 已修（0059）
 

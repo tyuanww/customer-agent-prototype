@@ -136,19 +136,18 @@ describe('route admission', () => {
     { profile: 'product' as const, allowlist: PRODUCT_PUBLIC, intakeRoutes: true },
   ])('refuses an anonymous caller on every route that is not explicitly public ($profile profile)', async ({ profile, allowlist, intakeRoutes }) => {
     const product = profile === 'product';
-    const app = createApiApp(parseApiRuntimeConfig({
-      CUSTOMER_AGENT_PROFILE: 'test',
-      AUTH_MODE: 'mock',
-      ...(product ? { AUTH_SESSION_MODE: 'product' } : {}),
-      CUSTOMER_AGENT_API_PORT: '0',
-      CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-route-admission',
-    }), stubRepository(),
-    /* diagnosticSink */ undefined, /* providedAuthService */ product ? anonymousProductAuth() : undefined,
-    /* policyAdmin */ undefined, /* search */ undefined, /* event */ undefined,
-    /* contentImport */ undefined, /* contentReview */ undefined, /* contentRelease */ undefined,
-    /* announce */ undefined, /* iterationTask */ undefined, /* opsLoop */ undefined,
-    /* accessLog */ undefined, /* notice */ undefined,
-    /* intakeDependencies */ product ? INTAKE_DEPENDENCIES : undefined);
+    const app = createApiApp({
+      config: parseApiRuntimeConfig({
+        CUSTOMER_AGENT_PROFILE: 'test',
+        AUTH_MODE: 'mock',
+        ...(product ? { AUTH_SESSION_MODE: 'product' } : {}),
+        CUSTOMER_AGENT_API_PORT: '0',
+        CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-route-admission',
+      }),
+      repository: stubRepository(),
+      authService: product ? anonymousProductAuth() : undefined,
+      intakeDependencies: product ? INTAKE_DEPENDENCIES : undefined,
+    });
     openApps.push(app);
     await app.ready();
 

@@ -175,21 +175,22 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
       },
       'mock',
     );
-    app = createApiApp(
-      parseApiRuntimeConfig({
+    app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
         CUSTOMER_AGENT_API_PORT: '0', CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t4',
       }),
-      repository, undefined, auth, undefined, undefined, undefined,
-      { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
-      { service: createContentReviewService({
+      repository,
+      authService: auth,
+      contentImportDependencies: { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
+      contentReviewDependencies: { service: createContentReviewService({
         connectionString: conn('t4_review'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
       }) },
-      { service: createContentReleaseService(
+      contentReleaseDependencies: { service: createContentReleaseService(
         { connectionString: conn('t4_admin'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
         HMAC, LOG_HASH,
       ) },
-    );
+    });
     worker = createContentWorker(
       { connectionString: conn('t4_worker'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
       store,

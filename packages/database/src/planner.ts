@@ -204,6 +204,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0058_grant_steward_no_restore',
     requiresPredecessor: 'Query restamp requires the one-way steward guard',
   },
+  {
+    index: 59,
+    minimumCatalogueLength: 60,
+    id: '0060_grant_issuer_authority',
+    predecessorId: '0059_query_grant_restamp',
+    requiresPredecessor: 'Issuer authority requires the restamped query grants',
+  },
 ];
 
 function requiredSuccessorStep(

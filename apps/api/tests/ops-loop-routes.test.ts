@@ -144,26 +144,16 @@ function sopMultipart(csv: string, field = 'file'): Buffer {
 }
 
 function appWith(ops?: OpsLoopRepository): FastifyInstance {
-  const app = createApiApp(
-    parseApiRuntimeConfig({
+  const app = createApiApp({
+    config: parseApiRuntimeConfig({
       CUSTOMER_AGENT_PROFILE: 'test',
       AUTH_MODE: 'mock',
       CUSTOMER_AGENT_API_PORT: '0',
       CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-ops-loop-test',
     }),
-    serviceRepository(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    ops === undefined ? undefined : { repository: ops, idempotencyHmac: keyRing },
-  );
+    repository: serviceRepository(),
+    opsLoopDependencies: ops === undefined ? undefined : { repository: ops, idempotencyHmac: keyRing },
+  });
   openApps.push(app);
   return app;
 }
