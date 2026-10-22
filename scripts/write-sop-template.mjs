@@ -4,6 +4,10 @@
  * a file checked into the repository: row 1 must be the header and every data row
  * must carry its own code, and those are the parser's own rules.
  *
+ * A code must be ASCII. The frozen contract types `businessEntryId` as
+ * `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`, so a code is a part number (`GM-001`), not a
+ * Chinese label. The parser rejects a non-ASCII code before that check runs.
+ *
  *   node scripts/write-sop-template.mjs --out ./SOP-模板.xlsx
  */
 import { writeFile } from 'node:fs/promises';

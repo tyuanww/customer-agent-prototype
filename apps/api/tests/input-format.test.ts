@@ -11,8 +11,11 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const scope = { tenantId: 't', appId: 'a', brandId: 'b', shopId: 'shop', sourceId: 'source' } as const;
 
 /** The tuple 0038 registers for src-menokin-sop. A client filename, MIME or
- * sheet list can never produce this; only the registry row can. */
-const registeredSopSource: Source = { scopeId: 'scope-sop', scope: { ...scope, domain: 'sop' }, version: 1,
+ * sheet list can never produce this; only the registry row can. The frozen contract
+ * types the scope domain as four values, so a `sop` scope is reachable only through
+ * the database; the cast is the point of the test, not a shortcut around it. */
+const registeredSopSource: Source = { scopeId: 'scope-sop',
+  scope: { ...scope, domain: 'sop' } as unknown as Source['scope'], version: 1,
   templateVersion: SOP_TEMPLATE_VERSION, ruleVersion: SOP_RULE_VERSION, mappingVersion: SOP_MAPPING_VERSION,
   structureDigest: SOP_STRUCTURE_SHA256, mode: 'v2-preview' };
 const registeredFaqSource: Source = { scopeId: 'scope', scope: { ...scope, domain: 'product' }, version: 1,
@@ -61,10 +64,10 @@ describe('material policy version against a registered SOP source', () => {
   });
 
   it('still refuses an FAQ parse presented under a CSV source', async () => {
-    const context = { ...scope, scope: 'shop', scopeKind: 'shop' as const, domain: 'product' as const,
-      sheet: 'FAQ' as const, templateVersion: TEMPLATE_VERSION };
+    const context: Parameters<typeof createTemplate>[0] = { sourceId: scope.sourceId, brandId: scope.brandId, scope: 'shop',
+      domain: 'product', sheet: 'FAQ', templateVersion: TEMPLATE_VERSION };
     const bytes = await createTemplate(context, [['entry-a', '合成标题', '合成回答', '', '', '分类', '', '启用', '', '', '', '', '', '', 'false']]);
-    const parsed = await parseWorkbook(bytes, context);
+    const parsed = await parseWorkbook(bytes, { ...context, scopeKind: 'shop' });
     const csvSource: Source = { ...registeredFaqSource, templateVersion: CSV_TEMPLATE_VERSION,
       ruleVersion: CSV_POLICY_VERSION, mappingVersion: CSV_MAPPING_VERSION, structureDigest: CSV_STRUCTURE_SHA256 };
     expect(() => materialFromParse({ parsed, source: csvSource,

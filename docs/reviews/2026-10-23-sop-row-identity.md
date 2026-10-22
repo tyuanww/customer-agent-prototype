@@ -38,7 +38,7 @@ export const isEntryCode = (value: string): boolean => ENTRY_CODE.test(value);
 - 每张表第 1 行是表头，必须含「条目编码」列；缺失即 `MISSING_ENTRY_CODE_HEADER`
 - 第 2 行起是数据，编码写入 `businessEntryId`
 - 空编码 → `MISSING_ENTRY_CODE`（不回退到位置）
-- 编码格式 `^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`，非法 → `ENTRY_CODE_INVALID`
+- 编码格式 `^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`，非法 → `ENTRY_CODE_INVALID`。必须是 ASCII，因为契约把 `businessEntryId` 定义成 `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`。所以编码是料号（`GM-001`），不是中文标签。
 - 整册唯一，重复 → `ENTRY_CODE_DUPLICATE`
 - 编码列的值不进入正文；第 1 行不再产生条目（原先表头「答案」会变成一条正式条目）
 
