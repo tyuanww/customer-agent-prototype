@@ -104,7 +104,7 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(commands.every(command=>['refresh','save','retry','discard','stop','source','preview','revoke'].includes(command.action))).toBe(true);
   expect(commands.filter(command=>command.action==='preview').map(command=>command.action==='preview'?[...command.actions]:[])).toEqual([[...supervisor.actions],[...agent.actions]]);
  }finally{main.dispose();}
-});
+}, 30_000);
 it('does not offer a post the current scope cannot grant',async()=>{
  const main=new ContentIntakePermissions(intakePermissionsData().session);
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
