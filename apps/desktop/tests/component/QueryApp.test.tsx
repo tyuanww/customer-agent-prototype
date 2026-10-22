@@ -16,6 +16,7 @@ import {
   SCRIPT_INACCURACY_RECORDED_STATUS,
 } from '../../src/renderer/features/search/query-view';
 import { productCatalogEntries } from '../../src/shared/product-catalog';
+import { observeSessionJob } from '../../src/shared/product-session';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
@@ -156,8 +157,12 @@ describe('QueryApp', () => {
     };
   });
 
-  function connectProduct(options: { noHit?: boolean } = {}) {
-    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString(), displayName: 'synthetic' };
+  function connectProduct(options: { noHit?: boolean; searchAllowed?: boolean } = {}) {
+    const view = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 10, userId: 'usr_synthetic', role: 'agent' as const, authMode: 'mock' as const, expiresAt: new Date(Date.now() + 800_000).toISOString(), displayName: 'synthetic',
+      // The search entry reads this bit, which the server derives from the query source set.
+      // Omitting it would leave the default job unresolved and exercise a different branch.
+      job: observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }],
+        actions: { query: options.searchAllowed !== false, import: false, publish: false, rollback: false } }) };
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(view),
       login: vi.fn().mockResolvedValue(view),
@@ -463,6 +468,21 @@ describe('QueryApp', () => {
     expect(screen.getByLabelText('订单号')).toBeDisabled();
     expect(f.copyAdopt).toHaveBeenCalledWith(expect.objectContaining({ placeholderValues: { order_id: 'SYNTHETIC-B' } }));
     await act(async () => pending.resolve(await response(f.copyAdopt.mock.calls[0][0])));
+  });
+
+  it('shows the denial sentence and no results when the query bit is false', async () => {
+    // The plan's fourth button is search. A closed query source set must not run a search at
+    // all, and it must say why instead of showing the ordinary no-hit sentence.
+    // prepareProductQuery waits for a search call, so this drives the two steps itself.
+    const f = connectProduct({ searchAllowed: false });
+    render(<QueryApp />); await screen.findByRole('button', { name: /· 退出$/ });
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    expect(await screen.findByText('没有权限，请找人开通。')).toBeInTheDocument();
+    // The IPC search never ran, so nothing could leak from an unfiltered read.
+    expect(f.search).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
   });
 
   it('offers synthetic help on no-hit without claiming a transfer', async () => {

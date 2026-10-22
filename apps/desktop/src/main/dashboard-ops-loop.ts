@@ -19,6 +19,7 @@ import {
   type RetrievalWindow,
 } from '../shared/dashboard-ops-loop';
 import { ProductHttpError } from './product-http';
+import { PRODUCT_ERRORS } from '../shared/product-session';
 import type { ProductSession } from './product-session';
 
 export type DashboardOpsSessionClient = Pick<ProductSession, 'view' | 'request'>;
@@ -48,6 +49,9 @@ function asFailure(error: unknown): DashboardOpsFailure {
   if (error.code === 'GONE') return dashboardOpsFailure('NOT_FOUND');
   if (error.code === 'SOURCE_GATE_NOT_READY' || error.code === 'CLIPBOARD_FAILED' || error.code === 'STALE' || error.code === 'CANCELLED') {
     return dashboardOpsFailure('UNAVAILABLE');
+  }
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+    return dashboardOpsFailure('FORBIDDEN', PRODUCT_ERRORS[error.code]);
   }
   return dashboardOpsFailure(error.code, error.message);
 }

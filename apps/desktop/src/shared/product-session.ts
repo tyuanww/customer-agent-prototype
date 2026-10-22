@@ -13,8 +13,14 @@ export type ProductSessionView = {
 export const UNRESOLVED_JOB_LABEL = '职务未识别';
 export const PERMISSION_DENIAL_MESSAGE = '没有权限，请找人开通。';
 
+/** The two refusals have different causes and different owners: an expired facts window
+ * needs a refresh, a missing grant needs a person to open access. The server already tells
+ * them apart in the roster projection, so this must not flatten them. */
+export const FACTS_EXPIRED_MESSAGE = '资料资格过期了，请稍后重试。';
+
 export function permissionNotice(state: RosterPermissionState | undefined): string | null {
   if (!state || state === 'ready' || state === 'unknown') return null;
+  if (state === 'expired') return FACTS_EXPIRED_MESSAGE;
   return PERMISSION_DENIAL_MESSAGE;
 }
 
@@ -31,6 +37,7 @@ export type SessionJobView =
     readonly rights: BoardRights;
     readonly permission: RosterPermissionState | null;
     readonly notice: string | null;
+    readonly actions: SessionActions;
   }
   | {
     readonly status: 'unresolved';
@@ -39,25 +46,38 @@ export type SessionJobView =
     readonly rights: BoardRights;
     readonly permission: RosterPermissionState | null;
     readonly notice: string | null;
+    readonly actions: SessionActions;
   };
+
+export type SessionActions = {
+  readonly query: boolean;
+  readonly import: boolean;
+  readonly publish: boolean;
+  readonly rollback: boolean;
+};
+
+export const NO_SESSION_ACTIONS: SessionActions = {
+  query: false, import: false, publish: false, rollback: false,
+};
 
 export type JobSnapshot = {
   readonly title: string;
   readonly directory: readonly JobDirectoryEntry[];
   readonly permissionState?: RosterPermissionState;
+  readonly actions?: SessionActions;
 };
 
 export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView {
   if (snapshot === null) {
-    return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission: null, notice: null };
+    return { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission: null, notice: null, actions: { ...NO_SESSION_ACTIONS } };
   }
   const lookup = resolveJobTitle(snapshot.title, snapshot.directory);
   const permission = snapshot.permissionState ?? null;
   const notice = permissionNotice(snapshot.permissionState);
+  const actions = snapshot.actions ?? NO_SESSION_ACTIONS;
   if (lookup.status === 'unresolved') {
-    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission, notice };
+    return { status: 'unresolved', reason: lookup.reason, label: UNRESOLVED_JOB_LABEL, rights: { ...NO_JOB_RIGHTS }, permission, notice, actions: { ...NO_SESSION_ACTIONS } };
   }
-  const queryReady = snapshot.permissionState === 'ready';
   return {
     status: 'resolved',
     title: lookup.title,
@@ -65,11 +85,14 @@ export function observeSessionJob(snapshot: JobSnapshot | null): SessionJobView 
     label: lookup.title,
     rights: {
       ...lookup.rights,
-      search: lookup.rights.search && queryReady,
-      readCatalog: lookup.rights.readCatalog && queryReady,
+      publish: actions.publish,
+      grant: actions.publish,
+      search: actions.query,
+      readCatalog: lookup.rights.readCatalog && actions.query,
     },
     permission,
     notice,
+    actions,
   };
 }
 export const PRODUCT_ERRORS = {
@@ -79,6 +102,10 @@ export const PRODUCT_ERRORS = {
   OVERLOADED: '服务繁忙，请稍后重试', RATE_LIMITED: '操作过于频繁，请稍后重试',
   CANCELLED: '操作已取消', STALE: '内容已变化，请重新查询',
   CLIPBOARD_FAILED: '复制失败，请重试', SOURCE_GATE_NOT_READY: '内容暂不可用，请联系话术师核实',
+  // The two refusals the search door states in its own words. They are their own codes rather
+  // than FORBIDDEN copies so the sentence an operator reads is the sentence the server sent.
+  NO_GRANT: '没有权限，请找人开通。',
+  FACTS_EXPIRED: '资料资格过期了，请稍后重试。',
 } as const;
 export type ProductErrorCode = keyof typeof PRODUCT_ERRORS;
 export type ProductFailure = { ok: false; sessionEpoch: number; code: ProductErrorCode; message: string };
@@ -119,27 +146,36 @@ export function isSessionJob(value: unknown): value is SessionJobView {
   const row = rights as Record<string, unknown>;
   if (!exactKeys(row, ['publish', 'grant', 'uploadSop', 'search', 'readCatalog'])) return false;
   if (![row.publish, row.grant, row.uploadSop, row.search, row.readCatalog].every((flag) => typeof flag === 'boolean')) return false;
-  if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE) return false;
+  if (job.notice !== null && job.notice !== PERMISSION_DENIAL_MESSAGE
+    && job.notice !== FACTS_EXPIRED_MESSAGE) return false;
   if (job.permission !== null && (typeof job.permission !== 'string'
     || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
+  if (!isSessionActions(job.actions)) return false;
   if (job.status === 'unresolved') {
-    return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice'])
+    return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice', 'actions'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
       && job.label === UNRESOLVED_JOB_LABEL
       && row.publish === false && row.grant === false && row.uploadSop === false
       && row.search === false && row.readCatalog === false;
   }
-  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights', 'permission', 'notice'])) return false;
+  if (job.status !== 'resolved' || !exactKeys(job, ['status', 'title', 'role', 'label', 'rights', 'permission', 'notice', 'actions'])) return false;
   if (typeof job.title !== 'string' || job.label !== job.title) return false;
   const expected = resolveJobTitle(job.title, [{ name: job.title, enabled: true }]);
-  const queryReady = job.permission === 'ready';
+  const actions = job.actions as SessionActions;
   return expected.status === 'resolved'
     && expected.role === job.role
-    && expected.rights.publish === row.publish
-    && expected.rights.grant === row.grant
+    && row.publish === actions.publish
+    && row.grant === actions.publish
     && expected.rights.uploadSop === row.uploadSop
-    && row.search === (queryReady && expected.rights.search)
-    && row.readCatalog === (queryReady && expected.rights.readCatalog);
+    && row.search === actions.query
+    && row.readCatalog === (expected.rights.readCatalog && actions.query);
+}
+
+function isSessionActions(value: unknown): value is SessionActions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!exactKeys(value, ['query', 'import', 'publish', 'rollback'])) return false;
+  const row = value as Record<string, unknown>;
+  return [row.query, row.import, row.publish, row.rollback].every((flag) => typeof flag === 'boolean');
 }
 export type ProductSessionApi = {
   sessionStatus(): Promise<ProductSessionResult>;

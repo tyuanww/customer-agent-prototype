@@ -164,6 +164,7 @@ describe('session notice projection', () => {
           rights: { publish: false, grant: false, uploadSop: false, search: false, readCatalog: false },
           permission: 'denied',
           notice: PERMISSION_DENIAL_MESSAGE,
+          actions: { query: false, import: false, publish: false, rollback: false },
         },
       },
       source: 'login',

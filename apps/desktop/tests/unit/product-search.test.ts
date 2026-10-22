@@ -12,7 +12,7 @@ const candidate: ProductCandidate = { rank: 1, release_id: 'rel-synthetic-001', 
   content_hash: 'a'.repeat(64), title: '合成发货', category: 'presale', answer_text: '合成订单 {订单号}', platform_scope: ['qianniu'],
   product_scope_type: 'storewide', product_scope_refs: [], effective_from: '2026-01-01T00:00:00Z', effective_to: null,
   intent_taxonomy_version: 'itax_synthetic_v1', intent_id: 'intent_synthetic_shipping', risk_level: 'low', risk_categories: [], has_conflict: false, placeholder_keys: ['order_id'] };
-async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; respectJob?: boolean; noticeAccepted?: boolean; notice?: 'missing' | 'declined' | 'throws'; openEntry?: () => boolean | Promise<boolean> } = {}) {
+async function fixture(options: { disabled?: boolean; eventFail?: boolean; candidate?: ProductCandidate; noHit?: boolean; respectJob?: boolean; noticeAccepted?: boolean; notice?: 'missing' | 'declined' | 'throws'; openEntry?: () => boolean | Promise<boolean>; forbid?: 'no_grant' | 'facts_expired' } = {}) {
   const events: unknown[] = []; const write = vi.fn();
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const p = new URL(String(url)).pathname;
@@ -40,6 +40,11 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
     }
     const body = JSON.parse(String(init?.body));
     if (p === '/v1/search') {
+      // The search door refuses with its own sentence, not the generic forbidden copy.
+      if (options.forbid) {
+        return Response.json({ error: { code: 'FORBIDDEN', message: options.forbid === 'no_grant'
+          ? '没有权限，请找人开通。' : '资料资格过期了，请稍后重试。' } }, { status: 403 });
+      }
       const row = options.candidate ?? candidate;
       let hit = !options.noHit;
       if (!options.noHit) {
@@ -69,10 +74,17 @@ async function fixture(options: { disabled?: boolean; eventFail?: boolean; candi
   const search = new ProductSearch(session, write, announce, help);
   const request: ProductSearchRequest = { sessionEpoch: session.view().sessionEpoch, generation: 1, queryText: '合成发货问题', platform: 'qianniu', platformSource: 'manual', productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null };
   const result = await search.search(1, request);
-  if (!result.ok) throw Error(result.code);
+  // A refusal fixture is expected to fail its first search, so it reports the failure rather
+  // than throwing the way the happy-path fixtures do. `copy` stays typed so the other cases
+  // need no narrowing; it is never read on the refusal path.
+  if (!result.ok) {
+    if (!options.forbid) throw Error(result.code);
+    return { search, session, request, copy: {} as never, write, events,
+      transport, announce, help, queryId: '', first: result };
+  }
   const copy = { sessionEpoch: request.sessionEpoch, generation: 1, queryId: result.queryId, rank: 1, scriptId: candidate.script_id,
     scriptVersion: 1, contentHash: candidate.content_hash, placeholderValues: { order_id: 'SYNTHETIC-001' } };
-  return { search, session, request, copy, write, events, transport, announce, help, queryId: result.queryId };
+  return { search, session, request, copy, write, events, transport, announce, help, queryId: result.queryId, first: undefined };
 }
 describe('product query and native copy provenance', () => {
   function recordedModes(transport: { mock: { calls: unknown[][] } }): string[] {
@@ -292,6 +304,23 @@ describe('product query and native copy provenance', () => {
     const searchCalls = f.transport.mock.calls.slice(before).filter((call) => String(call[0]).includes('/v1/search'));
     expect(searchCalls.length).toBeGreaterThan(0);
     expect(searchCalls.every((call) => JSON.parse(String(call[1]?.body)).collection_mode === 'pilot_recorded')).toBe(true);
+    await f.session.logout();
+  });
+  it('returns the sentence the search door sent when the query set is empty', async () => {
+    const f = await fixture({ forbid: 'no_grant' });
+    expect(f.first).toEqual({
+      ok: false, code: 'NO_GRANT', sessionEpoch: f.request.sessionEpoch, generation: 1,
+      message: '没有权限，请找人开通。',
+    });
+    await f.session.logout();
+  });
+  it('returns the stale sentence rather than the denial when the facts window closed', async () => {
+    const f = await fixture({ forbid: 'facts_expired' });
+    const result = f.first;
+    // The two refusals must not collapse: a closed window is not a missing grant, and telling
+    // the operator to ask for access would send them to the wrong person.
+    expect(result).toMatchObject({ ok: false, code: 'FACTS_EXPIRED', message: '资料资格过期了，请稍后重试。' });
+    expect(result).not.toMatchObject({ code: 'NO_GRANT' });
     await f.session.logout();
   });
   it('does not rerank fallback BM25 when smart retrieval is off', async () => {

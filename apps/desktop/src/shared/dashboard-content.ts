@@ -1,4 +1,4 @@
-import { exactKeys, isSessionJob, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL, type ProductErrorCode, type SessionJobView } from './product-session';
+import { exactKeys, isSessionJob, PERMISSION_DENIAL_MESSAGE, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL, type ProductErrorCode, type SessionJobView } from './product-session';
 
 export const DASHBOARD_CONTENT_DOMAINS = ['presale', 'campaign', 'aftersale', 'product'] as const;
 export type DashboardContentDomain = (typeof DASHBOARD_CONTENT_DOMAINS)[number];
@@ -217,12 +217,11 @@ export function contentPublishGate(input: ContentPublishGateInput): ContentPubli
     return { allowed: false, code: 'UNAUTHORIZED', message: CONTENT_PUBLISH_COPY.noSession };
   }
   const job = input.job ?? null;
-  if (job?.status !== 'resolved' || job.rights.publish !== true) {
-    return {
-      allowed: false,
-      code: 'FORBIDDEN',
-      message: job?.status === 'resolved' ? CONTENT_PUBLISH_COPY.agent : UNRESOLVED_JOB_LABEL,
-    };
+  if (job?.status !== 'resolved') {
+    return { allowed: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL };
+  }
+  if (job.rights.publish !== true) {
+    return { allowed: false, code: 'FORBIDDEN', message: PERMISSION_DENIAL_MESSAGE };
   }
   if (input.rows.some(rowRequiresOwner) && job.rights.grant !== true) {
     return { allowed: false, code: 'FORBIDDEN', message: CONTENT_PUBLISH_COPY.sensitive };

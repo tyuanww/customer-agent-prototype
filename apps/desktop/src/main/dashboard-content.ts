@@ -7,7 +7,6 @@ import {
   CONTENT_IMPORT_MAX_BYTES,
   CONTENT_IMPORT_TIMEOUT_MS,
   CONTENT_PUBLISH_COPY,
-  CONTENT_ROLLBACK_COPY,
   ACTOR_IN_FLIGHT_IMPORT_ID,
   contentPublishGate,
   dashboardContentFailure,
@@ -21,7 +20,7 @@ import {
   type DashboardContentSessionResult,
 } from '../shared/dashboard-content';
 import { ProductHttpError } from './product-http';
-import { UNRESOLVED_JOB_LABEL } from '../shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, PRODUCT_ERRORS, UNRESOLVED_JOB_LABEL } from '../shared/product-session';
 import type { ProductSession } from './product-session';
 import { LIBRARY_DOMAINS, composeLibraryDelta, type LibraryDomainCounts } from '../shared/library-delta';
 
@@ -53,10 +52,18 @@ function asFailure(error: unknown): DashboardContentFailure {
     return dashboardContentFailure('GONE', CONTENT_IMPORT_FAILURE_COPY.NO_IN_FLIGHT);
   }
   if (error.code === 'FORBIDDEN') {
+    if (error.reason === '没有权限，请找人开通。' || error.reason === '资料资格过期了，请稍后重试。') {
+      return dashboardContentFailure('FORBIDDEN', error.reason);
+    }
     if (error.reason === 'SOURCE_NOT_ELIGIBLE' || error.reason === 'SOURCE_SUSPENDED') {
       return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.sourceIneligible);
     }
     return dashboardContentFailure('FORBIDDEN');
+  }
+  // The search door's sentences are the same two refusals this plate already states, and
+  // this plate carries its own copy for them.
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+    return dashboardContentFailure('FORBIDDEN', PRODUCT_ERRORS[error.code]);
   }
   return dashboardContentFailure(error.code);
 }
@@ -219,11 +226,10 @@ export async function dashboardContentImport(
     if (!view.signedIn || view.role === null) {
       return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
     }
-    if (view.role === 'agent') return dashboardContentFailure('FORBIDDEN', CONTENT_PUBLISH_COPY.agent);
-    if (view.job?.status !== 'resolved' || view.job.rights.publish !== true) {
+    if (view.job?.status !== 'resolved' || view.job.actions.import !== true) {
       return dashboardContentFailure(
         'FORBIDDEN',
-        view.job?.status === 'resolved' ? CONTENT_PUBLISH_COPY.agent : UNRESOLVED_JOB_LABEL,
+        view.job?.status === 'resolved' ? PERMISSION_DENIAL_MESSAGE : UNRESOLVED_JOB_LABEL,
       );
     }
     if (payload.sourceBindings.length < 1) {
@@ -326,11 +332,6 @@ export async function dashboardContentRollbackPrevious(
     const view = client.view();
     if (!view.signedIn || view.role === null) {
       return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
-    }
-    // Rollback is owner-only in the contract (x-required-roles: [owner]); gate here so a coach
-    // gets a readable reason instead of an opaque API rejection.
-    if (view.role !== 'owner' || view.job?.status !== 'resolved' || view.job.rights.grant !== true) {
-      return dashboardContentFailure('FORBIDDEN', CONTENT_ROLLBACK_COPY.ownerOnly);
     }
     const response = await client.request(epoch, '/v1/content/rollback-previous', {
       method: 'POST',
