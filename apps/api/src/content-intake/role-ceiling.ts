@@ -64,6 +64,9 @@ export function roleMayDelegate(role: string | null): boolean {
   return row(role)?.mayDelegate ?? false;
 }
 
+/** Matching `content_intake.role_may_skip_import_parent`. No product caller asks this today,
+ *  but the SQL side has four predicates and this mirror keeps the same four surfaces, so a
+ *  future caller reads an answer instead of writing a fifth. */
 export function roleMaySkipImportParent(role: string | null): boolean {
   return row(role)?.maySkipImportParent ?? false;
 }

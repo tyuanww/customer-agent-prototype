@@ -3,13 +3,8 @@
 -- whenever the roster projection sees a different release lineage, so every query grant
 -- written before that moment goes stale on a value nobody can see.
 --
--- The roster path already repairs its own grants: it revokes the stale rows and inserts fresh
--- ones stamped with the new version. A grant written through the permission page carried an
--- operator reason and a different issuer, so it matched neither half of that filter and was
--- left behind. Measured before this migration: the source stayed approved, the set advanced,
--- and `authorization_sources` returned zero rows while the grant list still showed the grant.
---
--- The invariant belongs to the store set, not to whoever advances it, so it is enforced with a
+-- The roster path repairs its own grants; grants written elsewhere never were. The invariant
+-- belongs to the store set rather than to whoever advances it, so it is enforced with a
 -- trigger on the pointer. Every live manual query grant is re-stamped when its source is still
 -- a member of the new set, and revoked when it is not. Roster-issued grants are skipped
 -- because that path owns them and would otherwise be maintained twice.
@@ -75,27 +70,26 @@ BEGIN
         AND member_row.version = NEW.version
         AND member_row.scope_id = live.scope_id AND member_row.source_id = live.source_id
     )
-  ), restamped AS (
-    UPDATE content_intake.grants grant_row
-    SET version = grant_row.version + 1,
-        last_change_reason = '存储集变更。',
-        policy_version = COALESCE(v_policy, grant_row.policy_version),
-        store_set_version = NEW.version
-    FROM member
-    WHERE grant_row.grant_id = member.grant_id
-    RETURNING grant_row.grant_id
   )
+  -- One statement, so the two outcomes stay side by side: a source that is still approved
+  -- moves its stamp forward, and one that left the set is revoked in the same pass. `m` is
+  -- nullable precisely to express that branch.
   UPDATE content_intake.grants grant_row
   SET version = grant_row.version + 1,
       last_change_reason = '存储集变更。',
-      revoked_at = v_now
-  FROM live
-  WHERE grant_row.grant_id = live.grant_id
-    AND NOT EXISTS (SELECT 1 FROM member WHERE member.grant_id = live.grant_id);
+      store_set_version = CASE WHEN m.grant_id IS NULL THEN grant_row.store_set_version ELSE NEW.version END,
+      policy_version = CASE WHEN m.grant_id IS NULL THEN grant_row.policy_version
+                            ELSE COALESCE(v_policy, grant_row.policy_version) END,
+      revoked_at = CASE WHEN m.grant_id IS NULL THEN v_now ELSE grant_row.revoked_at END
+  FROM live l
+  LEFT JOIN member m ON m.grant_id = l.grant_id
+  WHERE grant_row.grant_id = l.grant_id;
   -- `revocation_generation` is deliberately untouched. A restamp changes no authority, and
   -- bumping the counter would invalidate every issued entitlement lease through the equality
-  -- join in `read_sop_release_assets`. A withdrawn grant already fails that function's own
-  -- `authorization_deadline` check, so the counter buys nothing here.
+  -- join in `read_sop_release_assets` (0040). A withdrawn grant already fails that function's
+  -- own `authorization_deadline` check, so the counter buys nothing here. This decision is
+  -- coupled to that join: if the function stops keying on `revocation_generation`, revisit
+  -- whether this trigger should start bumping it.
   RETURN NULL;
 END;
 $$;

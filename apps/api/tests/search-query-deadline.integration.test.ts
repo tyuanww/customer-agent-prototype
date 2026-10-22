@@ -15,7 +15,7 @@ const ACTOR = 'usr_synthetic_search_deadline';
 const DOMAINS = ['presale', 'campaign', 'aftersale', 'product'] as const;
 
 /**
- * PR-A unit: search reads the query source set at one clock and returns only items whose
+ * Search reads the query source set at one clock and returns only items whose
  * registered source version belongs to an allowed domain. The plan's lineage join was
  * replaced by this domain gate because release_items and release_lineage are written by
  * two disjoint publishers; the tests below pin the behaviour that decision produces.

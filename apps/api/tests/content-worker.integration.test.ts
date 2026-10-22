@@ -146,17 +146,18 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
       },
       'mock',
     );
-    app = createApiApp(
-      parseApiRuntimeConfig({
+    app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
         CUSTOMER_AGENT_API_PORT: '0', CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t3',
       }),
-      repository, undefined, auth, undefined, undefined, undefined,
-      { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
-      { service: createContentReviewService({
+      repository,
+      authService: auth,
+      contentImportDependencies: { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
+      contentReviewDependencies: { service: createContentReviewService({
         connectionString: reviewUrl, poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
       }) },
-    );
+    });
     worker = createContentWorker(
       { connectionString: workerUrl, poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
       store,

@@ -143,7 +143,10 @@ function databaseEnvironment(overrides: Record<string, string> = {}) {
 describe('Application API bootstrap', () => {
   it('keeps liveness dependency-free and contract-valid', async () => {
     const repository = stubRepository();
-    const app = createApiApp(testConfig(), repository);
+    const app = createApiApp({
+      config: testConfig(),
+      repository,
+    });
     openApps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/health' });
@@ -162,7 +165,10 @@ describe('Application API bootstrap', () => {
 
   it('returns the exact ready contract only when every check is ok', async () => {
     const repository = stubRepository(ALL_READY);
-    const app = createApiApp(testConfig(), repository);
+    const app = createApiApp({
+      config: testConfig(),
+      repository,
+    });
     openApps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/ready' });
@@ -177,13 +183,11 @@ describe('Application API bootstrap', () => {
     const RESTRICTED = 'routine-diagnosis-material-000000000001';
     const logHash = { version: 'hmac-log-v1', key: RESTRICTED };
     const lines: string[] = [];
-    const app = createApiApp(
-      testConfig(),
-      stubRepository(ALL_READY),
-      undefined, undefined, undefined, undefined, undefined, undefined,
-      undefined, undefined, undefined, undefined, undefined,
-      { logHash, sink: (line) => lines.push(line) },
-    );
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(ALL_READY),
+      accessLog: { logHash, sink: (line) => lines.push(line) },
+    });
     openApps.push(app);
 
     // Unauthenticated: the liveness probe still produces exactly one line.
@@ -229,7 +233,11 @@ describe('Application API bootstrap', () => {
   it('fails readiness closed for every dependency and repository exceptions', async () => {
     const repository = stubRepository();
     const diagnostics = vi.fn();
-    const app = createApiApp(testConfig(), repository, diagnostics);
+    const app = createApiApp({
+      config: testConfig(),
+      repository,
+      diagnosticSink: diagnostics,
+    });
     openApps.push(app);
 
     for (const dependency of ['database', 'schema', 'storage', 'content'] as const) {
@@ -275,15 +283,10 @@ describe('Application API bootstrap', () => {
 
   it('lets storage and content owners replace repository placeholders', async () => {
     const repository = stubRepository();
-    const app = createApiApp(
-      testConfig(),
+    const app = createApiApp({
+      config: testConfig(),
       repository,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {
+      contentImportDependencies: {
         service: {
           acceptUpload: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
           readStatus: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
@@ -291,9 +294,7 @@ describe('Application API bootstrap', () => {
           readiness: async () => 'ok' as const,
         },
       },
-      undefined,
-      undefined,
-      {
+      announceDependencies: {
         service: {
           current: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
           snapshot: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
@@ -302,7 +303,7 @@ describe('Application API bootstrap', () => {
           close: async () => undefined,
         },
       },
-    );
+    });
     openApps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/ready' });
@@ -315,15 +316,10 @@ describe('Application API bootstrap', () => {
 
   it('does not let the repository claim storage or content when owners are wired', async () => {
     const repository = stubRepository(ALL_READY);
-    const app = createApiApp(
-      testConfig(),
+    const app = createApiApp({
+      config: testConfig(),
       repository,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {
+      contentImportDependencies: {
         service: {
           acceptUpload: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
           readStatus: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const, commit: 'rolled_back' as const }),
@@ -331,9 +327,7 @@ describe('Application API bootstrap', () => {
           readiness: async () => 'not_ready' as const,
         },
       },
-      undefined,
-      undefined,
-      {
+      announceDependencies: {
         service: {
           current: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
           snapshot: async () => Object.freeze({ ok: false as const, code: 'OVERLOADED' as const }),
@@ -342,7 +336,7 @@ describe('Application API bootstrap', () => {
           close: async () => undefined,
         },
       },
-    );
+    });
     openApps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/ready' });
@@ -355,7 +349,11 @@ describe('Application API bootstrap', () => {
 
   it('normalizes unhandled request failures without reflecting private error text', async () => {
     const diagnostics = vi.fn();
-    const app = createApiApp(testConfig(), stubRepository(), diagnostics);
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+      diagnosticSink: diagnostics,
+    });
     openApps.push(app);
     app.get('/_synthetic-request-failure', async () => {
       throw new Error('private DSN and request payload must not escape');
@@ -375,7 +373,10 @@ describe('Application API bootstrap', () => {
   });
 
   it('keeps the exact method surface while unimplemented M1 ports remain absent', async () => {
-    const app = createApiApp(testConfig(), stubRepository());
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+    });
     openApps.push(app);
 
     for (const url of ['/health', '/ready']) {
@@ -391,7 +392,10 @@ describe('Application API bootstrap', () => {
   });
 
   it('creates an opaque process-local mock session and resolves only its bearer token', async () => {
-    const app = createApiApp(testConfig(), stubRepository());
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+    });
     openApps.push(app);
 
     const login = await app.inject({
@@ -443,7 +447,10 @@ describe('Application API bootstrap', () => {
   });
 
   it('rejects malformed claims, unknown fields and invalid bearer credentials with contract envelopes', async () => {
-    const app = createApiApp(testConfig(), stubRepository());
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+    });
     openApps.push(app);
 
     for (const payload of [
@@ -489,7 +496,10 @@ describe('Application API bootstrap', () => {
   });
 
   it('rejects oversized or malformed JSON with the stable validation envelope', async () => {
-    const app = createApiApp(testConfig(), stubRepository());
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+    });
     openApps.push(app);
 
     for (const { headers, payload } of [
@@ -516,7 +526,10 @@ describe('Application API bootstrap', () => {
 
   it('reads Phase 1 policy only for an authenticated identity and fails closed', async () => {
     const repository = stubRepository();
-    const app = createApiApp(testConfig(), repository);
+    const app = createApiApp({
+      config: testConfig(),
+      repository,
+    });
     openApps.push(app);
 
     const unauthorized = await app.inject({ method: 'GET', url: '/v1/policy' });
@@ -560,13 +573,11 @@ describe('Application API bootstrap', () => {
 
   it('authorizes and validates policy writes before selecting the admin capability', async () => {
     const adminRepository = stubPolicyAdminRepository();
-    const app = createApiApp(
-      testConfig(),
-      stubRepository(),
-      undefined,
-      undefined,
-      adminRepository,
-    );
+    const app = createApiApp({
+      config: testConfig(),
+      repository: stubRepository(),
+      policyAdminRepository: adminRepository,
+    });
     openApps.push(app);
     const payload = {
       flag_key: 'llm_ranker',
@@ -701,13 +712,11 @@ describe('Application API bootstrap', () => {
         end: vi.fn().mockResolvedValue(undefined),
         on: vi.fn(),
       });
-      const app = createApiApp(
-        testConfig(),
-        stubRepository(),
-        undefined,
-        undefined,
+      const app = createApiApp({
+        config: testConfig(),
+        repository: stubRepository(),
         policyAdminRepository,
-      );
+      });
       openApps.push(app);
 
       const response = await app.inject({
@@ -928,7 +937,10 @@ describe('Application API bootstrap', () => {
 
   it('binds repository cleanup to Fastify close', async () => {
     const repository = stubRepository();
-    const app = createApiApp(testConfig(), repository);
+    const app = createApiApp({
+      config: testConfig(),
+      repository,
+    });
 
     await app.close();
 
@@ -1207,13 +1219,11 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
     });
     const repository = createServiceRepository(bootstrap.runtimeDatabase);
     const policyAdminRepository = createPolicyAdminRepository(bootstrap.policyAdminDatabase);
-    const app = createApiApp(
-      testConfig(),
+    const app = createApiApp({
+      config: testConfig(),
       repository,
-      undefined,
-      undefined,
       policyAdminRepository,
-    );
+    });
     openApps.push(app);
 
     await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
@@ -1900,7 +1910,12 @@ describe('identity shutdown ownership', () => {
     const repository = stubRepository();
     const admin = stubPolicyAdminRepository();
     vi.spyOn(auth, 'close').mockImplementation(() => { throw new Error('synthetic shutdown failure'); });
-    const app = createApiApp(parseApiRuntimeConfig(databaseEnvironment()), repository, undefined, auth, admin);
+    const app = createApiApp({
+      config: parseApiRuntimeConfig(databaseEnvironment()),
+      repository,
+      authService: auth,
+      policyAdminRepository: admin,
+    });
     await app.ready();
     await expect(app.close()).rejects.toThrow('API resource shutdown failed');
     expect(repository.close).toHaveBeenCalledOnce();

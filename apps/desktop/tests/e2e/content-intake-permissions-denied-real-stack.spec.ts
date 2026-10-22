@@ -6,7 +6,7 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-/** PR-E denial lane. A director title whose only live grant is query must see no write control,
+/** Denial lane. A director title whose only live grant is query must see no write control,
  * and the sentence the operator specified. This is the review state the plan asks for, driven
  * through real Electron, HTTP and PG, with no renderer stub. */
 test('a director title with a query grant only sees no write control and the denial sentence', async () => {

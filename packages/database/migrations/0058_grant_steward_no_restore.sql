@@ -8,10 +8,6 @@
 -- The version guard already treats revocation as one-way: once `revoked_at` is set it can never
 -- be cleared. Clearing a steward is the same kind of decision, and it was the one exception.
 --
--- Measured before this migration: as `intake_business`, clearing the steward on a live child
--- dropped `authorization_sources` to 0 rows, and setting it back brought the row back, with no
--- authority check in between. That is a revocation the holder of the column can undo.
---
 -- The fix is the existing rule, applied to the second switch: a cleared steward cannot be
 -- restored. Re-granting access is a new grant, which is what the operator sees as a new row.
 SET LOCAL search_path = public, pg_catalog, pg_temp;

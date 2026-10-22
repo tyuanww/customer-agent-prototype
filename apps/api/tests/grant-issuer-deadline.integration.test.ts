@@ -6,7 +6,7 @@ import { IntakeRejection, principal } from '../src/content-intake/transaction.js
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
-/** PR-D unit: a grant issuer must already reach every source it hands out. A source outside
+/** A grant issuer must already reach every source it hands out. A source outside
  * that set rejects the batch, and an issuer whose own facts have closed cannot issue at all. */
 describe.skipIf(!enabled)('a grant issuer is checked against its own source set', () => {
   let fixture: AuthorizationFixture;
@@ -68,7 +68,7 @@ describe.skipIf(!enabled)('a grant issuer is checked against its own source set'
   });
 });
 
-/** The two "leave alone" clauses of PR-D. They are read from source text because the property
+/** The two "leave alone" clauses. They are read from source text because the property
  * is about which call does not exist, which no runtime fixture can observe: a login that
  * silently started creating grants would still pass every runtime test above. */
 describe('login authority stays on the roster function', () => {

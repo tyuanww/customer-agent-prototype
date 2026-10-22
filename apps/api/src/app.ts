@@ -64,32 +64,52 @@ function allChecksReady(checks: ServiceReadinessChecks): boolean {
   return Object.values(checks).every((status) => status === 'ok');
 }
 
-export function createApiApp(
-  config: ApiRuntimeConfig,
-  repository: ServiceRepository,
-  diagnosticSink: ApiRuntimeDiagnosticSink = reportApiRuntimeDiagnostic,
-  providedAuthService?: AuthService,
-  policyAdminRepository: PolicyAdminRepository = createUnavailablePolicyAdminRepository(),
-  searchDependencies?: SearchRouteDependencies,
-  eventDependencies?: EventRouteDependencies,
-  contentImportDependencies?: ContentImportRouteDependencies,
-  contentReviewDependencies?: ContentReviewRouteDependencies,
-  contentReleaseDependencies?: ContentReleaseRouteDependencies,
-  announceDependencies?: AnnounceRouteDependencies,
-  iterationTaskDependencies?: IterationTaskRouteDependencies,
-  opsLoopDependencies?: OpsLoopRouteDependencies,
+/** Every optional dependency is named at the call site. Fourteen of them could be reached
+ *  only by position, so a caller that needed the last one had to spell `undefined` eleven
+ *  times, and inserting a parameter silently re-bound every argument after it. */
+export type ApiAppOptions = Readonly<{
+  config: ApiRuntimeConfig;
+  repository: ServiceRepository;
+  diagnosticSink?: ApiRuntimeDiagnosticSink | undefined;
+  authService?: AuthService | undefined;
+  policyAdminRepository?: PolicyAdminRepository | undefined;
+  searchDependencies?: SearchRouteDependencies | undefined;
+  eventDependencies?: EventRouteDependencies | undefined;
+  contentImportDependencies?: ContentImportRouteDependencies | undefined;
+  contentReviewDependencies?: ContentReviewRouteDependencies | undefined;
+  contentReleaseDependencies?: ContentReleaseRouteDependencies | undefined;
+  announceDependencies?: AnnounceRouteDependencies | undefined;
+  iterationTaskDependencies?: IterationTaskRouteDependencies | undefined;
+  opsLoopDependencies?: OpsLoopRouteDependencies | undefined;
   accessLog?: Readonly<{
     logHash: Readonly<{ version: string; key: string }>;
     sink?: ApiAccessLogSink;
-  }>,
-  noticeDependencies?: NoticeRouteDependencies,
+  }> | undefined;
+  noticeDependencies?: NoticeRouteDependencies | undefined;
   intakeDependencies?: Readonly<{
     business: IntakePurposePool;
     usage: IntakePurposePool;
     worker: IntakePurposePool;
     store: ContentObjectStore;
-  }>,
-): FastifyInstance {
+  }> | undefined;
+}>;
+
+export function createApiApp(options: ApiAppOptions): FastifyInstance {
+  const { config, repository } = options;
+  const diagnosticSink = options.diagnosticSink ?? reportApiRuntimeDiagnostic;
+  const providedAuthService = options.authService;
+  const policyAdminRepository = options.policyAdminRepository ?? createUnavailablePolicyAdminRepository();
+  const searchDependencies = options.searchDependencies;
+  const eventDependencies = options.eventDependencies;
+  const contentImportDependencies = options.contentImportDependencies;
+  const contentReviewDependencies = options.contentReviewDependencies;
+  const contentReleaseDependencies = options.contentReleaseDependencies;
+  const announceDependencies = options.announceDependencies;
+  const iterationTaskDependencies = options.iterationTaskDependencies;
+  const opsLoopDependencies = options.opsLoopDependencies;
+  const accessLog = options.accessLog;
+  const noticeDependencies = options.noticeDependencies;
+  const intakeDependencies = options.intakeDependencies;
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
   }

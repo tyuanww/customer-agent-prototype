@@ -160,8 +160,12 @@ export async function startApi(
         const notice = runtimePool === undefined ? undefined : {
           service: createNoticeServiceForPool(runtimePool, false),
         };
-        const app = createApiApp(config, repository, undefined, auth, policyAdminRepository,
-          { operation: { execute: (request) => repository.executeSearch(request) },
+        const app = createApiApp({
+          config,
+          repository,
+          authService: auth,
+          policyAdminRepository,
+          searchDependencies: { operation: { execute: (request) => repository.executeSearch(request) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
             // Reads the acceptance proof on the same runtime pool the collection write
             // uses, so a user who accepted cannot be judged differently by two paths.
@@ -176,11 +180,17 @@ export async function startApi(
                   } finally { client.release(); }
                 })(),
             }) },
-          { repository, idempotencyHmac: bootstrap.idempotencyHmac },
-          contentImport, contentReview, contentRelease, announce, iterationTasks, opsLoop,
-          { logHash: bootstrap.logHash },
-          notice,
-          intake);
+          eventDependencies: { repository, idempotencyHmac: bootstrap.idempotencyHmac },
+          contentImportDependencies: contentImport,
+          contentReviewDependencies: contentReview,
+          contentReleaseDependencies: contentRelease,
+          announceDependencies: announce,
+          iterationTaskDependencies: iterationTasks,
+          opsLoopDependencies: opsLoop,
+          accessLog: { logHash: bootstrap.logHash },
+          noticeDependencies: notice,
+          intakeDependencies: intake,
+        });
         const environment = options.environment ?? process.env;
         const reviewPort = reviewLoginPort(environment, config.port);
         if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {

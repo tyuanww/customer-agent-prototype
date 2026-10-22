@@ -40,20 +40,16 @@ function serviceRepository(): ServiceRepository {
 }
 
 function appWith(repository: Pick<EventRepository, 'recordAdoption' | 'recordEscalation'>): FastifyInstance {
-  const app = createApiApp(
-    parseApiRuntimeConfig({
+  const app = createApiApp({
+    config: parseApiRuntimeConfig({
       CUSTOMER_AGENT_PROFILE: 'test',
       AUTH_MODE: 'mock',
       CUSTOMER_AGENT_API_PORT: '0',
       CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-events-test',
     }),
-    serviceRepository(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    { repository, idempotencyHmac: keyRing },
-  );
+    repository: serviceRepository(),
+    eventDependencies: { repository, idempotencyHmac: keyRing },
+  });
   openApps.push(app);
   return app;
 }

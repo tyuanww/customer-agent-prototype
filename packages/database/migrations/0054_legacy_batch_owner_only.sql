@@ -3,11 +3,10 @@
 -- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
--- Owner-only admission for the historical batch chain.
--- The faq-v2 candidate path replaces one source at a time and keeps its own gates.
--- These four functions rewrite or retire a whole domain from one staged batch, so they
--- stay operator maintenance: the session role is checked in the API, and the binding
--- role is checked here so a direct call or a disagreeing token cannot use a domain grant.
+-- Owner-only admission for the historical batch chain. Why this chain is operator-only lives
+-- in `apps/api/src/content-batch-admission.ts`; this file owns the SQL half of the same rule.
+-- The session role is checked in the API, and the binding role is checked here, so a direct
+-- call or a token whose role claim disagrees with its binding cannot use a domain grant.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 -- The gate reads only the operator's binding role, so grant exactly those columns. A
@@ -48,9 +47,6 @@ DECLARE
   v_at TIMESTAMPTZ;
   v_principal TEXT;
 BEGIN
-  -- The historical chain rewrites a whole domain, so only an operator drives it. The
-  -- session role is checked at the API too; this rejects a direct call and a token whose
-  -- role claim disagrees with the binding.
   IF NOT EXISTS (
     SELECT 1 FROM backend_identity.subject_bindings
     WHERE user_id = p_actor_user_id AND enabled AND role = 'owner'
@@ -683,9 +679,6 @@ DECLARE
   v_at TIMESTAMPTZ;
   v_principal TEXT;
 BEGIN
-  -- The historical chain rewrites a whole domain, so only an operator drives it. The
-  -- session role is checked at the API too; this rejects a direct call and a token whose
-  -- role claim disagrees with the binding.
   IF NOT EXISTS (
     SELECT 1 FROM backend_identity.subject_bindings
     WHERE user_id = p_actor_user_id AND enabled AND role = 'owner'
@@ -919,9 +912,6 @@ DECLARE
   v_at TIMESTAMPTZ;
   v_principal TEXT;
 BEGIN
-  -- The historical chain rewrites a whole domain, so only an operator drives it. The
-  -- session role is checked at the API too; this rejects a direct call and a token whose
-  -- role claim disagrees with the binding.
   IF NOT EXISTS (
     SELECT 1 FROM backend_identity.subject_bindings
     WHERE user_id = p_actor_user_id AND enabled AND role = 'owner'
@@ -1008,9 +998,6 @@ DECLARE
   v_at TIMESTAMPTZ;
   v_principal TEXT;
 BEGIN
-  -- The historical chain rewrites a whole domain, so only an operator drives it. The
-  -- session role is checked at the API too; this rejects a direct call and a token whose
-  -- role claim disagrees with the binding.
   IF NOT EXISTS (
     SELECT 1 FROM backend_identity.subject_bindings
     WHERE user_id = p_actor_user_id AND enabled AND role = 'owner'

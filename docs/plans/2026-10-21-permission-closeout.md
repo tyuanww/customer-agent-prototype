@@ -140,6 +140,27 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 `sop_candidate_rows` 与 `sop_asset_registrations`。而 0040 的发布触发器按 source mapping
 把该来源判为 SOP，强制要求这两份登记，于是 publish 必然 409。
 
+2026-10-22 复核（逐层实测，补强上述结论）：
+
+- 失败点是 `content-intake.integration.test.ts:878` 的 publish 断言，**不是** receive。
+  receive 返回 202 且 job 落到 `validated`；409 只在 publish 出现。
+- HTTP 409 由 `apps/api/src/content-intake/publication.ts:78` 把 SQL 的 `ZA003` 转成
+  `IntakeRejection(error.message, 'CONFLICT')`。同文件 74-77 行说明这是刻意让发布期的
+  资源变更与「候选不存在」不可区分。
+- SQL 抛点是 `0040:1397-1399`（`project_sop_release_media` 触发器）：来源命中
+  `s.domain='sop' OR template_version='sop-v1' OR rule_version='sop-not-imported'
+  OR mapping_version='sop-not-imported'` 时，要求同时存在 `sop_asset_registrations`
+  与本次 lineage 对应的 `sop_candidate_rows`，否则 `MATERIAL_CHANGED`。
+- `candidate.ts` 的 `freezeParsed` 里三处 `MATERIAL_CHANGED` 都不是抛点；探针确认过。
+
+**修复成本修正**：文档此前把「补调 `stage_sop_candidate_assets`」记为「可行但需小心」。
+实测读该函数（`0040:972`）后可以确定它比记录的更重：`p_media` 是一份严格校验的
+bundle，要求 `sourceId/sourceVersion/fileSha256/materialDigest/contentVersion/
+freshRowIds/items` 全部齐备，且每个 item 的 `payloadObjectId` 必须是
+`obj_<64hex>`、对应的 `object_reservations` 必须已 `adopted` 且 `purpose='sop-media'`。
+也就是说 TS 侧要先为每张图创建 payload object 与 reservation 并采用，才能凑出这个
+bundle。这不是补一次调用，而是一段新的媒体准备流程。
+
 关键证据：`tryParseSopAsFaq` 其实已经返回了 `rowBindings`
 （`packages/content-intake/src/sop.ts:185,211`），正是 `stage_sop_candidate_assets` 需要的
 `p_rows` 主体；但 `apps/api/src/content-intake/service.ts:203-210` 只取了 `parsed` 与
@@ -166,7 +187,7 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 **修复方向**
 - 可行（更正确）：`service.ts` 的 SOP 分支改走 `freeze_sop_parsed_candidate`，
   用 `sop.rowBindings` + 组装的 media payload 调用；通用路径只保留给非 SOP。
-- 可行但需小心：在通用 freeze 之后补调 `stage_sop_candidate_assets`。风险是 job 已被推进到
+- 可行但需小心（2026-10-22 复核后成本上调，见上）：在通用 freeze 之后补调 `stage_sop_candidate_assets`。风险是 job 已被推进到
   `validated`，且 `purpose='sop-media'` 的 reservation 采用逻辑只在 `freeze_sop_parsed_candidate`
   内（`0040:1247`），漏掉会让触发器第 4 条校验（`0040:1413-1418`）继续 409。
 - 有风险：放宽触发器。会让未登记行/媒体的 SOP 候选进入发布，削弱图片安全门禁。
@@ -199,18 +220,43 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 - 验收：`apps/api/tests/grant-steward-restore.integration.test.ts` 两条，
   一条钉住「清空后写回被拒且授权仍为 0」，一条钉住「接管仍可替换 steward 且授权仍为 1」。
 
-- 未修的相邻问题（O1b）：`intake_business` 也持有 `INSERT` on grants，而
-  `grant_parent_guard` 只校验父子关系一致，不校验签发人当下是否具备该动作的授权。
-  因此知道一条存活委派的人可以直接插一条子授权。这与 O1 属同一类「绕过 changeGrant
-  直接写表」，修法需要把签发资格判定搬进 SQL，另开一轮，不在 0058 范围内。
+- 相邻问题（O1b）· 已修（0060）：`intake_business` 也持有 `INSERT` on grants，而
+  `grant_parent_guard` 原只校验父子关系一致。父行证明签发人**曾经**拿到该动作，
+  但证明不了**当下**还够格：facts 窗口关闭、被停用、被降级，父行都还活着。
+  知道一条存活委派的人可以直接插一条子授权，绕过 `createGrants` 的资格判定。
+  - 修法：`0060_grant_issuer_authority` 在同一个守卫里加一次资格查询，条件与
+    `authorization_sources` 用的那组一致（facts 未过期且 enabled、`role_allows` 允许该动作）。
+    不新建第二个谓词，也不引入第二个角色定义。
+  - 为什么不用 `authorization_sources` 本身：它只返回 business 授权行，而父行通常是
+    allocation，永远不会出现在结果里。父行存在性已由 `parent_grant_id` 加本守卫校验，
+    缺的只是资格这一半。
+  - 验收：`apps/api/tests/grant-issuer-authority.integration.test.ts` 两条，
+    一条钉住 facts 关闭后子授权被拒，一条钉住正常签发仍然通过。
 
-### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 待验证
+### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 已修（0059）
 
 `0049:288-330` 的刷新逻辑只撤销/重发 `reason='职位名单系统签发。'` 且 `issuer_id = v_signer`
 的授权。通过 `createGrants` 手动签发、带操作者自定义 reason 的 query 授权，
 在 store set 版本变化后不会被重签也不会被撤销，于是永久失效却仍留在 `grants` 表里。
 
-与 P1a 叠加，正是「保存了、列表里也有、刷新也没用」的完整成因。此结论为代码推断，未运行验证。
+与 P1a 叠加，正是「保存了、列表里也有、刷新也没用」的完整成因。
+
+- 实测（2026-10-22，真实 PG15）：source 仍在批准的 store_set_members 里，集合从 1 推进到 2，
+  `authorization_sources` 返回 0 行，而授权列表仍显示这条授权存在。坐席被静默拒绝。
+- 修法：`0059_query_grant_restamp` 把不变量落到 store set 指针上。`store_set_current` 上的
+  触发器 `restamp_query_grants`（SECURITY DEFINER，owner `cs_ai_definer`）在版本推进时
+  维护手动签发的 query 授权：source 仍在新版本成员里就重戳，离开了就撤销。
+- 名单行按 `issuer_id` 跳过，而不是按 reason 文本。签发者 id 由 tenant/app 推导，是结构性
+  判据；用自由文本会让操作者输入保留句后把自己这条授权永久排除在维护之外。
+- `grant_version_guard` 因此允许两个审批戳在 query 授权上随 version 递增改动，其余身份列
+  仍冻结。这不给任何登录角色新能力：`intake_business` 的列级 UPDATE 只有
+  `version,last_change_reason,steward_id,revoked_at`，两个戳从来不在其中；且
+  `authorization_sources` 仍要求新戳对应的版本真的包含该 source。
+- `revocation_generation` 刻意不动。它是 `read_sop_release_assets` 绑定 entitlement 与
+  principal 的等值连接键（`0040:1444`），递增会让已签发的 SOP 凭证租约全部失效，而重戳
+  本身不改变任何权限。
+- 验收：`apps/api/tests/query-grant-store-set.integration.test.ts` 两条，旧迁移下都失败，
+  新迁移下通过。
 
 ### O3 · P7 实际覆盖 41 条路由，intake 的 19 条未覆盖 · 已修
 

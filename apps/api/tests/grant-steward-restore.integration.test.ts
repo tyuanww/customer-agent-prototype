@@ -9,9 +9,8 @@ const TENANT = 'tenant-steward-guard';
 const APP = 'app-steward-guard';
 const ACTION = 'publish';
 
-/** A parented business grant authorizes only while it keeps a steward, which makes that column
- *  an authorization switch. Revocation is already one-way; a cleared steward has to be one-way
- *  too, or the writer holding the column privilege can undo a revocation. */
+/** Pins both directions of `0058_grant_steward_no_restore`: clearing a steward severs the
+ *  grant permanently, and replacing a live steward still works because that is a takeover. */
 describe.skipIf(!enabled)('grant steward is one-way', () => {
   it('refuses to restore a cleared steward, and keeps the grant switched off', async () => {
     const harness = new Pg15Harness();

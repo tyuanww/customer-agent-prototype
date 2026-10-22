@@ -214,8 +214,6 @@ describe.skipIf(!enabled)('authorization reachability', () => {
     let states = 0;
     let deepest = 0;
     let savepoint = 0;
-    // Coverage of the interesting region. Without this a green run could mean the search
-    // never entered the state the invariants exist to police.
     const seen = { authorized: false, revokedDelegation: false, orphanedSteward: false };
     const applicable = new Set<string>();
 
@@ -269,7 +267,6 @@ describe.skipIf(!enabled)('authorization reachability', () => {
     expect(seen, 'search did not reach the guarded region').toEqual({
       authorized: true, revokedDelegation: true, orphanedSteward: true,
     });
-    // Coverage numbers stay visible so a future reader can see the search actually branched.
     console.log(`reachability: ${states} distinct states, deepest path ${deepest}`);
   }, 300_000);
 });

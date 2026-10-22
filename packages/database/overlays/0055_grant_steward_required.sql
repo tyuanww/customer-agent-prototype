@@ -1,12 +1,7 @@
 -- A parented business grant authorizes only while it has a steward and its parent is live.
--- Two revocations had to be made safe:
---   1. Revoking a delegation without a successor clears the child steward, which marks it
---      as awaiting takeover. That state used to keep authorizing, so the holder kept
---      publishing after a revocation the operator had confirmed.
---   2. Revoking a delegation WITH a successor keeps the child steward but marks the parent
---      revoked. Revoking that delegation a second time short-circuits in the API before the
---      child is touched, so the child kept authorizing. The parent check closes this.
--- A grant issued directly by its issuer has no parent and is unaffected.
+-- A grant issued directly by its issuer has no parent and is unaffected. Both halves are
+-- needed: revoking without a successor clears the steward, and revoking with one leaves the
+-- steward in place while marking the parent revoked.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 CREATE OR REPLACE FUNCTION content_intake.authorization_sources(
