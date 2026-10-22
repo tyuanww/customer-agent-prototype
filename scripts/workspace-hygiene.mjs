@@ -37,7 +37,7 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // allowed to make the source budget fail.
 // Approved 2026-10-09: each retained input remains budgeted. A group cannot
 // borrow unused space from another group, even with a larger aggregate override.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 45.5 * 1024 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 46.5 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
@@ -47,7 +47,14 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // 2026-10-20: roster source, migrations, and tests put GitHub's clean
   // checkout 128 KiB over 19.25 MiB and 364 KiB over 45 MiB. 19.5 and 45.5
   // cover that reading.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 19.5 * 1024 * 1024 }),
+  // 2026-10-21: the four source-set migrations and their tests read 316 KiB over
+  // source-inputs and 296 KiB over the remainder. This budget sums allocated
+  // bytes, so it follows the filesystem: the checkout is 42.48 MiB apparent
+  // against 46.93 MiB allocated over 2027 files on APFS, a 4.5 MiB
+  // block-rounding gap, and the Linux runner reads it 40 KiB higher. 20.5 and
+  // 46.5 cover both. The permission migrations above this one stay inside that
+  // headroom on purpose, so the stack does not need a second bump.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 20.5 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

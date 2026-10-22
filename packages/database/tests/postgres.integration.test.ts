@@ -29,6 +29,10 @@ const SOP_REPAIR_SUFFIX = [
   '0047_roster_query_signer',
   '0048_roster_store_set',
   '0049_roster_lifecycle',
+  '0050_authorization_sources',
+  '0051_publish_source_set',
+  '0052_import_source_set',
+  '0053_search_source_set',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -519,7 +523,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(49);
+      expect(fresh.pending).toHaveLength(53);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -531,12 +535,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 49,
-        inventory: { tables: 108, views: 7, functions: 276 },
+        migrationCount: 53,
+        inventory: { tables: 108, views: 7, functions: 278 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 40-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 44-migration current suffix',
         },
       });
 
@@ -683,7 +687,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 49,
+        migrationCount: 53,
       });
     } finally {
       await client.end();
@@ -939,7 +943,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 49,
+        migrationCount: 53,
       });
     } finally {
       await client.end();

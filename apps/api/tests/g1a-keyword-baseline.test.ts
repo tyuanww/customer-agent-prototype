@@ -10,15 +10,33 @@ const pin = JSON.parse(readFileSync(new URL('provenance.json', root), 'utf8'));
 const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 
 describe('frozen keyword baseline', () => {
-  it('matches the merged historical source with only the declared import relocation', () => {
+  /** Every vendored copy is identified by two hashes: the historical source it came from, and
+   *  its own bytes. A third check pins the transformations that are purely mechanical, so a
+   *  change to the vendored body cannot arrive as a silent hash update. Files that had to be
+   *  genuinely adapted are named below instead of pretending the transformation is mechanical.
+   */
+  const mechanical: Readonly<Record<string, (original: string) => string>> = {
+    'search-service.ts': (original) =>
+      original.replace("'./database-contract-errors.js'", "'../../../../src/database-contract-errors.js'"),
+  };
+  /** `search-repository.ts` is not a relocation. Search gained a caller at `$1`, so the copy
+   *  takes the actor as a parameter, its SQL names four arguments, and every later placeholder
+   *  shifts by one. Its guarantee is the two hashes plus this note. */
+  const adapted: readonly string[] = ['search-repository.ts'];
+
+  it('keeps every vendored copy on its historical source', () => {
     for (const [name, value] of Object.entries(pin.files)) {
       const file = value as { source_path: string; original_sha256: string; vendored_sha256: string };
       const original = execFileSync('git', ['show', `${pin.source_commit}:${file.source_path}`], { encoding: 'utf8' });
       const vendored = readFileSync(new URL(name, root), 'utf8');
-      expect(hash(original)).toBe(file.original_sha256);
-      expect(hash(vendored)).toBe(file.vendored_sha256);
-      expect(vendored).toBe(name === 'search-service.ts'
-        ? original.replace("'./database-contract-errors.js'", "'../../../../src/database-contract-errors.js'") : original);
+      expect(hash(original), `${name}: the historical source moved`).toBe(file.original_sha256);
+      expect(hash(vendored), `${name}: the pin is stale; re-pin only after reviewing the diff`).toBe(file.vendored_sha256);
+      const transform = mechanical[name];
+      if (transform) {
+        expect(vendored, `${name}: diverged from its declared mechanical change`).toBe(transform(original));
+      } else if (vendored !== original) {
+        expect(adapted, `${name}: an undeclared adaptation`).toContain(name);
+      }
     }
   });
   it('retains historical normalization and repeated AND bigrams', async () => {

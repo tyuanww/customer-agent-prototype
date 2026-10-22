@@ -27,6 +27,11 @@ function sendReleaseFailure(reply: FastifyReply, result: ContentReleaseFailure):
   if (result.code === 'VALIDATION') {
     return sendValidationError(reply, result.reason === undefined ? undefined : { reason: result.reason });
   }
+  if ((result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') && result.notice) {
+    return reply.code(403).send(parseContractSchema('ForbiddenOrPolicyDeniedErrorEnvelope', {
+      error: { code: result.code, message: result.notice },
+    }));
+  }
   if (result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') {
     return sendForbiddenOrPolicyDenied(
       reply,

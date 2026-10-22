@@ -17,6 +17,7 @@ import {
 } from './input-package.js';
 import { loadG1aEvaluationRelease } from './loader.js';
 import { installG1aNetworkGuard } from './network-guard.js';
+import { seedQueryPrincipal } from '../query-principal.js';
 
 import type { G1aCompletedRun } from './report-contract.js';
 export type { G1aCompletedRun } from './report-contract.js';
@@ -114,6 +115,10 @@ async function runEvaluationSession(
     owner = await harness.connect(database.config);
     await applyDatabaseMigrations(owner);
     await loadG1aEvaluationRelease(owner, input);
+    // Seed the query principal before the runtime opens its read-only snapshot: a grant
+    // committed afterwards is invisible to that transaction and every search would refuse.
+    await seedQueryPrincipal(owner, { userId: 'usr_synthetic_g1a_e0_reader',
+      domains: [...new Set(input.manifest.source_bindings.map(binding => binding.domain))] });
 
     const runtimeRole = `g1a_eval_${randomBytes(8).toString('hex')}`;
     await owner.query(`CREATE ROLE ${runtimeRole} LOGIN`);
@@ -151,14 +156,14 @@ async function runEvaluationSession(
     // Both algorithms share this transaction and qualification gate. Each lane
     // measures its own searches; no current ranking policy enters the baseline.
     if (compare) {
-      baselineReport = await evaluateG1aPackage(createKeywordBaseline(runtime), input, async () => {
+      baselineReport = await evaluateG1aPackage(createKeywordBaseline(runtime, 'usr_synthetic_g1a_e0_reader'), input, async () => {
         eventRowsAfter = await eventRowCount(owner!);
         return Object.freeze({ eventWrites: eventRowsAfter - eventRowsBefore, processGuardAttempts: guard!.attempts() });
       });
       assertScrubbedG1aReport(baselineReport);
       if (eventRowsAfter !== 0) throw new G1aRunError('G1A_RUNTIME_EVENT_STATE_INVALID');
     }
-    const repository = createSearchRepository(runtime as never);
+    const repository = createSearchRepository(runtime as never, 'usr_synthetic_g1a_e0_reader');
     const backend = createSearchBackend({ searchCandidates: repository.search });
     report = await evaluateG1aPackage(backend, input, async () => {
       eventRowsAfter = await eventRowCount(owner!);

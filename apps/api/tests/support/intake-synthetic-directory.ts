@@ -16,8 +16,12 @@ export async function seedIntakeSyntheticDirectory(admin: Client, options: { dup
       await admin.query("SELECT content_intake.upsert_shop_display('director','tenant-a','app-a','shop-b','合成示例店',1)");
       await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
         VALUES ('directory-root-b','allocation','director','director','tenant-a','app-a','scope-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','合成同名店验收','director')`);
-      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-        VALUES ('directory-query-b','business','director','agent','tenant-a','app-a','scope-b','source-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成同名店验收','director','directory-root-b')`);
+      await admin.query(`INSERT INTO content_intake.store_set_members(tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-a','app-a',1,'scope-b','source-b',clock_timestamp()+interval '2 hours')
+        ON CONFLICT (tenant_id,app_id,version,scope_id,source_id) DO NOTHING`);
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+        VALUES ('directory-query-b','business','director','agent','tenant-a','app-a','scope-b','source-b','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '30 minutes','合成同名店验收','director','directory-root-b',
+          (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'),1)`);
     }
     await admin.query('COMMIT');
   } catch (error) { await admin.query('ROLLBACK'); throw error; }

@@ -70,7 +70,7 @@ describe('runtime boundary composition', () => {
     };
     const repository = createServiceRepositoryForPool(pool as never);
     await repository.close();
-    await expect(repository.searchCandidates({} as never)).rejects.toMatchObject({ code: '08003' });
+    await expect(repository.searchCandidates({} as never, 'usr_closed_pool')).rejects.toMatchObject({ code: '08003' });
     await expect(repository.executeSearch({} as never)).resolves.toEqual({ ok: false, code: 'OVERLOADED' });
     await expect(repository.recordAdoption({} as never)).resolves.toEqual({ ok: false, code: 'OVERLOADED' });
     await expect(repository.recordEscalation({} as never)).resolves.toEqual({ ok: false, code: 'OVERLOADED' });

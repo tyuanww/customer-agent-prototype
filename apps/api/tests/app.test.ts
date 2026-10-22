@@ -1410,7 +1410,7 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       };
       const functionDefinition = await owner.query<{ function_definition: string }>(`
         SELECT pg_catalog.pg_get_functiondef(
-          'public.search_recommendable_scripts(text,text,text)'::pg_catalog.regprocedure
+          'public.search_recommendable_scripts(text,text,text,text)'::pg_catalog.regprocedure
         ) AS function_definition
       `);
       originalSearchFunctionDefinition = functionDefinition.rows[0]?.function_definition;
@@ -1602,54 +1602,55 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
-        GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        GRANT EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         TO w5_runtime
       `);
       await expectSchemaNotReady();
       await owner.query(`
-        REVOKE EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        REVOKE EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         FROM w5_runtime
       `);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         SECURITY INVOKER
       `);
       await expectSchemaNotReady();
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         SECURITY DEFINER
       `);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         SET search_path TO pg_catalog, public
       `);
       await expectSchemaNotReady();
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         SET search_path TO pg_catalog, public, pg_temp
       `);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         VOLATILE
       `);
       await expectSchemaNotReady();
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         STABLE
       `);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
 
       await owner.query(`
         CREATE OR REPLACE FUNCTION public.search_recommendable_scripts(
+          p_actor_user_id TEXT,
           p_platform TEXT,
-          p_product_context_type TEXT DEFAULT NULL,
-          p_product_context_ref TEXT DEFAULT NULL
+          p_product_context_type TEXT,
+          p_product_context_ref TEXT
         ) RETURNS TABLE(
           is_candidate BOOLEAN,
           script_id TEXT,
@@ -1772,12 +1773,12 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
 
       await owner.query('CREATE ROLE w5_alternate_definer NOLOGIN');
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         OWNER TO w5_alternate_definer
       `);
       await expectSchemaNotReady();
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         OWNER TO cs_ai_definer
       `);
       await expect(repository.readiness()).resolves.toEqual(W5_NOT_READY);
@@ -1840,16 +1841,16 @@ describePg15('Application API PostgreSQL 15 runtime boundary', () => {
       await owner.query('REVOKE CREATE ON SCHEMA public FROM w5_default_function_owner').catch(() => undefined);
       await owner.query(`ALTER FUNCTION public.digest(BYTEA,TEXT) OWNER TO "${harness.owner}"`).catch(() => undefined);
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         OWNER TO cs_ai_definer
       `).catch(() => undefined);
       await owner.query(`
-        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        ALTER FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         SECURITY DEFINER STABLE
         SET search_path TO pg_catalog, public, pg_temp
       `).catch(() => undefined);
       await owner.query(`
-        REVOKE EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT)
+        REVOKE EXECUTE ON FUNCTION public.search_recommendable_scripts(TEXT,TEXT,TEXT,TEXT)
         FROM w5_runtime
       `).catch(() => undefined);
       await owner.query(`

@@ -15,7 +15,7 @@
     "search-repository.ts": {
       "source_path": "apps/api/src/search-repository.ts",
       "original_sha256": "14d0e333c4cec223e0c292ed27464c19067cbbaafb2c78cccb37a5c55f3175a2",
-      "vendored_sha256": "14d0e333c4cec223e0c292ed27464c19067cbbaafb2c78cccb37a5c55f3175a2"
+      "vendored_sha256": "58f3f5392e0082495c83d22ac1788df59431425be65d12519562ef658a0baec4"
     },
     "search-service.ts": {
       "source_path": "apps/api/src/search-service.ts",

@@ -132,8 +132,8 @@ class PostgresServiceRepository implements ServiceRepository {
     });
   }
 
-  searchCandidates(request: SearchRepositoryRequest): Promise<SearchRepositoryResult> {
-    return this.searchRuntime.searchCandidates(request);
+  searchCandidates(request: SearchRepositoryRequest, actorUserId: string): Promise<SearchRepositoryResult> {
+    return this.searchRuntime.searchCandidates(request, actorUserId);
   }
 
   executeSearch(request: PreparedSearchOperation) {

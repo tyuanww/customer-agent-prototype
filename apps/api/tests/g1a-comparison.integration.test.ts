@@ -2,6 +2,7 @@ import type { Client } from 'pg';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { loadG1aEvaluationRelease } from './support/g1a-e0/loader.js';
+import { seedQueryPrincipal } from './support/query-principal.js';
 import { createKeywordBaseline } from './support/g1a-e0/keyword-baseline/backend.js';
 import { createSearchBackend } from '../src/search-service.js';
 import { createSearchRepository } from '../src/search-repository.js';
@@ -139,8 +140,10 @@ suite('same-session G1a comparison', () => {
       owner = await harness.connect(harness.createDatabase('comparison_source_gate').config);
       await applyDatabaseMigrations(owner);
       await loadG1aEvaluationRelease(owner, input);
-      const repository = createSearchRepository(owner as never);
-      const algorithms = [createKeywordBaseline(owner), createSearchBackend({ searchCandidates: repository.search })];
+      await seedQueryPrincipal(owner, { userId: 'usr_synthetic_g1a_reader',
+        domains: [...new Set(input.manifest.source_bindings.map(binding => binding.domain))] });
+      const repository = createSearchRepository(owner as never, 'usr_synthetic_g1a_reader');
+      const algorithms = [createKeywordBaseline(owner, 'usr_synthetic_g1a_reader'), createSearchBackend({ searchCandidates: repository.search })];
       const row = input.cases.find(row => row.stratum === 'positive')!;
       const request = { normalizedQuery: row.query_text, platform: row.platform,
         productContextType: row.product_context_type, productContextRef: row.product_context_ref, topK: 3 as const };

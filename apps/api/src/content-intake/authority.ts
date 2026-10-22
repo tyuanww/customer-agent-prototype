@@ -114,17 +114,44 @@ export async function readGrant(client: IntakeTransaction, id: string): Promise<
 async function prepareGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']) {
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [issuer.tenantId, issuer.appId]);
   if (issuer.factsVersion !== request.issuerFactsVersion || Number(policy.rows[0]?.version) !== request.policyVersion) throw new IntakeRejection('PERMISSION_CHANGED');
+  const stamped = await client.query<{ at: Date }>('SELECT clock_timestamp() AS at');
+  const at = stamped.rows[0]!.at;
+  requireFresh(issuer, at.getTime());
+  const allowedByAction = new Map<string, Set<string>>();
   const prepared: { item: C['IntakeGrantItem']; parent: string | null }[] = [];
   for (const item of request.items) {
     const recipient = await principal(client, { id: item.recipientPrincipalId });
-    requireFresh(recipient, await clock(client));
+    requireFresh(recipient, at.getTime());
     client.validUntil(recipient.validUntil);
     if (issuer.tenantId !== recipient.tenantId || issuer.appId !== recipient.appId) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
     if (samePerson(issuer, recipient)) throw new IntakeRejection('SELF_ESCALATION', 'FORBIDDEN');
     if (recipient.factsVersion !== item.recipientFactsVersion) throw new IntakeRejection('PERMISSION_CHANGED');
     if (!recipientRoleAllows(recipient.role, item.kind, item.action)) throw new IntakeRejection('ROLE_CEILING', 'FORBIDDEN');
+    // Authority to grant this action in this scope comes before the source set, so a caller
+    // without a parent still sees REDELEGATION_DENIED rather than a scope denial.
     if (!item.reason.trim() || Date.parse(item.expiresAt) <= Math.max(Date.parse(item.startsAt), await clock(client))) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     const parent = await issuingParent(client, issuer, item.kind, item.action, item.scope, item);
+    let allowed = allowedByAction.get(item.action);
+    if (!allowed) {
+      const rows = await client.query<{ source_id: string }>(
+        'SELECT source_id FROM content_intake.authorization_sources($1,$2,$3)',
+        [issuer.id, item.action, at]);
+      allowed = new Set(rows.rows.map(row => row.source_id));
+      allowedByAction.set(item.action, allowed);
+    }
+    if (item.scope.sourceId) {
+      if (!allowed.has(item.scope.sourceId)) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+    } else {
+      const scopeSources = await client.query<{ source_id: string }>(`
+        SELECT src.source_id FROM content_intake.sources src
+        JOIN content_intake.scopes scope ON scope.scope_id = src.scope_id
+        WHERE scope.tenant_id=$1 AND scope.app_id=$2 AND scope.brand_id=$3
+          AND scope.shop_id IS NOT DISTINCT FROM $4 AND scope.domain=$5`,
+        [item.scope.tenantId, item.scope.appId, item.scope.brandId, item.scope.shopId, item.scope.domain]);
+      if (scopeSources.rows.length === 0 || scopeSources.rows.some(row => !allowed.has(row.source_id))) {
+        throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+      }
+    }
     prepared.push({ item, parent });
   }
   return prepared;
@@ -199,14 +226,23 @@ export async function mayManageGrant(client: IntakeTransaction, actor: Principal
 
 export async function createGrants(client: IntakeTransaction, issuer: Principal, request: C['IntakeGrantBatch']): Promise<C['IntakeGrantList']> {
   const prepared = await prepareGrants(client, issuer, request);
+  // A query grant is read against the policy and store set version current at insert time.
+  // Without them authorization_sources drops the row, so a granted query never takes effect.
+  const stamped = await client.query<{ policy_version: string; store_set_version: string | null }>(`
+    SELECT (SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2) AS policy_version,
+           (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2) AS store_set_version`,
+  [issuer.tenantId, issuer.appId]);
+  const queryStamp = stamped.rows[0] ?? { policy_version: null, store_set_version: null };
   const results: Grant[] = [], affected = new Set<string>();
   for (const { item, parent } of prepared) {
     const id = `grant_${randomUUID()}`;
     await client.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,
-      scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3,$13)`,
+      scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id,policy_version,store_set_version)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$3,$13,$14,$15)`,
     [id, item.kind, issuer.id, item.recipientPrincipalId, issuer.tenantId, issuer.appId, await scopeId(client, item.scope),
-      item.scope.sourceId, item.action, item.startsAt, item.expiresAt, item.reason, parent]);
+      item.scope.sourceId, item.action, item.startsAt, item.expiresAt, item.reason, parent,
+      item.action === 'query' ? queryStamp.policy_version : null,
+      item.action === 'query' ? queryStamp.store_set_version : null]);
     results.push(await readGrant(client, id));
     affected.add(item.recipientPrincipalId);
   }

@@ -35,7 +35,9 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
     databaseName = db.name;
     admin = await harness.connect(db.config);
     await applyHistoricalIntakeMigrations(admin);
-    await seedIntakeSyntheticHost(admin);
+    // Pre-0048 schema: no store-set tables and no grant policy columns, so the seed cannot
+    // express a live query grant here. This suite assembles purpose roles, not grant liveness.
+    await seedIntakeSyntheticHost(admin, 'product', 'xlsx', false, 'fresh', false);
     await admin.query(await readFile(new URL('../experiments/intake-runtime/session-lock.sql', import.meta.url), 'utf8'));
     await admin.query(await readFile(new URL('../experiments/intake-runtime/purpose-acl.sql', import.meta.url), 'utf8'));
     await admin.query(`CREATE ROLE synthetic_runtime_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_runtime_auth;`);
