@@ -132,21 +132,17 @@ describe.skipIf(!enabled)('persistent content import receive', () => {
       readinessTimeoutMs: 3000,
     });
     const store = createContentObjectStore(storeRoot);
-    app = createApiApp(
-      parseApiRuntimeConfig({
+    app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test',
         AUTH_MODE: 'mock',
         CUSTOMER_AGENT_API_PORT: '0',
         CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t2',
       }),
       repository,
-      undefined,
-      createMockAuthService(),
-      undefined,
-      undefined,
-      undefined,
-      { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
-    );
+      authService: createMockAuthService(),
+      contentImportDependencies: { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
+    });
   }, 120_000);
 
   afterEach(async () => {

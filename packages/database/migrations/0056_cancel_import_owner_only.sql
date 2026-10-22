@@ -4,9 +4,6 @@
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
 -- Cancelling a historical import batch is operator-only, matching the upload that creates it.
--- The previous body also admitted the originating coach. Upload has been owner-only since
--- 0054, so no coach can originate a batch and that branch could not be reached. Removing it
--- keeps the API and SQL layers describing one rule.
 -- The binding role is read here, so the definer needs the columns 0054 already granted.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 

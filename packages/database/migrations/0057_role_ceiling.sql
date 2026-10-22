@@ -4,9 +4,6 @@
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
 -- One row per role owns every capability boundary the intake decides on.
--- Before this migration the same ceiling was written out in each decision function, in the
--- grant guards and again in TypeScript, so a role change had to be made in four places and a
--- missed one was invisible until a property test happened to disagree.
 -- The bands are exact: business_actions is the set of actions a business grant may carry,
 -- and the three flags own the remaining boundaries. Everything else asks this table.
 SET LOCAL search_path = public, pg_catalog, pg_temp;

@@ -91,25 +91,16 @@ function iterationRepository(): IterationTaskRepository {
 }
 
 function appWith(repository?: IterationTaskRepository): FastifyInstance {
-  const app = createApiApp(
-    parseApiRuntimeConfig({
+  const app = createApiApp({
+    config: parseApiRuntimeConfig({
       CUSTOMER_AGENT_PROFILE: 'test',
       AUTH_MODE: 'mock',
       CUSTOMER_AGENT_API_PORT: '0',
       CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-iteration-test',
     }),
-    serviceRepository(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    repository === undefined ? undefined : { repository, idempotencyHmac: keyRing },
-  );
+    repository: serviceRepository(),
+    iterationTaskDependencies: repository === undefined ? undefined : { repository, idempotencyHmac: keyRing },
+  });
   openApps.push(app);
   return app;
 }

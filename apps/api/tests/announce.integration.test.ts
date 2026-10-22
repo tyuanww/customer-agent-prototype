@@ -138,27 +138,28 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
       },
       'mock',
     );
-    app = createApiApp(
-      parseApiRuntimeConfig({
+    app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
         CUSTOMER_AGENT_API_PORT: '0', CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t5',
       }),
-      repository, undefined, auth, undefined,
-      {
+      repository,
+      authService: auth,
+      searchDependencies: {
         operation: { execute: (request) => repository.executeSearch(request) },
         logHash: LOG_HASH, idempotencyHmac: HMAC,
       },
-      { repository, idempotencyHmac: HMAC },
-      { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
-      { service: createContentReviewService({
+      eventDependencies: { repository, idempotencyHmac: HMAC },
+      contentImportDependencies: { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },
+      contentReviewDependencies: { service: createContentReviewService({
         connectionString: conn('t5_review'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
       }) },
-      { service: createContentReleaseService(
+      contentReleaseDependencies: { service: createContentReleaseService(
         { connectionString: conn('t5_admin'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
         HMAC, LOG_HASH,
       ) },
-      { service: createAnnounceServiceForPool(runtimePool, LOG_HASH, false, (entry) => diagnostics.push(entry)) },
-    );
+      announceDependencies: { service: createAnnounceServiceForPool(runtimePool, LOG_HASH, false, (entry) => diagnostics.push(entry)) },
+    });
     worker = createContentWorker(
       { connectionString: conn('t5_worker'), poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 },
       store,

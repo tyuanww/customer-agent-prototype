@@ -257,7 +257,6 @@ describe('synthetic product identity bootstrap', () => {
     const config = parseApiPrivateBootstrapConfig({
       ...environment,
       AUTH_MODE: 'feishu',
-      SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: undefined,
       FEISHU_APP_ID: 'cli_aaaaaaaaaaaaaaaa',
       FEISHU_APP_SECRET: 'test-feishu-secret-material-0001',
       FEISHU_REDIRECT_URI: 'https://oauth.test.invalid/v1/auth/callback',

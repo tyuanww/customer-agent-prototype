@@ -6,12 +6,11 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-/** PR-A search lanes, driven through real Electron, preload, Main, HTTP and PostgreSQL.
+/** Search lanes, driven through real Electron, preload, Main, HTTP and PostgreSQL.
  *
- * The plan asked for ten cloud VM lanes. This machine has no VM fleet, so the states it names
- * that are reachable through the shipped capsule are expressed here as repeatable cases. Each
- * one is produced by a real database write and read back from the rendered capsule, and each
- * saves a screenshot so a reviewer sees the state the operator sees.
+ * Every state reachable through the shipped capsule is expressed here as a repeatable case.
+ * Each one is produced by a real database write and read back from the rendered capsule, and
+ * each saves a screenshot so a reviewer sees the state the operator sees.
  *
  * The capsule answers through the intake usage surface rather than /v1/search. That surface
  * now reads the same source set, at one captured instant, so these lanes exercise the same

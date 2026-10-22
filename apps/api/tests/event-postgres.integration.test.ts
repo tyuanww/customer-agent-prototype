@@ -500,24 +500,21 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
       contentImport: unavailableContentImportRepository(),
       close: async () => undefined,
     } satisfies ServiceRepository;
-    const app = createApiApp(
-      parseApiRuntimeConfig({
+    const app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test',
         AUTH_MODE: 'mock',
         CUSTOMER_AGENT_API_PORT: '0',
         CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-events-pg15',
       }),
-      service,
-      undefined,
-      undefined,
-      undefined,
-      {
+      repository: service,
+      searchDependencies: {
         operation: { execute: repository.executeSearch },
         logHash: LOG_HASH,
         idempotencyHmac: IDEMPOTENCY_KEYS,
       },
-      { repository, idempotencyHmac: IDEMPOTENCY_KEYS },
-    );
+      eventDependencies: { repository, idempotencyHmac: IDEMPOTENCY_KEYS },
+    });
     const headers = {
       'x-mock-user': ACTOR.user_id,
       'x-mock-role': ACTOR.role,
@@ -653,25 +650,22 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     const noticeService = createNoticeServiceForPool(pool, false);
     const repository = createEventRepository(pool);
     let acceptedNotice = false;
-    const app = createApiApp(
-      parseApiRuntimeConfig({
+    const app = createApiApp({
+      config: parseApiRuntimeConfig({
         CUSTOMER_AGENT_PROFILE: 'test',
         AUTH_MODE: 'mock',
         CUSTOMER_AGENT_API_PORT: '0',
         CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-notice-gate',
       }),
-      service,
-      undefined, undefined, undefined,
-      {
+      repository: service,
+      searchDependencies: {
         operation: { execute: (request) => repository.executeSearch(request) },
         logHash: LOG_HASH,
         idempotencyHmac: IDEMPOTENCY_KEYS,
         hasAcceptedCurrentNotice: async () => acceptedNotice,
       },
-      undefined, undefined, undefined, undefined,
-      undefined, undefined, undefined, undefined,
-      { service: noticeService },
-    );
+      noticeDependencies: { service: noticeService },
+    });
     const headers = { 'x-mock-user': ACTOR.user_id, 'x-mock-role': ACTOR.role };
 
     // Acquire and RELEASE: the pool has max 2, and a leaked client here exhausts it

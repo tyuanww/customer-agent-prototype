@@ -136,29 +136,29 @@ describe('route admission', () => {
     { profile: 'product' as const, allowlist: PRODUCT_PUBLIC, intakeRoutes: true },
   ])('refuses an anonymous caller on every route that is not explicitly public ($profile profile)', async ({ profile, allowlist, intakeRoutes }) => {
     const product = profile === 'product';
-    const app = createApiApp(parseApiRuntimeConfig({
-      CUSTOMER_AGENT_PROFILE: 'test',
-      AUTH_MODE: 'mock',
-      ...(product ? { AUTH_SESSION_MODE: 'product' } : {}),
-      CUSTOMER_AGENT_API_PORT: '0',
-      CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-route-admission',
-    }), stubRepository(),
-    /* diagnosticSink */ undefined, /* providedAuthService */ product ? anonymousProductAuth() : undefined,
-    /* policyAdmin */ undefined, /* search */ undefined, /* event */ undefined,
-    /* contentImport */ undefined, /* contentReview */ undefined, /* contentRelease */ undefined,
-    /* announce */ undefined, /* iterationTask */ undefined, /* opsLoop */ undefined,
-    /* accessLog */ undefined, /* notice */ undefined,
-    /* intakeDependencies */ product ? INTAKE_DEPENDENCIES : undefined);
+    const app = createApiApp({
+      config: parseApiRuntimeConfig({
+        CUSTOMER_AGENT_PROFILE: 'test',
+        AUTH_MODE: 'mock',
+        ...(product ? { AUTH_SESSION_MODE: 'product' } : {}),
+        CUSTOMER_AGENT_API_PORT: '0',
+        CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-route-admission',
+      }),
+      repository: stubRepository(),
+      authService: product ? anonymousProductAuth() : undefined,
+      intakeDependencies: product ? INTAKE_DEPENDENCIES : undefined,
+    });
     openApps.push(app);
     await app.ready();
 
     const routes = registeredRoutes(app);
     // A parser or registration regression must not turn this check into a no-op.
     expect(routes.length).toBeGreaterThan(20);
-    // The intake routes are the sensitive half. In the product profile their absence would
-    // mean this sweep silently covers nothing there, so it fails rather than skips.
+    // The intake routes are the sensitive half. This count was 38 when the sweep learned to
+    // register them; a lower bound fails on any shrinkage rather than only on total loss,
+    // which is the failure mode this whole check exists for.
     if (intakeRoutes) {
-      expect(routes.filter(({ path }) => path.startsWith('/v1/intake/')).length).toBeGreaterThan(20);
+      expect(routes.filter(({ path }) => path.startsWith('/v1/intake/')).length).toBeGreaterThanOrEqual(38);
     }
 
     const publicSet = new Set(allowlist);
@@ -188,9 +188,6 @@ describe('route admission', () => {
     { profile: 'mock' as const, allowlist: MOCK_PUBLIC },
     { profile: 'product' as const, allowlist: PRODUCT_PUBLIC },
   ])('keeps the public allowlist free of anything that mutates state ($profile profile)', ({ profile, allowlist }) => {
-    // A public route that writes would be a worse defect than a missing 401, and reviewers
-    // read the allowlist as the complete public surface. Only the named login handshake may
-    // write; anything else appearing here has to be argued for explicitly.
     const mutating = allowlist.filter(entry => !entry.startsWith('GET '));
     expect([...mutating].sort()).toEqual([...PUBLIC_WRITES[profile]].sort());
   });
