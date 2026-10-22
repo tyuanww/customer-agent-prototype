@@ -1085,6 +1085,7 @@ const READINESS_SUFFIX = [
   { length: 55, index: 54, id: '0055_grant_steward_required' },
   { length: 56, index: 55, id: '0056_cancel_import_owner_only' },
   { length: 57, index: 56, id: '0057_role_ceiling' },
+  { length: 58, index: 57, id: '0058_grant_steward_no_restore' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1116,6 +1117,8 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0057 adds the ceiling table and four predicate functions, and the revoke takes the
   // implicit PUBLIC execute off them. Measured after this migration.
   57: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: 'ec51c4a71ecd49c0cc7b6601d9237c191c713a43af6d11597d1c62cd8cc70828' },
+  // 0058 replaces the version guard in place, so only its digest moves.
+  58: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: '68d598888268ac314a8981d243137fba475245ade22423d6574267481a96e6da' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1133,6 +1136,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   // Measured after 0057: the four grants add 26 entries, the PUBLIC revokes take 3 off per
   // function for the ones PUBLIC held, and the net is 609 -> 635.
   57: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
+  // 0058 replaces one function body, so the ACL manifest is unchanged.
+  58: { entries: 635, sha256: 'fcd0569419e5925d538f8a55711c2ae4c67c6d1cbd0c426bd88ea2b2f10bc165' },
 };
 
 export async function verifyReadinessSuccessor(

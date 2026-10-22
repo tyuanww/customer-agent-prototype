@@ -190,6 +190,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0056_cancel_import_owner_only',
     requiresPredecessor: 'Role ceiling requires the cancel admission',
   },
+  {
+    index: 57,
+    minimumCatalogueLength: 58,
+    id: '0058_grant_steward_no_restore',
+    predecessorId: '0057_role_ceiling',
+    requiresPredecessor: 'One-way steward requires the role ceiling',
+  },
 ];
 
 function requiredSuccessorStep(

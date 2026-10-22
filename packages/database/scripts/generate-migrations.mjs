@@ -816,6 +816,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     [55, '0055_grant_steward_required'],
     [56, '0056_cancel_import_owner_only'],
     [57, '0057_role_ceiling'],
+    [58, '0058_grant_steward_no_restore'],
   ];
   const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
   const occupiedMigration = productTail[0] ?? null;
