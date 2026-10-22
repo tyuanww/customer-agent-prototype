@@ -174,7 +174,7 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 
 ## 盘查发现的开放项（2026-10-21 对抗审查）
 
-### O1 · `steward_id` 可被直接改写，复活已撤销的授权 · HIGH
+### O1 · `steward_id` 可被直接改写，复活已撤销的授权 · 已修（0058）
 
 `intake_business` 持有 `UPDATE (version,last_change_reason,steward_id,revoked_at)` on grants
 （`0033:1215`），而 `grant_version_guard` 只要求 version 递增。实测三种写法：
@@ -185,10 +185,24 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 | `SET steward_id='issuer', version=version+1, last_change_reason='x'` | **通过** |
 | 之后 `authorization_sources` 行数 | **1（授权复活）** |
 
-P2 之前 `steward_id` 只是元数据；P2 之后它成了授权开关，本次改动**提升**了这个既有风险面。
-前提是以 `intake_business` 身份执行 SQL，不是远程可利用，因此定 HIGH 而非 blocker。
+改动前复测确认：以 `intake_business` 清空 steward 后 `authorization_sources` 变 0 行，
+再写回 steward 又变 1 行，中间没有任何权限校验。
 
-建议：给 `steward_id` 变更加 set_config 闸门（同 `app.publishing`），或要求只能由 `changeGrant` 变更。
+- 修法：`0058_grant_steward_no_restore` 把「清空 steward」变成单向操作。守卫此前已禁止
+  清除 `revoked_at`，现在同时禁止 `steward_id` 从 NULL 回到非 NULL，报
+  `GRANT_STEWARD_RESTORE_FORBIDDEN`。不再授权等于新建一条授权，产线看到的是新行。
+- 为什么不用 set_config 闸门：自定义 GUC 任何登录用户都能自己设置，直接连库的写入方
+  照样能打开，闸门只是看起来像防护。
+- 为什么不动列权限：`changeGrant` 本身就通过 `intake_business` 写 steward，收回列权限会
+  一并挡住产线，而把校验搬进 SQL 会让角色判定出现第二份实现，正是本轮在消除的漂移。
+- 保留的行为：steward 非 NULL 到非 NULL 的改写仍允许，接管走的就是这条路。
+- 验收：`apps/api/tests/grant-steward-restore.integration.test.ts` 两条，
+  一条钉住「清空后写回被拒且授权仍为 0」，一条钉住「接管仍可替换 steward 且授权仍为 1」。
+
+- 未修的相邻问题（O1b）：`intake_business` 也持有 `INSERT` on grants，而
+  `grant_parent_guard` 只校验父子关系一致，不校验签发人当下是否具备该动作的授权。
+  因此知道一条存活委派的人可以直接插一条子授权。这与 O1 属同一类「绕过 changeGrant
+  直接写表」，修法需要把签发资格判定搬进 SQL，另开一轮，不在 0058 范围内。
 
 ### O2 · 手动签发的 query 授权在 store set 版本变化后永久失效 · 待验证
 
