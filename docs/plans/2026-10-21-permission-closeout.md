@@ -212,10 +212,10 @@ P6（角色矩阵收敛）作为纯重构项单独排期，不阻塞本次交付
 
 与 P1a 叠加，正是「保存了、列表里也有、刷新也没用」的完整成因。此结论为代码推断，未运行验证。
 
-### O3 · P7 实际覆盖 41 条路由，intake 的 19 条未覆盖 · MEDIUM
+### O3 · P7 实际覆盖 41 条路由，intake 的 19 条未覆盖 · 已修
 
-`route-admission.test.ts` 在 mock profile 下构建应用，`intakeDependencies` 为 undefined，
-`app.ts:163-200` 的 intake 与 product-auth 整块不注册。实测：
+`route-admission.test.ts` 原本在 mock profile 下构建应用，`intakeDependencies` 为 undefined，
+`app.ts:177` 的 intake 与 product-auth 整块不注册。实测：
 
 ```
 ROUTE COUNT 41
@@ -225,8 +225,16 @@ INTAKE COVERED 0
 静态清点未覆盖 42 条：`/v1/intake/*` 38 条 + `/v1/auth/*` 4 条。这批正是最敏感的路由
 （`grants` 写入、`publish`、`rollback`、`sop` 删除、全部 usage 读）。
 
-建议：用 stub intakeDependencies 在 product 模式下建 app，复用同一个路由扫描。
-注意 stub 池必须在 `app.ready()` 之前就位，且 `authService.kind` 必须真的是 `'product'`。
+- 修法：扫描改成按 profile 参数化，跑两遍。product profile 传入匿名 product 身份与
+  unreachable 的 pool stub，于是 `/v1/intake/*` 全部注册。stub 在 `app.ready()` 之前就位，
+  `authService.kind` 真的是 `'product'`。匿名请求由 `intakeHttpBoundary` 的 `onRequest`
+  钩子在触库之前拒绝，所以无需集群。
+- 顺带暴露：product profile 下真正公开的只有登录握手三条
+  （`login-requests`、`exchange`、`callback`），它们对畸形请求返回 400 而不是 401。
+  白名单因此按 profile 拆开，"允许公开写"改成具名集合，新增任何其他公开写路由都会失败。
+- 防退化：product profile 下断言 `/v1/intake/` 路由数大于 20，注册被破坏时直接失败，
+  而不是静默扫一遍空集合。
+- 验收：`route-admission.test.ts` 4/4。
 
 ## 已澄清的误判
 
