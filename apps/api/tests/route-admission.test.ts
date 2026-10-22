@@ -155,10 +155,11 @@ describe('route admission', () => {
     const routes = registeredRoutes(app);
     // A parser or registration regression must not turn this check into a no-op.
     expect(routes.length).toBeGreaterThan(20);
-    // The intake routes are the sensitive half. In the product profile their absence would
-    // mean this sweep silently covers nothing there, so it fails rather than skips.
+    // The intake routes are the sensitive half. This count was 38 when the sweep learned to
+    // register them; a lower bound fails on any shrinkage rather than only on total loss,
+    // which is the failure mode this whole check exists for.
     if (intakeRoutes) {
-      expect(routes.filter(({ path }) => path.startsWith('/v1/intake/')).length).toBeGreaterThan(20);
+      expect(routes.filter(({ path }) => path.startsWith('/v1/intake/')).length).toBeGreaterThanOrEqual(38);
     }
 
     const publicSet = new Set(allowlist);

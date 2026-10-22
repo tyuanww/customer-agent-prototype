@@ -1132,7 +1132,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0059 adds the restamp trigger with its function, and replaces the version guard in place.
   // The guard now lets the two approval stamps move on query grants, so the ACL is unchanged:
   // the new function carries no PUBLIC entry and owner grants are excluded from the manifest.
-  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '2e8d2889db8671424b6723d89e8b9bd81012f0f8657fa634a9aff7653a6e36d3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '104d59e6692b4325f80b92bdd2e57452d351b9070de150a07aa5f09f61b5c0ff', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },

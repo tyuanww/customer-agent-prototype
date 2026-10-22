@@ -75,23 +75,20 @@ BEGIN
         AND member_row.version = NEW.version
         AND member_row.scope_id = live.scope_id AND member_row.source_id = live.source_id
     )
-  ), restamped AS (
-    UPDATE content_intake.grants grant_row
-    SET version = grant_row.version + 1,
-        last_change_reason = '存储集变更。',
-        policy_version = COALESCE(v_policy, grant_row.policy_version),
-        store_set_version = NEW.version
-    FROM member
-    WHERE grant_row.grant_id = member.grant_id
-    RETURNING grant_row.grant_id
   )
+  -- One statement, so the two outcomes stay side by side: a source that is still approved
+  -- moves its stamp forward, and one that left the set is revoked in the same pass. `m` is
+  -- nullable precisely to express that branch.
   UPDATE content_intake.grants grant_row
   SET version = grant_row.version + 1,
       last_change_reason = '存储集变更。',
-      revoked_at = v_now
-  FROM live
-  WHERE grant_row.grant_id = live.grant_id
-    AND NOT EXISTS (SELECT 1 FROM member WHERE member.grant_id = live.grant_id);
+      store_set_version = CASE WHEN m.grant_id IS NULL THEN grant_row.store_set_version ELSE NEW.version END,
+      policy_version = CASE WHEN m.grant_id IS NULL THEN grant_row.policy_version
+                            ELSE COALESCE(v_policy, grant_row.policy_version) END,
+      revoked_at = CASE WHEN m.grant_id IS NULL THEN v_now ELSE grant_row.revoked_at END
+  FROM live l
+  LEFT JOIN member m ON m.grant_id = l.grant_id
+  WHERE grant_row.grant_id = l.grant_id;
   -- `revocation_generation` is deliberately untouched. A restamp changes no authority, and
   -- bumping the counter would invalidate every issued entitlement lease through the equality
   -- join in `read_sop_release_assets`. A withdrawn grant already fails that function's own

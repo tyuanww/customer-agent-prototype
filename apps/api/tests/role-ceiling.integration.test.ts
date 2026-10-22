@@ -2,7 +2,7 @@ import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { ROLE_CEILING, roleAllows, roleMayAllocate, roleMayDelegate, roleMaySkipImportParent } from '../src/content-intake/role-ceiling.js';
+import { ROLE_CEILING, roleAllows, roleMayAllocate, roleMayDelegate } from '../src/content-intake/role-ceiling.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
@@ -70,7 +70,12 @@ describe.skipIf(!enabled)('role ceiling agreement', () => {
       if (sql.allows_query !== roleAllows(role, 'query')) disagreements.push(`${role}/query allows`);
       if (sql.may_allocate !== roleMayAllocate(role)) disagreements.push(`${role} may_allocate`);
       if (sql.may_delegate !== roleMayDelegate(role)) disagreements.push(`${role} may_delegate`);
-      if (sql.may_skip_parent !== roleMaySkipImportParent(role)) disagreements.push(`${role} may_skip_import_parent`);
+      // A null role means "no current role" and the SQL function answers false for it, which
+      // is why the lookup has to stay null-safe rather than indexing the table directly.
+      const maySkip = role !== null && role in ROLE_CEILING
+        ? ROLE_CEILING[role as keyof typeof ROLE_CEILING].maySkipImportParent
+        : false;
+      if (sql.may_skip_parent !== maySkip) disagreements.push(`${role} may_skip_import_parent`);
       for (const action of actions) {
         const one = await admin.query<{ allowed: boolean }>(
           'SELECT content_intake.role_allows($1,$2) AS allowed', [role, action]);

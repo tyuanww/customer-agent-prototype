@@ -63,7 +63,3 @@ export function roleMayAllocate(role: string | null): boolean {
 export function roleMayDelegate(role: string | null): boolean {
   return row(role)?.mayDelegate ?? false;
 }
-
-export function roleMaySkipImportParent(role: string | null): boolean {
-  return row(role)?.maySkipImportParent ?? false;
-}
