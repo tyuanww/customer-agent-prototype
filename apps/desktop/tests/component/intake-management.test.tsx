@@ -334,7 +334,11 @@ it('opens the materials page as a candidate table and expands only the current s
     expect(open.queryByRole('heading', { name: '1. 核对材料' })).not.toBeInTheDocument();
     expect(open.getByRole('heading', { name: '2. 确认来源' })).toBeInTheDocument();
     expect(open.getByRole('heading', { name: '合成洁面' })).toBeInTheDocument();
-    expect(open.queryByText('faq-a')).not.toBeInTheDocument();
+    // The workbook code is shown on purpose. A SOP workbook gives every row the same
+    // title (its sheet name), so without the code a reviewer cannot point at a row.
+    // This assertion used to forbid it; the code is the operator's own 条目编号, not a
+    // server-side handle, and the reviewer already sees the full answer text.
+    expect(open.getByText('faq-a', { selector: 'code' })).toBeInTheDocument();
     expect(open.getByRole('combobox', { name: '来源版本类型' }).tagName).not.toBe('SELECT');
     expect(open.getByText(/风险等级：常规内容/)).toBeInTheDocument();
     expect(open.getByRole('button', { name: '下一页材料' })).not.toHaveClass('ant-btn-primary');

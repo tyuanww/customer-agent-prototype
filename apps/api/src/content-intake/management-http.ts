@@ -10,7 +10,7 @@ import { contentIntakeGrantRoutes } from './grants-http.js';
 import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import type { IntakePrincipalLabels } from './discovery.js';
-import { intakeFailure, intakeHttpBoundary, intakePageQuery, sendIntake } from './http-boundary.js';
+import { intakeFailure, intakeHttpBoundary, intakePageQuery, materialPageQuery, sendIntake } from './http-boundary.js';
 
 const MAX_PENDING_PARSE = 10;
 const noQuery = (request: FastifyRequest) => Object.keys(request.query as object).length === 0;
@@ -122,7 +122,7 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
     return sendIntake(reply, await service.candidate(actor(request), params(request).candidateId!, version(request)), 'IntakeCandidate');
   });
   app.get('/v1/intake/candidates/:candidateId/versions/:version/material', { exposeHeadRoute: false }, async (request, reply) =>
-    sendIntake(reply, await service.material(actor(request), params(request).candidateId!, version(request), intakePageQuery(request)), 'IntakeCandidatePage'));
+    sendIntake(reply, await service.material(actor(request), params(request).candidateId!, version(request), materialPageQuery(request)), 'IntakeCandidatePage'));
   for (const [path, method, schema, status] of [
     ['source-confirmation', 'confirmSource', 'IntakeCandidate', 200],
     ['review', 'requestReview', 'IntakeReview', 202],

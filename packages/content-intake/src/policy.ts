@@ -18,19 +18,26 @@ export const QUESTION_HEADERS = ['条目编号', '问法编号', '问法', '状�
 export const SOURCE_HEADERS = ['sourceId', 'templateVersion', 'brandId', 'scope', 'domain'] as const;
 export const TEMPLATE_VERSION = 'faq-p1.1';
 export type ParseContext = Readonly<{
-  sourceId: string; brandId: string; scope: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale';
+  /** `sop` is a registered scope domain (0038) that the frozen FAQ contract enum
+   * still omits; a SOP source never reaches the FAQ rules, which select on the
+   * four FAQ domains and fall through otherwise. */
+  sourceId: string; brandId: string; scope: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale' | 'sop';
   /** Registered source category, independent of the worksheet's scope label/shop ID. */
   scopeKind: 'brand' | 'shop';
   sheet: 'FAQ'; templateVersion: typeof TEMPLATE_VERSION;
 }>;
 export const CSV_TEMPLATE_VERSION = 'faq-csv-v1';
-export const CSV_POLICY_VERSION = 'intake-csv-v1';
+/** The registry template string for a SOP workbook (0038). The FAQ parser must
+ * refuse it: a SOP workbook is parsed by the six-sheet reader, never as FAQ. */
+export const SOP_TEMPLATE_VERSION = 'sop-v1' as const;export const CSV_POLICY_VERSION = 'intake-csv-v1';
 export const CSV_MAPPING_VERSION = 'faq-csv-columns-v1';
 export const CSV_HEADERS = [...SOURCE_HEADERS, ...FAQ_HEADERS, '问法编号', '问法', '问法状态'] as const;
 /** SHA256 of the ordered UTF-8 JSON header array, exactly as frozen by the source contract. */
 export const CSV_STRUCTURE_SHA256 = 'daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165';
 export type CsvContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: typeof CSV_TEMPLATE_VERSION };
-export type IntakeParseContext = ParseContext | CsvContext;
+/** The SOP workbook parser reads the sheet list, never the FAQ sheet slot. */
+export type SopContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: 'sop-v1' };
+export type IntakeParseContext = ParseContext | CsvContext | SopContext;
 export type IntakePolicyVersion = typeof INTAKE_POLICY.version | typeof CSV_POLICY_VERSION;
 export type Issue = Readonly<{ code: string; sheet: string; row: number; column: string; fix: string }>;
 export type FaqRow = Readonly<{

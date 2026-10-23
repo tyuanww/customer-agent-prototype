@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { parseFamilyReference, type ParseResult } from '@customer-agent/content-intake';
+import { INTAKE_POLICY, SOP_TEMPLATE_VERSION, parseFamilyReference, type ParseResult } from '@customer-agent/content-intake';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
 import { IntakeRejection } from './transaction.js';
 import { sourceInputFormat } from './input-format.js';
@@ -54,7 +54,13 @@ export function materialFromParse(input: {
   const { parsed, source, previous, now } = input;
   if (!parsed.ok || parsed.issues.length) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
   const format = sourceInputFormat(source);
-  if (parsed.policyVersion !== source.ruleVersion || input.object.mime !== format.mime) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
+  // A SOP source declares `sop-not-imported` as its rule version while the parser it
+  // runs is the shared intake policy, so the two strings differ by design. This arm
+  // only becomes reachable once the contract has a sop-v1 IntakeMaterial variant; the
+  // bootstrap registers the FAQ tuple with an SOP mapping marker instead.
+  const policyVersion = format.context.templateVersion === SOP_TEMPLATE_VERSION
+    ? INTAKE_POLICY.version : source.ruleVersion;
+  if (parsed.policyVersion !== policyVersion || input.object.mime !== format.mime) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
   const before = new Map(previous.map(e => [e.businessEntryId, e]));
   const entries = new Map(before);
   const questionOwners = new Map(previous.flatMap(e => e.questions.map(q => [q.id, e.businessEntryId] as const)));

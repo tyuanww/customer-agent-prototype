@@ -19,7 +19,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
 
   it('verifies the actual 41-migration installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 60,
+      status: 'PASS', migrationCount: 61,
       inventory: { tables: 109, views: 7, functions: 283 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
@@ -153,7 +153,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
       expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
         status: 'PASS',
-        migrationCount: 60,
+        migrationCount: 61,
         triggerFingerprint: {
           entries: 113,
           frozenSha256: 'ff7ccb999ee509dc1134475e26ab791e29b8827ae6b563cd008992914a427f44',

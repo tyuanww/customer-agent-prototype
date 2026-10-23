@@ -163,15 +163,11 @@ export async function syncCandidateReadiness(client: IntakeTransaction, actor: P
   return readCandidate(client, actor, key.candidateId, key.version, action);
 }
 
-export async function freezeParsed(client: IntakeTransaction, actor: Principal, job: Job, src: Source, parsed: ParseResult): Promise<C['IntakeCandidate']> {
-  if (job.state !== 'parsing' || job.actor_id !== actor.id) throw new IntakeRejection('MATERIAL_CHANGED');
-  if (src.mode !== 'v2-preview' || src.version !== Number(job.source_version)) throw new IntakeRejection('SOURCE_MISMATCH');
-  await currentBase(client, job.base_release_id);
-  const old = job.expected_prior_id ? await readCandidate(client, actor, job.expected_prior_id, Number(job.expected_prior_version), 'import') : null;
-  if (old && (old.key.digest !== job.expected_prior_digest || !['awaiting-evidence', 'ready'].includes(old.state))) throw new IntakeRejection('MATERIAL_CHANGED');
-  const uncertain = old ? await client.query(`SELECT 1 FROM content_intake.write_attempts WHERE candidate_id=$1 AND candidate_version=$2
-    AND action='publish' AND state IN ('pending','unknown')`, [old.key.candidateId, old.key.version]) : null;
-  if (uncertain?.rowCount) throw new IntakeRejection('COMMIT_UNKNOWN');
+/** Database facts that shape one candidate material: the published predecessor
+ * entries, the live vocabulary and the recent disable count. Both the generic
+ * freeze and the SOP freeze build the same material from these, so a SOP upload
+ * cannot drift into a second definition of scope, inheritance or risk. */
+export async function materialFor(client: IntakeTransaction, job: Job, src: Source, parsed: ParseResult): Promise<C['IntakeMaterial']> {
   const objects = await client.query<{ object_id: string; sha256: string; bytes: string; mime: string }>(
     'SELECT * FROM content_intake.objects WHERE object_id=$1', [job.object_id]);
   const o = objects.rows[0]!;
@@ -188,11 +184,26 @@ export async function freezeParsed(client: IntakeTransaction, actor: Principal, 
     FROM content_intake.publications p JOIN content_intake.candidate_versions c ON c.candidate_id=p.candidate_id AND c.version=p.candidate_version
     JOIN public.content_releases r ON r.release_id=p.release_id WHERE c.source_id=$1
       AND r.published_at>clock_timestamp()-interval '24 hours' AND r.published_at<=clock_timestamp()`, [job.source_id]);
-  const material = materialFromParse({ parsed, source: src,
+  return materialFromParse({ parsed, source: src,
     object: parseContractSchema('IntakeObject', { objectId: o.object_id, sha256: o.sha256, bytes: Number(o.bytes), mime: o.mime, sourceId: job.source_id }),
     contributors: job.contributor_ids, previous: base.rows.map(r => parseContractSchema('IntakeEntry', r.entry)),
     terms: terms.rows.map(t => ({ ...t, displayVersion: Number(t.display_version) })),
     baseReleaseId: job.base_release_id, now: await clock(client), recentDisables: Number(recent.rows[0]!.count) });
+}
+
+export async function freezeParsed(client: IntakeTransaction, actor: Principal, job: Job, src: Source, parsed: ParseResult): Promise<C['IntakeCandidate']> {
+  if (job.state !== 'parsing' || job.actor_id !== actor.id) throw new IntakeRejection('MATERIAL_CHANGED');
+  if (src.mode !== 'v2-preview' || src.version !== Number(job.source_version)) throw new IntakeRejection('SOURCE_MISMATCH');
+  await currentBase(client, job.base_release_id);
+  const old = job.expected_prior_id ? await readCandidate(client, actor, job.expected_prior_id, Number(job.expected_prior_version), 'import') : null;
+  if (old && (old.key.digest !== job.expected_prior_digest || !['awaiting-evidence', 'ready'].includes(old.state))) throw new IntakeRejection('MATERIAL_CHANGED');
+  const uncertain = old ? await client.query(`SELECT 1 FROM content_intake.write_attempts WHERE candidate_id=$1 AND candidate_version=$2
+    AND action='publish' AND state IN ('pending','unknown')`, [old.key.candidateId, old.key.version]) : null;
+  if (uncertain?.rowCount) throw new IntakeRejection('COMMIT_UNKNOWN');
+  const objects = await client.query<{ object_id: string; sha256: string; bytes: string; mime: string }>(
+    'SELECT * FROM content_intake.objects WHERE object_id=$1', [job.object_id]);
+  const o = objects.rows[0]!;
+  const material = await materialFor(client, job, src, parsed);
   const id = old?.key.candidateId ?? `candidate_${randomUUID()}`;
   const version = (old?.key.version ?? 0) + 1;
   if (old) await client.query(`UPDATE content_intake.candidate_versions SET state='invalidated',revocation_generation=revocation_generation+1,

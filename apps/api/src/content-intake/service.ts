@@ -3,11 +3,11 @@ import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
-import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, mediaObjectId, previewFromBytes, stagePreviews } from './linked-preview.js';
+import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
-import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
+import type { ContentObjectStore, ContentAttachmentStore, PersistedContentObject } from '../content-object-store.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool, type IntakeResult } from './transaction.js';
 import { authorize, changeGrant, createGrants, previewGrants, source } from './authority.js';
@@ -15,6 +15,9 @@ import { cancelCandidate, cancellationReceipt, historicalCandidate, freezeParsed
 import { digest } from './material.js';
 import { sourceInputFormat } from './input-format.js';
 import { sourceUsesSopWorkbook } from './sop-source.js';
+import { freezeSopParsed, readSopInheritedAssets, sopContentVersion, type MediaItem } from './sop-freeze.js';
+import { createSopMediaLifecycle } from './sop-media.js';
+import { createReleasePreviewReader } from './sop-preview.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import { createIntakeEvidence } from './evidence.js';
 import { createIntakeRollback } from './rollback.js';
@@ -31,12 +34,19 @@ const operation = (value: unknown): string | null => typeof value === 'object' &
   && typeof Reflect.get(value, 'operationId') === 'string' ? Reflect.get(value, 'operationId') as string : null;
 const json = (value: unknown): CanonicalJsonValue => value as CanonicalJsonValue;
 
+/** SOP images are durable reservations; a store without the attachment lock
+ * cannot publish them at all, so the caller fails closed instead of freezing a
+ * text-only candidate that a later publish would refuse. */
+const isAttachmentStore = (store: ContentObjectStore & Partial<ContentAttachmentStore>): store is ContentAttachmentStore =>
+  typeof store.withObjectLock === 'function' && typeof store.persistAttachment === 'function'
+  && typeof store.readAttachment === 'function';
+
 /** P2 preview transaction slice. No production factory/HTTP registration is provided.
  * The authenticated actor comes from product-auth, never from a request body's userId.
  * The existing object store and isolated parser are the only file consumers.
  * The old transport argument is retained for internal caller compatibility only;
  * this direct profile never calls it and cannot enable approval writes. */
-export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore,
+export function createContentIntakeService(pool: IntakePool, store: ContentObjectStore & Partial<ContentAttachmentStore>,
   report: (diagnosticId: string, error: unknown) => void = () => undefined, _legacyApproval?: ApprovalAdapter,
   options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels; terminalPool?: IntakePool } = {}) {
   const run = createIntakeTransactions(pool, report, options);
@@ -174,6 +184,9 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     let previewStage: ReturnType<typeof stagePreviews> | undefined;
     let parsed: ParseResult;
     let sopPreviews: Awaited<ReturnType<typeof tryParseSopAsFaq>> extends infer Value ? Value extends { previews: infer Previews } ? Previews : never : never = [];
+    let sopRows: NonNullable<Awaited<ReturnType<typeof tryParseSopAsFaq>>>['rowBindings'] = [];
+    let sopVersion: unknown;
+    let sopWorkbook = false;
     try {
       const bytes = await store.readPayload(prepared.value.job.object_id);
       if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
@@ -181,8 +194,14 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const sopSource = sourceUsesSopWorkbook(prepared.value.source);
       const sop = sopSource ? await tryParseSopAsFaq(bytes, prepared.value.source.scope) : null;
       if (sop) {
+        // A non-null result means the six sheets were found, so these rows carry a
+        // workbook row map. When a sheet is missing, tryParseSopAsFaq returns null and
+        // the registered SOP context makes the FAQ parser refuse the workbook.
         parsed = sop.parsed;
         sopPreviews = sop.previews;
+        sopRows = sop.rowBindings;
+        sopVersion = sop.contentVersion;
+        sopWorkbook = true;
         previewStage = stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
           productRefIds: item.productRefIds, scenarioRefIds: item.scenarioRefIds, familySourceId: item.familySourceId,
         })));
@@ -192,6 +211,50 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     } catch {
       parsed = { ...failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version),
         issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
+      sopWorkbook = false;
+    }
+    // Images are published by the same SQL capability as the candidate rows, so
+    // every byte must already be a completed private reservation before freeze.
+    // Persisting is idempotent per (job, exact bytes); a retry reuses the first
+    // reservation instead of charging the source twice.
+    let sopMedia: MediaItem[] = [];
+    let sopLifecycle: ReturnType<typeof createSopMediaLifecycle> | undefined;
+    const releaseSopMedia = async (lifecycle: ReturnType<typeof createSopMediaLifecycle>,
+      who: AuthenticatedUser, jobId: string, sourceId: string, items: readonly MediaItem[]) => {
+      for (const item of items) {
+        try {
+          await lifecycle.release(who, jobId, { objectId: item.payloadObjectId, mediaObjectId: item.mediaObjectId,
+            sourceId, sha256: item.sha256, bytes: item.bytes,
+            mime: item.mime as 'image/png' | 'image/jpeg' | 'image/gif', state: 'persisted' });
+        } catch (error) { try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ } }
+      }
+    };
+    if (sopWorkbook && parsed.ok && sopPreviews.length) {
+      if (!isAttachmentStore(store)) { previewStage?.rollback(); return { ok: false, code: 'VALIDATION', reason: 'FILE_INVALID',
+        commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` }; }
+      if (!previewStage) previewStage = stagePreviews(previewKey, []);
+      const lifecycle = sopLifecycle = createSopMediaLifecycle(run, store);
+      const sourceId = prepared.value.source.scope.sourceId;
+      try {
+        for (const item of sopPreviews) {
+          const persisted = await lifecycle.persist(actor, id, sourceId, item.bytes, item.mime);
+          if (!persisted.ok) {
+            if (persisted.commit === 'rolled_back') {
+              previewStage.rollback();
+              await releaseSopMedia(lifecycle, actor, id, sourceId, sopMedia);
+            }
+            return persisted;
+          }
+          sopMedia = [...sopMedia, { mediaObjectId: persisted.value.mediaObjectId, payloadObjectId: persisted.value.objectId,
+            sha256: persisted.value.sha256, bytes: persisted.value.bytes, mime: persisted.value.mime,
+            sheetName: item.sheet, rowNumber: item.row, columnNumber: item.column, ordinal: item.ordinal }];
+        }
+      } catch (error) {
+        previewStage.rollback();
+        const diagnosticId = `intake_${randomUUID()}`;
+        try { report(diagnosticId, error); } catch { /* Observational. */ }
+        return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
+      }
     }
     let frozenKey: C['IntakeCandidateKey'] | undefined;
     const frozen = parsed.ok ? await run(actor, 'freeze', null, null, async (client, who) => {
@@ -200,13 +263,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
         const existing = await readCandidate(client, who, j.result_candidate_id!, Number(j.result_candidate_version), 'import');
         frozenKey = existing.key; return existing;
       }
-      const candidate = await freezeParsed(client, who, j, src, parsed);
-      for (const item of sopPreviews) {
-        await client.query(
-          'SELECT content_intake.stage_sop_candidate_media($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-          [candidate.key.candidateId, candidate.key.version, src.scope.sourceId, who.id, mediaObjectId(src.scope.sourceId, item.bytes), digest(item.bytes), item.bytes.length, item.mime, item.sheet, item.row, item.column, item.ordinal],
-        );
-      }
+      const candidate = sopWorkbook
+        ? await freezeSopParsed(client, who, j, src, parsed, sopContentVersion(sopVersion), sopRows,
+            await readSopInheritedAssets(client, who, j.job_id), sopMedia)
+        : await freezeParsed(client, who, j, src, parsed);
       frozenKey = candidate.key;
       return candidate;
     }, candidate) : { ok: false as const, code: 'VALIDATION' as const, reason: 'FILE_INVALID' as const,
@@ -216,6 +276,10 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     }
     if (!frozen.ok && frozen.commit === 'rolled_back') {
       previewStage?.rollback();
+      // The bytes are already durable, so a definite rollback has to give them and
+      // the quota back. An unknown outcome keeps them, because freeze may have
+      // committed and only SQL can tell.
+      if (sopLifecycle) await releaseSopMedia(sopLifecycle, actor, id, prepared.value.source.scope.sourceId, sopMedia);
       if (uncertainPreviews.get(id)?.stage === previewStage) uncertainPreviews.delete(id);
     }
     if (!frozen.ok && frozen.commit !== 'unknown') {
@@ -242,7 +306,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     ...evidence,
     ...createIntakeRollback(run),
     ...createIntakePublication(run),
-    ...createIntakeUsage(run),
+    ...createIntakeUsage(run, createReleasePreviewReader(store)),
     ...createIntakeShopDirectory(run),
     ...createIntakeDiscovery(run, options.principalLabels),
     ...createIntakeQualityAccess(run),
