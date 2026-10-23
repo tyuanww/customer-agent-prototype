@@ -37,7 +37,12 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // allowed to make the source budget fail.
 // Approved 2026-10-09: each retained input remains budgeted. A group cannot
 // borrow unused space from another group, even with a larger aggregate override.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 47 * 1024 * 1024;
+// 2026-10-24: a 2 832 330-byte Menokin SOP workbook had been committed under docs/ in
+// 360336b5 and is now out of the tree and out of history. Measured source-inputs after
+// the removal is 20.97 MiB, which clears the 21.0 set by 31 KiB, and the Linux runner
+// reads about 0.02 MiB above the Mac on the same tree, so the pass was a coin flip.
+// 21.5 restores real headroom; measured remainder is 46.62 MiB, so 47.5 keeps the gap.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 47.5 * 1024 * 1024;
 // 2026-10-23: the Linux runner read the remainder at 46.6 MiB on the SOP intake change,
 // 0.1 over the previous 46.5. The added files also cost block rounding, so 47.0 covers
 // it while source-inputs stays the tighter of the two.
@@ -63,7 +68,7 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // the difference is block rounding on 21 added files. 21.0 covers the Linux reading
   // and keeps the same headroom the earlier entries left. A one-shot red-team prompt
   // document was deleted first, so this bump covers source, not prose.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 21.0 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 21.5 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
