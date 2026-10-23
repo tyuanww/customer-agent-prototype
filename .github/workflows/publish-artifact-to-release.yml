@@ -58,4 +58,4 @@ jobs:
           for FILE in "${FILES[@]}"; do
             echo "${FILE} $(stat -c%s "${FILE}") bytes sha256 $(sha256sum "${FILE}" | cut -d' ' -f1)"
           done
-          gh release upload "$TAG" "${FILES[@]}" --clobber
+          gh release upload "$TAG" "${FILES[@]}" --clobber --repo "${{ github.repository }}"
