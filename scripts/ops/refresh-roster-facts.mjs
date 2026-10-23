@@ -9,8 +9,10 @@
  * window without weakening the cap: an organisational change still takes effect within one
  * interval.
  *
- * It refreshes facts only. It does not call issue_roster_query, so a timer tick can never
- * advance the store set or restamp grants; that stays a login-time decision.
+ * It refreshes facts and then re-runs the same issuance login runs. Issuance is idempotent
+ * while the job, policy version and store set are unchanged, and 0062 stops it from promoting
+ * a version with no members, so a tick cannot take authority away. Running it here instead of
+ * only at login means a published source becomes readable without a second manual login.
  *
  * Emits counts and statuses only. Job titles and department lists are personal data and must
  * not reach a log, a terminal transcript, or this repository.
@@ -153,7 +155,12 @@ async function main() {
         } else {
           skipped += 1;
           log(`skip ${row.principal_id}: projection returned ${String(status)}`);
+          continue;
         }
+        const issued = await client.query(
+          'SELECT content_intake.issue_roster_query($1,$2,$3) AS status',
+          [row.principal_id, TENANT, APP]);
+        log(`issue ${row.principal_id}: ${String(issued.rows[0]?.status)}`);
       } catch (error) {
         failed += 1;
         log(`fail ${row.principal_id}: ${error.message ?? 'error'}`);
