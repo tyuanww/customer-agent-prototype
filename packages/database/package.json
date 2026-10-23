@@ -30,7 +30,9 @@
     "test:all": "pnpm test && pnpm test:integration",
     "build": "pnpm check:generated && pnpm build:runtime",
     "test:package:built": "node --test tests/package-entry.smoke.mjs",
-    "test:built": "pnpm test:unit && pnpm test:package:built"
+    "test:built": "pnpm test:unit && pnpm test:package:built",
+    "dictionary": "node scripts/generate-data-dictionary.mjs",
+    "dictionary:check": "node scripts/generate-data-dictionary.mjs --check"
   },
   "dependencies": {
     "pg": "8.23.0"
