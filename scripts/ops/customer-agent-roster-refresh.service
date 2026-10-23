@@ -1,0 +1,31 @@
+[Unit]
+Description=Refresh customer-agent roster facts from the Feishu directory
+Documentation=file:///srv/customer-agent/current/docs/reference-job-roster-permission-model.md
+After=customer-agent-stack.service
+Wants=customer-agent-stack.service
+
+[Service]
+Type=oneshot
+User=customer-agent
+Group=customer-agent
+
+Environment=CUSTOMER_AGENT_STACK_ROOT=/srv/customer-agent/stack
+Environment=ROSTER_TENANT_ID=tenant-menokin
+Environment=ROSTER_APP_ID=app-customer-agent
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+ExecStart=/usr/local/bin/node /srv/customer-agent/current/scripts/ops/refresh-roster-facts.mjs
+
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+# The script reads the Feishu secrets from the stack root and writes facts over the PG socket.
+ReadWritePaths=/srv/customer-agent/stack
+
+[Install]
+WantedBy=multi-user.target

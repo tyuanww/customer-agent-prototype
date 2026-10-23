@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh customer-agent roster facts every four minutes
+
+[Timer]
+# The facts window is capped at five minutes by principal_facts_check, so the interval has to
+# stay below it. Four minutes leaves a one-minute margin for a slow run.
+OnBootSec=90s
+OnUnitActiveSec=4min
+AccuracySec=15s
+Unit=customer-agent-roster-refresh.service
+
+[Install]
+WantedBy=timers.target
