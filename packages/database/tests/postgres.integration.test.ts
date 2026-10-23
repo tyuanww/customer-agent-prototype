@@ -43,7 +43,7 @@ const SOP_REPAIR_SUFFIX = [
   '0061_sop_entry_code_identity',
   '0062_store_set_authority_retention',
   '0063_store_set_keep_members_boundary',
-  '0064_roster_query_requires_reader',
+  '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }

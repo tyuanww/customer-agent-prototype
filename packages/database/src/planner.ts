@@ -239,6 +239,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0063_store_set_keep_members_boundary',
     requiresPredecessor: 'Reader requirement requires the keep-members boundary',
   },
+  {
+    index: 64,
+    minimumCatalogueLength: 65,
+    id: '0065_legacy_orphan_fk_not_valid',
+    predecessorId: '0064_roster_query_requires_reader',
+    requiresPredecessor: 'Legacy orphan foreign keys require the roster issuance body',
+  },
 ];
 
 function requiredSuccessorStep(
