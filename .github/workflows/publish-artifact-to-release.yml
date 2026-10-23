@@ -1,0 +1,61 @@
+name: Publish artifact to release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach the package to
+        required: true
+      artifact:
+        description: Artifact name produced by the CI workflow
+        required: true
+      run_id:
+        description: Workflow run that produced the artifact
+        required: true
+      expected_sha:
+        description: Full commit the artifact must have been built from
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Refuse a run built from another commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ inputs.run_id }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -eu
+          ACTUAL_SHA="$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq .head_sha)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA" || {
+            echo "run ${RUN_ID} was built from ${ACTUAL_SHA}, not ${EXPECTED_SHA}" >&2
+            exit 1
+          }
+
+      - name: Download the CI artifact
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          name: ${{ inputs.artifact }}
+          path: package
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          ARTIFACT: ${{ inputs.artifact }}
+        run: |
+          set -eu
+          mapfile -t FILES < <(find package -type f -name '*UNSIGNED*' -print)
+          test "${#FILES[@]}" -gt 0 || { echo "artifact ${ARTIFACT} has no UNSIGNED package" >&2; exit 1; }
+          for FILE in "${FILES[@]}"; do
+            echo "${FILE} $(stat -c%s "${FILE}") bytes sha256 $(sha256sum "${FILE}" | cut -d' ' -f1)"
+          done
+          gh release upload "$TAG" "${FILES[@]}" --clobber
