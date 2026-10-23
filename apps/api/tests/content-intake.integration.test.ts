@@ -860,6 +860,64 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     } finally { await host.app.close(); }
   }, 40_000);
 
+  it('publishes a workbook at the recorded real-workbook scale and a second seat reads every entry', async () => {
+    // The original Menokin workbook is gone, so this reproduces the shape its structure record
+    // kept: 68/46/31/25/61/46 rows across the six sheets, 47 images, multi-line answers.
+    const { bytes: workbook } = await createSyntheticSopWorkbook({
+      sheetRows: [68, 46, 31, 25, 61, 46], tailRows: 46, tailImageStart: 0, tailImageCount: 46,
+    });
+    await publicationBase();
+    await registerSopSource();
+    const host = await managementHost();
+    const reader = Fastify();
+    await reader.register(contentIntakeUsageRoutes, { auth: auth!, usage: service });
+    const origin = await reader.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(workbook, 'sop-scale-upload', 'source-sop')).json());
+      const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-scale-receive', null, baseReleaseId, 'source-sop');
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+      const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+      const c = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
+      const source: C['IntakeSourceConfirmation'] = { operationId: 'sop-scale-source', key: c.key, expectedEvidenceVersion: 0,
+        confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-scale', acquisition: 'controlled-synthetic-export',
+        objectSha256: object.sha256, reason: '合成规模来源确认' };
+      expect((await fetch(`${url}/source-confirmation`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(source) })).status).toBe(200);
+      await httpQuality(host, c);
+      const publish: C['IntakePublish'] = { operationId: 'sop-scale-publish', key: c.key, baseReleaseId, sourceEvidenceVersion: 1, confirmed: true, title: '合成规模 SOP 发布', summary: '277 条 47 图' };
+      const published = await fetch(`${url}/publish`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(publish) });
+      expect(published.status, await published.clone().text()).toBe(202);
+      const receipt = parseContractSchema('IntakeReceipt', await published.json());
+      const secondSeat = await seat('agent', 'sop-scale');
+      const headers = { authorization: `Bearer ${secondSeat.token}` };
+      const entitlementResponse = await fetch(`${origin}/v1/intake/entitlements`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...usage, releaseId: receipt.releaseId }) });
+      expect(entitlementResponse.status).toBe(200);
+      const entitlement = parseContractSchema('IntakeEntitlement', await entitlementResponse.json());
+      // The seat pages the snapshot; reading one page would prove only that the first page
+      // arrived, which is exactly the failure a 277-entry workbook can hide.
+      const collected: C['IntakePublishedEntry'][] = [];
+      let snapshotCursor: string | null = null;
+      do {
+        const query = new URLSearchParams({ entitlementId: entitlement.entitlementId, limit: '50',
+          ...(snapshotCursor ? { cursor: snapshotCursor } : {}) });
+        const response = await fetch(`${origin}/v1/intake/snapshot?${query}`, { headers });
+        expect(response.status, await response.clone().text()).toBe(200);
+        const page = parseContractSchema('IntakeSnapshot', await response.json());
+        collected.push(...page.faq.map(row => row.entry));
+        snapshotCursor = page.nextCursor ?? null;
+      } while (snapshotCursor);
+      expect(collected, 'the whole 277-entry workbook must reach the seat, not one page of it')
+        .toHaveLength(277);
+      const codes = new Set(collected.map(entry => entry.businessEntryId));
+      expect(codes.size).toBe(277);
+      const multiline = collected.filter(entry => entry.answerText.includes('\n'));
+      expect(multiline.length).toBeGreaterThan(0);
+    } finally { await reader.close(); await host.app.close(); }
+  }, 120_000);
+
   it('second synthetic seat receives published SOP text and protected image bytes over HTTP', async () => {
     const { bytes: workbook, png } = await createSyntheticSopWorkbook();
     await publicationBase();

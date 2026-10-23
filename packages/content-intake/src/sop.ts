@@ -190,9 +190,13 @@ export async function createSopTemplate(samples: readonly (readonly string[])[] 
 }
 
 /** One synthetic six-sheet workbook with text and a same-row PNG. Not a real customer file. */
-export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: boolean; imageOnLastTextRow?: boolean; imageOnFinalRow?: boolean; sameImageOnLastTextRow?: boolean; omitFirstImage?: boolean; replaceFirstImage?: boolean; textSuffix?: string; declaredVersion?: string; tailRows?: number; tailImageStart?: number; tailImageCount?: number; firstSheetRows?: readonly { code: string; text: string }[] } = {}): Promise<{ bytes: Buffer; png: Buffer }> {
+export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: boolean; imageOnLastTextRow?: boolean; imageOnFinalRow?: boolean; sameImageOnLastTextRow?: boolean; omitFirstImage?: boolean; replaceFirstImage?: boolean; textSuffix?: string; declaredVersion?: string; tailRows?: number; tailImageStart?: number; tailImageCount?: number; firstSheetRows?: readonly { code: string; text: string }[]; sheetRows?: readonly number[] } = {}): Promise<{ bytes: Buffer; png: Buffer }> {
   const book = new ExcelJS.Workbook();
   if (options.tailRows !== undefined && (!Number.isInteger(options.tailRows) || options.tailRows < 1 || options.tailRows > 501)) throw new Error('SYNTHETIC_TAIL_ROWS');
+  // Per-sheet row counts exist so a scale fixture can match a real workbook's shape, which is
+  // the only thing a synthetic stand-in can honestly reproduce once the original is gone.
+  if (options.sheetRows !== undefined && (options.sheetRows.length !== SOP_SHEET_NAMES.length
+    || options.sheetRows.some(count => !Number.isInteger(count) || count < 0 || count > 501))) throw new Error('SYNTHETIC_SHEET_ROWS');
   const imageStart = options.tailImageStart ?? 0, imageCount = options.tailImageCount ?? 0;
   if (!Number.isInteger(imageStart) || !Number.isInteger(imageCount) || imageStart < 0 || imageCount < 0 || imageCount > 100
     || imageStart + imageCount > (options.tailRows ?? 0)) throw new Error('SYNTHETIC_TAIL_IMAGES');
@@ -215,6 +219,12 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
         sheet.getCell(offset + 2, 1).value = entry.code;
         sheet.getCell(offset + 2, 2).value = entry.text;
       });
+    } else if (options.sheetRows?.[index] !== undefined) {
+      // Every fourth row carries a newline, so the multi-line shape of the real sheets is
+      // exercised rather than assumed.
+      for (let row = 0; row < options.sheetRows[index]!; row++) {
+        writeRow(row + 2, row % 4 === 0 ? `${name}合成文字${row + 1}\n第二行` : `${name}合成文字${row + 1}`);
+      }
     } else if (index < 3) writeRow(2, `${name}合成文字${options.textSuffix ?? ''}`);
     if (lastSheet && options.tailRows !== undefined) {
       for (let row = 0; row < options.tailRows; row++) writeRow(row + 2, `合成规模答案${row + 1}`);
