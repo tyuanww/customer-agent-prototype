@@ -1098,6 +1098,7 @@ const READINESS_SUFFIX = [
   { length: 61, index: 60, id: '0061_sop_entry_code_identity' },
   { length: 62, index: 61, id: '0062_store_set_authority_retention' },
   { length: 63, index: 62, id: '0063_store_set_keep_members_boundary' },
+  { length: 64, index: 63, id: '0064_roster_query_requires_reader' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1146,6 +1147,8 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0063 settles the keep-members function's owner and revokes PUBLIC, which is what the
   // runtime boundary probe reads. Measured after this migration.
   63: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '9f7eebca06d5da054e7b764c64e459f667ed44fbd7cda4e71723533337482b42', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
+  // 0064 replaces the roster issuance body in place, so only the function digest moves.
+  64: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1176,6 +1179,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   62: { entries: 642, sha256: 'a6c8f7a3a982d9d50705e11737ab3be72b8b63054a0283231e83530f30e39eac' },
   // 0063 revokes that implicit PUBLIC execute, which returns the manifest to its 0061 shape.
   63: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
+  // 0064 replaces one function body, so the manifest is unchanged.
+  64: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
 };
 
 export async function verifyReadinessSuccessor(

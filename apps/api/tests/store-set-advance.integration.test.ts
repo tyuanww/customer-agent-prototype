@@ -242,65 +242,26 @@ describe.skipIf(!enabled)('store-set advance', () => {
     const mark = `sp${savepoint++}`;
     await admin.query(`SAVEPOINT ${mark}`);
     try {
-      const status = await admin.query<{ status: string }>(`SELECT content_intake.project_feishu_roster(
+      await admin.query(`SELECT content_intake.project_feishu_roster(
         $1,$2,$3,$4,'set',$1,ARRAY[$5],$6,'engineer',ARRAY['query']) AS status`,
       [OPERATOR, 'usr-operator', TENANT, APP, DEPT, JOB]);
-      if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
-        console.log(`project_feishu_roster -> ${status.rows[0]!.status}`);
-      }
       // projectRosterLogin calls both, in this order; the store-set advance lives in the
       // second one, so a repro that stops at the first never reaches the defect.
-      const issued = await admin.query<{ status: string }>(
-        'SELECT content_intake.issue_roster_query($1,$2,$3) AS status', [OPERATOR, TENANT, APP]);
-      if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
-        console.log(`issue_roster_query -> ${issued.rows[0]!.status}`);
-      }
-      if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
-        console.log(`store set before=${before.rows[0]!.version}/${before.rows[0]!.members}`);
-      }
-      if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
-        const diag = await admin.query<{ desired: string; members: string; missing: string; extra: string }>(`
-          WITH desired AS (
-            SELECT scope.scope_id, src.source_id, min(lineage.content_valid_until) AS content_valid_until
-            FROM content_intake.sources src
-            JOIN content_intake.scopes scope ON scope.scope_id = src.scope_id
-            JOIN public.content_current current_release ON current_release.id = 1
-            JOIN content_intake.release_lineage lineage
-              ON lineage.release_id = current_release.current_release_id AND lineage.source_id = src.source_id
-             AND lineage.content_valid_until > clock_timestamp()
-            WHERE scope.tenant_id = $1 AND scope.app_id = $2 AND src.mode = 'v2-preview'
-            GROUP BY scope.scope_id, src.source_id
-          ), current_version AS (
-            SELECT version FROM content_intake.store_set_current WHERE tenant_id = $1 AND app_id = $2
-          )
-          SELECT (SELECT count(*)::text FROM desired) AS desired,
-            (SELECT count(*)::text FROM content_intake.store_set_members member
-              JOIN current_version ON member.version = current_version.version
-              WHERE member.tenant_id = $1 AND member.app_id = $2) AS members,
-            (SELECT count(*)::text FROM (SELECT scope_id, source_id, content_valid_until FROM desired
-              EXCEPT SELECT member.scope_id, member.source_id, member.content_valid_until
-              FROM content_intake.store_set_members member JOIN current_version ON member.version = current_version.version
-              WHERE member.tenant_id = $1 AND member.app_id = $2) t) AS missing,
-            (SELECT count(*)::text FROM (SELECT member.scope_id, member.source_id, member.content_valid_until
-              FROM content_intake.store_set_members member JOIN current_version ON member.version = current_version.version
-              WHERE member.tenant_id = $1 AND member.app_id = $2
-              EXCEPT SELECT scope_id, source_id, content_valid_until FROM desired) t) AS extra`,
-        [TENANT, APP]);
-        console.log(`diag desired=${diag.rows[0]!.desired} members=${diag.rows[0]!.members} missing=${diag.rows[0]!.missing} extra=${diag.rows[0]!.extra}`);
-        const probe = await admin.query<Record<string, string>>(`
-          SELECT
-            (SELECT current_facts_version::text FROM content_intake.principals WHERE principal_id=$1) AS facts_version,
-            (SELECT count(*)::text FROM content_intake.policy_versions WHERE tenant_id=$2 AND app_id=$3) AS policies,
-            (SELECT count(*)::text FROM content_intake.role_rules r
-              JOIN content_intake.principals p ON p.principal_id=$1
-              JOIN content_intake.principal_facts f ON f.principal_id=p.principal_id AND f.facts_version=p.current_facts_version
-              WHERE r.tenant_id=$2 AND r.app_id=$3 AND r.department_id=ANY(f.department_ids) AND r.job_id=f.job_id) AS role_match,
-            (SELECT count(*)::text FROM content_intake.store_sets WHERE tenant_id=$2 AND app_id=$3) AS set_rows,
-            (SELECT string_agg(version::text, ',' ORDER BY version) FROM content_intake.store_sets
-              WHERE tenant_id=$2 AND app_id=$3) AS versions`,
-        [OPERATOR, TENANT, APP]);
-        console.log(`probe ${JSON.stringify(probe.rows[0])}`);
-      }
+      // Issuance is idempotent while nothing is readable, so the answer is not asserted; what
+      // matters is that repeating it neither inserts a version nor raises.
+      await admin.query('SELECT content_intake.issue_roster_query($1,$2,$3)', [OPERATOR, TENANT, APP]);
+      // A second tick is what a timer does. Before 0064 this one threw on store_sets_pkey,
+      // because the first call had already inserted a version with no members.
+      await admin.query('SELECT content_intake.issue_roster_query($1,$2,$3)', [OPERATOR, TENANT, APP]);
+      const sets = await admin.query<{ total: string; empty: string }>(`
+        SELECT count(*)::text AS total,
+          count(*) FILTER (WHERE NOT EXISTS (
+            SELECT 1 FROM content_intake.store_set_members member
+            WHERE member.tenant_id = sets.tenant_id AND member.app_id = sets.app_id
+              AND member.version = sets.version))::text AS empty
+        FROM content_intake.store_sets sets WHERE sets.tenant_id = $1 AND sets.app_id = $2`, [TENANT, APP]);
+      expect(sets.rows[0]!.empty, 'a login or tick stored a store-set version with no members')
+        .toBe('0');
       const after = await admin.query<{ version: string; members: string }>(`
         SELECT current.version::text AS version,
           (SELECT count(*)::text FROM content_intake.store_set_members member
@@ -308,9 +269,6 @@ describe.skipIf(!enabled)('store-set advance', () => {
               AND member.version=current.version) AS members
         FROM content_intake.store_set_current current
         WHERE current.tenant_id=$1 AND current.app_id=$2`, [TENANT, APP]);
-      if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
-        console.log(`store set after=${after.rows[0]!.version}/${after.rows[0]!.members}`);
-      }
       expect(after.rows[0]!.version, 'login promoted a new store-set version with no readable source')
         .toBe(before.rows[0]!.version);
       expect(after.rows[0]!.members, 'the current store set lost its only member on login')

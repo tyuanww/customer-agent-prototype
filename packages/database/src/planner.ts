@@ -232,6 +232,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0062_store_set_authority_retention',
     requiresPredecessor: 'Keep-members boundary requires the retention trigger',
   },
+  {
+    index: 63,
+    minimumCatalogueLength: 64,
+    id: '0064_roster_query_requires_reader',
+    predecessorId: '0063_store_set_keep_members_boundary',
+    requiresPredecessor: 'Reader requirement requires the keep-members boundary',
+  },
 ];
 
 function requiredSuccessorStep(
