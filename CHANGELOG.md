@@ -2,6 +2,15 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.32] - 2026-10-23
+
+### Changed
+
+- 业务方可以上传带「条目编码」的 SOP 工作簿，发布后坐席能读到文字。行身份是操作者填写的编码。
+- 仓库版本是 `0.3.32`。根目录 `VERSION` 与 `apps/desktop/package.json` 是同一串。
+- 未签名安装包、下载页、应用内下载目录和杭州健康检查随这一版改为 `0.3.32`。`v0.3.31`、`v0.3.30`、`v0.3.29`、`v0.3.27` 的附件不覆盖。
+- 话术指针仍是 `rel_27`。这一版不发布售前、活动、售后或 FAQ。
+
 ## [0.3.31] - 2026-10-20
 
 ### Changed
