@@ -159,10 +159,12 @@ const EXPECTED_TRIGGER_MANIFEST_ENTRIES = 109;
 const EXPECTED_TRIGGER_MANIFEST_SHA256 = '97259c3711dd67a7b8cab797fe5d667518f9778cf5a1276f17969c060c5e9505';
 const READINESS_TRIGGER_ENTRIES = 112;
 const READINESS_TRIGGER_SHA256 = '16f2dfb6b2e98e3921d0ad5d452c737d6883723744966535be6b235a0574e28a';
-// 0059 adds the restamp trigger, so the newest length carries one more than every older one.
-// It is a separate pair rather than a new shared default: lengths 40 through 58 predate it.
-const LATEST_TRIGGER_ENTRIES = 113;
-const LATEST_TRIGGER_SHA256 = 'ff7ccb999ee509dc1134475e26ab791e29b8827ae6b563cd008992914a427f44';
+// 0059 adds the restamp trigger, so lengths 59 through 61 carry one more than every older one.
+const RESTAMP_TRIGGER_ENTRIES = 113;
+const RESTAMP_TRIGGER_SHA256 = 'ff7ccb999ee509dc1134475e26ab791e29b8827ae6b563cd008992914a427f44';
+// 0062 adds the store-set keep-members trigger, so lengths 62 and up carry one more again.
+const LATEST_TRIGGER_ENTRIES = 114;
+const LATEST_TRIGGER_SHA256 = '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -895,6 +897,9 @@ async function verifyCatalogueState(
     expectedTriggerEntries === READINESS_TRIGGER_ENTRIES
     && expectedTriggerSha === READINESS_TRIGGER_SHA256
   ) || (
+    expectedTriggerEntries === RESTAMP_TRIGGER_ENTRIES
+    && expectedTriggerSha === RESTAMP_TRIGGER_SHA256
+  ) || (
     expectedTriggerEntries === LATEST_TRIGGER_ENTRIES
     && expectedTriggerSha === LATEST_TRIGGER_SHA256
   );
@@ -1135,20 +1140,20 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   58: { tables: 109, functions: 282, objectEntries: 3397, objectSha256: 'f8e9ab2d5c0d812e47b8c0389ef116364a24b3ea93c3c0975aaa826a23e0e18b', functionEntries: 282, functionSha256: '68d598888268ac314a8981d243137fba475245ade22423d6574267481a96e6da' },
   // 0059 adds the restamp trigger and its function, and replaces the version guard in place.
   // The guard now lets the two approval stamps move on query grants.
-  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1808f6f0512cc051840bd74fc8db1c604af167e6590cc6e840026d072524dceb', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  59: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1808f6f0512cc051840bd74fc8db1c604af167e6590cc6e840026d072524dceb', triggerEntries: RESTAMP_TRIGGER_ENTRIES, triggerSha256: RESTAMP_TRIGGER_SHA256 },
   // 0060 replaces the parent guard in place; no table, function or trigger is added.
-  60: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: 'c95865a4e59f5810534e543b27a5c87287fac33d8b043e990ba643ddfd7347f8', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  60: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: 'c95865a4e59f5810534e543b27a5c87287fac33d8b043e990ba643ddfd7347f8', triggerEntries: RESTAMP_TRIGGER_ENTRIES, triggerSha256: RESTAMP_TRIGGER_SHA256 },
   // 0061 replaces the SOP asset-staging body in place; no table, function or
   // trigger is added, so only the function digest moves.
-  61: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1c28c57e878bbcc19fc5a019e7a02f4144964be3e17f797255ddb173ef79c925', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  61: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1c28c57e878bbcc19fc5a019e7a02f4144964be3e17f797255ddb173ef79c925', triggerEntries: RESTAMP_TRIGGER_ENTRIES, triggerSha256: RESTAMP_TRIGGER_SHA256 },
   // 0062 adds the store-set trigger function and its trigger, and replaces the restamp body in
   // place. Measured after this migration.
-  62: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '5f8eaec128443c0c6a05ca86a24da1992eeb646b38539bb4f0f7ae69252e5568', functionEntries: 284, functionSha256: '031f52d2c4e9485fddbc1db457dcbc0774daeb69b59c08161684d3fe35896a3f', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
+  62: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '5f8eaec128443c0c6a05ca86a24da1992eeb646b38539bb4f0f7ae69252e5568', functionEntries: 284, functionSha256: '031f52d2c4e9485fddbc1db457dcbc0774daeb69b59c08161684d3fe35896a3f', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
   // 0063 settles the keep-members function's owner and revokes PUBLIC, which is what the
   // runtime boundary probe reads. Measured after this migration.
-  63: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '9f7eebca06d5da054e7b764c64e459f667ed44fbd7cda4e71723533337482b42', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
+  63: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '9f7eebca06d5da054e7b764c64e459f667ed44fbd7cda4e71723533337482b42', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
   // 0064 replaces the roster issuance body in place, so only the function digest moves.
-  64: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
+  64: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '0ccb2fd387364003ce13e4f0dce78bb0834df2ef7af5ef6bbb2dc9ba49eeef79', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
