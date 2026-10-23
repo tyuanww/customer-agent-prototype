@@ -1,0 +1,39 @@
+[Unit]
+Description=Nightly logical backup of the customer-agent catalog
+Documentation=file:///srv/customer-agent/current/docs/reference-backup-and-restore.md
+After=customer-agent-stack.service
+Wants=customer-agent-stack.service
+# The stack owns the PG cluster; a backup that starts before it is up would fail every
+# boot and teach everyone to ignore the unit.
+Requires=customer-agent-stack.service
+
+[Service]
+Type=oneshot
+User=customer-agent
+Group=customer-agent
+
+Environment=CUSTOMER_AGENT_STACK_ROOT=/srv/customer-agent/stack
+Environment=CUSTOMER_AGENT_PG15_BIN=/opt/pg15/usr/lib/postgresql/15/bin
+Environment=CUSTOMER_AGENT_BACKUP_ROOT=/srv/customer-agent/backups
+Environment=CUSTOMER_AGENT_BACKUP_KEEP=14
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+ExecStart=/srv/customer-agent/scripts/customer-agent-backup.sh
+# 3 means "dumped, but there is no off-site copy". The gap stays visible in the unit's
+# exit status and log without the timer entering a failed state every night.
+SuccessExitStatus=0 3
+
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+# Reads the cluster socket and content.env under the stack root; writes only the backups.
+ReadWritePaths=/srv/customer-agent/backups
+ReadOnlyPaths=/srv/customer-agent/stack
+
+[Install]
+WantedBy=multi-user.target

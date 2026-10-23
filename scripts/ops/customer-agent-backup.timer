@@ -1,0 +1,16 @@
+[Unit]
+Description=Run the customer-agent catalog backup every night
+
+[Timer]
+# 03:20 local: after the 03:10 sysstat summary and well clear of the 4-minute roster
+# refresh, so the dump is not competing with the login path for the same cluster.
+OnCalendar=*-*-* 03:20:00
+# A machine that was off at 03:20 still gets one backup after it comes up, rather than
+# skipping the night entirely.
+Persistent=true
+AccuracySec=60s
+RandomizedDelaySec=300
+Unit=customer-agent-backup.service
+
+[Install]
+WantedBy=timers.target
