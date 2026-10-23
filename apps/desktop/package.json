@@ -25,7 +25,8 @@
     "package:win": "node scripts/package-windows.mjs local",
     "package:linux": "node scripts/package-linux.mjs local",
     "package:mac:local": "node scripts/package-macos.mjs local",
-    "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution"
+    "package:mac": "node scripts/verify-mac-release-env.mjs && node scripts/package-macos.mjs distribution",
+    "eval:retrieval": "CUSTOMER_AGENT_RETRIEVAL_EVAL=1 vitest run tests/unit/retrieval-eval.test.ts"
   },
   "dependencies": {
     "@customer-agent/content-intake": "workspace:*",
