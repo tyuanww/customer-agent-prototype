@@ -218,6 +218,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0060_grant_issuer_authority',
     requiresPredecessor: 'SOP entry-code identity requires the issuer authority',
   },
+  {
+    index: 61,
+    minimumCatalogueLength: 62,
+    id: '0062_store_set_authority_retention',
+    predecessorId: '0061_sop_entry_code_identity',
+    requiresPredecessor: 'Store-set retention requires the SOP entry-code identity',
+  },
 ];
 
 function requiredSuccessorStep(

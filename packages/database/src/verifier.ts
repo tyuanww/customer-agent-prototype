@@ -1096,6 +1096,7 @@ const READINESS_SUFFIX = [
   { length: 59, index: 58, id: '0059_query_grant_restamp' },
   { length: 60, index: 59, id: '0060_grant_issuer_authority' },
   { length: 61, index: 60, id: '0061_sop_entry_code_identity' },
+  { length: 62, index: 61, id: '0062_store_set_authority_retention' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1138,6 +1139,9 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0061 replaces the SOP asset-staging body in place; no table, function or
   // trigger is added, so only the function digest moves.
   61: { tables: 109, functions: 283, objectEntries: 3398, objectSha256: '0f4c0bdd891509bea734c66bd9efbc5f691788f39c3926a9196de8b11d717a30', functionEntries: 283, functionSha256: '1c28c57e878bbcc19fc5a019e7a02f4144964be3e17f797255ddb173ef79c925', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  // 0062 adds the store-set trigger function and its trigger, and replaces the restamp body in
+  // place. Measured after this migration.
+  62: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '5f8eaec128443c0c6a05ca86a24da1992eeb646b38539bb4f0f7ae69252e5568', functionEntries: 284, functionSha256: '031f52d2c4e9485fddbc1db457dcbc0774daeb69b59c08161684d3fe35896a3f', triggerEntries: 114, triggerSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1163,6 +1167,9 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   60: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0061 changes a function body only, so the ACL grant list is unchanged.
   61: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
+  // 0062 adds the store-set trigger function and revokes nothing, so one new function's
+  // implicit PUBLIC execute carries the entry count forward. Measured after this migration.
+  62: { entries: 642, sha256: 'a6c8f7a3a982d9d50705e11737ab3be72b8b63054a0283231e83530f30e39eac' },
 };
 
 export async function verifyReadinessSuccessor(

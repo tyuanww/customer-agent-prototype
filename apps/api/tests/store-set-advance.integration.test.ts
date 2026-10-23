@@ -10,6 +10,8 @@ const TENANT = 'tenant-set';
 const APP = 'app-set';
 const SCOPE = 'scope-set';
 const SOURCE = 'source-set';
+/** A second readable source, so a version can drop SOURCE and still keep a member. */
+const OTHER = 'source-other';
 const OPERATOR = 'principal-operator';
 const ADMIN = 'principal-admin';
 const DEPT = 'dept-set';
@@ -64,9 +66,13 @@ describe.skipIf(!enabled)('store-set advance', () => {
       VALUES ($1,$2,$3,'brand-set','product')`, [SCOPE, TENANT, APP]);
     await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
       VALUES ($1,$2,1,'v2-preview')`, [SOURCE, SCOPE]);
-    await admin.query(`INSERT INTO content_intake.source_mappings(
-        source_id, version, template_version, rule_version, mapping_version, structure_digest)
-      VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('d',64))`, [SOURCE]);
+    await admin.query(`INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
+      VALUES ($1,$2,1,'v2-preview')`, [OTHER, SCOPE]);
+    for (const source of [SOURCE, OTHER]) {
+      await admin.query(`INSERT INTO content_intake.source_mappings(
+          source_id, version, template_version, rule_version, mapping_version, structure_digest)
+        VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('d',64))`, [source]);
+    }
 
     policyVersion = Number((await admin.query<{ version: string }>(
       'SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [TENANT, APP])).rows[0]!.version);
@@ -178,11 +184,14 @@ describe.skipIf(!enabled)('store-set advance', () => {
     const findings: Finding[] = [];
     const revoked = new Set<string>();
     let states = 0;
-    const subsets: readonly (readonly string[])[] = [[], [SOURCE]];
+    const subsets: readonly (readonly string[])[] = [[], [SOURCE], [OTHER], [SOURCE, OTHER]];
 
     const signature = async (): Promise<string> => {
         const revokedNow = await revokedActions();
-        return `${(await currentMembers()).join(',')}#${revokedNow.join(',')}#${await decide('query')}`;
+        const version = (await admin.query<{ version: string }>(
+          'SELECT version::text AS version FROM content_intake.store_set_current WHERE tenant_id=$1 AND app_id=$2',
+          [TENANT, APP])).rows[0]!.version;
+        return `v${version}:${(await currentMembers()).join(',')}#${revokedNow.join(',')}#${await decide('query')}`;
       };
 
       const walk = async (path: string[], depth: number): Promise<void> => {
@@ -323,7 +332,7 @@ describe.skipIf(!enabled)('store-set advance', () => {
    *  restamp trigger sets `revoked_at` for good, so returning the source to the set does not
    *  restore authority. `it.fails` keeps the suite honest now and flips this to a hard
    *  failure the day the behavior is fixed, which is when this becomes a normal expectation. */
-  it.fails('restores query authority when the source returns to the set', async () => {
+  it('restores query authority when the source returns to the set', async () => {
     const { states, findings } = await explore();
     if (process.env.CUSTOMER_AGENT_STORE_SET_VERBOSE === '1') {
       console.log(`states=${String(states)} findings=${JSON.stringify(findings, null, 2)}`);
