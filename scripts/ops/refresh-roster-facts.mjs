@@ -29,6 +29,11 @@ const IDENTITY_SCOPE = 'feishu-job-roster';
 const ROSTER_DEPARTMENT_TYPE = 'open_department_id';
 const FEISHU_ORIGIN = 'https://open.feishu.cn';
 const REQUEST_TIMEOUT_MS = 8_000;
+/** Refresh only when the current window is this close to ending. A tick that refreshed every
+ *  time would append a facts row per principal per tick forever, and `facts_version` is
+ *  referenced by grants, so those rows can never be deleted. The cap is five minutes, so this
+ *  leaves a margin while keeping the table flat between ticks. */
+const RENEW_BEFORE_MS = 120_000;
 /** Above this the run is reported as degraded rather than silently partial. */
 const MAX_FAILURES_BEFORE_UNHEALTHY = 1;
 
@@ -116,7 +121,11 @@ async function main() {
   try {
     await client.query('SET ROLE intake_business');
     const { rows } = await client.query(`
-      SELECT principal_id, user_id, person_key
+      SELECT principal_id, user_id, person_key,
+        (SELECT facts.valid_until
+           FROM content_intake.principal_facts facts
+          WHERE facts.principal_id = principals.principal_id
+            AND facts.facts_version = principals.current_facts_version) AS valid_until
       FROM content_intake.principals
       WHERE tenant_id = $1 AND app_id = $2 AND identity_scope = $3
       ORDER BY principal_id`, [TENANT, APP, IDENTITY_SCOPE]);
@@ -127,6 +136,17 @@ async function main() {
     const token = await tenantToken(appId, appSecret);
     for (const row of rows) {
       try {
+        const remaining = row.valid_until === null ? 0 : Date.parse(row.valid_until) - Date.now();
+        if (remaining > RENEW_BEFORE_MS) {
+          // Facts are still good. Issuance is still worth a call: it is what brings a freshly
+          // published source into the store set, and it appends no facts row for this person.
+          const issued = await client.query(
+            'SELECT content_intake.issue_roster_query($1,$2,$3) AS status',
+            [row.principal_id, TENANT, APP]);
+          skipped += 1;
+          log(`hold ${row.principal_id}: ${String(Math.round(remaining / 1000))}s left, issue ${String(issued.rows[0]?.status)}`);
+          continue;
+        }
         const facts = await directoryFacts(token, row.person_key);
         if (facts === null) {
           skipped += 1;
