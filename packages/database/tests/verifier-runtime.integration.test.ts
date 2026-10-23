@@ -153,7 +153,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
       expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
         status: 'PASS',
-        migrationCount: 64,
+        migrationCount: 65,
         triggerFingerprint: {
           entries: 114,
           frozenSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a',
