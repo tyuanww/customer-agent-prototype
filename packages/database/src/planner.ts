@@ -225,6 +225,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0061_sop_entry_code_identity',
     requiresPredecessor: 'Store-set retention requires the SOP entry-code identity',
   },
+  {
+    index: 62,
+    minimumCatalogueLength: 63,
+    id: '0063_store_set_keep_members_boundary',
+    predecessorId: '0062_store_set_authority_retention',
+    requiresPredecessor: 'Keep-members boundary requires the retention trigger',
+  },
 ];
 
 function requiredSuccessorStep(
