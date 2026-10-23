@@ -6,7 +6,6 @@ import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
 import { PERMISSION_DENIAL_MESSAGE, type SessionJobView } from '../shared/product-session';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
-import { PRODUCT_REMOTE_NAV } from '../shared/workbench-mode';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
@@ -158,22 +157,11 @@ function sopUploadControl(
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const [remoteSeat, setRemoteSeat] = useState(false);
-  useEffect(() => {
-    const read = window.dashboardWorkbench?.mode;
-    if (!read) return undefined;
-    let live = true;
-    void read().then((value) => {
-      if (live && value.ok && value.kind === 'product-remote') setRemoteSeat(true);
-    }).catch(() => undefined);
-    return () => { live = false; };
-  }, []);
-  const intakeNav = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => {
+  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => {
     if (profile === 'intake' && item.id === 'content') return { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' };
     if (profile === 'intake' && item.id === 'overview') return { ...item, label: '概览', blurb: item.blurb };
     return item;
   });
-  const navItems = remoteSeat ? PRODUCT_REMOTE_NAV : intakeNav;
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [jobKnown, setJobKnown] = useState(false);
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
@@ -209,10 +197,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
       ? (sessionJob.rights.grant ? '' : PERMISSION_DENIAL_MESSAGE)
       : '请重新登录后再查看职务。';
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
-  useEffect(() => {
-    if (!remoteSeat) return;
-    if (active === 'content' || active === 'permissions' || active === 'materials') setActive('overview');
-  }, [remoteSeat, active]);
   const [keepContent, setKeepContent] = useState(false);
   const [keepPublish, setKeepPublish] = useState(false);
   const [backStack, setBackStack] = useState<SidebarDestination[]>([]);

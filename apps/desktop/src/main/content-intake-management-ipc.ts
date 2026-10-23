@@ -8,8 +8,8 @@ import { createIntakeNativeFiles } from './content-intake-native-files';
 import { projectIntakeShellLine, type PackagedProductProfile } from './product-runtime-config';
 import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
 const CHANNELS = ['dashboard:intake-mode', 'dashboard:intake-shell-line', 'dashboard:intake-current', 'dashboard:intake-command'] as const;
-/** Only the explicit synthetic profile provides a session. No legacy product
- * capability is mounted in FAQ Dashboard, and no renderer supplies an identity. */
+/** The explicit synthetic profile and a packaged https profile both provide a
+ * session. No renderer supplies an identity. */
 export function registerContentIntakeManagementIpc(session: ProductSession | null,
   dashboard: () => WebContents | null, devUrl: () => string | undefined,
   profile: PackagedProductProfile | null = null) {

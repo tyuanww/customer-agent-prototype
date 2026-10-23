@@ -269,21 +269,23 @@ if (!gotLock) {
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
-    disposeIntakeCatalog = registerContentIntakeCatalogIpc(productProfile?.contentIntake ? productSession : null,
+    const hangzhouWorkbench = productProfile?.apiOrigin.startsWith('https://') === true;
+    const workbenchSession = productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench ? productSession : null;
+    disposeIntakeCatalog = registerContentIntakeCatalogIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
-    intakePermissions = registerContentIntakePermissionsIpc(productProfile?.contentIntake ? productSession : null,
+    intakePermissions = registerContentIntakePermissionsIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     seatAccounts = registerSeatAccountIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
-      () => productProfile?.contentIntake === 'faq-v2');
-    intakeManagement = registerContentIntakeManagementIpc(productProfile?.contentIntake ? productSession : null,
+      () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench);
+    intakeManagement = registerContentIntakeManagementIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
-    deskKnowledge = registerDeskKnowledgeIpc(productProfile?.contentIntake ? productSession : null,
+    deskKnowledge = registerDeskKnowledgeIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, userDataDirectory);
-    disposeIntakeQuery = registerContentIntakeQueryIpc(productProfile?.contentIntake ? productSession : null,
+    disposeIntakeQuery = registerContentIntakeQueryIpc(workbenchSession,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl);
     // The shared Fox still reads unread in FAQ mode. A null service supplies the

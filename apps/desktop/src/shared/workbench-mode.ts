@@ -11,10 +11,3 @@ export function workbenchKind(profile: { apiOrigin: string; contentIntake?: 'faq
   return 'legacy';
 }
 
-export const PRODUCT_REMOTE_NAV = Object.freeze([
-  { id: 'overview', label: '概览', group: '经营总览' },
-  { id: 'wording', label: '话术库', group: '话术运营' },
-  { id: 'sop', label: 'SOP', group: '话术运营' },
-  { id: 'publish', label: '内容管理', group: '治理与架构' },
-  { id: 'announce', label: '系统同步', group: '治理与架构' },
-] as const);

@@ -8,13 +8,19 @@ afterEach(() => {
   delete window.dashboardPermissions;
 });
 
-it('hides unfinished boards when the mode is product-remote and keeps 内容管理', async () => {
+it('keeps the current workbench pages when the mode is product-remote', async () => {
+  window.dashboardPermissions = {
+    current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
+    command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
+    onInvalidated: () => () => undefined,
+  } as unknown as Window['dashboardPermissions'];
   window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'product-remote' }) };
   render(<DashboardApp />);
-  expect(await screen.findByTestId('nav-publish')).toHaveAccessibleName('内容管理');
-  expect(screen.queryByTestId('nav-materials')).toBeNull();
-  expect(screen.queryByTestId('nav-permissions')).toBeNull();
-  expect(screen.queryByRole('button', { name: '知识库' })).toBeNull();
+  expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料管理');
+  expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
+  expect(screen.getByTestId('nav-content')).toHaveAccessibleName(/知识库/);
+  expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
+  expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
   expect(screen.getByTestId('nav-announce')).toBeInTheDocument();
 });
 
