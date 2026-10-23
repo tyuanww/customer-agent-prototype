@@ -692,6 +692,12 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     try {
       await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-sop','scope-a',1,'v2-preview')");
       await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-sop',1,'faq-p1.1','intake-p1.1','sop-not-imported',repeat('a',64))");
+      // Query authority is the intersection of a live business grant and current
+      // store-set membership (0050), so a source without a member row is invisible
+      // to every seat no matter who holds the grant.
+      await admin.query(`INSERT INTO content_intake.store_set_members(
+          tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-a','app-a',1,'scope-a','source-sop',clock_timestamp()+interval '2 hours')`);
       await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
         to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-sop','source_id','source-sop'))).*
         FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);
@@ -723,7 +729,10 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
               await target.query('ROLLBACK'); lost = true; throw new Error('synthetic uncertain freeze rolled back before acknowledgement');
             }
             const result = await target.query(sql, values);
-            if (sql.includes("SET state='validated'")) freezing = true;
+            // The freeze write moved behind the SOP capability; the injected loss
+            // still has to happen at the same logical moment (the statement that
+            // validates the job), or the retry is never exercised.
+            if (sql.includes("SET state='validated'") || sql.includes('freeze_sop_parsed_candidate')) freezing = true;
             if (sql === 'COMMIT' && freezing && !lost) {
               lost = true;
               if (variant === 'late-freeze-cancel') { entered(); await gate; }
@@ -936,6 +945,51 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       const denied = await fetch(`${origin}/v1/intake/preview?entitlementId=${otherEntitlement.entitlementId}&objectId=${handles.items[0]!.objectId}`, { headers: otherHeaders });
       expect(denied.status).toBe(404);
     } finally { await reader.close(); await host.app.close(); }
+  }, 40_000);
+
+  it('publishes a SOP workbook again after a row is inserted above published entries', async () => {
+    await publicationBase();
+    await registerSopSource();
+    const host = await managementHost();
+    const publishWorkbook = async (book: Buffer, label: string) => {
+      const object = parseContractSchema('IntakeObject', await (await host.upload(book, label, 'source-sop')).json());
+      const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, `${label}-receive`, null, baseReleaseId, 'source-sop');
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+      const url = `${host.origin}/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`;
+      const c = parseContractSchema('IntakeCandidate', await (await fetch(url, { headers: host.headers })).json());
+      const source: C['IntakeSourceConfirmation'] = { operationId: `${label}-source`, key: c.key, expectedEvidenceVersion: 0,
+        confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-export-one', acquisition: 'controlled-synthetic-export',
+        objectSha256: object.sha256, reason: '合成人工来源确认' };
+      expect((await fetch(`${url}/source-confirmation`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(source) })).status).toBe(200);
+      await httpQuality(host, c);
+      const publish: C['IntakePublish'] = { operationId: `${label}-publish`, key: c.key, baseReleaseId, sourceEvidenceVersion: 1, confirmed: true, title: '合成 SOP 迭代', summary: '插入一行后再次发布' };
+      const published = await fetch(`${url}/publish`, { method: 'POST', headers: { ...host.headers, 'content-type': 'application/json' }, body: JSON.stringify(publish) });
+      return { status: published.status, body: await published.clone().text(), candidate: c };
+    };
+    try {
+      const first = await publishWorkbook((await createSyntheticSopWorkbook({
+        firstSheetRows: [{ code: 'A-1', text: '过敏答案A' }, { code: 'A-2', text: '过敏答案B' }],
+      })).bytes, 'sop-insert-one');
+      expect(first.status, first.body).toBe(202);
+      const second = await publishWorkbook((await createSyntheticSopWorkbook({
+        firstSheetRows: [{ code: 'A-0', text: '新插入答案' }, { code: 'A-1', text: '过敏答案A' }, { code: 'A-2', text: '过敏答案B' }],
+      })).bytes, 'sop-insert-two');
+      expect(second.status, second.body).toBe(202);
+      // The published entry keeps its code and its text; only its workbook row moved.
+      const rows = (await admin.query<{ business_entry_id: string; row_id: string }>(
+        `SELECT r.business_entry_id, r.row_id FROM content_intake.sop_candidate_rows r
+         WHERE r.candidate_id=$1 AND r.candidate_version=$2 ORDER BY r.business_entry_id`,
+        [second.candidate.key.candidateId, second.candidate.key.version])).rows;
+      expect(rows).toContainEqual({ business_entry_id: 'A-1', row_id: 'sop:过敏流程SOP:3' });
+      const published = (await admin.query<{ e: { businessEntryId: string; answerText: string } }>(
+        `SELECT e FROM content_intake.candidate_versions c CROSS JOIN LATERAL jsonb_array_elements(c.material->'entries') e
+         WHERE c.candidate_id=$1 AND c.version=$2 AND e->>'businessEntryId'='A-1'`,
+        [second.candidate.key.candidateId, second.candidate.key.version])).rows;
+      expect(published[0]?.e.answerText).toBe('过敏答案A');
+    } finally { await host.app.close(); }
   }, 40_000);
 
   it('workflow HTTP validates exact candidate paths, complete bodies and action namespaces without trusting caller approval', async () => {

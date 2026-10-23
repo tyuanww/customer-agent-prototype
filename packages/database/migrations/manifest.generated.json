@@ -926,6 +926,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 61,
+      "id": "0061_sop_entry_code_identity",
+      "file": "0061_sop_entry_code_identity.sql",
+      "source_ranges": [],
+      "sha256": "de3835efb78b780669cc81283c9632f7d0cc971b6e1bdd7df8fefa9f17bcc222",
+      "bytes": 18158,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

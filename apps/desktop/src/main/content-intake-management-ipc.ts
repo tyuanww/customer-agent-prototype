@@ -68,6 +68,7 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       wc.once('destroyed', () => { win?.removeListener('close', close); windows.delete(wc); owned.dispose(); });
     }
     try {
+      if (channel === 'dashboard:intake-current') await manager.settleUpload();
       return { ok: true, view: channel === 'dashboard:intake-current' ? manager.view() : await manager.command(args[0] as Parameters<ContentIntakeManagement['command']>[0]) };
     } catch (error) { return failure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', manager, error instanceof ProductHttpError ? error.reason : undefined); }
   });

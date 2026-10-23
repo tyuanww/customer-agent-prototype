@@ -153,13 +153,15 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
       return run(actor, 'material', null, null, async (client, who) => {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         const query = raw as Record<string, unknown>;
-        if (Object.keys(query).some(k => k !== 'cursor' && k !== 'limit')) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        if (Object.keys(query).some(k => k !== 'cursor' && k !== 'limit' && k !== 'previous')) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         const limit = query.limit ?? 50;
         if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 100) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+        if (query.previous !== undefined && typeof query.previous !== 'boolean') throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         const view = await readCandidate(client, who, parseContractSchema('IntakeId', id), parseContractSchema('IntakeVersion', version));
         const { material } = await candidateContext(client, who, view.key, 'content-manage');
         const binding = JSON.stringify([view.key, authenticatedProductSession(actor), who.generation, who.factsVersion, limit]);
         const sign = (offset: number) => createHmac('sha256', cursorSecret).update(binding).update(String(offset)).digest('base64url');
+        const total = Math.max(material.entries.length, material.differences.length);
         let offset = 0;
         if (query.cursor !== undefined) {
           if (typeof query.cursor !== 'string' || query.cursor.length > 512) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
@@ -168,12 +170,18 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
             throw new IntakeRejection('MATERIAL_CHANGED');
           }
           offset = Number(match[1]);
-          if (offset === 0 || offset >= Math.max(material.entries.length, material.differences.length)) throw new IntakeRejection('MATERIAL_CHANGED');
+          // A forward cursor may not point at the start or past the end. A backward
+          // step re-uses the cursor of the page on screen, which the server reduces by
+          // one page, so the reader never needs a second signed token.
+          if (query.previous === true) offset = Math.max(0, offset - Number(limit));
+          else if (offset === 0 || offset >= total) throw new IntakeRejection('MATERIAL_CHANGED');
+        } else if (query.previous === true) {
+          throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         }
         const { entries, differences, ...materialHeader } = material;
         const end = offset + Number(limit);
         return { key: view.key, entries: entries.slice(offset, end), differences: differences.slice(offset, end), materialHeader,
-          nextCursor: end < Math.max(entries.length, differences.length) ? `${end}.${sign(end)}` : null };
+          nextCursor: end < total ? `${end}.${sign(end)}` : null };
       }, v => parseContractSchema('IntakeCandidatePage', v));
     },
   };

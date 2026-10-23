@@ -73,7 +73,7 @@ describe('formal candidate material from independently parsed workbook', () => {
     expect(() => preview(duplicate)).toThrow('MATERIAL_CHANGED');
   });
 
-  it('uses the existing 500/501 sampling boundary and makes a critical candidate entirely mandatory', async () => {
+  it('bounds the intake sample above a small catalog and makes a critical candidate entirely mandatory', async () => {
     const material = materialFromParse(await input());
     const preview = (count: number, critical = false) => {
       const m = structuredClone(material);
@@ -81,7 +81,10 @@ describe('formal candidate material from independently parsed workbook', () => {
       m.risk.level = critical ? 'critical' : 'routine';
       return qualityPopulation({ candidateId: 'candidate', version: 1, digest: digest(canonical(m)) }, m);
     };
-    expect(preview(500)).toMatchObject({ ordinaryCount: 500, mandatoryCount: 0, initialTarget: 500, expandedTarget: 500 });
+    // The intake policy has its own boundary at 100 now; the legacy batch chain keeps
+    // 500 and is asserted separately in intake-quality-targets.test.ts.
+    expect(preview(100)).toMatchObject({ ordinaryCount: 100, mandatoryCount: 0, initialTarget: 100, expandedTarget: 100 });
+    expect(preview(266)).toMatchObject({ ordinaryCount: 266, mandatoryCount: 0, initialTarget: 100, expandedTarget: 100 });
     expect(preview(501)).toMatchObject({ ordinaryCount: 501, mandatoryCount: 0, initialTarget: 100, expandedTarget: 151 });
     expect(preview(501, true)).toMatchObject({ ordinaryCount: 0, mandatoryCount: 501, initialTarget: 0, expandedTarget: 0 });
   });

@@ -211,6 +211,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0059_query_grant_restamp',
     requiresPredecessor: 'Issuer authority requires the restamped query grants',
   },
+  {
+    index: 60,
+    minimumCatalogueLength: 61,
+    id: '0061_sop_entry_code_identity',
+    predecessorId: '0060_grant_issuer_authority',
+    requiresPredecessor: 'SOP entry-code identity requires the issuer authority',
+  },
 ];
 
 function requiredSuccessorStep(

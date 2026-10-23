@@ -44,7 +44,7 @@ function managementView(): IntakeManagementView {
       { selection: 'row-publishing', scopeLabel: '品牌通用 · 售后', candidate: candidate('source-b', 'publishing') },
       { selection: 'row-published', scopeLabel: 'shop-b · 活动', candidate: candidate('source-c', 'published') },
     ],
-    moreCandidates: false, selected: null, material: null,
+    moreCandidates: false, selected: null, material: null, materialPage: 0,
     canReview: false, quality: null, hasDraft: false,
     canConfirmSource: false, canPublish: false, canRevise: false, canCancel: false,
     review: null, workflowResult: null, pending: null, receipt: null,

@@ -11,14 +11,19 @@ const context: SopParseContext = {
 
 async function fixture(options: { imageOnly?: boolean; extraSheet?: boolean; version?: string } = {}): Promise<Buffer> {
   const book = new ExcelJS.Workbook();
-  for (const name of SOP_SHEET_NAMES) {
+  for (const [index, name] of SOP_SHEET_NAMES.entries()) {
     const sheet = book.addWorksheet(name);
-    sheet.getCell('A1').value = options.version && name === SOP_SHEET_NAMES[0] ? '版本' : `合成 SOP ${name}`;
-    sheet.getCell('B1').value = options.version && name === SOP_SHEET_NAMES[0] ? options.version : '步骤文字';
-    if (options.version && name === SOP_SHEET_NAMES[0]) sheet.getCell('A2').value = options.version;
-    else sheet.getCell('A2').value = options.imageOnly && name === SOP_SHEET_NAMES[0] ? '' : '同一行的合成答案';
-    sheet.getCell('B2').value = options.imageOnly && name === SOP_SHEET_NAMES[0] ? '' : '保留列顺序\n保留单元格换行';
-    if (name === SOP_SHEET_NAMES[0] && !options.imageOnly) sheet.getCell('C2').value = { text: '外部说明标签', hyperlink: 'https://synthetic.example/' };
+    // Row 1 is the header on every sheet. A data row carries its own code, which is
+    // the row's identity; the code column does not join the answer text. The contract
+    // types businessEntryId as ASCII, so a code is a part number, not a Chinese label.
+    sheet.getCell('A1').value = '条目编码';
+    sheet.getCell('B1').value = '答案';
+    const blank = options.imageOnly && name === SOP_SHEET_NAMES[0];
+    sheet.getCell('A2').value = blank ? '' : `SYN-${index + 1}`;
+    sheet.getCell('B2').value = blank ? '' : '同一行的合成答案';
+    sheet.getCell('C2').value = blank ? '' : '保留列顺序\n保留单元格换行';
+    if (name === SOP_SHEET_NAMES[0] && !options.imageOnly) sheet.getCell('D2').value = { text: '外部说明标签', hyperlink: 'https://synthetic.example/' };
+    if (options.version && name === SOP_SHEET_NAMES[0]) { sheet.getCell('G1').value = '版本'; sheet.getCell('G2').value = options.version; }
   }
   const imageId = book.addImage({ base64: ONE_PIXEL_PNG, extension: 'png' });
   book.getWorksheet(SOP_SHEET_NAMES[0])!.addImage(imageId, 'D2:E3');
@@ -32,14 +37,16 @@ describe('candidate SOP workbook parser', () => {
     expect(repairEmptySharedStringMarkers('<ns0:si xmlns:ns0="urn:s"><ns0:t /><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>'))
       .toBe('<ns0:si xmlns:ns0="urn:s"><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>');
     const book = new ExcelJS.Workbook();
-    for (const name of SOP_SHEET_NAMES) {
+    for (const [index, name] of SOP_SHEET_NAMES.entries()) {
       const sheet = book.addWorksheet(name);
-      sheet.getCell('A1').value = name;
-      sheet.getCell('A2').value = '步骤文字';
+      sheet.getCell('A1').value = '条目编码';
+      sheet.getCell('B1').value = '答案';
+      sheet.getCell('A2').value = `SYN-${index + 1}`;
+      sheet.getCell('B2').value = '步骤文字';
       if (name === SOP_SHEET_NAMES[1]) {
-        sheet.getCell('B2').value = 1;
+        sheet.getCell('C2').value = 1;
         // ExcelJS types say hyperlink text is a string. WPS writes a rich-text object there.
-        sheet.getCell('C2').value = { text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/sop' } as unknown as ExcelJS.CellValue;
+        sheet.getCell('D2').value = { text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/sop' } as unknown as ExcelJS.CellValue;
       }
     }
     const zip = await JSZip.loadAsync(Buffer.from(await book.xlsx.writeBuffer()));
