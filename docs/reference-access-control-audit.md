@@ -6,7 +6,9 @@
 
 ## 0. 结论摘要
 
-1. **主账号今天无法在生产上给任何人授权。** 缺的不是界面，是缺「授权人能通过校验」这一环：`prepareGrants` 要求签发人事实新鲜，而生产里唯一持有 `allocation` 的主体 `hz-allocator` 事实停在 2026-10-15，且它绑定的 `usr_synthetic_owner` 无法通过任何登录入口刷新。见 §6。
+1. **主账号今天无法在生产上给任何人授权。** 缺的不是界面，是「签发人事实新鲜」这一环：`prepareGrants` 要求签发人事实新鲜。生产里持有 `allocation` 的两个主体事实都已过期（2026-10-15 与 2026-10-23），而两个登录入口都不负责刷新它们。见 §6。
+
+   更正（2026-10-24 02:30）：**主账号是 `hz-allocator`，不是 `principal-menokin-admin`。** `shinemage2026` 这个口令账号经 `synthetic_owner` 绑定落到 `hz-allocator`，它持有 7 条 allocation。所以主账号有可用的登录路径，缺的只是口令登录不写事实。见 §6.5。
 2. **「新建坐席」不是生产 API，是桌面主进程 spawn 的本地脚本。** 它把账号写进硬编码的 `customer_agent_synthetic`，口令写进运行脚本那台机器的 `STACK_ROOT`。见 §4。
 3. **新建的外包坐席即使写对了库也登不上生产。** 生产 `password-accounts.json` 里没有它的行；补上之后还要有对应 `subject_bindings` 行。见 §5。
 4. **前端在四个位置自己判断权限**，其中 `grant`、`uploadSop` 来自客户端硬编码的 `JOB_ROSTER` 表，不是服务端结论。见 §7。
@@ -148,7 +150,7 @@
 
 | 主体 | 持有 | 事实 | 能否自己续期 |
 | --- | --- | --- | --- |
-| `hz-allocator` | 7 条 allocation（缺 `rollback`） | v8，2026-10-15 到期 | 不能。`user_id='usr_synthetic_owner'`，不受任何登录入口支持 |
+| `hz-allocator` | 7 条 allocation（缺 `rollback`） | v8，2026-10-15 到期 | 不能，但原因不是没有登录路径（见 §6.5） |
 | `principal-menokin-admin` | 8 条 allocation | v3，由手工迁移写入 | 不能。`identity_scope='production-admin'`，无登录路径 |
 
 `hz-reviewer` 只有 2 条 business grant，不是 allocation 持有人。
@@ -166,6 +168,30 @@ A2 的「主账号能分配权限」必须先解决「谁是能签发的活主�
 - 给 `principal-menokin-admin` 一条可续期的事实来源（例如把它纳入定时任务，像 `refresh-roster-facts` 那样每次签发前刷新事实）；
 - 或引入「平台管理员」这一服务端概念，用受限的 SQL 权限而不是 `role_rules` 来签发；
 - 或允许同一真人的两个主体在授权场景下视为同一人以外的可信签发方（需要改 `SELF_ESCALATION` 语义，属于任务卡禁止的范围，须先评审）。
+
+### 6.5 更正：主账号是 `hz-allocator`，且它已有登录路径
+
+2026-10-24 02:30 复核口令文件与主体绑定，6.2 的表述需要更正。
+
+生产 `password-accounts.json` 只有 6 个账号，其中面向人的是 `shinemage2026` 与 `shinemage2026-1`，两者都映射到 binding `synthetic_owner`。而 `synthetic_owner` 的 `user_id = usr_synthetic_owner`，对应的主体是 **`hz-allocator`**，它持有 7 条带 steward 的 allocation（除 `rollback`）。
+
+没有 `binding-menokin-admin` 的口令账号，所以 `principal-menokin-admin` 仍然是不可登录的。
+
+于是 6.2 的结论要改写。真实缺口不是「主账号没有登录路径」，而是：
+
+> 口令登录成功后，服务端不给主体写事实。只有飞书登录会走 `project_feishu_roster` 写五分钟事实（`apps/api/src/product-auth-service.ts:164-172` 的 `afterLogin` 被 `isFeishuOpenId(binding)` 挡住）。
+
+所以 `shinemage2026` 每天能登录成功，但每次签发都在 `requireFresh` 处被拒。这是两个登录入口之间的行为不一致，不是缺一个概念。
+
+修法比 6.4 的三个方向都小：给口令登录一条写自己主体事实的路径。约束是
+
+1. `content_intake.project_feishu_roster` 只接受 roster 主体（角色取自 `role_rules`，`p_actions` 必须是 `['query']`），不能复用它；
+2. 需要新增一个只服务口令登录的事实写入函数，属于新迁移；
+3. 事实仍在五分钟内有效，仍然只证明「刚刚登录过」，不产生任何长期授权。
+
+这条改动不碰 `authorization_deadline`，不碰 `role_rules`，不碰 `SELF_ESCALATION`，也不新增授权概念。它把「登录即证明身份」这条规则补齐到第二种登录方式上。
+
+`hz-allocator` 缺 `rollback`，所以主账号今天仍然签不出回滚授权，这一条独立于事实问题，另议。
 
 ## 7. 前端判定权限的全部位置
 

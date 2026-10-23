@@ -41,7 +41,7 @@
 
 这是原文档 §4.6「六个概念能否收敛」的具体入口 —— 我判断它是那六条里最先该合的一条。
 
-### 3.2 授权链不能自持：缺一个「平台管理员」概念（§4.4 的实证）
+### 3.2 授权链不能自持：口令登录不写事实（§4.4 的实证）
 
 授权判定要求签发人持有时效内的事实（`apps/api/src/content-intake/authority.ts:118-119` 的 `requireFresh`，加上 SQL 侧 `content_intake.grant_parent_guard`）。
 
@@ -49,14 +49,18 @@
 
 | 主体 | 持有 | 事实 | 能否续期 |
 | --- | --- | --- | --- |
-| `hz-allocator` | 7 条 allocation | 停在 2026-10-15 | 不能。绑定的 `usr_synthetic_owner` 不受任何登录入口支持 |
-| `principal-menokin-admin` | 8 条 allocation | 手工迁移写入 | 不能。`identity_scope='production-admin'`，无登录路径 |
+| `hz-allocator` | 7 条 allocation | 停在 2026-10-15 | 不能。它是 `shinemage2026` 登录后的主体，登录能成功，但口令入口不写事实；只有飞书登录写 |
+| `principal-menokin-admin` | 8 条 allocation | 手工迁移写入 | 不能。`identity_scope='production-admin'`，且口令文件里没有它的账号 |
 
 而 `SELF_ESCALATION` 禁止自签（`authority.ts:126`，加 `grants` 上的 `CHECK`），所以一个真人不能既签发又接收。
 
 于是今天的事实是：**主账号给任何人授权都会在服务端被拒**（`GRANT_AUTHORITY_DENIED` 或 `PERMISSION_CHANGED`），无论前端做得多完整。
 
-> 问题：是给「管理员」一条独立的事实来源（比如服务端签发、不依赖飞书/口令登录），还是把「签发权」从 `role_rules` 里拿出来、改用受限 SQL 权限表达？前者多一个身份，后者多一条旁路。我倾向后者，但那等于新增一个授权概念，需要一并回答 §4.6。
+> 问题：口令登录该不该像飞书登录一样，给自己主体写一份五分钟事实？
+>
+> 我的判断是该，因为事实的含义是「此人刚刚证明过身份」，而口令登录就是一次身份证明。现在只有飞书登录写，是两种登录方式的行为不一致，不是设计选择。
+>
+> 需要顾问确认的只有一条。若采纳，是否还需要保留 `principal-menokin-admin` 这个没有登录路径的第二个签发方？两个签发方里有一个是把 `SELF_ESCALATION` 绕开的产物，补完口令事实之后它就是多余的，但删掉它会动到 F1 里「谁能签发」的边界。我倾向保留到 F1 给出结论为止，先不动。
 
 ### 3.3 展示与执行是两套真相（§4.5 的实证）
 
