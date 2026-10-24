@@ -246,6 +246,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0064_roster_query_requires_reader',
     requiresPredecessor: 'Legacy orphan foreign keys require the roster issuance body',
   },
+  {
+    index: 65,
+    minimumCatalogueLength: 66,
+    id: '0066_policy_version_restamp',
+    predecessorId: '0065_legacy_orphan_fk_not_valid',
+    requiresPredecessor: 'Policy restamp requires the legacy foreign-key repair',
+  },
 ];
 
 function requiredSuccessorStep(

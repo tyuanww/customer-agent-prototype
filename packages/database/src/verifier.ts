@@ -1105,6 +1105,7 @@ const READINESS_SUFFIX = [
   { length: 63, index: 62, id: '0063_store_set_keep_members_boundary' },
   { length: 64, index: 63, id: '0064_roster_query_requires_reader' },
   { length: 65, index: 64, id: '0065_legacy_orphan_fk_not_valid' },
+  { length: 66, index: 65, id: '0066_policy_version_restamp' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1159,6 +1160,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // changes, so only the object manifest moves; the pinned value below is measured, not
   // derived. Placeholder until the probe run reports it.
   65: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '054b28a7858de4b7957202a9704235aad53a0dcbf606e9c5b39998a67e069eed', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  66: { tables: 109, functions: 285, objectEntries: 3400, objectSha256: 'cbc8ed8645962d65582e1c7143ea6de17832f91f0d319e95a7f4a1d4b75df53b', functionEntries: 285, functionSha256: 'edfdfe3b5050db5a610b0962e223dda91d1df9f80925a71135921202f3492ccf', triggerEntries: 115, triggerSha256: 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1193,6 +1195,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   64: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0065 only rewrites constraint definitions, so no ACL entry moves.
   65: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
+  // 0066 adds no grant of its own; 0059 already covers what the new function writes.
+  66: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
 };
 
 export async function verifyReadinessSuccessor(
