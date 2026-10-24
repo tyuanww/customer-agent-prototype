@@ -2,9 +2,11 @@
 
 > **仓库身份：** 客服 Agent 产品实施仓；见 `PROJECT_CHARTER.md`。
 > **当前实现状态：** v3 双表面。Float 仍是输入法式狐狸头；Dashboard 是客服经理工作台。
-> **证据边界：** 工作台数字与按钮必须走产品会话 / 数据库支持的冻结接口。没有接口时显示「未接入」或禁用，禁止合成成功、禁止 fixture 数字冒充生产。
+> **证据边界：** 工作台数字与按钮必须走产品会话 / 数据库支持的冻结接口。没有接口时显示禁用或一句「何时会有数据」，禁止合成成功、禁止 fixture 数字冒充生产。
 
 本文件拥有产品视觉、交互和内容表达的不变量。下文 “Demo” 指当前原型模式；后续正式数据和服务接入不得推翻已经冻结的人在环、复制语义、可访问性与桌面交互基线。
+
+> **2026-10-24**：工作台与登录窗的外观以 §3「工作台与登录窗」为准；页面去留与各角色文案的设计稿在 [前端设计结论](docs/plans/2026-10-24-frontend-design-decisions.md)（未批准）。坐席的狐狸、查询条、Top 3 与复制保持本文件原规则。下文标注「已作废」的段落只作历史记录，不再约束实现。
 
 ## 1. 产品印象
 
@@ -20,8 +22,8 @@
 
 1. `FOX_IDLE`：约 88px 透明狐狸头常驻窗（含动效留白）；无边框、置顶、跳过任务栏。狐狸视觉约 64px。
 2. 查询窗：约 `600×88` 的玻璃胶囊；透明 frameless、原生 `resizable: false`，不开放 width / x / y / bounds IPC。正常结果路径按 DOM 实测 hug：capsule 88 + banner + `result-content` scrollHeight + border/padding + 约 20px grip，经 typed query-only layout IPC 上报后 Main 钳制到 `240..min(620, availableHeight)` 再一次 `setBounds` 并 ACK，然后才显示内容。旧分档 `240 / 340 / 430 / 620` 只作异常 fallback。自定义仅纵向 resize grip；collapse 必须用 Main 按真实狐狸屏幕中心减当前 query bounds 算出的 `handoffCenterX/Y`。小屏或超过 620 只压缩结果区滚动，胶囊 88 不缩。与狐狸同为 overlay。
-3. Dashboard：约 `1180×760`、最小约 `980×680` 的标准系统窗。正常 frame、可缩放、非透明、非置顶、显示在任务栏。macOS 使用 `titleBarStyle: 'hiddenInset'`：隐藏原生标题栏文字，保留红黄绿交通灯以及拖动、缩放、最小化 / 最大化 / 关闭；侧栏与顶栏延伸进标题栏，形成一体 chrome。交通灯位置保持 `trafficLightPosition: { x: 14, y: 16 }`。共享 SSOT：macOS 标题栏高度 `48px`、交通灯 / 控件安全左距 `72px`，由 Dashboard renderer 以 CSS vars 消费，不经 preload / IPC。一体 chrome 下是真正的 48px 单行标题栏：drag strip 高 48，主 topbar 高 48 且不再 `padding-top: 38`，模块名 / 刷新信息 / 主题控件与 48px 标题栏同一中心线（约 y24）。品牌与导航从标题栏下方开始（block offset 48），狐狸 Logo 不与红绿灯重叠。同一个持久 DOM PanelLeft 控制按钮在展开 / 过渡 / 折叠 / 展开中都固定存在：macOS integrated 在红绿灯右侧 `left:72px; top:4px; 40×40`（`x=72..112`），由侧栏自有 titlebar control island 持有（顶部 `x=72..120`、高 48、透明 no-drag overlay、`pointer-events:auto` / 顶层 z-index），不再用 `position:fixed` 逃出 `aside`。island 不得填充玻璃或不透明侧栏、不得画第二条实体边线。几何职责必须拆开：traffic-light safe zone 为 `0..72`；toggle 占 `72..112`；toggle 右侧到 divider 固定 8px；macOS integrated 的 collapsed surface / 结构边界 / main 左缘 / topbar 左缘 / resizer 中线 / 唯一全高 divider 统一为 `120px`。Windows / Linux native 的 collapsed surface 仍为 `72px`。视觉结构列边界由 `--dash-rendered-nav-width` 驱动的 `--dash-structure-boundary` 单一 token 决定：mac 折叠 / collapsing 为 120，native 为 72，展开 / expanding 为当前合法展开宽度，拖宽预览共用同一条边界。左侧玻璃与右侧实色 main 都从顶到底是一张连续表面，分界线单一。折叠态 topbar / drag surface 只随共享边界移动，禁止 20→52 的局部 padding 补偿。Win/Linux 在稳定 48px 侧栏 chrome 槽，永不放在狐狸 Logo 上。只做 100–120ms glyph crossfade/scale，不位移 / 旋转 / 闪现。macOS collapsed 时 `toggle.right <= 112` 且 divider=120。macOS 四阶段 brand / nav icon 中心固定为 `nav.left + 60`，native 固定为 `nav.left + 36`，切态与拖动漂移不超过 1px；macOS collapsed 选中面必须围绕图标对称，不得留下 48px 空白假栏。侧栏拖宽 expanded 向左时视觉 preview 必须连续经过 `216→193`，不得在 216 形成死区；`lastExpandedWidth` 只保存合法展开终态。raw `<=192` 时从当前 raw 的已提交帧平滑约 190ms 收到 collapsed surface；raw=`193` 松手从 193 平滑回 216。折叠态向右拖 preview 连续到 207；raw `>=208` 后必须至少保持当前 raw 一个已提交布局帧，再约 190ms 平滑到 `lastExpandedWidth`（至少 min 216），不得在同一 pointermove 直接跳到 248/320。阈值前松手 / 取消 / `lostpointercapture`（即使 `buttons===1`）/ blur / `buttons=0` 从当前 preview 平滑回 collapsed surface，公开 `aria-valuenow=平台折叠宽度` 并保留 `lastExpandedWidth`。preview CSS 变量只允许在 `transitionend` 稳定后清理。重开恢复此前 `lastExpandedWidth`。标题栏空白为 `-webkit-app-region: drag`，按钮 / 导航 / 输入 / 分隔条为 `no-drag`。CDP click 不能冒充 OS 命中；折叠态展开按钮的最终验收仍需真实 macOS 鼠标。Windows / Linux 保持原生标题栏与系统窗控，不套 hiddenInset，也不使用 titleBarOverlay。窗口 title 为「客服运营工作台」，供任务栏 / Mission Control 使用，不得被共用 `index.html` 的浮窗标题覆盖；侧栏业务标题「客服运营工作台 / 运营管理端」必须保留。不得再写「演示数据」。应用菜单含原生 `fileMenu` / `role:close`：macOS `Cmd+W` 关闭当前 Dashboard，Query 则收回 Fox，Fox idle 无副作用；`Cmd+Q` 才退出。Windows `Ctrl+W` / 标题栏 X / `Alt+F4` 关闭当前表面。Dashboard 关闭后可重建单例，Fox / Tray 继续。Page 截图只证明 webContents，不含原生红绿灯；最终原生外观仍需真实 macOS 人工或 OS 截图验证。懒创建；重复打开只 focus 同一窗口；关闭后可重建；关闭 Dashboard 不得退出狐狸。运行期间 macOS Dock / Cmd+Tab 必须保持 regular activation policy。开发态 ready 后用仓内可追踪 `apps/desktop/assets/app-icon.png` master（1024 近白 squircle 底板 + 光学居中狐狸）直接 `app.dock.setIcon`，不依赖 ignored / stale `apps/desktop/build/icon.png`，也不把透明 `apps/desktop/fox-head.png` 用于 Dock。打包态用 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`。Float、Dashboard Logo 与 macOS Tray Template 继续用透明狐狸。Query / Fox 可 skipTaskbar，应用级 Dock 图标保留。真实 Cmd+Tab / Dock 外观需人工 macOS 验收。
-4. 登录窗：约 `520×420` 的标准系统窗，**只用原生标题栏**，不套 hiddenInset / overlay chrome。标题「登录」。胶囊点「登录」打开；分段文案只有 **飞书 / 账号**，禁止内部 / 外包或其它受众标签。视觉复用查询胶囊 token（浅白玻璃底、`--ink` / `--muted`、淡紫主按钮、11px 次控件、输入井 16/24 与 14px 圆角）。本窗只做选择器和账号表单，**不内嵌飞书官方登录页**。点「飞书登录」后用系统浏览器打开校验过的授权地址；文案写「将用浏览器打开飞书登录」，不要写「将在此窗口打开」。账号是管理员下发的口令表单，失败只说「账号或密码不正确」，找回只说联系管理员。独立非持久 session，不与 Query / Dashboard 共享 cookie。关窗或 Esc 是取消，成功以会话交换为准。不改胶囊几何，也不把登录做成胶囊内表单。
+3. **（像素规则已作废，2026-10-24）** 工作台侧栏固定宽度，可收起成图标栏，不提供拖动改宽度；交通灯、标题栏、PanelLeft 与拖宽阈值的像素约定不再约束实现。以下原文仅作历史记录。Dashboard：约 `1180×760`、最小约 `980×680` 的标准系统窗。正常 frame、可缩放、非透明、非置顶、显示在任务栏。macOS 使用 `titleBarStyle: 'hiddenInset'`：隐藏原生标题栏文字，保留红黄绿交通灯以及拖动、缩放、最小化 / 最大化 / 关闭；侧栏与顶栏延伸进标题栏，形成一体 chrome。交通灯位置保持 `trafficLightPosition: { x: 14, y: 16 }`。共享 SSOT：macOS 标题栏高度 `48px`、交通灯 / 控件安全左距 `72px`，由 Dashboard renderer 以 CSS vars 消费，不经 preload / IPC。一体 chrome 下是真正的 48px 单行标题栏：drag strip 高 48，主 topbar 高 48 且不再 `padding-top: 38`，模块名 / 刷新信息 / 主题控件与 48px 标题栏同一中心线（约 y24）。品牌与导航从标题栏下方开始（block offset 48），狐狸 Logo 不与红绿灯重叠。同一个持久 DOM PanelLeft 控制按钮在展开 / 过渡 / 折叠 / 展开中都固定存在：macOS integrated 在红绿灯右侧 `left:72px; top:4px; 40×40`（`x=72..112`），由侧栏自有 titlebar control island 持有（顶部 `x=72..120`、高 48、透明 no-drag overlay、`pointer-events:auto` / 顶层 z-index），不再用 `position:fixed` 逃出 `aside`。island 不得填充玻璃或不透明侧栏、不得画第二条实体边线。几何职责必须拆开：traffic-light safe zone 为 `0..72`；toggle 占 `72..112`；toggle 右侧到 divider 固定 8px；macOS integrated 的 collapsed surface / 结构边界 / main 左缘 / topbar 左缘 / resizer 中线 / 唯一全高 divider 统一为 `120px`。Windows / Linux native 的 collapsed surface 仍为 `72px`。视觉结构列边界由 `--dash-rendered-nav-width` 驱动的 `--dash-structure-boundary` 单一 token 决定：mac 折叠 / collapsing 为 120，native 为 72，展开 / expanding 为当前合法展开宽度，拖宽预览共用同一条边界。左侧玻璃与右侧实色 main 都从顶到底是一张连续表面，分界线单一。折叠态 topbar / drag surface 只随共享边界移动，禁止 20→52 的局部 padding 补偿。Win/Linux 在稳定 48px 侧栏 chrome 槽，永不放在狐狸 Logo 上。只做 100–120ms glyph crossfade/scale，不位移 / 旋转 / 闪现。macOS collapsed 时 `toggle.right <= 112` 且 divider=120。macOS 四阶段 brand / nav icon 中心固定为 `nav.left + 60`，native 固定为 `nav.left + 36`，切态与拖动漂移不超过 1px；macOS collapsed 选中面必须围绕图标对称，不得留下 48px 空白假栏。侧栏拖宽 expanded 向左时视觉 preview 必须连续经过 `216→193`，不得在 216 形成死区；`lastExpandedWidth` 只保存合法展开终态。raw `<=192` 时从当前 raw 的已提交帧平滑约 190ms 收到 collapsed surface；raw=`193` 松手从 193 平滑回 216。折叠态向右拖 preview 连续到 207；raw `>=208` 后必须至少保持当前 raw 一个已提交布局帧，再约 190ms 平滑到 `lastExpandedWidth`（至少 min 216），不得在同一 pointermove 直接跳到 248/320。阈值前松手 / 取消 / `lostpointercapture`（即使 `buttons===1`）/ blur / `buttons=0` 从当前 preview 平滑回 collapsed surface，公开 `aria-valuenow=平台折叠宽度` 并保留 `lastExpandedWidth`。preview CSS 变量只允许在 `transitionend` 稳定后清理。重开恢复此前 `lastExpandedWidth`。标题栏空白为 `-webkit-app-region: drag`，按钮 / 导航 / 输入 / 分隔条为 `no-drag`。CDP click 不能冒充 OS 命中；折叠态展开按钮的最终验收仍需真实 macOS 鼠标。Windows / Linux 保持原生标题栏与系统窗控，不套 hiddenInset，也不使用 titleBarOverlay。窗口 title 为「客服运营工作台」，供任务栏 / Mission Control 使用，不得被共用 `index.html` 的浮窗标题覆盖；侧栏业务标题「客服运营工作台 / 运营管理端」必须保留。不得再写「演示数据」。应用菜单含原生 `fileMenu` / `role:close`：macOS `Cmd+W` 关闭当前 Dashboard，Query 则收回 Fox，Fox idle 无副作用；`Cmd+Q` 才退出。Windows `Ctrl+W` / 标题栏 X / `Alt+F4` 关闭当前表面。Dashboard 关闭后可重建单例，Fox / Tray 继续。Page 截图只证明 webContents，不含原生红绿灯；最终原生外观仍需真实 macOS 人工或 OS 截图验证。懒创建；重复打开只 focus 同一窗口；关闭后可重建；关闭 Dashboard 不得退出狐狸。运行期间 macOS Dock / Cmd+Tab 必须保持 regular activation policy。开发态 ready 后用仓内可追踪 `apps/desktop/assets/app-icon.png` master（1024 近白 squircle 底板 + 光学居中狐狸）直接 `app.dock.setIcon`，不依赖 ignored / stale `apps/desktop/build/icon.png`，也不把透明 `apps/desktop/fox-head.png` 用于 Dock。打包态用 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`。Float、Dashboard Logo 与 macOS Tray Template 继续用透明狐狸。Query / Fox 可 skipTaskbar，应用级 Dock 图标保留。真实 Cmd+Tab / Dock 外观需人工 macOS 验收。
+4. 登录窗：约 `520×420` 的标准系统窗，**只用原生标题栏**，不套 hiddenInset / overlay chrome。标题「登录」。胶囊点「登录」打开；分段文案只有 **飞书 / 账号**，禁止内部 / 外包或其它受众标签。~~视觉复用查询胶囊 token（浅白玻璃底、`--ink` / `--muted`、淡紫主按钮、11px 次控件、输入井 16/24 与 14px 圆角）。~~ **（已作废，2026-10-24）** 登录窗改用工作台同款 antd 外观：白底实色、紫色主按钮、8px 圆角。本窗只做选择器和账号表单，**不内嵌飞书官方登录页**。点「飞书登录」后用系统浏览器打开校验过的授权地址；文案写「将用浏览器打开飞书登录」，不要写「将在此窗口打开」。账号是管理员下发的口令表单，失败只说「账号或密码不正确」，找回只说联系管理员。独立非持久 session，不与 Query / Dashboard 共享 cookie。关窗或 Esc 是取消，成功以会话交换为准。不改胶囊几何，也不把登录做成胶囊内表单。
 5. 售后 SOP 窗：独立 `role=sop` 可拖动窗，宽 600，起壳高 240，hug `240..620`，40px chrome。过敏售后 Top 3 在结果标题和卡片之间给「打开过敏售后流程」；已有进度时改成「继续过敏售后流程」。Query 检索与 SOP 可同时开，不自动弹出。Esc / × 收起并保留进度；「结束并清除进度」销毁窗口。`OverlayRole` 仍只有 `fox | query`。SOP 复制只反馈 1.2s，不进入 Query `COPIED`，也不走 `copyAdopt`。复制卡不画 Query 排名。切片 1 仅合成过敏树 DEMO，坐席只读。凭证 / 高风险话术步才出现「本步只给话术，不建单、不指令仓配」。
 
 - 不再使用固定 `520×760` 工作台，也不再把旧 RecentPanel 冒充 Dashboard。
@@ -35,7 +37,82 @@
 
 ## 3. 视觉语言
 
+### 工作台与登录窗（2026-10-24 起的现行规则）
+
+本节是工作台和登录窗外观的唯一规则。狐狸和查询条不受本节约束，继续使用下文「颜色（浅白玻璃 + 内部工具）」中的 Float Query 规则。下文与本节冲突的工作台旧规则一律以本节为准。
+
+**目标**：给每天要用的人一个安静、有秩序的界面。层级靠字重、颜色和间距建立，不靠装饰。
+
+**颜色**
+
+- 只用 [Radix UI Colors](https://www.radix-ui.com/colors) v3。中性色 mauve，强调色 violet，成功 grass，提醒 amber，危险 tomato。色值只写在 `apps/desktop/src/renderer/styles/radix-palette.css`；组件样式只读 `workbench-tokens.css` 里的语义变量，不写颜色字面量。antd 主题的色值镜像在 `intake-antd.tsx` 的 `RADIX`，两处必须一致。
+- 按 Radix 的阶梯用色：1–2 是页面和侧栏底色；3 是悬停面，4 是按下面，选中行用 violet-3；6 是分隔线，7 是可交互控件的边框，8 是焦点环；9 是主按钮实色，10 是主按钮悬停；11 是次要文字，12 是正文。
+- 状态文字用对应色的 11 阶，底色用 3 阶，边线用 6 阶。状态不能只靠颜色，必须有文字。
+- 紫色只出现在三处：主按钮、侧栏选中行、焦点环。不铺满页面，不做渐变。
+
+**文字**
+
+- 只有三种字号：12（辅助信息、表头、标签）、14（正文、按钮、输入）、20（页面标题和概览数字）。最小 12。
+- 不够区分时用字重（400 / 500 / 600）、颜色（12 / 11 / 9 阶）和间距，不再加字号。
+- 不在区块标题上方加眉题或英文大写小标签。侧栏不显示分组名，分组之间只留 12px 空隙。顶栏只写当前页名，不写「分组 / 页名」。
+
+**线、圆角、阴影**
+
+- 线一律 0.5px（`--wb-hair`）。
+- 圆角两档：控件 6，面板 10。控件嵌在面板内 4px 时，10 − 4 = 6，保持同心。分段选择器的轨道 8、滑块 6、内边距 2，同理。
+- 工作台表面不用阴影。只有浮层（菜单、下拉、弹窗）用一层很淡的阴影把它和底层分开。
+- 不用卡片左侧的彩色竖线，不用装饰性圆角。
+
+**动效**
+
+- 只过渡颜色、背景和透明度，200ms，ease-out（`--wb-motion` / `--wb-ease`）。
+- 不做弹跳、发光、漂浮、位移入场。`prefers-reduced-motion` 时全部关闭。
+- 侧栏折叠沿用现有行为，速度同上。
+
+**文案**
+
+- 不用「·」做分隔符。复合标签用「 / 」，代码里统一走 `shared/display-separator.ts`；句内并列用顿号或逗号；字段用「标签：值」或标签和值分开排。
+- 不放解释界面怎么用的长句。按钮名和字段名本身应该说清楚；必须提醒的风险放在发生选择的那个按钮或确认框里。
+- 空状态只写一句「什么时候会有数据」，例如「坐席查询后会出现」。不放插画。
+- 用使用者的说法，不用内部词。「资格」「投影」「hydrate」「release」这类词不出现在界面上。
+- 复制成功只写「已复制」。
+
+**控件**
+
+- 工作台各页和登录窗只用 antd 控件。ESLint 规则拦截原生 `<button>`、`<input>`、`<select>`、`<textarea>`；隐藏的文件选择 `<input type="file">` 除外。
+- 例外只有两类：窗口外壳（侧栏导航、折叠按钮、返回按钮、主题菜单），它们承担拖动与折叠，外观与 antd 一致；以及待删除的旧 profile 模块（任务卡 D4）。登录窗的「飞书 / 账号」切换是逐行豁免的原生按钮。
+
+**等待与反馈**（统一由 `features/dashboard/WorkbenchState.tsx` 渲染）
+
+- 首次读取：在内容的位置放骨架屏，不写「加载中」。超过 8 秒加一行「还在读取…」。
+- 按钮触发的短动作：按钮自己显示转圈并禁用，防止连点。
+- 没有数据：一句何时会有数据。
+- 读取或写入失败、可以安全重试：一行原因加「重试」，输入不清空。
+- 写入结果不确定：一行说明加「按原请求确认结果」或「刷新查看」，**不给重试**，因为重试可能重复写入。
+- 危险操作（撤销、停用、回退、取消候选）先确认；确认框写清楚做什么、能不能撤销。
+- 复制成功只写「已复制」。
+
+**没有权限**（统一由 `WorkbenchNoAccess` 渲染，判断文字由 `shared/workbench-access.ts` 给出）
+
+- 页面和按钮留着，不藏。做不了的按钮禁用，旁边或上方一句「你还不能…」，下一行「请联系{角色}开通。」。
+- 该找的角色写角色名，不写人名：给他人开通找「你的经理」，上传 SOP 找「客服主管」，职务没登记或没登录找「管理员」。
+- 登录状态过期不是缺权限：写「登录状态需要确认，请重新登录。」。
+- 这层只决定显示。是否放行由服务端判断，前端不得据此放开任何操作。
+
+**概览**
+
+- 只放真实数字。没有数据时数字位置显示「—」，下面一行写何时会有。
+- 「命中率」在口径确定前不出现在概览上。也不放「较上期 ↑ 8%」这类对比。
+- 本机预览地址加 `preview=intake` 时可以出现样例数字，打包后的应用不会出现。
+
+**登录窗**
+
+- 系统原生标题栏。窗口内只有狐狸、「登录」标题、飞书 / 账号分段、对应表单和按钮。
+- 使用工作台同一套颜色、字号和控件。不再复用查询条的玻璃外观。
+
 ### 颜色（浅白玻璃 + 内部工具）
+
+> 本小节下面关于 Dashboard 的颜色、玻璃侧栏和 blur 规则已被上一节取代，只保留 Float Query 部分。
 
 ```css
 --glass: rgba(250, 252, 255, 0.88);
@@ -49,7 +126,7 @@
 ```
 
 - Float Query：使用 Query 专属语义 token，接近 macOS 搜索面板的轻透与清晰层级，不声称或照抄 Spotlight 精确 opacity。浅色起点为 `rgba(248, 249, 252, .80)` 主玻璃、`rgba(255, 255, 255, .48)` 内层、白色 highlight hairline、`blur(28px) saturate(118%)`，阴影 `0 22px 58px rgba(23, 27, 38, .22)` 加 `0 2px 10px` 同色 `.10`。深色可用炭灰 `rgba(31, 30, 36, .76)`，以实际可读性为准。不引入 BrowserWindow vibrancy，不改 transparent 或窗口安全选项。`backdrop-filter` 固定采样，不得进入 transition / keyframes；打开关闭只动画 `clip-path` 与 `opacity`。`prefers-reduced-transparency` 用实色无 blur；`forced-colors` 用 Canvas / CanvasText 且无 shadow / blur。这些 token 不得让 Dashboard 或 Fox 主题漂移。
-- Dashboard：白色卡片与极浅灰画布为主，紫色控制在品牌、焦点环、选中面与必要的关键动作；风险继续使用红 / 黄 / 绿并配文字。标准 `BrowserWindow` 保持不透明，不启用 vibrancy / transparent。深色是炭黑层级（画布 / 侧栏 / 卡片），不是纯黑或简单反相。仅 sidebar 是固定玻璃层：light 最终视觉约 `#f2f2f6..#f5f5f8`，dark 约 `#121116..#17161c`，与 main 的平均 RGB 差至少约 9；静态 `blur(20px)` + saturate、单一中性 hairline 和极轻顶部高光。右侧 `dashboard-main` 明确不透明：light 纯白 `#fff`，dark 不透明炭黑约 `#1c1b20`，alpha=1 且无 blur。只有固定 sidebar 和短时 popover / tooltip 可使用 `backdrop-filter`；顶栏、滚动中的筛选 / 工具区、卡片、图表与表格禁止 blur。resize / phase 期间 blur 数值恒定。数据正文保持高对比实色字。`prefers-reduced-transparency` 使用同等层级实色；`forced-colors` 使用 Canvas / CanvasText 且无 blur。禁止紫色渐变、霓虹发光、漂浮卡片墙、超大圆角、重阴影和噪点。
+- **（Dashboard 玻璃侧栏与 blur 要求已作废，2026-10-24：工作台全部实色，不用 blur；紫色只做主按钮与选中行。）** Dashboard：白色卡片与极浅灰画布为主，紫色控制在品牌、焦点环、选中面与必要的关键动作；风险继续使用红 / 黄 / 绿并配文字。标准 `BrowserWindow` 保持不透明，不启用 vibrancy / transparent。深色是炭黑层级（画布 / 侧栏 / 卡片），不是纯黑或简单反相。仅 sidebar 是固定玻璃层：light 最终视觉约 `#f2f2f6..#f5f5f8`，dark 约 `#121116..#17161c`，与 main 的平均 RGB 差至少约 9；静态 `blur(20px)` + saturate、单一中性 hairline 和极轻顶部高光。右侧 `dashboard-main` 明确不透明：light 纯白 `#fff`，dark 不透明炭黑约 `#1c1b20`，alpha=1 且无 blur。只有固定 sidebar 和短时 popover / tooltip 可使用 `backdrop-filter`；顶栏、滚动中的筛选 / 工具区、卡片、图表与表格禁止 blur。resize / phase 期间 blur 数值恒定。数据正文保持高对比实色字。`prefers-reduced-transparency` 使用同等层级实色；`forced-colors` 使用 Canvas / CanvasText 且无 blur。禁止紫色渐变、霓虹发光、漂浮卡片墙、超大圆角、重阴影和噪点。
 - Dashboard 按成熟运营工具处理：工作内容居中、固定可调面板、最小但可发现的控件、稳定肌肉记忆。导航紧凑、4/8 间距，主内容留白约 20–24px，section 约 20px；矩形控件 / 面板 / 卡片 / 输入 / 选择项 / 菜单统一 `--dash-radius: 8px`（`--dash-panel-radius` 为其别名）。pill / 徽标 / 进度条可保留 999px，圆形状态点保留 50%。普通数据面板不悬浮、不堆阴影、不做卡片马赛克。hover 必须是中性灰完整高亮面；selected / active 恢复淡紫完整高亮面（浅色约紫色 8–10%，深色约 14–16%），selected icon 可使用克制紫色；pressed 比 hover 稍深，但不做 `translateY`。绝不能恢复左侧紫色竖线、inset rail 或改变图标坐标。只过渡 `background` / `color` / `border` / `opacity`，至多极小 `transform`；禁止 `blur` / `filter` / `box-shadow` 过渡，也禁止 `padding` / `margin` / `border-width` 等会改布局的属性。危险操作用红，主 CTA 保持可识别，不得被通用中性规则抹平。文本链接只做下划线 / 透明度，不强铺底。
 - 风险、过期、无命中、阻断、未接入不能只靠颜色，必须有文字。
 - 闲置狐狸：2.8–3.2 秒一轮，3–4px 浮动、约 2° 摆动、最大 scale 1.04。紫色呼吸光晕拆到独立层，在 88px native bounds 内约 76px 内层 / 84px 外层双层 radial（最多留 2px 安全），只动画 opacity（约 3.0–3.4s，`.52–.60` 到 `.92–.95`）；FoxHead 只保留很轻的静态 drop-shadow，idle keyframe 不再动画 filter。稳定贴边时狐狸以与 idle 同周期的镜像 ready motion 朝屏幕内探身：峰值约内移 3px、上抬 2px、向内倾 5°、scale 1.035，呈现跃跃欲试但不脱离半露裁切；只允许在 `.fox-head` 上动画 transform，不能动画负责裁切的 `.fox-idle` 根节点或 `.fox-head-image`，避免 Query handoff 姿态跳变。贴边与非贴边统一紫光且 dock 自然裁半，无白 glint、无白点眼、无霓虹多圈、无实色圆盘。默认主题取消闭合蓝圆；键盘焦点只由明确 keyboard focus origin / `data-fox-keyboard-focus` 显示为双耳外侧短弧紫色剪影，不得由裸 `:focus-visible` 直接画出，也不得覆盖脸或耳麦。pointerdown 同步清键盘焦点；press / drag / session / settling / handoff 全部隐藏。`forced-colors` 仍用系统 Highlight。snap / peek / retract / warning / handoff 优先于 ready motion 并暂停 halo；warning 保留黄点与黄语义轮廓、不叠紫。reduced-motion 关闭 ready motion 并保留较明显静态紫轮廓；reduced-transparency / forced-colors 关闭 aura。CSS 变量是生产 SSOT。应用 Dock / 任务栏图标使用独立 1024 master：约 896px 连续圆角近白 squircle 底板、狐狸按有效 alpha 边界光学居中并占底板约 74–76%，四角透明。
@@ -59,8 +136,7 @@
 ### 字体与尺寸
 
 - 中文使用本地系统栈：PingFang SC / Microsoft YaHei UI / Segoe UI，不引入网络字体。
-- 输入 16/24；正文 14/22；辅助信息不小于 11px。
-- 外壳圆角约 22–24px。
+- 狐狸与查询条：输入 16/24；正文 14/22；辅助信息不小于 11px；外壳圆角约 22–24px。工作台与登录窗的字号、圆角见上文「工作台与登录窗」。
 - Float 采用双窗共享元素交接：主进程一次性提交目标 `BrowserWindow` bounds，先让隐藏 Query renderer 按点击瞬间狐狸的真实屏幕中心、64px 尺寸和当前 2D 位移 / 旋转 / 缩放矩阵准备代理首帧；renderer 回执 `open-armed` 后才显示 Query、隐藏 Fox 并启动约 260ms 的外壳 `clip-path` 展开。收起约 200ms，Query 抵达代理末帧并回执后才显示 Fox、隐藏 Query。贴边时 Query 与物理工作区边缘齐平，确保半露狐狸的 32px 可见轮廓连续。定时器只作异常兜底，不作为正常完成信号；禁止逐帧原生 resize、双狐狸错位、完整面板首闪或两窗同时不可见。玻璃层只做透明度变化，不再与 `backdrop-filter` 一起缩放。检索反馈至少 280ms，结果卡依次进入。
 
 ## 4. 关键组件
@@ -109,6 +185,8 @@ FAQ 纠正回退先展示上一发布版本及全部影响范围，再由 Main �
 
 ### 当前工作台（faq-v2）
 
+> **页签列表已作废（2026-10-24）**：工作台改为七页（概览、话术库、SOP、知识库、资料、权限、账号），见[前端设计结论 §6](docs/plans/2026-10-24-frontend-design-decisions.md)。下文六页签规格只作历史记录；其中「复制只表示已复制」「不得用样例数字」等内容约束继续有效。用户可见文案「未接入」改为一句何时会有数据，「读取资格已到期」改为「登录状态需要确认，请重新登录。」
+
 这一节是 faq-v2 六个页签的唯一视觉和交互规格。下文「演示级 Dashboard」里的 KPI、整库替换、下架、系统同步四张卡和 SOP 树只属于旧 profile。顾问和实现都不得把那些旧模块画回这一节。外壳仍用同一套侧栏、48px 顶栏、折叠动效和紫色 token。不另做蓝色主题，不搬数字员工、培训、巡检或云数据向导。
 
 动效只改变透明度、颜色和背景。侧栏折叠 180–200ms，`cubic-bezier(.2,.8,.2,1)`。导航 hover 在 120–160ms 内出现整行中性灰。选中是整行淡紫，图标可以用克制的紫，不画左侧竖线，图标坐标不动。按钮 hover 只换背景。弹层用短淡入。`prefers-reduced-motion` 直接到终态。不许弹跳、发光、漂浮，也不把狐狸的浮动语言用到工作台。
@@ -143,6 +221,8 @@ FAQ 纠正回退先展示上一发布版本及全部影响范围，再由 Main �
 **禁止展示数值匹配分。** 过期与未生效内容永不进入结果。
 
 ### 演示级 Dashboard
+
+> **整节已作废（2026-10-24）**：旧 profile 的五模块、拖宽规则与主题菜单键盘细节不再约束实现。保留下方「复制不能推断发送、采纳、未修改或回答正确」一句。
 
 左侧可折叠分组导航 + 顶栏 + 内容区，键盘可访问。展开宽度可在 `216–360px` 内拖动或键盘调整，默认 `248px`；折叠采用平台化 collapsed surface（macOS integrated `120px`，Windows / Linux native `72px`），展开时恢复本次会话的上次宽度。折叠态分隔条仍可命中：向右拖从 collapsed surface 连续预览到 207，超过滞回 expand threshold（`208`，相对 collapse `192`）后先保持当前 raw 至少一个已提交布局帧，再进入既有 expanding 并约 190ms 恢复 `lastExpandedWidth`（至少 min `216`），无需 pointerup；阈值以下松手 / `pointercancel` / `lostpointercapture`（即使 `buttons===1`）/ blur / `buttons=0` 从当前 preview 平滑弹回 collapsed surface 且不误展开；回滚后分隔条公开 `aria-valuenow=平台折叠宽度`，保留 `lastExpandedWidth`，不把上次展开宽度写回 collapsed 态。键盘分隔条在折叠态：ArrowRight / Enter 展开，End 展开到 max，Home / ArrowLeft 保持 collapsed surface。拖动期间 titlebar drag 临时 no-drag，pointer 合帧，不每帧 setState，不动画 backdrop-filter / filter / box-shadow / padding / margin。图标锚点在四阶段不变（mac `nav.left+60` / native `nav.left+36`），只裁切文字；collapsing / collapsed / expanding 期间 brand copy 与 nav labels 必须 `opacity:0`，expanded 结构过渡完成后再用 100–120ms 淡入。折叠态图标在 hover / focus 时于侧栏外显示明确名称。狐狸 Logo 保持原槽位，不再叠加展开按钮。主内容只使用系统滚轮、触控滚动与原生滚动条，不把鼠标按住拖动解释为滚页。`980×680`、`1180×760` 与更大窗口下不得出现页面级横向遮挡，图表和卡片按断点重排。5 个可切换模块：
 
@@ -201,5 +281,7 @@ Owner 发布必须走冻结合同：导入校验通过后 staged，再 `POST /v1
 | 明确不做 | ZIP 资产 / 源码、全局追踪、真实 roam、双击 / 多击 accumulator、per-frame native window move、眼球追踪宣传 |
 
 ### 显式合成后端接入 profile（D2）
+
+> **整节已作废（2026-10-24）**：这是旧的查询接入剖面，与任务卡里的 D2（加载与反馈）无关，名字重复容易混淆。坐席查询的现行规则见上文「查询胶囊」「FAQ P2 合成查询」「Top 3 话术卡」。
 
 登录后的查询通过 main 获取 Top 3 原文，保留人在环和“已复制”语义。查询前手动确认平台及商品范围；无具体商品仅查全店话术。上下文控件和占位符输入位于结果区域，纳入既有 DOM 高度测量，不改变胶囊与原生窗几何合同。接入模式显示「智能检索」开关（默认 ON），不再使用「深度思考 · 预留」说明入口。接入故障显示可恢复错误，不回退本地 fixture；旧 S0 profile 保留原合成 n-gram 检索。

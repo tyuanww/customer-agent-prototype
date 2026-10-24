@@ -128,7 +128,7 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
   const onOpen = vi.fn();
   render(<IntakeOverview onOpen={onOpen} />);
   await openTodo();
-  expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
+  expect(await screen.findByText('话术不准：script-a')).toBeInTheDocument();
   expect(screen.queryByText('task-2')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '开始处理' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '已处理' })).not.toBeInTheDocument();
@@ -173,7 +173,8 @@ it('names the next step when a block has no source', async () => {
   expect(screen.getByRole('tabpanel')).toHaveTextContent('坐席查询后，排行会出现在这里。');
   expect(screen.getByText('话术使用次数').parentElement).toHaveTextContent('坐席查询后会出现');
   expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('坐席查询后会出现');
-  expect(screen.getByText('命中率').parentElement).toHaveTextContent('坐席查询后会出现');
+  // The hit rate stays off the overview until its formula is settled (DESIGN.md, Overview).
+  expect(screen.queryByText('命中率')).not.toBeInTheDocument();
   expect(screen.getByLabelText('使用趋势')).toHaveTextContent('坐席查询后，趋势会出现在这里。');
   expect(screen.getByLabelText('话术类型占比')).toHaveTextContent('坐席查询后，占比会出现在这里。');
   await openTodo();
@@ -199,7 +200,7 @@ it('shows a separate 无命中 list and no percentage', async () => {
   };
   render(<IntakeOverview onOpen={() => undefined} />);
   await openTodo();
-  expect(await screen.findByText('话术不准 · script-a')).toBeInTheDocument();
+  expect(await screen.findByText('话术不准：script-a')).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('tab', { name: '无命中排行' }));
   const misses = screen.getByRole('region', { name: '无命中' });
   expect(misses).toHaveTextContent('无命中');
@@ -235,7 +236,7 @@ it('knowledge that is not yet effective or already 已失效 shows a separate re
   expect(reminder).not.toHaveTextContent('不准');
   await openTodo();
   const iteration = screen.getByRole('table', { name: '话术迭代' });
-  expect(iteration).toHaveTextContent('话术不准 · script-a');
+  expect(iteration).toHaveTextContent('话术不准：script-a');
   expect(iteration).not.toHaveTextContent('退货运费什么时候到');
   expect(iteration).not.toHaveTextContent('旧包装说明');
 });
@@ -358,7 +359,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
   await openTodo();
   await screen.findByText('处理中');
   expect(screen.getByRole('button', { name: '暂不处理' })).toBeDisabled();
-  await user.type(screen.getByRole('textbox', { name: '处理说明 话术不准 · script-a' }), '先观察');
+  await user.type(screen.getByRole('textbox', { name: '处理说明 话术不准：script-a' }), '先观察');
   expect(screen.getByRole('button', { name: '暂不处理' })).toBeEnabled();
   await user.click(screen.getByRole('button', { name: '暂不处理' }));
   expect(close).toHaveBeenCalledWith({
@@ -413,7 +414,7 @@ it('computes overview figures from the usage rows and still leaves SOP unwired',
   expect(useTile).toHaveTextContent('2');
   expect(useTile).not.toHaveTextContent('较上期');
   expect(screen.getByText('无命中次数').parentElement).toHaveTextContent('2');
-  expect(screen.getByText('命中率').parentElement).toHaveTextContent('50.0%');
+  expect(screen.queryByText('命中率')).not.toBeInTheDocument();
   expect(screen.getByRole('img', { name: '使用趋势图' })).toHaveTextContent(localMonthDay(copiedAt));
   expect(screen.getByLabelText('话术类型占比')).toHaveTextContent('这些记录还分不出话术类型。');
   const user = userEvent.setup();

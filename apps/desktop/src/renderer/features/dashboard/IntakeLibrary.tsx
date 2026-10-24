@@ -6,6 +6,7 @@ import { formatIntakeDay, formatSeatClock, remainingLabel, timeoutUntil } from '
 import { IntakeUsageLog } from './IntakeUsageLog';
 import './intake-management.css';
 import './workbench-v9.css';
+import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
 
 const RISK_LEVEL_LABEL = {
   low: '风险低', medium: '风险中', high: '风险高',
@@ -46,7 +47,7 @@ function Conditions({ label, options, selected, disabled, change }: {
 }) {
   const [search, setSearch] = useState('');
   const matches = options.filter(option => option.label.includes(search.trim()) || option.id.includes(search.trim()));
-  return <details className="intake-catalog-conditions"><summary>{label} · {selected.length ? `已选 ${selected.length}` : '通用'}</summary>
+  return <details className="intake-catalog-conditions"><summary>{label}<span className="cond-value">{selected.length ? `已选 ${selected.length}` : '通用'}</span></summary>
     <fieldset disabled={disabled}><legend className="sr-only">目录{label}条件</legend>
       <label>查找{label}<Input aria-label={`目录查找${label}`} value={search} onChange={e => setSearch(e.target.value)} /></label>
       <LibraryButton disabled={!selected.length} onClick={() => change([])}>清除{label}条件</LibraryButton>
@@ -93,7 +94,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
     if (!api) return;
     const off=api.onInvalidated(() => {
       generation.current++; pending.current=null; deadline.current=0; setView(null); setBusy(false);
-      setError('会话或读取资格已变化，请重新读取可用资料。');
+      setError('登录状态已变化，请刷新可用资料。');
       // current projects Main memory; it cannot silently acquire a new snapshot.
       void apply();
     });
@@ -106,7 +107,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
     return timeoutUntil(() => {
       generation.current++; pending.current=null; deadline.current=0; setBusy(false);
       setView(current => current ? {...current,rows:[],releaseId:null,validUntil:null} : null);
-      setError('读取资格已到期，请刷新可用资料。');
+      setError('登录状态需要确认，请刷新可用资料。');
     },Date.now()+Math.max(0,remaining));
   },[view?.validUntil]);
   useEffect(() => {
@@ -140,12 +141,12 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
       const risk = riskCopy(row.riskNote);
       return <>
         <span className="intake-answer">{row.answerText}</span>
-        {(row.applicabilityNote || risk) && <span className="cell-sub">{row.applicabilityNote ? <>适用说明：{row.applicabilityNote}</> : null}{row.applicabilityNote && risk ? ' · ' : null}{risk}</span>}
+        {(row.applicabilityNote || risk) && <span className="cell-sub">{row.applicabilityNote ? <>适用说明：{row.applicabilityNote}</> : null}{row.applicabilityNote && risk ? '；' : null}{risk}</span>}
       </>;
     } },
     { title: '状态', key: 'state', width: 110, render: (_value: unknown, row) => { const state = entryState(row); return <span className="state"><i className={`dot${state.dot}`} />{state.label}</span>; } },
     { title: '生效时间', key: 'effective', width: 130, render: (_value: unknown, row) => <span title={`条目版本 ${row.scriptVersion}`}>{formatIntakeDay(row.effectiveFrom)}
-      <span className="desk-sr">生效 {formatSeatClock(row.effectiveFrom)}{row.effectiveTo ? ` · 失效 ${formatSeatClock(row.effectiveTo)}` : ''} · 条目版本 {row.scriptVersion}</span></span> },
+      <span className="desk-sr">生效 {formatSeatClock(row.effectiveFrom)}{row.effectiveTo ? `，失效 ${formatSeatClock(row.effectiveTo)}` : ''}，条目版本 {row.scriptVersion}</span></span> },
   ];
   return <div hidden={!active}>
     <section className="dash-module intake-management intake-library wb9" aria-label={active==='announce' ? '当前可用版本' : '可用话术目录'}>
@@ -170,8 +171,8 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
         <Conditions label="场景" options={context.scenarios} selected={context.scenarioIds} disabled={disabled}
           change={scenarioIds => void apply({action:'select-conditions',productIds:context.productIds,scenarioIds})}/>
       </div>}
-      {error && <p role="alert">{error}</p>}
-      {disabled && <p role="status">正在读取可用资料…</p>}
+      {error && <WorkbenchFailed message={error} onRetry={disabled ? undefined : () => void apply({action:'refresh'})} />}
+      {disabled && !fresh ? <WorkbenchLoading rows={6} label="正在读取可用资料" /> : null}
       {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
       {!disabled && view?.signedIn && !context?.shopId && <p>请选择有权查看的店铺；没有可用店铺时请核对身份与范围。</p>}
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}

@@ -1,5 +1,5 @@
 import { createElement, useEffect, useState, type ComponentType, type KeyboardEvent } from 'react';
-import { Button, DatePicker, Empty, Input, Segmented, Select, Space, Table, type TableProps } from 'antd';
+import { Button, DatePicker, Input, Segmented, Select, Space, Table, type TableProps } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import dateZhCN from 'antd/es/date-picker/locale/zh_CN';
@@ -10,7 +10,7 @@ import {
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
 import type { DashboardWordingResult } from '@shared/dashboard-wording';
-import { inaccuracyScriptIdFromTask } from '@shared/inaccuracy-todo';
+import { aggregateInaccuracyTodoCounts, inaccuracyScriptIdFromTask, INACCURACY_TODO_COPY } from '@shared/inaccuracy-todo';
 import {
   decideIterationClose,
   type CloseHintCatalog,
@@ -25,6 +25,7 @@ import { aggregateUsage, rankMissRows, rankUsageRows, trendFromUsage, type Usage
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
 import './workbench-v9.css';
+import { WorkbenchLoading } from './WorkbenchState';
 
 dayjs.locale('zh-cn');
 
@@ -44,6 +45,7 @@ const CAUSE_OPTIONS = [
 
 const LOGIN_TODO = '请先登录后再查看待办。';
 const AFTER_QUERY = '坐席查询后会出现';
+const USAGE_FAILED = '没读到使用记录。';
 const TREND_EMPTY = '坐席查询后，趋势会出现在这里。';
 const SHARE_EMPTY = '坐席查询后，占比会出现在这里。';
 const SHARE_UNTYPED = '这些记录还分不出话术类型。';
@@ -64,7 +66,7 @@ const TYPE_OPTIONS = ['', '产品', '活动', '售前', '售后'].map((type) => 
   value: type,
 }));
 
-type OverviewPanel = 'usage' | 'sop' | 'miss' | 'expire' | 'todo';
+type OverviewPanel = 'usage' | 'sop' | 'miss' | 'expire' | 'todo' | 'inaccuracy';
 
 type UsageTableRow = {
   key: string;
@@ -92,6 +94,15 @@ type TodoTableRow = {
   task: DashboardIterationTask;
 };
 
+type InaccuracyTableRow = {
+  key: string;
+  rank: number;
+  scriptId: string;
+  sampleCount: number;
+  latest: string;
+  openTaskCount: number;
+};
+
 function statusLabel(status: DashboardIterationTask['status']): string {
   if (status === 'open') return '待处理';
   if (status === 'in_progress') return '处理中';
@@ -111,6 +122,7 @@ const OVERVIEW_PANELS: ReadonlyArray<{ id: OverviewPanel; label: string }> = [
   { id: 'miss', label: '无命中排行' },
   { id: 'expire', label: '话术过期提醒' },
   { id: 'todo', label: '迭代待办' },
+  { id: 'inaccuracy', label: '不准的话术' },
 ];
 
 function recentWindow(days: number, now = new Date()): DayWindow {
@@ -160,11 +172,13 @@ function seatMessage(message: string): string {
 
 function todoTitle(task: DashboardIterationTask): string {
   const scriptId = inaccuracyScriptIdFromTask(task);
-  return scriptId ? `话术不准 · ${scriptId}` : iterationMatterLabel(task.clusterKey);
+  return scriptId ? `话术不准：${scriptId}` : iterationMatterLabel(task.clusterKey);
 }
 
+/** Empty panels say what makes data appear, as one line of quiet text. No illustration: the
+ *  panel's own space already reads as empty, and a picture adds weight without information. */
 function OverviewEmpty({ description }: { description: string }) {
-  return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
+  return <p className="ov-empty">{description}</p>;
 }
 
 function tabLabel(label: string, count: number | null) {
@@ -472,12 +486,33 @@ export function IntakeOverview({
       : null;
   const missCount = liveMisses ? liveMisses.length : sampleHeadline ? V9_MISS.length : null;
   const todoRows: TodoTableRow[] = (tasks === null ? [] : openTasks).map((task) => ({ key: task.taskId, task }));
+  // aggregateInaccuracyTodoCounts only sees scriptId/sampleQueryIds/status (the narrow shape two
+  // legacy modules also depend on); "最近一次" needs each task's own createdAt, so it's read off
+  // the full task list here rather than widening that shared aggregator's contract for one panel.
+  const inaccuracyRows: InaccuracyTableRow[] = tasks === null ? [] : (() => {
+    const latestByScript = new Map<string, string>();
+    for (const task of tasks) {
+      const scriptId = inaccuracyScriptIdFromTask(task);
+      if (scriptId === null) continue;
+      const current = latestByScript.get(scriptId);
+      if (!current || task.createdAt > current) latestByScript.set(scriptId, task.createdAt);
+    }
+    return aggregateInaccuracyTodoCounts(tasks).map((row, index) => ({
+      key: row.scriptId,
+      rank: index + 1,
+      scriptId: row.scriptId,
+      sampleCount: row.sampleCount,
+      openTaskCount: row.openTaskCount,
+      latest: formatShortTime(latestByScript.get(row.scriptId) ?? ''),
+    }));
+  })();
   const panelCounts: Record<OverviewPanel, number | null> = {
     usage: usageCount,
     sop: null,
     miss: missCount,
     expire: reminders.length,
     todo: openTasks.length,
+    inaccuracy: tasks === null ? null : inaccuracyRows.length,
   };
 
   function supplyScript(question: string) {
@@ -488,6 +523,11 @@ export function IntakeOverview({
       onClick={() => { if (onSupplyScript) onSupplyScript(question); else onOpen('content'); }}
     >补充话术</Button>;
   }
+
+  // One short line under an empty count. The tile stays silent once a real number is shown.
+  const tileNote = headline || usageState === 'signed-out'
+    ? null
+    : <span className="t-sub">{usageState === 'failed' ? USAGE_FAILED : AFTER_QUERY}</span>;
 
   return <section className="dash-module intake-management intake-overview wb9" data-testid="module-overview">
     <h1 className="desk-sr">概览</h1>
@@ -517,28 +557,23 @@ export function IntakeOverview({
       />
     </div>
     <div className="tiles">
-      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{headline?.use ?? '—'}</b>{sampleHeadline ? <span className="t-sub up">较上期 ↑ 8%</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
-      <div className="tile"><span className="t-lbl">无命中次数</span><b>{headline?.miss ?? '—'}</b>{sampleHeadline ? <span className="t-sub down">较上期 ↓ 5%</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
-      <div className="tile"><span className="t-lbl">命中率</span><b>{headline?.rate ?? '—'}</b>{sampleHeadline ? <span className="t-sub up">较上期 ↑ 1.2 个百分点</span> : null}{headline || usageState === 'signed-out' ? null : <span className="t-sub">{usageState === 'failed' ? '使用记录没读到。刷新页面后再看。' : AFTER_QUERY}</span>}</div>
-      <div className="tile"><span className="t-lbl">待办</span><b>{openTasks.length}</b><Button type="text" onClick={() => setPanel('todo')}>去处理</Button></div>
+      <div className="tile"><span className="t-lbl">话术使用次数</span><b>{headline?.use ?? '—'}</b>{tileNote}</div>
+      <div className="tile"><span className="t-lbl">无命中次数</span><b>{headline?.miss ?? '—'}</b>{tileNote}</div>
+      <div className="tile"><span className="t-lbl">待办</span><b>{openTasks.length}</b><Button type="link" className="tile-action" onClick={() => setPanel('todo')}>去处理</Button></div>
     </div>
     <div className="charts">
       <div className="card" aria-label="使用趋势">
-        <div className="card-head"><h3>使用趋势</h3><span className="legend"><i style={{ background: 'var(--chart-use)' }} />使用<i style={{ background: 'var(--chart-miss)' }} />无命中</span></div>
-        <div className="chart-wrap">{usageState === 'signed-out'
+        <div className="card-head"><h3>使用趋势</h3>{liveTrend && liveTrend.length > 0 || sampleHeadline ? <span className="legend"><i style={{ background: 'var(--chart-use)' }} />使用<i style={{ background: 'var(--chart-miss)' }} />无命中</span> : null}</div>
+        <div className="chart-wrap">{usageState === 'loading'
+          ? <WorkbenchLoading rows={3} label="正在读取使用趋势" />
+          : usageState === 'signed-out'
           ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.signedOut}</p>
           : usageState === 'unmounted'
           ? <p data-testid="overview-usage-status">{WORKBENCH_EMPTY.usageUnmounted}</p>
           : liveTrend && liveTrend.length > 0
           ? <TrendLines points={liveTrend} />
           : usageState === 'empty'
-            ? <div data-testid="usage-trend-empty">
-              <svg viewBox="0 0 640 188" role="img" aria-label="暂无使用记录">
-                <rect x="0.5" y="0.5" width="639" height="187" fill="none" stroke="currentColor" strokeOpacity="0.12" />
-                <line x1="28" y1="142" x2="628" y2="142" stroke="currentColor" strokeOpacity="0.2" />
-              </svg>
-              <p>{WORKBENCH_EMPTY.usageEmpty}</p>
-            </div>
+            ? <div data-testid="usage-trend-empty" role="img" aria-label="暂无使用记录"><OverviewEmpty description={WORKBENCH_EMPTY.usageEmpty} /></div>
           : sampleHeadline
             ? <svg viewBox="0 0 600 222" dangerouslySetInnerHTML={{ __html: sampleDays ? v9Trend(sampleDays) : '' }} />
             : <OverviewEmpty description={TREND_EMPTY} />}</div>
@@ -633,7 +668,7 @@ export function IntakeOverview({
                     render: (total: number, row) => <div className="cnt"><b>{total}</b>{row.bar === undefined ? null : <i style={{ width: `${row.bar}%` }} />}</div>,
                   },
                   {
-                    title: usageView === 'script' ? `${spanLabel(span)} · 使用人` : '最常用话术',
+                    title: usageView === 'script' ? `${spanLabel(span)}使用人` : '最常用话术',
                     dataIndex: 'extra',
                     render: (extra: string, row) => row.trend
                       ? <div className="trend"><svg viewBox="0 0 76 20" className={row.trend.up ? '' : 'down'} aria-label="近7天趋势"><polyline points={row.trend.points} /></svg><span className="who">{extra}</span></div>
@@ -647,7 +682,7 @@ export function IntakeOverview({
                   },
                 ]}
               />
-              {usage ? <div className="pager"><span>共 {usage.count} 条{usageView === 'person' ? ` · ${usage.people} 位人员` : ''}</span><span className="grow" />
+              {usage ? <div className="pager"><span>共 {usage.count} 条{usageView === 'person' ? `，${usage.people} 位人员` : ''}</span><span className="grow" />
                 <Button disabled={usage.page === 0} onClick={() => setUsagePage(usage.page - 1)}>上一页</Button>
                 <span>{usage.page + 1} / {usage.pages}</span>
                 <Button disabled={usage.page >= usage.pages - 1} onClick={() => setUsagePage(usage.page + 1)}>下一页</Button></div> : null}
@@ -749,6 +784,38 @@ export function IntakeOverview({
                 },
               ]}
             /> : null}
+      {panel === 'inaccuracy' ? <section className="pn" aria-label={INACCURACY_TODO_COPY.heading}>
+              <h2 className="desk-sr">{INACCURACY_TODO_COPY.heading}</h2>
+              <A11yTable<InaccuracyTableRow>
+                aria-label={INACCURACY_TODO_COPY.heading}
+                pagination={false}
+                rowKey="key"
+                dataSource={inaccuracyRows}
+                locale={{ emptyText: <OverviewEmpty description={tasks === null ? message : INACCURACY_TODO_COPY.empty} /> }}
+                columns={[
+                  {
+                    title: '排名',
+                    dataIndex: 'rank',
+                    render: (rank: number) => <span className={rank <= 3 ? 'rk top' : 'rk'}>{rank}</span>,
+                  },
+                  { title: '话术', dataIndex: 'scriptId' },
+                  {
+                    title: '被点次数',
+                    dataIndex: 'sampleCount',
+                    render: (count: number) => <div className="cnt warn"><b>{count}</b></div>,
+                  },
+                  { title: '最近一次', dataIndex: 'latest', render: (latest: string) => <span className="mute">{latest}</span> },
+                  {
+                    title: '',
+                    key: 'act',
+                    render: (_value, row) => row.openTaskCount > 0
+                      ? <Button type="text" onClick={() => setPanel('todo')}>去处理</Button>
+                      : <span className="mute">已处理</span>,
+                  },
+                ]}
+              />
+              <p className="mute">{INACCURACY_TODO_COPY.footnoteLive}</p>
+            </section> : null}
       </div>
     </div>
     {message && tasks !== null ? <p role="status">{message}</p> : null}

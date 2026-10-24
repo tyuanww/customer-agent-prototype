@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Alert, Button, Form, Input } from 'antd';
 import { FoxHead } from './components/FoxHead';
 import type { LoginAudience, LoginChooserState } from '@shared/login-window';
+import { IntakeAntdTheme } from './features/dashboard/intake-antd';
+import './styles/radix-palette.css';
+import './styles/workbench-tokens.css';
 import './styles/login.css';
 
 function readChooserState(search = window.location.search): LoginChooserState {
@@ -8,6 +12,9 @@ function readChooserState(search = window.location.search): LoginChooserState {
   return value === 'loading' || value === 'waiting' || value === 'failed' || value === 'cancelled' ? value : 'entry';
 }
 
+/** The login window: a native-titled system window with the workbench look. It chooses between
+ *  Feishu (opens the system browser) and an administrator-issued account. Success is the session
+ *  exchange, owned by the login preload; this view only reflects it. */
 export function LoginApp() {
   const [audience, setAudience] = useState<LoginAudience>('feishu');
   const [state, setState] = useState<LoginChooserState>(readChooserState);
@@ -17,6 +24,7 @@ export function LoginApp() {
   const [accountUnavailable, setAccountUnavailable] = useState(false);
   const [failKind, setFailKind] = useState<'start' | 'open' | null>(null);
   const busy = state === 'loading' || state === 'waiting';
+  const cancel = () => void window.loginWindow?.cancel();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -52,85 +60,85 @@ export function LoginApp() {
 
   const failedCopy = failKind === 'start' ? '无法开始登录。' : '无法打开浏览器，请重试。';
 
-  return (
-    <div className="login-window">
-      <header className="login-header">
-        <FoxHead size={40} />
-        <div className="login-titles">
-          <h1 className="login-title">登录</h1>
-          <p className="login-subtitle">身份验证后返回查询</p>
+  let body;
+  if (state === 'loading') {
+    body = <>
+      <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开浏览器…'}</p>
+      <div className="login-actions"><Button onClick={cancel}>取消</Button></div>
+    </>;
+  } else if (state === 'waiting') {
+    body = <>
+      <p className="login-copy">正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。</p>
+      <div className="login-actions"><Button onClick={cancel}>取消</Button></div>
+    </>;
+  } else if (state === 'failed') {
+    body = <>
+      <p className="login-copy is-error" role="alert">{failedCopy}</p>
+      <div className="login-actions">
+        <Button type="primary" onClick={() => void chooseFeishu()}>重试</Button>
+        <Button onClick={cancel}>取消</Button>
+      </div>
+    </>;
+  } else if (state === 'cancelled') {
+    body = <>
+      <p className="login-copy">已取消登录。</p>
+      <div className="login-actions">
+        <Button type="primary" autoFocus onClick={() => { setState('entry'); setAudience('feishu'); setFailKind(null); }}>重新登录</Button>
+      </div>
+    </>;
+  } else {
+    body = <>
+      <div className="login-segmented" role="group" aria-label="登录方式">
+        {/* A two-option toggle with an aria-pressed contract; styled to match antd. */}
+        {(['feishu', 'account'] as const).map((value) => <button // eslint-disable-line no-restricted-syntax
+          key={value}
+          type="button"
+          className="login-segment"
+          aria-pressed={audience === value}
+          disabled={busy}
+          onClick={() => { setAudience(value); setInvalid(false); }}
+        >{value === 'feishu' ? '飞书' : '账号'}</button>)}
+      </div>
+      {audience === 'feishu' ? <>
+        <p className="login-copy">将用浏览器打开飞书登录。</p>
+        <div className="login-actions">
+          <Button type="primary" autoFocus disabled={busy} onClick={() => void chooseFeishu()}>飞书登录</Button>
+          <Button disabled={busy} onClick={cancel}>取消</Button>
         </div>
-      </header>
-
-      {state === 'loading' ? (
-        <>
-          <p className="login-copy">{audience === 'account' ? '正在验证账号…' : '正在打开浏览器…'}</p>
+      </> : (
+        <Form layout="vertical" requiredMark={false} component={false}>
+          <form className="login-form" onSubmit={(event) => { event.preventDefault(); void submitAccount(); }}>
+          {invalid ? <Alert type="error" showIcon={false} role="alert" message="账号或密码不正确，请重试。" /> : null}
+          {accountUnavailable ? <Alert type="error" showIcon={false} role="alert" message="账号登录暂时不可用，请改用飞书或联系管理员。" /> : null}
+          <Form.Item label="账号" htmlFor="login-username">
+            <Input id="login-username" name="username" autoComplete="username" value={username} disabled={busy}
+              onChange={(event) => { setUsername(event.target.value); setInvalid(false); }} />
+          </Form.Item>
+          <Form.Item label="密码" htmlFor="login-password">
+            <Input.Password id="login-password" name="password" autoComplete="current-password" value={password} disabled={busy}
+              visibilityToggle={false}
+              onChange={(event) => { setPassword(event.target.value); setInvalid(false); }} />
+          </Form.Item>
           <div className="login-actions">
-            <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
+            <Button type="primary" htmlType="submit" disabled={busy}>登录</Button>
+            <Button disabled={busy} onClick={cancel}>取消</Button>
           </div>
-        </>
-      ) : state === 'waiting' ? (
-        <>
-          <p className="login-copy">正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。</p>
-          <div className="login-actions">
-            <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
-          </div>
-        </>
-      ) : state === 'failed' ? (
-        <>
-          <p className="login-copy" style={{ color: 'var(--danger)' }}>{failedCopy}</p>
-          <div className="login-actions">
-            <button type="button" className="login-primary" onClick={() => void chooseFeishu()}>重试</button>
-            <button type="button" className="login-cancel" onClick={() => void window.loginWindow?.cancel()}>取消</button>
-          </div>
-        </>
-      ) : state === 'cancelled' ? (
-        <>
-          <p className="login-copy">已取消登录。</p>
-          <div className="login-actions">
-            <button type="button" className="login-primary" autoFocus onClick={() => { setState('entry'); setAudience('feishu'); setFailKind(null); }}>重新登录</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="login-audience" role="group" aria-label="登录方式">
-            <button type="button" className="login-segment" aria-pressed={audience === 'feishu'} disabled={busy}
-              onClick={() => { setAudience('feishu'); setInvalid(false); }}>飞书</button>
-            <button type="button" className="login-segment" aria-pressed={audience === 'account'} disabled={busy}
-              onClick={() => { setAudience('account'); setInvalid(false); }}>账号</button>
-          </div>
-          {audience === 'feishu' ? (
-            <>
-              <p className="login-copy">将用浏览器打开飞书登录。</p>
-              <div className="login-actions">
-                <button type="button" className="login-primary" autoFocus disabled={busy} onClick={() => void chooseFeishu()}>飞书登录</button>
-                <button type="button" className="login-cancel" disabled={busy} onClick={() => void window.loginWindow?.cancel()}>取消</button>
-              </div>
-            </>
-          ) : (
-            <form className="login-form" onSubmit={(event) => { event.preventDefault(); void submitAccount(); }}>
-              <p className="login-copy">使用管理员下发的账号登录。</p>
-              {invalid ? <p className="login-error" role="alert">账号或密码不正确，请重试。</p> : null}
-              {accountUnavailable ? <p className="login-error" role="alert">账号登录暂时不可用，请改用飞书或联系管理员。</p> : null}
-              <label className="login-field">
-                <span>账号</span>
-                <input name="username" autoComplete="username" value={username} disabled={busy}
-                  onChange={(event) => { setUsername(event.target.value); setInvalid(false); }} />
-              </label>
-              <label className="login-field">
-                <span>密码</span>
-                <input name="password" type="password" autoComplete="current-password" value={password} disabled={busy}
-                  onChange={(event) => { setPassword(event.target.value); setInvalid(false); }} />
-              </label>
-              <div className="login-actions">
-                <button type="submit" className="login-primary" disabled={busy}>登录</button>
-                <button type="button" className="login-cancel" disabled={busy} onClick={() => void window.loginWindow?.cancel()}>取消</button>
-              </div>
-              <p className="login-hint">没有账号或忘记密码？请联系管理员。</p>
-            </form>
-          )}
-        </>
+          <p className="login-hint">没有账号或忘记密码？请联系管理员。</p>
+          </form>
+        </Form>
       )}
-    </div>
+    </>;
+  }
+
+  return (
+    <IntakeAntdTheme>
+      <div className="login-window">
+        <header className="login-header">
+          <FoxHead size={32} />
+          <h1 className="login-title">登录</h1>
+        </header>
+        {body}
+      </div>
+    </IntakeAntdTheme>
   );
 }

@@ -118,7 +118,7 @@ it('legacy candidates show read-only history and cannot bypass an explicit revis
     expect(screen.queryByRole('button', { name: '刷新审批结果' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
     await f.user.click(screen.getByRole('button', { name: '读取历史审批' }));
-    await screen.findByText(/组织审批已通过 · 审批编号 synthetic-history/);
+    await screen.findByText(/组织审批已通过，审批编号 synthetic-history/);
     expect(f.data.candidate.publicationPolicy).toBe('approval-v1');
     expect(f.data.candidate.approvalEvidenceVersion).toBe(1);
   } finally { f.main.dispose(); }
@@ -183,7 +183,7 @@ it('explains candidate readiness and risk without exposing internal codes or pro
     expect(screen.getByText(/待确认来源版本 \/ 待组织审批通过 \/ 还有待核验事项，请刷新候选状态/)).toBeInTheDocument();
     expect(screen.queryByText(/SOURCE_CONFIRMATION_REQUIRED|constructor|NEW_REASON/)).not.toBeInTheDocument();
     await f.user.click(screen.getByRole('button', { name: '查看材料' }));
-    expect(await screen.findByText(/风险等级：常规内容/)).toBeInTheDocument();
+    expect(await screen.findByText('常规内容')).toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
 
@@ -212,12 +212,12 @@ it.each(['revise', 'cancel-candidate'] as const)('requires explicit confirmation
     await f.user.click(within(again.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '确认' }));
     expect(f.command).toHaveBeenLastCalledWith({ action });
     if (action === 'revise') {
-      await screen.findByText(/正在准备修订：candidate-a · 原版本 1/);
+      await screen.findByText(/正在准备修订：candidate-a，原版本 1/);
       expect(screen.queryByRole('region', { name: '当前候选' })).not.toBeInTheDocument();
       expect(screen.getByRole('combobox', { name: '上传来源' })).toBeDisabled();
       expect(screen.getByRole('button', { name: '放弃本地修订' })).toBeEnabled();
     } else {
-      await screen.findByText(/已取消 · 此版本不再接受修改或发布/);
+      await screen.findByText(/已取消：此版本不再接受修改或发布/);
       expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
     }
@@ -311,7 +311,7 @@ it('opens the materials page as a candidate table and expands only the current s
   try {
     expect(await screen.findByRole('columnheader', { name: '名称' })).toBeInTheDocument();
     expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['名称', '范围', '状态', '下一步', '时间']);
-    expect(screen.getByRole('cell', { name: '该店铺 · 产品' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '该店铺 / 产品' })).toBeInTheDocument();
     const candidateFilter = screen.getByRole('radiogroup', { name: '候选筛选' });
     expect(within(candidateFilter).getByRole('radio', { name: '待我处理' })).toBeChecked();
     expect(within(candidateFilter).getByRole('radio', { name: '已发布' })).toBeInTheDocument();
@@ -340,7 +340,7 @@ it('opens the materials page as a candidate table and expands only the current s
     // server-side handle, and the reviewer already sees the full answer text.
     expect(open.getByText('faq-a', { selector: 'code' })).toBeInTheDocument();
     expect(open.getByRole('combobox', { name: '来源版本类型' }).tagName).not.toBe('SELECT');
-    expect(open.getByText(/风险等级：常规内容/)).toBeInTheDocument();
+    expect(open.getByText('常规内容')).toBeInTheDocument();
     expect(open.getByRole('button', { name: '下一页材料' })).not.toHaveClass('ant-btn-primary');
     expect(open.getAllByRole('button').filter(button => button.classList.contains('ant-btn-primary')).map(button => button.textContent)).toEqual(['确认来源版本']);
   } finally { f.main.dispose(); }
@@ -368,7 +368,7 @@ it('shows publishing as its status and does not offer a material check', async (
   f.data.candidate.state = 'publishing';
   render(<IntakeManagement />);
   try {
-    expect(await screen.findByRole('cell', { name: '该店铺 · 产品' })).toBeInTheDocument();
+    expect(await screen.findByRole('cell', { name: '该店铺 / 产品' })).toBeInTheDocument();
     expect(screen.getAllByRole('cell', { name: '发布中' })).toHaveLength(2);
     expect(screen.queryByRole('cell', { name: '核对材料' })).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: '质量检查' })).not.toBeInTheDocument();

@@ -13,10 +13,19 @@ import type { UsageLogRow } from '../../src/shared/dashboard-usage-log';
 import { observeSessionJob } from '../../src/shared/product-session';
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// The workbench surface is Radix mauve-1 in each theme (styles/radix-palette.css). jsdom does
+// not resolve custom properties: a computed background reads the token itself, or transparent
+// where the rule sits behind a selector jsdom cannot match (`:has`), letting the surface behind
+// show through. A real engine resolves mauve-1; the e2e specs cover that.
+const SURFACE_LIGHT = ['var(--wb-surface)', 'rgba(0, 0, 0, 0)', 'rgb(253, 252, 253)'];
+const SURFACE_DARK = ['var(--wb-surface)', 'rgba(0, 0, 0, 0)', 'rgb(18, 17, 19)'];
+function expectSurface(element: Element, theme: 'light' | 'dark') {
+  expect(theme === 'light' ? SURFACE_LIGHT : SURFACE_DARK).toContain(getComputedStyle(element).backgroundColor);
+}
 
 function expectSeatFontSize(element: HTMLElement) {
   const size = getComputedStyle(element).fontSize;
-  expect(size === '14px' || size.startsWith('var(--ant-'), `${element.textContent} font size`).toBe(true);
+  expect(size === '14px' || size === 'var(--wb-text-body)' || size.startsWith('var(--ant-'), `${element.textContent} font size`).toBe(true);
 }
 
 function expectSeatFontWeight(element: HTMLElement, weight: '500' | '600') {
@@ -52,6 +61,9 @@ function installShippedDashboardCss() {
     'src/renderer/styles/dashboard.css',
     'src/renderer/features/dashboard/workbench-v9.css',
     'src/renderer/features/dashboard/desk-chrome.css',
+    'src/renderer/styles/radix-palette.css',
+    'src/renderer/styles/workbench-tokens.css',
+    'src/renderer/styles/workbench-shell.css',
   ]) {
     const node = document.createElement('style');
     node.id = `shipped-${file.split('/').pop()}`;
@@ -129,8 +141,8 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   if (!(knowledge instanceof HTMLElement) || !(column instanceof HTMLElement) || !(knowledge.parentElement instanceof HTMLElement)) {
     throw new Error('missing knowledge page');
   }
-  expect(getComputedStyle(content).backgroundColor).toBe('rgb(255, 255, 255)');
-  expect(getComputedStyle(knowledge.parentElement).backgroundColor).toBe('rgb(255, 255, 255)');
+  expectSurface(content, 'light');
+  expectSurface(knowledge.parentElement, 'light');
   expect(getComputedStyle(column).maxWidth).toBe('none');
   expectSeatFontSize(write);
   expectSeatFontWeight(write, '600');
@@ -161,12 +173,12 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     const permissionsColumn = document.querySelector('.desk-permissions');
     if (!(permissionsPage instanceof HTMLElement) || !(permissionsColumn instanceof HTMLElement)) throw new Error('missing permissions page');
     const content = screen.getByTestId('dashboard-content');
-    expect(getComputedStyle(content).backgroundColor).toBe('rgb(255, 255, 255)');
-    expect(getComputedStyle(permissionsPage).backgroundColor).toBe('rgb(255, 255, 255)');
+    expectSurface(content, 'light');
+    expectSurface(permissionsPage, 'light');
     expect(getComputedStyle(permissionsPage).minHeight).toBe('100%');
     expect(getComputedStyle(permissionsPage).maxWidth).not.toBe('1000px');
     expect(getComputedStyle(permissionsColumn).maxWidth).toBe('1000px');
-    expect(getComputedStyle(permissionsColumn).backgroundColor).toBe('rgb(255, 255, 255)');
+    expectSurface(permissionsColumn, 'light');
     await screen.findAllByRole('row',{name:/合成坐席/});
     await user.click(screen.getByRole('button',{name:'新增授权'}));
     const person = owner.view().people[0]!;
@@ -176,9 +188,9 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     await user.type(screen.getByLabelText('生效时间'), '2026-10-08 18:00{Enter}');
     await user.click(screen.getByLabelText('失效时间'));
     await user.type(screen.getByLabelText('失效时间'), '2026-10-09 18:00{Enter}');
-    await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览 · 尚未保存');
+    await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览，尚未保存');
     await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-permissions'));
-    expect(screen.getByText('预览 · 尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
+    expect(screen.getByText('预览，尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
     await user.click(screen.getByRole('button',{name:'返回修改'}));expect(screen.getByRole('textbox',{name:'授权原因'})).toHaveValue('合成导航保留');
   }finally{cleanup();owner.dispose();}
 }, 20000);
@@ -212,7 +224,7 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
       await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
       expect(shell).toHaveAttribute('data-theme', theme);
       if (theme === 'dark') {
-        await waitFor(() => expect(getComputedStyle(content).backgroundColor).toBe('rgb(22, 21, 26)'));
+        await waitFor(() => expectSurface(content, 'dark'));
       }
       for (const page of pages) {
         await user.click(screen.getByTestId(`nav-${page}`));
@@ -289,7 +301,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
       await user.click(screen.getByTestId('dashboard-theme-trigger'));
       await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
       expect(shell).toHaveAttribute('data-theme', theme);
-      if (theme === 'dark') await waitFor(() => expect(getComputedStyle(content).backgroundColor).toBe('rgb(22, 21, 26)'));
+      if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
 
       await user.click(screen.getByTestId('nav-content'));
       const add = await screen.findByRole('button', { name: '添加话术' });
@@ -344,7 +356,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     await user.type(screen.getByLabelText('失效时间'), '2026-10-09 10:00{Enter}');
     await user.type(screen.getByRole('textbox', { name: '授权原因' }), '焦点撤销');
     await user.click(screen.getByRole('button', { name: '预览权限' }));
-    await screen.findByText('预览 · 尚未保存');
+    await screen.findByText('预览，尚未保存');
     expect(owner.view().grants).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: '确认保存权限' }));
     await screen.findByText(/本次操作已保存/);

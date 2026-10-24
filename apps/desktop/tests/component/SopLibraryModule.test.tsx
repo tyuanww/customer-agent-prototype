@@ -247,10 +247,11 @@ describe('SopLibraryModule', () => {
       softwareOpenDownload: vi.fn(),
     };
     const { unmount } = render(<SopLibraryModule />);
+    // A catalog failure is said once, in the empty state, not repeated in the status line.
     await waitFor(() => {
-      expect(screen.getByTestId('sop-write-status')).toHaveTextContent('当前角色不能执行这个操作');
+      expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('当前角色不能执行这个操作');
     });
-    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('当前角色不能执行这个操作');
+    expect(screen.queryByTestId('sop-write-status')).toBeNull();
     expect(screen.getByTestId('sop-library-empty')).not.toHaveTextContent('未接入');
     expect(screen.getByTestId('sop-library-empty')).not.toHaveTextContent('请先登录后再管理 SOP。');
     unmount();
@@ -269,7 +270,7 @@ describe('SopLibraryModule', () => {
     };
     render(<SopLibraryModule />);
     await waitFor(() => {
-      expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('当前没有 SOP 步骤。');
+      expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('还没有 SOP 步骤。');
       expect(screen.getByTestId('sop-library-empty')).not.toHaveTextContent('未接入');
     });
   });

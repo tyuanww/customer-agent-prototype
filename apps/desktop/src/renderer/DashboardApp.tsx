@@ -4,7 +4,8 @@ import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule'
 import { AnnounceModule } from './features/dashboard/AnnounceModule';
 import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
 import { IntakePermissions } from './features/dashboard/IntakePermissions';
-import { PERMISSION_DENIAL_MESSAGE, type SessionJobView } from '../shared/product-session';
+import { type SessionJobView } from '../shared/product-session';
+import { accessBlock } from '../shared/workbench-access';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
 import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
@@ -71,6 +72,9 @@ import {
 import './styles/dashboard.css';
 import './features/dashboard/workbench-v9.css';
 import './features/dashboard/desk-chrome.css';
+import './styles/radix-palette.css';
+import './styles/workbench-tokens.css';
+import './styles/workbench-shell.css';
 
 type SidebarDestination = DashboardModuleId | 'permissions' | 'materials' | 'publish';
 
@@ -81,24 +85,47 @@ type SidebarItem = {
   blurb?: string;
 };
 
-function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
-  if (!canOpenPermissions) return DASHBOARD_NAV;
+/** One row per extra sidebar item, in display order, anchored to the `DASHBOARD_NAV` item it
+ *  follows. `shownFor` is the only place that decides whether a profile/permission combination
+ *  sees it — adding a destination never touches the two consumers below, only this table. */
+type SidebarExtraItem = {
+  afterId: DashboardModuleId;
+  item: SidebarItem;
+  shownFor: (profile: 'legacy' | 'intake', canOpenPermissions: boolean) => boolean;
+};
+
+const SIDEBAR_EXTRA_ITEMS: readonly SidebarExtraItem[] = [
+  {
+    afterId: 'content',
+    item: { id: 'publish', label: '内容管理', group: '治理与架构' },
+    shownFor: (profile) => profile === 'intake',
+  },
+  {
+    afterId: 'content',
+    item: { id: 'permissions', label: '权限', group: '治理与架构' },
+    shownFor: (_profile, canOpenPermissions) => canOpenPermissions,
+  },
+];
+
+/** `intake` also appends 资料管理 after every other item, with no anchor to splice after. */
+const SIDEBAR_TRAILING_ITEM: SidebarItem = { id: 'materials', label: '资料管理', group: '治理与架构' };
+
+function sidebarItemsFor(profile: 'legacy' | 'intake', canOpenPermissions: boolean): readonly SidebarItem[] {
   const items: SidebarItem[] = [];
   for (const item of DASHBOARD_NAV) {
     items.push(item);
-    if (item.id === 'content') items.push({ id: 'permissions', label: '权限', group: '治理与架构' });
+    for (const extra of SIDEBAR_EXTRA_ITEMS) {
+      if (extra.afterId === item.id && extra.shownFor(profile, canOpenPermissions)) items.push(extra.item);
+    }
   }
+  if (profile === 'intake') items.push(SIDEBAR_TRAILING_ITEM);
   return items;
 }
 
-function intakeSidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
-  const items: SidebarItem[] = [];
-  for (const item of sidebarItems(canOpenPermissions)) {
-    items.push(item);
-    if (item.id === 'content') items.push({ id: 'publish', label: '内容管理', group: '治理与架构' });
-  }
-  items.push({ id: 'materials', label: '资料管理', group: '治理与架构' });
-  return items;
+/** Groups are separated by space, not by a heading: the group names are internal structure and
+ *  tell the person using the page nothing the item labels do not. */
+function lastGroupIndex(item: SidebarItem, items: readonly SidebarItem[]): number {
+  return items.findIndex((candidate) => candidate.group === item.group);
 }
 
 function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
@@ -157,8 +184,8 @@ function sopUploadControl(
  * mounts business modules or subscribes to its session API. */
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => {
-    if (profile === 'intake' && item.id === 'content') return { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' };
+  const navItems = sidebarItemsFor(profile, canOpenPermissions).map((item) => {
+    if (profile === 'intake' && item.id === 'content') return { ...item, label: '知识库' };
     if (profile === 'intake' && item.id === 'overview') return { ...item, label: '概览', blurb: item.blurb };
     return item;
   });
@@ -191,11 +218,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     && sessionJob.rights.grant === true;
   const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
-  const grantBlock = !jobKnown
-    ? ''
-    : sessionJob?.status === 'resolved'
-      ? (sessionJob.rights.grant ? '' : PERMISSION_DENIAL_MESSAGE)
-      : '请重新登录后再查看职务。';
+  // Display only: which ability is missing and whom to ask. The grant button itself still
+  // follows canGrant, and the server checks every write.
+  const grantAccess = jobKnown ? accessBlock('grant', contentSignedIn, sessionJob) : null;
   const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
   const [keepContent, setKeepContent] = useState(false);
   const [keepPublish, setKeepPublish] = useState(false);
@@ -1237,7 +1262,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             lastGroup = item.group;
             return (
               <div className="dashboard-nav-item" key={item.id}>
-                {showGroup ? <p className="dashboard-nav-group">{item.group}</p> : null}
+                {showGroup && lastGroupIndex(item, navItems) > 0 ? <span className="dashboard-nav-gap" aria-hidden="true" /> : null}
                 <button
                   id={`dash-nav-${item.id}`}
                   type="button"
@@ -1361,7 +1386,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           <div className="dashboard-page-context">
             {profile === 'intake' ? <p className="intake-crumb">
               {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
-              <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
+              <strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
             {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
             <p className="dashboard-refresh" data-testid="dashboard-refresh">
               {profile === 'intake' ? '' : refreshLabel}
@@ -1396,7 +1421,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
               <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
             </div>
           ) : null}
-          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantBlock={grantBlock} /></div> : null}
+          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantAccess={grantAccess} /></div> : null}
           {active === 'materials' ? <IntakeManagement /> : null}
         </main>
       </div>

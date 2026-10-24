@@ -3,6 +3,7 @@ import { parseContractSchema, type components } from '@customer-agent/contracts'
 import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView, type IntakeRollbackCommand } from '../shared/content-intake-management';
 import { isIntakeUploadCommand } from '../shared/content-intake-upload';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
+import { joinDisplayParts } from '../shared/display-separator';
 import { ContentIntakeUpload } from './content-intake-upload';
 import { loadIntakeAccess, type IntakeAccess } from './content-intake-access';
 import { ContentIntakeRollback } from './content-intake-rollback';
@@ -28,7 +29,7 @@ function scopeLabel(sources: IntakeAccess['sources'], sourceId: string): string 
   const source = sources.find(item => item.scope.sourceId === sourceId);
   if (!source) return '—';
   const domain = DOMAIN_LABEL[source.scope.domain];
-  return `${source.scope.shopId ?? '品牌通用'} · ${domain}`;
+  return joinDisplayParts([source.scope.shopId ?? '品牌通用', domain]);
 }
 const isRollback = (command: IntakeManagementCommand): command is IntakeRollbackCommand => command.action.startsWith('rollback-');
 const sameKey = (a: C['IntakeCandidateKey'], b: C['IntakeCandidateKey']) => a.candidateId === b.candidateId && a.version === b.version && a.digest === b.digest;

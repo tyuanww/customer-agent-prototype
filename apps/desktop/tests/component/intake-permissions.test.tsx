@@ -60,13 +60,13 @@ it('selects a post, previews that post through the existing command, then saves 
   await user.click(screen.getByLabelText('失效时间'));
   await user.type(screen.getByLabelText('失效时间'), '2026-10-09 10:00{Enter}');
   await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成任务');await user.click(screen.getByRole('button',{name:'预览权限'}));
-  await screen.findByText('预览 · 尚未保存');expect(f.grants).toHaveLength(0);
+  await screen.findByText('预览，尚未保存');expect(f.grants).toHaveLength(0);
   expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').map(request=>(request.body as {items:{action:string}[]}).items.map(item=>item.action))).toEqual([[...supervisor.actions]]);
   expect(f.requests.some(request=>request.path.includes('password') || request.path.includes('account'))).toBe(false);
   await user.click(screen.getByRole('button',{name:'返回修改'}));
   await pick(user,/^岗位$/,'客服');
   await user.click(screen.getByRole('button',{name:'预览权限'}));
-  await screen.findByText('预览 · 尚未保存');expect(f.grants).toHaveLength(0);
+  await screen.findByText('预览，尚未保存');expect(f.grants).toHaveLength(0);
   const displayedPeriod='2026-10-08 10:00 至 2026-10-09 10:00';
   expect(screen.getByRole('region',{name:'权限预览'})).toHaveTextContent(displayedPeriod);
   expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').at(-1)).toMatchObject({body:{items:[{
@@ -237,11 +237,11 @@ it('keeps an unsaved permission preview open when discard fails',async()=>{
  const user=userEvent.setup();
  render(<IntakePermissions canGrant active/>);
  await user.click(await screen.findByRole('button',{name:'新增授权'}));
- const dialog=screen.getByRole('dialog',{name:'预览 · 尚未保存'});
+ const dialog=screen.getByRole('dialog',{name:'预览，尚未保存'});
  await user.click(within(dialog).getByRole('button',{name:'关闭'}));
  expect(commands).toContain('discard');
  expect(commands).not.toContain('save');
- expect(screen.getByRole('dialog',{name:'预览 · 尚未保存'})).toHaveTextContent('这次没有放弃预览。');
+ expect(screen.getByRole('dialog',{name:'预览，尚未保存'})).toHaveTextContent('这次没有放弃预览。');
 });
 
 it('hides 新增授权 when the server publish bit is false', async () => {
@@ -250,6 +250,19 @@ it('hides 新增授权 when the server publish bit is false', async () => {
   render(<IntakePermissions canGrant={false} grantBlock="没有权限，请找人开通。" active />);
   expect(await screen.findByRole('status')).toHaveTextContent('没有权限，请找人开通。');
   expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
+});
+
+it('names the missing ability and the role to ask, and still hides the grant button', async () => {
+  const view = { signedIn: true, available: true, busy: false, validUntil: null, sources: [{ selection: 'scope-1', label: '合成范围' }], source: 'scope-1', people: [], actions: ['query' as const], grants: [], preview: null, pending: false, resultUnknown: false, notice: null };
+  window.dashboardPermissions = { current: async () => ({ ok: true, view }), command: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
+  render(<IntakePermissions canGrant={false} grantAccess={{ need: '给他人开通权限', ask: '你的经理' }} active />);
+  const block = await screen.findByTestId('workbench-no-access');
+  expect(block).toHaveTextContent('你还不能给他人开通权限');
+  expect(block).toHaveTextContent('请联系你的经理开通。');
+  expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
+  // The block is shown on the grant tab only; the seat tab has its own controls.
+  await userEvent.setup().click(screen.getByRole('tab', { name: '外包坐席' }));
+  expect(screen.queryByTestId('workbench-no-access')).toBeNull();
 });
 
 it('does not say the read window expired when no countdown is running',async()=>{

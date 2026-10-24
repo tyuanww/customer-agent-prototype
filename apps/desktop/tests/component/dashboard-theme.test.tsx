@@ -38,7 +38,9 @@ describe('dashboard theme', () => {
     expect(workbench).not.toContain('system-ui');
     expect(workbench).not.toContain('#1d1b26');
     expect(intakeManagement).not.toContain('system-ui');
-    expect(workbench).toContain('#24212a');
-    expect(workbench).toContain('#6f4cc3');
+    // Colour now comes only from the Radix palette, never a literal in a component sheet.
+    expect(workbench).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(intakeManagement).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(deskChrome).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 });

@@ -40,7 +40,7 @@ it('shows entry dates and the read deadline in the same local time zone with an 
  vi.stubEnv('TZ','America/New_York');vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-01-15T14:59:00Z'));
  const f=setup(),view=data();view.rows[0]!.effectiveFrom='2026-01-15T15:00:00Z';view.rows[0]!.effectiveTo='2026-01-15T16:00:00Z';
  f.command.mockResolvedValueOnce({ok:true,view});const {rerender}=render(<IntakeLibrary active="wording"/>);
- expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026-01-15 10:00 · 失效 2026-01-15 11:00');
+ expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026-01-15 10:00，失效 2026-01-15 11:00');
  expect(screen.getByRole('row',{name:/合成标题 product/})).not.toHaveTextContent('UTC');
  rerender(<IntakeLibrary active="announce"/>);
  expect(screen.getByRole('status')).toHaveTextContent('当前可用 4 条，到 2026-01-15 还能查。');
@@ -98,7 +98,7 @@ it('browses four scoped domains and shares the same complete read with the avail
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active="wording"/>);
  await screen.findByText('合成原文 product');
- await user.click(screen.getByText('商品 · 通用'));
+ await user.click(screen.getByText('商品'));
  await user.click(screen.getByRole('checkbox',{name:'合成商品'}));
  expect(f.command).toHaveBeenLastCalledWith({action:'select-conditions',productIds:['product-a'],scenarioIds:[]});
  expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
@@ -142,7 +142,7 @@ it('withdraws expired content even while hidden and lets names expire separately
  expect(screen.getByRole('combobox',{name:'目录店铺'}).closest('.ant-select')).not.toHaveTextContent('合成同名店');
  expect(screen.getByText('合成原文 product')).toBeVisible();
  rerender(<IntakeLibrary active={null}/>);await act(async()=>{vi.advanceTimersByTime(100);});rerender(<IntakeLibrary active="wording"/>);
- expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('读取资格已到期');
+ expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('登录状态需要确认');
 });
 it('does not start directory I/O before visiting either consumer',async()=>{
  const f=setup();const {rerender}=render(<IntakeLibrary active={null}/>);expect(f.command).not.toHaveBeenCalled();

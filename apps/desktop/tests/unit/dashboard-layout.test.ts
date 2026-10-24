@@ -10,6 +10,7 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const css = readFileSync(path.join(root, 'src/renderer/styles/dashboard.css'), 'utf8');
+const workbenchTokens = readFileSync(path.join(root, 'src/renderer/styles/workbench-tokens.css'), 'utf8');
 const app = [
   readFileSync(path.join(root, 'src/renderer/DashboardApp.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/components/DashboardBrandFox.tsx'), 'utf8'),
@@ -44,17 +45,9 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('--dash-panel-radius: var(--dash-radius)');
     expect(css).toContain('--dash-radius-pill: 999px');
     expect(css).toContain('--dash-radius-dot: 50%');
-    expect(css).toContain('--dash-surface: light-dark(#ffffff, #1c1b20)');
-    expect(css).toContain('--dash-canvas: light-dark(#f4f4f6, #16151a)');
-    expect(css).toContain('--dash-sidebar-material: light-dark(rgba(228, 227, 234, 0.94), rgba(12, 11, 16, 0.94))');
-    expect(css).toContain('--dash-material-chrome: light-dark(rgba(242, 242, 246, 0.88), rgba(16, 15, 20, 0.88))');
-    expect(css).toContain('--dash-material-panel: light-dark(#ffffff, #1c1b20)');
-    expect(css).toContain('--dash-chrome-hover: light-dark(rgba(36, 33, 42, 0.055), rgba(255, 255, 255, 0.065))');
-    expect(css).toContain('--dash-chrome-selected: light-dark(rgba(111, 76, 195, 0.10), rgba(167, 139, 250, 0.16))');
-    expect(css).toContain('--dash-nav-active: var(--dash-chrome-selected)');
-    expect(css).toContain('--dash-purple: light-dark(#6f4cc3, #a78bfa)');
-    expect(css).toContain('--dash-control-line: light-dark(#8e8797, #8f8798)');
-    expect(css).toContain('--dash-heat-ink-4: light-dark(#21152f, #15121a)');
+    // Colour values live only in radix-palette.css; dashboard.css reads semantic tokens.
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(css).not.toMatch(/rgba?\(/);
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='light']");
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='dark']");
     expect(css).not.toMatch(/background:\s*linear-gradient/);
@@ -68,7 +61,7 @@ describe('dashboard layout contract', () => {
     expect(css).not.toContain('.overview-action-strip');
     expect(css).not.toContain('.overview-action-card');
     expect(css).toContain('.dashboard-shell button.dash-reset');
-    expect(css).toContain('font-size: 14px');
+    expect(css).toContain('font-size:var(--wb-text-body)');
     expect(css).toContain('font-weight: 600');
   });
 
@@ -250,7 +243,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('--dash-panel-radius: var(--dash-radius)');
     expect(css).toContain('border-radius: var(--dash-panel-radius)');
     const cardRule = css.match(/\.dash-card,\s*\n\.arch-card\s*\{([^}]*)\}/)?.[1] ?? '';
-    expect(cardRule).toContain('border: 1px solid var(--dash-line)');
+    expect(cardRule).toContain('border: var(--wb-hair) solid var(--dash-line)');
     expect(cardRule).toContain('background: var(--dash-material-panel)');
     expect(cardRule).toContain('box-shadow: inset 0 1px 0 var(--dash-highlight)');
     expect(cardRule).not.toMatch(/box-shadow:\s*0\s+\d+px/);
@@ -282,8 +275,7 @@ describe('dashboard layout contract', () => {
     expect(glassSupportRule).not.toMatch(/\.dashboard-topbar[\s\S]*?backdrop-filter/);
     expect(glassSupportRule).not.toContain('.dashboard-nav-toggle.is-expand-overlay::before');
     expect(css).toContain('.dashboard-main {');
-    expect(css).toContain('background: #ffffff');
-    expect(css).toContain('background: #1c1b20');
+    expect(css).toMatch(/\.dashboard-main \{[^}]*background: var\(--wb-surface\)/);
     expect(css).toContain('@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))');
     expect(css).toMatch(/@supports not[\s\S]*?\.dashboard-nav\s*\{/);
     expect(css).toContain('@media (prefers-reduced-transparency: reduce)');
@@ -389,11 +381,12 @@ describe('dashboard layout contract', () => {
     expect(app).toContain('viewBox="0 0 24 24"');
     const navLabelRule = css.match(/\.dashboard-nav-label\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(navLabelRule).toContain('margin-inline-start: var(--dash-nav-label-shift)');
-    expect(navLabelRule).toContain('transition: opacity 90ms ease');
+    expect(navLabelRule).toContain('transition: opacity var(--wb-motion) var(--wb-ease)');
     expect(navLabelRule).not.toMatch(/transition:[^;]*margin/);
     expect(css).toContain(".dashboard-shell[data-nav-resizing='true']");
     expect(css).toContain(".dashboard-shell[data-nav-resizing='true'] .dashboard-nav-label,");
     expect(css).toContain('--dash-motion-structure: 190ms');
+    expect(workbenchTokens).toContain('--dash-motion-structure: var(--wb-motion)');
     expect(css).toContain('--dash-ease-structure: cubic-bezier(0.2, 0.8, 0.2, 1)');
     expect(css).toContain('.dashboard-nav-resizer');
     expect(css).toContain('cursor: col-resize');
@@ -445,7 +438,7 @@ describe('dashboard layout contract', () => {
     expect(css).not.toContain('dashboard-nav-toggle__bar');
     expect(css).not.toContain('Uiverse');
     expect(css).toContain('color: var(--dash-muted)');
-    expect(css).toContain('border: 1px solid var(--dash-control-line)');
+    expect(css).toContain('border: var(--wb-hair) solid var(--dash-control-line)');
     expect(css).toContain('color: var(--dash-heat-ink-4)');
   });
 
@@ -476,10 +469,8 @@ describe('dashboard layout contract', () => {
     expect(app).not.toMatch(/localStorage|sessionStorage|indexedDB|customerAgent/);
     expect(css).toContain('color-scheme: inherit');
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-shell :is(button");
-    expect(css).toContain('--dash-ink: #24212a');
-    expect(css).toContain('--dash-ink: #f5f3f7');
-    expect(css).toContain('--dash-disabled-bg: #f5f3f6');
-    expect(css).toContain('--dash-disabled-bg: #27242a');
+    expect(workbenchTokens).toContain('--dash-ink: var(--wb-text)');
+    expect(workbenchTokens).toContain('--dash-disabled-bg: var(--wb-subtle)');
     expect(css).toContain('min-width: 40px');
     expect(css).toContain('min-height: 40px');
     expect(css).toContain('border-radius: var(--dash-radius-pill)');

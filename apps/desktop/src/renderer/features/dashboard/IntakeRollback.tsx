@@ -2,6 +2,7 @@ import { Button, type ButtonProps } from 'antd';
 import { useEffect } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView } from '@shared/content-intake-management';
 import { formatSeatClock } from './intake-time';
+import { joinDisplayParts } from '@shared/display-separator';
 
 function ActionButton(props: ButtonProps) {
   return <Button autoInsertSpace={false} {...props} />;
@@ -32,14 +33,14 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
       {impact && <>
         <p>当前版</p>
         <p>上一版</p>
-        <h3>{impact.requiresCorrectiveCandidate ? '有权查看的影响范围' : '全部受影响范围'}</h3><ul>{impact.scopes.map((scope, index) => <li key={index}>品牌 {scope.brandId} · {scope.shopId ? `店铺 ${scope.shopId}` : '品牌通用'} · 来源 {scope.sourceId ?? '未指定'}</li>)}</ul>
+        <h3>{impact.requiresCorrectiveCandidate ? '有权查看的影响范围' : '全部受影响范围'}</h3><ul>{impact.scopes.map((scope, index) => <li key={index}>{joinDisplayParts([`品牌 ${scope.brandId}`, scope.shopId ? `店铺 ${scope.shopId}` : '品牌通用', `来源 ${scope.sourceId ?? '未指定'}`])}</li>)}</ul>
         {impact.requiresCorrectiveCandidate ? <div className="intake-notice"><h3>需要提交纠正候选</h3><p>影响超出当前授权范围，列表不包含无权查看的来源，不能据此执行整库回退。请在有权范围内上传完整纠正稿，重新校验、检查与确认发布。</p>
           <ActionButton disabled={disabled} onClick={() => { apply({ action: 'rollback-correct' }); }}>返回上传纠正稿</ActionButton></div> : <>
           {rollback.hasReview && <div className="intake-toolbar"><p>这是历史审批计划，仅可查看记录。请关闭后重新查看回退影响。</p>
             <ActionButton disabled={disabled} onClick={() => apply({ action: 'rollback-read-review' })}>读取历史回退审批</ActionButton>
           </div>}
-          {review && <div role="status"><p>{labels[review.state]}{review.instanceCode ? ` · 审批编号 ${review.instanceCode}` : ''}</p>
-            <p>最近核验：{review.checkedAt ? formatSeatClock(review.checkedAt) : '尚未核验'} · 有效至：{review.validUntil ? formatSeatClock(review.validUntil) : '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
+          {review && <div role="status"><p>{labels[review.state]}{review.instanceCode ? `，审批编号 ${review.instanceCode}` : ''}</p>
+            <p>最近核验：{review.checkedAt ? formatSeatClock(review.checkedAt) : '尚未核验'}，有效至：{review.validUntil ? formatSeatClock(review.validUntil) : '尚无有效核验'}</p></div>}
         </>}
         <div className="intake-toolbar">
           {!impact.requiresCorrectiveCandidate && <ActionButton danger disabled={disabled || !rollback.canExecute}

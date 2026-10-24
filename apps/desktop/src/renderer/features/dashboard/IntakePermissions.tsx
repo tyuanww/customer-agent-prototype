@@ -8,6 +8,8 @@ import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@sh
 import { formatSeatClock, timeoutUntil } from './intake-time';
 import { IntakeAntdTheme } from './intake-antd';
 import { SeatDateTime } from './seat-date-time';
+import { WorkbenchFailed, WorkbenchNoAccess, WorkbenchUncertain } from './WorkbenchState';
+import type { AccessBlock } from '@shared/workbench-access';
 
 function DeskButton(props: ButtonProps) {
   return <Button {...props} autoInsertSpace={false} />;
@@ -144,7 +146,15 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     </Modal>
   </section>;
 }
-export function IntakePermissions({ active, canGrant = false, grantBlock = '' }: { active: boolean; canGrant?: boolean; grantBlock?: string }) {
+/** `grantAccess` is the display decision for the grant button, computed by the shell from the
+ *  session job. `grantBlock` is the older single-sentence form, still accepted from callers that
+ *  have not moved to the structured block. Neither decides access: the server still checks. */
+export function IntakePermissions({ active, canGrant = false, grantBlock = '', grantAccess = null }: {
+  active: boolean;
+  canGrant?: boolean;
+  grantBlock?: string;
+  grantAccess?: AccessBlock | null;
+}) {
   const [view,setView]=useState<IntakePermissionView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
@@ -219,13 +229,17 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '' }:
   ];
   return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="权限配置">
     <h1 className="desk-sr">权限配置</h1>
-    {error && !grantOpen && <p role="alert">{error}</p>}{view?.notice && <p role="status">{view.notice}</p>}
-    {view?.pending && <div className="funnel" style={{marginTop:0,marginBottom:12}}><p className="fn-note" style={{margin:'0 0 12px'}}>{view.resultUnknown?'授权结果可能已提交。请按原请求确认，不要重复新建授权。若现在关闭窗口或退出，本机原请求会丢失；请由有权人员核对授权列表。':'正在确认授权结果；请勿重复新建授权。'}</p><DeskButton disabled={busy} onClick={()=>void apply({action:'retry'})}>按原请求确认结果</DeskButton></div>}
+    {error && !grantOpen && <WorkbenchFailed message={error} onRetry={disabled ? undefined : ()=>void apply({action:'refresh'})} retryLabel="刷新权限列表" />}{view?.notice && <p role="status">{view.notice}</p>}
+    {view?.pending && <WorkbenchUncertain
+      message={view.resultUnknown ? '不确定授权是否已保存。请按原请求确认，不要重新开通；关闭窗口会丢失这次请求。' : '正在确认授权结果，请勿重复开通。'}
+      checkLabel="按原请求确认结果"
+      disabled={busy}
+      onCheck={()=>void apply({action:'retry'})} />}
     {!view?.available && <div className="toolbar" style={{marginBottom:12}}><div className="left">
       <DeskButton disabled={disabled || !!view?.preview} onClick={()=>void apply({action:'refresh'})}>刷新权限列表</DeskButton>
       {(busy || view?.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}</div></div>}
     {view && !view.signedIn && <p>请先登录。</p>}
-    {view?.signedIn && !view.available && !view.pending && <p>{eligibilityEnded ? '读取资格已到期。请刷新权限列表。' : '请刷新权限列表。'}</p>}
+    {view?.signedIn && !view.available && !view.pending && <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p>}
     {view?.available && <>
       <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="权限工作">
         <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>业务授权</DeskButton>
@@ -240,7 +254,8 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '' }:
             : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建坐席</DeskButton>}
         </span>
       </div>
-      {grantBlock ? <p role="status">{grantBlock}</p> : null}
+      {job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
+        : grantBlock ? <p role="status">{grantBlock}</p> : null}
       <div hidden={job!=='grants'}>
         <div className="sub"><label className="lbl" htmlFor="permissions-scope">配置范围</label>
           <Select<string> id="permissions-scope" aria-label="配置范围" style={{width:260}} disabled={disabled || !!view.preview} value={view.source ?? undefined} placeholder="请选择已有范围" virtual={false}
@@ -259,7 +274,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '' }:
           </section></div>
       </div>
       <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} createOpen={seatCreateOpen} setCreateOpen={setSeatCreateOpen} /></div>
-      <Modal open={grantOpen && view !== null} title={view?.preview ? '预览 · 尚未保存' : '新增业务权限'} width={520} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeGrant}>
+      <Modal open={grantOpen && view !== null} title={view?.preview ? '预览，尚未保存' : '新增业务权限'} width={520} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeGrant}>
           {error ? <p role="alert">{error}</p> : null}
           {view && !view.preview ? <>
             <fieldset className="fields" disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}>
@@ -276,7 +291,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '' }:
               <DeskButton type="primary" disabled={disabled || !person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
                 onClick={previewPost}>预览权限</DeskButton></footer>
           </> : view?.preview ? <section aria-label="权限预览">
-            <p>{view.preview.person} · {view.preview.scope}</p>
+            <p>{view.preview.person}<span className="mute">{view.preview.scope}</span></p>
             <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatSeatClock(view.preview.startsAt)} 至 {formatSeatClock(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
             <footer><DeskButton disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</DeskButton>
               <DeskButton type="primary" disabled={disabled} onClick={()=>void apply({action:'save'}).then((ok)=>{if(ok)setGrantOpen(false);})}>确认保存权限</DeskButton></footer>

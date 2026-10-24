@@ -9,6 +9,7 @@ import {
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
 import './intake-management.css';
+import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
 
 const RESULT_FILTERS: ReadonlyArray<{ id: UsageLogResult | ''; label: string }> = [
   { id: '', label: '全部' },
@@ -143,8 +144,8 @@ export function IntakeUsageLog() {
         </>}
       </div> : null}
       {notice ? <p role="status" className="hint">{notice}</p> : null}
-      {load.kind === 'failed' ? <p role="alert">{WORKBENCH_EMPTY.usageFailed}<LogButton onClick={() => fetchPage(null, result, query.trim())}>重试</LogButton></p> : null}
-      {load.kind === 'loading' ? <p role="status">正在读取…</p> : null}
+      {load.kind === 'failed' ? <WorkbenchFailed message={WORKBENCH_EMPTY.usageFailed} onRetry={() => fetchPage(null, result, query.trim())} /> : null}
+      {load.kind === 'loading' ? <WorkbenchLoading rows={5} label="正在读取使用情况" /> : null}
       {load.kind === 'ready' ? <UsageTable
         aria-label="使用情况"
         pagination={false}

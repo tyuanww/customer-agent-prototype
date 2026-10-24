@@ -74,7 +74,9 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
       } else {
         await waitFor(() => {
           expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
-          expect(screen.getByText('没有权限，请找人开通。')).toBeInTheDocument();
+          // A5: the block names what is missing and whom to ask, not a generic denial.
+          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('你还不能给他人开通权限');
+          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('请联系你的经理开通。');
         });
       }
       await user.click(screen.getByTestId('nav-materials'));
@@ -101,7 +103,7 @@ it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh
     expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
     await user.click(screen.getByTestId('nav-permissions'));
     await waitFor(() => expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull());
-    expect(screen.getByText('请重新登录后再查看职务。')).toBeInTheDocument();
+    expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('请重新登录后再查看职务。');
   } finally {
     owner.dispose();
   }
