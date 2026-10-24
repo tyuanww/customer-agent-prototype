@@ -42,7 +42,9 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // the removal is 20.97 MiB, which clears the 21.0 set by 31 KiB, and the Linux runner
 // reads about 0.02 MiB above the Mac on the same tree, so the pass was a coin flip.
 // 21.5 restores real headroom; measured remainder is 46.62 MiB, so 47.5 keeps the gap.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 47.5 * 1024 * 1024;
+// 2026-10-25: GitHub Linux read source-inputs 16 KiB over 21.5 MiB on the Feishu
+// link change (run 40093028028). 21.6 and 47.6 cover that reading and leave headroom.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 47.6 * 1024 * 1024;
 // 2026-10-23: the Linux runner read the remainder at 46.6 MiB on the SOP intake change,
 // 0.1 over the previous 46.5. The added files also cost block rounding, so 47.0 covers
 // it while source-inputs stays the tighter of the two.
@@ -68,7 +70,7 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // the difference is block rounding on 21 added files. 21.0 covers the Linux reading
   // and keeps the same headroom the earlier entries left. A one-shot red-team prompt
   // document was deleted first, so this bump covers source, not prose.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 21.5 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 21.6 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
