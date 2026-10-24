@@ -10,13 +10,14 @@ import { IntakeUpload } from './IntakeUpload';
 import { formatSeatClock } from './intake-time';
 import './intake-management.css';
 
-function askConfirm(content: string, onOk: () => void) {
+function askConfirm(content: string, onOk: () => void, danger = false) {
   Modal.confirm({
     title: '请确认',
     content,
     okText: '确认',
     cancelText: '取消',
-    okButtonProps: { autoInsertSpace: false },
+    focusable: { autoFocusButton: 'cancel' },
+    okButtonProps: { danger, autoInsertSpace: false },
     cancelButtonProps: { autoInsertSpace: false },
     onOk,
     transitionName: '',
@@ -424,7 +425,7 @@ export function IntakeManagement() {
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
           {view.canRevise && <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。', () => void apply({ action: 'revise' }))}>修订当前候选</ActionButton>}
-          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }))}>取消当前候选</ActionButton>}
+          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }), true)}>取消当前候选</ActionButton>}
         </div>}
         <ActionButton disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</ActionButton>
         <div hidden={step?.target !== 'material'}>

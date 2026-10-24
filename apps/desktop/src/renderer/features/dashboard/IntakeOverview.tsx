@@ -47,7 +47,7 @@ const USAGE_LATER = '坐席查询后会出现';
 const USAGE_FAILED = '没读到。';
 const TODO_EMPTY = '现在没有待办。';
 const INACCURACY_EMPTY = '当前没有达到开单阈值的不准稿。';
-const USAGE_SCOPE = '这些次数只含当前登录者最近读到的查询，不是全店。';
+const USAGE_SCOPE = '查询次数、没查到和被复制只含当前登录者最近读到的查询，不是全店。不准次数不随上面的日期变化。';
 const INACCURACY_SCOPE = '只含已开待办记下的样本，不是这段时间的全部。';
 const MISS_ALL_ANSWERED = '这段时间所有查询都有结果。';
 const COPY_ONLY = '只表示复制了';
@@ -593,7 +593,7 @@ export function IntakeOverview({
               },
               { title: '话术', dataIndex: 'scriptId' },
               {
-                title: '被点次数',
+                title: '记下的样本',
                 dataIndex: 'sampleCount',
                 render: (count: number) => <div className="cnt warn"><b>{count}</b></div>,
               },

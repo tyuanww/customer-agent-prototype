@@ -52,5 +52,5 @@ export function parseInaccuracyOutcomeList(value: unknown): InaccuracyOutcomeLis
 
 export function outcomeSentence(row: InaccuracyOutcome): string {
   if (!row.ready || row.beforeCount === null || row.afterCount === null) return INACCURACY_OUTCOME_COPY.early;
-  return `处理前 ${row.beforeCount} 次，处理后 ${row.afterCount} 次。`;
+  return `处理前 ${row.windowDays} 天 ${row.beforeCount} 次，处理后 ${row.windowDays} 天 ${row.afterCount} 次。`;
 }

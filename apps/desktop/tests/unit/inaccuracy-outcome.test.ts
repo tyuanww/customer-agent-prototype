@@ -33,7 +33,7 @@ describe('inaccuracy outcome', () => {
   it('keeps a finished comparison and says both counts', () => {
     const parsed = parseInaccuracyOutcomeList({ ok: true, items: [ready] });
     expect(parsed?.items).toEqual([ready]);
-    expect(outcomeSentence(ready)).toBe('处理前 4 次，处理后 1 次。');
+    expect(outcomeSentence(ready)).toBe('处理前 7 天 4 次，处理后 7 天 1 次。');
   });
 
   it('does not compare before the after-window has elapsed', () => {
