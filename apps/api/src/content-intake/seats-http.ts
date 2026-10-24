@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import type { ProductAuthService } from '../auth-service.js';
+import type { AuthService } from '../auth-service.js';
 import { intakeHttpBoundary } from './http-boundary.js';
 import { SEAT_REASONS, SeatRefusal, type SeatService, type SeatReason } from './seats.js';
 
@@ -47,7 +47,7 @@ function seatFailure(reply: FastifyReply, reason: SeatReason, diagnosticId: stri
 const KNOWN = new Set<string>(SEAT_REASONS);
 
 export const contentIntakeSeatRoutes: FastifyPluginAsync<{
-  auth: ProductAuthService;
+  auth: AuthService;
   seats: SeatService;
   report?: (diagnosticId: string, error: unknown) => void;
 }> = async (app, { auth, seats, report }) => {

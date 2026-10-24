@@ -45,7 +45,14 @@ async function seatIsEnabled(lookup: SeatBindingEnabled | undefined, bindingId: 
 }
 
 const MAX_BODY_BYTES = 4_096;
-const ALLOWED_BINDINGS = new Set(SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId));
+type SeededBindingId = (typeof SYNTHETIC_IDENTITIES)[number]['bindingId'];
+
+function isSeededBindingId(value: string): value is SeededBindingId {
+  for (const identity of SYNTHETIC_IDENTITIES) {
+    if (identity.bindingId === value) return true;
+  }
+  return false;
+}
 const ACCOUNTS_FILE = path.join(STACK_ROOT, 'password-accounts.json');
 
 /** The authorize endpoint always grants the agent subject; /exchange picks the subject. */
@@ -151,7 +158,7 @@ export function createIdentityProvider(
             if (typeof value === 'string') code = value;
           }
         } catch { code = ''; }
-        if (ALLOWED_BINDINGS.has(code)) {
+        if (isSeededBindingId(code)) {
           send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: code }));
           return;
         }

@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { createMockAuthService } from '../src/auth-service.js';
 import { contentIntakeSeatRoutes } from '../src/content-intake/seats-http.js';
-import { createSeatService, SeatRefusal } from '../src/content-intake/seats.js';
+import { createSeatService, SeatRefusal, type SeatService } from '../src/content-intake/seats.js';
 import type { IntakePool } from '../src/content-intake/transaction.js';
 import type { SeatPasswordFile } from '../src/content-intake/seat-password-file.js';
 
@@ -74,18 +74,19 @@ describe('seat routes', () => {
   it('returns 403 on every seat route when the caller is refused, and does not pretend the write happened', async () => {
     const app = Fastify();
     const calls: string[] = [];
-    const refuse = async (name: string) => {
+    const refuse = (name: string): never => {
       calls.push(name);
       throw new SeatRefusal('SEAT_FORBIDDEN');
     };
+    const seats: SeatService = {
+      async list() { return refuse('list'); },
+      async create() { return refuse('create'); },
+      async reset() { return refuse('reset'); },
+      async disable() { return refuse('disable'); },
+    };
     await app.register(contentIntakeSeatRoutes, {
       auth: createMockAuthService(),
-      seats: {
-        list: () => refuse('list'),
-        create: () => refuse('create'),
-        reset: () => refuse('reset'),
-        disable: () => refuse('disable'),
-      },
+      seats,
     });
     const headers = { 'x-mock-user': 'user-agent', 'x-mock-role': 'agent' };
     const listed = await app.inject({ method: 'GET', url: '/v1/intake/seats', headers });
