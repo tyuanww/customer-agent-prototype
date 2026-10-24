@@ -453,7 +453,7 @@ describe('workspace hygiene', () => {
   it.each([
     { key: 'frozen-contracts', relativePath: 'contracts/upstream/frozen/input.sql', capMiB: 16 },
     { key: 'frozen-evidence', relativePath: 'evidence/qa/frozen.log', capMiB: 10.5 },
-    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 21 },
+    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 21.5 },
   ])('rejects $key growth even with unused aggregate headroom', ({ key, relativePath, capMiB }) => {
     const root = createWorkspaceFixture();
     const target = path.join(root, relativePath);
@@ -461,7 +461,7 @@ describe('workspace hygiene', () => {
     writeFileSync(target, Buffer.alloc(capMiB * 1024 * 1024 + 4096, 'x'));
 
     const result = checkWorkspaceBudget(root);
-    expect(result.remainderBudgetBytes).toBe(47 * 1024 * 1024);
+    expect(result.remainderBudgetBytes).toBe(47.5 * 1024 * 1024);
     expect(result.remainderBytes).toBeLessThan(result.remainderBudgetBytes);
     expect(result.pass).toBe(false);
     expect(result.violations).toContainEqual(expect.objectContaining({ key, budgetBytes: capMiB * 1024 * 1024 }));
