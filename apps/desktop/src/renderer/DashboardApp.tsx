@@ -116,28 +116,8 @@ function sopUploadControl(
 function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
-  const [jobKnown, setJobKnown] = useState(false);
+  const [jobKnown, setJobKnown] = useState(() => window.dashboardContent === undefined);
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
-  useEffect(() => {
-    const read = window.dashboardContent?.session;
-    if (!read) return;
-    let alive = true;
-    setJobKnown(true);
-    setSessionJob(null);
-    setContentSignedIn(null);
-    void read().then((value) => {
-      if (!alive) return;
-      setSessionJob(value.ok ? value.job ?? null : null);
-      setContentSignedIn(value.ok ? value.signedIn : false);
-      setJobKnown(true);
-    }).catch(() => {
-      if (!alive) return;
-      setSessionJob(null);
-      setContentSignedIn(false);
-      setJobKnown(true);
-    });
-    return () => { alive = false; };
-  }, []);
   const canGrant = jobKnown
     && contentSignedIn === true
     && sessionJob?.status === 'resolved'
@@ -203,7 +183,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     setBackStack((stack) => stack.slice(0, -1));
     setActive(previous);
   };
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!seatLibraryOnly) return;
     if (active !== 'wording' && active !== 'sop' && active !== 'overview') setActive('overview');
   }, [seatLibraryOnly, active]);
@@ -230,6 +210,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
       void Promise.resolve(api.session()).then((result) => {
         if (!live) return;
         const nextSignedIn = result.ok === true && result.signedIn === true;
+        setSessionJob(result.ok ? result.job ?? null : null);
+        setContentSignedIn(result.ok ? result.signedIn : false);
+        setJobKnown(true);
         setRefreshLabel(
           nextSignedIn
             ? (sessionDisplayName({
@@ -240,6 +223,9 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         );
       }).catch(() => {
         if (!live) return;
+        setSessionJob(null);
+        setContentSignedIn(false);
+        setJobKnown(true);
         setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
       });
     };
@@ -804,7 +790,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           {active === 'overview' && !seatLibraryOnly ? <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} /> : null}
           {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
           <IntakeLibrary active={active === 'wording'} />
-          {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
+          {!seatLibraryOnly && (keepContent || active === 'content') ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
           {canOpenPermissions && !seatLibraryOnly ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantAccess={grantAccess} /></div> : null}
           {active === 'materials' && !seatLibraryOnly ? <IntakeManagement /> : null}
         </main>

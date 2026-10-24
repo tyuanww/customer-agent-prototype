@@ -176,10 +176,16 @@ function isContentJob(value: unknown): boolean {
   if (!exactKeys(actions, ['query', 'import', 'publish', 'rollback'])) return false;
   const bits = actions as Record<string, unknown>;
   if (![bits.query, bits.import, bits.publish, bits.rollback].every((flag) => typeof flag === 'boolean')) return false;
-  if (job.notice !== null && job.notice !== '没有权限，请找人开通。'
-    && job.notice !== '资料资格过期了，请稍后重试。') return false;
   if (job.permission !== null && (typeof job.permission !== 'string'
     || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
+  const noticeFor = job.permission === 'expired'
+    ? '资料资格过期了，请稍后重试。'
+    : job.permission === 'pending'
+      ? '资料尚未发布，暂时没有可查询内容。发布后重新登录即可。'
+      : job.permission === 'ready' || job.permission === 'unknown' || job.permission === null
+        ? null
+        : '没有权限，请找人开通。';
+  if (job.notice !== noticeFor) return false;
   if (job.status === 'unresolved') {
     return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice', 'actions'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
@@ -192,7 +198,7 @@ function isContentJob(value: unknown): boolean {
   const expected = JOB_RIGHTS[job.title];
   return expected !== undefined
     && flags[0] === bits.publish
-    && flags[1] === bits.publish
+    && flags[1] === expected[1]
     && flags[2] === expected[2]
     && flags[3] === bits.query
     && flags[4] === (expected[4] && bits.query);
