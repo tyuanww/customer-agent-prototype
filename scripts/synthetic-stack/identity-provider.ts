@@ -6,14 +6,18 @@
  * deliberately tiny:
  *
  *   GET  /authorize?state=...&redirect_uri=...  -> 302 to the API callback
- *   POST /password {username, password}          -> {code: bindingId} (seeded subjects only)
+ *   POST /password {username, password}          -> {code: bindingId}
  *   POST /exchange {code}                        -> {provider:'synthetic', binding_id}
  *   GET  /health                                 -> liveness
  *
- * `/exchange` echoes the requested binding id only when it matches a seeded
- * synthetic subject, so a typo fails the login instead of silently creating an
- * unknown identity. No real Feishu URL, credential, token or redirect is
- * accepted, and nothing here is reachable from off-host.
+ * `/exchange` echoes the requested binding id only when it is a seeded subject
+ * or an enabled seat binding. A typo fails the login instead of silently
+ * creating an unknown identity. No real Feishu URL, credential, token or
+ * redirect is accepted, and nothing here is reachable from off-host.
+ *
+ * A seat is accepted only when the password file names `synthetic_seat_<username>`
+ * and `seatBindingEnabled` says that binding is enabled. The fixed list is
+ * unchanged. With no lookup, a seat is refused: a missing database is not a yes.
  *
  * The help page the desktop opens is served by the desktop main process itself
  * (`apps/desktop/src/main/product-help-open.ts`), so this module stays free of
@@ -23,10 +27,32 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STACK_ROOT, SYNTHETIC_IDENTITIES } from './profile.ts';
-import { isAdmittedHost, loadPasswordAccounts, passwordMatches, reloadPasswordAccounts } from './identity-admission.ts';
+import { seatBindingEnabledFromStack } from './seat-binding-lookup.ts';
+import {
+  isAdmittedHost, isSeatBindingId, loadPasswordAccounts, passwordMatches,
+  reloadPasswordAccounts, seatBindingIdFor, type SeatBindingEnabled,
+} from './identity-admission.ts';
+
+export type { SeatBindingEnabled };
+
+async function seatIsEnabled(lookup: SeatBindingEnabled | undefined, bindingId: string): Promise<boolean> {
+  if (!lookup || !isSeatBindingId(bindingId)) return false;
+  try {
+    return await lookup(bindingId) === true;
+  } catch {
+    return false;
+  }
+}
 
 const MAX_BODY_BYTES = 4_096;
-const ALLOWED_BINDINGS = new Set(SYNTHETIC_IDENTITIES.map((identity) => identity.bindingId));
+type SeededBindingId = (typeof SYNTHETIC_IDENTITIES)[number]['bindingId'];
+
+function isSeededBindingId(value: string): value is SeededBindingId {
+  for (const identity of SYNTHETIC_IDENTITIES) {
+    if (identity.bindingId === value) return true;
+  }
+  return false;
+}
 const ACCOUNTS_FILE = path.join(STACK_ROOT, 'password-accounts.json');
 
 /** The authorize endpoint always grants the agent subject; /exchange picks the subject. */
@@ -52,7 +78,11 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 export function createIdentityProvider(
-  { port, accountsFile = ACCOUNTS_FILE }: Readonly<{ port: number; accountsFile?: string }>,
+  { port, accountsFile = ACCOUNTS_FILE, seatBindingEnabled }: Readonly<{
+    port: number;
+    accountsFile?: string;
+    seatBindingEnabled?: SeatBindingEnabled;
+  }>,
 ) {
   // Startup still requires a usable file, and still has no built-in password.
   // Each /password reads the file again so a reset is visible without a restart.
@@ -94,15 +124,25 @@ export function createIdentityProvider(
         const accounts = reloadPasswordAccounts(accountsFile);
         if (!accounts) { send(response, 503, '{"error":"accounts_unavailable"}'); return; }
         const identity = SYNTHETIC_IDENTITIES.find((item) => item.bindingId === username);
-        // Verify against the account file. The old code compared the submitted
-        // password to a module constant, which granted any seeded subject — including
-        // owner — to anyone who knew that string. Seeded subjects stay the only
-        // names this process will exchange; a new seat is not added here.
-        const account = identity === undefined ? undefined : accounts.get(username);
-        if (!identity || !account || !passwordMatches(account, password)) {
+        // The password is the file, not a module constant. The old constant let
+        // anyone who knew it in as owner.
+        if (identity) {
+          const account = accounts.get(username);
+          if (!account || !passwordMatches(account, password)) {
+            send(response, 401, '{"error":"invalid_credentials"}'); return;
+          }
+          send(response, 200, JSON.stringify({ code: identity.bindingId }));
+          return;
+        }
+        const seatBinding = seatBindingIdFor(username);
+        const account = accounts.get(username);
+        if (!seatBinding || !account || account.bindingId !== seatBinding || !passwordMatches(account, password)) {
           send(response, 401, '{"error":"invalid_credentials"}'); return;
         }
-        send(response, 200, JSON.stringify({ code: identity.bindingId }));
+        void seatIsEnabled(seatBindingEnabled, seatBinding).then((enabled) => {
+          if (!enabled) { send(response, 401, '{"error":"invalid_credentials"}'); return; }
+          send(response, 200, JSON.stringify({ code: seatBinding }));
+        });
       });
       return;
     }
@@ -118,8 +158,18 @@ export function createIdentityProvider(
             if (typeof value === 'string') code = value;
           }
         } catch { code = ''; }
-        if (!ALLOWED_BINDINGS.has(code)) { send(response, 401, '{"error":"unknown_subject"}'); return; }
-        send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: code }));
+        if (isSeededBindingId(code)) {
+          send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: code }));
+          return;
+        }
+        // The code this provider issues for a seat is the binding id itself, the
+        // same shape the fixed list uses. Recheck enabled here so a disable
+        // between /password and /exchange cannot still be exchanged.
+        if (!isSeatBindingId(code)) { send(response, 401, '{"error":"unknown_subject"}'); return; }
+        void seatIsEnabled(seatBindingEnabled, code).then((enabled) => {
+          if (!enabled) { send(response, 401, '{"error":"unknown_subject"}'); return; }
+          send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: code }));
+        });
       });
       return;
     }
@@ -143,7 +193,7 @@ export function createIdentityProvider(
 
 /** Entry point when spawned as a child process by the stack. */
 export async function runIdentityProvider(port: number): Promise<void> {
-  const provider = createIdentityProvider({ port });
+  const provider = createIdentityProvider({ port, seatBindingEnabled: seatBindingEnabledFromStack });
   const origin = await provider.listen();
   console.info(`[identity] listening at ${origin} provider=synthetic`);
   const stop = () => { void provider.close().then(() => { process.exitCode = 0; }); };

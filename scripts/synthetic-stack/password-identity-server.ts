@@ -17,10 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { STACK_ROOT } from './profile.ts';
 import {
   isAdmittedHost,
+  isSeatBindingId,
   loadPasswordAccounts,
   passwordMatches,
   reloadPasswordAccounts,
+  seatBindingIdFor, type SeatBindingEnabled,
 } from './identity-admission.ts';
+import { seatBindingEnabledFromStack } from './seat-binding-lookup.ts';
 
 const MAX_BODY_BYTES = 4_096;
 const CODE_TTL_MS = 120_000;
@@ -50,7 +53,11 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 export function createPasswordIdentityServer(
-  { port, accountsFile = ACCOUNTS_FILE }: Readonly<{ port: number; accountsFile?: string }>,
+  { port, accountsFile = ACCOUNTS_FILE, seatBindingEnabled }: Readonly<{
+    port: number;
+    accountsFile?: string;
+    seatBindingEnabled?: SeatBindingEnabled;
+  }>,
 ) {
   // Throws when the file is missing or empty, so the process exits instead of
   // accepting a default password. The stack start surfaces this as a failed start.
@@ -96,6 +103,22 @@ export function createPasswordIdentityServer(
           // response tell an attacker which usernames exist.
           send(response, 401, '{"error":"invalid"}'); return;
         }
+        // A seat binding is not a static account. The file proves the password;
+        // the database proves the seat is still enabled. Any other binding keeps
+        // the previous file-only check, including the seeded synthetic names.
+        if (isSeatBindingId(account.bindingId)) {
+          if (account.bindingId !== seatBindingIdFor(username)) {
+            send(response, 401, '{"error":"invalid"}'); return;
+          }
+          void (seatBindingEnabled ?? (async () => false))(account.bindingId).then((enabled) => {
+            if (enabled !== true) { send(response, 401, '{"error":"invalid"}'); return; }
+            failures.delete(username);
+            const code = randomBytes(32).toString('hex');
+            codes.set(code, { bindingId: account.bindingId, expiresAt: now + CODE_TTL_MS });
+            send(response, 200, JSON.stringify({ code }));
+          }).catch(() => { send(response, 401, '{"error":"invalid"}'); });
+          return;
+        }
         failures.delete(username);
         const code = randomBytes(32).toString('hex');
         codes.set(code, { bindingId: account.bindingId, expiresAt: now + CODE_TTL_MS });
@@ -133,7 +156,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     console.error('[password-identity] FAILED: a loopback port 1024..65535 is required');
     process.exitCode = 1;
   } else {
-    void createPasswordIdentityServer({ port }).listen().then(() => {
+    void createPasswordIdentityServer({ port, seatBindingEnabled: seatBindingEnabledFromStack }).listen().then(() => {
       console.info(`[password-identity] listening at http://127.0.0.1:${String(port)}`);
     });
   }

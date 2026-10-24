@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { parseContractSchema, type ContractSchemaName, type components } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthenticatedUser, type ProductAuthService } from '../auth-service.js';
+import { authenticateRequestHeaders, type AuthService, type AuthenticatedUser } from '../auth-service.js';
 import type { IntakeResult } from './transaction.js';
 
 declare module 'fastify' {
@@ -27,7 +27,7 @@ export function sendIntake(reply: FastifyReply, result: IntakeResult<unknown>, s
 
 /** Install only in an encapsulated intake plugin. Preserve product-auth's private
  * DTO identity; each DB operation still locks its authenticated session. */
-export function intakeHttpBoundary(app: FastifyInstance, auth: ProductAuthService,
+export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
   report?: (diagnosticId: string, error: unknown) => void) {
   const actors = new WeakMap<FastifyRequest, AuthenticatedUser>();
   app.addHook('onRequest', async (request, reply) => {
