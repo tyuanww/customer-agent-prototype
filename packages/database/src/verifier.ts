@@ -1114,6 +1114,7 @@ const READINESS_SUFFIX = [
   { length: 65, index: 64, id: '0065_legacy_orphan_fk_not_valid' },
   { length: 66, index: 65, id: '0066_policy_version_restamp' },
   { length: 67, index: 66, id: '0067_seat_lifecycle' },
+  { length: 68, index: 67, id: '0068_feishu_login_link' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1170,6 +1171,9 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   65: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '054b28a7858de4b7957202a9704235aad53a0dcbf606e9c5b39998a67e069eed', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
   66: { tables: 109, functions: 285, objectEntries: 3400, objectSha256: 'cbc8ed8645962d65582e1c7143ea6de17832f91f0d319e95a7f4a1d4b75df53b', functionEntries: 285, functionSha256: 'edfdfe3b5050db5a610b0962e223dda91d1df9f80925a71135921202f3492ccf', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   67: { tables: 110, functions: 291, objectEntries: 3422, objectSha256: '5afdcfd42188af9370330d5ea25480610185c8f8740604ae3ebf0f5717e60e66', functionEntries: 291, functionSha256: '2604c17ed3aba4092b7a17ed21b6f543c039af1dc8a0a2b38bc7408ce3250835', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  // 0068 adds the link table and three functions and replaces the roster projection body.
+  // Measured on PostgreSQL 15 after this migration.
+  68: { tables: 111, functions: 294, objectEntries: 3435, objectSha256: '2d2224974920e12a6719e7f42d2dd44fb8aac5d729db414b4e4cc941187a975f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1207,6 +1211,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   // 0066 adds no grant of its own; 0059 already covers what the new function writes.
   66: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   67: { entries: 646, sha256: '96b54a2aa5d19e8f0208bb485016dea8718dbd0ccdde2a7f6eb954aa872671de' },
+  68: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
 };
 
 export async function verifyReadinessSuccessor(

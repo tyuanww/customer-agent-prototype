@@ -260,6 +260,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0066_policy_version_restamp',
     requiresPredecessor: 'Seat lifecycle requires the policy restamp trigger',
   },
+  {
+    index: 67,
+    minimumCatalogueLength: 68,
+    id: '0068_feishu_login_link',
+    predecessorId: '0067_seat_lifecycle',
+    requiresPredecessor: 'Feishu login link requires the seat lifecycle',
+  },
 ];
 
 function requiredSuccessorStep(
