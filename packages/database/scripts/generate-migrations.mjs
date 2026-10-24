@@ -824,6 +824,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     [63, '0063_store_set_keep_members_boundary'],
     [64, '0064_roster_query_requires_reader'],
     [65, '0065_legacy_orphan_fk_not_valid'],
+    [66, '0066_seat_login_facts'],
   ];
   const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
   const occupiedMigration = productTail[0] ?? null;

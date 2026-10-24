@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { validateContractSchema } from '@customer-agent/contracts';
 import { qualityReceipt } from './quality-access.js';
 import { QUALITY_LIMITS } from './quality.js';
@@ -7,6 +8,8 @@ import type { ProductAuthService } from '../auth-service.js';
 import { CONTENT_UPLOAD_MAX_BYTES, type ContentObjectStore } from '../content-object-store.js';
 import { createContentIntakeService } from './service.js';
 import { contentIntakeGrantRoutes } from './grants-http.js';
+import { contentIntakeSeatRoutes } from './seats-http.js';
+import { createSeatServiceFromEnv, type SeatService } from './seats.js';
 import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import type { IntakePrincipalLabels } from './discovery.js';
@@ -47,6 +50,12 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   const service = createContentIntakeService(pool, store, report, approval,
     { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
   await app.register(contentIntakeGrantRoutes, { auth, service, ...(report ? { report } : {}) });
+  // Seat accounts are server-owned only when the stack root is known; without it the desktop
+  // adapter stays in charge and this door must not exist at all.
+  const seatStackRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
+  const seats: SeatService | null = seatStackRoot && path.isAbsolute(seatStackRoot)
+    ? createSeatServiceFromEnv(pool, seatStackRoot) : null;
+  if (seats) await app.register(contentIntakeSeatRoutes, { auth, seats, ...(report ? { report } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request) || request.body !== undefined || request.headers['transfer-encoding'] !== undefined
       || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {
