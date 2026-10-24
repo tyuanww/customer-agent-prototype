@@ -125,6 +125,19 @@ export async function startApi(
               if (reason !== 'projected') console.info(`[api] roster projection ${reason}`);
             } finally { client.release(); }
           },
+          async (bindingId) => {
+            if (!business) {
+              console.info('[api] seat projection skipped');
+              return;
+            }
+            const client = await business.connect();
+            try {
+              const projected = await client.query<{ status: string | null }>(
+                'SELECT content_intake.project_seat_login($1) AS status', [bindingId]);
+              const status = projected.rows[0]?.status ?? 'missing';
+              if (status !== 'projected') console.info(`[api] seat projection ${status}`);
+            } finally { client.release(); }
+          },
         );
       }
       try {
