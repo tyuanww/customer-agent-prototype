@@ -1160,9 +1160,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // changes, so only the object manifest moves; the pinned value below is measured, not
   // derived. Placeholder until the probe run reports it.
   65: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '054b28a7858de4b7957202a9704235aad53a0dcbf606e9c5b39998a67e069eed', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
-  // 0066 adds seat_posts, two functions and their grants. Placeholder until the probe run
-  // reports the measured digests.
-  66: { tables: 110, functions: 286, objectEntries: 3400, objectSha256: 'PENDING66_OBJECT', functionEntries: 286, functionSha256: 'PENDING66_FUNCTION', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
+  66: { tables: 110, functions: 286, objectEntries: 3417, objectSha256: '4ea9a320cbe22a58c9f8c44ed2eff2776746af7be367ae668122299c0ea42ebd', functionEntries: 286, functionSha256: 'd1212ab26b9c149c3f59516813ed9581cfccfb976df2aef1a5c524a03d7e590f', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1197,7 +1195,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   64: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0065 only rewrites constraint definitions, so no ACL entry moves.
   65: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
-  66: { entries: 673, sha256: 'PENDING66_ACL' },
+  66: { entries: 645, sha256: 'b7c875e3ea2afb2c6fd980154c2576f43ec6056b10044bab3b1f384e7185091d' },
 };
 
 export async function verifyReadinessSuccessor(

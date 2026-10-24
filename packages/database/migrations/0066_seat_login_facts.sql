@@ -38,6 +38,10 @@ REVOKE ALL ON content_intake.seat_posts FROM PUBLIC;
 --
 -- `enabled` is true because the assignment exists; a disabled seat is expressed by disabling
 -- its subject binding, which this function requires.
+-- `cs_ai_definer` already reads `user_id`/`enabled`/`role` from this table; the lookup here
+-- also filters on `binding_id`, and a column-level grant is what a WHERE clause needs.
+GRANT SELECT (binding_id) ON backend_identity.subject_bindings TO cs_ai_definer;
+
 CREATE OR REPLACE FUNCTION content_intake.project_seat_login(p_binding_id TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$

@@ -987,8 +987,8 @@
       "id": "0066_seat_login_facts",
       "file": "0066_seat_login_facts.sql",
       "source_ranges": [],
-      "sha256": "1ada44dbc24baa90ae55aecae303fab742bcd5d80691c00a3162d87fa379e1ac",
-      "bytes": 6691,
+      "sha256": "1ae63611145eb0327982e7460b659f70cd067941fca3a9d0a4ef353d18eb021f",
+      "bytes": 6954,
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
