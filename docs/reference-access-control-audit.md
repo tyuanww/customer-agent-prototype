@@ -193,6 +193,39 @@ A2 的「主账号能分配权限」必须先解决「谁是能签发的活主�
 
 `hz-allocator` 缺 `rollback`，所以主账号今天仍然签不出回滚授权，这一条独立于事实问题，另议。
 
+### 6.6 已解决（2026-10-24 13:30）
+
+6.5 的三个方向都不用做。真实缺口是「allocation 挂在错的 principal 上」。
+
+生产实测的三方对照：
+
+| 主体 | allocation | facts 来源 | 能否自持 |
+| --- | --- | --- | --- |
+| `hz-allocator` | 7 条 | 无，停在 2026-10-15 | 否 |
+| `principal-menokin-admin` | 8 条 | 手工迁移写入 | 否 |
+| `prin_0200…`（运营本人） | 0 条 | 飞书，定时器每 4 分钟 | **是** |
+
+缺的不是新概念，是把 allocation 放到本来就自持的主体上。
+`scripts/ops/bootstrap-issuer-authority.mjs` 写入 40 条根 allocation（5 scope × 8 action），
+签发人、接收人、steward 都是该主体，无父授权。
+
+写前写后对照，用真实写入路径（`grant_parent_guard` 触发器）在事务内回滚：
+
+| 时点 | 结果 |
+| --- | --- |
+| bootstrap 前 | `RESULT=NO_ROOT_ALLOCATION` |
+| bootstrap 后 | `RESULT=DELEGATION_ALLOWED parent=grant_e6b3d079…` |
+| 回滚后残留行 | 0 |
+
+能力仍然跟着事实走，不是永久授权。集成测试
+`apps/api/tests/issuer-bootstrap.integration.test.ts` 在真实 PG15 上证明了两个方向：
+根授权持有人可以对外签发，事实窗口一关就立刻被拒。
+
+**仍然受限的一点。** `authorization_sources` 只读 business 授权，不读 allocation。
+所以 allocation 决定「能不能往外授」，主体自己的 business 授权决定「能授哪些来源」。
+实测运营本人只能授出 `src-menokin-sop-v2` 上的 8 个动作；`src-menokin-faq` 与
+presale / aftersale / campaign / sop legacy 五个来源仍授不出去。这是第二层决定，未动。
+
 ## 7. 前端判定权限的全部位置
 
 | 位置 | 判定依据 | 来源 |

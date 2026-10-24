@@ -78,18 +78,17 @@ Result=success  ExecMainStatus=0
 
 timer 已 enable，下一次 03:23（`OnCalendar` 03:20 + `RandomizedDelaySec`）。
 
-### 首次真实演练：失败，且失败原因是真的
+### 第一次演练失败，以及它带出的问题
 
 第一次失败在 `commit_tickets` 的 3 行孤儿（已按授权清理，导出留档）。清理后演练前进到下一处：
 `entitlement_contexts` / `entitlement_scopes` / `grant_history` / `publications` / `quality_*` /
 `release_lineage` / `intake_organization.*` 共 15 条外键同样被标为 `convalidated = true`
 却存在孤儿行，约 117 行。
 
-**当前状态：演练习保持红色，这是正确的。** 详细取证、根因、三个方案和需要决定的事见
-[恢复完整性发现](reports/2026-10-24-restore-integrity-finding.md)。在没有决定之前不要为让它变绿而
-加 `--disable-triggers` 或忽略约束错误 —— 那正好会把问题藏起来。
+这里选择不删数据，而是把 15 条约束改成 `NOT VALID`（迁移 `0065`），理由是那些行是审计证据。
+取证、根因与三个方案的取舍见[恢复完整性发现](reports/2026-10-24-restore-integrity-finding.md)。
 
-已确认的第一次失败现场（`commit_tickets`，5 行中 3 行孤儿）：
+第一次失败现场（`commit_tickets`，5 行中 3 行孤儿）：
 
 ```text
 ready before drill: 200
@@ -99,6 +98,21 @@ pg_restore: error: could not execute query: ERROR: insert or update on table "co
   is not present in table "write_attempts".
 FAIL pg_restore reported an error
 ```
+
+### 第二次演练：通过
+
+`0065` 部署后（生产账本 64 → 65），同一份脚本第一次打印 `DRILL PASSED`：
+
+```text
+PASS dump replayed into an empty database
+ledger live='65 0065_legacy_orphan_fk_not_valid' restored='65 0065_legacy_orphan_fk_not_valid'
+table count live=121 restored=121
+grant rows live=42 restored=42
+ready after drill: 200
+DRILL PASSED dump=customer_agent_formal-20261023T184219Z-001.dump
+```
+
+要点是**备份自身没有变过**。dump 一直能写；不能还原的原因始终是数据违反了数据库自称成立的约束。
 
 ## 相关
 
@@ -128,18 +142,18 @@ FAIL pg_restore reported an error
 
 已在杭州生产机验证：
 
-- timer 已 enable 并按计划排到下一次；
-- 首次备份 `Result=success / ExecMainStatus=0`，dump 7 355 299 字节，副本已写出；
-- 首次演练**失败**，失败原因是生产库自身的孤儿行（见上一节），临时库已被 `trap` 清理干净（`pg_database` 查不到 `customer_agent_restore_drill`）；
-- 演练前后 `/ready` 都是 200，演练没有扰动线上服务。
+- timer 已 enable 并按计划运行；
+- 备份 `Result=success / ExecMainStatus=0`，dump 约 7.36 MB，副本已写出；
+- 第一次演练**失败**，原因是生产库自身的孤儿行（见上一节），临时库已被 `trap` 清理干净（`pg_database` 查不到 `customer_agent_restore_drill`）；
+- 每次演练前后 `/ready` 都是 200，演练没有扰动线上服务；
+- `0065` 部署后演练**通过**：账本 65 两侧一致、表 121 对 121、授权行 42 对 42、`DRILL PASSED`。
 
 **未验证：**
 
-- 恢复演练尚未通过 —— 阻塞在 `commit_tickets` 的 3 行孤儿，不是脚本问题。
 - 异地副本仍是同一台机器的另一个目录，与源盘共命运；真异地（另一块盘或另一台机器）没做。
+- 还原后的库没有跑迁移 verifier，也没有让应用对着它启动。
 - 保留策略的 14 天滚动只在本地用 `KEEP=3` 演练过，没有在生产上等满 14 天。
 - 备份文件没有加密，也没有校验和清单；能否还原完全依赖 `pg_restore` 读得动。
-- 还原后的库没有跑迁移 verifier，也没有让应用对着它启动。
 
 ## 相关
 
