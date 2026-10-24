@@ -37,6 +37,15 @@ REVOKE ALL ON content_intake.seat_posts FROM PUBLIC;
 -- also filters on `binding_id`, and a column-level grant is what a WHERE clause needs.
 GRANT SELECT (binding_id) ON backend_identity.subject_bindings TO cs_ai_definer;
 
+-- The definer owns these two functions, so every table they touch needs its own grant. 0050
+-- covered SELECT on principals, principal_facts and role_rules for authorization_sources; the
+-- writes below and the new table are what is missing. Keeping the definer at exactly these
+-- rights is the point: owning the function as the cluster owner would make every future edit
+-- to it silently run with full authority.
+GRANT SELECT ON content_intake.seat_posts TO cs_ai_definer;
+GRANT UPDATE (current_facts_version) ON content_intake.principals TO cs_ai_definer;
+GRANT INSERT ON content_intake.principal_facts TO cs_ai_definer;
+
 CREATE OR REPLACE FUNCTION content_intake.project_seat_login(p_binding_id TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$

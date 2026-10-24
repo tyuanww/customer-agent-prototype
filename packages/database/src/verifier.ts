@@ -1195,7 +1195,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   64: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0065 only rewrites constraint definitions, so no ACL entry moves.
   65: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
-  66: { entries: 645, sha256: 'b7c875e3ea2afb2c6fd980154c2576f43ec6056b10044bab3b1f384e7185091d' },
+  66: { entries: 649, sha256: '860fd8163bc3a9df76331f299d5c3b569248aeeb80b4ce751ba9181318e7bdd6' },
 };
 
 export async function verifyReadinessSuccessor(

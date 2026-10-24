@@ -154,7 +154,7 @@ export function createSeatService(pool: IntakePool, passwordFile: PasswordAccoun
         await client.query(`
           INSERT INTO content_intake.principals(
             principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version)
-          VALUES ($1, $2, $3, $4, $5, $6, 0)
+          VALUES ($1, $2, $3, $4, $5, $6, 1)
           ON CONFLICT (principal_id) DO UPDATE
             SET user_id = EXCLUDED.user_id, tenant_id = EXCLUDED.tenant_id, app_id = EXCLUDED.app_id
           WHERE content_intake.principals.identity_scope = EXCLUDED.identity_scope`,
@@ -176,6 +176,16 @@ export function createSeatService(pool: IntakePool, passwordFile: PasswordAccoun
             (SELECT version FROM content_intake.policy_versions WHERE tenant_id = $1 AND app_id = $2), $5)
           ON CONFLICT DO NOTHING`,
         [TENANT, APP, DEPARTMENT, post.jobId, post.role]);
+
+        // `principals.principal_current_facts_fk` is deferred, so the row may name a version
+        // that does not exist yet; it must exist by COMMIT. Running the same projection login
+        // runs keeps one owner of "what facts a post produces" and leaves the seat usable
+        // immediately rather than only after its first login.
+        const projected = await client.query<{ status: string | null }>(
+          'SELECT content_intake.project_seat_login($1) AS status', [bindingId]);
+        if (projected.rows[0]?.status !== 'projected') {
+          throw new IntakeRejection('PERMISSION_CHANGED', 'CONFLICT');
+        }
 
         return Object.freeze({
           displayName, username: command.username, post: command.post, enabled: true,
