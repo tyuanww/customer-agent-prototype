@@ -80,7 +80,7 @@
 **控件**
 
 - 工作台各页和登录窗只用 antd 控件。ESLint 规则拦截原生 `<button>`、`<input>`、`<select>`、`<textarea>`；隐藏的文件选择 `<input type="file">` 除外。
-- 例外只有两类：窗口外壳（侧栏导航、折叠按钮、返回按钮、主题菜单），它们承担拖动与折叠，外观与 antd 一致；以及待删除的旧 profile 模块（任务卡 D4）。登录窗的「飞书 / 账号」切换是逐行豁免的原生按钮。
+- 例外只有两类：窗口外壳（侧栏导航、折叠按钮、返回按钮、主题菜单），它们承担拖动与折叠，外观与 antd 一致；以及待删除的旧 profile 模块（任务卡 D4）。登录窗的「飞书 / 账号」切换用 antd Segmented。
 
 **等待与反馈**（统一由 `features/dashboard/WorkbenchState.tsx` 渲染）
 

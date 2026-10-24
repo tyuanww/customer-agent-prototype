@@ -253,6 +253,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0065_legacy_orphan_fk_not_valid',
     requiresPredecessor: 'Policy restamp requires the legacy foreign-key repair',
   },
+  {
+    index: 66,
+    minimumCatalogueLength: 67,
+    id: '0067_inaccuracy_outcome',
+    predecessorId: '0066_policy_version_restamp',
+    requiresPredecessor: 'Inaccuracy outcome read requires the policy restamp',
+  },
 ];
 
 function requiredSuccessorStep(

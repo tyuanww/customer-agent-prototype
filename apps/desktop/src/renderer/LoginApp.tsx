@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Form, Input } from 'antd';
+import { Alert, Button, Form, Input, Segmented } from 'antd';
 import { FoxHead } from './components/FoxHead';
 import type { LoginAudience, LoginChooserState } from '@shared/login-window';
 import { IntakeAntdTheme } from './features/dashboard/intake-antd';
@@ -68,7 +68,7 @@ export function LoginApp() {
     </>;
   } else if (state === 'waiting') {
     body = <>
-      <p className="login-copy">正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。</p>
+      <p className="login-copy">请在浏览器里完成授权，完成后这里会自动继续。</p>
       <div className="login-actions"><Button onClick={cancel}>取消</Button></div>
     </>;
   } else if (state === 'failed') {
@@ -88,17 +88,18 @@ export function LoginApp() {
     </>;
   } else {
     body = <>
-      <div className="login-segmented" role="group" aria-label="登录方式">
-        {/* A two-option toggle with an aria-pressed contract; styled to match antd. */}
-        {(['feishu', 'account'] as const).map((value) => <button // eslint-disable-line no-restricted-syntax
-          key={value}
-          type="button"
-          className="login-segment"
-          aria-pressed={audience === value}
-          disabled={busy}
-          onClick={() => { setAudience(value); setInvalid(false); }}
-        >{value === 'feishu' ? '飞书' : '账号'}</button>)}
-      </div>
+      <Segmented<LoginAudience>
+        block
+        className="login-segmented"
+        aria-label="登录方式"
+        value={audience}
+        disabled={busy}
+        options={[
+          { label: '飞书', value: 'feishu' },
+          { label: '账号', value: 'account' },
+        ]}
+        onChange={(value) => { setAudience(value); setInvalid(false); }}
+      />
       {audience === 'feishu' ? <>
         <p className="login-copy">将用浏览器打开飞书登录。</p>
         <div className="login-actions">
@@ -110,7 +111,8 @@ export function LoginApp() {
           <form className="login-form" onSubmit={(event) => { event.preventDefault(); void submitAccount(); }}>
           {invalid ? <Alert type="error" showIcon={false} role="alert" message="账号或密码不正确，请重试。" /> : null}
           {accountUnavailable ? <Alert type="error" showIcon={false} role="alert" message="账号登录暂时不可用，请改用飞书或联系管理员。" /> : null}
-          <Form.Item label="账号" htmlFor="login-username">
+          <p className="login-copy">使用管理员给你的登录名和密码。</p>
+          <Form.Item label="登录名" htmlFor="login-username">
             <Input id="login-username" name="username" autoComplete="username" value={username} disabled={busy}
               onChange={(event) => { setUsername(event.target.value); setInvalid(false); }} />
           </Form.Item>

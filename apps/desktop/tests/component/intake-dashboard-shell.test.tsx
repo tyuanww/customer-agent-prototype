@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
+import { intakeDestinationsExcludeAnnounce, readIntakePreviewPage } from '../../src/renderer/features/dashboard/intake-destinations';
 import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
@@ -95,18 +96,18 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
-  expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(7);
+  expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5);
   expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
   await user.click(screen.getByTestId('nav-content'));
   const tab = screen.getByTestId('nav-content');
   expect(tab).toHaveAttribute('aria-selected', 'true');
-  for (const [key,module] of [['ArrowDown','publish'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
+  for (const [key,module] of [['ArrowDown','materials'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
     fireEvent.keyDown(screen.getByTestId('nav-content'), { key });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', module);
   }
-  for (const id of ['overview','wording','sop','announce','content']) await user.click(screen.getByTestId(`nav-${id}`));
+  for (const id of ['overview','wording','sop','content']) await user.click(screen.getByTestId(`nav-${id}`));
   await user.click(screen.getByTestId('dashboard-theme-trigger'));
   await user.click(screen.getByTestId('dashboard-theme-dark'));
   expect(shell).toHaveAttribute('data-theme', 'dark');
@@ -166,7 +167,10 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();allowGrant();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
-    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(8);
+    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(6);
+    await user.click(screen.getByTestId('nav-content'));
+    fireEvent.keyDown(screen.getByTestId('nav-content'), { key: 'ArrowDown' });
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'materials');
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-permissions'));
     const permissionsPage = document.querySelector('.desk-permissions-page');
@@ -195,7 +199,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   }finally{cleanup();owner.dispose();}
 }, 20000);
 
-it('keeps the six intake pages inside 980 by 680 in light and dark', async () => {
+it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
   window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
@@ -218,7 +222,7 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
     shell.style.width = '980px';
     shell.style.height = '680px';
     const content = screen.getByTestId('dashboard-content');
-    const pages = ['overview', 'wording', 'sop', 'content', 'permissions', 'announce'] as const;
+    const pages = ['overview', 'wording', 'sop', 'content', 'permissions'] as const;
     for (const theme of ['light', 'dark'] as const) {
       await user.click(screen.getByTestId('dashboard-theme-trigger'));
       await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
@@ -237,8 +241,8 @@ it('keeps the six intake pages inside 980 by 680 in light and dark', async () =>
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP');
     expect(screen.getByTestId('module-sop')).toHaveTextContent('上传 CSV 会替换现在的 SOP');
-    await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
     const add = await screen.findByRole('button', { name: '添加话术' });
     for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
@@ -338,10 +342,10 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
-      await user.click(screen.getByTestId('nav-announce'));
+      await user.click(screen.getByTestId('nav-wording'));
       const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
       await tabUntil(user, refresh);
-      expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
       expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
     }
     await user.click(screen.getByTestId('nav-permissions'));
@@ -379,3 +383,26 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     document.body.style.cssText = '';
   }
 }, 20000);
+
+it('opens 话术库 for page=announce and leaves that URL alone', () => {
+  expect(intakeDestinationsExcludeAnnounce).toBe(true);
+  const location = { hostname: '127.0.0.1', search: '?preview=intake&page=announce' };
+  expect(readIntakePreviewPage(location, true)).toBe('wording');
+  expect(readIntakePreviewPage(location, false)).toBe('wording');
+  expect(location.search).toBe('?preview=intake&page=announce');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=permissions' }, false)).toBe('overview');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=permissions' }, true)).toBe('permissions');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=materials' }, false)).toBe('materials');
+  expect(readIntakePreviewPage({ hostname: 'example.test', search: '?preview=intake&page=wording' }, true)).toBe('overview');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?page=announce' }, true)).toBe('overview');
+  expect(readIntakePreviewPage({ hostname: 'localhost', search: '?preview=intake&page=nope' }, true)).toBe('overview');
+  window.history.replaceState({}, '', '/?preview=intake&page=announce');
+  try {
+    render(<DashboardApp />);
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
+    expect(window.location.search).toBe('?preview=intake&page=announce');
+  } finally {
+    window.history.replaceState({}, '', '/');
+  }
+});

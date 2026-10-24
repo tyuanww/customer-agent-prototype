@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { parseInaccuracyOutcomeList, type InaccuracyOutcomeList } from '../shared/inaccuracy-outcome';
 import {
   dashboardIterationFailure,
   isDashboardIterationCloseRequest,
@@ -54,6 +55,17 @@ async function withCoachSession<T>(
   }
 }
 
+export async function dashboardInaccuracyOutcomes(
+  session: DashboardIterationSessionClient | null,
+): Promise<InaccuracyOutcomeList | DashboardIterationFailure> {
+  return withCoachSession(session, async (client, epoch) => {
+    const result = await client.request(epoch, '/v1/metrics/inaccuracy-outcomes');
+    const parsed = parseInaccuracyOutcomeList(result.value);
+    if (!parsed) return dashboardIterationFailure('UNAVAILABLE');
+    return parsed;
+  });
+}
+
 export async function dashboardIterationList(
   session: DashboardIterationSessionClient | null,
 ): Promise<DashboardIterationListResult> {
@@ -73,7 +85,7 @@ export async function dashboardIterationList(
       }
       cursor = parsed.nextCursor;
     }
-    return Object.freeze({ ok: true as const, items: Object.freeze(items), nextCursor: null });
+    return dashboardIterationFailure('UNAVAILABLE');
   });
 }
 

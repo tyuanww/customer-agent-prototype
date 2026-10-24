@@ -1,4 +1,4 @@
-import { Button, type ButtonProps } from 'antd';
+import { Button, Modal, type ButtonProps } from 'antd';
 import { useEffect } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView } from '@shared/content-intake-management';
 import { formatSeatClock } from './intake-time';
@@ -16,6 +16,21 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
   const disabled = busy || blocked || !!rollback.pending;
   useEffect(() => { onDirty('rollback-input', false); return () => onDirty('rollback-input', false); }, [onDirty]);
   const reset = () => apply({ action: 'rollback-discard' });
+  const execute = () => {
+    // 取消不发送回退。Main 在真正发布前仍会再用系统对话框核对一次。
+    Modal.confirm({
+      title: '回退整个发布目录到上一版',
+      content: '回退之后不能撤销这次发布。坐席重新查询后会使用上一版内容。要回到现在这一版，需要再发布一次。',
+      okText: '确认回退',
+      cancelText: '取消',
+      focusable: { autoFocusButton: 'cancel' },
+      okButtonProps: { danger: true, autoInsertSpace: false },
+      cancelButtonProps: { autoInsertSpace: false },
+      onOk: () => apply({ action: 'rollback-execute' }),
+      transitionName: '',
+      maskTransitionName: '',
+    });
+  };
   return <section aria-label="已发布目录纠正回退" tabIndex={-1}>
     <h2>纠正已发布内容</h2><p>回退影响整个发布目录，不是只撤销某个店铺。先查看全部影响范围，发布前由系统弹窗再次确认。</p>
     {rollback.pending && <div className="intake-notice" aria-label="待恢复回退操作"><h3>回退操作结果待确认</h3>
@@ -44,7 +59,7 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
         </>}
         <div className="intake-toolbar">
           {!impact.requiresCorrectiveCandidate && <ActionButton danger disabled={disabled || !rollback.canExecute}
-            onClick={() => apply({ action: 'rollback-execute' })}>确认回退并发布</ActionButton>}
+            onClick={execute}>确认回退并发布</ActionButton>}
           <ActionButton disabled={disabled} onClick={reset}>关闭回退计划</ActionButton>
         </div>
       </>}

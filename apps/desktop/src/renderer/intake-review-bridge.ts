@@ -207,6 +207,7 @@ export function installIntakeReviewBridge(location: Location = window.location):
     list: async () => ({ ok: true, items: [iterationTask('task-open', 'open'), iterationTask('task-progress', 'in_progress')], nextCursor: null }),
     start: async () => ({ ok: true, task: iterationTask('task-open', 'in_progress') }),
     close: async () => ({ ok: true, task: iterationTask('task-open', 'resolved') }),
+    outcomes: async () => ({ ok: true, items: [] }),
   });
   exposePreview('dashboardWording', { list: async () => wordingView() });
   exposePreview('dashboardUsageLog', usageLogFixture());

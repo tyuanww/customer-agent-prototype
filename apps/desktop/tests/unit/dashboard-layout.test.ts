@@ -22,16 +22,16 @@ const appearance = readFileSync(
   'utf8',
 );
 const rendererMain = readFileSync(path.join(root, 'src/renderer/main.tsx'), 'utf8');
-const announce = readFileSync(
-  path.join(root, 'src/renderer/features/dashboard/AnnounceModule.tsx'),
+const library = readFileSync(
+  path.join(root, 'src/renderer/features/dashboard/IntakeLibrary.tsx'),
   'utf8',
 );
-const content = [
-  readFileSync(path.join(root, 'src/renderer/features/dashboard/ContentModule.tsx'), 'utf8'),
-  readFileSync(path.join(root, 'src/renderer/features/dashboard/coach-content-upload.ts'), 'utf8'),
-].join('\n');
+const materials = readFileSync(
+  path.join(root, 'src/renderer/features/dashboard/IntakeManagement.tsx'),
+  'utf8',
+);
 const iteration = readFileSync(
-  path.join(root, 'src/renderer/features/dashboard/IterationModule.tsx'),
+  path.join(root, 'src/renderer/features/dashboard/IntakeOverview.tsx'),
   'utf8',
 );
 const sopLibrary = readFileSync(
@@ -84,7 +84,7 @@ describe('dashboard layout contract', () => {
     expect(app).not.toContain('<small>{item.blurb}</small>');
     expect(app).not.toContain('Manager Decision Desk');
     expect(css).toContain('grid-template-columns: var(--dash-structure-boundary) minmax(0, 1fr)');
-    expect(css).toContain('--dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 248px))');
+    expect(css).toContain('--dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 220px))');
     expect(css).toContain('min-height: 42px');
     const navButtonRule = css.match(/\.dashboard-nav-item > button\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(navButtonRule).toContain('background: transparent');
@@ -184,7 +184,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('--dash-collapsed-surface-width: 120px');
     expect(css).toContain('--dash-nav-icon-slot-width: 120px');
     expect(css).toContain('--dash-nav-icon-anchor-offset: 60px');
-    expect(css).toContain('--dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 248px))');
+    expect(css).toContain('--dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 220px))');
     expect(css).toContain('.dashboard-titlebar-control-island');
     const islandRule = css.match(/\.dashboard-titlebar-control-island\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(islandRule).toContain('background: transparent');
@@ -208,8 +208,9 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('-webkit-app-region: drag');
     expect(css).toContain('-webkit-app-region: no-drag');
     expect(css).toContain(".dashboard-shell[data-dashboard-chrome='integrated'] .dashboard-titlebar-drag-strip");
-    expect(css).toContain("[data-nav-resizing='true'] :is(");
-    expect(css).toContain('.dashboard-titlebar-drag-strip,');
+    expect(css).toContain('.dashboard-titlebar-drag-strip');
+    expect(css).not.toContain("[data-nav-resizing='true']");
+    expect(css).not.toContain('.dashboard-nav-resizer');
     expect(css).toContain('.dashboard-topbar');
     expect(css).not.toContain(
       ".dashboard-shell[data-dashboard-chrome='integrated'] .dashboard-nav,\n.dashboard-shell[data-dashboard-chrome='integrated'] .dashboard-topbar",
@@ -221,16 +222,16 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('left: var(--dash-control-safe-left)');
     expect(app).toContain('dashboardChromeCssVars(chromeMode)');
     expect(app).toContain("'--dash-nav-rail-width': `${collapsedSurface}px`");
-    expect(app).toContain('const liveStructureWidth = navResizing || navHoldFrameRef.current || navSettlingPreviewRef.current');
+    expect(app).toContain('const liveStructureWidth = navSettlingPreviewRef.current');
     expect(app).toContain("'--dash-rendered-nav-width': `${liveStructureWidth}px`");
     expect(app).toContain("'--dash-structure-boundary': `${liveStructureWidth}px`");
-    expect(app).not.toContain('...(!(navResizing || navHoldFrameRef.current || navSettlingPreviewRef.current)');
+    expect(app).not.toContain('navResizing');
     expect(app).toContain('const interruptNavSettle = useCallback');
-    expect(app).toContain('const schedulePaintHold = useCallback');
+    expect(app).not.toContain('const schedulePaintHold = useCallback');
     expect(app).not.toContain('onTransitionEnd={handleNavStructureTransition}');
     expect(app).toContain("shell.addEventListener('transitionend', onNativeTransition)");
     expect(app).toContain("shell.addEventListener('transitioncancel', onNativeTransition)");
-    expect(css).toContain("[data-nav-hold='true']");
+    expect(css).not.toContain("[data-nav-hold='true']");
     expect(css).not.toContain('.dashboard-nav-toggle.is-expand-overlay');
     expect(app).toContain('data-nav-phase={navPhase}');
     expect(app).toContain('data-testid="dashboard-nav-toggle"');
@@ -258,7 +259,7 @@ describe('dashboard layout contract', () => {
       /@supports \(\(backdrop-filter: blur\(1px\)\)[\s\S]*?@supports not/,
     )?.[0] ?? '';
     expect(glassSupportRule).toContain('.dashboard-nav {');
-    expect(glassSupportRule).toContain(".dashboard-shell[data-nav-resizing='true'] .dashboard-nav,");
+    expect(glassSupportRule).not.toContain('data-nav-resizing');
     expect(glassSupportRule).toContain(".dashboard-shell[data-nav-phase='collapsing'] .dashboard-nav,");
     expect(glassSupportRule).toContain(".dashboard-shell[data-nav-phase='expanding'] .dashboard-nav {");
     expect(glassSupportRule).toMatch(
@@ -297,14 +298,14 @@ describe('dashboard layout contract', () => {
 
   it('invalidates every pending navigation frame when Dashboard unmounts', () => {
     const cleanup = app.match(
-      /useEffect\(\(\) => \(\) => \{[\s\S]*?cancelResizeFrame\(\);[\s\S]*?clearNavPreviewWidth\(\);[\s\S]*?\}, \[cancelResizeFrame,[^\]]+\]\);/,
+      /useEffect\(\(\) => \(\) => \{[\s\S]*?cancelSettleRaf\(\);[\s\S]*?clearNavPreviewWidth\(\);[\s\S]*?\}, \[cancelSettleRaf,[^\]]+\]\);/,
     )?.[0] ?? '';
-    expect(cleanup).toContain('cancelSettleAndHoldRafs();');
+    expect(cleanup).toContain('cancelSettleRaf();');
     expect(cleanup).toContain('navSettleEpochRef.current += 1;');
     expect(cleanup).toContain('navPendingSettleTargetRef.current = null;');
     expect(cleanup).toContain('navPendingPhaseRef.current = null;');
     expect(cleanup).toContain('navSettlingPreviewRef.current = false;');
-    expect(cleanup).toContain('setNavHoldFlag(false);');
+    expect(cleanup).not.toContain('setNavHoldFlag');
   });
 
   it('keeps the default 1180px dashboard in two-chart mode and stacks below 1120px', () => {
@@ -323,7 +324,7 @@ describe('dashboard layout contract', () => {
     expect(contentMarkup).not.toMatch(/onPointerDown|onPointerMove|onLostPointerCapture/);
   });
 
-  it('supports an adjustable separator, compact collapse, and PanelLeft state icons', () => {
+  it('keeps a fixed 220px sidebar that collapses to icons', () => {
     expect(app).toContain('aria-expanded={!navCollapsed}');
     expect(app).toContain('aria-controls="dashboard-primary-navigation"');
     expect(app).toContain('data-testid="dashboard-nav-toggle"');
@@ -331,35 +332,23 @@ describe('dashboard layout contract', () => {
     expect(app).not.toContain('dashboard-nav-toggle-collapse');
     expect(app).not.toContain('dashboard-nav-toggle-expand');
     expect(app).toContain('dashboard-nav-chrome');
-    expect(app).toContain('resolveDashboardNavResizeIntent');
-    expect(app).toContain('clampDashboardNavPreviewWidth');
-    expect(app).toContain('navAutoExpandedRef');
-    expect(app).toContain('scheduleNavPreview');
-    expect(app).toContain('armAutoExpand');
-    expect(appearance).toContain('shouldAutoExpandNavWidth');
-    expect(appearance).toContain('DASHBOARD_NAV_AUTO_EXPAND_WIDTH');
+    expect(app).toContain('const navWidth = DASHBOARD_NAV_DEFAULT_WIDTH');
+    expect(app).not.toContain('resolveDashboardNavResizeIntent');
+    expect(app).not.toContain('clampDashboardNavPreviewWidth');
+    expect(app).not.toContain('startNavResize');
+    expect(app).not.toContain('handleNavResizeKey');
+    expect(app).not.toContain('role="separator"');
+    expect(app).not.toContain('aria-label="调整工作台侧栏宽度"');
+    expect(app).not.toContain('dashboard-nav-resizer');
+    expect(app).not.toContain('onPointerDown={startNavResize}');
+    expect(app).not.toContain('onLostPointerCapture');
+    expect(appearance).toContain('export const DASHBOARD_NAV_DEFAULT_WIDTH = 220');
     expect(app).toContain("useState<DashboardNavPhase>('expanded')");
     expect(app).toContain('data-nav-phase={navPhase}');
     expect(app).toContain('useLayoutEffect');
     expect(app).toContain('focus({ preventScroll: true })');
-    expect(app).toContain('role="separator"');
-    expect(app).toContain('aria-label="调整工作台侧栏宽度"');
-    expect(app).toContain('aria-valuemin={separatorAria.valuemin}');
-    expect(app).toContain('aria-valuemax={separatorAria.valuemax}');
-    expect(app).toContain('aria-valuenow={separatorAria.valuenow}');
-    expect(app).toContain('resolveDashboardSeparatorAria');
-    expect(appearance).toContain('export function resolveDashboardSeparatorAria');
-    expect(appearance).toContain('export function visualDividerXFromPseudo');
-    expect(app).toContain('onPointerDown={startNavResize}');
-    expect(app).toContain('onPointerMove={moveNavResize}');
-    expect(app).toContain('onPointerCancel={endNavResize}');
-    expect(app).toContain('onLostPointerCapture={(event) => {');
-    expect(app).not.toContain('if ((event.buttons & 1) === 1) return;');
-    expect(app).toContain('publishCollapsedSeparatorAria');
     expect(app).toContain('shouldSettleDashboardNavTransition');
     expect(app).toContain('prefers-reduced-motion: reduce');
-    expect(app).toContain('onKeyDown={handleNavResizeKey}');
-    expect(app).toContain('const navResizeShellLeftRef = useRef<number | null>(null)');
     expect(css).toContain('--dash-rendered-nav-width');
     expect(css).toContain('grid-template-columns: var(--dash-structure-boundary) minmax(0, 1fr)');
     expect(css).toContain('padding: 0 8px 12px');
@@ -383,14 +372,13 @@ describe('dashboard layout contract', () => {
     expect(navLabelRule).toContain('margin-inline-start: var(--dash-nav-label-shift)');
     expect(navLabelRule).toContain('transition: opacity var(--wb-motion) var(--wb-ease)');
     expect(navLabelRule).not.toMatch(/transition:[^;]*margin/);
-    expect(css).toContain(".dashboard-shell[data-nav-resizing='true']");
-    expect(css).toContain(".dashboard-shell[data-nav-resizing='true'] .dashboard-nav-label,");
+    expect(css).not.toContain(".dashboard-shell[data-nav-resizing='true']");
     expect(css).toContain('--dash-motion-structure: 190ms');
     expect(workbenchTokens).toContain('--dash-motion-structure: var(--wb-motion)');
     expect(css).toContain('--dash-ease-structure: cubic-bezier(0.2, 0.8, 0.2, 1)');
-    expect(css).toContain('.dashboard-nav-resizer');
-    expect(css).toContain('cursor: col-resize');
-    expect(css).toContain('touch-action: none');
+    expect(css).not.toContain('.dashboard-nav-resizer');
+    expect(css).not.toContain('cursor: col-resize');
+    expect(css).not.toContain('touch-action: none');
     expect(css).not.toContain('.dashboard-nav-toggle.is-expand-overlay');
     expect(css).toContain('.dashboard-nav-chrome');
     expect(css).toContain('.dashboard-brand-logo {');
@@ -487,7 +475,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('@media (prefers-reduced-transparency: reduce)');
     expect(css).toContain('-webkit-backdrop-filter: none');
     expect(css).toContain('.dashboard-nav-toggle-icon,');
-    expect(css).toContain('.dashboard-nav-resizer::before,');
+    expect(css).not.toContain('.dashboard-nav-resizer');
     expect(css).toContain('.dashboard-nav-tooltip,');
     expect(css).toContain('.dashboard-theme-popover {');
     expect(css).toContain('.dashboard-theme-trigger,');
@@ -508,20 +496,18 @@ describe('dashboard layout contract', () => {
     expect(css).toContain("[data-nav-phase='collapsed'] .dashboard-brand-copy");
   });
 
-  it('binds the intake wording and announce pages to the published catalog', () => {
-    expect(app).toContain('<IntakeLibrary active={active === \'wording\' || active === \'announce\' ? active : null} />');
-    expect(app).toContain('<WordingLibraryModule');
-    expect(app).toContain('<AnnounceModule');
+  it('binds the intake wording page to the published catalog', () => {
+    expect(app).toContain('<IntakeLibrary active={active === \'wording\'} />');
+    expect(app).not.toContain('<WordingLibraryModule');
+    expect(app).not.toContain('<AnnounceModule');
+    expect(app).not.toContain('<ContentModule');
   });
 
-  it('keeps announce simulation local, transient, and timer-cleaned', () => {
-    expect(announce).toContain('dashboardAnnounce');
-    expect(announce).not.toContain('dashboardWording');
-    expect(announce).not.toContain('MOCK_SOFTWARE_VERSIONS');
-    expect(announce).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
-    if (announce.includes('window.setInterval')) {
-      expect(announce).toContain('window.clearInterval');
-    }
+  it('keeps the catalog pages local to the intake snapshot', () => {
+    expect(library).toContain('dashboardIntakeCatalog');
+    expect(library).not.toContain('dashboardWording');
+    expect(library).not.toContain('MOCK_SOFTWARE_VERSIONS');
+    expect(library).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
   });
 
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
@@ -537,8 +523,7 @@ describe('dashboard layout contract', () => {
 
   it('loads iteration tasks through dashboardIteration and never fetch or inaccuracy-reports', () => {
     expect(iteration).toContain('dashboardIteration');
-    expect(iteration).toContain('ITERATION_COPY.empty');
-    expect(iteration).toContain('ITERATION_COPY.unavailable');
+    expect(iteration).toContain('现在没有待办。');
     expect(iteration).not.toContain('/v1/inaccuracy-reports');
     expect(iteration).not.toContain('customerAgent');
     expect(iteration).not.toMatch(
@@ -546,15 +531,11 @@ describe('dashboard layout contract', () => {
     );
   });
 
-  it('keeps coach content preview local and publishes only through dashboardContent', () => {
-    expect(content).toContain('待发布');
-    expect(content).toContain('标准话术');
-    expect(content).toContain('readCoachUploadFile');
-    expect(content).toContain('dashboardContent');
-    expect(content).toContain('publishDraft');
-    expect(content).not.toContain('synthetic-sops');
-    expect(content).not.toContain('customerAgent');
-    expect(content).not.toMatch(
+  it('publishes from the materials page without a renderer-owned content client', () => {
+    expect(materials).toContain('发布当前候选');
+    expect(materials).not.toContain('publishDraft');
+    expect(materials).not.toContain('customerAgent');
+    expect(materials).not.toMatch(
       /fetch\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|ipcRenderer|preload/,
     );
   });
@@ -597,17 +578,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('.dashboard-shell .content-upload-controls .dash-reset');
     expect(css).not.toMatch(/^\.content-action-row \.dash-reset\s*\{/m);
 
-    expect(content).not.toContain('className="dash-card-label"');
-    expect(content).toContain('aria-label="内容导入"');
-    expect(content).toContain('data-testid="content-replace-row"');
-    expect(content).toContain('将替换');
-
     expect(css).not.toContain('.content-pipeline-steps');
-    expect(content).not.toContain('content-pipeline-steps');
-    expect(content).not.toContain('pipelineStepStatus');
-    expect(content).not.toContain('dash-scope dashboard-scope-important');
-    expect(content).toContain('data-testid="content-pending-dev"');
-    expect(content).toContain('data-testid="content-session-badge"');
   });
 
   it('fail-closes transition-all via direct values, var fallbacks, and earlier scoped custom properties', () => {

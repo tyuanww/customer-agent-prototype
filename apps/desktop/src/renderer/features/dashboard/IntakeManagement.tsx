@@ -364,8 +364,8 @@ export function IntakeManagement() {
     } },
     { title: '时间', key: 'time', render: (_value, row) => formatSeatClock(row.candidate.updatedAt) },
   ];
-  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料管理">
-    <h1 className="desk-sr">资料管理</h1>
+  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料">
+    <h1 className="desk-sr">资料</h1>
     <p className="intake-operator">{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</p>
     {error && <div><p role="alert">{error}</p><ActionButton disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</ActionButton></div>}
     {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">

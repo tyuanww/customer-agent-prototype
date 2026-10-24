@@ -20,7 +20,7 @@ html[data-role='dashboard'] {
   --dash-nav-rail-width: var(--dash-collapsed-surface-width, 72px);
   --dash-nav-icon-slot-width: var(--dash-collapsed-surface-width, 72px);
   --dash-nav-icon-anchor-offset: 36px;
-  --dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 248px));
+  --dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 220px));
   --dash-motion-structure: 190ms;
   --dash-motion-feedback: 140ms;
   --dash-ease-structure: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -43,7 +43,7 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
 }
 
 .dashboard-shell {
-  --dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 248px));
+  --dash-structure-boundary: var(--dash-rendered-nav-width, var(--dashboard-nav-width, 220px));
   --dash-brand-copy-shift: 0px;
   --dash-nav-icon-size: 20px;
   --dash-nav-label-shift: calc(var(--dash-brand-copy-shift) - 4px);
@@ -65,25 +65,6 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
 }
 
 .dashboard-shell[data-theme='dark'] :is(button, input, select, textarea, option, summary) {
-}
-
-.dashboard-shell[data-nav-resizing='true'] {
-  cursor: col-resize;
-  user-select: none;
-  transition: none;
-}
-
-.dashboard-shell[data-nav-resizing='true'] .dashboard-brand-copy,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-label,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-group,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-list,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-boundary,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-toggle::before,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-item > button::before,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-toggle-icon,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-resizer::before {
-  transition: none;
-  animation: none;
 }
 
 .dashboard-shell :is(button, input, select, textarea) {
@@ -603,8 +584,7 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
 .dashboard-shell:is(
   [data-nav-phase='collapsing'],
   [data-nav-phase='collapsed'],
-  [data-nav-phase='expanding'],
-  [data-nav-hold='true']
+  [data-nav-phase='expanding']
 ) :is(
   .dashboard-brand-copy,
   .dashboard-nav-label,
@@ -641,40 +621,6 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
   visibility: hidden;
 }
 
-.dashboard-nav-resizer {
-  position: absolute;
-  z-index: 8;
-  top: 0;
-  right: -7px;
-  bottom: 0;
-  width: 14px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: col-resize;
-  touch-action: none;
-}
-
-.dashboard-nav-resizer::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 6px;
-  width: 1px;
-  background: transparent;
-  content: '';
-  transition: background-color var(--dash-motion-feedback) ease;
-}
-
-.dashboard-nav-resizer:is(:hover, :focus-visible)::before,
-.dashboard-shell[data-nav-resizing='true'] .dashboard-nav-resizer::before {
-  background: var(--dash-control-line);
-}
-
-.dashboard-nav-resizer:focus-visible {
-  outline: 0;
-}
-
 .dashboard-nav-tooltip {
   position: fixed;
   z-index: 100;
@@ -704,7 +650,6 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
     backdrop-filter: blur(20px) saturate(114%);
   }
 
-  .dashboard-shell[data-nav-resizing='true'] .dashboard-nav,
   .dashboard-shell[data-nav-phase='collapsing'] .dashboard-nav,
   .dashboard-shell[data-nav-phase='expanding'] .dashboard-nav {
     background: var(--dash-sidebar);
@@ -822,14 +767,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   left: 0;
 }
 
-.dashboard-shell[data-dashboard-chrome='integrated'][data-nav-resizing='true'] :is(
-  .dashboard-titlebar-drag-strip,
-  .dashboard-topbar,
-  .dashboard-topbar-drag-surface
-) {
-  -webkit-app-region: no-drag;
-}
-
 .dashboard-shell[data-dashboard-chrome='integrated'] .dashboard-brand,
 .dashboard-shell[data-dashboard-chrome='integrated'].is-nav-collapsed .dashboard-brand {
   margin-top: var(--dash-titlebar-height);
@@ -900,7 +837,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   select,
   textarea,
   summary,
-  [role='separator'],
   [role='tab'],
   [role='tooltip']
 ) {
@@ -3412,7 +3348,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .dashboard-nav-toggle::before,
   .dashboard-nav-item > button::before,
   .dashboard-nav-toggle-icon,
-  .dashboard-nav-resizer::before,
   .dashboard-nav-tooltip,
   .dashboard-nav-list,
   .dashboard-nav-label,
@@ -3582,8 +3517,7 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
     color: HighlightText;
   }
 
-  .dashboard-nav-toggle-icon,
-  .dashboard-nav-resizer::before {
+  .dashboard-nav-toggle-icon {
     color: ButtonText;
   }
 
@@ -3603,11 +3537,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   .dashboard-theme-popover button {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .dashboard-nav-resizer {
-    right: -10px;
-    width: 20px;
   }
 }
 

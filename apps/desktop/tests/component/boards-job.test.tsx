@@ -5,8 +5,6 @@ import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
-import { CONTENT_PUBLISH_COPY } from '../../src/shared/dashboard-content';
-
 afterEach(() => {
   cleanup();
   delete window.dashboardIntake;
@@ -45,15 +43,20 @@ function install(job: SessionJobView) {
   return owner;
 }
 
-it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席', async () => {
+it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async () => {
   const user = userEvent.setup();
   const engineer = observeSessionJob({
     title: 'AI赋能工程师',
     directory: [{ name: 'AI赋能工程师', enabled: true }],
     actions: { query: true, import: true, publish: true, rollback: true },
   });
+  const supervisor = observeSessionJob({
+    title: '客服主管',
+    directory: [{ name: '客服主管', enabled: true }],
+    actions: { query: true, import: true, publish: true, rollback: true },
+  });
   const seat = observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
-  for (const job of [engineer, seat]) {
+  for (const job of [engineer, supervisor, seat]) {
     cleanup();
     delete window.dashboardIntake;
     delete window.dashboardContent;
@@ -61,8 +64,17 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
     const owner = install(job);
     try {
       render(<DashboardApp />);
+      expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('话术库');
+      expect(screen.getByTestId('nav-sop')).toHaveAccessibleName('SOP');
+      if (job.status === 'resolved' && job.role === 'agent') {
+        expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
+        expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
+        continue;
+      }
       expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
-      expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料管理');
+      expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
       const grant = job.rights.grant
@@ -80,15 +92,9 @@ it('keeps 权限 and 资料管理 reachable for an engineer and a 客服坐席',
         });
       }
       await user.click(screen.getByTestId('nav-materials'));
-      expect(await screen.findByRole('heading', { name: '资料管理' })).toBeInTheDocument();
-      await user.click(screen.getByTestId('nav-publish'));
-      if (job.actions.publish) {
-        expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
-      } else {
-        expect(screen.queryByRole('button', { name: '发布' })).toBeNull();
-        expect(screen.getByTestId('content-publish-denied')).toHaveTextContent('没有权限，请找人开通。');
-      }
-      expect(screen.queryByText(CONTENT_PUBLISH_COPY.ownerPublish)).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
+      expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('content-publish-denied')).not.toBeInTheDocument();
     } finally {
       owner.dispose();
     }

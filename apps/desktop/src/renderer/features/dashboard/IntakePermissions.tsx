@@ -141,8 +141,12 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
         <footer><DeskButton disabled={blocked} onClick={closeAll}>取消</DeskButton>
           <DeskButton type="primary" disabled={blocked || nextPassword.length === 0} onClick={() => void reset(resetting)}>确认重置</DeskButton></footer>
     </Modal>
-    <Modal open={disabling !== ''} title="停用坐席" closable={false} okText="确认停用" cancelText="取消" okButtonProps={{ danger: true, disabled: blocked }} onCancel={closeAll} onOk={() => void disable(disabling)}>
+    <Modal open={disabling !== ''} title="停用坐席" closable={false} footer={null} destroyOnHidden onCancel={closeAll}>
       <p>停用后该账号无法再登录。</p>
+      <footer>
+        <DeskButton autoFocus disabled={blocked} onClick={closeAll}>取消</DeskButton>
+        <DeskButton danger disabled={blocked} onClick={() => void disable(disabling)}>确认停用</DeskButton>
+      </footer>
     </Modal>
   </section>;
 }
@@ -217,6 +221,23 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     if(!view?.preview){setGrantOpen(false);return;}
     void apply({action:'discard'}).then((ok)=>{if(ok)setGrantOpen(false);});
   };
+  const askRevoke=()=>{
+    const grant=view?.grants.find(item=>item.selection===revoke);
+    if(!grant || !revokeReason.trim())return;
+    // 收回后原授权不能恢复。取消只关掉这个框，原因留在表单里。
+    Modal.confirm({
+      title:`收回 ${grant.person} 在 ${grant.scope}的${labels[grant.action]}`,
+      content:'收回之后不能撤销。以后要用，需要重新开通。',
+      okText:'确认收回',
+      cancelText:'取消',
+      focusable:{autoFocusButton:'cancel'},
+      okButtonProps:{danger:true,autoInsertSpace:false},
+      cancelButtonProps:{autoInsertSpace:false},
+      onOk:()=>apply({action:'revoke',selection:revoke,reason:revokeReason}),
+      transitionName:'',
+      maskTransitionName:'',
+    });
+  };
   const peopleRows=view?.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return {key:p.selection,label:p.label,post:grant.post ?? '—',status:grant.status};}) : [];
   const grantColumns: TableColumnsType<GrantRow> = [
     { title: '人员', key: 'person', render: (_value, grant) => <>{grant.person}<span className="cell-sub">{labels[grant.action]}</span><span className="cell-sub">原授权原因：{grant.reason}</span></> },
@@ -269,7 +290,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
             locale={{ emptyText: <PermissionsEmpty description="此范围暂无可管理业务权限。" /> }} />
           {revoke ? <fieldset disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}><div className="note-row"><span className="lbl">撤销原因</span>
             <Input aria-label="撤销原因" maxLength={512} value={revokeReason} onChange={event => setRevokeReason(event.target.value)} />
-            <DeskButton danger disabled={!revokeReason.trim()} onClick={() => void apply({ action: 'revoke', selection: revoke, reason: revokeReason })}>确认撤销</DeskButton>
+            <DeskButton danger disabled={!revokeReason.trim()} onClick={askRevoke}>确认撤销</DeskButton>
             <DeskButton onClick={() => setRevoke('')}>取消</DeskButton></div></fieldset> : null}
           </section></div>
       </div>

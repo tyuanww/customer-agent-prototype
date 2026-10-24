@@ -41,6 +41,7 @@ export const IPC_CHANNELS = {
   DASHBOARD_ITERATION_LIST: 'dashboard:iteration-list',
   DASHBOARD_ITERATION_START: 'dashboard:iteration-start',
   DASHBOARD_ITERATION_CLOSE: 'dashboard:iteration-close',
+  DASHBOARD_INACCURACY_OUTCOMES: 'dashboard:inaccuracy-outcomes',
   DASHBOARD_OPS_RETRIEVAL: 'dashboard:ops-retrieval',
   DASHBOARD_OPS_SOP_CATALOG: 'dashboard:ops-sop-catalog',
   DASHBOARD_OPS_SOP_IMPORT: 'dashboard:ops-sop-import',

@@ -25,8 +25,9 @@ describe('LoginApp', () => {
   it('defaults to Feishu and only labels the chooser 飞书 / 账号', () => {
     const { container } = mountLogin();
     expect(screen.getByRole('button', { name: '飞书登录' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '飞书' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '账号' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('radio', { name: '飞书' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: '账号' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: '飞书' }).closest('.ant-segmented-item')).toHaveClass('ant-segmented-item-selected');
     expect(screen.getByText('将用浏览器打开飞书登录。')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/内部|外包|将在此窗口打开/);
   });
@@ -37,7 +38,7 @@ describe('LoginApp', () => {
     fireEvent.click(screen.getByRole('button', { name: '飞书登录' }));
     expect(await screen.findByText('正在打开浏览器…')).toBeInTheDocument();
     finish({ ok: true });
-    expect(await screen.findByText('正在等待登录完成。如果浏览器里没有点授权，回到查询窗口再点一次登录。')).toBeInTheDocument();
+    expect(await screen.findByText('请在浏览器里完成授权，完成后这里会自动继续。')).toBeInTheDocument();
   });
 
   it('distinguishes a blocked browser from a rejected authorize URL', async () => {
@@ -51,8 +52,8 @@ describe('LoginApp', () => {
 
   it('submits the account form through the login preload and keeps invalid copy generic', async () => {
     const { submitAccount } = mountLogin();
-    fireEvent.click(screen.getByRole('button', { name: '账号' }));
-    fireEvent.change(screen.getByRole('textbox', { name: '账号' }), { target: { value: 'synthetic_agent' } });
+    fireEvent.click(screen.getByRole('radio', { name: '账号' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '登录名' }), { target: { value: 'synthetic_agent' } });
     fireEvent.change(document.querySelector('input[name="password"]') as HTMLInputElement, { target: { value: 'nope' } });
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
     expect(submitAccount).toHaveBeenCalledWith('synthetic_agent', 'nope');
@@ -63,8 +64,8 @@ describe('LoginApp', () => {
   it('shows account busy copy while the password check is in flight', async () => {
     let finish!: (value: { ok: false; code: 'INVALID' }) => void;
     mountLogin(() => new Promise((resolve) => { finish = resolve; }));
-    fireEvent.click(screen.getByRole('button', { name: '账号' }));
-    fireEvent.change(screen.getByRole('textbox', { name: '账号' }), { target: { value: 'synthetic_agent' } });
+    fireEvent.click(screen.getByRole('radio', { name: '账号' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '登录名' }), { target: { value: 'synthetic_agent' } });
     fireEvent.change(document.querySelector('input[name="password"]') as HTMLInputElement, { target: { value: 'synthetic-password' } });
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
     expect(await screen.findByText('正在验证账号…')).toBeInTheDocument();

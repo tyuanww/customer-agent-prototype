@@ -56,48 +56,30 @@ html[data-role='login'] #root {
   line-height: var(--wb-line-meta);
 }
 
-/* Segmented choice. The track and the thumb share one inset, so the thumb radius is the track
- * radius minus that inset: 8 − 2 = 6, concentric. */
-.login-segmented {
-  display: flex;
-  gap: 2px;
+/* Segmented choice. The workbench antd theme paints the track and the selected
+ * thumb with the same surface, so this window sets the track to the hover step
+ * and the selected thumb to the surface plus a hairline. Track radius 8px,
+ * inset 2px, thumb radius 6px: concentric. */
+.login-window .login-segmented.ant-segmented {
+  width: 100%;
   padding: 2px;
   border-radius: 8px;
   background: var(--wb-hover);
 }
 
-.login-segment {
-  flex: 1 1 0;
-  height: 28px;
-  padding: 0 12px;
-  border: 0;
+.login-window .login-segmented.ant-segmented .ant-segmented-item,
+.login-window .login-segmented.ant-segmented .ant-segmented-thumb {
   border-radius: 6px;
-  background: transparent;
   color: var(--wb-text-2);
-  font: inherit;
-  cursor: pointer;
-  transition: background-color var(--wb-motion) var(--wb-ease), color var(--wb-motion) var(--wb-ease);
 }
 
-.login-segment:hover:not(:disabled) {
-  color: var(--wb-text);
-}
-
-.login-segment[aria-pressed='true'] {
+.login-window .login-segmented.ant-segmented .ant-segmented-item.ant-segmented-item-selected,
+.login-window .login-segmented.ant-segmented .ant-segmented-item.ant-segmented-item-selected-text,
+.login-window .login-segmented.ant-segmented .ant-segmented-thumb {
   background: var(--wb-surface);
   color: var(--wb-text);
   font-weight: 500;
   box-shadow: 0 0 0 var(--wb-hair) var(--wb-line-strong);
-}
-
-.login-segment:focus-visible {
-  outline: 2px solid var(--wb-focus);
-  outline-offset: 2px;
-}
-
-.login-segment:disabled {
-  cursor: default;
-  opacity: 0.6;
 }
 
 .login-form {
@@ -135,5 +117,9 @@ html[data-role='login'] #root {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-segment { transition: none; }
+  .login-window .login-segmented.ant-segmented,
+  .login-window .login-segmented.ant-segmented .ant-segmented-item,
+  .login-window .login-segmented.ant-segmented .ant-segmented-thumb {
+    transition: none;
+  }
 }

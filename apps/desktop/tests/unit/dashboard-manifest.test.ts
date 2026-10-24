@@ -21,7 +21,6 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
-    expect(Object.isFrozen(DASHBOARD_MANIFEST.overview.metrics[0])).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.wording.entries)).toBe(true);
   });
 
@@ -117,38 +116,14 @@ describe('dashboard manifest', () => {
     expect(JSON.stringify(DASHBOARD_MANIFEST.wording)).not.toMatch(/customerText|order_id|image_url/i);
   });
 
-  it('models every manager decision as evidence, impact, accountability, timing, and navigation target', () => {
-    for (const decision of DASHBOARD_MANIFEST.overview.decisions) {
-      expect(decision.evidence.length).toBeGreaterThan(0);
-      expect(decision.impact.length).toBeGreaterThan(0);
-      expect(decision.owner.length).toBeGreaterThan(0);
-      expect(decision.nextStep.length).toBeGreaterThan(0);
-      expect(decision.statusLabel.length).toBeGreaterThan(0);
-      expect(decision.reviewWindow.length).toBeGreaterThan(0);
-      expect(DASHBOARD_MODULE_IDS).toContain(decision.target);
+  it('keeps fixed overview sample counts out of the compile-time manifest', () => {
+    expect(DASHBOARD_MANIFEST).not.toHaveProperty('overview');
+    const serialized = JSON.stringify(DASHBOARD_MANIFEST);
+    const source = readFileSync(sourcePath, 'utf8');
+    for (const sample of ['8.4%', '61.3%', '较上期', '无命中率', '合成演示样本', '58 次合成操作']) {
+      expect(serialized).not.toContain(sample);
+      expect(source).not.toContain(sample);
     }
-    expect(DASHBOARD_MANIFEST.overview.decisions.map((item) => item.priority)).toEqual([
-      'P0',
-      'P1',
-    ]);
-  });
-
-  it('keeps overview charts internally consistent and explicitly non-production', () => {
-    const overview = DASHBOARD_MANIFEST.overview;
-    // The W1-W8 trend series was removed: it was eight weeks of invented numbers with no
-    // render path. Assert it stays gone, so nobody reintroduces fabricated analytics.
-    expect('trend' in overview).toBe(false);
-    expect(overview.operationStructure.reduce((sum, item) => sum + item.count, 0)).toBe(346);
-    expect(new Set(overview.health.map((item) => item.id)).size).toBe(overview.health.length);
-    expect(overview.health.every((item) => item.period && item.definition && item.note)).toBe(true);
-    expect(overview.health.every((item) => DASHBOARD_MODULE_IDS.includes(item.target))).toBe(true);
-    expect(overview.health.find((item) => item.id === 'no-hit-rate')).toMatchObject({
-      value: '8.4%',
-      note: '29 / 346 次合成操作',
-    });
-    expect(overview.operationStructure.find((item) => item.id === 'copied')?.explanation).toContain(
-      '不能推断最终发送',
-    );
   });
 
   it('keeps offline review removed and announce simulation explicitly non-operational', () => {

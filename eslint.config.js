@@ -48,19 +48,13 @@ export default tseslint.config(
   },
   {
     // Workbench pages and the login window use antd controls only (DESIGN.md §3). Native
-    // controls stay legal in the window chrome, which owns drag, collapse and the theme menu,
-    // and in the legacy-profile modules that are pending removal (task card D4).
+    // controls stay legal in the window chrome, which owns drag, collapse and the theme menu.
     files: [
       'apps/desktop/src/renderer/LoginApp.tsx',
       'apps/desktop/src/renderer/features/dashboard/*.tsx',
     ],
     ignores: [
       'apps/desktop/src/renderer/features/dashboard/DashboardThemeMenu.tsx',
-      'apps/desktop/src/renderer/features/dashboard/AnnounceModule.tsx',
-      'apps/desktop/src/renderer/features/dashboard/ContentModule.tsx',
-      'apps/desktop/src/renderer/features/dashboard/IterationModule.tsx',
-      'apps/desktop/src/renderer/features/dashboard/OverviewModule.tsx',
-      'apps/desktop/src/renderer/features/dashboard/WordingLibraryModule.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

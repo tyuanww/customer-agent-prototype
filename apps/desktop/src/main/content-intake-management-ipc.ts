@@ -19,7 +19,7 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
     if (closing) return true;
     const risk = manager?.closeRisk() ?? [...windows.values()].map(m => m.closeRisk()).find(Boolean);
     if (!risk) return true;
-    const choice = dialog.showMessageBoxSync({ type: 'warning', title: '关闭资料管理',
+    const choice = dialog.showMessageBoxSync({ type: 'warning', title: '关闭资料',
       message: risk === 'pending' ? '操作结果尚未确定或请求仍在处理。' : '关闭后会丢失未提交的人工判断。',
       detail: risk === 'pending' ? '建议留在页面按提示确认原操作结果。强制关闭不会撤销服务端操作，重新打开后须核对候选状态。' : '已经提交到服务端的记录仍会保留。',
       buttons: ['继续检查', '仍然关闭'], defaultId: 0, cancelId: 0, noLink: true });

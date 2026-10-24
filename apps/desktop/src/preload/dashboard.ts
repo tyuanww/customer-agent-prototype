@@ -17,6 +17,7 @@ const CONTENT_CANCEL_IN_FLIGHT = 'dashboard:content-cancel-in-flight';
 const ITERATION_LIST = 'dashboard:iteration-list';
 const ITERATION_START = 'dashboard:iteration-start';
 const ITERATION_CLOSE = 'dashboard:iteration-close';
+const INACCURACY_OUTCOMES = 'dashboard:inaccuracy-outcomes';
 const OPS_RETRIEVAL = 'dashboard:ops-retrieval';
 const OPS_SOP_CATALOG = 'dashboard:ops-sop-catalog';
 const OPS_SOP_IMPORT = 'dashboard:ops-sop-import';
@@ -543,6 +544,20 @@ contextBridge.exposeInMainWorld('dashboardIteration', {
     try {
       const value: unknown = await ipcRenderer.invoke(ITERATION_CLOSE, request);
       return isIterationTaskResult(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async outcomes() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(INACCURACY_OUTCOMES);
+      if (isContentFailure(value)) return value;
+      if (!value || typeof value !== 'object') return unavailable;
+      const record = value as Record<string, unknown>;
+      if (record.ok !== true || !exactKeys(record, ['ok', 'items']) || !Array.isArray(record.items)) {
+        return unavailable;
+      }
+      return record;
     } catch {
       return unavailable;
     }

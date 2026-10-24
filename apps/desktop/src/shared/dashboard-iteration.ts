@@ -1,3 +1,4 @@
+import type { InaccuracyOutcomeList } from './inaccuracy-outcome';
 import { exactKeys, PRODUCT_ERRORS, type ProductErrorCode } from './product-session';
 
 /** Frozen OpenAPI IterationTask.task_id is minLength 1 / maxLength 128 with no charset. */
@@ -106,6 +107,7 @@ export type DashboardIterationApi = {
   list(): Promise<DashboardIterationListResult>;
   start(request: DashboardIterationStartRequest): Promise<DashboardIterationTaskResult>;
   close(request: DashboardIterationCloseRequest): Promise<DashboardIterationTaskResult>;
+  outcomes?(): Promise<InaccuracyOutcomeList | DashboardIterationFailure>;
 };
 
 const TASK_KEYS = [

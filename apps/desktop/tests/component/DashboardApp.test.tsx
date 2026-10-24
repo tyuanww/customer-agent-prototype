@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { COACH_UPLOAD_MAX_BYTES } from '../../src/renderer/features/dashboard/coach-content-upload';
-import { IterationModule } from '../../src/renderer/features/dashboard/IterationModule';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
@@ -132,11 +131,11 @@ describe('DashboardApp', () => {
     expect(screen.queryByText('演示环境')).not.toBeInTheDocument();
     expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-overview')).toHaveAccessibleName('概览');
-    expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
+    expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
-    await user.click(screen.getByTestId('nav-publish'));
-    expect(screen.getByLabelText('将替换')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
+    expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
+    await user.click(screen.getByTestId('nav-materials'));
+    expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
   });
 
   it('shows the allergy SOP tree as a read-only 话术运营 module', async () => {
@@ -174,7 +173,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
   });
 
-  it('adds 资料管理 after 系统同步 on the intake sidebar and projects the whitelist line', async () => {
+  it('adds 资料 last on the intake sidebar and projects the whitelist line', async () => {
     const user = userEvent.setup();
     window.dashboardPermissions = {
       current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取权限', view: null }),
@@ -190,26 +189,22 @@ describe('DashboardApp', () => {
     };
     render(<DashboardApp />);
     const materials = await screen.findByTestId('nav-materials');
-    expect(materials).toHaveAccessibleName('资料管理');
+    expect(materials).toHaveAccessibleName('资料');
     expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid')).filter((id) => id?.startsWith('nav-'))).toEqual([
-      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-publish', 'nav-permissions', 'nav-announce', 'nav-materials',
+      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-materials', 'nav-permissions',
     ]);
     expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
-    expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
-    expect(screen.getByTestId('nav-announce')).toHaveAccessibleName('系统同步');
+    expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-announce')).not.toBeInTheDocument();
     expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-topbar-drag-surface').parentElement).not.toHaveTextContent('synthetic-local');
     await user.click(materials);
-    expect(await screen.findByRole('heading', { name: '资料管理' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '知识库' })).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
     expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '资料管理' })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-publish'));
-    expect(screen.getByLabelText('将替换')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '发布' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '知识库' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '资料' })).not.toBeInTheDocument();
   });
 
   it('hides the intake shell line unless both whitelist strings are present', async () => {
@@ -308,70 +303,6 @@ describe('DashboardApp', () => {
     });
   }
 
-  function mockRafQueue() {
-    const queue: FrameRequestCallback[] = [];
-    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      queue.push(callback);
-      return queue.length;
-    });
-    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-    return {
-      flushNext() {
-        const callback = queue.shift();
-        if (callback) act(() => callback(performance.now()));
-      },
-      flushAll() {
-        while (queue.length > 0) {
-          const callback = queue.shift();
-          if (callback) act(() => callback(performance.now()));
-        }
-      },
-      restore() {
-        requestFrame.mockRestore();
-        cancelFrame.mockRestore();
-      },
-    };
-  }
-
-  function mockShellLeft(shell: HTMLElement) {
-    return vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-  }
-
-  function expectStableNavChrome(
-    shell: HTMLElement,
-    toggle: HTMLElement,
-    phase: 'expanded' | 'collapsed',
-    width: number,
-  ) {
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    expect(shell).toHaveAttribute('data-nav-phase', phase);
-    expect(shell).not.toHaveAttribute('data-nav-hold', 'true');
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${width}px`);
-    expect(toggle).toHaveAttribute('aria-expanded', phase === 'expanded' ? 'true' : 'false');
-    expect(toggle).toHaveAccessibleName(phase === 'expanded' ? '折叠侧边栏' : '展开侧边栏');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(width));
-    expect(resizer).toHaveAttribute('aria-valuemin', String(
-      phase === 'collapsed' ? width : 216,
-    ));
-    expect(Number(resizer.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(
-      Number(resizer.getAttribute('aria-valuemin')),
-    );
-    expect(Number(resizer.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
-      Number(resizer.getAttribute('aria-valuemax')),
-    );
-  }
-
   it('collapses navigation accessibly without deferred trash', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<DashboardApp />);
@@ -380,6 +311,10 @@ describe('DashboardApp', () => {
 
     expect(shell).toHaveAttribute('data-nav-collapsed', 'false');
     expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
+    expect(shell).toHaveAttribute('data-nav-width', '220');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('220px');
+    expect(screen.queryByTestId('dashboard-nav-resizer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAccessibleName('折叠侧边栏');
     expect(toggle).not.toHaveAttribute('hidden');
@@ -402,6 +337,8 @@ describe('DashboardApp', () => {
     settleNavPhase(shell);
     expect(shell).toHaveAttribute('data-nav-collapsed', 'true');
     expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(shell).toHaveAttribute('data-nav-width', '220');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurfaceOf(shell)}px`);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveAccessibleName('展开侧边栏');
     expect(toggle).not.toHaveAttribute('hidden');
@@ -445,456 +382,6 @@ describe('DashboardApp', () => {
     expect(within(brand).getByText('客服运营工作台')).toBeInTheDocument();
     expect(within(brand).getByText('运营管理端')).toBeInTheDocument();
     expect(brand.querySelector('.dashboard-brand-copy')).not.toHaveStyle({ maxWidth: '0px' });
-  });
-
-  it('resizes the expanded navigation through an accessible separator and restores its width', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    expect(resizer).toHaveAttribute('aria-orientation', 'vertical');
-    expect(resizer).toHaveAttribute('aria-controls', 'dashboard-sidebar');
-    expect(resizer).toHaveAttribute('aria-valuemin', '216');
-    expect(resizer).toHaveAttribute('aria-valuemax', '348');
-    expect(resizer).toHaveAttribute('aria-valuenow', '248');
-    expect(resizer).toHaveAttribute('aria-valuetext', '248 像素');
-    expect(resizer).toHaveAttribute('tabindex', '0');
-
-    fireEvent.keyDown(resizer, { key: 'ArrowRight' });
-    expect(shell).toHaveAttribute('data-nav-width', '256');
-    expect(resizer).toHaveAttribute('aria-valuenow', '256');
-    fireEvent.keyDown(resizer, { key: 'ArrowRight', shiftKey: true });
-    expect(shell).toHaveAttribute('data-nav-width', '280');
-    fireEvent.keyDown(resizer, { key: 'Home' });
-    expect(shell).toHaveAttribute('data-nav-width', '216');
-    fireEvent.keyDown(resizer, { key: 'End' });
-    expect(shell).toHaveAttribute('data-nav-width', '348');
-    fireEvent.doubleClick(resizer);
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-
-    let pendingFrame: FrameRequestCallback | null = null;
-    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      pendingFrame = callback;
-      return 91;
-    });
-    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-
-    const shellRect = vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 7, clientX: 248 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 7, clientX: 280 });
-    expect(shellRect).toHaveBeenCalledTimes(1);
-    expect(pendingFrame).not.toBeNull();
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 7, clientX: 320 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-width', '320');
-    expect(resizer).toHaveAttribute('aria-valuenow', '320');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shellRect).toHaveBeenCalledTimes(1);
-    expect(shell).toHaveAttribute('data-nav-width', '320');
-    expect(cancelFrame).toHaveBeenCalledWith(91);
-
-    await user.click(screen.getByTestId('dashboard-nav-toggle'));
-    settleNavPhase(shell);
-    expect(resizer).toBeVisible();
-    expect(resizer).toHaveAttribute('tabindex', '0');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurfaceOf(shell)));
-    await user.click(screen.getByTestId('dashboard-nav-toggle'));
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-width', '320');
-    expect(resizer).toBeVisible();
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 8, clientX: 320 });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 8, clientX: 193 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('193px');
-    expect(resizer).toHaveAttribute('aria-valuemin', '216');
-    expect(resizer).toHaveAttribute('aria-valuenow', '216');
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 8, clientX: 193 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell).toHaveAttribute('data-nav-width', '216');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 9, clientX: 216 });
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 9, clientX: 320 });
-    expect(shell).toHaveAttribute('data-nav-width', '320');
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 320 });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 200 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('200px');
-    expect(shell).toHaveAttribute('data-last-expanded-width', '320');
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 10, clientX: 192 });
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('192px');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-last-expanded-width', '320');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-    expect(resizer).toHaveAttribute('aria-valuemin', String(collapsedSurfaceOf(shell)));
-    expect(resizer).toHaveAttribute('aria-valuenow', '192');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('192px');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurfaceOf(shell)}px`);
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 10, clientX: 192 });
-    fireEvent.lostPointerCapture(resizer, { pointerId: 10 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    await user.click(screen.getByTestId('dashboard-nav-toggle'));
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-width', '320');
-    requestFrame.mockRestore();
-    cancelFrame.mockRestore();
-  });
-
-  it('keeps an active resize session when pointer samples are retargeted away from the separator', () => {
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    let pendingFrame: FrameRequestCallback | null = null;
-    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      pendingFrame = callback;
-      return 92;
-    });
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-
-    fireEvent.pointerDown(resizer, {
-      button: 0,
-      buttons: 1,
-      pointerId: 77,
-      clientX: 248,
-    });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
-    fireEvent.pointerMove(window, {
-      button: 0,
-      buttons: 1,
-      pointerId: 77,
-      clientX: 280,
-    });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('280px');
-
-    fireEvent.pointerUp(window, {
-      button: 0,
-      buttons: 0,
-      pointerId: 77,
-      clientX: 300,
-    });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-width', '300');
-    expect(resizer).toHaveAttribute('aria-valuenow', '300');
-    requestFrame.mockRestore();
-  });
-
-  it('previews collapsed drag, snaps back below the expand threshold, and expands only after hysteresis', async () => {
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-
-    let pendingFrame: FrameRequestCallback | null = null;
-    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      pendingFrame = callback;
-      return 77;
-    });
-    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    const collapsedSurface = collapsedSurfaceOf(shell);
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(resizer).toBeVisible();
-    expect(resizer).toHaveAttribute('tabindex', '0');
-    expect(resizer).toHaveAttribute('aria-valuemin', String(collapsedSurface));
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 21, clientX: collapsedSurface });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 21, clientX: 160 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('160px');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 21, clientX: 160 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurface}px`);
-    settleNavPhase(shell);
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
-    expect(resizer).toHaveAttribute('aria-valuetext', `${collapsedSurface} 像素`);
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: 207 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('207px');
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 22, clientX: 208 });
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('208px');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('208px');
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 22, clientX: 240 });
-    fireEvent.lostPointerCapture(resizer, { pointerId: 22 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 23, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 23, clientX: 180 });
-    act(() => pendingFrame?.(performance.now()));
-    fireEvent.pointerCancel(resizer, { pointerId: 23, buttons: 0, clientX: 180 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    act(() => pendingFrame?.(performance.now()));
-    settleNavPhase(shell);
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 24, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 24, clientX: 150 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('150px');
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 0, pointerId: 24, clientX: 260 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    act(() => pendingFrame?.(performance.now()));
-    settleNavPhase(shell);
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 25, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 25, clientX: 165 });
-    act(() => pendingFrame?.(performance.now()));
-    fireEvent.lostPointerCapture(resizer, { pointerId: 25, buttons: 1 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    act(() => pendingFrame?.(performance.now()));
-    settleNavPhase(shell);
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 26, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 26, clientX: 140 });
-    act(() => pendingFrame?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('140px');
-    act(() => {
-      window.dispatchEvent(new Event('blur'));
-    });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    act(() => pendingFrame?.(performance.now()));
-    settleNavPhase(shell);
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(resizer).toHaveAttribute('aria-valuenow', String(collapsedSurface));
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-
-    fireEvent.keyDown(resizer, { key: 'Home' });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    fireEvent.keyDown(resizer, { key: 'ArrowRight' });
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    fireEvent.keyDown(resizer, { key: 'End' });
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-width', '348');
-
-    requestFrame.mockRestore();
-    cancelFrame.mockRestore();
-  });
-
-  function parseCssPx(value: string): number {
-    return Number.parseFloat(value);
-  }
-
-  function readChromeBoundary(shell: HTMLElement) {
-    return {
-      rendered: parseCssPx(shell.style.getPropertyValue('--dash-rendered-nav-width')),
-      structure: parseCssPx(shell.style.getPropertyValue('--dash-structure-boundary')),
-      preview: parseCssPx(shell.style.getPropertyValue('--dash-nav-preview-width')),
-      expanded: parseCssPx(shell.style.getPropertyValue('--dashboard-nav-width')),
-    };
-  }
-
-  function assertCollapsedPointerDownGeometry(shell: HTMLElement, expected: number) {
-    const nav = document.getElementById('dashboard-sidebar');
-    const main = shell.querySelector('.dashboard-main');
-    const topbar = shell.querySelector('.dashboard-topbar');
-    const divider = shell.querySelector('.dashboard-nav');
-    const separator = screen.getByTestId('dashboard-nav-resizer');
-    const boundary = readChromeBoundary(shell);
-
-    expect(nav).not.toBeNull();
-    expect(main).not.toBeNull();
-    expect(topbar).not.toBeNull();
-    expect(divider).toBe(nav);
-    expect(separator).toBeInTheDocument();
-    expect(boundary.rendered).toBe(expected);
-    expect(boundary.structure).toBe(expected);
-    expect(boundary.preview).toBe(expected);
-    expect(boundary.expanded).toBe(248);
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-    expect(separator).toHaveAttribute('aria-valuenow', String(expected));
-    expect([
-      boundary.rendered,
-      boundary.structure,
-      boundary.preview,
-    ]).toEqual([expected, expected, expected]);
-  }
-
-  it('keeps macOS collapsed pointerdown without move on the 120px surface', () => {
-    window.history.replaceState({}, '', '/?platform=darwin');
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-collapsed-surface', '120');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 41, clientX: 120 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    assertCollapsedPointerDownGeometry(shell, 120);
-  });
-
-  it('keeps native collapsed pointerdown without move on the 72px surface', () => {
-    window.history.replaceState({}, '', '/?platform=win32');
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-collapsed-surface', '72');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 42, clientX: 72 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'true');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    assertCollapsedPointerDownGeometry(shell, 72);
-  });
-
-  it('does not let a stale preview settle overwrite a toggle during rollback', () => {
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const collapsedSurface = collapsedSurfaceOf(shell);
-
-    const scheduledFrames: FrameRequestCallback[] = [];
-    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      scheduledFrames.push(callback);
-      return scheduledFrames.length;
-    });
-
-    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 43, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 43, clientX: 160 });
-    act(() => scheduledFrames.at(-1)?.(performance.now()));
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('160px');
-
-    fireEvent.pointerUp(resizer, { button: 0, buttons: 0, pointerId: 43, clientX: 160 });
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    const rollbackFlush = scheduledFrames.at(-1);
-
-    fireEvent.click(toggle);
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
-
-    act(() => {
-      rollbackFlush?.(performance.now());
-    });
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('160px');
-    expect(shell.style.getPropertyValue('--dash-structure-boundary')).toBe('160px');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    expect(shell).toHaveAttribute('data-last-expanded-width', '248');
-
-    act(() => scheduledFrames.at(-1)?.(performance.now()));
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('248px');
-
-    settleNavPhase(shell);
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
-    requestFrame.mockRestore();
   });
 
   it('shows collapsed navigation tooltips on hover and focus, then dismisses with Escape', () => {
@@ -1073,7 +560,10 @@ describe('DashboardApp', () => {
     expect(macShell).toHaveAttribute('data-icon-anchor', '60');
     fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
     settleNavPhase(macShell);
-    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toHaveAttribute('aria-valuenow', '120');
+    expect(macShell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(macShell).toHaveAttribute('data-nav-width', '220');
+    expect(macShell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('120px');
+    expect(screen.queryByTestId('dashboard-nav-resizer')).not.toBeInTheDocument();
     unmount();
 
     window.history.replaceState({}, '', '/?platform=win32');
@@ -1084,7 +574,8 @@ describe('DashboardApp', () => {
     expect(nativeShell).toHaveAttribute('data-icon-anchor', '36');
     fireEvent.click(screen.getByTestId('dashboard-nav-toggle'));
     settleNavPhase(nativeShell);
-    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toHaveAttribute('aria-valuenow', '72');
+    expect(nativeShell).toHaveAttribute('data-nav-phase', 'collapsed');
+    expect(nativeShell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('72px');
   });
 
   it('jumps to the collapsed rail immediately when reduced motion is requested', async () => {
@@ -1105,23 +596,9 @@ describe('DashboardApp', () => {
 
     await user.click(screen.getByTestId('dashboard-nav-toggle'));
     expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      left: 0,
-      top: 0,
-      right: 1024,
-      bottom: 768,
-      width: 1024,
-      height: 768,
-      toJSON: () => ({}),
-    } as DOMRect);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 31, clientX: collapsedSurfaceOf(shell) });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 31, clientX: 220 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell).toHaveAttribute('data-nav-resizing', 'false');
-    expect(shell).toHaveAttribute('data-nav-width', '248');
+    expect(shell).toHaveAttribute('data-nav-width', '220');
+    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${collapsedSurfaceOf(shell)}px`);
+    expect(screen.getByTestId('dashboard-nav-toggle')).toBeVisible();
   });
 
   it('does not settle a reversed structure transition on a stale transitioncancel', () => {
@@ -1137,7 +614,8 @@ describe('DashboardApp', () => {
     const widthSpy = mockStructureWidth(shell, 160);
     dispatchNavStructureTransition(shell, 'transitioncancel');
     expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-    expect(screen.getByRole('separator', { name: '调整工作台侧栏宽度' })).toBeVisible();
+    expect(screen.getByTestId('dashboard-nav-toggle')).toBeVisible();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
     widthSpy.mockRestore();
 
     settleNavPhase(shell);
@@ -1169,151 +647,12 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('dashboard-nav-toggle')).not.toHaveAttribute('hidden');
   });
 
-  it('cancels auto-expand first-frame hold when reduced motion flips on', () => {
-    const media = installColorSchemeMedia(false, false);
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const raf = mockRafQueue();
-    mockShellLeft(shell);
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    const collapsedSurface = collapsedSurfaceOf(shell);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 61, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 61, clientX: 208 });
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-
-    act(() => media.setReducedMotion(true));
-    expectStableNavChrome(shell, toggle, 'expanded', 248);
-    raf.flushAll();
-    expectStableNavChrome(shell, toggle, 'expanded', 248);
-    raf.flushAll();
-    expect(shell).not.toHaveAttribute('data-nav-phase', 'expanding');
-    raf.restore();
-  });
-
-  it('cancels auto-expand second-frame hold when reduced motion flips on', () => {
-    const media = installColorSchemeMedia(false, false);
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const raf = mockRafQueue();
-    mockShellLeft(shell);
-
-    fireEvent.click(toggle);
-    settleNavPhase(shell);
-    const collapsedSurface = collapsedSurfaceOf(shell);
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 62, clientX: collapsedSurface });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 62, clientX: 208 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    raf.flushNext();
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsed');
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-
-    act(() => media.setReducedMotion(true));
-    expectStableNavChrome(shell, toggle, 'expanded', 248);
-    raf.flushAll();
-    expectStableNavChrome(shell, toggle, 'expanded', 248);
-    raf.flushAll();
-    expect(shell).not.toHaveAttribute('data-nav-phase', 'expanding');
-    raf.restore();
-  });
-
-  it('cancels auto-collapse first-frame hold when reduced motion flips on', () => {
-    const media = installColorSchemeMedia(false, false);
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const raf = mockRafQueue();
-    mockShellLeft(shell);
-    const collapsedSurface = collapsedSurfaceOf(shell);
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 63, clientX: 248 });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 63, clientX: 192 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-
-    act(() => media.setReducedMotion(true));
-    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
-    raf.flushAll();
-    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
-    raf.flushAll();
-    expect(shell).not.toHaveAttribute('data-nav-phase', 'collapsing');
-    raf.restore();
-  });
-
-  it('cancels auto-collapse second-frame hold when reduced motion flips on', () => {
-    const media = installColorSchemeMedia(false, false);
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const raf = mockRafQueue();
-    mockShellLeft(shell);
-    const collapsedSurface = collapsedSurfaceOf(shell);
-
-    fireEvent.pointerDown(resizer, { button: 0, buttons: 1, pointerId: 64, clientX: 248 });
-    fireEvent.pointerMove(resizer, { button: 0, buttons: 1, pointerId: 64, clientX: 192 });
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    raf.flushNext();
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    expect(shell).toHaveAttribute('data-nav-hold', 'true');
-
-    act(() => media.setReducedMotion(true));
-    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
-    raf.flushAll();
-    expectStableNavChrome(shell, toggle, 'collapsed', collapsedSurface);
-    raf.flushAll();
-    expect(shell).not.toHaveAttribute('data-nav-phase', 'collapsing');
-    raf.restore();
-  });
-
-  it('clears settling preview on target-matched transitioncancel so viewport clamp can publish', () => {
-    render(<DashboardApp />);
-    const shell = screen.getByTestId('dashboard-shell');
-    const resizer = screen.getByRole('separator', { name: '调整工作台侧栏宽度' });
-    const toggle = screen.getByTestId('dashboard-nav-toggle');
-    const originalInnerWidth = window.innerWidth;
-
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
-    act(() => window.dispatchEvent(new Event('resize')));
-    fireEvent.keyDown(resizer, { key: 'End' });
-    const expanded = Number(shell.getAttribute('data-nav-width'));
-    expect(expanded).toBeGreaterThan(238);
-
-    fireEvent.click(toggle);
-    expect(shell).toHaveAttribute('data-nav-phase', 'collapsing');
-    fireEvent.click(toggle);
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanding');
-
-    const widthSpy = mockStructureWidth(shell, expanded);
-    dispatchNavStructureTransition(shell, 'transitioncancel');
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe(`${expanded}px`);
-    widthSpy.mockRestore();
-
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 700 });
-    act(() => window.dispatchEvent(new Event('resize')));
-    expect(shell).toHaveAttribute('data-nav-width', '238');
-    expect(shell.style.getPropertyValue('--dash-rendered-nav-width')).toBe('238px');
-    expect(shell.style.getPropertyValue('--dash-nav-preview-width')).toBe('');
-    expect(shell).toHaveAttribute('data-nav-phase', 'expanded');
-
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
-  });
-
   it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
     render(<DashboardApp />);
 
     expect(screen.getByRole('heading', { name: '概览' })).toBeInTheDocument();
     expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('话术使用次数');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('查询次数');
     expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
   });
 
@@ -1326,8 +665,8 @@ describe('DashboardApp', () => {
 
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('无命中次数');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('坐席查询后，排行会出现在这里。');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('没查到');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('坐席查询后会出现');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
@@ -1379,217 +718,11 @@ describe('DashboardApp', () => {
     expect(content).not.toHaveAttribute('data-drag-scrolling');
   });
 
-  it('demonstrates local announce success and recoverable failure without changing facets', async () => {
+  it('opens 话术库 from the sidebar', async () => {
     render(<DashboardApp />);
-    fireEvent.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
-  });
-
-  it('shows ledger details without a sent body and keeps publish disabled', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    // ledger is now accessible via overview: open the details section
-    await user.click(screen.getByTestId('nav-publish'));
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '请先登录后再发布',
-    );
-    expect(screen.queryByTestId('release-rel-demo-2026-08-blocked')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('missing-domain-block')).not.toBeInTheDocument();
-    expect(screen.queryByText('结构演示')).not.toBeInTheDocument();
-    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-  });
-
-  it('lets a coach import a synthetic csv/xlsx or demo file into staged preview without enabling publish', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    expect(window.customerAgent).toBeUndefined();
-    await user.click(screen.getByTestId('nav-publish'));
-
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('content-replace-row')).toHaveTextContent('将替换');
-    expect(screen.getByTestId('content-upload-draft-copy')).toHaveTextContent(
-      '选表只预览，点发布后坐席才能搜到',
-    );
-    expect(screen.queryByTestId('content-upload-role-note')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('content-upload-boundary')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('content-aftersale-note')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('formal-source-warning')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
-    // 浏览器侧 accept 只放行 .csv / .xlsx；扩展名兜底在 parser 单测覆盖。
-    expect(screen.getByTestId('content-upload-input')).toHaveAttribute('accept', '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    expect(screen.getByTestId('content-upload-input')).toHaveAttribute('type', 'file');
-    expect(screen.getByLabelText('选择 CSV 或 xlsx')).toBeInTheDocument();
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('选择 CSV 或 xlsx');
-
-    // The import workspace ships collapsed; the header carries the session state.
-    expect(screen.getByTestId('content-pending-dev')).not.toHaveAttribute('open');
-    expect(screen.getByTestId('content-session-badge')).toHaveTextContent('请先登录');
-    const actionRow = document.querySelector('.content-action-row');
-    expect(actionRow).toContainElement(screen.getByTestId('publish-action'));
-    expect(actionRow).toContainElement(screen.getByTestId('cancel-in-flight'));
-    expect(screen.getByTestId('content-replace-row').closest('[data-testid="content-pending-dev"]')).toBeNull();
-    expect(screen.getByTestId('content-session-badge')).toHaveAttribute(
-      'title',
-      expect.stringContaining('不会写入假发布'),
-    );
-    expect(screen.queryByTestId('content-pipeline-steps')).not.toBeInTheDocument();
-    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-
-    const demoCsv = new File(
-      ['scene,script\n洁面用量确认,先确认产品版本，再说明用量与不可承诺边界\n满赠规则说明,展示门槛与结算条件，不承诺库存\n售后质量升级,记录必要证据，禁止原因承诺\n'],
-      'coach-draft.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
-    });
-    expect(screen.getByTestId('content-pending-dev').tagName).toBe('SECTION');
-    expect(screen.getByTestId('content-staged-preview')).toBeVisible();
-    const demoPreview = screen.getByTestId('content-staged-preview');
-    expect(demoPreview).toHaveTextContent('场景');
-    expect(demoPreview).toHaveTextContent('标准话术');
-    expect(demoPreview).not.toHaveTextContent('步骤');
-    expect(demoPreview).toHaveTextContent('洁面用量确认');
-    expect(demoPreview).toHaveTextContent('售后质量升级');
-    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(window.customerAgent).toBeUndefined();
-
-    const csv = new File(
-      ['scene,step\n洁面用量确认,先确认产品版本\n'],
-      'coach-draft.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), csv);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
-    });
-    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('先确认产品版本');
-    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('coach-draft.csv');
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('不是已发布');
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-
-    const xlsx = new File(
-      ['scene,step\n满赠规则说明,不承诺库存\n'],
-      'coach-draft.xlsx',
-      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), xlsx);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('满赠规则说明');
-    });
-    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('不承诺库存');
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(
-      '请先登录后再发布',
-    );
-    expect(window.customerAgent).toBeUndefined();
-
-    const binary = new File(
-      [new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00])],
-      'workbook.xlsx',
-      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), binary);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
-    });
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('这个 Excel 现在打不开');
-    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(window.customerAgent).toBeUndefined();
-  });
-
-  it('keeps the staged preview after leaving content and coming back', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-publish'));
-    const csv = new File(
-      ['scene,script\n洁面用量确认,先确认产品版本\n'],
-      'coach-draft.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), csv);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
-    });
-    await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByTestId('nav-publish'));
-    expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'ready');
-    expect(screen.getByTestId('content-staged-preview')).toHaveTextContent('洁面用量确认');
-    expect(screen.getByTestId('publish-disabled-reason')).not.toHaveTextContent('请先导入草稿');
-  });
-
-  it('clears the coach preview back to idle without leaving released state behind', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-publish'));
-
-    const clear = screen.getByTestId('content-upload-clear');
-    expect(clear).toBeDisabled();
-
-    const demoCsv = new File(
-      ['scene,script\n洁面用量确认,先确认产品版本\n'],
-      'coach-draft.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
-    });
-    expect(clear).toBeEnabled();
-
-    await user.click(clear);
-    expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
-    expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'idle');
-    expect(screen.getByTestId('content-upload-status')).toHaveTextContent('等待导入');
-    expect(screen.getByTestId('content-upload-status')).not.toHaveTextContent('不是已发布');
-    expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('content-pipeline')).not.toBeInTheDocument();
-    expect(screen.getByTestId('publish-action')).toBeDisabled();
-    expect(window.customerAgent).toBeUndefined();
-  });
-
-  it('fail-closes bad coach tables without leaking a staged preview or enabling publish', async () => {
-    const user = userEvent.setup();
-    render(<DashboardApp />);
-    await user.click(screen.getByTestId('nav-publish'));
-    const demoCsv = new File(
-      ['scene,script\n洁面用量确认,先确认产品版本\n'],
-      'coach-draft.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(screen.getByTestId('content-upload-input'), demoCsv);
-    await waitFor(() => {
-      expect(screen.getByTestId('content-staged-preview')).toBeInTheDocument();
-    });
-
-    const cases = [
-      { file: new File(['title,body\nA,B\n'], 'bad-headers.csv', { type: 'text/csv' }), copy: '表头必须能映射' },
-      { file: new File([''], 'empty.csv', { type: 'text/csv' }), copy: '没有可预览的数据行' },
-      { file: new File(['scene,step,domain\n用量,说明,legal\n'], 'bad-domain.csv', { type: 'text/csv' }), copy: '域只能是' },
-      {
-        file: new File(['x'.repeat(COACH_UPLOAD_MAX_BYTES + 1)], 'huge.csv', { type: 'text/csv' }),
-        copy: '10MiB',
-      },
-    ] as const;
-
-    for (const item of cases) {
-      await user.upload(screen.getByTestId('content-upload-input'), item.file);
-      await waitFor(() => {
-        expect(screen.getByTestId('content-upload-status')).toHaveAttribute('data-state', 'error');
-      });
-      expect(screen.getByTestId('content-upload-status')).toHaveTextContent('未进入待发布');
-      expect(screen.getByTestId('content-upload-status')).toHaveTextContent(item.copy);
-      expect(screen.queryByTestId('content-staged-preview')).not.toBeInTheDocument();
-      expect(screen.queryByText('ACK/Lease')).not.toBeInTheDocument();
-      expect(screen.getByTestId('publish-action')).toBeDisabled();
-      expect(window.customerAgent).toBeUndefined();
-    }
+    fireEvent.click(screen.getByTestId('nav-wording'));
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
   });
 
   it('removed: review module deleted', () => {
@@ -1597,164 +730,16 @@ describe('DashboardApp', () => {
     expect(true).toBe(true);
   });
 
-  it('keeps iteration tasks and announce facets separate', async () => {
+  it('shows 待办 on 概览, then opens 话术库', async () => {
     const user = userEvent.setup();
     render(<DashboardApp />);
 
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
     expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
 
-    await user.click(screen.getByTestId('nav-announce'));
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'announce');
-    expect(screen.getByRole('region', { name: '当前可用版本' })).toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-wording'));
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
   });
 
-  it('reminds coach/owner of open P0 iteration tasks and selects the matching queue row', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-
-    const reminder = screen.getByTestId('iteration-reminder');
-    expect(reminder).toHaveClass('dash-card');
-    expect(reminder).toHaveTextContent('有 2 条待处理 P0 需要跟进');
-    expect(reminder).not.toHaveTextContent('DEMO · 合成数据');
-    expect(reminder).toHaveTextContent('会员积分过期补发缺少有效稿');
-    expect(reminder).toHaveTextContent('退货检测旧稿已过有效期仍被召回');
-    expect(reminder).not.toHaveTextContent('洁面泡沫少的首条场景过宽');
-    expect(reminder).not.toHaveTextContent('班牛');
-    expect(reminder).not.toHaveTextContent('工单');
-    expect(screen.getByTestId('iteration-reset-drill')).toBeDisabled();
-    expect(screen.queryByTestId('iteration-reminder-empty')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-it-2041')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('iteration-reminder-it-2041')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('module-iteration')).toHaveTextContent(
-      '需要跟进的话术',
-    );
-    expect(screen.getByTestId('iteration-inaccuracy-counts-footnote')).toHaveTextContent(
-      '不准次数还没接上。这里先不显示数字。',
-    );
-
-    await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
-    expect(screen.queryByTestId('iteration-it-2055')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-it-2017')).toBeInTheDocument();
-    expect(screen.getByTestId('iteration-it-1992')).toBeInTheDocument();
-
-    await user.click(screen.getByTestId('iteration-reminder-it-2055'));
-    expect(screen.getByTestId('iteration-status-filter')).toHaveValue('all');
-    expect(screen.getByTestId('iteration-cause-filter')).toHaveValue('all');
-    expect(screen.getByTestId('iteration-it-2055')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('iteration-reminder-it-2055')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('退货检测旧稿已过有效期仍被召回');
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('it-2055');
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('过期仍召回');
-  });
-
-  it('drills start and close on the in-memory iteration queue without persisting anything', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-
-    // 开始处理：open @ v1 → in_progress @ v2，按钮换成结论表单。
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
-    expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('iteration-start'));
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
-    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
-    expect(screen.getByTestId('iteration-reset-drill')).toBeEnabled();
-    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 1 条待处理 P0 需要跟进');
-    expect(screen.queryByTestId('iteration-reminder-it-2041')).not.toBeInTheDocument();
-
-    // 缺少结论时不能关闭。
-    expect(screen.getByTestId('iteration-close-resolved')).toBeDisabled();
-    expect(screen.getByTestId('iteration-close-wont-fix')).toBeDisabled();
-    await user.type(screen.getByTestId('iteration-note'), '已确认有效期过滤口径，待排期修复');
-    expect(screen.getByTestId('iteration-close-resolved')).toBeEnabled();
-
-    await user.click(screen.getByTestId('iteration-close-resolved'));
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('已处理');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v3');
-    expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('终态不可再变更');
-    expect(screen.getByTestId('iteration-terminal')).toHaveTextContent('已确认有效期过滤口径');
-    expect(screen.queryByTestId('iteration-start')).not.toBeInTheDocument();
-
-    // 关闭待办不等于已发布。
-    expect(screen.getByTestId('iteration-detail-footnote')).toHaveTextContent(
-      '不自动改写 Answer。关闭待办不等于已发布。演练不保存、不联网。',
-    );
-
-    // 重置演练恢复合成清单。
-    await user.click(screen.getByTestId('iteration-reset-drill'));
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
-    expect(screen.queryByTestId('iteration-drill-state')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
-    expect(screen.getByTestId('iteration-reset-drill')).toBeDisabled();
-    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('有 2 条待处理 P0 需要跟进');
-  });
-
-  it('keeps a P0 empty reminder after the last open P0 leaves the strip', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-
-    await user.click(screen.getByTestId('iteration-start'));
-    await user.click(screen.getByTestId('iteration-reminder-it-2055'));
-    await user.click(screen.getByTestId('iteration-start'));
-
-    expect(screen.getByTestId('iteration-reminder')).toHaveClass('is-empty');
-    expect(screen.getByTestId('iteration-reminder')).toHaveTextContent('当前没有待处理 P0');
-    expect(screen.getByTestId('iteration-reminder-empty')).toHaveTextContent('处理中或已关闭的不出现在这里');
-    expect(screen.queryByTestId('iteration-reminder-it-2041')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('iteration-reminder-it-2055')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-reset-drill')).toBeEnabled();
-  });
-
-  it('reports a refresh prompt when the server version moves ahead of the client snapshot', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-    expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-stale-attempt')).toHaveTextContent('演示版本冲突');
-
-    await user.click(screen.getByTestId('iteration-stale-attempt'));
-    await user.click(screen.getByTestId('iteration-start'));
-
-    expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
-    // 冲突不落地：客户端快照仍是 open @ v1。
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('待处理');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
-    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
-
-    await user.click(screen.getByTestId('iteration-reset-drill'));
-    expect(screen.queryByTestId('iteration-conflict')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v1');
-  });
-
-  it('rejects close when the server version moved ahead during in_progress', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-    await user.click(screen.getByTestId('iteration-start'));
-    await user.type(screen.getByTestId('iteration-note'), '已核对有效期过滤');
-    await user.click(screen.getByTestId('iteration-stale-attempt'));
-    await user.click(screen.getByTestId('iteration-close-resolved'));
-
-    expect(screen.getByTestId('iteration-conflict')).toHaveTextContent('待办已更新，请刷新后再处理');
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
-    expect(screen.queryByTestId('iteration-terminal')).not.toBeInTheDocument();
-  });
-
-  it('resets filters without wiping an in-memory drill', async () => {
-    const user = userEvent.setup();
-    render(<IterationModule />);
-    await user.click(screen.getByTestId('iteration-start'));
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-
-    await user.selectOptions(screen.getByTestId('iteration-status-filter'), 'closed');
-    expect(screen.queryByTestId('iteration-it-2041')).not.toBeInTheDocument();
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-
-    await user.click(screen.getByTestId('iteration-reset-filters'));
-    expect(screen.getByTestId('iteration-status-filter')).toHaveValue('all');
-    expect(screen.getByTestId('iteration-it-2041')).toBeInTheDocument();
-    expect(screen.getByTestId('iteration-detail')).toHaveTextContent('处理中');
-    expect(screen.getByTestId('iteration-detail-version')).toHaveTextContent('v2');
-    expect(screen.getByTestId('iteration-drill-state')).toHaveTextContent('仅存在本页内存');
-  });
 });

@@ -1,4 +1,4 @@
-/** Deterministic local preview sample. Not a live usage feed. */
+/** Test-only sample counts. The intake overview must not import this file. */
 const hash = (str: string) => {
   let h = 2166136261;
   for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }

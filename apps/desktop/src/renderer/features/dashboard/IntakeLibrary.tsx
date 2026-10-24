@@ -2,8 +2,8 @@ import { createElement, useEffect, useRef, useState, type ComponentType, type Ke
 import { Button, Checkbox, Empty, Input, Select, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import type { IntakeCatalogCommand, IntakeCatalogRow, IntakeCatalogView } from '@shared/content-intake-catalog';
 import type { IntakeQueryOption } from '@shared/content-intake-query';
-import { formatIntakeDay, formatSeatClock, remainingLabel, timeoutUntil } from './intake-time';
-import { IntakeUsageLog } from './IntakeUsageLog';
+import { catalogAvailability, catalogAvailabilitySentence } from './catalog-availability';
+import { formatIntakeDay, formatSeatClock, timeoutUntil } from './intake-time';
 import './intake-management.css';
 import './workbench-v9.css';
 import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
@@ -59,9 +59,8 @@ function Conditions({ label, options, selected, disabled, change }: {
   </details>;
 }
 
-/** One mounted reader serves the library and available-version views. Navigation
- * only changes presentation; Main owns snapshots, authorization and cancellation. */
-export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | null }) {
+/** Stays mounted while hidden so the catalog subscription and the one first refresh survive leaving 话术库. */
+export function IntakeLibrary({ active }: { active: boolean }) {
   const [view,setView] = useState<IntakeCatalogView|null>(null), [busy,setBusy] = useState(false), [error,setError] = useState('');
   const [domain,setDomain] = useState<LibraryTab>('product');
   const [question,setQuestion] = useState('');
@@ -117,6 +116,7 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
   },[view?.context.shopNamesValidUntil]);
   const context=view?.context, disabled=busy || !!view?.busy;
   const fresh=!!view?.validUntil && Date.now()<Date.parse(view.validUntil) && performance.now()<deadline.current;
+  const availability = catalogAvailability(view, fresh);
   const rows=fresh ? view.rows : [];
   const names=new Map(context?.shopNamesValidUntil && Date.parse(context.shopNamesValidUntil)>Date.now() ? context.shopNames.map(n=>[n.id,n.label]) : []);
   const counts=new Map<string,number>(); for(const name of names.values()) counts.set(name,(counts.get(name)??0)+1);
@@ -149,9 +149,18 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
       <span className="desk-sr">生效 {formatSeatClock(row.effectiveFrom)}{row.effectiveTo ? `，失效 ${formatSeatClock(row.effectiveTo)}` : ''}，条目版本 {row.scriptVersion}</span></span> },
   ];
   return <div hidden={!active}>
-    <section className="dash-module intake-management intake-library wb9" aria-label={active==='announce' ? '当前可用版本' : '可用话术目录'}>
-      <h1 className="desk-sr">{active==='announce' ? '系统同步' : '话术库'}</h1>
-      {active==='wording' && <div className="toolbar">
+    {active ? <section className="dash-module intake-management intake-library wb9" aria-label="可用话术目录">
+      <h1 className="desk-sr">话术库</h1>
+      <div className="sync-line">
+        <span className="state">
+          <i className={availability.kind === 'available' ? 'dot ok' : 'dot'} />
+          <b role="status">{catalogAvailabilitySentence(availability)}</b>
+        </span>
+        {availability.kind === 'available' && availability.remaining
+          ? <span className="rel">{availability.remaining}</span>
+          : null}
+      </div>
+      <div className="toolbar">
         <div className="left">
           <label className="lbl">目标店铺<Select aria-label="目录店铺" virtual={false} disabled={disabled || !context?.shops.length}
             value={context?.shopId ?? undefined} placeholder={context?.shops.length ? '请选择店铺' : '暂无可用店铺'} style={{ width: 220 }}
@@ -163,9 +172,9 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
           {disabled && <LibraryButton onClick={() => void apply({action:'cancel'})}>停止目录读取</LibraryButton>}
           <LibraryButton aria-label="刷新可用资料" disabled={disabled} onClick={() => void apply({action:'refresh'})}>{refreshIcon}</LibraryButton>
         </div>
-      </div>}
+      </div>
       {context && context.shops.length>0 && names.size!==context.shops.length && <p role="status" className="hint">当前显示店铺编号。</p>}
-      {active==='wording' && context?.shopId && <div className="intake-catalog-filter-grid">
+      {context?.shopId && <div className="intake-catalog-filter-grid">
         <Conditions label="商品" options={context.products} selected={context.productIds} disabled={disabled}
           change={productIds => void apply({action:'select-conditions',productIds,scenarioIds:context.scenarioIds})}/>
         <Conditions label="场景" options={context.scenarios} selected={context.scenarioIds} disabled={disabled}
@@ -176,32 +185,18 @@ export function IntakeLibrary({ active }: { active: 'wording' | 'announce' | nul
       {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
       {!disabled && view?.signedIn && !context?.shopId && <p>请选择有权查看的店铺；没有可用店铺时请核对身份与范围。</p>}
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
-      {active==='announce' ? <>
-        <div className="sync-line">
-          {fresh ? <span className="state"><i className="dot ok" /><b role="status">当前可用 {rows.length} 条，到 {formatIntakeDay(view!.validUntil)} 还能查。</b></span>
-            : <span className="state"><i className="dot" /><b>暂无有效发布</b></span>}
-          {fresh && remainingLabel(view!.validUntil) && <span className="rel">{remainingLabel(view!.validUntil)}</span>}
-          <span className="grow" />
-          {disabled && <LibraryButton onClick={() => void apply({action:'cancel'})}>停止目录读取</LibraryButton>}
-          <LibraryButton aria-label="刷新可用资料" disabled={disabled} onClick={() => void apply({action:'refresh'})}>{refreshIcon}</LibraryButton>
-        </div>
-        <p>软件更新：安装包更新还不在这页。</p>
-        <p>发布记录：发布记录还没有接到这里。</p>
-        <IntakeUsageLog />
-      </> : <>
-        <div className="tabbar sub"><div className="tabs" role="tablist" aria-label="话术类型">
-          {libraryTabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
-            aria-selected={domain===item.id} aria-controls="intake-domain-panel" tabIndex={domain===item.id?0:-1}
-            className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</LibraryButton>)}
-        </div></div>
-        <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>
-          {fresh ? <ScriptTable<IntakeCatalogRow>
-            aria-label="可用话术" pagination={false} tableLayout="fixed" rowKey="id" rowClassName={() => 'item'}
-            dataSource={visible} columns={scriptColumns}
-            locale={{ emptyText: <CatalogEmpty description="当前条件下没有此类可用话术。" /> }} />
-            : <CatalogEmpty description={context?.shops.length ? '选择店铺后，可用话术会出现在这里。' : '暂无可用店铺。目录接入后会出现在这里。'} />}
-        </section>
-      </>}
-    </section>
+      <div className="tabbar sub"><div className="tabs" role="tablist" aria-label="话术类型">
+        {libraryTabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
+          aria-selected={domain===item.id} aria-controls="intake-domain-panel" tabIndex={domain===item.id?0:-1}
+          className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</LibraryButton>)}
+      </div></div>
+      <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>
+        {fresh ? <ScriptTable<IntakeCatalogRow>
+          aria-label="可用话术" pagination={false} tableLayout="fixed" rowKey="id" rowClassName={() => 'item'}
+          dataSource={visible} columns={scriptColumns}
+          locale={{ emptyText: <CatalogEmpty description="当前条件下没有此类可用话术。" /> }} />
+          : <CatalogEmpty description={context?.shops.length ? '选择店铺后，可用话术会出现在这里。' : '暂无可用店铺。目录接入后会出现在这里。'} />}
+      </section>
+    </section> : null}
   </div>;
 }
