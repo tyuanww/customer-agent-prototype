@@ -19,8 +19,8 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
 
   it('verifies the actual 41-migration installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 65,
-      inventory: { tables: 109, views: 7, functions: 284 },
+      status: 'PASS', migrationCount: 67,
+      inventory: { tables: 110, views: 7, functions: 291 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
   });
@@ -142,7 +142,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
     }
   }, 180_000);
 
-  it('accepts the two disabled import-batch triggers on the 113-entry readiness fingerprint and leaves them disabled', async () => {
+  it('accepts the two disabled import-batch triggers on the 115-entry policy restamp fingerprint and leaves them disabled', async () => {
     const local = new Pg15Harness();
     let readiness: Client | undefined;
     try {
@@ -153,10 +153,10 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
       expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
         status: 'PASS',
-        migrationCount: 65,
+        migrationCount: 67,
         triggerFingerprint: {
-          entries: 114,
-          frozenSha256: '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a',
+          entries: 115,
+          frozenSha256: 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b',
           difference: 'import_batches_tgenabled',
           disabledTriggers: [
             'backend_review_sync_wait_on_batch_failed',

@@ -52,6 +52,9 @@ export async function createProductAuthService(
   provider: SyntheticIdentityProvider,
   authMode: AuthMode,
   afterLogin?: (openId: string) => Promise<void>,
+  /** Runs after a non-Feishu binding is accepted. A seat has no Feishu identity, so this is the
+   *  only place its five-minute facts can be renewed from the post the operator assigned. */
+  afterPasswordLogin?: (bindingId: string) => Promise<void>,
 ): Promise<ProductAuthService> {
   const pool = new Pool({
     connectionString: config.connectionString,
@@ -167,6 +170,15 @@ export async function createProductAuthService(
         catch (error) {
           const name = error instanceof Error ? error.name : 'unknown';
           console.info(`[api] roster projection failed: ${name}`);
+        }
+      } else if (afterPasswordLogin && !isFeishuOpenId(binding)) {
+        // A failure here must not fail the login: the exchange already succeeded and the session
+        // exists. The seat then has no live facts, which the next request reports as an ordinary
+        // authorization refusal rather than a broken session.
+        try { await afterPasswordLogin(binding); }
+        catch (error) {
+          const name = error instanceof Error ? error.name : 'unknown';
+          console.info(`[api] seat projection failed: ${name}`);
         }
       }
     },

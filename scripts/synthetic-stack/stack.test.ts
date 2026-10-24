@@ -485,10 +485,67 @@ describe('synthetic identity password', () => {
         ]));
         assert.equal((await postPassword(origin, 'seatok', 'seat-password')).status, 401);
         assert.equal((await postPassword(origin, 'synthetic_agent', second)).status, 200);
+        writeFileSync(accountsFile, JSON.stringify([
+          buildAccount('synthetic_agent', 'synthetic_agent', second),
+          buildAccount('alice', 'synthetic_seat_alice', 'seat-password'),
+        ]));
+        assert.equal((await postPassword(origin, 'alice', 'seat-password')).status, 401);
       } finally {
         await provider.close();
       }
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts an enabled seat and still refuses a disabled one, without touching the fixed list', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-seat-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    const password = 'seat-password-enabled';
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_agent', 'synthetic_agent', password),
+      buildAccount('alice', 'synthetic_seat_alice', password),
+      buildAccount('bob', 'synthetic_owner', password),
+    ]));
+    const enabled = new Set(['synthetic_seat_alice']);
+    const provider = createIdentityProvider({
+      port,
+      accountsFile,
+      seatBindingEnabled: async (bindingId) => enabled.has(bindingId),
+    });
+    const origin = await provider.listen();
+    const post = (username: string, secret = password) => fetch(`${origin}/password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password: secret }),
+    });
+    try {
+      const seated = await post('alice');
+      assert.equal(seated.status, 200);
+      assert.deepEqual(await seated.json(), { code: 'synthetic_seat_alice' });
+      const exchanged = await fetch(`${origin}/exchange`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: 'synthetic_seat_alice' }),
+      });
+      assert.equal(exchanged.status, 200);
+      assert.deepEqual(await exchanged.json(), { provider: 'synthetic', binding_id: 'synthetic_seat_alice' });
+      const seeded = await post('synthetic_agent');
+      assert.equal(seeded.status, 200);
+      assert.deepEqual(await seeded.json(), { code: 'synthetic_agent' });
+      // A file row whose binding is not the seat id derived from the username.
+      assert.equal((await post('bob')).status, 401);
+      enabled.delete('synthetic_seat_alice');
+      assert.equal((await post('alice')).status, 401);
+      const afterDisable = await fetch(`${origin}/exchange`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: 'synthetic_seat_alice' }),
+      });
+      assert.equal(afterDisable.status, 401);
+    } finally {
+      await provider.close();
       rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -508,6 +565,40 @@ describe('synthetic identity password', () => {
 });
 
 describe('password identity server reload', () => {
+  it('requires an enabled seat binding and still accepts a seeded account', async () => {
+    const port = await freeLoopbackPort();
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'password-identity-seat-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    const password = 'password-server-seat';
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('synthetic_agent', 'synthetic_agent', password),
+      buildAccount('alice', 'synthetic_seat_alice', password),
+    ]));
+    const enabled = new Set(['synthetic_seat_alice']);
+    const server = createPasswordIdentityServer({
+      port,
+      accountsFile,
+      seatBindingEnabled: async (bindingId) => enabled.has(bindingId),
+    });
+    const post = (username: string) => fetch(`http://127.0.0.1:${String(port)}/password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    try {
+      await server.listen();
+      assert.equal((await post('synthetic_agent')).status, 200);
+      const seated = await post('alice');
+      assert.equal(seated.status, 200);
+      enabled.delete('synthetic_seat_alice');
+      assert.equal((await post('alice')).status, 401);
+      assert.equal((await post('synthetic_agent')).status, 200);
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('accepts a seat password written after startup and refuses a broken file', async () => {
     const port = await freeLoopbackPort();
     const dir = mkdtempSync(path.join(os.tmpdir(), 'password-identity-'));
