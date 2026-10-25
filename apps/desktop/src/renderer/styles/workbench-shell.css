@@ -4,7 +4,6 @@
  * are while colour, type, borders and motion follow workbench-tokens.css.
  */
 
-/* ── Surfaces ──────────────────────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell,
 html[data-role='dashboard'] .dashboard-shell.is-intake .dashboard-content,
 html[data-role='dashboard'] .dashboard-shell .dashboard-main,
@@ -28,7 +27,6 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-nav::after {
   background: var(--wb-line);
 }
 
-/* ── Brand ─────────────────────────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell .dashboard-brand-copy strong {
   font-size: var(--wb-text-body);
   line-height: var(--wb-line-body);
@@ -42,7 +40,6 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-brand-subtitle {
   color: var(--wb-text-3);
 }
 
-/* ── Navigation ────────────────────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-list { gap: 1px; padding: 4px 8px 12px; }
 
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-group,
@@ -59,7 +56,7 @@ html[data-role='dashboard'] .dashboard-shell.is-intake .dashboard-nav-group {
 }
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-item:first-child .dashboard-nav-group { margin-top: 4px; }
 
-/* Groups separate by space alone; see lastGroupIndex in DashboardApp. */
+/* Groups separate by space alone. */
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-gap { display: block; height: 12px; }
 
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-item > button {
@@ -96,7 +93,6 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-nav-group {
   transition: opacity var(--wb-motion) var(--wb-ease);
 }
 
-/* Count badge: number only, no pill fill. */
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-badge,
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-item > button > small {
   min-width: 0;
@@ -118,7 +114,6 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-nav-tooltip {
   box-shadow: none;
 }
 
-/* ── Top bar ───────────────────────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell .dashboard-topbar {
   border-bottom: var(--wb-hair) solid var(--wb-line);
   background: var(--wb-surface);
@@ -132,7 +127,6 @@ html[data-role='dashboard'] .dashboard-shell .intake-crumb strong {
 }
 html[data-role='dashboard'] .dashboard-shell .intake-crumb { font-size: var(--wb-text-body); color: var(--wb-text); }
 
-/* ── Content ───────────────────────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell.is-intake .dashboard-content { padding: 24px 32px 48px; }
 
 html[data-role='dashboard'] .dashboard-shell :focus-visible,
@@ -141,7 +135,6 @@ html[data-role='dashboard'] .dashboard-shell.is-intake :focus-visible {
   outline-offset: 2px;
 }
 
-/* Hairlines everywhere a 1px rule used to be. */
 html[data-role='dashboard'] .dashboard-shell .wb9 .card,
 html[data-role='dashboard'] .dashboard-shell .wb9 .tile {
   border: var(--wb-hair) solid var(--wb-line);
@@ -150,7 +143,6 @@ html[data-role='dashboard'] .dashboard-shell .wb9 .tile {
   background: var(--wb-surface);
 }
 
-/* No shadows on workbench surfaces; menus and popovers keep a thin edge instead. */
 html[data-role='dashboard'] .dashboard-shell :is(.card, .tile, .panel, section, article) { box-shadow: none; }
 html[data-role='dashboard'] .dashboard-shell .dashboard-theme-popover {
   border: var(--wb-hair) solid var(--wb-line-strong);
@@ -166,7 +158,6 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-theme-trigger {
 }
 html[data-role='dashboard'] .dashboard-shell .dashboard-theme-trigger:hover { background: var(--wb-hover); }
 
-/* ── Page content primitives ───────────────────────────────── */
 html[data-role='dashboard'] .dashboard-shell .intake-operator {
   margin: 0 0 16px;
   color: var(--wb-text-3);
@@ -174,7 +165,6 @@ html[data-role='dashboard'] .dashboard-shell .intake-operator {
   line-height: var(--wb-line-meta);
 }
 
-/* Label/value facts in one line, separated by space instead of a middle dot. */
 html[data-role='dashboard'] .dashboard-shell .intake-facts {
   display: flex;
   flex-wrap: wrap;
@@ -209,7 +199,6 @@ html[data-role='dashboard'] .dashboard-shell .intake-catalog-conditions .cond-va
   color: var(--wb-text-3);
 }
 
-/* Overview tiles: label in meta, value as the one large number, action flush to the value. */
 html[data-role='dashboard'] .dashboard-shell .wb9 .tile {
   display: flex;
   flex-direction: column;
@@ -247,22 +236,6 @@ html[data-role='dashboard'] .dashboard-shell .wb9 .ov-empty {
   text-align: center;
 }
 
-/* Count badge beats the legacy pill rule in workbench-v9.css on specificity. */
-html[data-role='dashboard'] .dashboard-shell.is-intake .dashboard-nav-item > button > .dashboard-nav-badge {
-  min-width: 0;
-  height: auto;
-  margin-left: 8px;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--wb-accent-text);
-  -webkit-text-fill-color: var(--wb-accent-text);
-  font-size: var(--wb-text-meta);
-  font-weight: 600;
-  line-height: var(--wb-line-meta);
-}
-
-/* Section headings: one size, weight carries the hierarchy. */
 html[data-role='dashboard'] .dashboard-shell :is(.wb9, .intake-management) :is(h2, h3, .card-head h3) {
   color: var(--wb-text);
   font-size: var(--wb-text-body);
@@ -276,7 +249,6 @@ html[data-role='dashboard'] .dashboard-shell :is(.wb9, .intake-management) h1:no
   font-weight: 600;
 }
 
-/* Tables: header in meta weight, rows divided by a hairline only. */
 html[data-role='dashboard'] .dashboard-shell .ant-table-thead > tr > th {
   font-size: var(--wb-text-meta);
   font-weight: 500;
@@ -287,7 +259,6 @@ html[data-role='dashboard'] .dashboard-shell .ant-table-tbody > tr > td {
   border-bottom: var(--wb-hair) solid var(--wb-line);
 }
 
-/* ── Shared states (WorkbenchState.tsx) ────────────────────── */
 html[data-role='dashboard'] .dashboard-shell .wb-state { margin: 0 0 16px; }
 html[data-role='dashboard'] .dashboard-shell .wb-state-loading { padding: 8px 0; }
 html[data-role='dashboard'] .dashboard-shell .wb-state-loading .ant-skeleton-paragraph > li { height: 14px; border-radius: 4px; }
@@ -300,7 +271,6 @@ html[data-role='dashboard'] .dashboard-shell .wb-state-empty {
 }
 html[data-role='dashboard'] .dashboard-shell .wb-state-empty { padding: 24px 0; text-align: center; font-size: var(--wb-text-body); }
 
-/* Failure and uncertainty sit inline with their action, on a tinted surface, no border accent. */
 html[data-role='dashboard'] .dashboard-shell :is(.wb-state-failed, .wb-state-uncertain) {
   display: flex;
   align-items: center;
@@ -313,7 +283,6 @@ html[data-role='dashboard'] .dashboard-shell .wb-state-failed { background: var(
 html[data-role='dashboard'] .dashboard-shell .wb-state-uncertain { background: var(--wb-warn-soft); color: var(--wb-warn); }
 html[data-role='dashboard'] .dashboard-shell :is(.wb-state-failed, .wb-state-uncertain) .ant-btn { flex: none; }
 
-/* No access: a quiet block, not an error. It explains, it does not alarm. */
 html[data-role='dashboard'] .dashboard-shell .wb-state-noaccess {
   padding: 16px;
   border-radius: var(--wb-radius-panel);
@@ -334,19 +303,16 @@ html[data-role='dashboard'] .dashboard-shell .wb-inline-block {
   font-size: var(--wb-text-meta);
 }
 
-/* SOP source page */
 html[data-role='dashboard'] .dashboard-shell .sop-source-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 html[data-role='dashboard'] .dashboard-shell .sop-source-file { color: var(--wb-text-2); }
 html[data-role='dashboard'] .dashboard-shell .sop-source-status { margin: 0 0 12px; color: var(--wb-text-3); font-size: var(--wb-text-meta); }
 html[data-role='dashboard'] .dashboard-shell .sop-source-issues { margin: 4px 0 0; padding-left: 18px; }
 
-/* ── Motion ────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html[data-role='dashboard'] .dashboard-shell *,
   html[data-role='dashboard'] .dashboard-shell *::before { transition: none !important; animation: none !important; }
 }
 
-/* SOP library toolbar: actions in one row, the replace warning beside the upload button. */
 html[data-role='dashboard'] .dashboard-shell .sop-toolbar {
   display: flex;
   flex-wrap: wrap;

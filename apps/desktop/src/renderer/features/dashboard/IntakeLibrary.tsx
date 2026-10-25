@@ -80,7 +80,6 @@ function hang(): Promise<typeof READ_DISCARDED> {
   return Promise.resolve(READ_DISCARDED);
 }
 
-/** Stays mounted while hidden so the catalog subscription and the one first refresh survive leaving 话术库. */
 export function IntakeLibrary({ active, seatNotice = false }: { active: boolean; seatNotice?: boolean }) {
   const shownRef = useRef<IntakeCatalogView | null>(null);
   const intentRef = useRef<CatalogIntent | null>(null);
@@ -94,8 +93,6 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   const [busy, setBusy] = useState(() => active && window.dashboardIntakeCatalog !== undefined);
   const [domain, setDomain] = useState<LibraryTab>('product');
   const [question, setQuestion] = useState('');
-  // The hook reads on mount. This page stays mounted while hidden, so the first
-  // refresh waits until it is actually shown and does not run again on the next show.
   if (active && !startedRef.current) {
     startedRef.current = true;
     intentRef.current = { kind: 'command', command: { action: 'refresh' } };
@@ -113,8 +110,6 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
     : { status: 'error', message: UNAVAILABLE };
   const { resource, reload, replace } = useAsyncResource(async () => {
     if (flightRef.current === 0) {
-      // Missing catalog API uses the unavailable sentence, so it is an error.
-      // The logged-out sentence is the forbidden one, and this branch is not it.
       return hasCatalog ? { status: 'idle' } : { status: 'error', message: UNAVAILABLE };
     }
     consumedRef.current = true;
@@ -155,7 +150,6 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
     intentRef.current = command ? { kind: 'command', command } : { kind: 'current' };
     deadlineRef.current = 0;
     setBusy(true);
-    // Never show the old snapshot while selecting conditions or refreshing it.
     const current = shownRef.current;
     remember(current ? withoutRows(current) : null);
     replace((state) => (state.status === 'forbidden' || state.status === 'loading' ? state : { status: 'loading' }));
@@ -180,8 +174,6 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
       deadlineRef.current = 0;
       setBusy(false);
       remember(null);
-      // The follow-up current() read replaces this before paint when it starts.
-      // It remains when that read does not run.
       replace({ status: 'error', message: SESSION_CHANGED });
       // current projects Main memory; it cannot silently acquire a new snapshot.
       beginRef.current();

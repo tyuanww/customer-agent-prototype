@@ -17,7 +17,6 @@ export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: 
   useEffect(() => { onDirty('rollback-input', false); return () => onDirty('rollback-input', false); }, [onDirty]);
   const reset = () => apply({ action: 'rollback-discard' });
   const execute = () => {
-    // 取消不发送回退。Main 在真正发布前仍会再用系统对话框核对一次。
     Modal.confirm({
       title: '回退整个发布目录到上一版',
       content: '回退之后不能撤销这次发布。坐席重新查询后会使用上一版内容。要回到现在这一版，需要再发布一次。',

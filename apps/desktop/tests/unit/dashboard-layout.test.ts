@@ -46,7 +46,6 @@ describe('dashboard layout contract', () => {
     expect(css).toContain('--dash-panel-radius: var(--dash-radius)');
     expect(css).toContain('--dash-radius-pill: 999px');
     expect(css).toContain('--dash-radius-dot: 50%');
-    // Colour values live only in radix-palette.css; dashboard.css reads semantic tokens.
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/rgba?\(/);
     expect(css).toContain("html[data-role='dashboard'][data-dashboard-theme='light']");

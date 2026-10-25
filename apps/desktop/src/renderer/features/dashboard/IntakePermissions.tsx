@@ -293,7 +293,6 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   const askRevoke=()=>{
     const grant=view?.grants.find(item=>item.selection===revoke);
     if(!grant || !revokeReason.trim())return;
-    // 收回后原授权不能恢复。取消只关掉这个框，原因留在表单里。
     Modal.confirm({
       title:`收回 ${grant.person} 在 ${grant.scope}的${labels[grant.action]}`,
       content:'收回之后不能撤销。以后要用，需要重新开通。',

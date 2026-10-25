@@ -13,12 +13,6 @@ function isDiscarded<T>(value: DashboardRead<T>): value is typeof READ_DISCARDED
   return value === READ_DISCARDED;
 }
 
-/**
- * One dashboard read with the five states from `AsyncResource`.
- * `retainReady` keeps the last list on screen while a later read is in flight.
- * The caller owns action sentences. This hook does not store them.
- * A discarded read is dropped and does not change the five states.
- */
 export function useAsyncResource<T>(
   read: () => Promise<DashboardRead<T>>,
   deps: readonly unknown[],

@@ -230,7 +230,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 
 
 .wb9 .ov-head{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:24px}
-.wb9 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.wb9 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 .wb9 .tile{border:var(--wb-hair) solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:2px}
 .wb9 .t-lbl{color:var(--mute);font-size:var(--wb-text-meta)}
 .wb9 .tile b{font-size:var(--wb-text-title);line-height:36px;font-weight:600;letter-spacing:0}
@@ -341,7 +341,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .dashboard-nav-item
 .dashboard-shell.is-intake .dashboard-nav-item > button.is-active .dashboard-nav-icon { color: var(--wb-accent); }
 .dashboard-shell.is-intake .dashboard-nav-group { font-weight: 400; letter-spacing:0; margin-top: 16px; }
 .dashboard-shell.is-intake .dashboard-nav-item:first-child .dashboard-nav-group { margin-top: 2px; }
-.dashboard-shell.is-intake .dashboard-nav-item > button > .dashboard-nav-badge { min-width: 18px; height: 18px; margin-left: 8px; padding: 0 6px; border-radius: 9px; background: var(--wb-accent); color: var(--wb-surface); -webkit-text-fill-color: var(--wb-surface); font-size:var(--wb-text-meta); line-height: 18px; text-align: center; font-weight: 600; }
+.dashboard-shell.is-intake .dashboard-nav-item > button > .dashboard-nav-badge { min-width: 0; height: auto; margin-left: 8px; padding: 0; border-radius: 0; background: transparent; color: var(--wb-accent-text); -webkit-text-fill-color: var(--wb-accent-text); font-size: var(--wb-text-meta); line-height: var(--wb-line-meta); text-align: center; font-weight: 600; }
 .dashboard-shell.is-intake .dashboard-topbar { border-bottom: var(--wb-hair) solid var(--wb-line); }
 .dashboard-shell.is-intake .intake-crumb { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--wb-text-2); font-size:var(--wb-text-body); }
 .dashboard-shell.is-intake .intake-crumb strong { color: var(--wb-text); font-weight: 600; }

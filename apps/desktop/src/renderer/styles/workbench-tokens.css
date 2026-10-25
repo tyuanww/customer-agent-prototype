@@ -24,7 +24,6 @@ html[data-role='login'] {
   --wb-motion: 200ms;
   --wb-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 
-  /* Neutral surfaces */
   --wb-app: var(--mauve-1);
   --wb-sidebar: var(--mauve-2);
   --wb-surface: var(--mauve-1);
@@ -37,7 +36,6 @@ html[data-role='login'] {
   --wb-text-2: var(--mauve-11);
   --wb-text-3: var(--mauve-9);
 
-  /* Accent */
   --wb-accent: var(--violet-9);
   --wb-accent-hover: var(--violet-10);
   --wb-accent-text: var(--violet-11);
@@ -47,7 +45,6 @@ html[data-role='login'] {
   --wb-focus: var(--violet-8);
   --wb-on-accent: var(--rx-contrast);
 
-  /* Status: text uses step 11, fills use step 3, lines use step 6 */
   --wb-ok: var(--grass-11);
   --wb-ok-soft: var(--grass-3);
   --wb-warn: var(--amber-11);
@@ -57,7 +54,6 @@ html[data-role='login'] {
   --wb-danger-soft: var(--tomato-3);
   --wb-danger-line: var(--tomato-6);
 
-  /* Charts */
   --wb-chart-1: var(--violet-9);
   --wb-chart-2: var(--amber-9);
   --wb-chart-track: var(--mauve-4);

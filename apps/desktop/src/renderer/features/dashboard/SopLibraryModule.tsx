@@ -106,6 +106,7 @@ export function SopLibraryModule({
   }, [catalog]);
 
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
+  const emptyStateOwnsMessage = items === null && !acted;
   useEffect(() => {
     setDraftTitle(selected?.title ?? '');
     setDraftBody(selected?.body ?? '');
@@ -310,9 +311,7 @@ export function SopLibraryModule({
         <Input aria-label="步骤名称" value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} />
         <Input.TextArea aria-label="步骤内容" rows={3} value={draftBody} onChange={(event) => setDraftBody(event.target.value)} />
       </div> : null}
-      {/* Action results. On first render with no catalog the same sentence is the empty state below,
-          so it is hidden here to avoid saying it twice; after any action it shows. */}
-      {message && !(items === null && !acted) ? <p className="sop-status" data-testid="sop-write-status" role="status">{message}</p> : null}
+      {message && !emptyStateOwnsMessage ? <p className="sop-status" data-testid="sop-write-status" role="status">{message}</p> : null}
       {items === null && loading ? <WorkbenchLoading rows={5} label="正在读取 SOP" /> : items === null ? (
         <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{window.dashboardOps ? message : NO_CHANNEL_EMPTY}</p>
       ) : items.length === 0 ? (

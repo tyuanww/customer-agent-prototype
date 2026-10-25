@@ -1,4 +1,3 @@
-// One row is one live page. DASHBOARD_NAV is a projection of these rows.
 export const INTAKE_DESTINATION_ROWS = [
   {
     id: 'overview',
@@ -66,7 +65,6 @@ export const INTAKE_DESTINATION_ROWS = [
 
 type RowId<Row> = Row extends { readonly id: infer Id extends string } ? Id : never;
 
-// The assignment below fails when two rows share an id.
 type AssertUniqueIds<
   Rows extends readonly { readonly id: string }[],
   Seen extends string = never,
@@ -87,7 +85,6 @@ export type IntakeSidebarItem = IntakeDestinationRow;
 
 export const INTAKE_DESTINATIONS: readonly IntakeDestination[] = INTAKE_DESTINATION_ROWS.map((row) => row.id);
 
-// The assignment fails if `announce` is added to the live sidebar.
 type AnnounceExcluded = 'announce' extends IntakeDestination ? never : true;
 export const intakeDestinationsExcludeAnnounce: AnnounceExcluded = true;
 
@@ -104,7 +101,6 @@ export function intakeDestinationItem(id: IntakeDestination): IntakeSidebarItem 
   return INTAKE_DESTINATION_ROWS[0];
 }
 
-/** Loopback `preview=intake` only. `announce` opens 话术库 and this function does not write the URL. */
 export function readIntakePreviewPage(
   location: Pick<Location, 'hostname' | 'search'>,
   canOpenPermissions: boolean,
@@ -119,10 +115,6 @@ export function readIntakePreviewPage(
   return 'overview';
 }
 
-/**
- * Before the job is known, and for a resolved 客服坐席, the sidebar is 话术库 and SOP.
- * A resolved non-seat also sees staff rows. 权限 also needs the permissions bridge.
- */
 export function intakeSidebarItems(
   canOpenPermissions: boolean,
   seatLibraryOnly: boolean,

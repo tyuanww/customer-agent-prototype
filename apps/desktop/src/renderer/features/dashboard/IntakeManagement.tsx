@@ -239,7 +239,6 @@ function listNext(candidate: components['schemas']['IntakeCandidate']) {
 function sameCandidate(candidate: components['schemas']['IntakeCandidate'], selected: components['schemas']['IntakeCandidate'] | null) {
   return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version && candidate.sourceId === selected.sourceId;
 }
-/** A carried view stays ready so the open candidate does not disappear. No view is the read itself: UNAUTHORIZED is forbidden, and every other code stays an error. The messages are the sentences the reply already has. */
 function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeManagementView> {
   if (reply.view) return { status: 'ready', value: reply.view };
   if (!reply.ok) return asyncFailure(reply.code, { forbidden: reply.message, error: reply.message });
@@ -257,7 +256,6 @@ export function IntakeManagement() {
   const stopPending = useRef(false);
   const listed = useRef(false);
   const readTicket = useRef(0);
-  // Missing intake keeps the unavailable sentence. That sentence is not the logged-out one, so the read is an error. A forbidden initial would skip the loading flash; this page does not start there.
   const held = useRef<AsyncResource<IntakeManagementView>>(window.dashboardIntake
     ? { status: 'idle' }
     : { status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });

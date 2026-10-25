@@ -169,10 +169,6 @@ export function DeskKnowledge({
   const consumedDraft = useRef<string | null>(null);
   const mounted = useRef(true);
   const readGeneration = useRef(0);
-  // current() is the page read. A missing desk API is already forbidden, so the
-  // hook does not flash it through loading. retainReady keeps the persona list
-  // up during a later read. A failed command only sets `message`; it does not
-  // replace that list.
   const { resource, reload, replace } = useAsyncResource<DeskView>(async () => {
     const generation = ++readGeneration.current;
     const report = (nextMessage: string | null) => {

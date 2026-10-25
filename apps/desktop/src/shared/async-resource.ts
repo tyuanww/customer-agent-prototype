@@ -1,10 +1,3 @@
-/**
- * One async read shared by dashboard pages. This module does not fetch or render.
- *
- * `forbidden` is an explicit unauthorized result. A missing API is not a status
- * of its own: the caller stores `forbidden` only when the sentence the person
- * already sees is the logged-out one.
- */
 export type AsyncResource<T> =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }

@@ -247,7 +247,6 @@ describe('SopLibraryModule', () => {
       softwareOpenDownload: vi.fn(),
     };
     const { unmount } = render(<SopLibraryModule />);
-    // A catalog failure is said once, in the empty state, not repeated in the status line.
     await waitFor(() => {
       expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('当前角色不能执行这个操作');
     });

@@ -90,7 +90,6 @@ type InaccuracyTableRow = {
   openTaskCount: number;
 };
 
-/** Query count is every loaded row. aggregateUsage omits misses and also returns a rate. */
 function countOverviewUsage(rows: readonly UsageSourceRow[]): OverviewUsageCounts {
   let misses = 0;
   let copied = 0;
@@ -470,8 +469,7 @@ export function IntakeOverview({
         }}
       />
     </div>
-    {/* .tiles is three columns in workbench-v9.css. Four counts share one row. */}
-    <div className="tiles" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+    <div className="tiles">
       <CountTile label="查询次数" value={usageCounts?.queries ?? null} />
       <CountTile label="没查到" value={usageCounts?.misses ?? null} />
       <CountTile label="被复制" value={usageCounts?.copied ?? null} detail={COPY_ONLY} />

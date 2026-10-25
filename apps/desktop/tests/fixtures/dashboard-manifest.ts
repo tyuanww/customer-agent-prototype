@@ -155,8 +155,6 @@ export const DASHBOARD_MANIFEST = deepFreeze({
     metricScope: DASHBOARD_METRIC_SCOPE,
     syntheticMark: 'DEMO · 合成数据',
   },
-  // The intake overview reads live usage and inaccuracy rows.
-  // Fixed sample rates stay out of this manifest so a failed read cannot fall back to them.
   ledger: {
     title: '检索流水',
     kicker: 'root question 与 search operation 双账',

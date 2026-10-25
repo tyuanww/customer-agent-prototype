@@ -1,19 +1,6 @@
 import type { SessionJobView } from './product-session';
 
-/**
- * What a person sees when the workbench will not let them do something.
- *
- * This decides display only. Whether an action is allowed is decided by the server and by the
- * session's job rights, which arrive already computed in `SessionJobView`; this module reads
- * them and says, in the person's words, what is missing. A block that names a role says whom to ask. It never grants,
- * widens or infers access, and a `null` answer means "show the control", not "the action will
- * succeed". The server still checks.
- *
- * Upload SOP names 客服主管. A resolved job without grant shows 「没有权限，请找人开通。」
- * because the server does not yet send allowed, reason, and askRole. Who may grant is still
- * `job.rights`, which mirrors the job roster. The knowledge base is not here: it gates on the
- * session role in `desk-knowledge-ipc.ts`, and repeating that rule here would create a second owner.
- */
+/** Display only. The server still checks. `null` while `signedIn` is null means the session has not answered. `null` when the job holds the ability means show the control. Upload SOP asks 客服主管 until the server sends `askRole`. Knowledge gating stays in `desk-knowledge-ipc.ts`. */
 export type WorkbenchAbility = 'grant' | 'upload-sop';
 
 export type AccessAsk = '客服主管' | '管理员';
@@ -47,8 +34,6 @@ export function accessBlock(
   if (signedIn === null) return null;
   const need = NEED[ability];
   if (!signedIn) return { need, ask: '管理员', detail: '请先登录。' };
-  // A missing job means the session did not deliver it, which a fresh sign-in fixes. A blank,
-  // unknown or duplicate title is a roster problem only an administrator can fix.
   if (!job || (job.status === 'unresolved' && job.reason === 'missing')) {
     return { need, ask: '管理员', detail: '请重新登录后再查看职务。' };
   }

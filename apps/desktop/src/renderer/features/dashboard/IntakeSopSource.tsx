@@ -8,8 +8,6 @@ import './workbench-v9.css';
 
 type SopLine = SopWorkbookView['sheets'][number]['lines'][number];
 
-/** Read-only preview of an operator's local SOP workbook. Nothing here publishes or switches the
- *  seat's flow; the page says so once, in the status line above the table. */
 export function IntakeSopSource() {
   const api = window.dashboardSopWorkbook;
   const [sheetName, setSheetName] = useState('');

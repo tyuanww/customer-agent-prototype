@@ -60,8 +60,6 @@ import './styles/radix-palette.css';
 import './styles/workbench-tokens.css';
 import './styles/workbench-shell.css';
 
-/** Groups are separated by space, not by a heading: the group names are internal structure and
- *  tell the person using the page nothing the item labels do not. */
 function lastGroupIndex(item: IntakeSidebarItem, items: readonly IntakeSidebarItem[]): number {
   return items.findIndex((candidate) => candidate.group === item.group);
 }
@@ -100,8 +98,9 @@ function sopUploadControl(
   signedIn: boolean | null,
   job: SessionJobView | null,
 ): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
-  if (phase === 'pending' || signedIn === null) return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
-  if (phase === 'signed-out' || !signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  if (phase === 'pending') return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
+  if (phase === 'signed-out' || signedIn === false) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  if (signedIn === null) return null;
   return sopUploadRefusal(job);
 }
 

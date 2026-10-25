@@ -276,7 +276,6 @@ it('shows the fixed denial when grant is missing, and still hides the grant butt
   expect(block).toHaveTextContent('你还不能给他人开通权限');
   expect(block).toHaveTextContent('没有权限，请找人开通。');
   expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
-  // The block is shown on the grant tab only; the seat tab has its own controls.
   await userEvent.setup().click(screen.getByRole('tab', { name: '外包坐席' }));
   expect(screen.queryByTestId('workbench-no-access')).toBeNull();
 });

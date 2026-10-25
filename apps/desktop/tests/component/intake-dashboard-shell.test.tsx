@@ -88,7 +88,18 @@ afterEach(cleanupDashboardWithWindowBridges);
 it('reuses workspace chrome and theme without mounting legacy modules or calling their session API', async () => {
   const user = userEvent.setup();
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-  const legacySession = vi.fn(async () => ({ ok: false as const }));
+  const legacySession = vi.fn(async () => ({
+    ok: true as const,
+    enabled: true,
+    signedIn: true,
+    role: 'owner' as const,
+    displayName: '合成管理员',
+    job: observeSessionJob({
+      title: '客服总监',
+      directory: [{ name: '客服总监', enabled: true }],
+      actions: { query: true, import: true, publish: true, rollback: true },
+    }),
+  }));
   window.dashboardContent = { session: legacySession } as unknown as typeof window.dashboardContent;
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '合成管理会话暂不可用', view: null }),
@@ -96,7 +107,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
-  expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5);
+  await waitFor(() => expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5));
   expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
