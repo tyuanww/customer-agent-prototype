@@ -92,7 +92,7 @@ it('fail-closes unsigned dashboard senders and does not leak the product token',
   expect(await list(event(dashboard), { extra: true })).toMatchObject({ ok: false, code: 'VALIDATION' });
   vi.mocked(session.request).mockResolvedValueOnce({ status: 200, value: { items: [], next_cursor: null } });
   const view = await list(event(dashboard));
-  expect(view).toEqual({ ok: true, items: [], nextCursor: null });
+  expect(view).toEqual({ ok: true, items: [], nextCursor: null, truncated: false });
   expect(JSON.stringify(view)).not.toContain('usr_synthetic');
   expect(JSON.stringify(view)).not.toContain('access_token');
 });
