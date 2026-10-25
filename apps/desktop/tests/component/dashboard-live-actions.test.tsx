@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { SopLibraryModule } from '../../src/renderer/features/dashboard/SopLibraryModule';
+import type { SopUse } from '../../src/shared/page-use';
 
 describe('dashboard live actions', () => {
   afterEach(() => {
@@ -54,8 +55,15 @@ describe('dashboard live actions', () => {
       softwareOpenDownload: vi.fn(),
     };
     const user = userEvent.setup();
-    render(<SopLibraryModule />);
-    await waitFor(() => expect(sopCatalog).toHaveBeenCalled());
+    const sop: SopUse = {
+      state: 'open',
+      nodes: [{
+        nodeId: 'n1', parentNodeId: null, title: '停手', body: '先停手',
+        sortKey: 0, version: 1, lifecycle: 'active',
+      }],
+    };
+    render(<SopLibraryModule sop={sop} />);
+    expect(sopCatalog).not.toHaveBeenCalled();
     expect(screen.getByTestId('sop-library-list')).toHaveTextContent('停手');
     const csvText = 'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n';
     const csv = new File([csvText], 'sop.csv', { type: 'text/csv' });
@@ -63,7 +71,7 @@ describe('dashboard live actions', () => {
     await user.upload(screen.getByTestId('sop-upload-input'), csv);
     await waitFor(() => expect(sopImport).toHaveBeenCalled());
     expect(sopImport.mock.calls[0]?.[0]).toContain('node_id,parent_node_id,title,body,sort_key');
-    await waitFor(() => expect(sopCatalog).toHaveBeenCalledTimes(2));
+    expect(sopCatalog).not.toHaveBeenCalled();
     expect(screen.getByTestId('sop-library-list')).toHaveTextContent('停手');
   });
 });

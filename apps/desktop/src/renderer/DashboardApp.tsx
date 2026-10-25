@@ -9,8 +9,7 @@ import {
 } from './features/dashboard/intake-destinations';
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
-import { accessBlock } from '../shared/workbench-access';
-import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
+import { canOpenPermissions, type PageUseSnapshot } from '../shared/page-use';
 import {
   useCallback,
   useMemo,
@@ -93,19 +92,32 @@ type NavTooltipState = {
 export function DashboardApp() {
   return <DashboardWorkspace />;
 }
-function sopUploadControl(
-  phase: 'pending' | 'signed-out' | 'ready',
-  signedIn: boolean | null,
-  job: SessionJobView | null,
-): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
-  if (phase === 'pending') return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
-  if (phase === 'signed-out' || signedIn === false) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
-  if (signedIn === null) return null;
-  return sopUploadRefusal(job);
+
+function usePageUse(): PageUseSnapshot {
+  const [snapshot, setSnapshot] = useState<PageUseSnapshot>({ phase: 'signed-out' });
+  useEffect(() => {
+    const api = window.dashboardPageUse;
+    if (!api) return undefined;
+    let live = true;
+    void api.current().then((next) => {
+      if (live) setSnapshot(next);
+    }).catch(() => {
+      if (live) setSnapshot({ phase: 'signed-out' });
+    });
+    const stop = api.onChanged((next) => {
+      if (live) setSnapshot(next);
+    });
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
+  return snapshot;
 }
 
 function DashboardWorkspace() {
-  const canOpenPermissions = window.dashboardPermissions !== undefined;
+  const snapshot = usePageUse();
+  const permissionsOpen = canOpenPermissions(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
     () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
@@ -115,21 +127,12 @@ function DashboardWorkspace() {
   const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
   const sessionEpoch = useRef(0);
   const sessionConfirmed = useRef(false);
-  const canGrant = jobKnown
-    && contentSignedIn === true
-    && sessionJob?.status === 'resolved'
-    && sessionJob.rights.grant === true;
-  const uploadRefusal = sopUploadControl(sessionPhase, contentSignedIn, sessionJob);
-  const canUploadSop = uploadRefusal === null;
-  const grantAccess = jobKnown ? accessBlock('grant', contentSignedIn, sessionJob) : null;
   const seatLibraryOnly = sessionJob?.status === 'resolved' && sessionJob.role === 'agent';
   const sessionKey = !jobKnown || contentSignedIn !== true
     ? 'signed-out'
     : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
-  const canUpdateSop = canUploadSop && (contentRole === 'owner' || contentRole === 'coach');
-  const canDeleteSop = canUploadSop && contentRole === 'owner';
-  const navItems = intakeSidebarItems(canOpenPermissions, seatLibraryOnly, jobKnown);
-  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, canOpenPermissions));
+  const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown);
+  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, permissionsOpen));
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
@@ -172,9 +175,17 @@ function DashboardWorkspace() {
     setActive(previous);
   };
   useLayoutEffect(() => {
-    if (!seatLibraryOnly) return;
-    if (active !== 'wording' && active !== 'sop') setActive('wording');
-  }, [seatLibraryOnly, active]);
+    if (!jobKnown) return;
+    if (navItems.some((item) => item.id === active)) return;
+    const next = navItems[0]?.id;
+    if (next) setActive(next);
+  }, [jobKnown, navItems, active]);
+  useLayoutEffect(() => {
+    if (!permissionsOpen) return;
+    if (readIntakePreviewPage(window.location, true) !== 'permissions') return;
+    if (new URLSearchParams(window.location.search).get('page') !== 'permissions') return;
+    setActive((current) => (current === 'overview' ? 'permissions' : current));
+  }, [permissionsOpen]);
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
@@ -779,17 +790,12 @@ function DashboardWorkspace() {
         >
           {renderIntakeDestinations({
             active,
-            canOpenPermissions,
+            canOpenPermissions: permissionsOpen,
             seatLibraryOnly,
             jobKnown,
             jobPending: sessionPhase === 'pending',
-            canUploadSop,
-            canUpdateSop,
-            canDeleteSop,
             sessionKey,
-            uploadBlock: uploadRefusal?.message ?? '',
-            canGrant,
-            grantAccess,
+            snapshot,
             onOpen: jump,
             onTodoCount: setTodoCount,
             onSupplyScript: (question) => { setScriptDraft(question); jump('content'); },

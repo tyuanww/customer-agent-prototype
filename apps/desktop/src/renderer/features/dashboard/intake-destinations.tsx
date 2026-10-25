@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import type { AccessBlock } from '@shared/workbench-access';
+import type { PageUseSnapshot } from '@shared/page-use';
 import { DeskKnowledge } from './DeskKnowledge';
 import { IntakeLibrary } from './IntakeLibrary';
 import { IntakeManagement } from './IntakeManagement';
@@ -8,6 +8,7 @@ import { IntakePermissions } from './IntakePermissions';
 import { SopLibraryModule } from './SopLibraryModule';
 import {
   INTAKE_DESTINATION_ROWS,
+  intakeRowVisible,
   type IntakeDestination,
   type IntakeDestinationRow,
 } from './intake-destination-rows';
@@ -21,6 +22,7 @@ export {
   INTAKE_DESTINATIONS,
   intakeDestinationItem,
   intakeDestinationsExcludeAnnounce,
+  intakeRowVisible,
   intakeSidebarItems,
   isIntakeDestination,
   readIntakePreviewPage,
@@ -32,13 +34,8 @@ export type IntakeDestinationContext = {
   seatLibraryOnly: boolean;
   jobKnown: boolean;
   jobPending: boolean;
-  canUploadSop: boolean;
-  canUpdateSop: boolean;
-  canDeleteSop: boolean;
   sessionKey: string;
-  uploadBlock: string;
-  canGrant: boolean;
-  grantAccess: AccessBlock | null;
+  snapshot: PageUseSnapshot;
   onOpen: (target: 'content' | 'wording' | 'permissions') => void;
   onTodoCount: (count: number) => void;
   onSupplyScript: (question: string) => void;
@@ -51,19 +48,20 @@ const INTAKE_DESTINATION_MOUNTS: {
 } = {
   overview: (ctx) => <IntakeOverview key={ctx.sessionKey} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
-  sop: (ctx) => <SopLibraryModule canUploadSop={ctx.canUploadSop} canUpdateSop={ctx.canUpdateSop} canDeleteSop={ctx.canDeleteSop} uploadBlock={ctx.uploadBlock} />,
+  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} />,
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
   materials: () => <IntakeManagement />,
   permissions: (ctx) => (
     <div hidden={ctx.active !== 'permissions'}>
-      <IntakePermissions active={ctx.active === 'permissions'} canGrant={ctx.canGrant} grantAccess={ctx.grantAccess} />
+      {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
+        ? <IntakePermissions active={ctx.active === 'permissions'} gate={ctx.snapshot.permissions} />
+        : null}
     </div>
   ),
 };
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {
-  if (row.needsPermissionBridge && !ctx.canOpenPermissions) return false;
-  if (row.audience === 'staff' && (!ctx.jobKnown || ctx.seatLibraryOnly)) return false;
+  if (!intakeRowVisible(row, ctx.canOpenPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return false;
   if (row.keepAlive) return true;
   return row.id === ctx.active;
 }

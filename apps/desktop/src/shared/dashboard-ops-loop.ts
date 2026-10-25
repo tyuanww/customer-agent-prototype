@@ -1,4 +1,4 @@
-import { exactKeys, UNRESOLVED_JOB_LABEL, type SessionJobView } from './product-session';
+import { exactKeys } from './product-session';
 
 export const OPS_LOOP_COPY = Object.freeze({
   noProduct: '请先登录。',
@@ -86,14 +86,6 @@ export function sopCsvAllergyStopMissing(csvText: string): boolean {
 }
 
 export const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
-
-export function sopUploadRefusal(job: SessionJobView | null | undefined): { code: 'FORBIDDEN'; message: string } | null {
-  if (job?.status === 'resolved' && job.rights.uploadSop === true) return null;
-  return {
-    code: 'FORBIDDEN',
-    message: job?.status === 'resolved' ? OPS_LOOP_COPY.sopUploadJob : UNRESOLVED_JOB_LABEL,
-  };
-}
 
 export type DashboardOpsFailureCode =
   | 'UNAUTHORIZED'

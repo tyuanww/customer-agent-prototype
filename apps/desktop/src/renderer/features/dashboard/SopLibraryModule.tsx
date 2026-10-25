@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, type ButtonProps } from 'antd';
 import {
   isDashboardOpsFailure,
@@ -8,12 +8,19 @@ import {
   sopCsvAllergyStopMissing,
   type DashboardSopNode,
 } from '@shared/dashboard-ops-loop';
+import type { SopUse } from '@shared/page-use';
 import { StatusBadge } from './StatusBadge';
 import { WorkbenchLoading } from './WorkbenchState';
-import { useAsyncResource } from './use-async-resource';
 
 const NO_CHANNEL_EMPTY = '请先登录后再管理 SOP。';
 const NO_STEPS = '还没有 SOP 步骤。上传 CSV 后会出现在这里。';
+
+function sopStatusText(state: SopUse['state'] | undefined, fallback: string): string {
+  if (state === 'closed') return '没有权限，请找人开通。';
+  if (state === 'unavailable') return OPS_LOOP_COPY.unavailable;
+  if (state === 'pending' || state === 'open') return '';
+  return fallback;
+}
 
 function stepNotice(action: '已更新' | '已删除', title: string): string {
   return `${action}「${title}」。`;
@@ -36,34 +43,31 @@ function toCsv(items: readonly DashboardSopNode[]): string {
 }
 
 export function SopLibraryModule({
-  canUploadSop = true,
-  canUpdateSop = true,
-  canDeleteSop = true,
-  uploadBlock = '',
+  sop,
+  canUploadSop: uploadProp = true,
+  canUpdateSop: updateProp = true,
+  canDeleteSop: deleteProp = true,
+  uploadBlock: uploadBlockProp = '',
 }: {
+  sop?: SopUse;
   canUploadSop?: boolean;
   canUpdateSop?: boolean;
   canDeleteSop?: boolean;
   uploadBlock?: string;
 } = {}) {
+  const usingSnapshot = sop !== undefined;
+  const open = sop?.state === 'open';
+  const canUploadSop = usingSnapshot ? open === true : uploadProp;
+  const canUpdateSop = usingSnapshot ? open === true : updateProp;
+  const canDeleteSop = usingSnapshot ? false : deleteProp;
+  const uploadBlock = sopStatusText(sop?.state, uploadBlockProp);
+  const items = useMemo(() => (
+    sop?.state === 'open' ? sop.nodes.filter((item) => item.lifecycle === 'active') : null
+  ), [sop]);
+  const loading = sop?.state === 'pending';
+  const emptyText = sopStatusText(sop?.state, NO_CHANNEL_EMPTY);
   const pendingNotice = useRef<string | undefined>(undefined);
   const noticePending = useRef(false);
-  const { resource: catalog, reload } = useAsyncResource(async () => {
-    const api = window.dashboardOps;
-    if (!api) return { status: 'forbidden', message: NO_CHANNEL_EMPTY };
-    try {
-      const result = await api.sopCatalog();
-      if (!result.ok) return { status: 'error', message: result.message };
-      return {
-        status: 'ready',
-        value: result.items.filter((item) => item.lifecycle === 'active'),
-      };
-    } catch {
-      return { status: 'error', message: OPS_LOOP_COPY.unavailable };
-    }
-  }, [], window.dashboardOps ? { status: 'loading' } : { status: 'forbidden', message: NO_CHANNEL_EMPTY }, { retainReady: true });
-  const items = catalog.status === 'ready' ? catalog.value : null;
-  const loading = catalog.status === 'loading';
   const [message, setMessage] = useState('');
   const [acted, setActed] = useState(false);
   const report = (text: string) => { setActed(true); setMessage(text); };
@@ -75,9 +79,10 @@ export function SopLibraryModule({
   const liveRef = useRef(true);
 
   const load = (notice?: string) => {
+    if (notice === undefined) return;
     pendingNotice.current = notice;
     noticePending.current = true;
-    reload();
+    report(notice);
   };
 
   useEffect(() => {
@@ -86,24 +91,17 @@ export function SopLibraryModule({
   }, []);
 
   useEffect(() => {
-    if (catalog.status === 'ready') {
-      const active = catalog.value;
-      setSelectedId((current) => current && active.some((item) => item.nodeId === current)
-        ? current
-        : active[0]?.nodeId ?? null);
-      if (noticePending.current) {
-        noticePending.current = false;
-        setMessage(pendingNotice.current ?? (active.length === 0 ? NO_STEPS : ''));
-        return;
-      }
-      if (active.length === 0) setMessage((current) => current || NO_STEPS);
+    if (!items) return;
+    setSelectedId((current) => current && items.some((item) => item.nodeId === current)
+      ? current
+      : items[0]?.nodeId ?? null);
+    if (noticePending.current) {
+      noticePending.current = false;
+      setMessage(pendingNotice.current ?? (items.length === 0 ? NO_STEPS : ''));
       return;
     }
-    if (catalog.status === 'error' || (catalog.status === 'forbidden' && window.dashboardOps)) {
-      noticePending.current = false;
-      setMessage(catalog.message);
-    }
-  }, [catalog]);
+    if (items.length === 0) setMessage((current) => current || NO_STEPS);
+  }, [items]);
 
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
   const emptyStateOwnsMessage = items === null && !acted;
@@ -126,6 +124,10 @@ export function SopLibraryModule({
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             const file = event.target.files?.[0];
             event.target.value = '';
+            if (sop && sop.state !== 'open') {
+              if (uploadBlock) report(uploadBlock);
+              return;
+            }
             if (!canUploadSop) {
               if (uploadBlock) report(uploadBlock);
               return;
@@ -165,6 +167,7 @@ export function SopLibraryModule({
           data-testid="sop-update"
           disabled={!canUpdateSop}
           onClick={() => {
+            if (sop && sop.state !== 'open') return;
             if (!canUpdateSop) return;
             const api = window.dashboardOps;
             if (!api) {
@@ -268,6 +271,7 @@ export function SopLibraryModule({
           data-testid="sop-custom-step"
           disabled={!canUploadSop}
           onClick={() => {
+            if (sop && sop.state !== 'open') return;
             const api = window.dashboardOps;
             if (!api) {
               report(NO_CHANNEL_EMPTY);
@@ -313,7 +317,7 @@ export function SopLibraryModule({
       </div> : null}
       {message && !emptyStateOwnsMessage ? <p className="sop-status" data-testid="sop-write-status" role="status">{message}</p> : null}
       {items === null && loading ? <WorkbenchLoading rows={5} label="正在读取 SOP" /> : items === null ? (
-        <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{window.dashboardOps ? message : NO_CHANNEL_EMPTY}</p>
+        <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{emptyText}</p>
       ) : items.length === 0 ? (
         <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{NO_STEPS}</p>
       ) : (

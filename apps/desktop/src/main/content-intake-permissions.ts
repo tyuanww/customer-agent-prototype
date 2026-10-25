@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { IntakePermissionCommand, IntakePermissionView } from '../shared/content-intake-permissions';
+import { GRANTABLE_ACTIONS, type OpenGrant } from '../shared/page-use';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
 import { loadIntakeAccess } from './content-intake-access';
@@ -61,6 +62,18 @@ export class ContentIntakePermissions {
   private clear() { if(this.expiry)clearTimeout(this.expiry);this.expiry=null; this.access=null; this.sources=[]; this.selected=null; this.people=[]; this.grants=[]; this.preview=null; this.previewView=null; this.deadline=0; }
   private fresh() { return !!this.access && Date.now()<Date.parse(this.access.validUntil) && performance.now()<this.deadline; }
   closeRisk() { return !!this.pending || !!this.preview || !!this.active; }
+  recovery(): string | null {
+    const notice = this.notice;
+    if (!notice) return null;
+    if (this.view().resultUnknown) return notice;
+    if (notice.startsWith('会话已变化') || notice.startsWith('先前操作结果仍未确认') || notice.startsWith('已停止本机等待')) return notice;
+    return null;
+  }
+  dropLists(): void { this.clear(); this.emit(); }
+  async loadLists(gate: OpenGrant, epoch: number): Promise<IntakePermissionView> {
+    if (gate.state !== 'open' || this.session.view().sessionEpoch !== epoch) throw new ProductHttpError('STALE');
+    return this.command({ action: 'refresh' });
+  }
   view(): IntakePermissionView {
     const fresh = this.fresh(), named = this.people.filter(p=>this.personFresh(p));
     const names = new Map(named.map(p=>[p.principalId,p.displayLabel]));
@@ -154,7 +167,7 @@ export class ContentIntakePermissions {
         this.clear();const access=await loadIntakeAccess(this.session,controller.signal);check();this.access=access;
         this.deadline=performance.now()+Math.max(0,Date.parse(access.validUntil)-Date.now());this.armExpiry();
         this.sources=access.sources.flatMap(source=>{const c=access.capabilities.find(c=>c.scope.sourceId===source.scope.sourceId)!;
-          const actions=c.mayAllocate.filter(a=>a!=='review');return actions.length?[{source,actions,selection:randomUUID()}]:[];});
+          const actions=c.mayAllocate.filter(a=>(GRANTABLE_ACTIONS as readonly string[]).includes(a));return actions.length?[{source,actions,selection:randomUUID()}]:[];});
         if(this.sources.length===1){this.selected=this.sources[0]!;await readSelected();}
       }else{
         if(!this.fresh())return reject();

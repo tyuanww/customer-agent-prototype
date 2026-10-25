@@ -129,14 +129,16 @@ it('fail-closes unsigned dashboard senders and extra IPC args', async () => {
 
 it('lets an agent read the SOP catalog and still blocks writes', async () => {
   const agent = fakeSession('agent');
-  vi.mocked(agent.request).mockResolvedValueOnce({
-    status: 200,
-    value: { product_session_id: 'default', items: [] },
-  });
+  vi.mocked(agent.request)
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { product_session_id: 'default', items: [] },
+    })
+    .mockRejectedValueOnce(new ProductHttpError('FORBIDDEN'));
   expect(await dashboardSopCatalog(agent)).toMatchObject({ ok: true, items: [] });
   expect(await dashboardSopImport(agent, 'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停,0\n'))
     .toMatchObject({ ok: false, code: 'FORBIDDEN' });
-  expect(agent.request).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(agent.request).mock.calls[1]?.[1]).toBe('/v1/sop/import');
 
   const coach = fakeSession('coach');
   expect(await dashboardSoftwareCatalog(coach)).toMatchObject({
@@ -463,11 +465,12 @@ async function loginOwner(snapshot: JobSnapshot | null) {
   return { session, paths, login };
 }
 
-it('refuses an SOP patch when the signed-in job cannot upload', async () => {
+it('sends an SOP patch without a local job refusal', async () => {
   const owner = fakeSession('owner');
+  vi.mocked(owner.request).mockResolvedValueOnce({ status: 200, value: sopNode });
   expect(await dashboardSopPatch(owner, { nodeId: 'n1', expectedVersion: 1, title: '停手', body: '先停手' }))
-    .toMatchObject({ ok: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL });
-  expect(owner.request).not.toHaveBeenCalled();
+    .toMatchObject({ nodeId: 'n1', title: '停手' });
+  expect(vi.mocked(owner.request).mock.calls[0]?.[1]).toBe('/v1/sop/nodes/n1');
 });
 
 it('refuses SOP import for a signed-in owner whose job cannot upload', async () => {
@@ -485,19 +488,19 @@ it('refuses SOP import for a signed-in owner whose job cannot upload', async () 
   expect(agent.login).toMatchObject({
     job: { status: 'resolved', title: '普通客服', rights: { uploadSop: false } },
   });
-  expect(await dashboardSopImport(agent.session, sopCsv)).toMatchObject({
-    ok: false, code: 'FORBIDDEN', message: OPS_LOOP_COPY.sopUploadJob,
+  expect(await dashboardSopImport(agent.session, sopCsv)).toEqual({
+    ok: true, productSessionId: 'default', nodeCount: 1,
   });
-  expect(agent.paths).not.toContain('/v1/sop/import');
+  expect(agent.paths).toContain('/v1/sop/import');
 
   const missing = await loginOwner(null);
   expect(missing.login).toMatchObject({
     job: { status: 'unresolved', reason: 'missing', label: UNRESOLVED_JOB_LABEL, rights: { uploadSop: false, search: false } },
   });
-  expect(await dashboardSopImport(missing.session, sopCsv)).toMatchObject({
-    ok: false, code: 'FORBIDDEN', message: UNRESOLVED_JOB_LABEL,
+  expect(await dashboardSopImport(missing.session, sopCsv)).toEqual({
+    ok: true, productSessionId: 'default', nodeCount: 1,
   });
-  expect(missing.paths).not.toContain('/v1/sop/import');
+  expect(missing.paths).toContain('/v1/sop/import');
   expect(JSON.stringify(await dashboardSopImport(missing.session, sopCsv))).not.toContain('一期发布仅管理员');
 
   const engineer = await loginOwner({ title: 'AI赋能工程师', directory: [{ name: 'AI赋能工程师', enabled: true }] });

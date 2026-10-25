@@ -1,5 +1,6 @@
 import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
+import { isPageUseSnapshot, type PageUseApi, type PageUseSnapshot } from '../shared/page-use';
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import type { DeskCommand, DeskKnowledgeApi } from '../shared/desk-knowledge';
@@ -27,6 +28,8 @@ const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
 const OPS_SOFTWARE_OPEN = 'dashboard:ops-software-open';
 const PRODUCT_SESSION_CHANGED = 'product:session-changed';
+const PAGE_USE_CURRENT = 'dashboard:page-use-current';
+const PAGE_USE_CHANGED = 'dashboard:page-use-changed';
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -533,6 +536,22 @@ contextBridge.exposeInMainWorld('dashboardDesk', {
   current: () => ipcRenderer.invoke('dashboard:desk-current'),
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
 } satisfies DeskKnowledgeApi);
+
+const SIGNED_OUT: PageUseSnapshot = { phase: 'signed-out' };
+
+contextBridge.exposeInMainWorld('dashboardPageUse', {
+  current: async () => {
+    const value: unknown = await ipcRenderer.invoke(PAGE_USE_CURRENT);
+    return isPageUseSnapshot(value) ? value : SIGNED_OUT;
+  },
+  onChanged: (listener: (snapshot: PageUseSnapshot) => void) => {
+    const handler = (_event: unknown, snapshot: unknown) => {
+      if (isPageUseSnapshot(snapshot)) listener(snapshot);
+    };
+    ipcRenderer.on(PAGE_USE_CHANGED, handler);
+    return () => { ipcRenderer.removeListener(PAGE_USE_CHANGED, handler); };
+  },
+} satisfies PageUseApi);
 
 contextBridge.exposeInMainWorld('dashboardPermissions', {
   current: () => ipcRenderer.invoke('dashboard:permissions-current'),
