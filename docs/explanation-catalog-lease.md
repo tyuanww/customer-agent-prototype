@@ -38,7 +38,7 @@ ProductAnnounce.refresh
 - 已登录但 `matchesLease` 为 false：话术库徽章「本机目录」，kicker「本机目录，不是当前检索租约」。
 - 已登录且 `matchesLease` 为 true：徽章「当前发布已挂载」，kicker「坐席现在能搜到的当前发布」。
 
-`PRODUCT_ANNOUNCE_CONTENT_UPDATED` 会打到 fox、query **和** dashboard。话术库 / 概览订阅后立刻 `list()`，跟内存 snapshot 对齐。系统同步四卡仍靠聚焦 / 可见 / 10s poll 重取 `dashboard:announce-current`。查询胶囊登录时 `product:session-changed` 同样扇出到 dashboard，内容管理不必靠窗口失焦才刷新会话。
+`PRODUCT_ANNOUNCE_CONTENT_UPDATED` 打到 fox 和 query。查询胶囊登录时 `product:session-changed` 同样扇出到 dashboard。
 
 ## Trade-offs
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_MANIFEST } from '../../src/renderer/data/dashboard-manifest';
+import { DASHBOARD_MANIFEST } from '../fixtures/dashboard-manifest';
 import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
 import { SYNTHETIC_DEVELOPMENT_BASELINE } from '../fixtures/synthetic-development-baseline';
 

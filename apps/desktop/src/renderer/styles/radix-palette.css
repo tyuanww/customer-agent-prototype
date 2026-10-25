@@ -1,0 +1,69 @@
+/*
+ * Workbench and login colour source of truth: Radix UI Colors v3.
+ *
+ * Scales: mauve (neutral, pairs with violet), violet (accent), grass (success),
+ * amber (warning), tomato (danger). Values are copied verbatim from
+ * @radix-ui/colors@3.0.0 so the palette ships without a runtime dependency.
+ *
+ * Step usage follows the Radix guide:
+ *   1-2  app and subtle backgrounds
+ *   3-5  component backgrounds: normal, hover, pressed / selected
+ *   6-8  borders: subtle separators, interactive borders, focus rings
+ *   9-10 solid fills (primary buttons) and their hover
+ *   11   low-contrast text, 12 high-contrast text
+ *
+ * Scoped to the workbench and login roots so the fox and query glass
+ * tokens in tokens.css never drift. Every other workbench colour variable is an alias onto one of these steps.
+ * Add colour here, never as a literal in a component stylesheet.
+ */
+html[data-role='dashboard'],
+html[data-role='login'],
+html[data-role='dashboard'] [data-theme='light'] {
+  --mauve-1: #fdfcfd; --mauve-2: #faf9fb; --mauve-3: #f2eff3; --mauve-4: #eae7ec;
+  --mauve-5: #e3dfe6; --mauve-6: #dbd8e0; --mauve-7: #d0cdd7; --mauve-8: #bcbac7;
+  --mauve-9: #8e8c99; --mauve-10: #84828e; --mauve-11: #65636d; --mauve-12: #211f26;
+
+  --violet-1: #fdfcfe; --violet-2: #faf8ff; --violet-3: #f4f0fe; --violet-4: #ebe4ff;
+  --violet-5: #e1d9ff; --violet-6: #d4cafe; --violet-7: #c2b5f5; --violet-8: #aa99ec;
+  --violet-9: #6e56cf; --violet-10: #654dc4; --violet-11: #6550b9; --violet-12: #2f265f;
+
+  --grass-3: #e9f6e9; --grass-6: #b2ddb5; --grass-9: #46a758; --grass-11: #2a7e3b;
+  --amber-3: #fff7c2; --amber-6: #f3d673; --amber-9: #ffc53d; --amber-11: #ab6400;
+  --tomato-3: #feebe7; --tomato-4: #ffdcd3; --tomato-6: #fdbdaf; --tomato-9: #e54d2e;
+  --tomato-10: #dd4425; --tomato-11: #d13415;
+
+  --rx-contrast: #ffffff;
+}
+
+html[data-role='dashboard'][data-dashboard-theme='dark'],
+html[data-role='dashboard'] [data-theme='dark'] {
+  --mauve-1: #121113; --mauve-2: #1a191b; --mauve-3: #232225; --mauve-4: #2b292d;
+  --mauve-5: #323035; --mauve-6: #3c393f; --mauve-7: #49474e; --mauve-8: #625f69;
+  --mauve-9: #6f6d78; --mauve-10: #7c7a85; --mauve-11: #b5b2bc; --mauve-12: #eeeef0;
+
+  --violet-1: #14121f; --violet-2: #1b1525; --violet-3: #291f43; --violet-4: #33255b;
+  --violet-5: #3c2e69; --violet-6: #473876; --violet-7: #56468b; --violet-8: #6958ad;
+  --violet-9: #6e56cf; --violet-10: #7d66d9; --violet-11: #baa7ff; --violet-12: #e2ddfe;
+
+  --grass-3: #1b2a1e; --grass-6: #2d5736; --grass-9: #46a758; --grass-11: #71d083;
+  --amber-3: #302008; --amber-6: #5c3d05; --amber-9: #ffc53d; --amber-11: #ffca16;
+  --tomato-3: #391714; --tomato-4: #4e1511; --tomato-6: #6e2920; --tomato-9: #e54d2e;
+  --tomato-10: #ec6142; --tomato-11: #ff977d;
+
+  --rx-contrast: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-role='login'] {
+    --mauve-1: #121113; --mauve-2: #1a191b; --mauve-3: #232225; --mauve-4: #2b292d;
+    --mauve-5: #323035; --mauve-6: #3c393f; --mauve-7: #49474e; --mauve-8: #625f69;
+    --mauve-9: #6f6d78; --mauve-10: #7c7a85; --mauve-11: #b5b2bc; --mauve-12: #eeeef0;
+    --violet-1: #14121f; --violet-2: #1b1525; --violet-3: #291f43; --violet-4: #33255b;
+    --violet-5: #3c2e69; --violet-6: #473876; --violet-7: #56468b; --violet-8: #6958ad;
+    --violet-9: #6e56cf; --violet-10: #7d66d9; --violet-11: #baa7ff; --violet-12: #e2ddfe;
+    --grass-3: #1b2a1e; --grass-6: #2d5736; --grass-9: #46a758; --grass-11: #71d083;
+    --amber-3: #302008; --amber-6: #5c3d05; --amber-9: #ffc53d; --amber-11: #ffca16;
+    --tomato-3: #391714; --tomato-4: #4e1511; --tomato-6: #6e2920; --tomato-9: #e54d2e;
+    --tomato-10: #ec6142; --tomato-11: #ff977d;
+  }
+}

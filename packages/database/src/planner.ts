@@ -256,15 +256,22 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
   {
     index: 66,
     minimumCatalogueLength: 67,
-    id: '0067_seat_lifecycle',
+    id: '0067_inaccuracy_outcome',
     predecessorId: '0066_policy_version_restamp',
-    requiresPredecessor: 'Seat lifecycle requires the policy restamp trigger',
+    requiresPredecessor: 'Inaccuracy outcome read requires the policy restamp',
   },
   {
     index: 67,
     minimumCatalogueLength: 68,
-    id: '0068_feishu_login_link',
-    predecessorId: '0067_seat_lifecycle',
+    id: '0068_seat_lifecycle',
+    predecessorId: '0067_inaccuracy_outcome',
+    requiresPredecessor: 'Seat lifecycle requires the inaccuracy outcome read',
+  },
+  {
+    index: 68,
+    minimumCatalogueLength: 69,
+    id: '0069_feishu_login_link',
+    predecessorId: '0068_seat_lifecycle',
     requiresPredecessor: 'Feishu login link requires the seat lifecycle',
   },
 ];

@@ -1,21 +1,25 @@
 import type { components } from '@customer-agent/contracts';
 import { Button, Empty, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import type { IntakeManagementCommand, IntakeManagementReply, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
+import { READ_DISCARDED, useAsyncResource, type DashboardRead } from './use-async-resource';
+import { DISPLAY_SEPARATOR, joinDisplayParts } from '@shared/display-separator';
 import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
 import { formatSeatClock } from './intake-time';
 import './intake-management.css';
 
-function askConfirm(content: string, onOk: () => void) {
+function askConfirm(content: string, onOk: () => void, danger = false) {
   Modal.confirm({
     title: '请确认',
     content,
     okText: '确认',
     cancelText: '取消',
-    okButtonProps: { autoInsertSpace: false },
+    focusable: { autoFocusButton: 'cancel' },
+    okButtonProps: { danger, autoInsertSpace: false },
     cancelButtonProps: { autoInsertSpace: false },
     onOk,
     transitionName: '',
@@ -31,11 +35,11 @@ const domainWord: Record<string, string> = { product: '产品', campaign: '活�
 function scopeWording(scopeLabel: string | undefined, sourceId: string, domain?: string) {
   const label = scopeLabel?.trim() ?? '';
   const word = domain ? domainWord[domain] : undefined;
-  const fallback = word ? `该店铺 · ${word} · 该来源` : '该店铺 · 该来源';
+  const fallback = joinDisplayParts(word ? ['该店铺', word, '该来源'] : ['该店铺', '该来源']);
   if (!label || label === '—' || label === sourceId || label.startsWith('source-')) return fallback;
-  const parts = label.split(' · ');
+  const parts = label.split(DISPLAY_SEPARATOR);
   const head = parts[0] ?? '';
-  if (parts.length >= 2 && !/[\u3400-\u9fff]/.test(head)) return ['该店铺', ...parts.slice(1)].join(' · ');
+  if (parts.length >= 2 && !/[\u3400-\u9fff]/.test(head)) return joinDisplayParts(['该店铺', ...parts.slice(1)]);
   return label;
 }
 function candidateTitle(scopeLabel: string | undefined, version: number, sourceId: string, domain?: string) {
@@ -66,7 +70,7 @@ function workflowPane(target: string | undefined, policy: string | undefined): '
 }
 function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonNullable<IntakeManagementView['material']>; disabled: boolean; apply: (command: IntakeManagementCommand) => void; pageIndex: number }) {
   return <section aria-label="当前页材料与差异">
-    <p>来源版本：{material.materialHeader.sourceClaim.versionValue ?? '尚未确认'} · 风险等级：{riskLabels[material.materialHeader.risk.level]} · 第 {pageIndex + 1} 页</p>
+    <dl className="intake-facts"><dt>来源版本</dt><dd>{material.materialHeader.sourceClaim.versionValue ?? '尚未确认'}</dd><dt>风险等级</dt><dd>{riskLabels[material.materialHeader.risk.level]}</dd><dt>页码</dt><dd>第 {pageIndex + 1} 页</dd></dl>
     <div className="intake-toolbar">
       <ActionButton disabled={disabled || pageIndex === 0} onClick={() => apply({ action: 'material', next: false, previous: true })}>上一页材料</ActionButton>
       <ActionButton disabled={disabled || !material.nextCursor} onClick={() => apply({ action: 'material', next: true })}>下一页材料</ActionButton>
@@ -79,7 +83,7 @@ function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonN
       <p className="intake-answer">{entry.answerText}</p>
       <EntryDetails entry={entry} />
     </article>)}
-    <h3>当前页差异</h3>{material.differences.map(difference => <p key={difference.businessEntryId}><code>{difference.businessEntryId}</code> · {differenceTitle(material.entries, difference.businessEntryId)} · {({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[difference.change]} · {difference.previousVersion ?? '无前版'} → {difference.nextVersion}</p>)}
+    <h3>当前页差异</h3>{material.differences.map(difference => <p key={difference.businessEntryId} className="intake-diff"><code>{difference.businessEntryId}</code><span>{differenceTitle(material.entries, difference.businessEntryId)}</span><span>{({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[difference.change]}</span><span className="mute">{difference.previousVersion ?? '无前版'} → {difference.nextVersion}</span></p>)}
   </section>;
 }
 /** An instance can be bound before the first observation exists. The frozen
@@ -98,7 +102,7 @@ function EntryDetails({ entry }: { entry: components['schemas']['IntakeEntry'] }
     <dt>分类</dt><dd>{entry.category || '未填写'}</dd>
     <dt>适用说明</dt><dd>{entry.applicabilityNote || '未填写'}</dd>
     <dt>有效时间</dt><dd>{formatSeatClock(entry.effectiveFrom)} 至 {entry.effectiveTo ? formatSeatClock(entry.effectiveTo) : '长期'}</dd>
-    <dt>问题表达</dt><dd>{entry.questions.map(q => `${q.text}（${q.active ? '启用' : '停用'} · ${q.id} / ${q.version}）`).join('；') || '无'}</dd>
+    <dt>问题表达</dt><dd>{entry.questions.map(q => `${q.text}（${q.active ? '启用' : '停用'}，${q.id} / ${q.version}）`).join('；') || '无'}</dd>
     <dt>商品 / 场景引用</dt><dd>{[...entry.productRefs, ...entry.scenarioRefs].map(r => `${r.id} / ${r.displayVersion}`).join('；') || '无'}</dd>
     <dt>内部说明</dt><dd>{entry.internalNote || '无'}</dd><dt>风险提示</dt><dd>{entry.riskNote || '无'}</dd>
     <dt>附件说明</dt><dd>{entry.attachmentNote || '无'}</dd>
@@ -169,10 +173,10 @@ function CandidateWorkflow({ view, disabled, apply, onDirty, sectionId, open, ch
     </fieldset> : <p>当前没有此来源的确认权限。</p>}
     </div>
     {legacy && <section hidden={open !== 'legacy'} aria-label="历史审批记录"><h2>历史审批记录</h2>
-      <p>这是旧审批流程的候选。首次确认直发须显式修订或重新导入，不能直接转换；已发布历史保留原审核记录。</p>
+      <p>旧审批流程的候选，需先修订或重新导入才能直接发布。</p>
       <ActionButton disabled={disabled || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'read-review' })}>读取历史审批</ActionButton>
-      {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? ` · 审批编号 ${view.review.instanceCode}` : ''}</p>
-        <p>历史核验：{view.review.checkedAt ? formatSeatClock(view.review.checkedAt) : '尚未核验'} · 有效至：{view.review.validUntil ? formatSeatClock(view.review.validUntil) : '尚无有效核验'}。此处只读，不延长有效期。</p></div>}
+      {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? `，审批编号 ${view.review.instanceCode}` : ''}</p>
+        <p>历史核验：{view.review.checkedAt ? formatSeatClock(view.review.checkedAt) : '尚未核验'}，有效至：{view.review.validUntil ? formatSeatClock(view.review.validUntil) : '尚无有效核验'}</p></div>}
     </section>}
     {children}
     <div hidden={open !== 'publish'}>
@@ -235,12 +239,70 @@ function listNext(candidate: components['schemas']['IntakeCandidate']) {
 function sameCandidate(candidate: components['schemas']['IntakeCandidate'], selected: components['schemas']['IntakeCandidate'] | null) {
   return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version && candidate.sourceId === selected.sourceId;
 }
+function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeManagementView> {
+  if (reply.view) return { status: 'ready', value: reply.view };
+  if (!reply.ok) return asyncFailure(reply.code, { forbidden: reply.message, error: reply.message });
+  return { status: 'idle' };
+}
+function shownView(view: IntakeManagementView | null): AsyncResource<IntakeManagementView> {
+  return view ? { status: 'ready', value: view } : { status: 'idle' };
+}
 export function IntakeManagement() {
   const sectionId = useId();
-  const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
+  const [rereading, setRereading] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
   const stopPending = useRef(false);
+  const listed = useRef(false);
+  const readTicket = useRef(0);
+  const held = useRef<AsyncResource<IntakeManagementView>>(window.dashboardIntake
+    ? { status: 'idle' }
+    : { status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
+  const readCurrent = async (): Promise<DashboardRead<IntakeManagementView>> => {
+    const ticket = readTicket.current;
+    const gen = generation.current;
+    // A newer command or session notification owns the screen. Resolving here would
+    // let this older read replace that result after the hook applies it.
+    const stale = () => Promise.resolve(READ_DISCARDED);
+    const finish = (next: AsyncResource<IntakeManagementView>) => {
+      if (generation.current !== gen) return stale();
+      held.current = next;
+      if (readTicket.current === ticket) setRereading(false);
+      return next;
+    };
+    const api = window.dashboardIntake;
+    if (!api) return finish({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
+    try {
+      const reply = listed.current ? await api.current() : await api.command({ action: 'list', next: false });
+      if (generation.current !== gen) return stale();
+      listed.current = true;
+      setError(!reply.ok && reply.view ? reply.message : '');
+      return finish(resourceForReply(reply));
+    } catch {
+      if (generation.current !== gen) return stale();
+      listed.current = true;
+      setError('');
+      return finish({ status: 'error', message: '管理服务不可用，请刷新。' });
+    }
+  };
+  const { resource, reload, replace } = useAsyncResource(readCurrent, [], held.current, { retainReady: true });
+  const view = resource.status === 'ready' ? resource.value : null;
+  const reading = resource.status === 'loading';
+  const readFailure = resource.status === 'error' || resource.status === 'forbidden' ? resource.message : '';
+  const commit = (next: AsyncResource<IntakeManagementView>) => {
+    held.current = next;
+    replace(next);
+  };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const reread = () => {
+    generation.current += 1;
+    readTicket.current += 1;
+    setError('');
+    setRereading(true);
+    reload();
+  };
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('open');
   const [rollbackFocus, setRollbackFocus] = useState(0);
@@ -258,7 +320,10 @@ export function IntakeManagement() {
       stopPending.current = true; setStopping(true); const gen = ++generation.current;
       try {
         const reply = await window.dashboardIntake.command(command);
-        if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '' : reply.message); }
+        if (generation.current === gen) {
+          commit(resourceForReply(reply));
+          setError(reply.ok ? '' : reply.message);
+        }
       } catch { if (generation.current === gen) setError('停止请求尚未确认，请重新读取当前状态。服务器可能仍在处理原任务。'); }
       finally {
         // Main's stop acknowledgement releases local waiting. A late original
@@ -270,7 +335,7 @@ export function IntakeManagement() {
     }
     if (pending.current !== null || stopPending.current) return;
     if (!window.dashboardIntake) {
-      setView(null);
+      commit({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
       setError(WORKBENCH_EMPTY.intakeUnmounted);
       setBusy(false);
       return;
@@ -281,7 +346,7 @@ export function IntakeManagement() {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
-      setView(reply.view); if (!reply.ok) setError(reply.message);
+      commit(resourceForReply(reply)); if (!reply.ok) setError(reply.message);
     } catch {
       if (generation.current !== gen) return;
       if (uploading) {
@@ -289,45 +354,51 @@ export function IntakeManagement() {
         // A failed IPC reply alone cannot prove either success or revocation.
         try {
           const reply = await window.dashboardIntake!.current();
-          if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '本次操作未完整返回，已重新读取当前状态。请按当前提示继续。' : reply.message); }
-        } catch { if (generation.current === gen) { setView(null); setError('管理服务不可用，请重新读取当前状态。'); } }
-      } else { setView(null); setError('管理服务不可用，请刷新。'); }
+          if (generation.current === gen) {
+            commit(resourceForReply(reply));
+            setError(reply.ok ? '本次操作未完整返回，已重新读取当前状态。请按当前提示继续。' : reply.message);
+          }
+        } catch { if (generation.current === gen) {
+          commit({ status: 'error', message: '管理服务不可用，请重新读取当前状态。' });
+          setError('管理服务不可用，请重新读取当前状态。');
+        } }
+      } else {
+        commit({ status: 'error', message: '管理服务不可用，请刷新。' });
+        setError('管理服务不可用，请刷新。');
+      }
     } finally {
       if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
     }
   };
   useEffect(() => {
     if (!busy || !uploadRequest) return;
-    let active = true, reading = false;
+    let active = true, polling = false;
     const gen = generation.current;
     // current() now also settles a running parse job through one HTTP read per tick
     // (Main serialises it), so this loop is what advances 解析中 to its final state.
     // Manual refresh sends the same command. Every other state still comes from memory.
     const read = async () => {
-      if (reading) return;
-      reading = true;
+      if (polling) return;
+      polling = true;
       try {
         const reply = await window.dashboardIntake!.current();
-        if (active && generation.current === gen && reply.view) setView(reply.view);
+        if (active && generation.current === gen && reply.view) commitRef.current({ status: 'ready', value: reply.view });
       } catch { /* The original command owns its visible transport outcome. */ }
-      finally { reading = false; }
+      finally { polling = false; }
     };
     void read(); const timer = window.setInterval(() => void read(), 250);
     return () => { active = false; window.clearInterval(timer); };
   }, [busy, uploadRequest]);
   useEffect(() => {
     const api = window.dashboardIntake;
-    if (!api) {
-      setView(null);
-      setError(WORKBENCH_EMPTY.intakeUnmounted);
-      return undefined;
-    }
+    if (!api) return undefined;
     const off = api.onInvalidated(() => {
-      const gen = ++generation.current; setDirtyIds(new Set()); setView(null); setError('请重新读取当前状态。');
-      void api.current().then(reply => { if (generation.current === gen) setView(reply.view); })
-        .catch(() => { if (generation.current === gen) setView(null); });
+      const gen = ++generation.current; setDirtyIds(new Set());
+      commitRef.current({ status: 'idle' });
+      setError('请重新读取当前状态。');
+      void api.current().then(reply => { if (generation.current === gen) commitRef.current(shownView(reply.view)); })
+        .catch(() => { if (generation.current === gen) commitRef.current({ status: 'idle' }); });
     });
-    void apply({ action: 'list', next: false });
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
   }, []);
@@ -339,7 +410,7 @@ export function IntakeManagement() {
     if (typeof region.scrollIntoView === 'function') region.scrollIntoView({ block: 'start' });
   }, [rollbackFocus, view?.selected]);
   const upload = view?.upload;
-  const disabled = busy || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const disabled = busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
@@ -363,9 +434,10 @@ export function IntakeManagement() {
     } },
     { title: '时间', key: 'time', render: (_value, row) => formatSeatClock(row.candidate.updatedAt) },
   ];
-  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料管理">
-    <header><div><h1>资料管理</h1><p>上传后核对并发布</p></div><span>{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</span></header>
-    {error && <div><p role="alert">{error}</p><ActionButton disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</ActionButton></div>}
+  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料">
+    <h1 className="desk-sr">资料</h1>
+    <p className="intake-operator">{view?.displayName ?? (busy || reading || rereading ? '正在读取会话…' : '会话待确认')}</p>
+    {(error || readFailure) && <div><p role="alert">{error || readFailure}</p><ActionButton disabled={busy || reading || rereading || stopping} onClick={reread}>重新读取当前状态</ActionButton></div>}
     {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">
       <div><h2>{step.title}</h2><p>{step.detail}</p><small>核对材料 → 确认来源 → 质量检查 → 确认发布</small></div>
       <ActionButton onClick={() => {
@@ -373,17 +445,17 @@ export function IntakeManagement() {
         target?.focus(); target?.scrollIntoView({ block: 'start' });
       }}>前往当前步骤</ActionButton>
     </section>}
-    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
+    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy || rereading} stopping={stopping}
       blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
-    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || stopping}
+    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || reading || rereading || stopping}
       onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</ActionButton>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2 id={`${sectionId}-recovery`} tabIndex={-1}>操作结果待确认</h2>
       {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
-      <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
-        {view.pending.retryAllowed !== false && <ActionButton disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
+      <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
+        {view.pending.retryAllowed !== false && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
         {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
-    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || (view.rollback.available && view.selected?.state === 'published')) && <IntakeRollback view={view} busy={busy || stopping}
+    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || (view.rollback.available && view.selected?.state === 'published')) && <IntakeRollback view={view} busy={busy || rereading || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
@@ -391,7 +463,7 @@ export function IntakeManagement() {
     {view?.authorized && <div className={view.selected ? 'intake-stage has-sheet' : 'intake-stage'}>
       <section aria-label="候选列表">
         <div className="intake-candidate-head">
-          <h2>有权范围内的候选</h2>
+          <h2>候选</h2>
           <div className="intake-toolbar">
             <ActionButton disabled={disabled || dirty || uploadDraft} onClick={() => void apply({ action: 'list', next: false })}>刷新候选</ActionButton>
             <ActionButton disabled={disabled || dirty || uploadDraft || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页候选</ActionButton>
@@ -418,11 +490,11 @@ export function IntakeManagement() {
         {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
       </section>
       {view.selected && <section className="intake-sheet" aria-label="当前候选"><h2 id={`${sectionId}-candidate`} tabIndex={-1}>{candidateTitle(view.candidates.find(row => sameCandidate(row.candidate, view.selected))?.scopeLabel, view.selected.key.version, view.selected.sourceId, view.material?.materialHeader.scope.domain)}</h2>
-        <p>{states[view.selected.state]} · {['awaiting-evidence','ready'].includes(view.selected.state)
+        <p>{states[view.selected.state]}：{['awaiting-evidence','ready'].includes(view.selected.state)
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
           {view.canRevise && <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。', () => void apply({ action: 'revise' }))}>修订当前候选</ActionButton>}
-          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }))}>取消当前候选</ActionButton>}
+          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }), true)}>取消当前候选</ActionButton>}
         </div>}
         <ActionButton disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</ActionButton>
         <div hidden={step?.target !== 'material'}>
@@ -432,11 +504,11 @@ export function IntakeManagement() {
         <CandidateWorkflow key={view.selected.key.digest} view={view} disabled={disabled || qualityDirty} apply={c => void apply(c)} onDirty={onDirty} sectionId={sectionId}
           open={workflowPane(step?.target, view.selected.publicationPolicy)}>
           <section aria-label="人工质量检查" hidden={step?.target !== 'quality'}><h2 id={`${sectionId}-quality`} tabIndex={-1}>3. 质量检查</h2>
-          <p>{view.selected.publicationPolicy === 'approval-v1' ? '旧候选保留原审批记录；如需直接发布，请先修订或重新导入。' : '检查用于核对资料质量。通过后可直接确认发布，无需另行审批。'}</p>
+          {view.selected.publicationPolicy === 'approval-v1' ? <p>旧候选需先修订或重新导入，才能直接发布。</p> : null}
           {view.canReview ? <div className="intake-toolbar"><ActionButton type={quality ? 'default' : 'primary'} disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取初检</ActionButton>
             <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取扩检</ActionButton></div> : <p>当前没有此来源的检查权限。</p>}
-        {quality && <><h3>{states[quality.status.state] ?? quality.status.state}</h3><p>本轮 {quality.total} 条 · 已填写 {quality.checked} 条</p>
-          {!quality.status.frozen && <><p>冻结抽样会固定本轮要检查的条目，不会发布资料。</p><ActionButton type="primary" disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>冻结本次抽样</ActionButton></>}
+        {quality && <><h3>{states[quality.status.state] ?? quality.status.state}</h3><p>本轮 {quality.total} 条，已填写 {quality.checked} 条</p>
+          {!quality.status.frozen && <><ActionButton type="primary" disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>冻结本次抽样</ActionButton></>}
           <div className="intake-toolbar"><ActionButton disabled={disabled || dirty || quality.offset === 0} onClick={() => void apply({ action: 'quality-page', offset: Math.max(0, quality.offset - 20) })}>上一页检查</ActionButton>
             <ActionButton disabled={disabled || dirty || quality.offset + 20 >= quality.total} onClick={() => void apply({ action: 'quality-page', offset: quality.offset + 20 })}>下一页检查</ActionButton></div>
           {quality.samples.map(sample => <CheckRow key={`${view.selected!.key.digest}-${quality.phase}-${quality.offset}-${sample.scriptId}`} sample={sample}

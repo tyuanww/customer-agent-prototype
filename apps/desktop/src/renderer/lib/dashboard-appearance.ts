@@ -25,7 +25,7 @@ export const DASHBOARD_NAV_INTEGRATED_COLLAPSED_WIDTH = DASHBOARD_MACOS_COLLAPSE
 /** Native collapsed surface only. macOS integrated must use collapsedSurfaceWidth('integrated'). */
 export const DASHBOARD_NAV_COLLAPSED_WIDTH = DASHBOARD_NAV_NATIVE_COLLAPSED_WIDTH;
 export const DASHBOARD_NAV_MIN_WIDTH = 216;
-export const DASHBOARD_NAV_DEFAULT_WIDTH = 248;
+export const DASHBOARD_NAV_DEFAULT_WIDTH = 220;
 export const DASHBOARD_NAV_MAX_WIDTH = 360;
 export const DASHBOARD_NAV_RESIZE_STEP = 8;
 export const DASHBOARD_NAV_STRUCTURE_MS = 190;

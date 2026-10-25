@@ -226,7 +226,7 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
  *  migration text and checks the mapping against the TypeScript ceiling. Adding a role on one side
  *  without the other fails here instead of at a customer's first login. */
 describe('seat post mapping agrees with the role ceiling', () => {
-  const sql = readFileSync(new URL('../../../packages/database/overlays/0067_seat_lifecycle.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../../packages/database/overlays/0068_seat_lifecycle.sql', import.meta.url), 'utf8');
 
   it('names only roles the ceiling knows', () => {
     const tuples = [...sql.matchAll(/\('([^']+)',\s*'(job-[^']+)',\s*'([a-z]+)',\s*'([a-z]+)'\)/g)];

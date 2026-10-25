@@ -848,7 +848,7 @@ D `953a555` → `b1531fc` 已在[Menokin 整理说明](../reference-intake-menok
 
 证据入口：
 
-- [内容管理](../../apps/desktop/src/renderer/features/dashboard/ContentModule.tsx)、[本地解析与发布](../../apps/desktop/src/main/dashboard-content.ts)、[XLSX 解析](../../apps/desktop/src/main/xlsx-first-sheet.ts)。
+- [资料](../../apps/desktop/src/renderer/features/dashboard/IntakeManagement.tsx)、[本地解析与发布](../../apps/desktop/src/main/dashboard-content.ts)、[XLSX 解析](../../apps/desktop/src/main/xlsx-first-sheet.ts)。
 - [SOP 限额与接口类型](../../apps/desktop/src/shared/dashboard-ops-loop.ts)、[SOP CSV 解析](../../apps/api/src/ops-loop-csv.ts)。
 - [SOP 流程窗控制器](../../apps/desktop/src/main/sop-window-controller.ts)、[SOP 窗口投影](../../apps/desktop/src/shared/sop-window.ts)。
 - [现行内容发布合同](../reference-content-publish.md)、[飞书导入待办](../../TODOS.md)。

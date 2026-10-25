@@ -1,137 +1,108 @@
+/* Login window. Same look as the workbench: Radix palette, three text sizes, hairlines.
+ * The native title bar carries the window title; the header here is the brand only. */
 html[data-role='login'],
 html[data-role='login'] body,
 html[data-role='login'] #root {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--query-glass-solid);
-  color: var(--ink);
-  font-family: var(--font-body);
+  background: var(--wb-surface);
+  color: var(--wb-text);
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  font-size: var(--wb-text-body);
+  line-height: var(--wb-line-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 .login-window {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   height: 100%;
-  padding: 16px;
+  padding: 24px 28px;
 }
 
 .login-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.login-titles {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
+  gap: 10px;
 }
 
 .login-title {
   margin: 0;
-  color: var(--ink);
-  font-size: 16px;
+  color: var(--wb-text);
+  font-size: var(--wb-text-title);
+  line-height: var(--wb-line-title);
   font-weight: 600;
-  line-height: 24px;
 }
 
-.login-subtitle,
 .login-copy,
-.login-hint,
-.login-error {
+.login-hint {
   margin: 0;
 }
 
-.login-subtitle,
-.login-hint {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 16px;
-}
-
 .login-copy {
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 22px;
+  color: var(--wb-text-2);
 }
 
-.login-error {
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+.login-copy.is-error {
+  color: var(--wb-danger);
+}
+
+.login-hint {
+  color: var(--wb-text-3);
+  font-size: var(--wb-text-meta);
+  line-height: var(--wb-line-meta);
+}
+
+/* Segmented choice. The workbench antd theme paints the track and the selected
+ * thumb with the same surface, so this window sets the track to the hover step
+ * and the selected thumb to the surface plus a hairline. Track radius 8px,
+ * inset 2px, thumb radius 6px: concentric. */
+.login-window .login-segmented.ant-segmented {
+  width: 100%;
+  padding: 2px;
   border-radius: 8px;
-  background: #fff5f5;
-  color: var(--danger);
-  font-size: 12px;
-  line-height: 20px;
+  background: var(--wb-hover);
+}
+
+.login-window .login-segmented.ant-segmented .ant-segmented-item,
+.login-window .login-segmented.ant-segmented .ant-segmented-thumb {
+  border-radius: 6px;
+  color: var(--wb-text-2);
+}
+
+.login-window .login-segmented.ant-segmented .ant-segmented-item.ant-segmented-item-selected,
+.login-window .login-segmented.ant-segmented .ant-segmented-item.ant-segmented-item-selected-text,
+.login-window .login-segmented.ant-segmented .ant-segmented-thumb {
+  background: var(--wb-surface);
+  color: var(--wb-text);
+  font-weight: 500;
+  box-shadow: 0 0 0 var(--wb-hair) var(--wb-line-strong);
 }
 
 .login-form {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
-.login-audience {
-  display: flex;
-  gap: 8px;
+.login-form .ant-form-item {
+  margin-bottom: 12px;
 }
 
-.login-segment {
-  flex: 1 1 0;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--hairline);
+.login-form .ant-form-item-label > label {
+  color: var(--wb-text-2);
+  font-size: var(--wb-text-meta);
+  height: auto;
+}
+
+.login-form .ant-alert {
+  margin-bottom: 12px;
+  padding: 8px 12px;
   border-radius: 6px;
-  background: var(--query-control);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.login-segment[aria-pressed='true'] {
-  border-color: color-mix(in srgb, var(--fox) 32%, var(--hairline));
-  background: var(--fox-soft);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.login-segment:focus-visible,
-.login-field input:focus-visible,
-.login-primary:focus-visible,
-.login-cancel:focus-visible {
-  outline: 2px solid var(--fox);
-  outline-offset: 2px;
-}
-
-.login-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.login-field span {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.login-field input {
-  height: 40px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--hairline) 80%, transparent);
-  border-radius: 14px;
-  background: var(--glass-inner);
-  box-shadow: var(--glass-highlight);
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-  line-height: 24px;
-  text-align: left;
 }
 
 .login-actions {
@@ -140,35 +111,15 @@ html[data-role='login'] #root {
   gap: 8px;
 }
 
-.login-primary {
-  min-height: 36px;
-  min-width: 64px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--fox) 26%, var(--hairline));
-  border-radius: 14px;
-  background: var(--query-accent-control);
-  color: var(--ink);
-  font-weight: 600;
+.login-form .login-actions {
+  margin-top: 4px;
+  margin-bottom: 12px;
 }
 
-.login-primary:hover {
-  background: var(--query-accent-control-hover);
-}
-
-.login-cancel {
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  background: var(--query-control);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.login-primary:disabled,
-.login-cancel:disabled,
-.login-segment:disabled,
-.login-field input:disabled {
-  opacity: 0.82;
+@media (prefers-reduced-motion: reduce) {
+  .login-window .login-segmented.ant-segmented,
+  .login-window .login-segmented.ant-segmented .ant-segmented-item,
+  .login-window .login-segmented.ant-segmented .ant-segmented-thumb {
+    transition: none;
+  }
 }

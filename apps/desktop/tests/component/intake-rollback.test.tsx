@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { IntakeRollback } from '../../src/renderer/features/dashboard/IntakeRollback';
@@ -27,7 +27,18 @@ it('does not ask for a release id until the view already has both versions', asy
   const confirm = vi.spyOn(window, 'confirm');
   try {
     await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
-    expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-execute' }); expect(confirm).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: '回退整个发布目录到上一版' });
+    expect(dialog).toHaveTextContent('回退之后不能撤销这次发布。坐席重新查询后会使用上一版内容。要回到现在这一版，需要再发布一次。');
+    const cancel = within(dialog).getByRole('button', { name: '取消' });
+    expect(within(dialog).getByRole('button', { name: '确认回退' })).toHaveClass('ant-btn-dangerous');
+    await waitFor(() => expect(cancel).toHaveFocus());
+    await user.click(cancel);
+    expect(apply).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
+    await user.click(await screen.findByRole('button', { name: '确认回退' }));
+    expect(apply).toHaveBeenLastCalledWith({ action: 'rollback-execute' });
     expect(screen.queryByRole('button', { name: '发起回退复核' })).not.toBeInTheDocument();
   } finally { confirm.mockRestore(); }
 });

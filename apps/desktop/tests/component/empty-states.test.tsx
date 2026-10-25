@@ -4,9 +4,8 @@ import { IntakeOverview } from '../../src/renderer/features/dashboard/IntakeOver
 import { IntakeUsageLog } from '../../src/renderer/features/dashboard/IntakeUsageLog';
 import { IntakePermissions } from '../../src/renderer/features/dashboard/IntakePermissions';
 import { IntakeManagement } from '../../src/renderer/features/dashboard/IntakeManagement';
-import { WordingLibraryModule } from '../../src/renderer/features/dashboard/WordingLibraryModule';
+import { IntakeLibrary } from '../../src/renderer/features/dashboard/IntakeLibrary';
 import { SopLibraryModule } from '../../src/renderer/features/dashboard/SopLibraryModule';
-import { AnnounceModule } from '../../src/renderer/features/dashboard/AnnounceModule';
 import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowledge';
 import { WORKBENCH_EMPTY } from '../../src/shared/workbench-empty';
 
@@ -16,7 +15,6 @@ afterEach(() => {
   delete window.dashboardPermissions;
   delete window.dashboardIntake;
   delete window.dashboardWording;
-  delete window.dashboardAnnounce;
   delete window.dashboardDesk;
 });
 
@@ -31,7 +29,7 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageFailed }),
   };
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageEmpty)).not.toHaveLength(0);
+  expect(await screen.findAllByText('这段时间所有查询都有结果。')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   cleanup();
   window.dashboardUsageLog = {
@@ -40,7 +38,7 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
   };
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageUnmounted)).not.toHaveLength(0);
+  expect(await screen.findAllByText('坐席查询后会出现')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
@@ -52,27 +50,24 @@ it('names a missing usage source on the usage log and an empty log separately', 
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
 
-it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限 and 资料管理 without accusing the operator', async () => {
+it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限 and 资料 without accusing the operator', async () => {
   render(<IntakePermissions active />);
   expect(await screen.findByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText(/没有可用的资料管理权限|权限配置尚未接入/)).toBeNull();
   expect(screen.getByRole('region', { name: '权限配置' })).toBeVisible();
   cleanup();
   render(<IntakeManagement />);
-  expect(await screen.findByRole('heading', { name: '资料管理' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: '资料' })).toBeVisible();
   expect(screen.getByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText('当前没有可用的资料管理权限，请确认登录身份与店铺授权。')).toBeNull();
 });
 
-it('keeps the locked empty sentences on 话术库, SOP, 系统同步 and 知识库', async () => {
-  render(<WordingLibraryModule />);
-  expect(await screen.findByText(WORKBENCH_EMPTY.wordingUnmounted)).toBeVisible();
+it('keeps the locked empty sentences on 话术库, SOP and 知识库', async () => {
+  render(<IntakeLibrary active />);
+  expect(await screen.findByText('可用资料暂不可读取，请重试。')).toBeVisible();
   cleanup();
   render(<SopLibraryModule />);
   expect(await screen.findAllByText('请先登录后再管理 SOP。')).not.toHaveLength(0);
-  cleanup();
-  render(<AnnounceModule />);
-  expect(await screen.findByText(WORKBENCH_EMPTY.announceUnmounted)).toBeVisible();
   cleanup();
   window.dashboardDesk = {
     current: async () => ({

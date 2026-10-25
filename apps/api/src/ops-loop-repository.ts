@@ -79,8 +79,18 @@ export type PreparedScriptMutation = Readonly<{
   requestHashes: PreparedIdempotencyHashes;
 }>;
 
+export type InaccuracyOutcomeRow = Readonly<{
+  scriptId: string;
+  resolvedAt: string;
+  ready: boolean;
+  beforeCount: number | null;
+  afterCount: number | null;
+  windowDays: 7;
+}>;
+
 export type OpsLoopRepository = Readonly<{
   recordInaccuracy: (request: PreparedInaccuracyReport) => Promise<OperationResult<InaccuracyReportResponse>>;
+  listInaccuracyOutcomes: (actor: AuthenticatedUser) => Promise<OperationResult<readonly InaccuracyOutcomeRow[]>>;
   readSopCatalog: (actor: AuthenticatedUser) => Promise<OperationResult<SopCatalogResponse>>;
   importSopCatalog: (request: PreparedSopImport) => Promise<OperationResult<SopImportAccepted>>;
   patchSopNode: (request: PreparedSopPatch) => Promise<OperationResult<SopNode>>;
@@ -295,6 +305,39 @@ export function createOpsLoopRepository(
   }
 
   return Object.freeze({
+    listInaccuracyOutcomes(actor) {
+      if (actor.role !== 'coach' && actor.role !== 'owner') return Promise.resolve(failure('FORBIDDEN'));
+      return read(async (client) => {
+        const result = await client.query<{
+          script_id: string;
+          resolved_at: Date;
+          ready: boolean;
+          before_count: number | null;
+          after_count: number | null;
+          window_days: number;
+        }>(
+          `SELECT script_id, resolved_at, ready, before_count, after_count, window_days
+           FROM ops_loop.list_resolved_inaccuracy_outcomes($1)`,
+          [actor.role],
+        );
+        return result.rows.map((row) => {
+          if (typeof row.script_id !== 'string' || row.window_days !== 7) throw new Error('OPS_LOOP_SHAPE');
+          const ready = row.ready === true;
+          if (!ready && (row.before_count !== null || row.after_count !== null)) throw new Error('OPS_LOOP_SHAPE');
+          if (ready && (!Number.isInteger(row.before_count) || !Number.isInteger(row.after_count))) {
+            throw new Error('OPS_LOOP_SHAPE');
+          }
+          return Object.freeze({
+            scriptId: row.script_id,
+            resolvedAt: row.resolved_at.toISOString(),
+            ready,
+            beforeCount: ready ? row.before_count : null,
+            afterCount: ready ? row.after_count : null,
+            windowDays: 7 as const,
+          });
+        });
+      });
+    },
     recordInaccuracy(request) {
       return mutate(
         INACCURACY_SCOPE,

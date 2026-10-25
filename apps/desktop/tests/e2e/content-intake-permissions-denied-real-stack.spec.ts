@@ -54,16 +54,10 @@ test('a director title with a query grant only sees no write control and the den
       actions: { query: true, import: false, publish: false, rollback: false },
     });
 
-    await dashboard.getByTestId('nav-publish').click();
-    const module = dashboard.getByTestId('module-content');
-    await expect(module).toBeVisible();
-    // Every write control is absent, and each absent control explains itself with one sentence.
-    await expect(module.getByTestId('publish-action')).toHaveCount(0);
-    await expect(module.getByTestId('content-publish-denied')).toHaveText('没有权限，请找人开通。');
-    await expect(module.getByTestId('content-rollback-previous')).toHaveCount(0);
-    await expect(module.getByTestId('content-rollback-denied')).toHaveText('没有权限，请找人开通。');
-    await expect(module.getByTestId('content-upload-pick')).toHaveCount(0);
-    await expect(module.getByTestId('content-import-denied')).toHaveText('没有权限，请找人开通。');
+    await dashboard.getByTestId('nav-materials').click();
+    await expect(dashboard.getByRole('heading', { name: '资料' })).toBeVisible();
+    await expect(dashboard.getByTestId('nav-publish')).toHaveCount(0);
+    await expect(dashboard.getByTestId('module-content')).toHaveCount(0);
     await dashboard.screenshot({ path: path.join(evidence, 'denied-publish.png') });
 
     // The permission page still lists a scope, so the missing grant button cannot be blamed on

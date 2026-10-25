@@ -32,7 +32,7 @@ function managementView(): IntakeManagementView {
     upload: {
       draftRevision: 0, phase: 'idle', busy: false, authorized: true, validUntil: '2099-01-01T00:00:00.000Z',
       revisionOf: null,
-      sources: [{ selection: 'source-sel-a', label: 'source-a · shop-a', domain: 'product' }],
+      sources: [{ selection: 'source-sel-a', label: 'source-a / shop-a', domain: 'product' }],
       sourceSelection: null, file: null, principals: [],
       preparerSelection: null, editorSelections: [], confirmed: false, pending: null, job: null,
       canChoose: true, canSubmit: false, canRetry: false, canRefresh: false,
@@ -40,9 +40,9 @@ function managementView(): IntakeManagementView {
     },
     signedIn: true, displayName: '合成审核员', authorized: true, validUntil: '2099-01-01T00:00:00.000Z',
     candidates: [
-      { selection: 'row-open', scopeLabel: 'shop-a · 产品', candidate: candidate('source-a', 'awaiting-evidence') },
-      { selection: 'row-publishing', scopeLabel: '品牌通用 · 售后', candidate: candidate('source-b', 'publishing') },
-      { selection: 'row-published', scopeLabel: 'shop-b · 活动', candidate: candidate('source-c', 'published') },
+      { selection: 'row-open', scopeLabel: 'shop-a / 产品', candidate: candidate('source-a', 'awaiting-evidence') },
+      { selection: 'row-publishing', scopeLabel: '品牌通用 / 售后', candidate: candidate('source-b', 'publishing') },
+      { selection: 'row-published', scopeLabel: 'shop-b / 活动', candidate: candidate('source-c', 'published') },
     ],
     moreCandidates: false, selected: null, material: null, materialPage: 0,
     canReview: false, quality: null, hasDraft: false,
@@ -55,7 +55,7 @@ function permissionView(): IntakePermissionView {
   const until = '2099-01-01T00:00:00.000Z';
   return {
     signedIn: true, available: true, busy: false, validUntil: until,
-    sources: [{ selection: 'scope-1', label: '该店铺 · 产品 · 该来源' }],
+    sources: [{ selection: 'scope-1', label: '该店铺 / 产品 / 该来源' }],
     source: 'scope-1',
     people: [
       { selection: 'person-a', label: '合成坐席' },
@@ -64,7 +64,7 @@ function permissionView(): IntakePermissionView {
     actions: ['query', 'content-manage', 'import', 'source-confirm', 'publish'],
     grants: [{
       selection: 'grant-1', reference: 'grant-demo', person: '合成坐席', personSelection: 'person-a',
-      action: 'query', scope: '该店铺 · 产品 · 该来源', startsAt: '2026-10-08T02:00:00.000Z',
+      action: 'query', scope: '该店铺 / 产品 / 该来源', startsAt: '2026-10-08T02:00:00.000Z',
       reason: '预览夹具', expiresAt: '2026-10-09T02:00:00.000Z', revoked: false, canRevoke: true,
     }],
     preview: null, pending: false, resultUnknown: false, notice: null,
@@ -207,6 +207,7 @@ export function installIntakeReviewBridge(location: Location = window.location):
     list: async () => ({ ok: true, items: [iterationTask('task-open', 'open'), iterationTask('task-progress', 'in_progress')], nextCursor: null }),
     start: async () => ({ ok: true, task: iterationTask('task-open', 'in_progress') }),
     close: async () => ({ ok: true, task: iterationTask('task-open', 'resolved') }),
+    outcomes: async () => ({ ok: true, items: [] }),
   });
   exposePreview('dashboardWording', { list: async () => wordingView() });
   exposePreview('dashboardUsageLog', usageLogFixture());

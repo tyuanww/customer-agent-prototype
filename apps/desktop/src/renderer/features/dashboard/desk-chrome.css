@@ -5,7 +5,7 @@
 .dashboard-shell .desk-delete-cancel,
 .dashboard-shell .desk-delete-confirm,
 .dashboard-shell .desk-row-actions button {
-  font-size: 14px;
+  font-size:var(--wb-text-body);
   font-weight: 500;
 }
 .dashboard-shell .desk-add,
@@ -19,7 +19,7 @@
 .dashboard-shell .desk-field select,
 .dashboard-shell .desk-tacit-field select,
 .dashboard-shell .desk-tacit-field textarea {
-  font-size: 14px;
+  font-size:var(--wb-text-body);
 }
 .dashboard-shell .desk-save {
   font-weight: 600;
@@ -30,7 +30,7 @@
 .dashboard-shell .desk-knowledge .ant-btn,
 .dashboard-shell .desk-permissions .ant-btn,
 .dashboard-shell .desk-permissions-page .ant-btn {
-  font-size: 14px;
+  font-size:var(--wb-text-body);
 }
 .dashboard-shell .desk-knowledge .ant-btn,
 .dashboard-shell .desk-permissions .ant-btn,

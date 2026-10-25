@@ -21,6 +21,7 @@ const CHANNEL = 'dashboard:seats-command';
 const NOT_SAVED: SeatAccountReply = { ok: false, message: '账号没有保存。' };
 const INVALID: SeatAccountReply = { ok: false, message: '账号输入无效。' };
 const NO_SESSION: SeatAccountReply = { ok: false, message: WORKBENCH_EMPTY.intakeUnmounted };
+const DENIED: SeatAccountReply = { ok: false, message: '没有权限，请找人开通。' };
 
 /** Server refusals the operator can act on, keyed by the reason the API returns. Anything else is
  *  a state change or an outage, and "try again" would be the wrong instruction. */
@@ -58,6 +59,8 @@ export function registerSeatAccountIpc(
   session: ProductSession | null,
   dashboard: () => WebContents | null,
   devUrl: () => string | undefined,
+  enabled: () => boolean,
+  allowsWrite: () => boolean,
 ) {
   async function request(epoch: number, path: string, init: { method: 'GET' | 'POST' | 'DELETE'; body?: unknown }) {
     const response = await session!.request(epoch, path, { ...init, maxResponseBytes: 262_144 });
@@ -110,7 +113,9 @@ export function registerSeatAccountIpc(
   ipcMain.handle(CHANNEL, async (event, intent: unknown): Promise<SeatAccountReply> => {
     const contents = dashboard();
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return { ok: false, message: '无权访问此窗口能力。' };
+    if (!enabled()) return { ok: false, message: '账号还不能在这里改。' };
     if (!isSeatAccountIntent(intent)) return INVALID;
+    if (intent.action !== 'list' && !allowsWrite()) return DENIED;
     return perform(intent);
   });
   return { dispose: () => { ipcMain.removeHandler(CHANNEL); } };

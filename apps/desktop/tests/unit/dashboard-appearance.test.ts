@@ -79,7 +79,7 @@ describe('dashboard appearance contract', () => {
     expect(DASHBOARD_MACOS_ICON_ANCHOR_OFFSET).toBe(60);
     expect(DASHBOARD_NATIVE_ICON_ANCHOR_OFFSET).toBe(36);
     expect(DASHBOARD_NAV_MIN_WIDTH).toBe(216);
-    expect(DASHBOARD_NAV_DEFAULT_WIDTH).toBe(248);
+    expect(DASHBOARD_NAV_DEFAULT_WIDTH).toBe(220);
     expect(DASHBOARD_NAV_MAX_WIDTH).toBe(360);
     expect(DASHBOARD_NAV_RESIZE_STEP).toBe(8);
     expect(DASHBOARD_NAV_AUTO_COLLAPSE_WIDTH).toBe(192);
@@ -134,7 +134,7 @@ describe('dashboard appearance contract', () => {
     expect(clampDashboardNavWidth(100, 980)).toBe(216);
     expect(clampDashboardNavWidth(248, 980)).toBe(248);
     expect(clampDashboardNavWidth(900, 980)).toBe(333);
-    expect(clampDashboardNavWidth(Number.NaN, 1180)).toBe(248);
+    expect(clampDashboardNavWidth(Number.NaN, 1180)).toBe(220);
 
     expect(resolveDashboardSeparatorAria({
       phase: 'expanded',

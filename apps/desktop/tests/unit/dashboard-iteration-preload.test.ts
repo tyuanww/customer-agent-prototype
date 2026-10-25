@@ -44,8 +44,8 @@ function iterationApi(): DashboardIterationApi {
 
 it('fail-closes malformed iteration IPC payloads and invoke throws', async () => {
   const api = iterationApi();
-  invoke.mockResolvedValueOnce({ ok: true, items: [], nextCursor: null });
-  await expect(api.list()).resolves.toEqual({ ok: true, items: [], nextCursor: null });
+  invoke.mockResolvedValueOnce({ ok: true, items: [], nextCursor: null, truncated: false });
+  await expect(api.list()).resolves.toEqual({ ok: true, items: [], nextCursor: null, truncated: false });
 
   invoke.mockResolvedValueOnce({ ok: true, items: [task], nextCursor: null, extra: true });
   await expect(api.list()).resolves.toEqual(unavailable);
@@ -97,4 +97,26 @@ it('fail-closes malformed iteration IPC payloads and invoke throws', async () =>
   })).resolves.toEqual(unavailable);
 
   expect(JSON.stringify(invoke.mock.calls)).not.toContain('access_token');
+});
+
+it('accepts a truncated outcome list and rejects a bad item', async () => {
+  const api = iterationApi();
+  const row = {
+    scriptId: 'shipping-001',
+    resolvedAt: '2026-10-01T00:00:00.000Z',
+    ready: true,
+    beforeCount: 4,
+    afterCount: 1,
+    windowDays: 7,
+  };
+  invoke.mockResolvedValueOnce({
+    ok: true,
+    truncated: true,
+    items: Array.from({ length: 200 }, (_, index) => ({ ...row, scriptId: `shipping-${index}` })),
+  });
+  await expect(api.outcomes?.()).resolves.toMatchObject({ ok: true, truncated: true });
+  invoke.mockResolvedValueOnce({ ok: true, items: [row], truncated: false });
+  await expect(api.outcomes?.()).resolves.toEqual({ ok: true, items: [row], truncated: false });
+  invoke.mockResolvedValueOnce({ ok: true, items: [{ ...row, windowDays: 3 }], truncated: false });
+  await expect(api.outcomes?.()).resolves.toEqual(unavailable);
 });
