@@ -278,7 +278,11 @@ if (!gotLock) {
     seatAccounts = registerSeatAccountIpc(
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
-      () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench);
+      () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench,
+      () => {
+        const job = workbenchSession?.view().job ?? null;
+        return job?.status === 'resolved' && job.rights.grant === true;
+      });
     intakeManagement = registerContentIntakeManagementIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
@@ -291,8 +295,7 @@ if (!gotLock) {
     // The shared Fox still reads unread in FAQ mode. A null service supplies the
     // existing unavailable projection without creating legacy I/O or missing IPC.
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
-      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
-      () => controller?.dashboardWebContents() ?? null);
+      contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl);
     const usageJournal = createUsageJournal(join(userDataDirectory, 'usage-journal.json'));
     bindUsageFeed((actorId) => usageJournal.read(actorId));
     if (productSession) {

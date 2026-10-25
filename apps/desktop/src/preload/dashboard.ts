@@ -17,6 +17,7 @@ const CONTENT_CANCEL_IN_FLIGHT = 'dashboard:content-cancel-in-flight';
 const ITERATION_LIST = 'dashboard:iteration-list';
 const ITERATION_START = 'dashboard:iteration-start';
 const ITERATION_CLOSE = 'dashboard:iteration-close';
+const INACCURACY_OUTCOMES = 'dashboard:inaccuracy-outcomes';
 const OPS_RETRIEVAL = 'dashboard:ops-retrieval';
 const OPS_SOP_CATALOG = 'dashboard:ops-sop-catalog';
 const OPS_SOP_IMPORT = 'dashboard:ops-sop-import';
@@ -25,67 +26,7 @@ const OPS_SOP_DELETE = 'dashboard:ops-sop-delete';
 const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
 const OPS_SOFTWARE_OPEN = 'dashboard:ops-software-open';
-const ANNOUNCE_CURRENT = 'dashboard:announce-current';
-const ANNOUNCE_MARK_READ = 'dashboard:announce-mark-read';
-const ANNOUNCE_CONTENT_UPDATED = 'product:announce-content-updated';
 const PRODUCT_SESSION_CHANGED = 'product:session-changed';
-
-const LIBRARY_DOMAINS = ['product', 'campaign', 'presale', 'aftersale'] as const;
-type LibraryDomain = (typeof LIBRARY_DOMAINS)[number];
-
-function isLibraryDomain(value: unknown): value is LibraryDomain {
-  return typeof value === 'string' && (LIBRARY_DOMAINS as readonly string[]).includes(value);
-}
-
-function isDomainCounts(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  return Object.keys(record).length === LIBRARY_DOMAINS.length
-    && LIBRARY_DOMAINS.every((domain) => Number.isSafeInteger(record[domain]) && (record[domain] as number) >= 0);
-}
-
-function isAnnouncement(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  return exactKeys(record, ['title', 'summary', 'createdAt'])
-    && typeof record.title === 'string'
-    && (record.summary === null || typeof record.summary === 'string')
-    && typeof record.createdAt === 'string';
-}
-
-function isAnnounceCurrent(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  if (record.ok === false) {
-    return exactKeys(record, ['ok', 'code', 'signedIn'])
-      && (record.code === 'NO_CURRENT' || record.code === 'FORBIDDEN' || record.code === 'UNAVAILABLE')
-      && typeof record.signedIn === 'boolean';
-  }
-  if (record.ok !== true
-    || !exactKeys(record, ['ok', 'signedIn', 'releaseId', 'announcement', 'counts', 'unread', 'unreadDomains'])) {
-    return false;
-  }
-  return typeof record.signedIn === 'boolean'
-    && typeof record.releaseId === 'string'
-    && record.releaseId.length > 0
-    && (record.announcement === null || isAnnouncement(record.announcement))
-    && (record.counts === null || isDomainCounts(record.counts))
-    && typeof record.unread === 'boolean'
-    && Array.isArray(record.unreadDomains)
-    && record.unreadDomains.length <= 4
-    && record.unreadDomains.every(isLibraryDomain);
-}
-
-function parseDomainList(request: unknown): readonly LibraryDomain[] {
-  if (!Array.isArray(request) || request.length > 4) return [];
-  const seen = new Set<string>();
-  for (const item of request) {
-    if (!isLibraryDomain(item) || seen.has(item)) return [];
-    seen.add(item);
-  }
-  return LIBRARY_DOMAINS.filter((domain) => seen.has(domain));
-}
-
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -175,10 +116,16 @@ function isContentJob(value: unknown): boolean {
   if (!exactKeys(actions, ['query', 'import', 'publish', 'rollback'])) return false;
   const bits = actions as Record<string, unknown>;
   if (![bits.query, bits.import, bits.publish, bits.rollback].every((flag) => typeof flag === 'boolean')) return false;
-  if (job.notice !== null && job.notice !== '没有权限，请找人开通。'
-    && job.notice !== '资料资格过期了，请稍后重试。') return false;
   if (job.permission !== null && (typeof job.permission !== 'string'
     || !['unknown', 'pending', 'ready', 'denied', 'expired', 'revoked'].includes(job.permission))) return false;
+  const noticeFor = job.permission === 'expired'
+    ? '资料资格过期了，请稍后重试。'
+    : job.permission === 'pending'
+      ? '资料尚未发布，暂时没有可查询内容。发布后重新登录即可。'
+      : job.permission === 'ready' || job.permission === 'unknown' || job.permission === null
+        ? null
+        : '没有权限，请找人开通。';
+  if (job.notice !== noticeFor) return false;
   if (job.status === 'unresolved') {
     return exactKeys(job, ['status', 'reason', 'label', 'rights', 'permission', 'notice', 'actions'])
       && (job.reason === 'blank' || job.reason === 'unknown' || job.reason === 'duplicate' || job.reason === 'missing')
@@ -191,7 +138,7 @@ function isContentJob(value: unknown): boolean {
   const expected = JOB_RIGHTS[job.title];
   return expected !== undefined
     && flags[0] === bits.publish
-    && flags[1] === bits.publish
+    && flags[1] === expected[1]
     && flags[2] === expected[2]
     && flags[3] === bits.query
     && flags[4] === (expected[4] && bits.query);
@@ -275,7 +222,8 @@ function isIterationList(value: unknown): boolean {
   if (isContentFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'items', 'nextCursor'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'items', 'nextCursor', 'truncated'])) return false;
+  if (typeof record.truncated !== 'boolean') return false;
   if (!(record.nextCursor === null || (typeof record.nextCursor === 'string' && record.nextCursor.length >= 1))) {
     return false;
   }
@@ -290,6 +238,36 @@ function isIterationTaskResult(value: unknown): boolean {
 }
 
 const unavailable = { ok: false as const, code: 'UNAVAILABLE' as const, message: '服务暂不可用，请重试' };
+
+function isOutcomeCount(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 1_000_000;
+}
+
+function isOutcomeItem(value: unknown): value is { scriptId: string } {
+  if (!isRecord(value)) return false;
+  if (typeof value.scriptId !== 'string' || value.scriptId.length < 1 || value.scriptId.length > 128) return false;
+  if (typeof value.resolvedAt !== 'string' || !Number.isFinite(Date.parse(value.resolvedAt))) return false;
+  if (value.windowDays !== 7) return false;
+  if (value.ready === false) return value.beforeCount === null && value.afterCount === null;
+  return value.ready === true && isOutcomeCount(value.beforeCount) && isOutcomeCount(value.afterCount);
+}
+
+function asOutcomeList(value: unknown) {
+  if (isContentFailure(value)) return value;
+  if (!isRecord(value) || value.ok !== true || !exactKeys(value, ['ok', 'items', 'truncated']) || !Array.isArray(value.items)) {
+    return unavailable;
+  }
+  if (typeof value.truncated !== 'boolean') return unavailable;
+  const items = value.items.slice(0, 200);
+  const truncated = value.truncated === true || value.items.length > 200;
+  if (!items.every(isOutcomeItem)) return unavailable;
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.scriptId)) return unavailable;
+    seen.add(item.scriptId);
+  }
+  return { ok: true as const, items, truncated };
+}
 
 contextBridge.exposeInMainWorld('dashboardWording', {
   async list() {
@@ -422,33 +400,9 @@ contextBridge.exposeInMainWorld('dashboardOps', {
   },
 });
 
-const catalogUpdatedListeners = new Set<() => void>();
 const sessionChangedListeners = new Set<() => void>();
-ipcRenderer.on(ANNOUNCE_CONTENT_UPDATED, () => {
-  for (const listener of catalogUpdatedListeners) listener();
-});
 ipcRenderer.on(PRODUCT_SESSION_CHANGED, () => {
   for (const listener of sessionChangedListeners) listener();
-});
-
-contextBridge.exposeInMainWorld('dashboardAnnounce', {
-  async current() {
-    try {
-      const value: unknown = await ipcRenderer.invoke(ANNOUNCE_CURRENT);
-      return isAnnounceCurrent(value) ? value : { ok: false, code: 'UNAVAILABLE', signedIn: false };
-    } catch {
-      return { ok: false, code: 'UNAVAILABLE', signedIn: false };
-    }
-  },
-  async markRead(request: unknown) {
-    const domains = parseDomainList(request);
-    if (domains.length === 0) return;
-    try { await ipcRenderer.invoke(ANNOUNCE_MARK_READ, domains); } catch { /* best effort */ }
-  },
-  onCatalogUpdated(listener: () => void) {
-    catalogUpdatedListeners.add(listener);
-    return () => { catalogUpdatedListeners.delete(listener); };
-  },
 });
 
 const SOP_WORKBOOK_OPEN = 'dashboard:sop-workbook-open';
@@ -543,6 +497,14 @@ contextBridge.exposeInMainWorld('dashboardIteration', {
     try {
       const value: unknown = await ipcRenderer.invoke(ITERATION_CLOSE, request);
       return isIterationTaskResult(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async outcomes() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(INACCURACY_OUTCOMES);
+      return asOutcomeList(value);
     } catch {
       return unavailable;
     }

@@ -1,3 +1,4 @@
+import { Button } from 'antd';
 import {
   useCallback,
   useEffect,
@@ -125,9 +126,10 @@ export function DashboardThemeMenu({
 
   return (
     <div className="dashboard-theme-menu" data-testid="dashboard-theme-switcher">
-      <button
+      <Button
         ref={triggerRef}
-        type="button"
+        htmlType="button"
+        autoInsertSpace={false}
         className="dashboard-theme-trigger"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -139,7 +141,7 @@ export function DashboardThemeMenu({
         onKeyDown={handleTriggerKey}
       >
         <DashboardChromeIcon id={themeMode} />
-      </button>
+      </Button>
       {open ? (
         <div
           id="dashboard-theme-menu"
@@ -152,12 +154,13 @@ export function DashboardThemeMenu({
           {DASHBOARD_THEME_OPTIONS.map((option, index) => {
             const selected = themeMode === option.mode;
             return (
-              <button
+              <Button
                 key={option.mode}
                 ref={(node) => {
-                  itemRefs.current[index] = node;
+                  itemRefs.current[index] = node instanceof HTMLButtonElement ? node : null;
                 }}
-                type="button"
+                htmlType="button"
+                autoInsertSpace={false}
                 role="menuitemradio"
                 aria-checked={selected}
                 tabIndex={index === rovingIndex ? 0 : -1}
@@ -170,7 +173,7 @@ export function DashboardThemeMenu({
               >
                 <DashboardChromeIcon id={option.mode} />
                 <span>{option.label}</span>
-              </button>
+              </Button>
             );
           })}
         </div>

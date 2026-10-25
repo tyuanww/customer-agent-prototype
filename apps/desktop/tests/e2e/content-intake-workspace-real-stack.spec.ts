@@ -104,19 +104,17 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
           && document.querySelector<HTMLElement>('.dashboard-content')!.scrollWidth <= document.querySelector<HTMLElement>('.dashboard-content')!.clientWidth)).toBe(true);
         await dashboard.screenshot({ path: path.join(evidence, `library-${theme}.png`) });
       }
-      await dashboard.getByTestId('nav-announce').click();
-      const versions = dashboard.getByRole('region', { name: '当前可用版本', exact: true });
-      await expect(versions).toContainText(receipt.releaseId!);
-      await expect(versions).toContainText('暂无记录');
-      await expect(versions.getByRole('button', { name: /安装|下载|已读/ })).toHaveCount(0);
+      await expect(library.getByRole('button', { name: /安装|下载|已读/ })).toHaveCount(0);
+      await dashboard.getByTestId('nav-overview').click();
+      await expect(dashboard.getByText('暂无使用记录', { exact: true })).toBeVisible();
       await dashboard.screenshot({ path: path.join(evidence, 'current-version.png') });
       // Directory refresh/navigation must leave Query's original qualification
       // intact; its still-valid opaque key remains usable in its own window.
       const retainedCopy = await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key);
       expect(retainedCopy, JSON.stringify(retainedCopy)).toMatchObject({ ok: true, copied: true });
       await host.revokeSyntheticQuery();
-      await versions.getByRole('button', { name: '刷新可用资料', exact: true }).click();
       await dashboard.getByTestId('nav-wording').click();
+      await library.getByRole('button', { name: '刷新可用资料', exact: true }).click();
       await expect(library.getByRole('article')).toHaveCount(0);
       expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }))).toMatchObject({ ok: false });
       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: false });

@@ -1,0 +1,140 @@
+/*
+ * Workbench design tokens. Owner of type scale, borders, radii, motion, and the
+ * semantic colour aliases every workbench stylesheet reads. Colour values come
+ * only from radix-palette.css.
+ *
+ * Type: three sizes. 12 for meta and table headers, 14 for body and controls,
+ * 20 for the page title. Hierarchy otherwise comes from weight, colour, space.
+ * Borders: 0.5px hairlines. Radii: 6 for controls, 10 for panels, so a control
+ * inset 4px inside a panel stays concentric (10 - 4 = 6).
+ * Motion: one ease-out, 200ms, colour and opacity only.
+ */
+html[data-role='dashboard'],
+html[data-role='login'] {
+  --wb-text-meta: 12px;
+  --wb-text-body: 14px;
+  --wb-text-title: 20px;
+  --wb-line-meta: 18px;
+  --wb-line-body: 22px;
+  --wb-line-title: 28px;
+
+  --wb-hair: 0.5px;
+  --wb-radius-control: 6px;
+  --wb-radius-panel: 10px;
+  --wb-motion: 200ms;
+  --wb-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  --wb-app: var(--mauve-1);
+  --wb-sidebar: var(--mauve-2);
+  --wb-surface: var(--mauve-1);
+  --wb-subtle: var(--mauve-2);
+  --wb-hover: var(--mauve-3);
+  --wb-pressed: var(--mauve-4);
+  --wb-line: var(--mauve-6);
+  --wb-line-strong: var(--mauve-7);
+  --wb-text: var(--mauve-12);
+  --wb-text-2: var(--mauve-11);
+  --wb-text-3: var(--mauve-9);
+
+  --wb-accent: var(--violet-9);
+  --wb-accent-hover: var(--violet-10);
+  --wb-accent-text: var(--violet-11);
+  --wb-accent-soft: var(--violet-3);
+  --wb-accent-soft-hover: var(--violet-4);
+  --wb-accent-line: var(--violet-7);
+  --wb-focus: var(--violet-8);
+  --wb-on-accent: var(--rx-contrast);
+
+  --wb-ok: var(--grass-11);
+  --wb-ok-soft: var(--grass-3);
+  --wb-warn: var(--amber-11);
+  --wb-warn-soft: var(--amber-3);
+  --wb-danger: var(--tomato-11);
+  --wb-danger-solid: var(--tomato-9);
+  --wb-danger-soft: var(--tomato-3);
+  --wb-danger-line: var(--tomato-6);
+
+  --wb-chart-1: var(--violet-9);
+  --wb-chart-2: var(--amber-9);
+  --wb-chart-track: var(--mauve-4);
+}
+
+/* Legacy variable names, aliased so existing component CSS reads Radix steps. */
+html[data-role='dashboard'],
+html[data-role='dashboard'] .dashboard-shell,
+html[data-role='dashboard'] .dashboard-shell[data-theme] {
+  --dash-canvas: var(--wb-app);
+  --dash-surface: var(--wb-surface);
+  --dash-sidebar: var(--wb-sidebar);
+  --dash-sidebar-material: var(--wb-sidebar);
+  --dash-sidebar-hairline: var(--wb-line);
+  --dash-chrome-hover: var(--wb-hover);
+  --dash-chrome-pressed: var(--wb-pressed);
+  --dash-chrome-selected: var(--wb-accent-soft);
+  --dash-chrome-surface: var(--wb-surface);
+  --dash-material-chrome: var(--wb-surface);
+  --dash-material-panel: var(--wb-surface);
+  --dash-highlight: transparent;
+  --dash-nav-active: var(--wb-accent-soft);
+  --dash-surface-subtle: var(--wb-subtle);
+  --dash-surface-selected: var(--wb-accent-soft);
+  --dash-ink: var(--wb-text);
+  --dash-muted: var(--wb-text-2);
+  --dash-ink-soft: var(--wb-text-2);
+  --dash-line: var(--wb-line);
+  --dash-line-strong: var(--wb-line-strong);
+  --dash-control-line: var(--wb-line-strong);
+  --dash-purple: var(--wb-accent);
+  --dash-purple-strong: var(--wb-accent-hover);
+  --dash-purple-soft: var(--wb-accent-soft);
+  --dash-purple-tint: var(--violet-2);
+  --dash-purple-line: var(--wb-accent-line);
+  --dash-success: var(--wb-ok);
+  --dash-success-bg: var(--wb-ok-soft);
+  --dash-success-line: var(--grass-6);
+  --dash-warning: var(--wb-warn);
+  --dash-danger: var(--wb-danger);
+  --dash-danger-bg: var(--wb-danger-soft);
+  --dash-danger-line: var(--wb-danger-line);
+  --dash-disabled-bg: var(--wb-subtle);
+  --dash-disabled-ink: var(--wb-text-3);
+  --dash-chart-track: var(--wb-chart-track);
+  --dash-neutral: var(--wb-text-3);
+  --dash-neutral-bg: var(--wb-hover);
+  --dash-tooltip-bg: var(--mauve-12);
+  --dash-tooltip-ink: var(--mauve-1);
+  --dash-card: var(--wb-surface);
+  --dash-radius: var(--wb-radius-control);
+  --dash-panel-radius: var(--wb-radius-panel);
+  --dash-motion-structure: var(--wb-motion);
+  --dash-motion-feedback: var(--wb-motion);
+  --dash-ease-structure: var(--wb-ease);
+}
+
+html[data-role='dashboard'] .dashboard-shell .wb9,
+html[data-role='dashboard'] .dashboard-shell.is-intake,
+html[data-role='dashboard'] .dashboard-shell.is-intake[data-theme] .wb9 {
+  --p: var(--wb-accent);
+  --p-hover: var(--wb-accent-hover);
+  --p-soft: var(--wb-accent-soft);
+  --p-line: var(--wb-accent-line);
+  --bg: var(--wb-surface);
+  --side: var(--wb-sidebar);
+  --ink: var(--wb-text);
+  --ink2: var(--wb-text);
+  --mute: var(--wb-text-2);
+  --faint: var(--wb-text-3);
+  --line: var(--wb-line);
+  --ctl: var(--wb-line-strong);
+  --hover: var(--wb-hover);
+  --row: var(--wb-subtle);
+  --danger: var(--wb-danger);
+  --danger-soft: var(--wb-danger-soft);
+  --ok: var(--wb-ok);
+  --warn: var(--wb-warn);
+  --chart-use: var(--wb-chart-1);
+  --chart-miss: var(--wb-chart-2);
+  --r: var(--wb-radius-control);
+  --t: var(--wb-motion);
+  --ring: 0 0 0 2px var(--wb-focus);
+}

@@ -71,6 +71,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_ITERATION_LIST,
       IPC_CHANNELS.DASHBOARD_ITERATION_START,
       IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE,
+      IPC_CHANNELS.DASHBOARD_INACCURACY_OUTCOMES,
       IPC_CHANNELS.DASHBOARD_OPS_RETRIEVAL,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT,
@@ -79,8 +80,6 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE,
       IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE,
       IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE_OPEN,
-      IPC_CHANNELS.DASHBOARD_ANNOUNCE_CURRENT,
-      IPC_CHANNELS.DASHBOARD_ANNOUNCE_MARK_READ,
       IPC_CHANNELS.DISMISS,
       IPC_CHANNELS.REPORT_UI_PHASE,
       IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
@@ -153,7 +152,9 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).not.toContain('product:login');
     expect(dashboardPreload).not.toContain("from '../shared/product-session'");
     expect(dashboardPreload).not.toContain('ipcRenderer.send(');
-    expect(dashboardPreload).toContain('ipcRenderer.on(ANNOUNCE_CONTENT_UPDATED');
+    expect(dashboardPreload).not.toContain('dashboardAnnounce');
+    expect(dashboardPreload).not.toContain('dashboard:announce-current');
+    expect(dashboardPreload).not.toContain('dashboard:announce-mark-read');
     expect(dashboardPreload).toContain('ipcRenderer.on(PRODUCT_SESSION_CHANGED');
   });
 

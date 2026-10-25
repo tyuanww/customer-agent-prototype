@@ -126,6 +126,18 @@ export function registerOpsLoopRoutes(
     return ++window.count <= maximum;
   }
 
+  app.get('/v1/metrics/inaccuracy-outcomes', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const actor = await authenticateRequestHeaders(authService, request.headers);
+    if (actor === null) return sendUnauthorized(reply);
+    if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (dependencies === undefined) return sendOverloaded(reply);
+    if (!limit('inaccuracy-outcomes', actor.user_id, 60)) return sendRateLimited(reply);
+    const result = await dependencies.repository.listInaccuracyOutcomes(actor);
+    if (!result.ok) return sendOperationFailure(reply, result);
+    return { items: result.response };
+  });
+
   app.post('/v1/inaccuracy-reports', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const actor = await authenticateRequestHeaders(authService, request.headers);

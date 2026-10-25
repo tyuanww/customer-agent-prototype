@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_ERRORS } from '../../src/shared/product-session';
+import { dashboardIterationList, type DashboardIterationSessionClient } from '../../src/main/dashboard-iteration';
 import {
   ITERATION_COPY,
   dashboardIterationFailure,
@@ -36,6 +37,7 @@ describe('dashboard iteration contract mapping', () => {
       ok: true,
       items: [],
       nextCursor: null,
+      truncated: false,
     });
     expect(iterationTaskFromContract(contractTask)).toMatchObject({
       taskId: 'itask-01J4PF9TQX7G',
@@ -107,6 +109,7 @@ describe('dashboard iteration contract mapping', () => {
       ok: true,
       items: [iterationTaskFromContract(contractTask)],
       nextCursor: 'abc',
+      truncated: false,
     });
     expect(iterationListFromContract(null)).toBeNull();
     expect(iterationListFromContract({ items: 'nope', next_cursor: null })).toBeNull();
@@ -119,6 +122,20 @@ describe('dashboard iteration contract mapping', () => {
     expect(iterationTaskFromContract([])).toBeNull();
     expect(iterationTaskFromContract({ ...contractTask, sample_query_ids: [1] })).toBeNull();
     expect(iterationTaskFromContract({ ...contractTask, suspected_cause: 'ticket' })).toBeNull();
+  });
+
+  it('marks the list truncated when a cursor remains after 20 pages', async () => {
+    let calls = 0;
+    const session = {
+      view: () => ({ enabled: true, signedIn: true, role: 'owner' as const, sessionEpoch: 1 }),
+      request: async () => {
+        calls += 1;
+        return { status: 200, value: { items: [], next_cursor: `c${calls}` } };
+      },
+    };
+    const result = await dashboardIterationList(session as unknown as DashboardIterationSessionClient);
+    expect(calls).toBe(20);
+    expect(result).toMatchObject({ ok: true, truncated: true, nextCursor: 'c20' });
   });
 });
 

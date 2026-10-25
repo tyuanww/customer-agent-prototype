@@ -51,6 +51,17 @@ function serviceRepository(): ServiceRepository {
 
 function repository(): OpsLoopRepository {
   return {
+    listInaccuracyOutcomes: vi.fn<OpsLoopRepository['listInaccuracyOutcomes']>().mockResolvedValue({
+      ok: true,
+      response: [{
+        scriptId: 'script-1',
+        resolvedAt: '2026-10-01T00:00:00.000Z',
+        ready: false,
+        beforeCount: null,
+        afterCount: null,
+        windowDays: 7,
+      }],
+    }),
     recordInaccuracy: vi.fn<OpsLoopRepository['recordInaccuracy']>().mockResolvedValue({
       ok: true,
       response: {
@@ -159,6 +170,33 @@ function appWith(ops?: OpsLoopRepository): FastifyInstance {
 }
 
 describe('ops-loop HTTP routes', () => {
+  it('returns inaccuracy outcomes to a coach and refuses an agent', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const denied = await app.inject({
+      method: 'GET',
+      url: '/v1/metrics/inaccuracy-outcomes',
+      headers: agentHeaders,
+    });
+    expect(denied.statusCode).toBe(403);
+    const allowed = await app.inject({
+      method: 'GET',
+      url: '/v1/metrics/inaccuracy-outcomes',
+      headers: coachHeaders,
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.json()).toEqual({
+      items: [{
+        scriptId: 'script-1',
+        resolvedAt: '2026-10-01T00:00:00.000Z',
+        ready: false,
+        beforeCount: null,
+        afterCount: null,
+        windowDays: 7,
+      }],
+    });
+  });
+
   it('records inaccuracy for agent and rejects missing idempotency', async () => {
     const ops = repository();
     const app = appWith(ops);

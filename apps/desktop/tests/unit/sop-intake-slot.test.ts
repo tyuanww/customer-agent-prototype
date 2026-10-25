@@ -7,10 +7,25 @@ const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 it('puts the catalog upload on the six-page SOP slot and keeps the seat window on the built-in tree', () => {
   const app = readFileSync(resolve(desktopRoot, 'src/renderer/DashboardApp.tsx'), 'utf8');
+  const destinations = readFileSync(resolve(desktopRoot, 'src/renderer/features/dashboard/intake-destinations.tsx'), 'utf8');
+  const rows = readFileSync(resolve(desktopRoot, 'src/renderer/features/dashboard/intake-destination-rows.ts'), 'utf8');
   const windowController = readFileSync(resolve(desktopRoot, 'src/main/sop-window-controller.ts'), 'utf8');
   const ops = readFileSync(resolve(desktopRoot, 'src/main/dashboard-ops-loop.ts'), 'utf8');
-  expect(app).toContain('{active === \'sop\' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? \'\'} />}');
-  expect(app).not.toContain('{active === \'sop\' && <IntakeSopSource />}');
+  expect(destinations).toContain('sop: (ctx) => <SopLibraryModule canUploadSop={ctx.canUploadSop} canUpdateSop={ctx.canUpdateSop} canDeleteSop={ctx.canDeleteSop} uploadBlock={ctx.uploadBlock} />');
+  expect(app).toContain('uploadBlock: uploadRefusal?.message ?? \'\'');
+  expect(app).toContain('renderIntakeDestinations');
+  expect(app).not.toContain('<SopLibraryModule');
+  expect(rows).toContain([
+    "id: 'sop',",
+    "    label: 'SOP',",
+    "    blurb: '当前产品会话 SOP 树',",
+    "    group: '话术运营',",
+    "    audience: 'everyone',",
+    "    needsPermissionBridge: false,",
+    '    keepAlive: false,',
+  ].join('\n'));
+  expect(destinations).not.toContain('IntakeSopSource');
+  expect(app).not.toContain('IntakeSopSource');
   expect(windowController).toContain('return this.tree ?? ALLERGY_SOP_TREE');
   expect(ops).toContain("'/v1/sop/import'");
   expect(ops).toContain('sopUploadRefusal(client.view().job)');

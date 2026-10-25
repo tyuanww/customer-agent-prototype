@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { IntakePermissionCommand, IntakePermissionView } from '../shared/content-intake-permissions';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
+import { joinDisplayParts } from '../shared/display-separator';
 import { loadIntakeAccess } from './content-intake-access';
 import type { IntakeUsageSession } from './content-intake-usage';
 import { ProductHttpError } from './product-http';
@@ -11,7 +12,7 @@ type Person = C['IntakePrincipalPage']['items'][number] & { selection: string; d
 type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange']; uncertain: boolean };
 const reject = () => { throw new ProductHttpError('STALE'); };
 // IntakeScope has ids, not names. A missing name stays 该店铺 / 该来源, and the id never becomes the label.
-const label = (s: C['IntakeScope']) => `该店铺 · ${{product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain]} · 该来源`;
+const label = (s: C['IntakeScope']) => joinDisplayParts(['该店铺', {product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain], '该来源']);
 
 /** Owns ephemeral selections, credential epochs and exact mutation recovery.
  * Renderer supplies intent; it never receives IDs to construct a grant request. */
@@ -121,7 +122,7 @@ export class ContentIntakePermissions {
       if(!pending)return reject();
       try {const raw=await request(pending.path,{method:pending.method,body:pending.body});
         parseContractSchema(pending.method==='POST'?'IntakeGrantList':'IntakeGrant',raw);this.pending=null;this.preview=null;this.previewView=null;
-        this.notice='本次操作已保存。请刷新列表查看当前权限；此回执不代表权限永久有效。';
+        this.notice='本次操作已保存。';
         this.clear();
       }catch(error){
         // Only the current attempt may settle recovery. An aborted/old-session
@@ -134,7 +135,7 @@ export class ContentIntakePermissions {
         const body = pending.body as { items?: { action?: unknown }[] };
         const queryGrant = Array.isArray(body?.items) && body.items.some(item => item.action === 'query');
         if(error instanceof ProductHttpError && error.reason === 'PERMISSION_CHANGED' && queryGrant) {
-          this.notice='查询授权未保存。可能是当前店铺还没有已发布内容（需先完成一次发布），也可能是资格在预览后已变化。请先确认店铺已有已发布内容，再刷新重试。';
+          this.notice='查询授权没有保存。请确认这个店铺已有发布内容，再刷新重试。';
         }
         // A transport/cancellation/malformed response cannot prove no COMMIT.
         const definitive = error instanceof ProductHttpError && isDefinitiveRollback(error.code,error.reason);
