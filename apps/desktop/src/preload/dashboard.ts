@@ -537,10 +537,6 @@ contextBridge.exposeInMainWorld('dashboardDesk', {
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
 } satisfies DeskKnowledgeApi);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
 function pageUseSnapshot(value: unknown): value is PageUseSnapshot {
   if (!isRecord(value)) return false;
   if (value.phase === 'signed-out') return !('permissions' in value) && !('sop' in value);
