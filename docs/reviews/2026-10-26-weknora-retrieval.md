@@ -30,7 +30,7 @@ E2 调研卡对照 WeKnora 与当前桌面检索。下文引用的 Top-3 命中�
 
 ## E1 基线（仅描述本仓 BM25 lane）
 
-E1 已在合成语料上量化当前桌面链路，详见基线报告。held-out 200 条正例 Top-3 命中率 67.6%，MRR 0.608，30 条负例无命中正确率 33.3%。向量与重排两档因无 MiniMax 凭据未跑，报告量的是 BM25 回落路径的下界，不是三档融合上限。
+E1 已在合成语料上量化当前桌面链路，详见基线报告。held-out 共 200 条，其中正例 170 条，Top-3 命中率 67.6%，MRR 0.608。负例 30 条，无命中正确率 33.3%。向量与重排两档因无 MiniMax 凭据未跑，报告量的是 BM25 回落路径的下界，不是三档融合上限。
 
 复现命令为 `pnpm --filter @customer-agent/desktop eval:retrieval`。语料与题集在 `apps/desktop/tests/fixtures/retrieval-eval/`。
 
