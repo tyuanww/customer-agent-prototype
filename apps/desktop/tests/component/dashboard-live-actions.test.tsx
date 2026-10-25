@@ -20,8 +20,9 @@ describe('dashboard live actions', () => {
     const user = userEvent.setup();
 
     render(<SopLibraryModule />);
-    await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-update')).toBeDisabled();
+    expect(screen.getByTestId('sop-delete')).toBeDisabled();
     await user.click(screen.getByTestId('sop-export'));
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');

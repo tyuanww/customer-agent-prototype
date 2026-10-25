@@ -540,21 +540,35 @@ type DashboardPageSnapshot =
   | { phase: 'signed-out' }
   | { phase: 'ready'; epoch: number; permissions: Record<string, unknown>; sop: Record<string, unknown> };
 
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function permissionsPayload(permissions: Record<string, unknown>): boolean {
+  if (permissions.state === 'pending' || permissions.state === 'unavailable') return onlyKeys(permissions, ['state']);
+  if (permissions.state === 'closed') {
+    return onlyKeys(permissions, ['state', 'recovery'])
+      && (permissions.recovery === null || typeof permissions.recovery === 'string');
+  }
+  return permissions.state === 'open'
+    && onlyKeys(permissions, ['state', 'body'])
+    && (permissions.body === null || isRecord(permissions.body));
+}
+
+function sopPayload(sop: Record<string, unknown>): boolean {
+  if (sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed') return onlyKeys(sop, ['state']);
+  return sop.state === 'open' && onlyKeys(sop, ['state', 'nodes']) && Array.isArray(sop.nodes);
+}
+
 function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot {
   if (!isRecord(value)) return false;
-  if (value.phase === 'signed-out') return !('permissions' in value) && !('sop' in value);
+  if (value.phase === 'signed-out') return onlyKeys(value, ['phase']);
   if (value.phase !== 'ready' || typeof value.epoch !== 'number' || !Number.isSafeInteger(value.epoch)) return false;
+  if (!onlyKeys(value, ['phase', 'epoch', 'permissions', 'sop'])) return false;
   const permissions = value.permissions;
   const sop = value.sop;
   if (!isRecord(permissions) || !isRecord(sop)) return false;
-  const permissionsClosed = permissions.state === 'pending' || permissions.state === 'unavailable'
-    || (permissions.state === 'closed' && (permissions.recovery === null || typeof permissions.recovery === 'string'));
-  const permissionsOk = permissionsClosed
-    ? !('body' in permissions)
-    : permissions.state === 'open' && (permissions.body === null || isRecord(permissions.body));
-  const sopClosed = sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed';
-  const sopOk = sopClosed ? !('nodes' in sop) : sop.state === 'open' && Array.isArray(sop.nodes);
-  return permissionsOk && sopOk;
+  return permissionsPayload(permissions) && sopPayload(sop);
 }
 
 const SIGNED_OUT: DashboardPageSnapshot = { phase: 'signed-out' };

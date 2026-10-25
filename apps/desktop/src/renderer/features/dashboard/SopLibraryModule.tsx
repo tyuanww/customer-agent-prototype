@@ -44,9 +44,9 @@ function toCsv(items: readonly DashboardSopNode[]): string {
 
 export function SopLibraryModule({
   sop,
-  canUploadSop: uploadProp = true,
-  canUpdateSop: updateProp = true,
-  canDeleteSop: deleteProp = true,
+  canUploadSop: uploadProp = false,
+  canUpdateSop: updateProp = false,
+  canDeleteSop: deleteProp = false,
   uploadBlock: uploadBlockProp = '',
 }: {
   sop?: SopUse;

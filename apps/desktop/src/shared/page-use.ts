@@ -75,30 +75,38 @@ export function withPermissionsBody(
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
 }
 
 function isPermissionsUse(value: unknown): value is PermissionsUse {
   if (!isRecord(value) || typeof value.state !== 'string') return false;
-  if (value.state === 'pending' || value.state === 'unavailable') return !('body' in value);
+  if (value.state === 'pending' || value.state === 'unavailable') return onlyKeys(value, ['state']);
   if (value.state === 'closed') {
-    return !('body' in value) && (value.recovery === null || typeof value.recovery === 'string');
+    return onlyKeys(value, ['state', 'recovery'])
+      && (value.recovery === null || typeof value.recovery === 'string');
   }
-  return value.state === 'open' && (value.body === null || isRecord(value.body));
+  return value.state === 'open'
+    && onlyKeys(value, ['state', 'body'])
+    && (value.body === null || isRecord(value.body));
 }
 
 function isSopUse(value: unknown): value is SopUse {
   if (!isRecord(value) || typeof value.state !== 'string') return false;
   if (value.state === 'pending' || value.state === 'unavailable' || value.state === 'closed') {
-    return !('nodes' in value);
+    return onlyKeys(value, ['state']);
   }
-  return value.state === 'open' && Array.isArray(value.nodes);
+  return value.state === 'open' && onlyKeys(value, ['state', 'nodes']) && Array.isArray(value.nodes);
 }
 
 export function isPageUseSnapshot(value: unknown): value is PageUseSnapshot {
   if (!isRecord(value)) return false;
-  if (value.phase === 'signed-out') return !('permissions' in value) && !('sop' in value);
+  if (value.phase === 'signed-out') return onlyKeys(value, ['phase']);
   return value.phase === 'ready'
+    && onlyKeys(value, ['phase', 'epoch', 'permissions', 'sop'])
     && typeof value.epoch === 'number'
     && Number.isSafeInteger(value.epoch)
     && isPermissionsUse(value.permissions)

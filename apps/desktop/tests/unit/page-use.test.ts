@@ -45,11 +45,23 @@ const closedReady = {
 function preloadPageUseSnapshot(): (value: unknown) => boolean {
   const source = readFileSync(path.join(desktopRoot, 'src/preload/dashboard.ts'), 'utf8');
   const isRecord = source.slice(source.indexOf('function isRecord'), source.indexOf('function asSopOpen'));
-  const pageUse = source.slice(source.indexOf('function pageUseSnapshot'), source.indexOf('const SIGNED_OUT'));
+  const pageUse = source.slice(source.indexOf('function onlyKeys'), source.indexOf('const SIGNED_OUT'));
   const javascript = `${isRecord}\n${pageUse}`
     .replace(
       'function isRecord(value: unknown): value is Record<string, unknown>',
       'function isRecord(value)',
+    )
+    .replace(
+      'function onlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean',
+      'function onlyKeys(value, allowed)',
+    )
+    .replace(
+      'function permissionsPayload(permissions: Record<string, unknown>): boolean',
+      'function permissionsPayload(permissions)',
+    )
+    .replace(
+      'function sopPayload(sop: Record<string, unknown>): boolean',
+      'function sopPayload(sop)',
     )
     .replace(
       'function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot',

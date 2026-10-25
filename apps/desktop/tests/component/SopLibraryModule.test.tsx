@@ -49,20 +49,16 @@ describe('SopLibraryModule', () => {
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
-  it('refuses upload, update, delete, export, and custom steps', async () => {
+  it('keeps upload, update, delete, and custom steps off before a catalog is open', async () => {
     const user = userEvent.setup();
     render(<SopLibraryModule />);
-    expect(screen.getByRole('button', { name: '上传' })).toBeInTheDocument();
-    const file = new File(['scene,script\n过敏,先停用\n'], 'sop.csv', { type: 'text/csv' });
-    await user.upload(screen.getByTestId('sop-upload-input'), file);
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
-    await user.click(screen.getByTestId('sop-update'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
-    await user.click(screen.getByTestId('sop-delete'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-upload-input')).toBeDisabled();
+    expect(screen.getByTestId('sop-update')).toBeDisabled();
+    expect(screen.getByTestId('sop-delete')).toBeDisabled();
+    expect(screen.getByTestId('sop-custom-step')).toBeDisabled();
     await user.click(screen.getByTestId('sop-export'));
-    expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
-    await user.click(screen.getByTestId('sop-custom-step'));
     expect(screen.getByTestId('sop-write-status')).toHaveTextContent('请先登录后再管理 SOP。');
   });
 
