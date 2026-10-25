@@ -13,8 +13,9 @@
  * - The dense (embedding) and rerank lanes. Those need MiniMax credentials; without them
  *   `rankScripts` falls back to the answer-text BM25 lane, which is the path measured here.
  * - The production script library. That index lives off-repo; see docs/how-to-verify-desktop.md.
- * - Platform-specific ranking. Platform only filters candidates after ranking, so the
- *   per-platform numbers below are equal by construction and are printed as a check on that.
+ * - Platform-specific ranking. `evaluate` ranks the full corpus, then buckets positives
+ *   by the gold script's platform. The qianniu and douyin rows are different case sets,
+ *   so their rates are not required to match. Negatives use platform `any`.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
