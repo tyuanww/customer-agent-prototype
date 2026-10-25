@@ -199,7 +199,7 @@ API 返回 `NOT_FOUND`（HTTP 404），桌面把 404 映射成 `GONE`，文案�
 
 内容发布是一个**软信号**，不是失效：
 
-- `ProductAnnounce.refresh` 发现 `releaseId` 变了，向 fox + query **和 dashboard** 扇出独立的 `content-updated` 事件（`{releaseId, summary, domainHashes, unreadDomains}`）。**禁止**走 `PRODUCT_ANNOUNCE_INVALIDATED`。dashboard preload 暴露 `dashboardAnnounce.onCatalogUpdated`（听 `product:announce-content-updated`）。话术库 / 概览订阅后立刻 `list()`。系统同步四卡仍靠窗口聚焦/可见 + 10s poll 重取 `dashboard:announce-current`。
+- `ProductAnnounce.refresh` 发现 `releaseId` 变了，向 fox 和 query 扇出独立的 `content-updated` 事件（`{releaseId, summary, domainHashes, unreadDomains}`）。禁止走 `PRODUCT_ANNOUNCE_INVALIDATED`。Dashboard 不再订阅这路事件。
 - Query 收到软更新：换租约、出 `--muted` 墨色横幅（「售前话术已更新」，多域固定顺序 产品→活动→售前→售后，带「知道了」可关），**禁止** `setResults([])` / `cancelPendingSearch`——坐席正在接待，Top 3 必须留在屏幕上。横幅高度计入窗口 hug。窗口不可见时到达的横幅会被记住，等 Query 重新可见后才开始 1s 已读计时（不会卡住或永不清）。
 - 真正的 `expired` / `source_gate` / `unavailable` 才走 `onInvalidated`，语义保持：抽空结果 + `is-invalid`。
 
