@@ -274,3 +274,54 @@ rights: {
 | A4 | 界面做得再好也会被 §6 卡住；需要先定「活签发方」 |
 | A5 | 必须同时消掉 `window.dashboardPermissions !== undefined` 与客户端 `JOB_ROSTER` 两个来源，并处理 §3.4 的服务端分叉 |
 | A6 | 「主账号授予后对方下次请求立即生效」依赖事实新鲜；事实窗口仍是 5 分钟，靠定时器续 |
+
+## 11. 2026-10-25 补记
+
+本次只读核对当前 `origin/main` `b29e8586594f7aee835677c9e2d3735db073b691`（Merge pull request #108）的代码，并引用仓库里已有的 2026-10-24 生产记录。没有连接杭州，没有重跑生产查询。上文的生产数字保持原样。
+
+头部仍把审计对象写成 `main@6dc485b0`。该对象在 GitHub 上是 `6dc485b0d07f43b095c98c3df9b415a5f0395d38`（2026-10-23），不在 `b29e8586` 的提交历史上。正文最后一次提交是 `11b57260729754a37040ae2381670c5d486703a4`，它是 `b29e8586` 的祖先。§4 写的 `seat-account-ipc.ts:14-16`、`:32-60`、`:65` 对得上 `11b5726` 里的 `spawn`，对不上当前文件。
+
+### 11.1 已被当前 main 的代码取代
+
+这些段落写的是 `11b5726` 当时的代码。`b29e8586` 上对应实现已经换过。
+
+**坐席创建。** §0 第 2 条、§4、§5 第 1 条和第 2 条、§10 的 A2 行，写的是桌面主进程 `spawn` 本地 `seat-account-runtime.ts`。当前 `apps/desktop/src/main/seat-account-ipc.ts:11-18` 说明这条路径已经离开；同文件 `:74-101` 把 `dashboard:seats-command` 送到 `GET/POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`。路由在 `apps/api/src/content-intake/seats-http.ts:65-91`。`apps/api/src/content-intake/seats.ts:106-109` 在写之前调用 `content_intake.seat_administration_allowed`。函数在 `packages/database/migrations/0068_seat_lifecycle.sql:341-378`，`REVOKE`/`GRANT` 在 `:381-382`，执行权只给 `intake_business`。身份行由同文件 `backend_identity.create_seat`（`:67`）写入。`scripts/synthetic-stack/seat-account-runtime.ts` 在这个树上已经没有该文件。口令行由 `seats.ts:147` 写成 `synthetic_seat_${username}`。
+
+**坐席口令登录。** §1 写生产口令入口只查口令文件；§5 末段写登录入口本身不拦新坐席，并以 `password-identity-server.ts:89-99` 的 scrypt 比对为据。当前生产入口的选择没变：`scripts/synthetic-stack/stack.ts:278` 在有飞书配置时仍用 `PASSWORD_IDENTITY_ENTRY`。对坐席绑定，`password-identity-server.ts:106-120` 还要求 `bindingId` 等于 `seatBindingIdFor(username)`，并且 `seatBindingEnabled` 返回 true。`seatBindingIdFor` 在 `scripts/synthetic-stack/identity-admission.ts:162-169`，格式是 `synthetic_seat_<username>`。本地合成入口 `identity-provider.ts:137-145` 走同一条判定；固定名单仍是 `SYNTHETIC_IDENTITIES`（`:48-55`、`:126-136`）。非坐席账号在 `password-identity-server.ts:122-125` 仍只凭口令文件发码。§0 第 3 条里「今天登不上生产」仍是 §11.2 的生产实测；被取代的是「入口只查口令文件、不看 `synthetic_seat_` 绑定是否启用」这句代码描述。
+
+**口令登录与事实。** §6.5 写口令登录不写事实，`product-auth-service.ts:164-172` 的 `afterLogin` 被 `isFeishuOpenId` 挡住。当前 `product-auth-service.ts:163-177` 对飞书 open id 仍调 `afterLogin`，对其他 binding 调 `afterPasswordLogin`。`apps/api/src/server.ts:128-140` 让后者执行 `content_intake.project_seat_login`。该函数在 `0068_seat_lifecycle.sql:283-284` 对不匹配 `^synthetic_seat_[A-Za-z0-9_-]{1,64}$` 的 binding 直接返回 `missing`，不插入 `principal_facts`。`synthetic_owner` 不匹配这个正则，所以主账号这条口令登录在当前代码里仍然不刷新自己的事实。能被刷新的是坐席 binding，而且函数本身在迁移 0068 里。
+
+**同一真人的两种登录。** §2 写两种登录不能共存，依据是 `principals.user_id` 唯一。该唯一约束仍在 `packages/database/migrations/0021_content_intake_v1_20.sql:20`。`0069_feishu_login_link.sql:10-12` 增加 `backend_identity.feishu_login_links`，一行 open id 指向一个已有 `binding_id`。`establish_feishu_login`（`:45-61`）在已有链接时用那个 binding 完成回调。`product-auth-service.ts:145-146` 在回调里调用它。`attach_feishu_login`（`0069_feishu_login_link.sql:83-121`）可以把 open id 挂到另一个主体已有的 binding 上；仓库里的调用点是 `apps/api/src/feishu-login-link.ts:58-66`，没有 HTTP 路由。
+
+### 11.2 仍是 2026-10-24 生产实测，本次未重探
+
+下列内容本次没有重新测量，数字以上文为准：
+
+- §2 的 5 个主体、7 个 binding，以及各类事实版本和到期说明。
+- §3.1 的 7 行角色上限，§3.3 对 `prin_…` 八个动作的 `authorization_deadline` 结果。
+- §5 关于生产口令文件位置、生产 `role_rules` 16 行，以及 `job-seat` 不在其中的实测。
+- §6.2、§6.5、§6.6 的主体、allocation 条数、事实停在 2026-10-15、口令账号个数、bootstrap 前 `RESULT=NO_ROOT_ALLOCATION`、回滚后残留行 0、运营本人只能授出 `src-menokin-sop-v2`。
+- 杭州迁移账本。`docs/reference-backup-and-restore.md:104-112` 与 `:149` 记录 `0065` 部署后账本为 `65 0065_legacy_orphan_fk_not_valid`。`docs/reports/2026-10-24-seat-accounts-withdrawal.md:90` 记录生产未部署 0066、账本仍是 65。当前目录里 0068、0069 排在 0065 之后（`packages/database/src/verifier.ts:1114-1118`）。那次实测的库因此还没有 `seat_administration_allowed`、`create_seat`、`project_seat_login`、`feishu_login_links`。本次未重探。
+
+### 11.3 主账号如何给某个人授权，生产上今天能不能走通
+
+代码链路（`b29e8586`）：
+
+1. 权限页命令进 `apps/desktop/src/main/content-intake-permissions-ipc.ts:18-24`。预览、保存、撤销先看 `job.rights.grant === true`。`rights.grant` 仍来自客户端职务表，见 `apps/desktop/src/shared/product-session.ts:81-84`。
+2. 预览是 `POST /v1/intake/grants/preview`，保存是 `POST /v1/intake/grants`（`apps/desktop/src/main/content-intake-permissions.ts:162-172`）。
+3. 路由在 `apps/api/src/content-intake/grants-http.ts:18-21`，服务在 `apps/api/src/content-intake/service.ts:329-335`，落到 `previewGrants` / `createGrants`。
+4. `prepareGrants`（`authority.ts:113-132`）核对签发人事实版本，调用 `requireFresh`（实现在 `transaction.ts:99-102`，事实过期则 `ORG_FACTS_UNAVAILABLE`），以 `samePerson` 拒绝自己给自己签（`authority.ts:126`），再经 `parentAuthority`（`:68-86`）要求签发人持有未撤销、未过期、带 steward 的 allocation 或 delegation。没有父授权时抛 `GRANT_AUTHORITY_DENIED`（`:84`）。
+5. `createGrants`（`authority.ts:226-227`）写入。SQL 侧 `grant_parent_guard` 再查签发人事实（`packages/database/overlays/0060_grant_issuer_authority.sql:28-47`）。
+
+生产：按 2026-10-24 实测，这条链路走不通。签发人事实不新鲜时，`requireFresh` 在父授权检查之前就拒绝。§6.6 的 bootstrap 在事务里看到 `DELEGATION_ALLOWED`，回滚后残留行是 0，这 40 条根 allocation 没有留在生产库。本次未重探。当前 main 的 `project_seat_login` 也不给 `synthetic_owner` 写事实（见 §11.1），而且该函数在 0068，不在上述账本 65 的实测里。
+
+### 11.4 代码结论仍在，行号有的已移动
+
+- §3.4 的 `ACTION_SQL` 仍在 `apps/api/src/project-roster-login.ts:101-112`。`authorization_deadline` 仍不读 `subject_bindings.role`。
+- §6.1 的 `requireFresh` 调用点仍是 `authority.ts:29` 与 `:118`。
+- §1 的生产口令进程选择仍是 `stack.ts:278`。`issueBoundSession` 的正则仍是 `synthetic_(coach|owner|quality)`，现位于 `product-auth-service.ts:189-190`。
+- §7 的分工还在：`publish` / `search` 用服务端 actions，`grant` / `uploadSop` 用客户端职务表。`DashboardApp.tsx` 现为 `canOpenPermissions` `:108`、`canGrant` `:118-121`、`canUploadSop` `:122-123`、侧栏 `:131`。`product-session.ts:81-87`、`dashboard-content.ts:223` 与 `:226`、`dashboard-ops-loop.ts:91` 仍是原文说的那几处。`grant` 的另一处拦截在 `apps/desktop/src/shared/workbench-access.ts:22`。
+
+### 11.5 一处源码行号对不上原文
+
+§5 把生产口令文件写成 `password-identity-server.ts:26` 的 `/srv/customer-agent/stack/password-accounts.json`。`11b5726` 的第 26 行是 `CODE_TTL_MS`；同文件第 29 行是 `path.join(STACK_ROOT, 'password-accounts.json')`。当前文件同一表达式在 `password-identity-server.ts:32`。`/srv/customer-agent/stack` 这一绝对路径本次未重探，上文不改。
