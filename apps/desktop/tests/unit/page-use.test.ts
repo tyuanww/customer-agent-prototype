@@ -35,6 +35,45 @@ it('rejects a closed catalog that still carries nodes', () => {
   })).toBe(true);
 });
 
+const closedReady = {
+  phase: 'ready',
+  epoch: 1,
+  permissions: { state: 'closed', recovery: null },
+  sop: { state: 'closed' },
+};
+
+function preloadPageUseSnapshot(): (value: unknown) => boolean {
+  const source = readFileSync(path.join(desktopRoot, 'src/preload/dashboard.ts'), 'utf8');
+  const isRecord = source.slice(source.indexOf('function isRecord'), source.indexOf('function asSopOpen'));
+  const pageUse = source.slice(source.indexOf('function pageUseSnapshot'), source.indexOf('const SIGNED_OUT'));
+  const javascript = `${isRecord}\n${pageUse}`
+    .replace(
+      'function isRecord(value: unknown): value is Record<string, unknown>',
+      'function isRecord(value)',
+    )
+    .replace(
+      'function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot',
+      'function pageUseSnapshot(value)',
+    );
+  return new Function(`${javascript}\nreturn pageUseSnapshot;`)() as (value: unknown) => boolean;
+}
+
+it('rejects a closed page that still carries people, grants, seats, or step text', () => {
+  const leaked = [
+    { ...closedReady, permissions: { state: 'closed', recovery: null, people: [], grants: [], seats: [] } },
+    { ...closedReady, sop: { state: 'closed', body: 'step text' } },
+    { ...closedReady, body: 'step text' },
+    { ...closedReady, people: [] },
+  ];
+  const accept = preloadPageUseSnapshot();
+  for (const value of leaked) {
+    expect(isPageUseSnapshot(value)).toBe(false);
+    expect(accept(value)).toBe(false);
+  }
+  expect(isPageUseSnapshot(closedReady)).toBe(true);
+  expect(accept(closedReady)).toBe(true);
+});
+
 it('does not open the permissions page for review-only mayAllocate', () => {
   const closed = grantUse([{ mayAllocate: ['review'] }], null);
   const snapshot = ready(closed.state === 'open' ? { state: 'open', body: null } : closed, { state: 'pending' });

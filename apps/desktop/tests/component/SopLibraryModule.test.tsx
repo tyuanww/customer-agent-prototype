@@ -41,6 +41,8 @@ describe('SopLibraryModule', () => {
     expect(screen.getByTestId('sop-library-empty')).not.toHaveTextContent('未接入');
     expect(screen.getByTestId('sop-update')).not.toHaveClass('ant-btn-primary');
     expect(screen.getByTestId('sop-delete')).toHaveClass('ant-btn-dangerous');
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-delete')).toBeDisabled();
     expect(screen.getByTestId('sop-upload')).not.toHaveClass('ant-btn-primary');
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByText('过敏凭证')).not.toBeInTheDocument();
