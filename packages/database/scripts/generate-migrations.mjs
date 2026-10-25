@@ -827,6 +827,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     [66, '0066_policy_version_restamp'],
     [67, '0067_inaccuracy_outcome'],
     [68, '0068_seat_lifecycle'],
+    [69, '0069_feishu_login_link'],
   ];
   const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
   const occupiedMigration = productTail[0] ?? null;

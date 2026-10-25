@@ -267,6 +267,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0067_inaccuracy_outcome',
     requiresPredecessor: 'Seat lifecycle requires the inaccuracy outcome read',
   },
+  {
+    index: 68,
+    minimumCatalogueLength: 69,
+    id: '0069_feishu_login_link',
+    predecessorId: '0068_seat_lifecycle',
+    requiresPredecessor: 'Feishu login link requires the seat lifecycle',
+  },
 ];
 
 function requiredSuccessorStep(

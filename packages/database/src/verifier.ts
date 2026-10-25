@@ -1115,6 +1115,7 @@ const READINESS_SUFFIX = [
   { length: 66, index: 65, id: '0066_policy_version_restamp' },
   { length: 67, index: 66, id: '0067_inaccuracy_outcome' },
   { length: 68, index: 67, id: '0068_seat_lifecycle' },
+  { length: 69, index: 68, id: '0069_feishu_login_link' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1175,6 +1176,8 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   67: { tables: 109, functions: 285, objectEntries: 3401, objectSha256: 'ee2028c801ca6bcbcfb109c100c48137b4864ae6d954f749e7f246a52b9035ef', functionEntries: 285, functionSha256: 'edfdfe3b5050db5a610b0962e223dda91d1df9f80925a71135921202f3492ccf', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   // 0068 adds the seat lifecycle. Counts are filled from the PostgreSQL 15 probe.
   68: { tables: 110, functions: 291, objectEntries: 3423, objectSha256: '7b6a6223f1841a4b4f94dcce4b28cb325fa6070402772192482af2abf237a3ad', functionEntries: 291, functionSha256: '2604c17ed3aba4092b7a17ed21b6f543c039af1dc8a0a2b38bc7408ce3250835', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  // 0069 adds the Feishu login link. The first probe fills any digest that moved.
+  69: { tables: 111, functions: 294, objectEntries: 3436, objectSha256: 'e7847606ad50cf3d26136c3524080dc963fae27051b6c76a0c336665350cfe0f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1213,6 +1216,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   66: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   67: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   68: { entries: 646, sha256: '96b54a2aa5d19e8f0208bb485016dea8718dbd0ccdde2a7f6eb954aa872671de' },
+  69: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
 };
 
 export async function verifyReadinessSuccessor(
