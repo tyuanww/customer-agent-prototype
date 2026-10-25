@@ -222,6 +222,7 @@ describe('dashboard manifest', () => {
     const hits = files.filter((file) => {
       const text = readFileSync(file, 'utf8');
       return text.includes('dashboard-manifest')
+        || text.includes('v9-overview-model')
         || text.includes('DEMO · 合成数据')
         || text.includes('虚构合成结构样例')
         || text.includes('较上期');
