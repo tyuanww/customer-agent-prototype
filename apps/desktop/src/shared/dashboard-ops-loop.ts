@@ -4,7 +4,7 @@ export const OPS_LOOP_COPY = Object.freeze({
   noProduct: '请先登录。',
   noSession: '请先登录。',
   forbidden: '你现在不能做这一步。',
-  sopUploadJob: '当前职务不能上传 SOP。请让客服经理或客服总监开通。',
+  sopUploadJob: '你还不能上传 SOP。请联系客服主管开通。',
   grantJob: '当前职务不能授权。请让客服经理或客服总监开通。',
   unavailable: '服务暂不可用，请重试',
   retireHint: '提交后，要等下一次发布，坐席才搜不到这条。',

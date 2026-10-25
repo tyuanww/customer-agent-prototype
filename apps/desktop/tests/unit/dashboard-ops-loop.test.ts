@@ -127,14 +127,16 @@ it('fail-closes unsigned dashboard senders and extra IPC args', async () => {
     .toMatchObject({ ok: false, code: 'FORBIDDEN' });
 });
 
-it('blocks agent SOP writes and coach software before any product HTTP', async () => {
+it('lets an agent read the SOP catalog and still blocks writes', async () => {
   const agent = fakeSession('agent');
-  expect(await dashboardSopCatalog(agent)).toMatchObject({
-    ok: false, code: 'FORBIDDEN', message: OPS_LOOP_COPY.forbidden,
+  vi.mocked(agent.request).mockResolvedValueOnce({
+    status: 200,
+    value: { product_session_id: 'default', items: [] },
   });
+  expect(await dashboardSopCatalog(agent)).toMatchObject({ ok: true, items: [] });
   expect(await dashboardSopImport(agent, 'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停,0\n'))
     .toMatchObject({ ok: false, code: 'FORBIDDEN' });
-  expect(agent.request).not.toHaveBeenCalled();
+  expect(agent.request).toHaveBeenCalledTimes(1);
 
   const coach = fakeSession('coach');
   expect(await dashboardSoftwareCatalog(coach)).toMatchObject({

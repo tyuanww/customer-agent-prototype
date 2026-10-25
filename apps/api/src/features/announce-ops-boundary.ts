@@ -26,6 +26,7 @@ export const ANNOUNCE_FUNCTION_GRANTS = Object.freeze([
 
 export const OPS_FUNCTION_GRANTS = Object.freeze([
   'ops_loop.record_inaccuracy_report(text,text,integer,integer,text,text,text)',
+  'ops_loop.list_resolved_inaccuracy_outcomes(text)',
   'ops_loop.read_sop_catalog(text,text)',
   'ops_loop.import_sop_catalog(text,jsonb,text,text)',
   'ops_loop.patch_sop_node(text,integer,text,text,integer,text)',

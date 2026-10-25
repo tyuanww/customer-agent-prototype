@@ -55,10 +55,20 @@ export function listUsageLog(
   if (source === null) return { ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted };
   const selected = selectUsageLogRows(source, filter);
   const cursor = filter?.cursor ?? null;
-  const found = cursor ? selected.findIndex((row) => row.id === cursor) : -1;
-  const offset = cursor ? (found >= 0 ? found : selected.length) : 0;
-  const rows = selected.slice(offset, offset + USAGE_PAGE_SIZE);
-  const next = selected[offset + USAGE_PAGE_SIZE];
+  if (cursor) {
+    const found = selected.findIndex((row) => row.id === cursor);
+    if (found < 0) return { ok: false, code: 'FAILED', message: WORKBENCH_EMPTY.usageFailed };
+    const rows = selected.slice(found, found + USAGE_PAGE_SIZE);
+    const next = selected[found + USAGE_PAGE_SIZE];
+    return {
+      ok: true,
+      rows,
+      nextCursor: next ? next.id : null,
+      canExport: source.some(usageRowIsExportable),
+    };
+  }
+  const rows = selected.slice(0, USAGE_PAGE_SIZE);
+  const next = selected[USAGE_PAGE_SIZE];
   return {
     ok: true,
     rows,

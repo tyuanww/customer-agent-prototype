@@ -1,5 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
-import { Button, Empty, Input, type ButtonProps } from 'antd';
+import { Button, Input, type ButtonProps } from 'antd';
 import {
   isDashboardOpsFailure,
   OPS_LOOP_COPY,
@@ -9,9 +9,11 @@ import {
   type DashboardSopNode,
 } from '@shared/dashboard-ops-loop';
 import { StatusBadge } from './StatusBadge';
+import { WorkbenchLoading } from './WorkbenchState';
+import { useAsyncResource } from './use-async-resource';
 
 const NO_CHANNEL_EMPTY = '请先登录后再管理 SOP。';
-const NO_STEPS = '当前没有 SOP 步骤。点上传，把 CSV 加进来。';
+const NO_STEPS = '还没有 SOP 步骤。上传 CSV 后会出现在这里。';
 
 function stepNotice(action: '已更新' | '已删除', title: string): string {
   return `${action}「${title}」。`;
@@ -35,13 +37,36 @@ function toCsv(items: readonly DashboardSopNode[]): string {
 
 export function SopLibraryModule({
   canUploadSop = true,
+  canUpdateSop = true,
+  canDeleteSop = true,
   uploadBlock = '',
 }: {
   canUploadSop?: boolean;
+  canUpdateSop?: boolean;
+  canDeleteSop?: boolean;
   uploadBlock?: string;
 } = {}) {
-  const [items, setItems] = useState<readonly DashboardSopNode[] | null>(null);
-  const [message, setMessage] = useState('加载中…');
+  const pendingNotice = useRef<string | undefined>(undefined);
+  const noticePending = useRef(false);
+  const { resource: catalog, reload } = useAsyncResource(async () => {
+    const api = window.dashboardOps;
+    if (!api) return { status: 'forbidden', message: NO_CHANNEL_EMPTY };
+    try {
+      const result = await api.sopCatalog();
+      if (!result.ok) return { status: 'error', message: result.message };
+      return {
+        status: 'ready',
+        value: result.items.filter((item) => item.lifecycle === 'active'),
+      };
+    } catch {
+      return { status: 'error', message: OPS_LOOP_COPY.unavailable };
+    }
+  }, [], window.dashboardOps ? { status: 'loading' } : { status: 'forbidden', message: NO_CHANNEL_EMPTY }, { retainReady: true });
+  const items = catalog.status === 'ready' ? catalog.value : null;
+  const loading = catalog.status === 'loading';
+  const [message, setMessage] = useState('');
+  const [acted, setActed] = useState(false);
+  const report = (text: string) => { setActed(true); setMessage(text); };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftBody, setDraftBody] = useState('');
@@ -50,41 +75,38 @@ export function SopLibraryModule({
   const liveRef = useRef(true);
 
   const load = (notice?: string) => {
-    const api = window.dashboardOps;
-    if (!api) {
-      setItems(null);
-      setMessage(NO_CHANNEL_EMPTY);
-      return;
-    }
-    void api.sopCatalog().then((result) => {
-      if (!liveRef.current) return;
-      if (!result.ok) {
-        setItems(null);
-        setMessage(result.message);
-        return;
-      }
-      const active = result.items.filter((item) => item.lifecycle === 'active');
-      setItems(active);
-      setSelectedId((current) => current && active.some((item) => item.nodeId === current)
-        ? current
-        : active[0]?.nodeId ?? null);
-      setMessage(notice ?? (active.length === 0 ? NO_STEPS : ''));
-    }).catch(() => {
-      if (!liveRef.current) return;
-      setItems(null);
-      setMessage(OPS_LOOP_COPY.unavailable);
-    });
+    pendingNotice.current = notice;
+    noticePending.current = true;
+    reload();
   };
 
   useEffect(() => {
     liveRef.current = true;
-    load();
-    return () => {
-      liveRef.current = false;
-    };
+    return () => { liveRef.current = false; };
   }, []);
 
+  useEffect(() => {
+    if (catalog.status === 'ready') {
+      const active = catalog.value;
+      setSelectedId((current) => current && active.some((item) => item.nodeId === current)
+        ? current
+        : active[0]?.nodeId ?? null);
+      if (noticePending.current) {
+        noticePending.current = false;
+        setMessage(pendingNotice.current ?? (active.length === 0 ? NO_STEPS : ''));
+        return;
+      }
+      if (active.length === 0) setMessage((current) => current || NO_STEPS);
+      return;
+    }
+    if (catalog.status === 'error' || (catalog.status === 'forbidden' && window.dashboardOps)) {
+      noticePending.current = false;
+      setMessage(catalog.message);
+    }
+  }, [catalog]);
+
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
+  const emptyStateOwnsMessage = items === null && !acted;
   useEffect(() => {
     setDraftTitle(selected?.title ?? '');
     setDraftBody(selected?.body ?? '');
@@ -92,16 +114,8 @@ export function SopLibraryModule({
 
   return (
     <div className="dash-module" data-testid="module-sop">
-      <header className="dash-module-head">
-        <div>
-          <h1>SOP</h1>
-          <p className="dash-kicker">上传会替换现有 SOP。删除请让客服经理操作。</p>
-        </div>
-      </header>
-      <p className="dash-scope dash-scope-important">
-        上传 CSV 会替换现在的 SOP。改一条或删一条，先点中那一步。
-      </p>
-      <div className="dash-filter-toolbar" aria-label="SOP 写操作">
+      <h1 className="desk-sr">SOP</h1>
+      <div className="sop-toolbar" aria-label="SOP 写操作">
         <input
           ref={uploadRef}
           data-testid="sop-upload-input"
@@ -113,25 +127,25 @@ export function SopLibraryModule({
             const file = event.target.files?.[0];
             event.target.value = '';
             if (!canUploadSop) {
-              if (uploadBlock) setMessage(uploadBlock);
+              if (uploadBlock) report(uploadBlock);
               return;
             }
             const api = window.dashboardOps;
             if (!file || !api) {
-              setMessage(file ? NO_CHANNEL_EMPTY : message);
+              report(file ? NO_CHANNEL_EMPTY : message);
               return;
             }
             if (file.size > SOP_UPLOAD_MAX_BYTES) {
-              setMessage(OPS_LOOP_COPY.sopTooLarge);
+              report(OPS_LOOP_COPY.sopTooLarge);
               return;
             }
             void file.text().then(async (csvText) => {
               if (sopCsvAllergyStopMissing(csvText)) {
-                setMessage(OPS_LOOP_COPY.allergyStop);
+                report(OPS_LOOP_COPY.allergyStop);
                 return;
               }
               const result = await api.sopImport(csvText);
-              setMessage(result.ok ? `已导入 ${result.nodeCount} 个节点` : result.message);
+              report(result.ok ? `已导入 ${result.nodeCount} 个节点` : result.message);
               if (result.ok) load();
             });
           }}
@@ -143,25 +157,30 @@ export function SopLibraryModule({
         >
           上传
         </SopButton>
+        {!canUploadSop && uploadBlock
+          ? <span className="wb-inline-block" data-testid="sop-upload-block">{uploadBlock}</span>
+          : <span className="wb-inline-block">上传 CSV 会替换现在的 SOP。</span>}
         <SopButton
           type={selected ? 'primary' : 'default'}
           data-testid="sop-update"
+          disabled={!canUpdateSop}
           onClick={() => {
+            if (!canUpdateSop) return;
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(NO_CHANNEL_EMPTY);
+              report(NO_CHANNEL_EMPTY);
               return;
             }
             if (!selected) {
-              setMessage(OPS_LOOP_COPY.selectSop);
+              report(OPS_LOOP_COPY.selectSop);
               return;
             }
             if (!draftTitle.trim()) {
-              setMessage('请先填写步骤名称。');
+              report('请先填写步骤名称。');
               return;
             }
             if (sopAllergyStepNeedsStopCopy(draftTitle, draftBody)) {
-              setMessage(OPS_LOOP_COPY.allergyStop);
+              report(OPS_LOOP_COPY.allergyStop);
               return;
             }
             const title = draftTitle.trim();
@@ -173,11 +192,11 @@ export function SopLibraryModule({
               sortKey: selected.sortKey,
             }).then((result) => {
               if (isDashboardOpsFailure(result)) {
-                setMessage(result.message);
+                report(result.message);
                 return;
               }
               const notice = stepNotice('已更新', title);
-              setMessage(notice);
+              report(notice);
               load(notice);
             });
           }}
@@ -187,14 +206,16 @@ export function SopLibraryModule({
         <SopButton
           danger
           data-testid="sop-delete"
+          disabled={!canDeleteSop}
           onClick={() => {
+            if (!canDeleteSop) return;
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(NO_CHANNEL_EMPTY);
+              report(NO_CHANNEL_EMPTY);
               return;
             }
             if (!selected) {
-              setMessage(OPS_LOOP_COPY.selectSop);
+              report(OPS_LOOP_COPY.selectSop);
               return;
             }
             const title = selected.title;
@@ -203,11 +224,11 @@ export function SopLibraryModule({
               expectedVersion: selected.version,
             }).then((result) => {
               if (isDashboardOpsFailure(result)) {
-                setMessage(result.message);
+                report(result.message);
                 return;
               }
               const notice = stepNotice('已删除', title);
-              setMessage(notice);
+              report(notice);
               load(notice);
             });
           }}
@@ -218,11 +239,11 @@ export function SopLibraryModule({
           data-testid="sop-export"
           onClick={() => {
             if (!window.dashboardOps) {
-              setMessage(NO_CHANNEL_EMPTY);
+              report(NO_CHANNEL_EMPTY);
               return;
             }
             if (!items || items.length === 0) {
-              setMessage('没有可导出的节点。');
+              report('没有可导出的节点。');
               return;
             }
             const blob = new Blob([toCsv(items)], { type: 'text/csv;charset=utf-8' });
@@ -249,12 +270,12 @@ export function SopLibraryModule({
           onClick={() => {
             const api = window.dashboardOps;
             if (!api) {
-              setMessage(NO_CHANNEL_EMPTY);
+              report(NO_CHANNEL_EMPTY);
               return;
             }
             const title = customTitle.trim();
             if (!title) {
-              setMessage('请先填写新步骤的名称。');
+              report('请先填写新步骤的名称。');
               return;
             }
             const nodeId = `sop_${crypto.randomUUID()}`;
@@ -273,12 +294,12 @@ export function SopLibraryModule({
             ]);
             void api.sopImport(csv).then((result) => {
               if (!result.ok) {
-                setMessage(result.message);
+                report(result.message);
                 return;
               }
               setCustomTitle('');
               const notice = `已整树导入「${title}」。`;
-              setMessage(notice);
+              report(notice);
               load(notice);
             });
           }}
@@ -290,19 +311,11 @@ export function SopLibraryModule({
         <Input aria-label="步骤名称" value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} />
         <Input.TextArea aria-label="步骤内容" rows={3} value={draftBody} onChange={(event) => setDraftBody(event.target.value)} />
       </div> : null}
-      {message ? <p className="dash-scope" data-testid="sop-write-status">{message}</p> : null}
-      {items === null ? (
-        <Empty
-          data-testid="sop-library-empty"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={window.dashboardOps ? message : NO_CHANNEL_EMPTY}
-        />
+      {message && !emptyStateOwnsMessage ? <p className="sop-status" data-testid="sop-write-status" role="status">{message}</p> : null}
+      {items === null && loading ? <WorkbenchLoading rows={5} label="正在读取 SOP" /> : items === null ? (
+        <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{window.dashboardOps ? message : NO_CHANNEL_EMPTY}</p>
       ) : items.length === 0 ? (
-        <Empty
-          data-testid="sop-library-empty"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={NO_STEPS}
-        />
+        <p className="wb-state wb-state-empty" data-testid="sop-library-empty">{NO_STEPS}</p>
       ) : (
         <ul className="dash-list" data-testid="sop-library-list">
           {items.map((item) => (

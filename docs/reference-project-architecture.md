@@ -57,13 +57,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。Live UUID 查询的「话术不准」走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。Dashboard 一期五项：管理概览、话术库、SOP、内容管理、系统同步。没有产品会话或没有冻结合同的数字写「未接入」，不读 VOC / 工单合成 manifest 冒充生产。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才回退磁盘 hydrate / 本机检索索引。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。ops-loop 走 `dashboardOps`：检索账、SOP 树、话术下架 `pending_review`、软件目录。管理员发布在 Main 里 `publishDraft`：内部 `POST /v1/content/import` 等到 staged，再 `POST /v1/content/publish`；不 park `/v1/admin/content/reviews*`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
+桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。Live UUID 查询的「话术不准」走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。当前工作台是概览、话术库、SOP、知识库、资料、权限。没有产品会话或没有冻结合同的数字写一句何时会有数据，不写「未接入」，也不读 VOC / 工单合成 manifest 冒充生产。一期五项（管理概览、话术库、SOP、内容管理、系统同步）是旧工作台。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才回退磁盘 hydrate / 本机检索索引。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。ops-loop 走 `dashboardOps`：检索账、SOP 树、话术下架 `pending_review`、软件目录。管理员发布在 Main 里 `publishDraft`：内部 `POST /v1/content/import` 等到 staged，再 `POST /v1/content/publish`；不 park `/v1/admin/content/reviews*`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
 
 ## 2. 目录归属
 
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
-| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页/`content-updated`、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Query `product:inaccuracy-report`；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*`、ops-loop `dashboard:ops-*`、系统同步 `dashboard:announce-*` 与 origin-keyed `product-last-seen` | React 视图、业务 fixture、通用 HTTP 客户端 |
+| `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页/`content-updated`、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Query `product:inaccuracy-report`；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*`、ops-loop `dashboard:ops-*`、origin-keyed `product-last-seen` | React 视图、业务 fixture、通用 HTTP 客户端 |
 | `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `sop.ts` 是独立入口，通道字符串必须内联 | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard、登录 chooser、SOP 投影和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
 | `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及把产品字段权重、分词和弃权策略接到 `@customer-agent/retrieval-core` 的检索适配器 | 依赖 DOM、Electron、React 的实现，或把产品策略硬编码进通用检索包 |
@@ -174,13 +174,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps` / `dashboardAnnounce`） | 五项工作台；话术库只读当前发布 hydrate（`list().matchesLease`）；管理员下架 DELETE → pending_review；SOP 读/导入/更新当前会话树（删除仅管理员）；待办 live list/start/close；KPI 走 retrieval metrics；CSV/xlsx 经 `dashboard:content-parse`；管理员发布走 import-then-publish（无独立 import IPC）；软件目录禁止 latest.yml；打开下载页走 `ops-software-open` |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是概览、话术库、SOP、知识库、资料、权限。话术库只读当前发布目录。SOP 读/导入/更新当前会话树（删除仅管理员）。待办 live list/start/close。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce`。 |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
-Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close、系统同步投影，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录 / 打开下载页）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
+Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录 / 打开下载页）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
 
 ## 4. 数据边界
 
@@ -219,7 +219,7 @@ v1.17 migrated PG15
   └─ same SearchBackend + zero events ──> scrubbed aggregate report（NOT_SIGNED）
 ```
 
-上图 Dashboard 数据面不再走 `DASHBOARD_MANIFEST` 冒充生产数字。话术库、待办、内容发布、ops-loop（SOP / 检索账 / 话术下架 / 软件目录）和 Query 不准落库画在该 ASCII。没有产品会话时这些写口仍 fail-closed 为「未接入」。
+上图 Dashboard 数据面不再走 `DASHBOARD_MANIFEST` 冒充生产数字。话术库、待办、内容发布、ops-loop（SOP / 检索账 / 话术下架 / 软件目录）和 Query 不准落库画在该 ASCII。没有产品会话时这些写口仍 fail-closed，页面写一句何时会有数据，不写「未接入」。
 
 未登录的 S0 仍由 `apps/desktop/src/renderer/features/search/search-service.ts` 做本地 n-gram，返回展示用 `RankedScript`。合成登录后由 main `ProductSearch` 走仓外 BM25 + RRF 与可选 MiniMax；有 hydrate 快照时不打 leftover `/v1/search`。见 [桌面语义检索](reference-desktop-retrieval.md)。正式衔接必须在对应切片由本仓 main-process adapter 和正式服务模块完成，不能把 fixture 直接插入正式表，具体字段缺口见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。
 
@@ -284,7 +284,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。2026-10-14 在 `4a22c6b` 上运行 `pnpm check:architecture`，438 个源码/配置文件、0 个依赖方向违规。更早的记录仍有效：`main@4739c39` 的 CI run `37024571842` 是 303 个文件、0 违规；统一工作台当时是 389 个文件、0 违规。`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-FAQ 合成 profile 与旧工作台复用 `DashboardApp.tsx` 内的 `DashboardWorkspace`：外壳独占侧栏、键盘导航、标题栏与主题；profile 只选择可用模块。faq-v2 是六个页签：管理概览、话术库、SOP、知识库、权限、系统同步。导航 id `content` 的文案是「知识库」，挂载 `DeskKnowledge`，本机文件是 `userData/desk-knowledge.json`。`IntakeManagement` 仍在仓库中供组件测试使用，这个 profile 不挂载它。同一常驻 `IntakeLibrary` 投影话术库；它的 SOP 页签没有目录时写「未接入」。SOP 页没有打开本机六表时写「未接入」；运营打开 xlsx 后只读展示未发布原文，不调用 `POST /v1/sop/import`，图片不入库。使用情况没有来源时，列表和导出都写「未接入」，不写文件。权限不进入 `DASHBOARD_MODULE_IDS`。上文 ASCII 仍画一期五项，那是旧工作台。知识库主按钮用紫色。字段见 [DESIGN.md](../DESIGN.md) 的「当前工作台（faq-v2）」、[人设知识库](reference-desk-knowledge.md) 和[资料页与权限页](reference-intake-pages.md)。
+当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏六页是概览、话术库、SOP、知识库、资料、权限。`content` 的文案是「知识库」，挂载 `DeskKnowledge`，本机文件是 `userData/desk-knowledge.json`。`IntakeManagement` 挂在「资料」。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这六页一致，不含「系统同步」。上文 ASCII 仍画一期五项，那是旧工作台。知识库主按钮用紫色。字段见[前端设计结论](plans/2026-10-24-frontend-design-decisions.md)、[人设知识库](reference-desk-knowledge.md) 和[资料页与权限页](reference-intake-pages.md)。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 
@@ -363,7 +363,7 @@ SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用�
 
 独立合成 host 的 `purpose-runtime` 使用当前完整35段迁移及四个低权 LOGIN，实际组织登记/观察/写入后启动业务、usage、worker 消费者；没有 SQL 改写桥或候选重复安装。旧 experiments SQL/probe 测试显式固定旧32段基线，仅保留历史实验边界。当前实现/证据见[正式合同合成接入](../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。生产 app/server 注册、真实配置和真实数据仍未完成。FAQ 工作台接线见下一段，不把合成桌面验收等同生产激活。
 
-`main/content-intake-catalog.ts` 独占 Dashboard 的店铺/商品/场景选择、完整分页读取和失效；复用独立的 `ContentIntakeUsage` 实例，与 Query 的资格、选择和复制句柄隔离。每条所属域只取本次签发资格的唯一 source→domain 映射，重复/缺失映射拒绝，整组超限不截断显示。窄 `content-intake-catalog-ipc.ts` 仅接受 Dashboard 主 frame 的 current/command，窗口销毁释放实例；preload 不暴露 URL、身份、资格或复制能力。`IntakeLibrary` 保持一份视图供话术库/系统同步使用，正文失效即清空，名称失效只回退编号。它表达当前条件下可用内容，不是全库清单、公告已读或同步完成证明。上传来源的域由既有 discovery 权限投影透传，显示在原上传选择器。验证见[统一工作台合成证据](../evidence/qa/intake-unified-workspace/README.md)。
+`main/content-intake-catalog.ts` 独占 Dashboard 的店铺/商品/场景选择、完整分页读取和失效；复用独立的 `ContentIntakeUsage` 实例，与 Query 的资格、选择和复制句柄隔离。每条所属域只取本次签发资格的唯一 source→domain 映射，重复/缺失映射拒绝，整组超限不截断显示。窄 `content-intake-catalog-ipc.ts` 仅接受 Dashboard 主 frame 的 current/command，窗口销毁释放实例；preload 不暴露 URL、身份、资格或复制能力。`IntakeLibrary` 保持一份视图供话术库使用，正文失效即清空，名称失效只回退编号。它表达当前条件下可用内容，不是全库清单、公告已读或同步完成证明。上传来源的域由既有 discovery 权限投影透传，显示在原上传选择器。验证见[统一工作台合成证据](../evidence/qa/intake-unified-workspace/README.md)。
 
 
 `packages/content-intake/src/csv.ts` 隐藏UTF-8/CSV语法、固定23列、来源逐记录绑定与预算；`faq-rules.ts` 单一拥有FAQ/问法业务约束，runner在隔离子进程按受信模板选择CSV/XLSX并核对返回policy。`apps/api/src/content-intake/input-format.ts` 单一拥有登记template/rule/mapping/structure到MIME、context和逻辑selectedSheets的映射，由files/service/material消费。Main只拥有原生有界读、原字节及未知请求重放；renderer不提供路径、MIME或解析结果。CSV采用运行依赖csv-parse7.0.3，不新增服务或生产注册。实验目录仅保留合成模板与历史说明；实际验证见[CSV接入](../evidence/qa/intake-csv-runtime/README.md)。

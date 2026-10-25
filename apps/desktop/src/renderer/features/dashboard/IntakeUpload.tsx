@@ -1,6 +1,7 @@
 import { Button, Checkbox, Form, Modal, Select, Space, Table, type ButtonProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { IntakeUploadCommand, IntakeUploadView } from '@shared/content-intake-upload';
+import { joinDisplayParts } from '@shared/display-separator';
 
 function ActionButton(props: ButtonProps) {
   return <Button autoInsertSpace={false} {...props} />;
@@ -41,7 +42,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       <Select aria-label="上传来源" value={view.sourceSelection ?? undefined} virtual={false} style={{ width: 280 }}
         placeholder="请选择有权维护的来源" disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
         onChange={selection => { if (selection) apply({ action: 'upload-source', selection }); }}
-        options={view.sources.map(source => ({ value: source.selection, label: `${domainWord[source.domain]} · ${source.label}` }))} />
+        options={view.sources.map(source => ({ value: source.selection, label: joinDisplayParts([domainWord[source.domain] ?? '', source.label]) }))} />
       <ActionButton disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</ActionButton>
       {(view.sourceSelection || view.canReset) && <ActionButton disabled={disabled || !view.canReset} onClick={() => {
         const run = () => apply({ action: 'upload-reset' });
@@ -58,10 +59,9 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
           maskTransitionName: '',
         });
       }}>{!view.authorized ? '清除本地上传准备' : view.revisionOf && view.phase !== 'validated' ? '放弃本地修订' : '重新选择来源'}</ActionButton>}
-      <span className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}{view.file ? ` · ${view.file.name}` : ''}</span>
+      <span className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}{view.file ? `：${view.file.name}` : ''}</span>
     </Space>
-    {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId} · 原版本 {view.revisionOf.version}。
-      请上传完整修订稿；校验失败保留旧版，成功后生成下一版并重新确认来源、完成质量检查与发布确认。</p>}
+    {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId}，原版本 {view.revisionOf.version}。请上传完整修订稿。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
     {!view.authorized && <p>请核对登录与来源授权。</p>}
     {view.notice && <p role="status">{view.notice}</p>}

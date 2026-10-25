@@ -1,12 +1,16 @@
-import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
-import { IntakeOverview } from './features/dashboard/IntakeOverview';
-import { WordingLibraryModule } from './features/dashboard/WordingLibraryModule';
-import { AnnounceModule } from './features/dashboard/AnnounceModule';
-import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
-import { IntakePermissions } from './features/dashboard/IntakePermissions';
-import { PERMISSION_DENIAL_MESSAGE, type SessionJobView } from '../shared/product-session';
+import { Button } from 'antd';
+import {
+  intakeDestinationItem,
+  intakeSidebarItems,
+  readIntakePreviewPage,
+  renderIntakeDestinations,
+  type IntakeDestination,
+  type IntakeSidebarItem,
+} from './features/dashboard/intake-destinations';
+import { type DashboardContentRole } from '../shared/dashboard-content';
+import { type SessionJobView } from '../shared/product-session';
+import { accessBlock } from '../shared/workbench-access';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
-import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
   useMemo,
@@ -15,22 +19,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
-import {
-  DASHBOARD_MANIFEST,
-  DASHBOARD_NAV,
-  type DashboardModuleId,
-  type DashboardNavItem,
-  type DomainId,
-} from './data/dashboard-manifest';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
-import { ContentModule } from './features/dashboard/ContentModule';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
-import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { DASHBOARD_FONT_FAMILY, IntakeAntdTheme } from './features/dashboard/intake-antd';
 import {
   DASHBOARD_WINDOW_TITLE,
@@ -38,28 +31,20 @@ import {
   dashboardChromeModeFor,
   inferDashboardHostPlatform,
 } from '@shared/dashboard-window';
-import { sessionDisplayName } from '@shared/product-session';
 import {
-  clampDashboardNavPreviewWidth,
-  clampDashboardNavWidth,
   dashboardCollapsedSurfaceWidth,
   dashboardNavIconAnchorOffset,
   dashboardStructureBoundaryPx,
   DASHBOARD_NAV_DEFAULT_WIDTH,
-  DASHBOARD_NAV_MIN_WIDTH,
   DASHBOARD_NAV_PREVIEW_WIDTH_VAR,
-  DASHBOARD_NAV_RESIZE_STEP,
   DASHBOARD_RENDERED_NAV_WIDTH_VAR,
   DASHBOARD_STRUCTURE_BOUNDARY_VAR,
-  resolveDashboardNavResizeIntent,
-  getDashboardNavMaxWidth,
   isDashboardNavRailPhase,
   isDashboardNavStablePhase,
   isDashboardNavStructureTransition,
   prefersReducedMotion,
   readDashboardStructureWidth,
   dashboardNavTooltipPosition,
-  resolveDashboardSeparatorAria,
   resolveDashboardTheme,
   settleDashboardNavPhase,
   systemPrefersDark,
@@ -71,53 +56,19 @@ import {
 import './styles/dashboard.css';
 import './features/dashboard/workbench-v9.css';
 import './features/dashboard/desk-chrome.css';
+import './styles/radix-palette.css';
+import './styles/workbench-tokens.css';
+import './styles/workbench-shell.css';
 
-type SidebarDestination = DashboardModuleId | 'permissions' | 'materials' | 'publish';
-
-type SidebarItem = {
-  id: SidebarDestination;
-  label: string;
-  group: DashboardNavItem['group'];
-  blurb?: string;
-};
-
-function sidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
-  if (!canOpenPermissions) return DASHBOARD_NAV;
-  const items: SidebarItem[] = [];
-  for (const item of DASHBOARD_NAV) {
-    items.push(item);
-    if (item.id === 'content') items.push({ id: 'permissions', label: '权限', group: '治理与架构' });
-  }
-  return items;
+function lastGroupIndex(item: IntakeSidebarItem, items: readonly IntakeSidebarItem[]): number {
+  return items.findIndex((candidate) => candidate.group === item.group);
 }
 
-function intakeSidebarItems(canOpenPermissions: boolean): readonly SidebarItem[] {
-  const items: SidebarItem[] = [];
-  for (const item of sidebarItems(canOpenPermissions)) {
-    items.push(item);
-    if (item.id === 'content') items.push({ id: 'publish', label: '内容管理', group: '治理与架构' });
-  }
-  items.push({ id: 'materials', label: '资料管理', group: '治理与架构' });
-  return items;
+function sidebarIcon(id: IntakeDestination): DashboardNavIconId {
+  return id;
 }
 
-function sidebarIcon(id: SidebarDestination): DashboardNavIconId {
-  return id === 'publish' ? 'content' : id;
-}
-
-const PREVIEW_PAGES = new Set<SidebarDestination>(['overview', 'wording', 'sop', 'content', 'announce', 'permissions', 'publish', 'materials']);
-
-function intakePreviewStart(canOpenPermissions: boolean): SidebarDestination {
-  const location = window.location;
-  const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-  if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return 'overview';
-  const page = new URLSearchParams(location.search).get('page');
-  if (page === 'permissions' && !canOpenPermissions) return 'overview';
-  if (page && PREVIEW_PAGES.has(page as SidebarDestination)) return page as SidebarDestination;
-  return 'overview';
-}
-
-function rememberPreviewPage(id: SidebarDestination) {
+function rememberPreviewPage(id: IntakeDestination) {
   const location = window.location;
   const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   if (!local || new URLSearchParams(location.search).get('preview') !== 'intake') return;
@@ -126,7 +77,7 @@ function rememberPreviewPage(id: SidebarDestination) {
   history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-function nextSidebarDestination(active: SidebarDestination, delta: number, items: readonly SidebarItem[]): SidebarDestination {
+function nextSidebarDestination(active: IntakeDestination, delta: number, items: readonly IntakeSidebarItem[]): IntakeDestination {
   const index = items.findIndex((item) => item.id === active);
   return items[(index + delta + items.length) % items.length].id;
 }
@@ -140,110 +91,66 @@ type NavTooltipState = {
 };
 
 export function DashboardApp() {
-  return <DashboardWorkspace profile="intake" />;
+  return <DashboardWorkspace />;
 }
 function sopUploadControl(
-  jobKnown: boolean,
+  phase: 'pending' | 'signed-out' | 'ready',
   signedIn: boolean | null,
   job: SessionJobView | null,
 ): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
-  if (!jobKnown) return null;
-  if (signedIn === null) return { code: 'FORBIDDEN', message: '' };
-  if (!signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  if (phase === 'pending') return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
+  if (phase === 'signed-out' || signedIn === false) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  if (signedIn === null) return null;
   return sopUploadRefusal(job);
 }
 
-/** Both profiles share native chrome and appearance. Only the selected profile
- * mounts business modules or subscribes to its session API. */
-function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
-  const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
-  const navItems = (profile === 'intake' ? intakeSidebarItems(canOpenPermissions) : sidebarItems(canOpenPermissions)).map((item) => {
-    if (profile === 'intake' && item.id === 'content') return { ...item, label: '知识库', blurb: '人设知识 · 生效后到坐席' };
-    if (profile === 'intake' && item.id === 'overview') return { ...item, label: '概览', blurb: item.blurb };
-    return item;
-  });
+function DashboardWorkspace() {
+  const canOpenPermissions = window.dashboardPermissions !== undefined;
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
-  const [jobKnown, setJobKnown] = useState(false);
+  const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
+    () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
+  );
+  const jobKnown = sessionPhase === 'ready';
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
-  useEffect(() => {
-    const read = window.dashboardContent?.session;
-    if (!read) return;
-    let alive = true;
-    setJobKnown(true);
-    setSessionJob(null);
-    setContentSignedIn(null);
-    void read().then((value) => {
-      if (!alive) return;
-      setSessionJob(value.ok ? value.job ?? null : null);
-      setContentSignedIn(value.ok ? value.signedIn : false);
-      setJobKnown(true);
-    }).catch(() => {
-      if (!alive) return;
-      setSessionJob(null);
-      setContentSignedIn(false);
-      setJobKnown(true);
-    });
-    return () => { alive = false; };
-  }, []);
+  const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
+  const sessionEpoch = useRef(0);
+  const sessionConfirmed = useRef(false);
   const canGrant = jobKnown
     && contentSignedIn === true
     && sessionJob?.status === 'resolved'
     && sessionJob.rights.grant === true;
-  const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
+  const uploadRefusal = sopUploadControl(sessionPhase, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
-  const grantBlock = !jobKnown
-    ? ''
-    : sessionJob?.status === 'resolved'
-      ? (sessionJob.rights.grant ? '' : PERMISSION_DENIAL_MESSAGE)
-      : '请重新登录后再查看职务。';
-  const [active, setActive] = useState<SidebarDestination>(profile === 'intake' ? intakePreviewStart(canOpenPermissions) : 'overview');
-  const [keepContent, setKeepContent] = useState(false);
-  const [keepPublish, setKeepPublish] = useState(false);
-  const [backStack, setBackStack] = useState<SidebarDestination[]>([]);
+  const grantAccess = jobKnown ? accessBlock('grant', contentSignedIn, sessionJob) : null;
+  const seatLibraryOnly = sessionJob?.status === 'resolved' && sessionJob.role === 'agent';
+  const sessionKey = !jobKnown || contentSignedIn !== true
+    ? 'signed-out'
+    : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
+  const canUpdateSop = canUploadSop && (contentRole === 'owner' || contentRole === 'coach');
+  const canDeleteSop = canUploadSop && contentRole === 'owner';
+  const navItems = intakeSidebarItems(canOpenPermissions, seatLibraryOnly, jobKnown);
+  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, canOpenPermissions));
+  const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
-  const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
-  const [navWidth, setNavWidth] = useState(DASHBOARD_NAV_DEFAULT_WIDTH);
-  const [navResizing, setNavResizing] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const navWidth = DASHBOARD_NAV_DEFAULT_WIDTH;
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [navTooltip, setNavTooltip] = useState<NavTooltipState | null>(null);
-  const [wordingDomain, setWordingDomain] = useState<DomainId | undefined>(undefined);
-  const openWordingDomain = useCallback((domain: DomainId) => {
-    setWordingDomain(domain);
-    setActive('wording');
-  }, []);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const navToggleRef = useRef<HTMLButtonElement | null>(null);
   const pendingNavFocusRef = useRef(false);
-  const navResizeHandleRef = useRef<HTMLDivElement | null>(null);
-  const navWidthRef = useRef(DASHBOARD_NAV_DEFAULT_WIDTH);
-  const lastExpandedWidthRef = useRef(DASHBOARD_NAV_DEFAULT_WIDTH);
-  const navResizeOriginWidthRef = useRef(DASHBOARD_NAV_DEFAULT_WIDTH);
-  const navResizePointerRef = useRef<number | null>(null);
-  const finishNavResizeRef = useRef<(commit?: boolean) => void>(() => undefined);
-  const navResizeShellLeftRef = useRef<number | null>(null);
-  const navResizeFrameRef = useRef<number | null>(null);
-  const pendingNavWidthRef = useRef<number | null>(null);
-  const navResizeCommittedRef = useRef(false);
-  const navAutoCollapsedRef = useRef(false);
-  const navAutoExpandedRef = useRef(false);
-  const navResizeFromCollapsedRef = useRef(false);
-  const navHoldFrameRef = useRef(false);
   const navSettlingPreviewRef = useRef(false);
   const navPendingSettleTargetRef = useRef<number | null>(null);
   const navPendingPhaseRef = useRef<DashboardNavPhase | null>(null);
   const navSettleEpochRef = useRef(0);
   const navSettleRafRef = useRef<number | null>(null);
-  const navHoldRafIdsRef = useRef<number[]>([]);
   const navPhaseRef = useRef<DashboardNavPhase>('expanded');
   const navPreviewWidthRef = useRef(DASHBOARD_NAV_DEFAULT_WIDTH);
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
-  const navMaxWidth = getDashboardNavMaxWidth(viewportWidth);
   const resolvedTheme = resolveDashboardTheme(themeMode, systemDark);
 
   const navCollapsed = isDashboardNavRailPhase(navPhase);
@@ -256,28 +163,22 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   );
   const chromeMode = dashboardChromeModeFor(hostPlatform);
   const collapsedSurface = dashboardCollapsedSurfaceWidth(chromeMode);
-  useEffect(() => {
-    if (profile !== 'intake') return undefined;
-    const api = window.dashboardIteration;
-    if (!api) return undefined;
-    let live = true;
-    void api.list().then((result) => {
-      if (live && result.ok) setTodoCount(result.items.filter((task) => task.status === 'open' || task.status === 'in_progress').length);
-    }).catch(() => undefined);
-    return () => { live = false; };
-  }, [profile]);
-  const selectNav = (id: SidebarDestination) => { setBackStack([]); setActive(id); rememberPreviewPage(id); };
-  const jump = (id: SidebarDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); rememberPreviewPage(id); };
+  const selectNav = (id: IntakeDestination) => { setBackStack([]); setActive(id); rememberPreviewPage(id); };
+  const jump = (id: IntakeDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); rememberPreviewPage(id); };
   const goBack = () => {
     const previous = backStack[backStack.length - 1];
     if (!previous) return;
     setBackStack((stack) => stack.slice(0, -1));
     setActive(previous);
   };
+  useLayoutEffect(() => {
+    if (!seatLibraryOnly) return;
+    if (active !== 'wording' && active !== 'sop') setActive('wording');
+  }, [seatLibraryOnly, active]);
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
-    () => navItems.find((item) => item.id === active) ?? navItems[0],
+    () => navItems.find((item) => item.id === active) ?? intakeDestinationItem(active),
     [active, navItems],
   );
 
@@ -286,29 +187,37 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   }, [active]);
 
   useEffect(() => {
-    if (active === 'content') setKeepContent(true);
-    if (active === 'publish') setKeepPublish(true);
-  }, [active]);
-
-  useEffect(() => {
     const api = window.dashboardContent;
     if (!api) return undefined;
     let live = true;
+    const applySignedOut = () => {
+      sessionConfirmed.current = false;
+      setSessionJob(null);
+      setContentSignedIn(false);
+      setContentRole(null);
+      setSessionPhase('signed-out');
+    };
     const load = () => {
+      const epoch = ++sessionEpoch.current;
       void Promise.resolve(api.session()).then((result) => {
-        if (!live) return;
-        const nextSignedIn = result.ok === true && result.signedIn === true;
-        setRefreshLabel(
-          nextSignedIn
-            ? (sessionDisplayName({
-              role: result.role,
-              mappedName: result.displayName,
-            }) ?? DASHBOARD_MANIFEST.banners.refreshLabel)
-            : DASHBOARD_MANIFEST.banners.refreshLabel,
-        );
+        if (!live || epoch !== sessionEpoch.current) return;
+        if (!result.ok) {
+          if (sessionConfirmed.current) return;
+          applySignedOut();
+          return;
+        }
+        if (!result.signedIn) {
+          applySignedOut();
+          return;
+        }
+        sessionConfirmed.current = true;
+        setSessionJob(result.job ?? null);
+        setContentSignedIn(true);
+        setContentRole(result.role);
+        setSessionPhase('ready');
       }).catch(() => {
-        if (!live) return;
-        setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
+        if (!live || epoch !== sessionEpoch.current || sessionConfirmed.current) return;
+        applySignedOut();
       });
     };
     load();
@@ -319,7 +228,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
       window.removeEventListener('focus', load);
       stopSession?.();
     };
-  }, [profile]);
+  }, []);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -353,26 +262,8 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     };
   }, [resolvedTheme, themeMode]);
 
-  useEffect(() => {
-    const updateViewport = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', updateViewport);
-    return () => window.removeEventListener('resize', updateViewport);
-  }, []);
-
-  const applyNavWidth = useCallback((value: number, commit: boolean) => {
-    const next = clampDashboardNavWidth(value, viewportWidth);
-    navWidthRef.current = next;
-    shellRef.current?.style.setProperty('--dashboard-nav-width', `${next}px`);
-    if (commit) {
-      lastExpandedWidthRef.current = next;
-      setNavWidth(next);
-    }
-    return next;
-  }, [viewportWidth]);
-
   const publishRenderedWidth = useCallback((width: number, options?: {
     preview?: boolean;
-    aria?: number;
   }) => {
     const next = Math.round(width);
     navPreviewWidthRef.current = next;
@@ -384,30 +275,12 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         shell.style.setProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR, `${next}px`);
       }
     }
-    const aria = resolveDashboardSeparatorAria({
-      phase: navPhaseRef.current,
-      visualWidth: options?.aria ?? next,
-      collapsedWidth: collapsedSurface,
-      maxWidth: getDashboardNavMaxWidth(viewportWidth),
-    });
-    navResizeHandleRef.current?.setAttribute('aria-valuemin', String(aria.valuemin));
-    navResizeHandleRef.current?.setAttribute('aria-valuemax', String(aria.valuemax));
-    navResizeHandleRef.current?.setAttribute('aria-valuenow', String(aria.valuenow));
-    navResizeHandleRef.current?.setAttribute('aria-valuetext', `${aria.valuenow} 像素`);
     return next;
-  }, [collapsedSurface, viewportWidth]);
+  }, []);
 
   const clearNavPreviewWidth = useCallback(() => {
     navPreviewWidthRef.current = collapsedSurface;
     shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-  }, [collapsedSurface]);
-
-  const publishCollapsedSeparatorAria = useCallback(() => {
-    navResizeHandleRef.current?.setAttribute('aria-valuenow', String(collapsedSurface));
-    navResizeHandleRef.current?.setAttribute(
-      'aria-valuetext',
-      `${collapsedSurface} 像素`,
-    );
   }, [collapsedSurface]);
 
   const stableRenderedWidth = useCallback((phase: DashboardNavPhase, expandedWidth: number) => (
@@ -418,41 +291,24 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     })
   ), [collapsedSurface]);
 
-  const cancelResizeFrame = useCallback(() => {
-    if (navResizeFrameRef.current !== null) {
-      window.cancelAnimationFrame(navResizeFrameRef.current);
-      navResizeFrameRef.current = null;
-    }
-  }, []);
-
-  const cancelSettleAndHoldRafs = useCallback(() => {
+  const cancelSettleRaf = useCallback(() => {
     if (navSettleRafRef.current !== null) {
       window.cancelAnimationFrame(navSettleRafRef.current);
       navSettleRafRef.current = null;
     }
-    if (navHoldRafIdsRef.current.length > 0) {
-      for (const id of navHoldRafIdsRef.current) {
-        window.cancelAnimationFrame(id);
-      }
-      navHoldRafIdsRef.current = [];
-    }
   }, []);
 
-  const setNavHoldFlag = useCallback((hold: boolean) => {
-    navHoldFrameRef.current = hold;
-    const shell = shellRef.current;
-    if (!shell) return;
-    if (hold) shell.setAttribute('data-nav-hold', 'true');
-    else shell.removeAttribute('data-nav-hold');
-  }, []);
+  const applyNavPhase = (nextPhase: DashboardNavPhase, restoreFocus: boolean) => {
+    pendingNavFocusRef.current = restoreFocus;
+    navPhaseRef.current = nextPhase;
+    setNavPhase(nextPhase);
+  };
 
   const interruptNavSettle = useCallback(() => {
-    cancelSettleAndHoldRafs();
-    cancelResizeFrame();
+    cancelSettleRaf();
     navSettleEpochRef.current += 1;
     navPendingSettleTargetRef.current = null;
     navPendingPhaseRef.current = null;
-    setNavHoldFlag(false);
     const painted = readDashboardStructureWidth(shellRef.current);
     const frozen = painted != null && painted > 0
       ? Math.round(painted)
@@ -460,255 +316,61 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     navSettlingPreviewRef.current = true;
     publishRenderedWidth(frozen, { preview: true });
     return frozen;
-  }, [cancelResizeFrame, cancelSettleAndHoldRafs, publishRenderedWidth, setNavHoldFlag]);
-
-  const schedulePaintHold = useCallback((onPainted: () => void) => {
-    cancelSettleAndHoldRafs();
-    const settleEpoch = navSettleEpochRef.current;
-    const first = window.requestAnimationFrame(() => {
-      if (settleEpoch !== navSettleEpochRef.current) {
-        navHoldRafIdsRef.current = [];
-        return;
-      }
-      const second = window.requestAnimationFrame(() => {
-        navHoldRafIdsRef.current = [];
-        if (settleEpoch !== navSettleEpochRef.current) return;
-        onPainted();
-      });
-      navHoldRafIdsRef.current = [second];
-    });
-    navHoldRafIdsRef.current = [first];
-  }, [cancelSettleAndHoldRafs]);
+  }, [cancelSettleRaf, publishRenderedWidth]);
 
   useLayoutEffect(() => {
-    if (navResizing) return;
     const pendingTarget = navPendingSettleTargetRef.current;
-    const pendingPhase = navPendingPhaseRef.current;
-    if (pendingTarget != null || pendingPhase != null) {
+    if (pendingTarget != null) {
       const settleEpoch = navSettleEpochRef.current;
       const flush = () => {
         navSettleRafRef.current = null;
         if (settleEpoch !== navSettleEpochRef.current) return;
-        if (
-          navPendingSettleTargetRef.current !== pendingTarget
-          || navPendingPhaseRef.current !== pendingPhase
-        ) {
-          return;
-        }
+        if (navPendingSettleTargetRef.current !== pendingTarget) return;
         navPendingSettleTargetRef.current = null;
-        navPendingPhaseRef.current = null;
-        setNavHoldFlag(false);
-        if (pendingPhase) applyNavPhase(pendingPhase, false);
-        if (pendingTarget == null) return;
         if (prefersReducedMotion() || Math.abs(navPreviewWidthRef.current - pendingTarget) <= 1) {
           publishRenderedWidth(pendingTarget);
           navSettlingPreviewRef.current = false;
           const settled = settleDashboardNavPhase(navPhaseRef.current);
           if (settled !== navPhaseRef.current) applyNavPhase(settled, false);
-          if (pendingTarget === collapsedSurface) {
-            clearNavPreviewWidth();
-            publishCollapsedSeparatorAria();
-          } else {
-            shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-          }
+          if (pendingTarget === collapsedSurface) clearNavPreviewWidth();
+          else shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
           return;
         }
         navSettlingPreviewRef.current = true;
         publishRenderedWidth(pendingTarget, { preview: true });
       };
       navSettleRafRef.current = window.requestAnimationFrame(flush);
-      return;
+      return () => {
+        cancelSettleRaf();
+      };
     }
-    if (navHoldFrameRef.current || navSettlingPreviewRef.current) return;
-    publishRenderedWidth(stableRenderedWidth(navPhase, navWidthRef.current));
-    if (navPhase === 'collapsed') {
-      clearNavPreviewWidth();
-      publishCollapsedSeparatorAria();
-    } else if (navPhase === 'expanded') {
+    if (navSettlingPreviewRef.current) return;
+    publishRenderedWidth(stableRenderedWidth(navPhase, navWidth));
+    if (navPhase === 'collapsed') clearNavPreviewWidth();
+    else if (navPhase === 'expanded') {
       shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
     }
+    return undefined;
   }, [
+    cancelSettleRaf,
     clearNavPreviewWidth,
     collapsedSurface,
     navPhase,
-    navResizing,
     navWidth,
-    publishCollapsedSeparatorAria,
     publishRenderedWidth,
-    setNavHoldFlag,
     stableRenderedWidth,
   ]);
 
-  useEffect(() => {
-    const clamped = clampDashboardNavWidth(navWidthRef.current, viewportWidth);
-    if (clamped !== navWidthRef.current) applyNavWidth(clamped, true);
-  }, [applyNavWidth, viewportWidth]);
-
-  const releaseNavPointer = useCallback(() => {
-    cancelResizeFrame();
-    pendingNavWidthRef.current = null;
-    const pointerId = navResizePointerRef.current;
-    const handle = navResizeHandleRef.current;
-    // Clear the pointer first: releasePointerCapture may synchronously dispatch
-    // lostpointercapture, which must not finish the same gesture twice.
-    navResizePointerRef.current = null;
-    navResizeShellLeftRef.current = null;
-    if (pointerId !== null && handle?.hasPointerCapture?.(pointerId)) {
-      handle.releasePointerCapture?.(pointerId);
-    }
-  }, [cancelResizeFrame]);
-
-  const finishPointerSession = useCallback(() => {
-    releaseNavPointer();
-    navResizeCommittedRef.current = false;
-    navResizeFromCollapsedRef.current = false;
-    setNavResizing(false);
-  }, [releaseNavPointer]);
-
-  const rollbackCollapsedPreview = useCallback(() => {
-    const current = navPreviewWidthRef.current;
-    navSettlingPreviewRef.current = true;
-    finishPointerSession();
-    publishCollapsedSeparatorAria();
-    if (prefersReducedMotion() || Math.abs(current - collapsedSurface) <= 1) {
-      publishRenderedWidth(collapsedSurface);
-      clearNavPreviewWidth();
-      publishCollapsedSeparatorAria();
-      navSettlingPreviewRef.current = false;
-      return;
-    }
-    publishRenderedWidth(current, { preview: true });
-    navPendingSettleTargetRef.current = collapsedSurface;
-  }, [
-    clearNavPreviewWidth,
-    collapsedSurface,
-    finishPointerSession,
-    publishCollapsedSeparatorAria,
-    publishRenderedWidth,
-  ]);
-
-  const snapExpandedPreview = useCallback((target: number) => {
-    const current = navPreviewWidthRef.current;
-    const next = applyNavWidth(target, true);
-    finishPointerSession();
-    if (prefersReducedMotion() || Math.abs(current - next) <= 1) {
-      publishRenderedWidth(next);
-      shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-      navSettlingPreviewRef.current = false;
-      return;
-    }
-    navSettlingPreviewRef.current = true;
-    publishRenderedWidth(current, { preview: true });
-    navPendingSettleTargetRef.current = next;
-  }, [applyNavWidth, finishPointerSession, publishRenderedWidth]);
-
-  const finishNavResize = useCallback((commit = true) => {
-    const active = navResizePointerRef.current !== null
-      || navResizeFromCollapsedRef.current
-      || navAutoCollapsedRef.current
-      || navAutoExpandedRef.current
-      || navHoldFrameRef.current;
-    if (!active) {
-      releaseNavPointer();
-      navResizeCommittedRef.current = false;
-      setNavResizing(false);
-      return;
-    }
-    if (navAutoCollapsedRef.current || navAutoExpandedRef.current) {
-      releaseNavPointer();
-      navResizeCommittedRef.current = false;
-      navResizeFromCollapsedRef.current = false;
-      setNavResizing(false);
-      return;
-    }
-    if (navResizeFromCollapsedRef.current) {
-      rollbackCollapsedPreview();
-      return;
-    }
-    if (commit && !navResizeCommittedRef.current) {
-      snapExpandedPreview(navWidthRef.current);
-      return;
-    }
-    if (!commit) {
-      snapExpandedPreview(navResizeOriginWidthRef.current);
-      return;
-    }
-    finishPointerSession();
-    shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-  }, [
-    finishPointerSession,
-    releaseNavPointer,
-    rollbackCollapsedPreview,
-    snapExpandedPreview,
-  ]);
-  finishNavResizeRef.current = finishNavResize;
-
-  useLayoutEffect(() => {
-    const abortNavResize = () => {
-      const active = navResizePointerRef.current !== null
-        || navResizeFromCollapsedRef.current
-        || navAutoCollapsedRef.current
-        || navAutoExpandedRef.current
-        || navHoldFrameRef.current;
-      if (active) finishNavResizeRef.current(false);
-    };
-    const forwardLostPointerEvent = (event: PointerEvent): void => {
-      const handle = navResizeHandleRef.current;
-      if (
-        !handle
-        || navResizePointerRef.current !== event.pointerId
-        || event.target === handle
-        || (event.target instanceof Node && handle.contains(event.target))
-      ) {
-        return;
-      }
-      // Native titlebar/app-region changes can retarget a captured pointer to
-      // the page beneath the separator. Forward that sample through the real
-      // separator handlers so move/up/cancel cannot leave resize mode stuck.
-      handle.dispatchEvent(new PointerEvent(event.type, {
-        bubbles: true,
-        cancelable: true,
-        pointerId: event.pointerId,
-        pointerType: event.pointerType,
-        isPrimary: event.isPrimary,
-        button: event.button,
-        buttons: event.buttons,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        screenX: event.screenX,
-        screenY: event.screenY,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-      }));
-    };
-    window.addEventListener('blur', abortNavResize);
-    window.addEventListener('resize', abortNavResize);
-    window.addEventListener('pointermove', forwardLostPointerEvent, true);
-    window.addEventListener('pointerup', forwardLostPointerEvent, true);
-    window.addEventListener('pointercancel', forwardLostPointerEvent, true);
-    return () => {
-      window.removeEventListener('blur', abortNavResize);
-      window.removeEventListener('resize', abortNavResize);
-      window.removeEventListener('pointermove', forwardLostPointerEvent, true);
-      window.removeEventListener('pointerup', forwardLostPointerEvent, true);
-      window.removeEventListener('pointercancel', forwardLostPointerEvent, true);
-    };
-  }, []);
-
   useEffect(() => () => {
-    cancelResizeFrame();
-    cancelSettleAndHoldRafs();
+    cancelSettleRaf();
     navSettleEpochRef.current += 1;
     navPendingSettleTargetRef.current = null;
     navPendingPhaseRef.current = null;
     navSettlingPreviewRef.current = false;
-    setNavHoldFlag(false);
     clearNavPreviewWidth();
     if (tooltipOpenTimerRef.current !== null) window.clearTimeout(tooltipOpenTimerRef.current);
     if (tooltipCloseTimerRef.current !== null) window.clearTimeout(tooltipCloseTimerRef.current);
-  }, [cancelResizeFrame, cancelSettleAndHoldRafs, clearNavPreviewWidth, setNavHoldFlag]);
+  }, [cancelSettleRaf, clearNavPreviewWidth]);
 
   const hideNavTooltip = useCallback((immediate = false) => {
     if (tooltipOpenTimerRef.current !== null) {
@@ -766,44 +428,24 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     navToggleRef.current?.focus({ preventScroll: true });
   }, [navPhase]);
 
-  const applyNavPhase = (nextPhase: DashboardNavPhase, restoreFocus: boolean) => {
-    pendingNavFocusRef.current = restoreFocus;
-    navPhaseRef.current = nextPhase;
-    setNavPhase(nextPhase);
-  };
-
   const toggleNavigation = (options?: { restoreFocus?: boolean }) => {
     interruptNavSettle();
-    if (navResizePointerRef.current !== null || navResizing) {
-      finishPointerSession();
-    }
-    navAutoCollapsedRef.current = false;
-    navAutoExpandedRef.current = false;
     hideNavTooltip(true);
     const collapse = !isDashboardNavRailPhase(navPhaseRef.current);
-    if (!collapse) {
-      applyNavWidth(lastExpandedWidthRef.current, true);
-    }
     const nextPhase = prefersReducedMotion()
       ? (collapse ? 'collapsed' : 'expanded')
       : startDashboardNavPhase(navPhaseRef.current, collapse);
     applyNavPhase(nextPhase, Boolean(options?.restoreFocus));
+    const target = collapse ? collapsedSurface : navWidth;
     if (prefersReducedMotion()) {
-      const target = collapse ? collapsedSurface : lastExpandedWidthRef.current;
       publishRenderedWidth(target);
-      if (collapse) {
-        clearNavPreviewWidth();
-        publishCollapsedSeparatorAria();
-      } else {
-        shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-      }
+      if (collapse) clearNavPreviewWidth();
+      else shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
       navSettlingPreviewRef.current = false;
       return;
     }
     navSettlingPreviewRef.current = true;
-    navPendingSettleTargetRef.current = collapse
-      ? collapsedSurface
-      : lastExpandedWidthRef.current;
+    navPendingSettleTargetRef.current = target;
   };
 
   const handleNavToggleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -824,36 +466,30 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
         eventType: event.type,
         phase,
         actualWidth,
-        expandedWidth: navWidthRef.current,
+        expandedWidth: navWidth,
         collapsedWidth: collapsedSurface,
         reducedMotion,
       });
       if (!shouldSettle) return phase;
-      cancelSettleAndHoldRafs();
+      cancelSettleRaf();
       navSettleEpochRef.current += 1;
       navPendingSettleTargetRef.current = null;
       navPendingPhaseRef.current = null;
-      setNavHoldFlag(false);
       navSettlingPreviewRef.current = false;
       const next = settleDashboardNavPhase(phase);
-      const targetWidth = next === 'collapsed' ? collapsedSurface : navWidthRef.current;
+      const targetWidth = next === 'collapsed' ? collapsedSurface : navWidth;
       publishRenderedWidth(targetWidth);
-      if (next === 'collapsed') {
-        clearNavPreviewWidth();
-        publishCollapsedSeparatorAria();
-      } else {
-        shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-      }
+      if (next === 'collapsed') clearNavPreviewWidth();
+      else shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
       navPhaseRef.current = next;
       return next;
     });
   }, [
-    cancelSettleAndHoldRafs,
+    cancelSettleRaf,
     clearNavPreviewWidth,
     collapsedSurface,
-    publishCollapsedSeparatorAria,
+    navWidth,
     publishRenderedWidth,
-    setNavHoldFlag,
   ]);
 
   const navStructureTransitionRef = useRef(handleNavStructureTransition);
@@ -875,53 +511,34 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
 
   const settleReducedMotionNavRef = useRef<() => void>(() => undefined);
   settleReducedMotionNavRef.current = () => {
-    cancelSettleAndHoldRafs();
-    cancelResizeFrame();
+    cancelSettleRaf();
     navSettleEpochRef.current += 1;
-    if (navResizePointerRef.current !== null || navResizing) {
-      finishPointerSession();
-    }
     const phaseNow = navPhaseRef.current;
     const pendingPhase = navPendingPhaseRef.current;
     const pendingTarget = navPendingSettleTargetRef.current;
     const nextPhase: DashboardNavPhase = (
-      navAutoExpandedRef.current
-      || phaseNow === 'expanding'
+      phaseNow === 'expanding'
       || pendingPhase === 'expanding'
       || pendingPhase === 'expanded'
     )
       ? 'expanded'
       : (
-        navAutoCollapsedRef.current
-        || phaseNow === 'collapsing'
+        phaseNow === 'collapsing'
+        || phaseNow === 'collapsed'
         || pendingPhase === 'collapsing'
         || pendingPhase === 'collapsed'
         || (pendingTarget != null && Math.abs(pendingTarget - collapsedSurface) <= 1)
       )
         ? 'collapsed'
         : settleDashboardNavPhase(phaseNow);
-    const nextWidth = nextPhase === 'collapsed'
-      ? collapsedSurface
-      : clampDashboardNavWidth(
-        pendingTarget != null && pendingTarget >= DASHBOARD_NAV_MIN_WIDTH
-          ? pendingTarget
-          : lastExpandedWidthRef.current,
-        viewportWidth,
-      );
+    const nextWidth = nextPhase === 'collapsed' ? collapsedSurface : navWidth;
     navPendingSettleTargetRef.current = null;
     navPendingPhaseRef.current = null;
-    navAutoCollapsedRef.current = false;
-    navAutoExpandedRef.current = false;
     navSettlingPreviewRef.current = false;
-    setNavHoldFlag(false);
     applyNavPhase(nextPhase, false);
     publishRenderedWidth(nextWidth);
-    if (nextPhase === 'collapsed') {
-      clearNavPreviewWidth();
-      publishCollapsedSeparatorAria();
-    } else {
-      shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-    }
+    if (nextPhase === 'collapsed') clearNavPreviewWidth();
+    else shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
   };
 
   useEffect(() => {
@@ -937,186 +554,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     return () => media.removeEventListener('change', settleIfReduced);
   }, []);
 
-  const navWidthFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const shellLeft = navResizeShellLeftRef.current ?? 0;
-    return event.clientX - shellLeft;
-  };
-
-  const startNavResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    if (!isDashboardNavStablePhase(navPhaseRef.current)) return;
-    event.preventDefault();
-    interruptNavSettle();
-    navResizeShellLeftRef.current = shellRef.current?.getBoundingClientRect().left ?? 0;
-    navResizePointerRef.current = event.pointerId;
-    const fromCollapsed = isDashboardNavRailPhase(navPhaseRef.current);
-    navResizeFromCollapsedRef.current = fromCollapsed;
-    navResizeOriginWidthRef.current = fromCollapsed
-      ? collapsedSurface
-      : lastExpandedWidthRef.current;
-    navPreviewWidthRef.current = fromCollapsed
-      ? collapsedSurface
-      : lastExpandedWidthRef.current;
-    navResizeCommittedRef.current = false;
-    navAutoCollapsedRef.current = false;
-    navAutoExpandedRef.current = false;
-    setNavHoldFlag(false);
-    navSettlingPreviewRef.current = false;
-    publishRenderedWidth(navPreviewWidthRef.current, {
-      preview: true,
-      aria: fromCollapsed ? collapsedSurface : lastExpandedWidthRef.current,
-    });
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setNavResizing(true);
-  };
-
-  const armAutoCollapse = () => {
-    if (navAutoCollapsedRef.current || navAutoExpandedRef.current) return;
-    navAutoCollapsedRef.current = true;
-    setNavHoldFlag(true);
-    navPhaseRef.current = 'collapsing';
-    applyNavPhase('collapsing', false);
-    publishRenderedWidth(navPreviewWidthRef.current, { preview: true });
-    releaseNavPointer();
-    if (prefersReducedMotion()) {
-      setNavHoldFlag(false);
-      applyNavPhase('collapsed', false);
-      publishRenderedWidth(collapsedSurface);
-      clearNavPreviewWidth();
-      publishCollapsedSeparatorAria();
-      setNavResizing(false);
-      return;
-    }
-    setNavResizing(false);
-    schedulePaintHold(() => {
-      setNavHoldFlag(false);
-      navSettlingPreviewRef.current = true;
-      publishRenderedWidth(collapsedSurface, { preview: true });
-    });
-  };
-
-  const armAutoExpand = () => {
-    if (navAutoExpandedRef.current || navAutoCollapsedRef.current) return;
-    navAutoExpandedRef.current = true;
-    setNavHoldFlag(true);
-    hideNavTooltip(true);
-    const target = clampDashboardNavWidth(lastExpandedWidthRef.current, viewportWidth);
-    lastExpandedWidthRef.current = target;
-    applyNavWidth(target, true);
-    releaseNavPointer();
-    if (prefersReducedMotion()) {
-      setNavHoldFlag(false);
-      applyNavPhase('expanded', false);
-      publishRenderedWidth(target);
-      shellRef.current?.style.removeProperty(DASHBOARD_NAV_PREVIEW_WIDTH_VAR);
-      setNavResizing(false);
-      return;
-    }
-    setNavResizing(false);
-    schedulePaintHold(() => {
-      setNavHoldFlag(false);
-      navSettlingPreviewRef.current = true;
-      applyNavPhase(startDashboardNavPhase(navPhaseRef.current, false), false);
-      publishRenderedWidth(target, { preview: true });
-    });
-  };
-
-  const scheduleNavPreview = (value: number) => {
-    pendingNavWidthRef.current = value;
-    if (navResizeFrameRef.current !== null) return;
-    navResizeFrameRef.current = window.requestAnimationFrame(() => {
-      navResizeFrameRef.current = null;
-      if (pendingNavWidthRef.current === null) return;
-      const next = clampDashboardNavPreviewWidth(
-        pendingNavWidthRef.current,
-        viewportWidth,
-        collapsedSurface,
-      );
-      pendingNavWidthRef.current = null;
-      publishRenderedWidth(next, { preview: true });
-    });
-  };
-
-  const moveNavResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (navAutoCollapsedRef.current || navAutoExpandedRef.current || navHoldFrameRef.current) return;
-    if (navResizePointerRef.current !== event.pointerId) return;
-    if (event.buttons === 0) {
-      finishNavResize(false);
-      return;
-    }
-    const raw = navWidthFromPointer(event);
-    const origin = navResizeFromCollapsedRef.current ? 'collapsed' : 'expanded';
-    const intent = resolveDashboardNavResizeIntent(origin, raw);
-    const live = clampDashboardNavPreviewWidth(raw, viewportWidth, collapsedSurface);
-    if (intent === 'auto-expand' || intent === 'auto-collapse') {
-      publishRenderedWidth(live, { preview: true });
-      if (intent === 'auto-expand') armAutoExpand();
-      else armAutoCollapse();
-      return;
-    }
-    scheduleNavPreview(raw);
-  };
-
-  const endNavResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (navAutoCollapsedRef.current || navAutoExpandedRef.current || navHoldFrameRef.current) return;
-    if (navResizePointerRef.current !== event.pointerId) return;
-    if (navResizeFromCollapsedRef.current) {
-      rollbackCollapsedPreview();
-      return;
-    }
-    if (event.type === 'pointerup') {
-      cancelResizeFrame();
-      pendingNavWidthRef.current = null;
-      const raw = navWidthFromPointer(event);
-      const live = clampDashboardNavPreviewWidth(raw, viewportWidth, collapsedSurface);
-      publishRenderedWidth(live, { preview: true });
-      if (raw < DASHBOARD_NAV_MIN_WIDTH) {
-        snapExpandedPreview(DASHBOARD_NAV_MIN_WIDTH);
-        return;
-      }
-      applyNavWidth(raw, true);
-      navResizeCommittedRef.current = true;
-      snapExpandedPreview(navWidthRef.current);
-      return;
-    }
-    snapExpandedPreview(navResizeOriginWidthRef.current);
-  };
-
-  const handleNavResizeKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (navCollapsed) {
-      if (event.key === 'Enter' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        toggleNavigation({ restoreFocus: true });
-        return;
-      }
-      if (event.key === 'End') {
-        event.preventDefault();
-        applyNavWidth(navMaxWidth, true);
-        toggleNavigation({ restoreFocus: true });
-        return;
-      }
-      if (event.key === 'Home' || event.key === 'ArrowLeft') {
-        event.preventDefault();
-        return;
-      }
-      return;
-    }
-    const step = event.shiftKey ? DASHBOARD_NAV_RESIZE_STEP * 3 : DASHBOARD_NAV_RESIZE_STEP;
-    let next: number | null = null;
-    if (event.key === 'ArrowLeft') next = navWidthRef.current - step;
-    if (event.key === 'ArrowRight') next = navWidthRef.current + step;
-    if (event.key === 'Home') next = DASHBOARD_NAV_MIN_WIDTH;
-    if (event.key === 'End') next = navMaxWidth;
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      toggleNavigation({ restoreFocus: true });
-      return;
-    }
-    if (next === null) return;
-    event.preventDefault();
-    applyNavWidth(next, true);
-  };
-
   const move = (delta: number) => {
     const nextId = nextSidebarDestination(active, delta, navItems);
     selectNav(nextId);
@@ -1125,37 +562,28 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     });
   };
 
-  const focusModule = (moduleId: SidebarDestination) => {
+  const focusModule = (moduleId: IntakeDestination) => {
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${moduleId}`)?.focus();
     });
   };
 
   let lastGroup: string | null = null;
-  const liveStructureWidth = navResizing || navHoldFrameRef.current || navSettlingPreviewRef.current
+  const liveStructureWidth = navSettlingPreviewRef.current
     ? navPreviewWidthRef.current
     : stableRenderedWidth(navPhase, navWidth);
-  const separatorAria = resolveDashboardSeparatorAria({
-    phase: navPhase,
-    visualWidth: navResizing || navHoldFrameRef.current || navSettlingPreviewRef.current
-      ? navPreviewWidthRef.current
-      : (navCollapsed ? collapsedSurface : navWidth),
-    collapsedWidth: collapsedSurface,
-    maxWidth: navMaxWidth,
-  });
 
   return (
     <IntakeAntdTheme>
     <div
       ref={shellRef}
-      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''}${profile === 'intake' ? ' is-intake' : ''}`}
+      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''} is-intake`}
       data-testid="dashboard-shell"
       data-window-role="dashboard"
       data-nav-collapsed={navCollapsed}
       data-nav-phase={navPhase}
-      data-nav-resizing={navResizing}
       data-nav-width={navWidth}
-      data-last-expanded-width={lastExpandedWidthRef.current}
+      data-last-expanded-width={navWidth}
       data-collapsed-surface={collapsedSurface}
       data-icon-anchor={iconAnchorOffset}
       data-theme-mode={themeMode}
@@ -1188,9 +616,10 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-testid="dashboard-titlebar-control-island"
         >
         <div className="dashboard-nav-chrome dashboard-no-drag" data-testid="dashboard-nav-chrome">
-          <button
+          <Button
             ref={navToggleRef}
-            type="button"
+            htmlType="button"
+            autoInsertSpace={false}
             className="dashboard-nav-toggle dashboard-no-drag"
             aria-controls="dashboard-primary-navigation"
             aria-expanded={!navCollapsed}
@@ -1209,7 +638,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             <span className="dashboard-nav-toggle-icon is-expand-glyph" aria-hidden="true">
               <DashboardChromeIcon id="panel-open" />
             </span>
-          </button>
+          </Button>
         </div>
         </div>
         <div
@@ -1237,10 +666,11 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             lastGroup = item.group;
             return (
               <div className="dashboard-nav-item" key={item.id}>
-                {showGroup ? <p className="dashboard-nav-group">{item.group}</p> : null}
-                <button
+                {showGroup && lastGroupIndex(item, navItems) > 0 ? <span className="dashboard-nav-gap" aria-hidden="true" /> : null}
+                <Button
                   id={`dash-nav-${item.id}`}
-                  type="button"
+                  htmlType="button"
+                  autoInsertSpace={false}
                   role="tab"
                   aria-controls="dashboard-module-panel"
                   data-nav-group={item.group}
@@ -1300,43 +730,12 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
                 >
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={sidebarIcon(item.id)} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
-                  {profile === 'intake' && item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
-                </button>
+                  {item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
+                </Button>
               </div>
             );
           })}
         </div>
-
-        <div
-          ref={navResizeHandleRef}
-          className="dashboard-nav-resizer dashboard-no-drag"
-          role="separator"
-          aria-label="调整工作台侧栏宽度"
-          aria-controls="dashboard-sidebar"
-          aria-orientation="vertical"
-          aria-valuemin={separatorAria.valuemin}
-          aria-valuemax={separatorAria.valuemax}
-          aria-valuenow={separatorAria.valuenow}
-          aria-valuetext={`${separatorAria.valuenow} 像素`}
-          tabIndex={0}
-          data-testid="dashboard-nav-resizer"
-          onPointerDown={startNavResize}
-          onPointerMove={moveNavResize}
-          onPointerUp={endNavResize}
-          onPointerCancel={endNavResize}
-          onLostPointerCapture={(event) => {
-            if (navResizePointerRef.current !== event.pointerId) return;
-            if (navAutoCollapsedRef.current || navAutoExpandedRef.current || navHoldFrameRef.current) {
-              return;
-            }
-            finishNavResize(false);
-          }}
-          onDoubleClick={() => {
-            applyNavWidth(DASHBOARD_NAV_DEFAULT_WIDTH, true);
-            if (navCollapsed) toggleNavigation();
-          }}
-          onKeyDown={handleNavResizeKey}
-        />
       </aside>
 
       {navTooltip ? (
@@ -1359,13 +758,11 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             aria-hidden="true"
           />
           <div className="dashboard-page-context">
-            {profile === 'intake' ? <p className="intake-crumb">
-              {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
-              <span>{activeItem.group}</span><span aria-hidden="true"> / </span><strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
-            {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
-            <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {profile === 'intake' ? '' : refreshLabel}
+            <p className="intake-crumb">
+              {backStack.length > 0 ? <Button htmlType="button" autoInsertSpace={false} className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></Button> : null}
+              <strong>{sessionPhase === 'pending' ? '正在确认' : sessionPhase === 'signed-out' ? '请先登录' : activeItem.label}</strong>
             </p>
+            {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
             <DashboardThemeMenu themeMode={themeMode} onChange={setThemeMode} />
@@ -1376,28 +773,29 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           ref={contentRef}
           className="dashboard-content"
           role="tabpanel"
-          aria-labelledby={`dash-nav-${active}`}
+          aria-labelledby={navItems.some((item) => item.id === active) ? `dash-nav-${active}` : undefined}
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {active === 'overview' && <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} />}
-          {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
-          {profile === 'intake' ? <IntakeLibrary active={active === 'wording' || active === 'announce' ? active : null} /> : null}
-          {profile !== 'intake' && active === 'wording' && (
-            <WordingLibraryModule
-              initialDomain={wordingDomain}
-              onDomainConsumed={() => setWordingDomain(undefined)}
-            />
-          )}
-          {profile !== 'intake' && active === 'announce' && <AnnounceModule onOpenDomain={openWordingDomain} />}
-          {keepContent || active === 'content' ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
-          {keepPublish || active === 'publish' ? (
-            <div hidden={active !== 'publish'}>
-              <ContentModule onNavigate={setActive} onOpenWordingDomain={openWordingDomain} />
-            </div>
-          ) : null}
-          {canOpenPermissions ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantBlock={grantBlock} /></div> : null}
-          {active === 'materials' ? <IntakeManagement /> : null}
+          {renderIntakeDestinations({
+            active,
+            canOpenPermissions,
+            seatLibraryOnly,
+            jobKnown,
+            jobPending: sessionPhase === 'pending',
+            canUploadSop,
+            canUpdateSop,
+            canDeleteSop,
+            sessionKey,
+            uploadBlock: uploadRefusal?.message ?? '',
+            canGrant,
+            grantAccess,
+            onOpen: jump,
+            onTodoCount: setTodoCount,
+            onSupplyScript: (question) => { setScriptDraft(question); jump('content'); },
+            scriptDraft,
+            onDraftConsumed: () => setScriptDraft(null),
+          })}
         </main>
       </div>
     </div>

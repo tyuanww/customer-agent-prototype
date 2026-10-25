@@ -12,6 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  SOURCE_BUDGET_GROUPS,
+  WORKSPACE_REMAINDER_BUDGET_BYTES,
   checkWorkspaceBudget,
   checkWorkspacePolicy,
   cleanWorkspace,
@@ -451,20 +453,22 @@ describe('workspace hygiene', () => {
   });
 
   it.each([
-    { key: 'frozen-contracts', relativePath: 'contracts/upstream/frozen/input.sql', capMiB: 16 },
-    { key: 'frozen-evidence', relativePath: 'evidence/qa/frozen.log', capMiB: 10.5 },
-    { key: 'source-inputs', relativePath: 'apps/desktop/src/big.ts', capMiB: 21.5 },
-  ])('rejects $key growth even with unused aggregate headroom', ({ key, relativePath, capMiB }) => {
+    { key: 'frozen-contracts' as const, relativePath: 'contracts/upstream/frozen/input.sql' },
+    { key: 'frozen-evidence' as const, relativePath: 'evidence/qa/frozen.log' },
+    { key: 'source-inputs' as const, relativePath: 'apps/desktop/src/big.ts' },
+  ])('rejects $key growth even with unused aggregate headroom', ({ key, relativePath }) => {
+    const budgetBytes = SOURCE_BUDGET_GROUPS.find((group) => group.key === key)?.budgetBytes;
+    if (budgetBytes === undefined) throw new Error(`missing budget for ${key}`);
     const root = createWorkspaceFixture();
     const target = path.join(root, relativePath);
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, Buffer.alloc(capMiB * 1024 * 1024 + 4096, 'x'));
+    writeFileSync(target, Buffer.alloc(budgetBytes + 4096, 'x'));
 
     const result = checkWorkspaceBudget(root);
-    expect(result.remainderBudgetBytes).toBe(47.5 * 1024 * 1024);
+    expect(result.remainderBudgetBytes).toBe(WORKSPACE_REMAINDER_BUDGET_BYTES);
     expect(result.remainderBytes).toBeLessThan(result.remainderBudgetBytes);
     expect(result.pass).toBe(false);
-    expect(result.violations).toContainEqual(expect.objectContaining({ key, budgetBytes: capMiB * 1024 * 1024 }));
+    expect(result.violations).toContainEqual(expect.objectContaining({ key, budgetBytes }));
     // The legacy one-time aggregate override cannot bypass a group gate.
     expect(checkWorkspaceBudget(root, { remainderBudgetBytes: 64 * 1024 * 1024 }).pass).toBe(false);
   });

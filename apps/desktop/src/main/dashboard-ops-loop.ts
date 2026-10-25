@@ -97,7 +97,7 @@ export async function dashboardRetrievalMetrics(
 export async function dashboardSopCatalog(
   session: DashboardOpsSessionClient | null,
 ): Promise<DashboardSopCatalog | DashboardOpsFailure> {
-  return withSession(session, ['coach', 'owner'], async (client, epoch) => {
+  return withSession(session, ['agent', 'coach', 'owner'], async (client, epoch) => {
     const result = await client.request(epoch, '/v1/sop/catalog');
     const parsed = parseContractSchema('SopCatalogResponse', result.value);
     return Object.freeze({

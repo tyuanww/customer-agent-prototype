@@ -162,11 +162,11 @@ const READINESS_TRIGGER_SHA256 = '16f2dfb6b2e98e3921d0ad5d452c737d68837237449665
 // 0059 adds the restamp trigger, so lengths 59 through 61 carry one more than every older one.
 const RESTAMP_TRIGGER_ENTRIES = 113;
 const RESTAMP_TRIGGER_SHA256 = 'ff7ccb999ee509dc1134475e26ab791e29b8827ae6b563cd008992914a427f44';
-// 0062 adds the store-set keep-members trigger, so lengths 62 and up carry one more again.
+// 0062 adds the store-set keep-members trigger. Lengths 62 through 65 stay here.
 const LATEST_TRIGGER_ENTRIES = 114;
 const LATEST_TRIGGER_SHA256 = '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4ba90798fbb0a81a';
-// 0066 adds the policy-version restamp trigger. 0067 adds none, so 66 and 67 share it.
-// Measured on PostgreSQL 15.19. Named so a disabled import-batch pair still verifies.
+// 0066 adds the policy restamp trigger. A disabled import-batch pair is still legitimate
+// at this length, so the allowance below has to name this fingerprint too.
 const POLICY_RESTAMP_TRIGGER_ENTRIES = 115;
 const POLICY_RESTAMP_TRIGGER_SHA256 = 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
@@ -1113,7 +1113,8 @@ const READINESS_SUFFIX = [
   { length: 64, index: 63, id: '0064_roster_query_requires_reader' },
   { length: 65, index: 64, id: '0065_legacy_orphan_fk_not_valid' },
   { length: 66, index: 65, id: '0066_policy_version_restamp' },
-  { length: 67, index: 66, id: '0067_seat_lifecycle' },
+  { length: 67, index: 66, id: '0067_inaccuracy_outcome' },
+  { length: 68, index: 67, id: '0068_seat_lifecycle' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1169,7 +1170,11 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // derived. Placeholder until the probe run reports it.
   65: { tables: 109, functions: 284, objectEntries: 3399, objectSha256: '054b28a7858de4b7957202a9704235aad53a0dcbf606e9c5b39998a67e069eed', functionEntries: 284, functionSha256: '026b4488f7e7bcc4bbd043c4915bb864c6ae4e6e49e9312e9bd5c399a99d7cc3', triggerEntries: LATEST_TRIGGER_ENTRIES, triggerSha256: LATEST_TRIGGER_SHA256 },
   66: { tables: 109, functions: 285, objectEntries: 3400, objectSha256: 'cbc8ed8645962d65582e1c7143ea6de17832f91f0d319e95a7f4a1d4b75df53b', functionEntries: 285, functionSha256: 'edfdfe3b5050db5a610b0962e223dda91d1df9f80925a71135921202f3492ccf', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
-  67: { tables: 110, functions: 291, objectEntries: 3422, objectSha256: '5afdcfd42188af9370330d5ea25480610185c8f8740604ae3ebf0f5717e60e66', functionEntries: 291, functionSha256: '2604c17ed3aba4092b7a17ed21b6f543c039af1dc8a0a2b38bc7408ce3250835', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  // 0067 adds one ops_loop read. The function inventory stays on the 0066 digest;
+  // the new object is the measured row below.
+  67: { tables: 109, functions: 285, objectEntries: 3401, objectSha256: 'ee2028c801ca6bcbcfb109c100c48137b4864ae6d954f749e7f246a52b9035ef', functionEntries: 285, functionSha256: 'edfdfe3b5050db5a610b0962e223dda91d1df9f80925a71135921202f3492ccf', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  // 0068 adds the seat lifecycle. Counts are filled from the PostgreSQL 15 probe.
+  68: { tables: 110, functions: 291, objectEntries: 3423, objectSha256: '7b6a6223f1841a4b4f94dcce4b28cb325fa6070402772192482af2abf237a3ad', functionEntries: 291, functionSha256: '2604c17ed3aba4092b7a17ed21b6f543c039af1dc8a0a2b38bc7408ce3250835', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1206,7 +1211,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   65: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
   // 0066 adds no grant of its own; 0059 already covers what the new function writes.
   66: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
-  67: { entries: 646, sha256: '96b54a2aa5d19e8f0208bb485016dea8718dbd0ccdde2a7f6eb954aa872671de' },
+  67: { entries: 641, sha256: 'fa54a9fb34ed60b256cc7c85dc2167d32f8f8e78194210d6dec63685125cb20a' },
+  68: { entries: 646, sha256: '96b54a2aa5d19e8f0208bb485016dea8718dbd0ccdde2a7f6eb954aa872671de' },
 };
 
 export async function verifyReadinessSuccessor(

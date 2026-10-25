@@ -46,4 +46,24 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: [
+      'apps/desktop/src/renderer/LoginApp.tsx',
+      'apps/desktop/src/renderer/DashboardApp.tsx',
+      'apps/desktop/src/renderer/features/dashboard/*.tsx',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXOpeningElement[name.name=/^(button|select|textarea)$/]",
+          message: 'Use the antd control here (DESIGN.md §3).',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='file']):has(JSXAttribute[name.name='hidden']))",
+          message: 'Use the antd Input here (DESIGN.md §3). A hidden file picker is the one native input allowed.',
+        },
+      ],
+    },
+  },
 );

@@ -16,15 +16,16 @@ it('keeps the current workbench pages when the mode is product-remote', async ()
   } as unknown as Window['dashboardPermissions'];
   window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'product-remote' }) };
   render(<DashboardApp />);
-  expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料管理');
+  expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料');
   expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
   expect(screen.getByTestId('nav-content')).toHaveAccessibleName(/知识库/);
-  expect(screen.getByTestId('nav-publish')).toHaveAccessibleName('内容管理');
+  expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
-  expect(screen.getByTestId('nav-announce')).toBeInTheDocument();
+  expect(screen.queryByTestId('nav-announce')).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: '系统同步' })).not.toBeInTheDocument();
 });
 
-it('keeps 权限 and 资料管理 when the mode is faq-v2', async () => {
+it('keeps 权限 and 资料 when the mode is faq-v2', async () => {
   window.dashboardPermissions = {
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
     command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
@@ -33,5 +34,5 @@ it('keeps 权限 and 资料管理 when the mode is faq-v2', async () => {
   window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'faq-v2' }) };
   render(<DashboardApp />);
   expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
-  expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料管理');
+  expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
 });

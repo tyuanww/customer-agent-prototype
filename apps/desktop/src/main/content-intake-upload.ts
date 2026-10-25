@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
+import { joinDisplayParts } from '../shared/display-separator';
 import type { IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
@@ -104,7 +105,7 @@ export class ContentIntakeUpload {
     return structuredClone({ draftRevision: this.revision, phase: this.phase, busy, authorized: allowed.length > 0,
       revisionOf: readable && this.priorKey ? { candidateId: this.priorKey.candidateId, version: this.priorKey.version } : null,
       validUntil: readable && deadlines.length ? new Date(Math.min(...deadlines.map(Date.parse))).toISOString() : null,
-      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, domain: s.scope.domain, label: `${s.scope.sourceId} · ${s.scope.shopId ?? s.scope.brandId}` })),
+      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, domain: s.scope.domain, label: joinDisplayParts([s.scope.sourceId, s.scope.shopId ?? s.scope.brandId]) })),
       sourceSelection: readable ? this.sources.get(this.sourceId!) ?? null : null,
       file: readable && this.file ? { name: this.file.name, bytes: this.file.bytes.length } : null,
       principals: declarations ? this.principals.map(({ selection, displayLabel, enabled }) => ({ selection, displayLabel, enabled })) : [],

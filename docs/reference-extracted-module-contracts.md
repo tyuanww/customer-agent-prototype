@@ -75,9 +75,9 @@ const rank = resultCopyRankFromKey(event.code, event.key);
 
 ### 5.1 Manifest 与导航
 
-位置：`apps/desktop/src/renderer/data/dashboard-manifest.ts`
+样例目录在 `apps/desktop/tests/fixtures/dashboard-manifest.ts`。工作台页面不导入它。活侧栏以 `intake-destination-rows.ts` 为写入者。
 
-- `nextDashboardNavId(active, delta)` 在 `DASHBOARD_NAV` 中循环移动，调用方传入整数步长（当前键盘路径使用 `-1` / `+1`）。它只返回已有导航 id，不创建新路由。
+- `nextDashboardNavId(active, delta)` 只在测试夹具里，沿 `DASHBOARD_NAV` 循环。它不创建路由，工作台键盘移动不读这份夹具。
 
 ### 5.2 外观与 tooltip 几何
 

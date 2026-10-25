@@ -1,6 +1,5 @@
 /**
- * 系统同步 · 使用情况。坐席每次提问的一行记录，供运营复盘与后续训练样本。
- * 契约由前端先定，后端按此实现；renderer 只读，导出由 Main 写文件，数据不经过 renderer。
+ * 坐席每次提问的一行记录。renderer 只读，导出由 Main 写文件。
  */
 export type UsageLogResult = 'copied' | 'viewed' | 'miss';
 export const USAGE_LOG_RESULTS: readonly UsageLogResult[] = ['copied', 'viewed', 'miss'];

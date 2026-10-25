@@ -219,14 +219,14 @@ describe('login window visual contract', () => {
     expect(loginCss).not.toMatch(/内部|外包/);
   });
 
-  it('reuses query capsule tokens instead of a second palette', () => {
-    expect(loginCss).toContain('background: var(--query-glass-solid)');
-    expect(loginCss).toContain('color: var(--ink)');
-    expect(loginCss).toContain('color: var(--muted)');
-    expect(loginCss).toContain('background: var(--query-accent-control)');
-    expect(loginCss).toContain('border-radius: 14px');
-    expect(loginCss).toContain('font-size: 16px');
-    expect(loginCss).toContain('font-size: 11px');
-    expect(loginCss).not.toMatch(/linear-gradient|#6543aa|#7c3aed/);
+  it('uses the workbench look rather than the query glass (DESIGN.md §3)', () => {
+    expect(loginApp).toContain("import './styles/radix-palette.css'");
+    expect(loginApp).toContain("import './styles/workbench-tokens.css'");
+    expect(loginCss).toContain('background: var(--wb-surface)');
+    expect(loginCss).toContain('color: var(--wb-text)');
+    expect(loginCss).not.toMatch(/--query-|--glass|backdrop-filter/);
+    expect(loginCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+    expect(loginCss).not.toMatch(/font-size:\s*\d+px/);
+    expect(loginCss).not.toMatch(/linear-gradient/);
   });
 });

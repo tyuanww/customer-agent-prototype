@@ -39,18 +39,20 @@ function setup() {
 it('shows entry dates and the read deadline in the same local time zone with an explicit offset',async()=>{
  vi.stubEnv('TZ','America/New_York');vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-01-15T14:59:00Z'));
  const f=setup(),view=data();view.rows[0]!.effectiveFrom='2026-01-15T15:00:00Z';view.rows[0]!.effectiveTo='2026-01-15T16:00:00Z';
- f.command.mockResolvedValueOnce({ok:true,view});const {rerender}=render(<IntakeLibrary active="wording"/>);
- expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026-01-15 10:00 · 失效 2026-01-15 11:00');
+ f.command.mockResolvedValueOnce({ok:true,view});render(<IntakeLibrary active/>);
+ expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026-01-15 10:00，失效 2026-01-15 11:00');
  expect(screen.getByRole('row',{name:/合成标题 product/})).not.toHaveTextContent('UTC');
- rerender(<IntakeLibrary active="announce"/>);
- expect(screen.getByRole('status')).toHaveTextContent('当前可用 4 条，到 2026-01-15 还能查。');
- expect(screen.getByRole('status')).not.toHaveTextContent('rel_');
- expect(screen.getByRole('status')).not.toHaveTextContent('UTC');
+ const status=screen.getByRole('status');
+ expect(status).toHaveTextContent('当前可用 4 条，到 2026-01-15 还能查。');
+ expect(status).not.toHaveTextContent('rel_');
+ expect(status).not.toHaveTextContent('UTC');
+ expect(status).not.toHaveTextContent('1 小时内到期');
+ expect(screen.getByText('1 小时内到期')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(1);
 });
 it('shows missing and invalid entry times explicitly instead of inventing a date',async()=>{
  const f=setup(),view=data();view.rows[0]!.effectiveFrom='';view.rows[0]!.effectiveTo='not-a-date';
- f.command.mockResolvedValueOnce({ok:true,view});render(<IntakeLibrary active="wording"/>);
+ f.command.mockResolvedValueOnce({ok:true,view});render(<IntakeLibrary active/>);
  const row=await screen.findByRole('row',{name:/合成标题 product/});
  expect(row).toHaveTextContent('生效 —');
  expect(row).not.toHaveTextContent('UTC');
@@ -61,9 +63,18 @@ it('does not turn an absent optional timestamp into the Unix epoch',()=>{
  expect(formatIntakeTime(undefined)).toBe('未提供时间');
  expect(formatIntakeTime('  ')).toBe('未提供时间');
 });
-it('browses four scoped domains and shares the same complete read with the available-version page',async()=>{
- const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active="wording"/>);
+it('counts the snapshot on the status line while a domain tab shows fewer rows',async()=>{
+ const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
  const product=await screen.findByRole('row',{name:/合成标题 product/});
+ expect(screen.getByRole('region',{name:'可用话术目录'})).toBeVisible();
+ expect(screen.getByRole('heading',{name:'话术库'})).toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
+ expect(screen.queryByText(/软件更新/)).not.toBeInTheDocument();
+ expect(screen.queryByText(/发布记录/)).not.toBeInTheDocument();
+ const status=screen.getByRole('status');
+ expect(status).toHaveTextContent('当前可用 4 条');
+ expect(status).not.toHaveTextContent('rel_');
+ expect(screen.queryByText('合成原文 campaign')).not.toBeInTheDocument();
  expect(document.querySelector('select')).toBeNull();
  expect(product).not.toHaveTextContent(/rel_/);
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent(/rel_/);
@@ -71,22 +82,15 @@ it('browses four scoped domains and shares the same complete read with the avail
  for(const [label,domain] of [['活动','campaign'],['售前','presale'],['售后','aftersale']]){
   await user.click(screen.getByRole('tab',{name:label}));expect(screen.getByText(`合成原文 ${domain}`)).toBeVisible();
   expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('当前可用 4 条');
  }
+ expect(f.command).toHaveBeenCalledTimes(1);
  fireEvent.keyDown(screen.getByRole('tab',{name:'售后'}),{key:'Home'});
  expect(screen.getByRole('tab',{name:'产品'})).toHaveFocus();
  expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby','intake-domain-product');
  expect(screen.queryByRole('button',{name:/复制|下架|导出/})).not.toBeInTheDocument();
- rerender(<IntakeLibrary active="announce"/>);
- expect(screen.getByRole('region',{name:'当前可用版本'})).toBeVisible();
- expect(screen.getByRole('status')).toHaveTextContent(/当前可用 \d+ 条/);
- expect(screen.getByRole('status')).not.toHaveTextContent(/rel_/);
- expect(screen.getByText('软件更新：安装包更新还不在这页。')).toBeVisible();
- expect(screen.getByText('发布记录：发布记录还没有接到这里。')).toBeVisible();
- expect(screen.getByRole('region', { name: '当前可用版本' })).not.toHaveTextContent('未接入');
  expect(screen.getByRole('button', { name: '刷新可用资料' })).toBeVisible();
- expect(f.command).toHaveBeenCalledTimes(1);
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
- rerender(<IntakeLibrary active="wording"/>);
  await user.click(screen.getByRole('tab',{name:'SOP'}));
  // SOP is a real tab now, rendered by the same table as the other four.
  expect(screen.getByRole('tabpanel')).toHaveTextContent('当前条件下没有此类可用话术。');
@@ -96,9 +100,9 @@ it('browses four scoped domains and shares the same complete read with the avail
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
 });
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{
- const f=setup(),user=userEvent.setup();render(<IntakeLibrary active="wording"/>);
+ const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
  await screen.findByText('合成原文 product');
- await user.click(screen.getByText('商品 · 通用'));
+ await user.click(screen.getByText('商品'));
  await user.click(screen.getByRole('checkbox',{name:'合成商品'}));
  expect(f.command).toHaveBeenLastCalledWith({action:'select-conditions',productIds:['product-a'],scenarioIds:[]});
  expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
@@ -108,25 +112,27 @@ it('clears content on condition changes and uses IDs rather than names for shop 
  expect(f.command).toHaveBeenLastCalledWith({action:'select-shop',shopId:'shop-b'});
 });
 it('withdraws old content when a refresh fails instead of treating it as an empty successful catalog',async()=>{
- const f=setup(),user=userEvent.setup();render(<IntakeLibrary active="wording"/>);await screen.findByText('合成原文 product');
+ const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);await screen.findByText('合成原文 product');
  f.command.mockResolvedValueOnce({ok:false,code:'UNAVAILABLE',message:'合成读取失败',view:null});
  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
- expect(await screen.findByRole('alert')).toHaveTextContent('合成读取失败');expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
+ expect(await screen.findByRole('alert')).toHaveTextContent('合成读取失败');
+ expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
+ expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
 });
 it('keeps invalidation subscribed while hidden and rejects a late response from the previous generation',async()=>{
- const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active="wording"/>);await screen.findByText('合成原文 product');
+ const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active/>);await screen.findByText('合成原文 product');
  let late!:(value:IntakeCatalogReply)=>void;f.command.mockImplementationOnce(()=>new Promise(resolve=>{late=resolve;}));
  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
- rerender(<IntakeLibrary active={null}/>);
+ rerender(<IntakeLibrary active={false}/>);
  f.setView({...data(),signedIn:false,rows:[],releaseId:null,validUntil:null,context:emptyIntakeQueryContext()});
  await act(async()=>{f.listeners.forEach(fn=>fn());});
  await act(async()=>{late({ok:true,view:data()});});
- rerender(<IntakeLibrary active="wording"/>);
+ rerender(<IntakeLibrary active/>);
  expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();expect(screen.getByText('请先在查询窗口登录。')).toBeVisible();
  expect(f.command).toHaveBeenCalledTimes(2);
 });
 it('keeps cancellation available and does not repaint a late completed read',async()=>{
- const f=setup(),user=userEvent.setup();render(<IntakeLibrary active="wording"/>);await screen.findByText('合成原文 product');
+ const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);await screen.findByText('合成原文 product');
  let late!:(value:IntakeCatalogReply)=>void;f.command.mockImplementationOnce(()=>new Promise(resolve=>{late=resolve;}));
  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await user.click(screen.getByRole('button',{name:'停止目录读取'}));
  await act(async()=>{late({ok:true,view:data()});});
@@ -135,18 +141,21 @@ it('keeps cancellation available and does not repaint a late completed read',asy
 it('withdraws expired content even while hidden and lets names expire separately to IDs',async()=>{
  vi.useFakeTimers();const f=setup();const v=data();v.context.shopNamesValidUntil=new Date(Date.now()+100).toISOString();v.validUntil=new Date(Date.now()+200).toISOString();
  f.command.mockResolvedValueOnce({ok:true,view:v});
- const {rerender}=render(<IntakeLibrary active="wording"/>);await act(async()=>{});
+ const {rerender}=render(<IntakeLibrary active/>);await act(async()=>{});
  expect(screen.getByText('合成原文 product')).toBeVisible();
  await act(async()=>{vi.advanceTimersByTime(110);});
  expect(screen.getByRole('combobox',{name:'目录店铺'}).closest('.ant-select')).toHaveTextContent('shop-a');
  expect(screen.getByRole('combobox',{name:'目录店铺'}).closest('.ant-select')).not.toHaveTextContent('合成同名店');
  expect(screen.getByText('合成原文 product')).toBeVisible();
- rerender(<IntakeLibrary active={null}/>);await act(async()=>{vi.advanceTimersByTime(100);});rerender(<IntakeLibrary active="wording"/>);
- expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('读取资格已到期');
+ rerender(<IntakeLibrary active={false}/>);await act(async()=>{vi.advanceTimersByTime(100);});rerender(<IntakeLibrary active/>);
+ expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('登录状态需要确认');
 });
-it('does not start directory I/O before visiting either consumer',async()=>{
- const f=setup();const {rerender}=render(<IntakeLibrary active={null}/>);expect(f.command).not.toHaveBeenCalled();
- rerender(<IntakeLibrary active="announce"/>);await waitFor(()=>expect(f.command).toHaveBeenCalledOnce());
+it('refreshes once when 话术库 is shown and does not refresh again after hiding',async()=>{
+ const f=setup();const {rerender}=render(<IntakeLibrary active={false}/>);expect(f.command).not.toHaveBeenCalled();
+ rerender(<IntakeLibrary active/>);await waitFor(()=>expect(f.command).toHaveBeenCalledOnce());
+ rerender(<IntakeLibrary active={false}/>);rerender(<IntakeLibrary active/>);
+ await act(async()=>{});
+ expect(f.command).toHaveBeenCalledOnce();
 });
 
 it.each(['LIMIT','UNAVAILABLE'] as const)('preserves a real Main command failure after a shown snapshot: %s',async code=>{
@@ -158,13 +167,14 @@ it.each(['LIMIT','UNAVAILABLE'] as const)('preserves a real Main command failure
   catch(error){return {ok:false,code:error instanceof IntakeUsageError?error.code:'UNAVAILABLE',message:`目录失败 ${code}`,view:owner.view()};}});
  window.dashboardIntakeCatalog={command,current:async()=>({ok:true,view:owner.view()}),onInvalidated:fn=>owner.subscribe(fn)};
  const user=userEvent.setup();
- try{render(<IntakeLibrary active="wording"/>);
+ try{render(<IntakeLibrary active/>);
   await waitFor(()=>expect(screen.getByRole('combobox',{name:'目录店铺'})).toBeEnabled());
   await user.click(screen.getByRole('combobox',{name:'目录店铺'}));
   await user.click(await screen.findByRole('option',{name:'shop-a'}));
   await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await screen.findByRole('row',{name:/洁面用法 0/});
   fail=true;await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
   expect(await screen.findByRole('alert')).toHaveTextContent(`目录失败 ${code}`);
+  expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
   expect(screen.queryByRole('row',{name:/洁面用法 0/})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'刷新可用资料'})).toBeEnabled();expect(invalidations).not.toHaveBeenCalled();
  }finally{cleanup();owner.dispose();}
@@ -180,7 +190,7 @@ it('reads low, medium, and high risk notes as levels on the wording list',async(
   {...base,id:'sentence',title:'句子话术',riskNote:'核对后使用'},
  ];
  f.command.mockResolvedValueOnce({ok:true,view});
- render(<IntakeLibrary active="wording"/>);
+ render(<IntakeLibrary active/>);
  const low=await screen.findByRole('row',{name:/低风险话术/});
  expect(low).toHaveTextContent('风险低');
  expect(low).not.toHaveTextContent(/\blow\b/);
@@ -202,4 +212,30 @@ it('reads low, medium, and high risk notes as levels on the wording list',async(
  expect(document.querySelector('select')).toBeNull();
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent(/rel_/);
  for(const row of [low,medium,high,zh,sentence]) expect(row).not.toHaveTextContent(/rel_/);
+});
+it('counts a fresh empty snapshot as zero available rows',async()=>{
+ const f=setup(),view=data();view.rows=[];
+ f.command.mockResolvedValueOnce({ok:true,view});
+ render(<IntakeLibrary active/>);
+ const status=await screen.findByRole('status');
+ expect(status.textContent ?? '').toMatch(/^当前可用 0 条，到 \d{4}-\d{2}-\d{2} 还能查。$/);
+ expect(status).not.toHaveTextContent('暂无有效发布');
+});
+it('stores a missing catalog API as the unavailable sentence with a retry',async()=>{
+ render(<IntakeLibrary active/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('可用资料暂不可读取，请重试。');
+ expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
+ expect(screen.queryByText('请先在查询窗口登录。')).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
+ expect(screen.queryByText(/全店|店铺总数|全库/)).not.toBeInTheDocument();
+});
+it('stores a signed-out catalog as the logged-out sentence without a retry',async()=>{
+ const f=setup(),view=data();
+ view.signedIn=false;view.rows=[];view.releaseId=null;view.validUntil=null;view.context=emptyIntakeQueryContext();
+ f.command.mockResolvedValueOnce({ok:true,view});
+ render(<IntakeLibrary active/>);
+ expect(await screen.findByText('请先在查询窗口登录。')).toBeVisible();
+ expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'重试'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
 });
