@@ -96,19 +96,22 @@ export function DashboardApp() {
   return <DashboardWorkspace />;
 }
 function sopUploadControl(
-  jobKnown: boolean,
+  phase: 'pending' | 'signed-out' | 'ready',
   signedIn: boolean | null,
   job: SessionJobView | null,
 ): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
-  if (!jobKnown || signedIn === null) return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
-  if (!signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
+  if (phase === 'pending' || signedIn === null) return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
+  if (phase === 'signed-out' || !signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
   return sopUploadRefusal(job);
 }
 
 function DashboardWorkspace() {
   const canOpenPermissions = window.dashboardPermissions !== undefined;
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
-  const [jobKnown, setJobKnown] = useState(() => window.dashboardContent === undefined);
+  const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
+    () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
+  );
+  const jobKnown = sessionPhase === 'ready';
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
   const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
   const sessionEpoch = useRef(0);
@@ -117,7 +120,7 @@ function DashboardWorkspace() {
     && contentSignedIn === true
     && sessionJob?.status === 'resolved'
     && sessionJob.rights.grant === true;
-  const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
+  const uploadRefusal = sopUploadControl(sessionPhase, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
   const grantAccess = jobKnown ? accessBlock('grant', contentSignedIn, sessionJob) : null;
   const seatLibraryOnly = sessionJob?.status === 'resolved' && sessionJob.role === 'agent';
@@ -193,13 +196,18 @@ function DashboardWorkspace() {
       setSessionJob(null);
       setContentSignedIn(false);
       setContentRole(null);
-      setJobKnown(false);
+      setSessionPhase('signed-out');
     };
     const load = () => {
       const epoch = ++sessionEpoch.current;
       void Promise.resolve(api.session()).then((result) => {
         if (!live || epoch !== sessionEpoch.current) return;
-        if (!result.ok || !result.signedIn) {
+        if (!result.ok) {
+          if (sessionConfirmed.current) return;
+          applySignedOut();
+          return;
+        }
+        if (!result.signedIn) {
           applySignedOut();
           return;
         }
@@ -207,7 +215,7 @@ function DashboardWorkspace() {
         setSessionJob(result.job ?? null);
         setContentSignedIn(true);
         setContentRole(result.role);
-        setJobKnown(true);
+        setSessionPhase('ready');
       }).catch(() => {
         if (!live || epoch !== sessionEpoch.current || sessionConfirmed.current) return;
         applySignedOut();
@@ -753,7 +761,7 @@ function DashboardWorkspace() {
           <div className="dashboard-page-context">
             <p className="intake-crumb">
               {backStack.length > 0 ? <Button htmlType="button" autoInsertSpace={false} className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></Button> : null}
-              <strong>{jobKnown ? activeItem.label : '正在确认'}</strong>
+              <strong>{sessionPhase === 'pending' ? '正在确认' : sessionPhase === 'signed-out' ? '请先登录' : activeItem.label}</strong>
             </p>
             {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
           </div>
@@ -766,7 +774,7 @@ function DashboardWorkspace() {
           ref={contentRef}
           className="dashboard-content"
           role="tabpanel"
-          aria-labelledby={`dash-nav-${active}`}
+          aria-labelledby={navItems.some((item) => item.id === active) ? `dash-nav-${active}` : undefined}
           data-testid="dashboard-content"
           data-active-module={active}
         >
@@ -775,6 +783,7 @@ function DashboardWorkspace() {
             canOpenPermissions,
             seatLibraryOnly,
             jobKnown,
+            jobPending: sessionPhase === 'pending',
             canUploadSop,
             canUpdateSop,
             canDeleteSop,

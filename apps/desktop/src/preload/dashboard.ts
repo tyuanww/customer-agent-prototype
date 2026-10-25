@@ -258,8 +258,8 @@ function asOutcomeList(value: unknown) {
     return unavailable;
   }
   if (typeof value.truncated !== 'boolean') return unavailable;
-  const truncated = value.items.length > 200;
   const items = value.items.slice(0, 200);
+  const truncated = value.truncated === true || value.items.length > 200;
   if (!items.every(isOutcomeItem)) return unavailable;
   const seen = new Set<string>();
   for (const item of items) {

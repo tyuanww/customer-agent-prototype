@@ -162,6 +162,29 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
   }
 });
 
+it('says please sign in after the session returns logged out', async () => {
+  const owner = install(observeSessionJob(null));
+  window.dashboardContent = {
+    ...window.dashboardContent!,
+    session: async () => ({
+      ok: true,
+      enabled: true,
+      signedIn: false,
+      role: null,
+      displayName: null,
+      job: null,
+    }),
+  };
+  try {
+    render(<DashboardApp />);
+    expect(await screen.findByTestId('module-signed-out')).toHaveTextContent('请先登录。');
+    expect(screen.queryByText('正在确认你的职务……')).not.toBeInTheDocument();
+    expect(screen.getByText('请先登录')).toBeInTheDocument();
+  } finally {
+    owner.dispose();
+  }
+});
+
 it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh login', async () => {
   const user = userEvent.setup();
   const owner = install(observeSessionJob(null));

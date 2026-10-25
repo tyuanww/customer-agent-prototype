@@ -60,6 +60,7 @@ const nowrapCell = () => ({ style: { whiteSpace: 'nowrap' as const } });
 type DayWindow = { start: number; end: number };
 
 type UsageRows = readonly UsageSourceRow[];
+type UsageLoad = { rows: UsageRows; truncated: boolean };
 
 type OverviewUsageCounts = {
   readonly queries: number;
@@ -194,7 +195,7 @@ function CountTile({ label, value, detail }: { label: string; value: number | nu
   </div>;
 }
 
-function usageStatusText(read: AsyncResource<UsageRows>): string | null {
+function usageStatusText(read: AsyncResource<UsageLoad>): string | null {
   switch (read.status) {
     case 'ready':
     case 'loading':
@@ -208,7 +209,7 @@ function usageStatusText(read: AsyncResource<UsageRows>): string | null {
   }
 }
 
-function usageNote(read: AsyncResource<UsageRows>, onRetry: () => void) {
+function usageNote(read: AsyncResource<UsageLoad>, onRetry: () => void) {
   const text = usageStatusText(read);
   if (text === null) return null;
   if (read.status === 'error') {
@@ -226,25 +227,33 @@ function rowsInWindow(rows: readonly UsageSourceRow[], span: DayWindow): UsageSo
   });
 }
 
-async function readUsageAll(): Promise<AsyncResource<UsageRows>> {
+async function readUsageAll(): Promise<AsyncResource<UsageLoad>> {
   const api = window.dashboardUsageLog;
   if (!api) return { status: 'idle' };
   try {
     const collected: UsageSourceRow[] = [];
     const seen = new Set<string>();
     let cursor: string | null = null;
+    let pages = 0;
+    let truncated = false;
     do {
+      pages += 1;
       const reply = await api.list({ result: '', query: '', cursor });
       if (!reply.ok) {
         if (reply.code === 'UNAVAILABLE' && reply.message === WORKBENCH_EMPTY.usageUnmounted) return { status: 'idle' };
-        return asyncFailure<UsageRows>(reply.code, READ_SENTENCES);
+        return asyncFailure<UsageLoad>(reply.code, READ_SENTENCES);
       }
       if (cursor !== null && seen.has(cursor)) return { status: 'error', message: USAGE_FAILED };
       if (cursor !== null) seen.add(cursor);
       collected.push(...reply.rows);
-      cursor = reply.nextCursor;
+      if (pages >= 20 && reply.nextCursor) {
+        truncated = true;
+        cursor = null;
+      } else {
+        cursor = reply.nextCursor;
+      }
     } while (cursor);
-    return { status: 'ready', value: collected };
+    return { status: 'ready', value: { rows: collected, truncated } };
   } catch {
     return { status: 'error', message: USAGE_FAILED };
   }
@@ -280,7 +289,7 @@ export function IntakeOverview({
     window.dashboardIteration ? { status: 'loading' } : { status: 'forbidden', message: LOGGED_OUT },
   );
   const usageMounted = window.dashboardUsageLog !== undefined;
-  const { resource: usage, reload: retryUsage } = useAsyncResource<UsageRows>(
+  const { resource: usage, reload: retryUsage } = useAsyncResource<UsageLoad>(
     () => readUsageAll(),
     [],
     usageMounted ? { status: 'loading' } : { status: 'idle' },
@@ -408,7 +417,8 @@ export function IntakeOverview({
 
   const loadedTasks = taskRead.status === 'ready' ? taskRead.value : null;
   const openTasks = (loadedTasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
-  const usageRows = usage.status === 'ready' ? rowsInWindow(usage.value, span) : null;
+  const usageRows = usage.status === 'ready' ? rowsInWindow(usage.value.rows, span) : null;
+  const usageTruncated = usage.status === 'ready' && usage.value.truncated;
   const usageCounts = usageRows ? countOverviewUsage(usageRows) : null;
   const missRows: MissTableRow[] | null = usageRows
     ? rankMissRows(usageRows).map((row, index) => ({
@@ -468,6 +478,7 @@ export function IntakeOverview({
       <CountTile label="不准次数" value={inaccuracyTotal} detail={inaccuracyTotal === null ? undefined : INACCURACY_SCOPE} />
     </div>
     {usage.status === 'ready' ? <p className="t-sub">{USAGE_SCOPE}</p> : null}
+    {usageTruncated ? <p data-testid="usage-truncated">还有更多，这里只显示前 {usageRows?.length ?? 0} 条。</p> : null}
     {usageNote(usage, retryUsage)}
     <section ref={todoSection} className="card" aria-label="待办" tabIndex={-1}>
       <div className="card-head"><h3>待办</h3></div>

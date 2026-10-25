@@ -31,6 +31,7 @@ export type IntakeDestinationContext = {
   canOpenPermissions: boolean;
   seatLibraryOnly: boolean;
   jobKnown: boolean;
+  jobPending: boolean;
   canUploadSop: boolean;
   canUpdateSop: boolean;
   canDeleteSop: boolean;
@@ -76,7 +77,9 @@ export function renderIntakeDestinations(ctx: IntakeDestinationContext): ReactNo
   if (!ctx.jobKnown) {
     return <>
       {pages}
-      <section className="dash-module" data-testid="module-job-pending"><p>{JOB_PENDING}</p></section>
+      <section className="dash-module" data-testid={ctx.jobPending ? 'module-job-pending' : 'module-signed-out'}>
+        <p>{ctx.jobPending ? JOB_PENDING : '请先登录。'}</p>
+      </section>
     </>;
   }
   return pages;

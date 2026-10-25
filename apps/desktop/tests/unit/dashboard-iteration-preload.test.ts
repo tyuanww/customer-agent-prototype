@@ -109,6 +109,12 @@ it('accepts a truncated outcome list and rejects a bad item', async () => {
     afterCount: 1,
     windowDays: 7,
   };
+  invoke.mockResolvedValueOnce({
+    ok: true,
+    truncated: true,
+    items: Array.from({ length: 200 }, (_, index) => ({ ...row, scriptId: `shipping-${index}` })),
+  });
+  await expect(api.outcomes?.()).resolves.toMatchObject({ ok: true, truncated: true });
   invoke.mockResolvedValueOnce({ ok: true, items: [row], truncated: false });
   await expect(api.outcomes?.()).resolves.toEqual({ ok: true, items: [row], truncated: false });
   invoke.mockResolvedValueOnce({ ok: true, items: [{ ...row, windowDays: 3 }], truncated: false });
