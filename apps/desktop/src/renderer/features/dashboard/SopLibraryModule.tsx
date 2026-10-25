@@ -10,6 +10,7 @@ import {
 } from '@shared/dashboard-ops-loop';
 import { StatusBadge } from './StatusBadge';
 import { WorkbenchLoading } from './WorkbenchState';
+import { useAsyncResource } from './use-async-resource';
 
 const NO_CHANNEL_EMPTY = '请先登录后再管理 SOP。';
 const NO_STEPS = '还没有 SOP 步骤。上传 CSV 后会出现在这里。';
@@ -36,15 +37,34 @@ function toCsv(items: readonly DashboardSopNode[]): string {
 
 export function SopLibraryModule({
   canUploadSop = true,
+  canUpdateSop = true,
+  canDeleteSop = true,
   uploadBlock = '',
 }: {
   canUploadSop?: boolean;
+  canUpdateSop?: boolean;
+  canDeleteSop?: boolean;
   uploadBlock?: string;
 } = {}) {
-  const [items, setItems] = useState<readonly DashboardSopNode[] | null>(null);
+  const pendingNotice = useRef<string | undefined>(undefined);
+  const noticePending = useRef(false);
+  const { resource: catalog, reload } = useAsyncResource(async () => {
+    const api = window.dashboardOps;
+    if (!api) return { status: 'forbidden', message: NO_CHANNEL_EMPTY };
+    try {
+      const result = await api.sopCatalog();
+      if (!result.ok) return { status: 'error', message: result.message };
+      return {
+        status: 'ready',
+        value: result.items.filter((item) => item.lifecycle === 'active'),
+      };
+    } catch {
+      return { status: 'error', message: OPS_LOOP_COPY.unavailable };
+    }
+  }, [], window.dashboardOps ? { status: 'loading' } : { status: 'forbidden', message: NO_CHANNEL_EMPTY }, { retainReady: true });
+  const items = catalog.status === 'ready' ? catalog.value : null;
+  const loading = catalog.status === 'loading';
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(() => window.dashboardOps !== undefined);
-  // Becomes true after the first action, so the status line then reports its result.
   const [acted, setActed] = useState(false);
   const report = (text: string) => { setActed(true); setMessage(text); };
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -55,41 +75,35 @@ export function SopLibraryModule({
   const liveRef = useRef(true);
 
   const load = (notice?: string) => {
-    const api = window.dashboardOps;
-    if (!api) {
-      setItems(null);
-      setMessage(NO_CHANNEL_EMPTY);
-      return;
-    }
-    void api.sopCatalog().then((result) => {
-      if (!liveRef.current) return;
-      setLoading(false);
-      if (!result.ok) {
-        setItems(null);
-        setMessage(result.message);
-        return;
-      }
-      const active = result.items.filter((item) => item.lifecycle === 'active');
-      setItems(active);
-      setSelectedId((current) => current && active.some((item) => item.nodeId === current)
-        ? current
-        : active[0]?.nodeId ?? null);
-      setMessage(notice ?? (active.length === 0 ? NO_STEPS : ''));
-    }).catch(() => {
-      if (!liveRef.current) return;
-      setLoading(false);
-      setItems(null);
-      setMessage(OPS_LOOP_COPY.unavailable);
-    });
+    pendingNotice.current = notice;
+    noticePending.current = true;
+    reload();
   };
 
   useEffect(() => {
     liveRef.current = true;
-    load();
-    return () => {
-      liveRef.current = false;
-    };
+    return () => { liveRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    if (catalog.status === 'ready') {
+      const active = catalog.value;
+      setSelectedId((current) => current && active.some((item) => item.nodeId === current)
+        ? current
+        : active[0]?.nodeId ?? null);
+      if (noticePending.current) {
+        noticePending.current = false;
+        setMessage(pendingNotice.current ?? (active.length === 0 ? NO_STEPS : ''));
+        return;
+      }
+      if (active.length === 0) setMessage((current) => current || NO_STEPS);
+      return;
+    }
+    if (catalog.status === 'error' || (catalog.status === 'forbidden' && window.dashboardOps)) {
+      noticePending.current = false;
+      setMessage(catalog.message);
+    }
+  }, [catalog]);
 
   const selected = (items ?? []).find((item) => item.nodeId === selectedId) ?? null;
   useEffect(() => {
@@ -148,7 +162,9 @@ export function SopLibraryModule({
         <SopButton
           type={selected ? 'primary' : 'default'}
           data-testid="sop-update"
+          disabled={!canUpdateSop}
           onClick={() => {
+            if (!canUpdateSop) return;
             const api = window.dashboardOps;
             if (!api) {
               report(NO_CHANNEL_EMPTY);
@@ -189,7 +205,9 @@ export function SopLibraryModule({
         <SopButton
           danger
           data-testid="sop-delete"
+          disabled={!canDeleteSop}
           onClick={() => {
+            if (!canDeleteSop) return;
             const api = window.dashboardOps;
             if (!api) {
               report(NO_CHANNEL_EMPTY);

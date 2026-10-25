@@ -1,8 +1,7 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
-import { COACH_UPLOAD_MAX_BYTES } from '../../src/renderer/features/dashboard/coach-content-upload';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
@@ -81,7 +80,6 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
-    delete window.dashboardAnnounce;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -100,7 +98,6 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
-    delete window.dashboardAnnounce;
     delete window.dashboardIntake;
     delete window.dashboardPermissions;
     Object.defineProperty(window, 'matchMedia', {

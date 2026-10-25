@@ -12,9 +12,6 @@ function readChooserState(search = window.location.search): LoginChooserState {
   return value === 'loading' || value === 'waiting' || value === 'failed' || value === 'cancelled' ? value : 'entry';
 }
 
-/** The login window: a native-titled system window with the workbench look. It chooses between
- *  Feishu (opens the system browser) and an administrator-issued account. Success is the session
- *  exchange, owned by the login preload; this view only reflects it. */
 export function LoginApp() {
   const [audience, setAudience] = useState<LoginAudience>('feishu');
   const [state, setState] = useState<LoginChooserState>(readChooserState);
@@ -109,8 +106,8 @@ export function LoginApp() {
       </> : (
         <Form layout="vertical" requiredMark={false} component={false}>
           <form className="login-form" onSubmit={(event) => { event.preventDefault(); void submitAccount(); }}>
-          {invalid ? <Alert type="error" showIcon={false} role="alert" message="账号或密码不正确，请重试。" /> : null}
-          {accountUnavailable ? <Alert type="error" showIcon={false} role="alert" message="账号登录暂时不可用，请改用飞书或联系管理员。" /> : null}
+          {invalid ? <Alert type="error" showIcon={false} role="alert" title="账号或密码不正确，请重试。" /> : null}
+          {accountUnavailable ? <Alert type="error" showIcon={false} role="alert" title="账号登录暂时不可用，请改用飞书或联系管理员。" /> : null}
           <p className="login-copy">使用管理员给你的登录名和密码。</p>
           <Form.Item label="登录名" htmlFor="login-username">
             <Input id="login-username" name="username" autoComplete="username" value={username} disabled={busy}

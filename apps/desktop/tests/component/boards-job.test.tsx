@@ -68,12 +68,14 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
       expect(screen.getByTestId('nav-sop')).toHaveAccessibleName('SOP');
       if (job.status === 'resolved' && job.role === 'agent') {
         expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
+        expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
+        expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
         expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
         expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
         expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
         continue;
       }
-      expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
+      expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
       expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
@@ -86,9 +88,8 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
       } else {
         await waitFor(() => {
           expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
-          // A5: the block names what is missing and whom to ask, not a generic denial.
           expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('你还不能给他人开通权限');
-          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('请联系你的经理开通。');
+          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('没有权限，请找人开通。');
         });
       }
       await user.click(screen.getByTestId('nav-materials'));
@@ -101,12 +102,72 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
   }
 });
 
+it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
+  let resolveSession: (job: SessionJobView) => void = () => undefined;
+  const owner = install(observeSessionJob(null));
+  window.dashboardContent = {
+    ...window.dashboardContent!,
+    session: () => new Promise((resolve) => {
+      resolveSession = (job) => resolve({
+        ok: true,
+        enabled: true,
+        signedIn: true,
+        role: 'owner',
+        displayName: '合成管理员',
+        job,
+      });
+    }),
+  };
+  try {
+    render(<DashboardApp />);
+    expect(screen.getByTestId('nav-wording')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
+    expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-job-pending')).toHaveTextContent('正在确认你的职务……');
+    expect(screen.getByText('正在确认')).toBeInTheDocument();
+
+    const seat = observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
+    resolveSession(seat);
+    expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
+    expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+    expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+  } finally {
+    owner.dispose();
+    cleanup();
+  }
+
+  const supervisor = observeSessionJob({
+    title: '客服主管',
+    directory: [{ name: '客服主管', enabled: true }],
+    actions: { query: true, import: true, publish: true, rollback: true },
+  });
+  const again = install(supervisor);
+  try {
+    render(<DashboardApp />);
+    expect(await screen.findByTestId('nav-content')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-materials')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-wording')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
+    expect(screen.queryByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).not.toBeInTheDocument();
+  } finally {
+    again.dispose();
+  }
+});
+
 it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh login', async () => {
   const user = userEvent.setup();
   const owner = install(observeSessionJob(null));
   try {
     render(<DashboardApp />);
-    expect(screen.getByTestId('nav-permissions')).toHaveAccessibleName('权限');
+    expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
     await user.click(screen.getByTestId('nav-permissions'));
     await waitFor(() => expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull());
     expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('请重新登录后再查看职务。');

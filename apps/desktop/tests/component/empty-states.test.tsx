@@ -15,7 +15,6 @@ afterEach(() => {
   delete window.dashboardPermissions;
   delete window.dashboardIntake;
   delete window.dashboardWording;
-  delete window.dashboardAnnounce;
   delete window.dashboardDesk;
 });
 
@@ -30,7 +29,7 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageFailed }),
   };
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageEmpty)).not.toHaveLength(0);
+  expect(await screen.findAllByText('这段时间所有查询都有结果。')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   cleanup();
   window.dashboardUsageLog = {
@@ -39,7 +38,7 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
   };
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText(WORKBENCH_EMPTY.usageUnmounted)).not.toHaveLength(0);
+  expect(await screen.findAllByText('坐席查询后会出现')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });

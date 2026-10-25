@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DASHBOARD_MANIFEST } from '../../src/renderer/data/dashboard-manifest';
+import { DASHBOARD_MANIFEST } from '../fixtures/dashboard-manifest';
 import {
   COACH_UPLOAD_MAX_BYTES,
   COACH_UPLOAD_MAX_ROWS,

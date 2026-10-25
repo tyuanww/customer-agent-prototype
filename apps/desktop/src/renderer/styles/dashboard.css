@@ -956,7 +956,104 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   color: var(--dash-purple);
 }
 
-.dashboard-refresh,
+/* antd injects .ant-btn after this file, and its hover rule outranks a single class.
+   Shell buttons restate the height, padding, border, shadow, and background set above. */
+html .dashboard-shell .dashboard-nav-toggle.ant-btn {
+  display: grid;
+  width: var(--nav-toggle-control-size, 40px);
+  height: var(--nav-toggle-control-size, 40px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--dash-radius);
+  box-shadow: none;
+  background: transparent;
+  color: var(--dash-muted);
+}
+html .dashboard-shell .dashboard-nav-toggle.ant-btn:hover {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--dash-ink);
+}
+html .dashboard-shell .dashboard-nav-toggle.ant-btn:active {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+html .dashboard-shell .dashboard-theme-trigger.ant-btn {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dash-radius);
+  box-shadow: none;
+  background: transparent;
+  color: var(--dash-muted);
+}
+html .dashboard-shell .dashboard-theme-trigger.ant-btn:hover {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-hover);
+  color: var(--dash-ink);
+}
+html .dashboard-shell .dashboard-theme-trigger.ant-btn:active {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-pressed);
+}
+html .dashboard-shell .dashboard-theme-trigger.ant-btn[aria-expanded='true'] {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-selected);
+  color: var(--dash-purple);
+}
+html .dashboard-shell .dashboard-theme-popover button.ant-btn {
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+}
+html .dashboard-shell .dashboard-theme-popover button.ant-btn:hover:not(.is-selected) {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-hover);
+}
+html .dashboard-shell .dashboard-theme-popover button.ant-btn:active:not(:disabled) {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-pressed);
+}
+html .dashboard-shell .dashboard-theme-popover button.ant-btn.is-selected {
+  border: 0;
+  box-shadow: none;
+  background: var(--dash-chrome-selected);
+  color: var(--dash-ink);
+}
+html .dashboard-shell .intake-back.ant-btn {
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+}
+html .dashboard-shell .intake-back.ant-btn:hover,
+html .dashboard-shell .intake-back.ant-btn:active {
+  border: 0;
+  box-shadow: none;
+  background: var(--wb-hover);
+}
+html .dashboard-shell .dashboard-nav-item > button.ant-btn {
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+}
+html .dashboard-shell .dashboard-nav-item > button.ant-btn:hover,
+html .dashboard-shell .dashboard-nav-item > button.ant-btn:active {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
 .dashboard-disclaimer {
   margin: 0;
 }
@@ -973,16 +1070,6 @@ html[data-role='dashboard'][data-dashboard-theme='light'] .dashboard-main {
   color: var(--dash-ink);
   font-size:var(--wb-text-body);
   line-height: 20px;
-  white-space: nowrap;
-}
-
-.dashboard-refresh {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dash-muted);
-  font-size:var(--wb-text-meta);
-  line-height: 18px;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

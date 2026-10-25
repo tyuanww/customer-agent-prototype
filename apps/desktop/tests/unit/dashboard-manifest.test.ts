@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,16 +8,16 @@ import {
   DASHBOARD_NAV,
   listOpenP0IterationTasks,
   nextDashboardNavId,
-} from '../../src/renderer/data/dashboard-manifest';
+} from '../fixtures/dashboard-manifest';
 
 const sourcePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../src/renderer/data/dashboard-manifest.ts',
+  '../fixtures/dashboard-manifest.ts',
 );
 
 describe('dashboard manifest', () => {
-  it('is deeply frozen compile-time data with five decision-oriented modules', () => {
-    expect(DASHBOARD_MODULE_IDS).toHaveLength(5);
+  it('is deeply frozen compile-time data with the live workbench pages', () => {
+    expect(DASHBOARD_MODULE_IDS).toHaveLength(6);
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
@@ -30,8 +30,12 @@ describe('dashboard manifest', () => {
       'wording',
       'sop',
       'content',
-      'announce',
+      'materials',
+      'permissions',
     ]);
+    expect(DASHBOARD_NAV.find((item) => item.id === 'content')?.label).toBe('知识库');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'materials')?.label).toBe('资料');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'permissions')?.label).toBe('权限');
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
@@ -133,8 +137,9 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_MODULE_IDS).not.toContain('ledger');
     expect(DASHBOARD_MODULE_IDS).not.toContain('iteration');
     expect(nextDashboardNavId('overview', 1)).toBe('wording');
-    expect(nextDashboardNavId('announce', 1)).toBe('overview');
-    expect(nextDashboardNavId('overview', -1)).toBe('announce');
+    expect(DASHBOARD_MODULE_IDS).not.toContain('announce');
+    expect(nextDashboardNavId('permissions', 1)).toBe('overview');
+    expect(nextDashboardNavId('overview', -1)).toBe('permissions');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不联网');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不发送');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不保存');
@@ -200,5 +205,27 @@ describe('dashboard manifest', () => {
         { ...DASHBOARD_MANIFEST.iteration.tasks[2], priority: 'P1' },
       ]),
     ).toEqual([]);
+  });
+
+  it('keeps the sample catalog out of the renderer tree', () => {
+    const renderer = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/renderer');
+    expect(existsSync(path.join(renderer, 'data/dashboard-manifest.ts'))).toBe(false);
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const target = path.join(dir, name);
+        if (statSync(target).isDirectory()) walk(target);
+        else if (name.endsWith('.ts') || name.endsWith('.tsx')) files.push(target);
+      }
+    };
+    walk(renderer);
+    const hits = files.filter((file) => {
+      const text = readFileSync(file, 'utf8');
+      return text.includes('dashboard-manifest')
+        || text.includes('DEMO · 合成数据')
+        || text.includes('虚构合成结构样例')
+        || text.includes('较上期');
+    });
+    expect(hits).toEqual([]);
   });
 });

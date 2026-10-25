@@ -6,16 +6,15 @@ import {
   DASHBOARD_REFRESHED_AT,
   DASHBOARD_STRUCTURE_DISCLAIMER,
 } from '@shared/dashboard-window';
+import {
+  INTAKE_DESTINATION_ROWS,
+  type IntakeDestination,
+  type IntakeDestinationGroup,
+} from '../../src/renderer/features/dashboard/intake-destination-rows';
 
-export const DASHBOARD_MODULE_IDS = [
-  'overview',
-  'wording',
-  'sop',
-  'content',
-  'announce',
-] as const;
+export const DASHBOARD_MODULE_IDS: readonly IntakeDestination[] = INTAKE_DESTINATION_ROWS.map((row) => row.id);
 
-export type DashboardModuleId = (typeof DASHBOARD_MODULE_IDS)[number];
+export type DashboardModuleId = IntakeDestination;
 
 export type LedgerTerminal = 'copied' | 'no_hit' | 'abandoned' | 'risk_escalated';
 export type IterationStatus = 'open' | 'in_progress' | 'resolved' | 'wont_fix';
@@ -28,7 +27,7 @@ export type DashboardNavItem = {
   id: DashboardModuleId;
   label: string;
   blurb: string;
-  group: '经营总览' | '服务洞察' | '话术运营' | '治理与架构';
+  group: IntakeDestinationGroup;
 };
 
 export type WordingLifecycle = 'demo_effective' | 'demo_expiring' | 'structure_sample' | 'published';
@@ -138,13 +137,14 @@ export type AnnounceRow = {
   offlineLease: boolean;
 };
 
-export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze([
-  { id: 'overview', label: '管理概览', blurb: '风险、责任与处理进度', group: '经营总览' },
-  { id: 'wording', label: '话术库', blurb: '四域资产浏览与来源就绪度', group: '话术运营' },
-  { id: 'sop', label: 'SOP', blurb: '当前产品会话 SOP 树', group: '话术运营' },
-  { id: 'content', label: '内容管理', blurb: '导入 · 发布', group: '治理与架构' },
-  { id: 'announce', label: '系统同步', blurb: '话术版本 / 软件版本更新', group: '治理与架构' },
-]);
+export const DASHBOARD_NAV: readonly DashboardNavItem[] = deepFreeze(
+  INTAKE_DESTINATION_ROWS.map((row) => ({
+    id: row.id,
+    label: row.label,
+    blurb: row.blurb,
+    group: row.group,
+  })),
+);
 
 export const DASHBOARD_MANIFEST = deepFreeze({
   banners: {

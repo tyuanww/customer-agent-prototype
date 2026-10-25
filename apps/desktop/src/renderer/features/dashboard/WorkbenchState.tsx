@@ -58,15 +58,16 @@ export function WorkbenchUncertain({ message, onCheck, checkLabel = '刷新查�
   </div>;
 }
 
-export type AccessRole = '客服主管' | '你的经理' | '管理员';
+export type AccessRole = '客服主管' | '管理员';
 
 /**
  * The no-access block. It renders what the caller already decided; it holds no rule of its own
  * about who may do what. `need` names the missing ability in the person's words, `ask` the role.
  */
-export function WorkbenchNoAccess({ need, ask, detail }: { need: string; ask: AccessRole; detail?: string }) {
+export function WorkbenchNoAccess({ need, ask, detail }: { need: string; ask?: AccessRole; detail?: string }) {
+  const line = detail ?? (ask !== undefined ? `请联系${ask}开通。` : '');
   return <div className="wb-state wb-state-noaccess" role="note" data-testid="workbench-no-access">
     <p className="wb-state-title">{`你还不能${need}`}</p>
-    <p className="wb-state-line">{detail ?? `请联系${ask}开通。`}</p>
+    <p className="wb-state-line">{line}</p>
   </div>;
 }

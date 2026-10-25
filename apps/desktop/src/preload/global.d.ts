@@ -4,7 +4,6 @@ import type { SeatAccountApi } from '../shared/seat-account-intent';
 import type { IntakeManagementApi } from '../shared/content-intake-management';
 import type { DeskKnowledgeApi } from '../shared/desk-knowledge';
 import type { CustomerAgentApi } from '../shared/contracts';
-import type { DashboardAnnounceApi } from '../shared/dashboard-announce';
 import type { DashboardContentApi } from '../shared/dashboard-content';
 import type { DashboardIterationApi } from '../shared/dashboard-iteration';
 import type { DashboardOpsApi } from '../shared/dashboard-ops-loop';
@@ -24,7 +23,6 @@ declare global {
     dashboardDesk?: DeskKnowledgeApi;
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
-    dashboardAnnounce?: DashboardAnnounceApi;
     dashboardContent?: DashboardContentApi;
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;

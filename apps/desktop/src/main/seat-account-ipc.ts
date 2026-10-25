@@ -10,6 +10,7 @@ import { isTrustedMainFrameSender } from './sender-guard';
 const CHANNEL = 'dashboard:seats-command';
 const NOT_SAVED: SeatAccountReply = { ok: false, message: '账号没有保存。' };
 const INVALID: SeatAccountReply = { ok: false, message: '账号输入无效。' };
+const DENIED: SeatAccountReply = { ok: false, message: '没有权限，请找人开通。' };
 
 function seatRuntimeScript(moduleUrl = import.meta.url): string {
   return path.resolve(path.dirname(fileURLToPath(moduleUrl)), '../../../../scripts/synthetic-stack/seat-account-runtime.ts');
@@ -82,12 +83,14 @@ export function registerSeatAccountIpc(
   dashboard: () => WebContents | null,
   devUrl: () => string | undefined,
   enabled: () => boolean,
+  allowsWrite: () => boolean,
 ) {
   ipcMain.handle(CHANNEL, async (event, intent: unknown): Promise<SeatAccountReply> => {
     const contents = dashboard();
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return { ok: false, message: '无权访问此窗口能力。' };
     if (!enabled()) return { ok: false, message: '账号还不能在这里改。' };
     if (!isSeatAccountIntent(intent)) return INVALID;
+    if (intent.action !== 'list' && !allowsWrite()) return DENIED;
     return perform(intent);
   });
   return { dispose: () => { ipcMain.removeHandler(CHANNEL); } };

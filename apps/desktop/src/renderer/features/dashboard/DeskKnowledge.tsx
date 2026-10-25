@@ -1,6 +1,7 @@
 import { createElement, useEffect, useRef, useState, type AriaAttributes, type ComponentType } from 'react';
 import { Button, Empty, Input, Modal, Segmented, Select, Table, Upload, type ButtonProps, type TableColumnsType, type TableProps, type UploadProps } from 'antd';
 import { InboxOutlined, FileTextOutlined } from '@ant-design/icons';
+import { asyncFailure } from '@shared/async-resource';
 import {
   DESK_CATEGORIES,
   type DeskCommand,
@@ -13,6 +14,7 @@ import { IntakeAntdTheme } from './intake-antd';
 import { SeatDateTime } from './seat-date-time';
 import './intake-management.css';
 import './workbench-v9.css';
+import { useAsyncResource } from './use-async-resource';
 import { WorkbenchLoading } from './WorkbenchState';
 
 type CsvPreview = { fileName: string; size: number; csvText: string; count: number; sample: ReadonlyArray<readonly [string, string]> };
@@ -61,6 +63,9 @@ const EMPTY: DeskView = {
   signedIn: false, role: null, displayName: null, personas: [], selectedPersonaId: 'shop',
   items: [], delivered: [], tacit: [], revision: 0, notice: null, persistence: 'ok',
 };
+
+const UNAVAILABLE = '知识库还不能在这里用。';
+const READ_FAILED = '知识库暂时读不出来。';
 
 const VALIDITY_CHOICES: { label: string; value: Validity }[] = [
   { label: '长期生效', value: 'always' },
@@ -145,9 +150,7 @@ export function DeskKnowledge({
   onDraftConsumed?: () => void;
 } = {}) {
   const api = window.dashboardDesk;
-  const [view, setView] = useState<DeskView>(EMPTY);
   const [message, setMessage] = useState<string | null>(null);
-  const [settled, setSettled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [writing, setWriting] = useState(false);
   const [addMode, setAddMode] = useState<'upload' | 'manual'>('upload');
@@ -164,22 +167,43 @@ export function DeskKnowledge({
   const [validFrom, setValidFrom] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const consumedDraft = useRef<string | null>(null);
+  const mounted = useRef(true);
+  const readGeneration = useRef(0);
+  // current() is the page read. A missing desk API is already forbidden, so the
+  // hook does not flash it through loading. retainReady keeps the persona list
+  // up during a later read. A failed command only sets `message`; it does not
+  // replace that list.
+  const { resource, reload, replace } = useAsyncResource<DeskView>(async () => {
+    const generation = ++readGeneration.current;
+    const report = (nextMessage: string | null) => {
+      if (mounted.current && generation === readGeneration.current) setMessage(nextMessage);
+    };
+    const desk = window.dashboardDesk;
+    if (!desk) return { status: 'forbidden', message: UNAVAILABLE };
+    try {
+      const reply = await desk.current();
+      if (!reply.ok) {
+        if (reply.view) {
+          report(reply.message);
+          return { status: 'ready', value: reply.view };
+        }
+        report(null);
+        return asyncFailure<DeskView>(reply.code, { forbidden: reply.message, error: reply.message });
+      }
+      report(null);
+      return { status: 'ready', value: reply.view };
+    } catch {
+      report(null);
+      return { status: 'error', message: READ_FAILED };
+    }
+  }, [api ? 'present' : 'missing'], api ? { status: 'loading' } : { status: 'forbidden', message: UNAVAILABLE }, { retainReady: true });
+  const view = resource.status === 'ready' ? resource.value : EMPTY;
 
+  useEffect(() => () => { mounted.current = false; }, []);
   useEffect(() => {
     if (!api) return undefined;
-    let live = true;
-    const load = () => {
-      void api.current().then((reply) => {
-        if (!live) return;
-        if (reply.view) setView(reply.view);
-        setMessage(reply.ok ? null : reply.message);
-        setSettled(true);
-      }).catch(() => { if (live) setMessage('知识库暂时读不出来。'); });
-    };
-    load();
-    const stop = window.dashboardContent?.onSessionChanged?.(load);
-    return () => { live = false; stop?.(); };
-  }, [api]);
+    return window.dashboardContent?.onSessionChanged?.(reload);
+  }, [api, reload]);
 
   useEffect(() => {
     if (!draftQuestion || draftQuestion === consumedDraft.current) return;
@@ -196,22 +220,23 @@ export function DeskKnowledge({
     setBusy(true);
     try {
       const reply = await api.command(command);
-      if (reply.view) setView(reply.view);
+      if (reply.view) replace({ status: 'ready', value: reply.view });
       setMessage(reply.ok ? (command.action === 'import-csv' ? reply.view.notice : null) : reply.message);
       if (reply.ok && command.action === 'upload') { setName(''); setText(''); }
       if (reply.ok && command.action === 'import-csv') { setWriting(false); setCsv(null); setConfirmImport(false); }
       if (!reply.ok) setConfirmImport(false);
     } catch {
-      setMessage('知识库暂时读不出来。');
+      setMessage(READ_FAILED);
     } finally {
       setBusy(false);
     }
   }
 
-  if (!api) {
-    return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>知识库还不能在这里用。</p></div></section>;
+  if (resource.status === 'forbidden') {
+    return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>{resource.message}</p></div></section>;
   }
   const operator = view.role === 'operator';
+  const statusLine = message ?? (resource.status === 'error' ? resource.message : null);
   const emptyCopy = view.role === null
     ? (view.signedIn ? '正在读取知识库。' : '请先登录。')
     : (operator ? '还没有知识。' : '还没有生效知识。');
@@ -264,10 +289,10 @@ export function DeskKnowledge({
         </div>
         {operator ? <DeskButton type="primary" onClick={() => { setAddMode('upload'); setCsv(null); setConfirmImport(false); setWriting(true); }}>添加话术</DeskButton> : null}
       </div>
-      {message ? <p role="status">{message}</p> : null}
-      {view.notice && view.notice !== message ? <p role="status">{view.notice}</p> : null}
-      {view.role === null && !settled && view.signedIn ? <WorkbenchLoading rows={5} label="正在读取知识库" /> : null}
-      {view.role === null && (!settled || message) ? null : <KnowledgeTable<DeskItemView>
+      {statusLine ? <p role="status">{statusLine}</p> : null}
+      {view.notice && view.notice !== statusLine ? <p role="status">{view.notice}</p> : null}
+      {resource.status === 'idle' || resource.status === 'loading' ? <WorkbenchLoading rows={5} label="正在读取知识库" /> : null}
+      {resource.status === 'ready' && !(view.role === null && statusLine) ? <KnowledgeTable<DeskItemView>
         aria-label="当前人设知识"
         pagination={false}
         rowKey="id"
@@ -275,7 +300,7 @@ export function DeskKnowledge({
         dataSource={view.items}
         columns={columns}
         locale={{ emptyText: <KnowledgeEmpty description={emptyCopy} /> }}
-      />}
+      /> : null}
     </div>
     <Modal open={operator && writing} title="添加话术" width={520} footer={null} destroyOnHidden maskClosable transitionName="" maskTransitionName="" onCancel={closeWriting}>
         {addMode === 'upload' ? <>

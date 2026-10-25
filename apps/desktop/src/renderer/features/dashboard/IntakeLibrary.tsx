@@ -1,7 +1,9 @@
-import { createElement, useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { Button, Checkbox, Empty, Input, Select, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
+import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import type { IntakeCatalogCommand, IntakeCatalogRow, IntakeCatalogView } from '@shared/content-intake-catalog';
 import type { IntakeQueryOption } from '@shared/content-intake-query';
+import { READ_DISCARDED, useAsyncResource } from './use-async-resource';
 import { catalogAvailability, catalogAvailabilitySentence } from './catalog-availability';
 import { formatIntakeDay, formatSeatClock, timeoutUntil } from './intake-time';
 import './intake-management.css';
@@ -59,65 +61,175 @@ function Conditions({ label, options, selected, disabled, change }: {
   </details>;
 }
 
+const LOGGED_OUT = '请先在查询窗口登录。';
+const UNAVAILABLE = '可用资料暂不可读取，请重试。';
+const SESSION_CHANGED = '登录状态已变化，请刷新可用资料。';
+const SESSION_CONFIRM = '登录状态需要确认，请刷新可用资料。';
+
+type CatalogIntent = { kind: 'current' } | { kind: 'command'; command: IntakeCatalogCommand };
+
+function readFailure(code: string, message: string): AsyncResource<IntakeCatalogView> {
+  return asyncFailure(code, { forbidden: LOGGED_OUT, error: message });
+}
+
+function withoutRows(current: IntakeCatalogView): IntakeCatalogView {
+  return { ...current, rows: [], releaseId: null, validUntil: null };
+}
+
+function hang(): Promise<typeof READ_DISCARDED> {
+  return Promise.resolve(READ_DISCARDED);
+}
+
 /** Stays mounted while hidden so the catalog subscription and the one first refresh survive leaving 话术库. */
-export function IntakeLibrary({ active }: { active: boolean }) {
-  const [view,setView] = useState<IntakeCatalogView|null>(null), [busy,setBusy] = useState(false), [error,setError] = useState('');
-  const [domain,setDomain] = useState<LibraryTab>('product');
-  const [question,setQuestion] = useState('');
-    const started=useRef(false), generation=useRef(0), pending=useRef<number|null>(null), deadline=useRef(0);
-  const apply = async (command?: IntakeCatalogCommand) => {
-    if (pending.current !== null && command?.action !== 'cancel') return;
-    const gen=++generation.current; pending.current=gen; setBusy(true); setError('');
-    // Never show the old snapshot while selecting conditions or refreshing it.
-    setView(current => current ? {...current,rows:[],releaseId:null,validUntil:null} : null);
-    deadline.current=0;
-    try {
-      const api=window.dashboardIntakeCatalog;
-      if (!api) throw new Error('unavailable');
-      const result=await (command ? api.command(command) : api.current());
-      if (generation.current !== gen) return;
-      deadline.current=result.view?.validUntil ? performance.now()+Math.max(0,Date.parse(result.view.validUntil)-Date.now()) : 0;
-      setView(result.view); if (!result.ok) setError(result.message);
-    } catch {
-      if (generation.current === gen) { setView(null); setError('可用资料暂不可读取，请重试。'); }
-    } finally {
-      if (pending.current === gen) { pending.current=null; setBusy(false); }
+export function IntakeLibrary({ active, seatNotice = false }: { active: boolean; seatNotice?: boolean }) {
+  const shownRef = useRef<IntakeCatalogView | null>(null);
+  const intentRef = useRef<CatalogIntent | null>(null);
+  const generationRef = useRef(0);
+  const flightRef = useRef(0);
+  const deadlineRef = useRef(0);
+  const startedRef = useRef(false);
+  const kickRef = useRef(false);
+  const consumedRef = useRef(false);
+  const [held, setHeld] = useState<IntakeCatalogView | null>(null);
+  const [busy, setBusy] = useState(() => active && window.dashboardIntakeCatalog !== undefined);
+  const [domain, setDomain] = useState<LibraryTab>('product');
+  const [question, setQuestion] = useState('');
+  // The hook reads on mount. This page stays mounted while hidden, so the first
+  // refresh waits until it is actually shown and does not run again on the next show.
+  if (active && !startedRef.current) {
+    startedRef.current = true;
+    intentRef.current = { kind: 'command', command: { action: 'refresh' } };
+    generationRef.current += 1;
+    flightRef.current = generationRef.current;
+    kickRef.current = true;
+  }
+  const remember = useCallback((next: IntakeCatalogView | null) => {
+    shownRef.current = next;
+    setHeld(next);
+  }, []);
+  const hasCatalog = window.dashboardIntakeCatalog !== undefined;
+  const initial: AsyncResource<IntakeCatalogView> = hasCatalog
+    ? (active ? { status: 'loading' } : { status: 'idle' })
+    : { status: 'error', message: UNAVAILABLE };
+  const { resource, reload, replace } = useAsyncResource(async () => {
+    if (flightRef.current === 0) {
+      // Missing catalog API uses the unavailable sentence, so it is an error.
+      // The logged-out sentence is the forbidden one, and this branch is not it.
+      return hasCatalog ? { status: 'idle' } : { status: 'error', message: UNAVAILABLE };
     }
-  };
+    consumedRef.current = true;
+    const gen = generationRef.current;
+    const pending = intentRef.current;
+    try {
+      const api = window.dashboardIntakeCatalog;
+      if (!api) {
+        remember(null);
+        deadlineRef.current = 0;
+        return { status: 'error', message: UNAVAILABLE };
+      }
+      const reply = pending?.kind === 'command' ? await api.command(pending.command) : await api.current();
+      if (generationRef.current !== gen) return hang();
+      deadlineRef.current = reply.view?.validUntil
+        ? performance.now() + Math.max(0, Date.parse(reply.view.validUntil) - Date.now())
+        : 0;
+      remember(reply.view);
+      if (!reply.ok) return readFailure(reply.code, reply.message);
+      if (!reply.view.signedIn) return { status: 'forbidden', message: LOGGED_OUT };
+      return { status: 'ready', value: reply.view };
+    } catch {
+      if (generationRef.current !== gen) return hang();
+      deadlineRef.current = 0;
+      remember(null);
+      return { status: 'error', message: UNAVAILABLE };
+    } finally {
+      if (flightRef.current === gen) {
+        flightRef.current = 0;
+        setBusy(false);
+      }
+    }
+  }, [], initial);
+  const begin = useCallback((command?: IntakeCatalogCommand) => {
+    if (flightRef.current !== 0 && command?.action !== 'cancel') return;
+    const gen = ++generationRef.current;
+    flightRef.current = gen;
+    intentRef.current = command ? { kind: 'command', command } : { kind: 'current' };
+    deadlineRef.current = 0;
+    setBusy(true);
+    // Never show the old snapshot while selecting conditions or refreshing it.
+    const current = shownRef.current;
+    remember(current ? withoutRows(current) : null);
+    replace((state) => (state.status === 'forbidden' || state.status === 'loading' ? state : { status: 'loading' }));
+    reload();
+  }, [remember, reload, replace]);
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
   useEffect(() => {
-    if (!active || started.current) return;
-    started.current=true; void apply({action:'refresh'});
-  },[active]);
+    if (!kickRef.current) return undefined;
+    kickRef.current = false;
+    if (consumedRef.current) return undefined;
+    setBusy(true);
+    reload();
+    return undefined;
+  }, [active, reload]);
   useEffect(() => {
-    const api=window.dashboardIntakeCatalog;
-    if (!api) return;
-    const off=api.onInvalidated(() => {
-      generation.current++; pending.current=null; deadline.current=0; setView(null); setBusy(false);
-      setError('登录状态已变化，请刷新可用资料。');
+    const api = window.dashboardIntakeCatalog;
+    if (!api) return undefined;
+    const off = api.onInvalidated(() => {
+      generationRef.current += 1;
+      flightRef.current = 0;
+      deadlineRef.current = 0;
+      setBusy(false);
+      remember(null);
+      // The follow-up current() read replaces this before paint when it starts.
+      // It remains when that read does not run.
+      replace({ status: 'error', message: SESSION_CHANGED });
       // current projects Main memory; it cannot silently acquire a new snapshot.
-      void apply();
+      beginRef.current();
     });
-    const invalidate=() => { generation.current++; };
-    return () => { invalidate(); off(); };
-  },[]);
+    return () => {
+      generationRef.current += 1;
+      off();
+    };
+  }, [remember, replace]);
+  const reading = busy || resource.status === 'loading';
+  const view = reading || resource.status !== 'ready' ? held : resource.value;
+  const context = view?.context;
+  const disabled = reading || !!view?.busy;
+  const fresh = !!view?.validUntil && Date.now() < Date.parse(view.validUntil) && performance.now() < deadlineRef.current;
   useEffect(() => {
-    if (!view?.validUntil) return;
-    const remaining=Math.min(Date.parse(view.validUntil)-Date.now(),deadline.current-performance.now());
+    if (!view?.validUntil) return undefined;
+    const remaining = Math.min(Date.parse(view.validUntil) - Date.now(), deadlineRef.current - performance.now());
     return timeoutUntil(() => {
-      generation.current++; pending.current=null; deadline.current=0; setBusy(false);
-      setView(current => current ? {...current,rows:[],releaseId:null,validUntil:null} : null);
-      setError('登录状态需要确认，请刷新可用资料。');
-    },Date.now()+Math.max(0,remaining));
-  },[view?.validUntil]);
+      generationRef.current += 1;
+      flightRef.current = 0;
+      deadlineRef.current = 0;
+      setBusy(false);
+      const current = shownRef.current;
+      remember(current ? withoutRows(current) : null);
+      replace({ status: 'error', message: SESSION_CONFIRM });
+    }, Date.now() + Math.max(0, remaining));
+  }, [view?.validUntil, remember, replace]);
   useEffect(() => {
-    const until=view?.context.shopNamesValidUntil;
-    if (!until) return;
-    return timeoutUntil(() => setView(current => current ? {...current,context:{...current.context,shopNames:[],shopNamesValidUntil:null}} : null),Date.parse(until));
-  },[view?.context.shopNamesValidUntil]);
-  const context=view?.context, disabled=busy || !!view?.busy;
-  const fresh=!!view?.validUntil && Date.now()<Date.parse(view.validUntil) && performance.now()<deadline.current;
+    const until = view?.context.shopNamesValidUntil;
+    if (!until) return undefined;
+    return timeoutUntil(() => {
+      const current = shownRef.current;
+      if (!current) return;
+      const next: IntakeCatalogView = {
+        ...current,
+        context: { ...current.context, shopNames: [], shopNamesValidUntil: null },
+      };
+      remember(next);
+      replace((state) => (state.status === 'ready' ? { status: 'ready', value: next } : state));
+    }, Date.parse(until));
+  }, [view?.context.shopNamesValidUntil, remember, replace]);
   const availability = catalogAvailability(view, fresh);
-  const rows=fresh ? view.rows : [];
+  const rows = fresh && view ? view.rows : [];
+  const loggedOut = resource.status === 'forbidden'
+    ? resource.message
+    : view && !view.signedIn
+      ? LOGGED_OUT
+      : '';
   const names=new Map(context?.shopNamesValidUntil && Date.parse(context.shopNamesValidUntil)>Date.now() ? context.shopNames.map(n=>[n.id,n.label]) : []);
   const counts=new Map<string,number>(); for(const name of names.values()) counts.set(name,(counts.get(name)??0)+1);
   const shopLabel=(id:string) => names.has(id) ? `${names.get(id)}${counts.get(names.get(id)!)!>1 ? `（${id}）` : ''}` : id;
@@ -151,6 +263,7 @@ export function IntakeLibrary({ active }: { active: boolean }) {
   return <div hidden={!active}>
     {active ? <section className="dash-module intake-management intake-library wb9" aria-label="可用话术目录">
       <h1 className="desk-sr">话术库</h1>
+      {seatNotice ? <p data-testid="seat-library-notice">你现在可以查话术。需要看数据或管内容，请联系客服主管。</p> : null}
       <div className="sync-line">
         <span className="state">
           <i className={availability.kind === 'available' ? 'dot ok' : 'dot'} />
@@ -165,24 +278,24 @@ export function IntakeLibrary({ active }: { active: boolean }) {
           <label className="lbl">目标店铺<Select aria-label="目录店铺" virtual={false} disabled={disabled || !context?.shops.length}
             value={context?.shopId ?? undefined} placeholder={context?.shops.length ? '请选择店铺' : '暂无可用店铺'} style={{ width: 220 }}
             options={(context?.shops ?? []).map(id => ({ value: id, label: shopLabel(id) }))}
-            onChange={shopId => { void apply({ action: 'select-shop', shopId }); }} /></label>
+            onChange={shopId => { begin({ action: 'select-shop', shopId }); }} /></label>
           <label className="lbl">问题<Input style={{width:220}} placeholder="搜索问题" aria-label="问题搜索" value={question} onChange={e => setQuestion(e.target.value)} /></label>
         </div>
         <div className="right">
-          {disabled && <LibraryButton onClick={() => void apply({action:'cancel'})}>停止目录读取</LibraryButton>}
-          <LibraryButton aria-label="刷新可用资料" disabled={disabled} onClick={() => void apply({action:'refresh'})}>{refreshIcon}</LibraryButton>
+          {disabled && <LibraryButton onClick={() => begin({ action: 'cancel' })}>停止目录读取</LibraryButton>}
+          <LibraryButton aria-label="刷新可用资料" disabled={disabled} onClick={() => begin({ action: 'refresh' })}>{refreshIcon}</LibraryButton>
         </div>
       </div>
       {context && context.shops.length>0 && names.size!==context.shops.length && <p role="status" className="hint">当前显示店铺编号。</p>}
       {context?.shopId && <div className="intake-catalog-filter-grid">
         <Conditions label="商品" options={context.products} selected={context.productIds} disabled={disabled}
-          change={productIds => void apply({action:'select-conditions',productIds,scenarioIds:context.scenarioIds})}/>
+          change={productIds => begin({ action: 'select-conditions', productIds, scenarioIds: context.scenarioIds })}/>
         <Conditions label="场景" options={context.scenarios} selected={context.scenarioIds} disabled={disabled}
-          change={scenarioIds => void apply({action:'select-conditions',productIds:context.productIds,scenarioIds})}/>
+          change={scenarioIds => begin({ action: 'select-conditions', productIds: context.productIds, scenarioIds })}/>
       </div>}
-      {error && <WorkbenchFailed message={error} onRetry={disabled ? undefined : () => void apply({action:'refresh'})} />}
+      {resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : () => begin({ action: 'refresh' })} /> : null}
       {disabled && !fresh ? <WorkbenchLoading rows={6} label="正在读取可用资料" /> : null}
-      {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
+      {loggedOut ? <p>{loggedOut}</p> : null}
       {!disabled && view?.signedIn && !context?.shopId && <p>请选择有权查看的店铺；没有可用店铺时请核对身份与范围。</p>}
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
       <div className="tabbar sub"><div className="tabs" role="tablist" aria-label="话术类型">

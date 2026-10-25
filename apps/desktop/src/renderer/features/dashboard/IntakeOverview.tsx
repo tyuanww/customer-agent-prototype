@@ -20,6 +20,8 @@ import {
   type CloseHintCatalog,
   type CloseHintTask,
 } from '@shared/iteration-close-hint';
+import { asyncFailure, type AsyncResource } from '@shared/async-resource';
+import { useAsyncResource } from './use-async-resource';
 import { rankMissRows, type UsageSourceRow } from '@shared/usage-log-csv';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
@@ -46,6 +48,7 @@ const LOGGED_OUT = '请先登录。';
 const USAGE_LATER = '坐席查询后会出现';
 const USAGE_FAILED = '没读到。';
 const TODO_EMPTY = '现在没有待办。';
+const READ_SENTENCES = { forbidden: LOGGED_OUT, error: USAGE_FAILED } as const;
 const INACCURACY_EMPTY = '当前没有达到开单阈值的不准稿。';
 const USAGE_SCOPE = '查询次数、没查到和被复制只含当前登录者最近读到的查询，不是全店。不准次数不随上面的日期变化。';
 const INACCURACY_SCOPE = '只含已开待办记下的样本，不是这段时间的全部。';
@@ -56,19 +59,7 @@ const nowrapCell = () => ({ style: { whiteSpace: 'nowrap' as const } });
 
 type DayWindow = { start: number; end: number };
 
-type UsageRead =
-  | { readonly status: 'absent' }
-  | { readonly status: 'loading' }
-  | { readonly status: 'failed' }
-  | { readonly status: 'signed-out' }
-  | { readonly status: 'unmounted' }
-  | { readonly status: 'ready'; readonly rows: readonly UsageSourceRow[] };
-
-type TaskRead =
-  | { readonly status: 'loading' }
-  | { readonly status: 'logged-out' }
-  | { readonly status: 'failed' }
-  | { readonly status: 'ready'; readonly tasks: readonly DashboardIterationTask[] };
+type UsageRows = readonly UsageSourceRow[];
 
 type OverviewUsageCounts = {
   readonly queries: number;
@@ -109,7 +100,6 @@ function countOverviewUsage(rows: readonly UsageSourceRow[]): OverviewUsageCount
   return { queries: rows.length, misses, copied };
 }
 
-/** The tile adds the sample counts the inaccuracy table already computed. It does not walk the tasks again. */
 function sumInaccuracySamples(rows: readonly { readonly sampleCount: number }[]): number {
   let total = 0;
   for (const row of rows) total += row.sampleCount;
@@ -204,31 +194,63 @@ function CountTile({ label, value, detail }: { label: string; value: number | nu
   </div>;
 }
 
-function usageStatusText(read: UsageRead): string | null {
+function usageStatusText(read: AsyncResource<UsageRows>): string | null {
   switch (read.status) {
     case 'ready':
     case 'loading':
       return null;
-    case 'failed':
-      return USAGE_FAILED;
-    case 'signed-out':
-      return LOGGED_OUT;
-    case 'unmounted':
-    case 'absent':
+    case 'idle':
       return USAGE_LATER;
+    case 'error':
+      return read.message;
+    case 'forbidden':
+      return read.message;
   }
 }
 
-function usageNote(read: UsageRead, onRetry: () => void) {
+function usageNote(read: AsyncResource<UsageRows>, onRetry: () => void) {
   const text = usageStatusText(read);
   if (text === null) return null;
-  if (read.status === 'failed') {
+  if (read.status === 'error') {
     return <div data-testid="overview-usage-status">
       <WorkbenchFailed message={text} onRetry={onRetry} />
     </div>;
   }
   return <p className="t-sub" data-testid="overview-usage-status">{text}</p>;
 }
+
+function rowsInWindow(rows: readonly UsageSourceRow[], span: DayWindow): UsageSourceRow[] {
+  return rows.filter((row) => {
+    const asked = Date.parse(row.askedAt);
+    return Number.isFinite(asked) && asked >= span.start && asked <= span.end;
+  });
+}
+
+async function readUsageAll(): Promise<AsyncResource<UsageRows>> {
+  const api = window.dashboardUsageLog;
+  if (!api) return { status: 'idle' };
+  try {
+    const collected: UsageSourceRow[] = [];
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const reply = await api.list({ result: '', query: '', cursor });
+      if (!reply.ok) {
+        if (reply.code === 'UNAVAILABLE' && reply.message === WORKBENCH_EMPTY.usageUnmounted) return { status: 'idle' };
+        return asyncFailure<UsageRows>(reply.code, READ_SENTENCES);
+      }
+      if (cursor !== null && seen.has(cursor)) return { status: 'error', message: USAGE_FAILED };
+      if (cursor !== null) seen.add(cursor);
+      collected.push(...reply.rows);
+      cursor = reply.nextCursor;
+    } while (cursor);
+    return { status: 'ready', value: collected };
+  } catch {
+    return { status: 'error', message: USAGE_FAILED };
+  }
+}
+
+type OutcomeValue = { items: readonly InaccuracyOutcome[]; truncated: boolean };
 
 export function IntakeOverview({
   onOpen,
@@ -240,73 +262,49 @@ export function IntakeOverview({
   onSupplyScript?: (question: string) => void;
 }) {
   const todoSection = useRef<HTMLElement>(null);
-  const [taskRead, setTaskRead] = useState<TaskRead>(() => (
-    window.dashboardIteration ? { status: 'loading' } : { status: 'logged-out' }
-  ));
-  const [outcomes, setOutcomes] = useState<readonly InaccuracyOutcome[] | null>(null);
-  const [outcomeFailed, setOutcomeFailed] = useState(false);
-  const [outcomeAttempt, setOutcomeAttempt] = useState(0);
+  const taskTruncated = useRef(false);
+  const { resource: taskRead, reload: retryTasks, replace: setTaskRead } = useAsyncResource<readonly DashboardIterationTask[]>(
+    async () => {
+      const api = window.dashboardIteration;
+      if (!api) return { status: 'forbidden', message: LOGGED_OUT };
+      try {
+        const result = await api.list();
+        if (!result.ok) return asyncFailure<readonly DashboardIterationTask[]>(result.code, READ_SENTENCES);
+        taskTruncated.current = result.truncated === true;
+        return { status: 'ready', value: result.items };
+      } catch {
+        return { status: 'error', message: USAGE_FAILED };
+      }
+    },
+    [],
+    window.dashboardIteration ? { status: 'loading' } : { status: 'forbidden', message: LOGGED_OUT },
+  );
+  const usageMounted = window.dashboardUsageLog !== undefined;
+  const { resource: usage, reload: retryUsage } = useAsyncResource<UsageRows>(
+    () => readUsageAll(),
+    [],
+    usageMounted ? { status: 'loading' } : { status: 'idle' },
+  );
+  const outcomesMounted = window.dashboardIteration?.outcomes !== undefined;
+  const { resource: outcomeRead, reload: retryOutcomes } = useAsyncResource<OutcomeValue>(async () => {
+    const api = window.dashboardIteration;
+    if (!api?.outcomes) return { status: 'idle' };
+    try {
+      const result = await api.outcomes();
+      if (!result.ok) return asyncFailure(result.code, { forbidden: LOGGED_OUT, error: USAGE_FAILED });
+      return { status: 'ready', value: { items: result.items, truncated: result.truncated === true } };
+    } catch {
+      return { status: 'error', message: USAGE_FAILED };
+    }
+  }, [], outcomesMounted ? { status: 'loading' } : { status: 'idle' });
   const [message, setMessage] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CloseHintCatalog | null>(null);
   const [deskRole, setDeskRole] = useState<'operator' | 'seat' | null>(null);
   const [causeById, setCauseById] = useState<Record<string, DashboardIterationCause>>({});
   const [noteById, setNoteById] = useState<Record<string, string>>({});
+  const mutation = useRef(false);
   const [span, setSpan] = useState<DayWindow>(() => recentWindow(7));
-  const [usageAttempt, setUsageAttempt] = useState(0);
-  const [taskAttempt, setTaskAttempt] = useState(0);
-  const [usage, setUsage] = useState<UsageRead>(() => (
-    window.dashboardUsageLog ? { status: 'loading' } : { status: 'absent' }
-  ));
-
-  // A missing iteration API means the person is not signed in. A failed list is a read,
-  // including a list that stopped before the last page.
-  useEffect(() => {
-    const api = window.dashboardIteration;
-    if (!api) {
-      setTaskRead({ status: 'logged-out' });
-      return undefined;
-    }
-    setTaskRead({ status: 'loading' });
-    let live = true;
-    void api.list().then((result) => {
-      if (!live) return;
-      if (!result.ok) {
-        setTaskRead({ status: result.code === 'UNAUTHORIZED' ? 'logged-out' : 'failed' });
-        return;
-      }
-      setTaskRead({ status: 'ready', tasks: result.items });
-    }).catch(() => {
-      if (!live) return;
-      setTaskRead({ status: 'failed' });
-    });
-    return () => { live = false; };
-  }, [taskAttempt]);
-
-  useEffect(() => {
-    const api = window.dashboardIteration;
-    if (!api || typeof api.outcomes !== 'function') {
-      setOutcomes([]);
-      setOutcomeFailed(false);
-      return undefined;
-    }
-    let live = true;
-    void api.outcomes().then((result) => {
-      if (!live) return;
-      if (!result.ok) {
-        setOutcomes(null);
-        setOutcomeFailed(true);
-        return;
-      }
-      setOutcomes(result.items);
-      setOutcomeFailed(false);
-    }).catch(() => {
-      if (!live) return;
-      setOutcomes(null);
-      setOutcomeFailed(true);
-    });
-    return () => { live = false; };
-  }, [outcomeAttempt]);
 
   useEffect(() => {
     const api = window.dashboardWording;
@@ -336,59 +334,14 @@ export function IntakeOverview({
   }, []);
 
   useEffect(() => {
-    const api = window.dashboardUsageLog;
-    if (!api) {
-      setUsage({ status: 'absent' });
-      return undefined;
-    }
-    setUsage({ status: 'loading' });
-    let live = true;
-    void (async () => {
-      const collected: UsageSourceRow[] = [];
-      const seen = new Set<string>();
-      let cursor: string | null = null;
-      do {
-        const reply = await api.list({ result: '', query: '', cursor });
-        if (!live) return;
-        if (!reply.ok) {
-          const unmounted = reply.code === 'UNAVAILABLE' && reply.message === WORKBENCH_EMPTY.usageUnmounted;
-          setUsage({
-            status: reply.code === 'UNAUTHORIZED' ? 'signed-out'
-              : unmounted ? 'unmounted'
-              : 'failed',
-          });
-          return;
-        }
-        if (cursor !== null && seen.has(cursor)) {
-          setUsage({ status: 'failed' });
-          return;
-        }
-        if (cursor !== null) seen.add(cursor);
-        collected.push(...reply.rows);
-        cursor = reply.nextCursor;
-      } while (cursor);
-      if (!live) return;
-      const rows = collected.filter((row) => {
-        const asked = Date.parse(row.askedAt);
-        return Number.isFinite(asked) && asked >= span.start && asked <= span.end;
-      });
-      setUsage({ status: 'ready', rows });
-    })().catch(() => {
-      if (live) setUsage({ status: 'failed' });
-    });
-    return () => { live = false; };
-  }, [span.start, span.end, usageAttempt]);
-
-  useEffect(() => {
-    const count = taskRead.status === 'ready'
-      ? taskRead.tasks.filter((task) => task.status === 'open' || task.status === 'in_progress').length
-      : 0;
+    if (taskRead.status !== 'ready') return;
+    const count = taskRead.value.filter((task) => task.status === 'open' || task.status === 'in_progress').length;
     onTodoCount?.(count);
   }, [taskRead, onTodoCount]);
 
   function closeTask(task: DashboardIterationTask, status: 'resolved' | 'wont_fix') {
     const api = window.dashboardIteration;
-    if (!api || busyId !== null) return;
+    if (!api || mutation.current) return;
     const cause = causeById[task.taskId] ?? task.suspectedCause;
     const note = noteById[task.taskId] ?? '';
     const decision = decideIterationClose({
@@ -406,14 +359,16 @@ export function IntakeOverview({
     const resolutionNote = decision.resolutionNote.length > 0
       ? `${CAUSE_LABELS[cause]}：${decision.resolutionNote}`
       : CAUSE_LABELS[cause];
+    mutation.current = true;
     setBusyId(task.taskId);
+    const finish = () => { mutation.current = false; setBusyId(null); };
     void api.close({
       taskId: task.taskId,
       expectedVersion: task.version,
       status: decision.status,
       resolutionNote,
     }).then((result) => {
-      setBusyId(null);
+      finish();
       if (!result.ok) {
         setMessage(seatMessage(result.message));
         return;
@@ -422,38 +377,41 @@ export function IntakeOverview({
         if (current.status !== 'ready') return current;
         return {
           status: 'ready',
-          tasks: current.tasks.map((row) => row.taskId === result.task.taskId ? result.task : row),
+          value: current.value.map((row) => row.taskId === result.task.taskId ? result.task : row),
         };
       });
       setMessage('');
     }).catch(() => {
-      setBusyId(null);
+      finish();
       setMessage(USAGE_FAILED);
     });
   }
 
   function startTask(task: DashboardIterationTask) {
     const api = window.dashboardIteration;
-    if (!api) return;
+    if (!api || mutation.current) return;
+    mutation.current = true;
     setBusyId(task.taskId);
+    const finish = () => { mutation.current = false; setBusyId(null); };
     void api.start({ taskId: task.taskId, expectedVersion: task.version }).then((result) => {
-      setBusyId(null);
+      finish();
       if (!result.ok) { setMessage(seatMessage(result.message)); return; }
       setTaskRead((current) => {
         if (current.status !== 'ready') return current;
         return {
           status: 'ready',
-          tasks: current.tasks.map((row) => row.taskId === result.task.taskId ? result.task : row),
+          value: current.value.map((row) => row.taskId === result.task.taskId ? result.task : row),
         };
       });
-    }).catch(() => { setBusyId(null); setMessage(USAGE_FAILED); });
+    }).catch(() => { finish(); setMessage(USAGE_FAILED); });
   }
 
-  const loadedTasks = taskRead.status === 'ready' ? taskRead.tasks : null;
+  const loadedTasks = taskRead.status === 'ready' ? taskRead.value : null;
   const openTasks = (loadedTasks ?? []).filter((task) => task.status === 'open' || task.status === 'in_progress');
-  const usageCounts = usage.status === 'ready' ? countOverviewUsage(usage.rows) : null;
-  const missRows: MissTableRow[] | null = usage.status === 'ready'
-    ? rankMissRows(usage.rows).map((row, index) => ({
+  const usageRows = usage.status === 'ready' ? rowsInWindow(usage.value, span) : null;
+  const usageCounts = usageRows ? countOverviewUsage(usageRows) : null;
+  const missRows: MissTableRow[] | null = usageRows
+    ? rankMissRows(usageRows).map((row, index) => ({
       key: row.question,
       rank: index + 1,
       question: row.question,
@@ -510,12 +468,12 @@ export function IntakeOverview({
       <CountTile label="不准次数" value={inaccuracyTotal} detail={inaccuracyTotal === null ? undefined : INACCURACY_SCOPE} />
     </div>
     {usage.status === 'ready' ? <p className="t-sub">{USAGE_SCOPE}</p> : null}
-    {usageNote(usage, () => setUsageAttempt((current) => current + 1))}
+    {usageNote(usage, retryUsage)}
     <section ref={todoSection} className="card" aria-label="待办" tabIndex={-1}>
       <div className="card-head"><h3>待办</h3></div>
-      {taskRead.status === 'loading' ? <WorkbenchLoading rows={3} label="正在读取待办" />
-        : taskRead.status === 'logged-out' ? <OverviewEmpty description={LOGGED_OUT} />
-        : taskRead.status === 'failed' ? <WorkbenchFailed message={USAGE_FAILED} onRetry={() => setTaskAttempt((current) => current + 1)} />
+      {taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={3} label="正在读取待办" />
+        : taskRead.status === 'forbidden' ? <OverviewEmpty description={taskRead.message} />
+        : taskRead.status === 'error' ? <WorkbenchFailed message={taskRead.message} onRetry={retryTasks} />
         : openTasks.length === 0 ? <OverviewEmpty description={TODO_EMPTY} />
         : <A11yTable<TodoTableRow>
           aria-label="话术迭代"
@@ -572,12 +530,15 @@ export function IntakeOverview({
           ]}
         />}
       {message ? <p role="status">{message}</p> : null}
+      {taskTruncated.current && taskRead.status === 'ready'
+        ? <p data-testid="todo-truncated">还有更多，这里只显示前 {taskRead.value.length} 条。</p>
+        : null}
     </section>
     <section className="card" aria-label="不准的话术">
       <div className="card-head"><h3>不准的话术</h3></div>
-      {taskRead.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取不准的话术" />
-        : taskRead.status === 'logged-out' ? <OverviewEmpty description={LOGGED_OUT} />
-        : taskRead.status === 'failed' ? <WorkbenchFailed message={USAGE_FAILED} onRetry={() => setTaskAttempt((current) => current + 1)} />
+      {taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取不准的话术" />
+        : taskRead.status === 'forbidden' ? <OverviewEmpty description={taskRead.message} />
+        : taskRead.status === 'error' ? <WorkbenchFailed message={taskRead.message} onRetry={retryTasks} />
         : inaccuracyRows.length === 0 ? <OverviewEmpty description={INACCURACY_EMPTY} />
         : <>
           <A11yTable<InaccuracyTableRow>
@@ -639,15 +600,24 @@ export function IntakeOverview({
     </section>
     <section className="card" aria-label={INACCURACY_OUTCOME_COPY.heading} data-testid="overview-outcomes">
       <div className="card-head"><h3>{INACCURACY_OUTCOME_COPY.heading}</h3></div>
-      {outcomeFailed
-        ? <p>{INACCURACY_OUTCOME_COPY.failed} <Button type="link" onClick={() => setOutcomeAttempt((current) => current + 1)}>{INACCURACY_OUTCOME_COPY.retry}</Button></p>
-        : outcomes === null
-          ? <WorkbenchLoading rows={2} label="正在读取处理结果" />
-          : outcomes.length === 0
-            ? <OverviewEmpty description={INACCURACY_OUTCOME_COPY.empty} />
-            : <ul>
-              {outcomes.map((row) => <li key={row.scriptId}>{row.scriptId} {outcomeSentence(row)}</li>)}
-            </ul>}
+      {outcomeRead.status === 'error'
+        ? <p>{outcomeRead.message} <Button type="link" onClick={retryOutcomes}>{INACCURACY_OUTCOME_COPY.retry}</Button></p>
+        : outcomeRead.status === 'forbidden'
+          ? <OverviewEmpty description={outcomeRead.message} />
+          : outcomeRead.status === 'loading'
+            ? <WorkbenchLoading rows={2} label="正在读取处理结果" />
+            : outcomeRead.status === 'idle'
+              ? <OverviewEmpty description={INACCURACY_OUTCOME_COPY.later} />
+              : outcomeRead.value.items.length === 0
+                ? <OverviewEmpty description={INACCURACY_OUTCOME_COPY.empty} />
+                : <>
+                  <ul>
+                    {outcomeRead.value.items.map((row) => <li key={row.scriptId}>{row.scriptId} {outcomeSentence(row)}</li>)}
+                  </ul>
+                  {outcomeRead.value.truncated
+                    ? <p data-testid="outcome-truncated">还有更多，这里只显示前 {outcomeRead.value.items.length} 条。</p>
+                    : null}
+                </>}
     </section>
   </section>;
 }

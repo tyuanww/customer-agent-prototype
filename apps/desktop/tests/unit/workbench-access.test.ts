@@ -28,7 +28,7 @@ describe('workbench access display', () => {
   });
 
   it('names the role that can open each missing ability', () => {
-    expect(accessBlock('grant', true, job('客服主管'))).toEqual({ need: '给他人开通权限', ask: '你的经理' });
+    expect(accessBlock('grant', true, job('客服主管'))).toEqual({ need: '给他人开通权限', detail: '没有权限，请找人开通。' });
     expect(accessBlock('upload-sop', true, job('普通客服'))).toEqual({ need: '上传 SOP', ask: '客服主管' });
   });
 

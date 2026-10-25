@@ -115,7 +115,9 @@ it('withdraws old content when a refresh fails instead of treating it as an empt
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);await screen.findByText('合成原文 product');
  f.command.mockResolvedValueOnce({ok:false,code:'UNAVAILABLE',message:'合成读取失败',view:null});
  await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
- expect(await screen.findByRole('alert')).toHaveTextContent('合成读取失败');expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
+ expect(await screen.findByRole('alert')).toHaveTextContent('合成读取失败');
+ expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
+ expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
 });
 it('keeps invalidation subscribed while hidden and rejects a late response from the previous generation',async()=>{
  const f=setup(),user=userEvent.setup();const {rerender}=render(<IntakeLibrary active/>);await screen.findByText('合成原文 product');
@@ -172,6 +174,7 @@ it.each(['LIMIT','UNAVAILABLE'] as const)('preserves a real Main command failure
   await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await screen.findByRole('row',{name:/洁面用法 0/});
   fail=true;await user.click(screen.getByRole('button',{name:'刷新可用资料'}));
   expect(await screen.findByRole('alert')).toHaveTextContent(`目录失败 ${code}`);
+  expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
   expect(screen.queryByRole('row',{name:/洁面用法 0/})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'刷新可用资料'})).toBeEnabled();expect(invalidations).not.toHaveBeenCalled();
  }finally{cleanup();owner.dispose();}
@@ -217,4 +220,22 @@ it('counts a fresh empty snapshot as zero available rows',async()=>{
  const status=await screen.findByRole('status');
  expect(status.textContent ?? '').toMatch(/^当前可用 0 条，到 \d{4}-\d{2}-\d{2} 还能查。$/);
  expect(status).not.toHaveTextContent('暂无有效发布');
+});
+it('stores a missing catalog API as the unavailable sentence with a retry',async()=>{
+ render(<IntakeLibrary active/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('可用资料暂不可读取，请重试。');
+ expect(screen.getByRole('button',{name:'重试'})).toBeVisible();
+ expect(screen.queryByText('请先在查询窗口登录。')).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
+ expect(screen.queryByText(/全店|店铺总数|全库/)).not.toBeInTheDocument();
+});
+it('stores a signed-out catalog as the logged-out sentence without a retry',async()=>{
+ const f=setup(),view=data();
+ view.signedIn=false;view.rows=[];view.releaseId=null;view.validUntil=null;view.context=emptyIntakeQueryContext();
+ f.command.mockResolvedValueOnce({ok:true,view});
+ render(<IntakeLibrary active/>);
+ expect(await screen.findByText('请先在查询窗口登录。')).toBeVisible();
+ expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'重试'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
 });

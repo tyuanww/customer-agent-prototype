@@ -81,6 +81,7 @@ export type DashboardIterationListView = Readonly<{
   ok: true;
   items: readonly DashboardIterationTask[];
   nextCursor: string | null;
+  truncated?: boolean;
 }>;
 
 export type DashboardIterationTaskView = Readonly<{
@@ -223,7 +224,8 @@ export function isDashboardIterationListResult(value: unknown): value is Dashboa
   if (isDashboardIterationFailure(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !exactKeys(record, ['ok', 'items', 'nextCursor'])) return false;
+  if (record.ok !== true || !exactKeys(record, ['ok', 'items', 'nextCursor', 'truncated'])) return false;
+  if (typeof record.truncated !== 'boolean') return false;
   if (!(record.nextCursor === null
     || (typeof record.nextCursor === 'string' && record.nextCursor.length >= 1))) {
     return false;
@@ -314,5 +316,5 @@ export function iterationListFromContract(value: unknown): DashboardIterationLis
     if (!mapped) return null;
     items.push(mapped);
   }
-  return Object.freeze({ ok: true, items: Object.freeze(items), nextCursor: record.next_cursor });
+  return Object.freeze({ ok: true, items: Object.freeze(items), nextCursor: record.next_cursor, truncated: false });
 }

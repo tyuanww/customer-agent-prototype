@@ -1,8 +1,10 @@
 import type { components } from '@customer-agent/contracts';
 import { Button, Empty, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { IntakeManagementCommand, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import type { IntakeManagementCommand, IntakeManagementReply, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
+import { READ_DISCARDED, useAsyncResource, type DashboardRead } from './use-async-resource';
 import { DISPLAY_SEPARATOR, joinDisplayParts } from '@shared/display-separator';
 import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
@@ -237,12 +239,72 @@ function listNext(candidate: components['schemas']['IntakeCandidate']) {
 function sameCandidate(candidate: components['schemas']['IntakeCandidate'], selected: components['schemas']['IntakeCandidate'] | null) {
   return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version && candidate.sourceId === selected.sourceId;
 }
+/** A carried view stays ready so the open candidate does not disappear. No view is the read itself: UNAUTHORIZED is forbidden, and every other code stays an error. The messages are the sentences the reply already has. */
+function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeManagementView> {
+  if (reply.view) return { status: 'ready', value: reply.view };
+  if (!reply.ok) return asyncFailure(reply.code, { forbidden: reply.message, error: reply.message });
+  return { status: 'idle' };
+}
+function shownView(view: IntakeManagementView | null): AsyncResource<IntakeManagementView> {
+  return view ? { status: 'ready', value: view } : { status: 'idle' };
+}
 export function IntakeManagement() {
   const sectionId = useId();
-  const [view, setView] = useState<IntakeManagementView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
+  const [rereading, setRereading] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
   const stopPending = useRef(false);
+  const listed = useRef(false);
+  const readTicket = useRef(0);
+  // Missing intake keeps the unavailable sentence. That sentence is not the logged-out one, so the read is an error. A forbidden initial would skip the loading flash; this page does not start there.
+  const held = useRef<AsyncResource<IntakeManagementView>>(window.dashboardIntake
+    ? { status: 'idle' }
+    : { status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
+  const readCurrent = async (): Promise<DashboardRead<IntakeManagementView>> => {
+    const ticket = readTicket.current;
+    const gen = generation.current;
+    // A newer command or session notification owns the screen. Resolving here would
+    // let this older read replace that result after the hook applies it.
+    const stale = () => Promise.resolve(READ_DISCARDED);
+    const finish = (next: AsyncResource<IntakeManagementView>) => {
+      if (generation.current !== gen) return stale();
+      held.current = next;
+      if (readTicket.current === ticket) setRereading(false);
+      return next;
+    };
+    const api = window.dashboardIntake;
+    if (!api) return finish({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
+    try {
+      const reply = listed.current ? await api.current() : await api.command({ action: 'list', next: false });
+      if (generation.current !== gen) return stale();
+      listed.current = true;
+      setError(!reply.ok && reply.view ? reply.message : '');
+      return finish(resourceForReply(reply));
+    } catch {
+      if (generation.current !== gen) return stale();
+      listed.current = true;
+      setError('');
+      return finish({ status: 'error', message: '管理服务不可用，请刷新。' });
+    }
+  };
+  const { resource, reload, replace } = useAsyncResource(readCurrent, [], held.current, { retainReady: true });
+  const view = resource.status === 'ready' ? resource.value : null;
+  const reading = resource.status === 'loading';
+  const readFailure = resource.status === 'error' || resource.status === 'forbidden' ? resource.message : '';
+  const commit = (next: AsyncResource<IntakeManagementView>) => {
+    held.current = next;
+    replace(next);
+  };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const reread = () => {
+    generation.current += 1;
+    readTicket.current += 1;
+    setError('');
+    setRereading(true);
+    reload();
+  };
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('open');
   const [rollbackFocus, setRollbackFocus] = useState(0);
@@ -260,7 +322,10 @@ export function IntakeManagement() {
       stopPending.current = true; setStopping(true); const gen = ++generation.current;
       try {
         const reply = await window.dashboardIntake.command(command);
-        if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '' : reply.message); }
+        if (generation.current === gen) {
+          commit(resourceForReply(reply));
+          setError(reply.ok ? '' : reply.message);
+        }
       } catch { if (generation.current === gen) setError('停止请求尚未确认，请重新读取当前状态。服务器可能仍在处理原任务。'); }
       finally {
         // Main's stop acknowledgement releases local waiting. A late original
@@ -272,7 +337,7 @@ export function IntakeManagement() {
     }
     if (pending.current !== null || stopPending.current) return;
     if (!window.dashboardIntake) {
-      setView(null);
+      commit({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
       setError(WORKBENCH_EMPTY.intakeUnmounted);
       setBusy(false);
       return;
@@ -283,7 +348,7 @@ export function IntakeManagement() {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
-      setView(reply.view); if (!reply.ok) setError(reply.message);
+      commit(resourceForReply(reply)); if (!reply.ok) setError(reply.message);
     } catch {
       if (generation.current !== gen) return;
       if (uploading) {
@@ -291,45 +356,51 @@ export function IntakeManagement() {
         // A failed IPC reply alone cannot prove either success or revocation.
         try {
           const reply = await window.dashboardIntake!.current();
-          if (generation.current === gen) { setView(reply.view); setError(reply.ok ? '本次操作未完整返回，已重新读取当前状态。请按当前提示继续。' : reply.message); }
-        } catch { if (generation.current === gen) { setView(null); setError('管理服务不可用，请重新读取当前状态。'); } }
-      } else { setView(null); setError('管理服务不可用，请刷新。'); }
+          if (generation.current === gen) {
+            commit(resourceForReply(reply));
+            setError(reply.ok ? '本次操作未完整返回，已重新读取当前状态。请按当前提示继续。' : reply.message);
+          }
+        } catch { if (generation.current === gen) {
+          commit({ status: 'error', message: '管理服务不可用，请重新读取当前状态。' });
+          setError('管理服务不可用，请重新读取当前状态。');
+        } }
+      } else {
+        commit({ status: 'error', message: '管理服务不可用，请刷新。' });
+        setError('管理服务不可用，请刷新。');
+      }
     } finally {
       if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
     }
   };
   useEffect(() => {
     if (!busy || !uploadRequest) return;
-    let active = true, reading = false;
+    let active = true, polling = false;
     const gen = generation.current;
     // current() now also settles a running parse job through one HTTP read per tick
     // (Main serialises it), so this loop is what advances 解析中 to its final state.
     // Manual refresh sends the same command. Every other state still comes from memory.
     const read = async () => {
-      if (reading) return;
-      reading = true;
+      if (polling) return;
+      polling = true;
       try {
         const reply = await window.dashboardIntake!.current();
-        if (active && generation.current === gen && reply.view) setView(reply.view);
+        if (active && generation.current === gen && reply.view) commitRef.current({ status: 'ready', value: reply.view });
       } catch { /* The original command owns its visible transport outcome. */ }
-      finally { reading = false; }
+      finally { polling = false; }
     };
     void read(); const timer = window.setInterval(() => void read(), 250);
     return () => { active = false; window.clearInterval(timer); };
   }, [busy, uploadRequest]);
   useEffect(() => {
     const api = window.dashboardIntake;
-    if (!api) {
-      setView(null);
-      setError(WORKBENCH_EMPTY.intakeUnmounted);
-      return undefined;
-    }
+    if (!api) return undefined;
     const off = api.onInvalidated(() => {
-      const gen = ++generation.current; setDirtyIds(new Set()); setView(null); setError('请重新读取当前状态。');
-      void api.current().then(reply => { if (generation.current === gen) setView(reply.view); })
-        .catch(() => { if (generation.current === gen) setView(null); });
+      const gen = ++generation.current; setDirtyIds(new Set());
+      commitRef.current({ status: 'idle' });
+      setError('请重新读取当前状态。');
+      void api.current().then(reply => { if (generation.current === gen) commitRef.current(shownView(reply.view)); })
+        .catch(() => { if (generation.current === gen) commitRef.current({ status: 'idle' }); });
     });
-    void apply({ action: 'list', next: false });
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
   }, []);
@@ -341,7 +412,7 @@ export function IntakeManagement() {
     if (typeof region.scrollIntoView === 'function') region.scrollIntoView({ block: 'start' });
   }, [rollbackFocus, view?.selected]);
   const upload = view?.upload;
-  const disabled = busy || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const disabled = busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
@@ -367,8 +438,8 @@ export function IntakeManagement() {
   ];
   return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料">
     <h1 className="desk-sr">资料</h1>
-    <p className="intake-operator">{view?.displayName ?? (busy ? '正在读取会话…' : '会话待确认')}</p>
-    {error && <div><p role="alert">{error}</p><ActionButton disabled={busy || stopping} onClick={() => void apply()}>重新读取当前状态</ActionButton></div>}
+    <p className="intake-operator">{view?.displayName ?? (busy || reading || rereading ? '正在读取会话…' : '会话待确认')}</p>
+    {(error || readFailure) && <div><p role="alert">{error || readFailure}</p><ActionButton disabled={busy || reading || rereading || stopping} onClick={reread}>重新读取当前状态</ActionButton></div>}
     {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">
       <div><h2>{step.title}</h2><p>{step.detail}</p><small>核对材料 → 确认来源 → 质量检查 → 确认发布</small></div>
       <ActionButton onClick={() => {
@@ -376,17 +447,17 @@ export function IntakeManagement() {
         target?.focus(); target?.scrollIntoView({ block: 'start' });
       }}>前往当前步骤</ActionButton>
     </section>}
-    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy} stopping={stopping}
+    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy || rereading} stopping={stopping}
       blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
-    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || stopping}
+    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || reading || rereading || stopping}
       onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</ActionButton>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2 id={`${sectionId}-recovery`} tabIndex={-1}>操作结果待确认</h2>
       {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
-      <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
-        {view.pending.retryAllowed !== false && <ActionButton disabled={busy} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
+      <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
+        {view.pending.retryAllowed !== false && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
         {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
-    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || (view.rollback.available && view.selected?.state === 'published')) && <IntakeRollback view={view} busy={busy || stopping}
+    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || (view.rollback.available && view.selected?.state === 'published')) && <IntakeRollback view={view} busy={busy || rereading || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}

@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import { createElement, useEffect, useRef, useState, type ComponentType } from 'react';
 import { Button, Empty, Input, Segmented, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import {
   isUsageLogResult,
@@ -10,6 +10,7 @@ import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
 import './intake-management.css';
 import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
+import { READ_DISCARDED, useAsyncResource } from './use-async-resource';
 
 const RESULT_FILTERS: ReadonlyArray<{ id: UsageLogResult | ''; label: string }> = [
   { id: '', label: '全部' },
@@ -19,7 +20,11 @@ const RESULT_FILTERS: ReadonlyArray<{ id: UsageLogResult | ''; label: string }> 
 ];
 const RESULT_LABEL: Readonly<Record<UsageLogResult, string>> = { copied: '已复制', viewed: '仅查看', miss: '未命中' };
 
-type Load = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'failed' } | { kind: 'ready' };
+type UsagePage = {
+  readonly rows: readonly UsageLogRow[];
+  readonly next: string | null;
+  readonly canExport: boolean;
+};
 
 function LogButton(props: ButtonProps) {
   return <Button {...props} autoInsertSpace={false} />;
@@ -33,43 +38,62 @@ function UsageTable(props: TableProps<UsageLogRow> & { 'aria-label': string }) {
 export function IntakeUsageLog() {
   const [result, setResult] = useState<UsageLogResult | ''>('');
   const [query, setQuery] = useState('');
-  const [rows, setRows] = useState<UsageLogRow[]>([]);
-  const [next, setNext] = useState<string | null>(null);
-  const [canExport, setCanExport] = useState(false);
-  const [load, setLoad] = useState<Load>(() => (window.dashboardUsageLog ? { kind: 'loading' } : { kind: 'unavailable' }));
+  const [debounced, setDebounced] = useState('');
   const [moreBusy, setMoreBusy] = useState(false);
   const [preview, setPreview] = useState<UsageLogExportPreview | null>(null);
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState('');
   const generation = useRef(0);
 
-  const fetchPage = useCallback((cursor: string | null, filterResult: UsageLogResult | '', filterQuery: string) => {
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(query.trim()), query === '' ? 0 : 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const { resource, reload, replace } = useAsyncResource<UsagePage>(async () => {
     const api = window.dashboardUsageLog;
-    if (!api) { setLoad({ kind: 'unavailable' }); return; }
+    if (!api) return { status: 'idle' };
     const gen = ++generation.current;
-    if (cursor === null) setLoad({ kind: 'loading' }); else setMoreBusy(true);
-    void api.list({ result: filterResult, query: filterQuery, cursor }).then((reply) => {
+    try {
+      const reply = await api.list({ result, query: debounced, cursor: null });
+      if (gen !== generation.current) return READ_DISCARDED;
+      if (!reply.ok) {
+        if (reply.code === 'UNAVAILABLE') return { status: 'forbidden', message: WORKBENCH_EMPTY.usageUnmounted };
+        return { status: 'error', message: WORKBENCH_EMPTY.usageFailed };
+      }
+      return { status: 'ready', value: { rows: reply.rows, next: reply.nextCursor, canExport: reply.canExport } };
+    } catch {
+      if (gen !== generation.current) return READ_DISCARDED;
+      return { status: 'error', message: WORKBENCH_EMPTY.usageFailed };
+    }
+  }, [result, debounced], window.dashboardUsageLog
+    ? { status: 'loading' }
+    : { status: 'idle' });
+
+  const loadMore = () => {
+    const api = window.dashboardUsageLog;
+    if (!api || resource.status !== 'ready' || resource.value.next === null || moreBusy) return;
+    const cursor = resource.value.next;
+    const gen = ++generation.current;
+    setMoreBusy(true);
+    void api.list({ result, query: debounced, cursor }).then((reply) => {
       if (gen !== generation.current) return;
       setMoreBusy(false);
-      if (!reply.ok) { setLoad({ kind: reply.code === 'UNAVAILABLE' ? 'unavailable' : 'failed' }); return; }
-      setRows((current) => (cursor === null ? reply.rows : [...current, ...reply.rows]));
-      setNext(reply.nextCursor);
-      setCanExport(reply.canExport);
-      setLoad({ kind: 'ready' });
+      if (!reply.ok) {
+        replace(reply.code === 'UNAVAILABLE'
+          ? { status: 'forbidden', message: WORKBENCH_EMPTY.usageUnmounted }
+          : { status: 'error', message: WORKBENCH_EMPTY.usageFailed });
+        return;
+      }
+      replace((current) => current.status === 'ready'
+        ? { status: 'ready', value: { rows: [...current.value.rows, ...reply.rows], next: reply.nextCursor, canExport: reply.canExport } }
+        : current);
     }).catch(() => {
       if (gen !== generation.current) return;
       setMoreBusy(false);
-      setLoad({ kind: 'failed' });
+      replace({ status: 'error', message: WORKBENCH_EMPTY.usageFailed });
     });
-  }, []);
-
-  useEffect(() => {
-    if (!window.dashboardUsageLog) return undefined;
-    const timer = setTimeout(() => fetchPage(null, result, query.trim()), query === '' ? 0 : 250);
-    return () => clearTimeout(timer);
-  }, [result, query, fetchPage]);
-
-  useEffect(() => () => { generation.current++; }, []);
+  };
 
   const startExport = () => {
     const api = window.dashboardUsageLog;
@@ -108,13 +132,15 @@ export function IntakeUsageLog() {
     </> },
     { title: '结果', dataIndex: 'result', width: 96, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (value: UsageLogRow['result']) => <span className={`res intake-result${resultClass(value)}`}>{RESULT_LABEL[value]}</span> },
   ];
+  const page = resource.status === 'ready' ? resource.value : null;
 
   return <section className="sec intake-usage-log" aria-label="使用情况">
     <div className="sec-head">
       <h2>使用情况</h2>
-      {canExport && load.kind === 'ready' ? <LogButton onClick={startExport}>导出使用记录</LogButton> : null}
+      {page?.canExport ? <LogButton onClick={startExport}>导出使用记录</LogButton> : null}
     </div>
-    {load.kind === 'unavailable' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageUnmounted}</p> : <>
+    {resource.status === 'idle' ? <p className="notready" style={{ padding: '12px 0' }}>{WORKBENCH_EMPTY.usageUnmounted}</p>
+      : resource.status === 'forbidden' ? <p className="notready" style={{ padding: '12px 0' }}>{resource.message}</p> : <>
       <div className="filters2" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <Segmented
           aria-label="结果"
@@ -144,21 +170,21 @@ export function IntakeUsageLog() {
         </>}
       </div> : null}
       {notice ? <p role="status" className="hint">{notice}</p> : null}
-      {load.kind === 'failed' ? <WorkbenchFailed message={WORKBENCH_EMPTY.usageFailed} onRetry={() => fetchPage(null, result, query.trim())} /> : null}
-      {load.kind === 'loading' ? <WorkbenchLoading rows={5} label="正在读取使用情况" /> : null}
-      {load.kind === 'ready' ? <UsageTable
+      {resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={reload} /> : null}
+      {resource.status === 'loading' ? <WorkbenchLoading rows={5} label="正在读取使用情况" /> : null}
+      {page ? <UsageTable
         aria-label="使用情况"
         pagination={false}
         tableLayout="fixed"
         rowKey="id"
         rowClassName={() => 'item'}
-        dataSource={rows}
+        dataSource={[...page.rows]}
         columns={columns}
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={result === '' && query.trim() === '' ? WORKBENCH_EMPTY.usageEmpty : '没有符合条件的记录'} /> }}
       /> : null}
-      {load.kind === 'ready' && next !== null ? <div className="pager">
-        <LogButton disabled={moreBusy} onClick={() => fetchPage(next, result, query.trim())}>加载更多</LogButton></div> : null}
-      {load.kind === 'ready' ? <p className="hint" style={{ marginTop: 10 }}>“已复制”表示话术进了输入框，系统不知道最后是否发送。</p> : null}
+      {page && page.next !== null ? <div className="pager">
+        <LogButton disabled={moreBusy} onClick={loadMore}>加载更多</LogButton></div> : null}
+      {page ? <p className="hint" style={{ marginTop: 10 }}>“已复制”表示话术进了输入框，系统不知道最后是否发送。</p> : null}
     </>}
   </section>;
 }

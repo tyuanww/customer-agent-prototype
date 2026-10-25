@@ -36,6 +36,13 @@ describe('inaccuracy outcome', () => {
     expect(outcomeSentence(ready)).toBe('处理前 7 天 4 次，处理后 7 天 1 次。');
   });
 
+  it('keeps the first 200 rows and marks a longer list truncated', () => {
+    const items = Array.from({ length: 201 }, (_, index) => ({ ...ready, scriptId: `shipping-${index}` }));
+    const parsed = parseInaccuracyOutcomeList({ ok: true, items });
+    expect(parsed?.truncated).toBe(true);
+    expect(parsed?.items).toHaveLength(200);
+  });
+
   it('does not compare before the after-window has elapsed', () => {
     expect(outcomeSentence(early)).toBe('处理后时间还短，先不比较。');
   });

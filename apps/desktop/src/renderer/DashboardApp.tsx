@@ -1,17 +1,16 @@
-import { IntakeLibrary } from './features/dashboard/IntakeLibrary';
+import { Button } from 'antd';
 import {
+  intakeDestinationItem,
   intakeSidebarItems,
   readIntakePreviewPage,
+  renderIntakeDestinations,
   type IntakeDestination,
   type IntakeSidebarItem,
 } from './features/dashboard/intake-destinations';
-import { IntakeOverview } from './features/dashboard/IntakeOverview';
-import { DeskKnowledge } from './features/dashboard/DeskKnowledge';
-import { IntakePermissions } from './features/dashboard/IntakePermissions';
+import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
 import { accessBlock } from '../shared/workbench-access';
 import { OPS_LOOP_COPY, sopUploadRefusal } from '../shared/dashboard-ops-loop';
-import { IntakeManagement } from './features/dashboard/IntakeManagement';
 import {
   useCallback,
   useMemo,
@@ -20,14 +19,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { DASHBOARD_MANIFEST } from './data/dashboard-manifest';
 import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
-import { SopLibraryModule } from './features/dashboard/SopLibraryModule';
 import { DASHBOARD_FONT_FAMILY, IntakeAntdTheme } from './features/dashboard/intake-antd';
 import {
   DASHBOARD_WINDOW_TITLE,
@@ -35,7 +31,6 @@ import {
   dashboardChromeModeFor,
   inferDashboardHostPlatform,
 } from '@shared/dashboard-window';
-import { sessionDisplayName } from '@shared/product-session';
 import {
   dashboardCollapsedSurfaceWidth,
   dashboardNavIconAnchorOffset,
@@ -98,43 +93,44 @@ type NavTooltipState = {
 };
 
 export function DashboardApp() {
-  return <DashboardWorkspace profile="intake" />;
+  return <DashboardWorkspace />;
 }
 function sopUploadControl(
   jobKnown: boolean,
   signedIn: boolean | null,
   job: SessionJobView | null,
 ): { code: 'UNAUTHORIZED' | 'FORBIDDEN'; message: string } | null {
-  if (!jobKnown) return null;
-  if (signedIn === null) return { code: 'FORBIDDEN', message: '' };
+  if (!jobKnown || signedIn === null) return { code: 'FORBIDDEN', message: '正在确认你的职务……' };
   if (!signedIn) return { code: 'UNAUTHORIZED', message: OPS_LOOP_COPY.noSession };
   return sopUploadRefusal(job);
 }
 
-/** Both profiles share native chrome and appearance. Only the selected profile
- * mounts business modules or subscribes to its session API. */
-function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
-  const canOpenPermissions = profile === 'intake' && window.dashboardPermissions !== undefined;
+function DashboardWorkspace() {
+  const canOpenPermissions = window.dashboardPermissions !== undefined;
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [jobKnown, setJobKnown] = useState(() => window.dashboardContent === undefined);
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
+  const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
+  const sessionEpoch = useRef(0);
+  const sessionConfirmed = useRef(false);
   const canGrant = jobKnown
     && contentSignedIn === true
     && sessionJob?.status === 'resolved'
     && sessionJob.rights.grant === true;
   const uploadRefusal = sopUploadControl(jobKnown, contentSignedIn, sessionJob);
   const canUploadSop = uploadRefusal === null;
-  // Display only: which ability is missing and whom to ask. The grant button itself still
-  // follows canGrant, and the server checks every write.
   const grantAccess = jobKnown ? accessBlock('grant', contentSignedIn, sessionJob) : null;
   const seatLibraryOnly = sessionJob?.status === 'resolved' && sessionJob.role === 'agent';
-  const navItems = intakeSidebarItems(canOpenPermissions, seatLibraryOnly);
-  const [active, setActive] = useState<IntakeDestination>(profile === 'intake' ? readIntakePreviewPage(window.location, canOpenPermissions) : 'overview');
-  const [keepContent, setKeepContent] = useState(false);
+  const sessionKey = !jobKnown || contentSignedIn !== true
+    ? 'signed-out'
+    : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
+  const canUpdateSop = canUploadSop && (contentRole === 'owner' || contentRole === 'coach');
+  const canDeleteSop = canUploadSop && contentRole === 'owner';
+  const navItems = intakeSidebarItems(canOpenPermissions, seatLibraryOnly, jobKnown);
+  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, canOpenPermissions));
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
-  const [refreshLabel, setRefreshLabel] = useState(DASHBOARD_MANIFEST.banners.refreshLabel);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const navWidth = DASHBOARD_NAV_DEFAULT_WIDTH;
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
@@ -165,16 +161,6 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   );
   const chromeMode = dashboardChromeModeFor(hostPlatform);
   const collapsedSurface = dashboardCollapsedSurfaceWidth(chromeMode);
-  useEffect(() => {
-    if (profile !== 'intake') return undefined;
-    const api = window.dashboardIteration;
-    if (!api) return undefined;
-    let live = true;
-    void api.list().then((result) => {
-      if (live && result.ok) setTodoCount(result.items.filter((task) => task.status === 'open' || task.status === 'in_progress').length);
-    }).catch(() => undefined);
-    return () => { live = false; };
-  }, [profile]);
   const selectNav = (id: IntakeDestination) => { setBackStack([]); setActive(id); rememberPreviewPage(id); };
   const jump = (id: IntakeDestination) => { setBackStack((stack) => [...stack, active]); setActive(id); rememberPreviewPage(id); };
   const goBack = () => {
@@ -185,12 +171,12 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   };
   useLayoutEffect(() => {
     if (!seatLibraryOnly) return;
-    if (active !== 'wording' && active !== 'sop' && active !== 'overview') setActive('overview');
+    if (active !== 'wording' && active !== 'sop') setActive('wording');
   }, [seatLibraryOnly, active]);
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
-    () => navItems.find((item) => item.id === active) ?? { id: 'overview' as const, label: '概览', group: '经营总览' as const },
+    () => navItems.find((item) => item.id === active) ?? intakeDestinationItem(active),
     [active, navItems],
   );
 
@@ -199,34 +185,32 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
   }, [active]);
 
   useEffect(() => {
-    if (active === 'content') setKeepContent(true);
-  }, [active]);
-
-  useEffect(() => {
     const api = window.dashboardContent;
     if (!api) return undefined;
     let live = true;
+    const applySignedOut = () => {
+      sessionConfirmed.current = false;
+      setSessionJob(null);
+      setContentSignedIn(false);
+      setContentRole(null);
+      setJobKnown(false);
+    };
     const load = () => {
+      const epoch = ++sessionEpoch.current;
       void Promise.resolve(api.session()).then((result) => {
-        if (!live) return;
-        const nextSignedIn = result.ok === true && result.signedIn === true;
-        setSessionJob(result.ok ? result.job ?? null : null);
-        setContentSignedIn(result.ok ? result.signedIn : false);
+        if (!live || epoch !== sessionEpoch.current) return;
+        if (!result.ok || !result.signedIn) {
+          applySignedOut();
+          return;
+        }
+        sessionConfirmed.current = true;
+        setSessionJob(result.job ?? null);
+        setContentSignedIn(true);
+        setContentRole(result.role);
         setJobKnown(true);
-        setRefreshLabel(
-          nextSignedIn
-            ? (sessionDisplayName({
-              role: result.role,
-              mappedName: result.displayName,
-            }) ?? DASHBOARD_MANIFEST.banners.refreshLabel)
-            : DASHBOARD_MANIFEST.banners.refreshLabel,
-        );
       }).catch(() => {
-        if (!live) return;
-        setSessionJob(null);
-        setContentSignedIn(false);
-        setJobKnown(true);
-        setRefreshLabel(DASHBOARD_MANIFEST.banners.refreshLabel);
+        if (!live || epoch !== sessionEpoch.current || sessionConfirmed.current) return;
+        applySignedOut();
       });
     };
     load();
@@ -237,7 +221,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
       window.removeEventListener('focus', load);
       stopSession?.();
     };
-  }, [profile]);
+  }, []);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -586,7 +570,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
     <IntakeAntdTheme>
     <div
       ref={shellRef}
-      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''}${profile === 'intake' ? ' is-intake' : ''}`}
+      className={`dashboard-shell${navCollapsed ? ' is-nav-collapsed' : ''} is-intake`}
       data-testid="dashboard-shell"
       data-window-role="dashboard"
       data-nav-collapsed={navCollapsed}
@@ -625,9 +609,10 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-testid="dashboard-titlebar-control-island"
         >
         <div className="dashboard-nav-chrome dashboard-no-drag" data-testid="dashboard-nav-chrome">
-          <button
+          <Button
             ref={navToggleRef}
-            type="button"
+            htmlType="button"
+            autoInsertSpace={false}
             className="dashboard-nav-toggle dashboard-no-drag"
             aria-controls="dashboard-primary-navigation"
             aria-expanded={!navCollapsed}
@@ -646,7 +631,7 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             <span className="dashboard-nav-toggle-icon is-expand-glyph" aria-hidden="true">
               <DashboardChromeIcon id="panel-open" />
             </span>
-          </button>
+          </Button>
         </div>
         </div>
         <div
@@ -675,9 +660,10 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             return (
               <div className="dashboard-nav-item" key={item.id}>
                 {showGroup && lastGroupIndex(item, navItems) > 0 ? <span className="dashboard-nav-gap" aria-hidden="true" /> : null}
-                <button
+                <Button
                   id={`dash-nav-${item.id}`}
-                  type="button"
+                  htmlType="button"
+                  autoInsertSpace={false}
                   role="tab"
                   aria-controls="dashboard-module-panel"
                   data-nav-group={item.group}
@@ -737,8 +723,8 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
                 >
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={sidebarIcon(item.id)} /></span>
                   <span className="dashboard-nav-label">{item.label}</span>
-                  {profile === 'intake' && item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
-                </button>
+                  {item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
+                </Button>
               </div>
             );
           })}
@@ -765,13 +751,11 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
             aria-hidden="true"
           />
           <div className="dashboard-page-context">
-            {profile === 'intake' ? <p className="intake-crumb">
-              {backStack.length > 0 ? <button type="button" className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></button> : null}
-              <strong>{activeItem.label}</strong></p> : <strong>{activeItem.label}</strong>}
-            {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
-            <p className="dashboard-refresh" data-testid="dashboard-refresh">
-              {profile === 'intake' ? '' : refreshLabel}
+            <p className="intake-crumb">
+              {backStack.length > 0 ? <Button htmlType="button" autoInsertSpace={false} className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></Button> : null}
+              <strong>{jobKnown ? activeItem.label : '正在确认'}</strong>
             </p>
+            {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
           </div>
           <div className="dashboard-topbar-actions dashboard-no-drag">
             <DashboardThemeMenu themeMode={themeMode} onChange={setThemeMode} />
@@ -786,13 +770,24 @@ function DashboardWorkspace({ profile }: { profile: 'legacy' | 'intake' }) {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {active === 'overview' && seatLibraryOnly ? <section className="dash-module" data-testid="module-overview"><h1 className="desk-sr">概览</h1><p>你现在可以查话术。需要看数据或管内容，请联系客服主管。</p></section> : null}
-          {active === 'overview' && !seatLibraryOnly ? <IntakeOverview onOpen={jump} onTodoCount={setTodoCount} onSupplyScript={(question) => { setScriptDraft(question); jump('content'); }} /> : null}
-          {active === 'sop' && <SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? ''} />}
-          <IntakeLibrary active={active === 'wording'} />
-          {!seatLibraryOnly && (keepContent || active === 'content') ? <div hidden={active !== 'content'}><DeskKnowledge draftQuestion={scriptDraft} onDraftConsumed={() => setScriptDraft(null)} /></div> : null}
-          {canOpenPermissions && !seatLibraryOnly ? <div hidden={active !== 'permissions'}><IntakePermissions active={active === 'permissions'} canGrant={canGrant} grantAccess={grantAccess} /></div> : null}
-          {active === 'materials' && !seatLibraryOnly ? <IntakeManagement /> : null}
+          {renderIntakeDestinations({
+            active,
+            canOpenPermissions,
+            seatLibraryOnly,
+            jobKnown,
+            canUploadSop,
+            canUpdateSop,
+            canDeleteSop,
+            sessionKey,
+            uploadBlock: uploadRefusal?.message ?? '',
+            canGrant,
+            grantAccess,
+            onOpen: jump,
+            onTodoCount: setTodoCount,
+            onSupplyScript: (question) => { setScriptDraft(question); jump('content'); },
+            scriptDraft,
+            onDraftConsumed: () => setScriptDraft(null),
+          })}
         </main>
       </div>
     </div>

@@ -1,6 +1,7 @@
 export const INACCURACY_OUTCOME_COPY = Object.freeze({
   heading: '改过之后有没有变好',
   empty: '现在没有已处理的不准待办。',
+  later: '已处理的不准待办出现后，这里比较处理前后 7 天。',
   early: '处理后时间还短，先不比较。',
   failed: '没读到。',
   retry: '重试',
@@ -18,6 +19,7 @@ export type InaccuracyOutcome = Readonly<{
 export type InaccuracyOutcomeList = Readonly<{
   ok: true;
   items: readonly InaccuracyOutcome[];
+  truncated?: boolean;
 }>;
 
 function isCount(value: unknown): value is number {
@@ -37,16 +39,19 @@ function isOutcome(value: unknown): value is InaccuracyOutcome {
 export function parseInaccuracyOutcomeList(value: unknown): InaccuracyOutcomeList | null {
   if (!value || typeof value !== 'object') return null;
   const body = value as Record<string, unknown>;
-  if (!Array.isArray(body.items) || body.items.length > 200) return null;
-  if (!body.items.every(isOutcome)) return null;
+  if (!Array.isArray(body.items)) return null;
+  const truncated = body.items.length > 200;
+  const items = body.items.slice(0, 200);
+  if (!items.every(isOutcome)) return null;
   const seen = new Set<string>();
-  for (const item of body.items) {
+  for (const item of items) {
     if (seen.has(item.scriptId)) return null;
     seen.add(item.scriptId);
   }
   return Object.freeze({
     ok: true as const,
-    items: Object.freeze(body.items.map((item) => Object.freeze({ ...item }))),
+    truncated,
+    items: Object.freeze(items.map((item) => Object.freeze({ ...item }))),
   });
 }
 

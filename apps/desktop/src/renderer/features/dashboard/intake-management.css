@@ -290,7 +290,6 @@
 .dashboard-shell .ant-btn-primary { min-height: 38px; border-radius: 8px; }
 .intake-overview .desk-row-actions button:not(.ant-btn) { min-height: 32px; padding: 4px 12px; }
 .intake-overview section[aria-label] { margin-top: 24px; }
-.dashboard-refresh:empty { display: none; }
 
 /* system sync: status line + remaining time */
 .intake-sync-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border: var(--wb-hair) solid var(--dash-line); border-radius: var(--dash-radius); }

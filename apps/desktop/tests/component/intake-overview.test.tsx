@@ -8,6 +8,7 @@ import type { UsageSourceRow } from '../../src/shared/usage-log-csv';
 import type { DashboardIterationTask } from '../../src/shared/dashboard-iteration';
 import type { DashboardWordingEntry, DashboardWordingView } from '../../src/shared/dashboard-wording';
 import type { DeskItemView, DeskView } from '../../src/shared/desk-knowledge';
+import { WORKBENCH_EMPTY } from '../../src/shared/workbench-empty';
 
 if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
@@ -544,6 +545,39 @@ it('asks a signed-out seat to log in and does not call the read a failure', asyn
   expect(screen.queryByText('话术使用次数')).not.toBeInTheDocument();
 });
 
+it('says 坐席查询后会出现 when usage is not mounted', async () => {
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted })),
+    previewExport: vi.fn(),
+    export: vi.fn(),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const status = await screen.findByTestId('overview-usage-status');
+  expect(status).toHaveTextContent('坐席查询后会出现');
+  expect(status).not.toHaveTextContent('没读到');
+  expect(status).not.toHaveTextContent('请先登录');
+  expect(within(status).queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('坐席查询后会出现');
+  expect(screen.queryByText('这段时间所有查询都有结果。')).not.toBeInTheDocument();
+  expect(screen.queryByText(WORKBENCH_EMPTY.usageUnmounted)).not.toBeInTheDocument();
+  expect(tileText('查询次数')).toBe('查询次数');
+});
+
+it('says 没读到 when a mounted usage read fails for another reason', async () => {
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '服务暂不可用' })),
+    previewExport: vi.fn(),
+    export: vi.fn(),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const status = await screen.findByTestId('overview-usage-status');
+  expect(status).toHaveTextContent('没读到。');
+  expect(within(status).getByRole('button', { name: '重试' })).toBeInTheDocument();
+  expect(status).not.toHaveTextContent('坐席查询后会出现');
+  expect(status).not.toHaveTextContent('请先登录');
+  expect(tileText('查询次数')).toBe('查询次数');
+});
+
 it('shows the digit 0 when the signed-in reads are empty', async () => {
   window.dashboardIteration = {
     list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
@@ -592,4 +626,72 @@ it('says 没读到 and runs the usage read again', async () => {
   expect(tileText('查询次数')).toBe('查询次数0');
   expect(tileText('没查到')).toBe('没查到0');
   expect(screen.queryByText('没读到。')).not.toBeInTheDocument();
+});
+
+it('keeps an unauthorized task read on the logged-out sentence', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED' as const, message: '请先登录' })),
+    start: vi.fn(),
+    close: vi.fn(),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const todo = screen.getByRole('region', { name: '待办' });
+  expect(await within(todo).findByText('请先登录。')).toBeInTheDocument();
+  expect(todo).not.toHaveTextContent('没读到');
+  expect(screen.getByRole('region', { name: '不准的话术' })).toHaveTextContent('请先登录。');
+  expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+  expect(tileText('不准次数')).toBe('不准次数');
+  expect(screen.queryByText('现在没有待办。')).not.toBeInTheDocument();
+});
+
+it('says 没读到 when the task read fails for another reason', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE' as const, message: '服务暂不可用' })),
+    start: vi.fn(),
+    close: vi.fn(),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const todo = screen.getByRole('region', { name: '待办' });
+  expect(await within(todo).findByText('没读到。')).toBeInTheDocument();
+  expect(within(todo).getByRole('button', { name: '重试' })).toBeInTheDocument();
+  expect(todo).not.toHaveTextContent('请先登录');
+  expect(screen.getByRole('region', { name: '不准的话术' })).toHaveTextContent('没读到。');
+  expect(tileText('不准次数')).toBe('不准次数');
+});
+
+it('does not render the frozen sample catalog on the live overview', () => {
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(screen.queryByText(/虚构合成结构样例/)).not.toBeInTheDocument();
+  expect(screen.queryByText('DEMO · 合成数据')).not.toBeInTheDocument();
+  expect(screen.queryByText(/澄芽氨基酸/)).not.toBeInTheDocument();
+  expect(screen.queryByText('较上期')).not.toBeInTheDocument();
+  expect(screen.queryByText('未接入')).not.toBeInTheDocument();
+  expect(screen.queryByText('内容管理')).not.toBeInTheDocument();
+  expect(screen.queryByText('系统同步')).not.toBeInTheDocument();
+  const outcomes = screen.getByTestId('overview-outcomes');
+  expect(outcomes).toHaveTextContent('已处理的不准待办出现后，这里比较处理前后 7 天。');
+  expect(outcomes).not.toHaveTextContent('现在没有已处理的不准待办。');
+});
+
+it('shows the seven-day comparison only from a real outcome read', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
+    start: vi.fn(),
+    close: vi.fn(),
+    outcomes: vi.fn(async () => ({
+      ok: true as const,
+      items: [{
+        scriptId: 'script-a',
+        resolvedAt: '2026-10-20T00:00:00.000Z',
+        ready: true,
+        beforeCount: 4,
+        afterCount: 1,
+        windowDays: 7,
+      }],
+    })),
+  };
+  render(<IntakeOverview onOpen={() => undefined} />);
+  const outcomes = screen.getByTestId('overview-outcomes');
+  expect(await within(outcomes).findByText(/处理前 7 天 4 次，处理后 7 天 1 次。/)).toBeInTheDocument();
+  expect(outcomes).not.toHaveTextContent('已处理的不准待办出现后');
 });

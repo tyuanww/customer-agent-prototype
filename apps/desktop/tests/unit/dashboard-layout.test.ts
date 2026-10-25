@@ -16,6 +16,7 @@ const app = [
   readFileSync(path.join(root, 'src/renderer/components/DashboardBrandFox.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/dashboard/DashboardIcons.tsx'), 'utf8'),
   readFileSync(path.join(root, 'src/renderer/features/dashboard/DashboardThemeMenu.tsx'), 'utf8'),
+  readFileSync(path.join(root, 'src/renderer/features/dashboard/intake-destinations.tsx'), 'utf8'),
 ].join('\n');
 const appearance = readFileSync(
   path.join(root, 'src/renderer/lib/dashboard-appearance.ts'),
@@ -497,10 +498,12 @@ describe('dashboard layout contract', () => {
   });
 
   it('binds the intake wording page to the published catalog', () => {
-    expect(app).toContain('<IntakeLibrary active={active === \'wording\'} />');
+    expect(app).toContain('<IntakeLibrary active={ctx.active === \'wording\'} seatNotice={ctx.seatLibraryOnly} />');
     expect(app).not.toContain('<WordingLibraryModule');
     expect(app).not.toContain('<AnnounceModule');
     expect(app).not.toContain('<ContentModule');
+    expect(app).not.toContain('DASHBOARD_MANIFEST');
+    expect(app).not.toContain("profile: 'legacy'");
   });
 
   it('keeps the catalog pages local to the intake snapshot', () => {
@@ -511,7 +514,8 @@ describe('dashboard layout contract', () => {
   });
 
   it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
-    expect(app).toContain('<SopLibraryModule canUploadSop={canUploadSop} uploadBlock={uploadRefusal?.message ?? \'\'} />');
+    expect(app).toContain('<SopLibraryModule canUploadSop={ctx.canUploadSop} canUpdateSop={ctx.canUpdateSop} canDeleteSop={ctx.canDeleteSop} uploadBlock={ctx.uploadBlock} />');
+    expect(app).toContain('uploadBlock: uploadRefusal?.message ?? \'\'');
     expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
     expect(sopLibrary).not.toContain('allergySopTree()');
     expect(sopLibrary).toContain('data-testid="module-sop"');

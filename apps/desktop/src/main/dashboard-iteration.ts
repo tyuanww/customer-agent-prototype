@@ -81,11 +81,11 @@ export async function dashboardIterationList(
       if (!parsed) return dashboardIterationFailure('UNAVAILABLE');
       items.push(...parsed.items);
       if (parsed.nextCursor === null) {
-        return Object.freeze({ ok: true as const, items: Object.freeze(items), nextCursor: null });
+        return Object.freeze({ ok: true as const, items: Object.freeze(items), nextCursor: null, truncated: false });
       }
       cursor = parsed.nextCursor;
     }
-    return dashboardIterationFailure('UNAVAILABLE');
+    return Object.freeze({ ok: true as const, items: Object.freeze(items), nextCursor: cursor, truncated: true });
   });
 }
 

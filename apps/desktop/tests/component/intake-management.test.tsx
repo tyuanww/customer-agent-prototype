@@ -374,3 +374,35 @@ it('shows publishing as its status and does not offer a material check', async (
     expect(screen.queryByRole('cell', { name: '质量检查' })).not.toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
+
+it('keeps the unavailable sentence when intake is not mounted', async () => {
+  render(<IntakeManagement />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('资料还不能在这里改。请把表交给客服经理。');
+  expect(screen.getByRole('button', { name: '重新读取当前状态' })).toBeEnabled();
+  expect(screen.queryByText('请先在查询窗口登录。')).not.toBeInTheDocument();
+});
+
+it('shows a logged-out read as forbidden and retries other read failures', async () => {
+  const f = setup();
+  window.dashboardIntake!.command = vi.fn(async () => ({
+    ok: false as const, code: 'UNAUTHORIZED', message: '请先在查询窗口登录。', view: null,
+  }));
+  try {
+    render(<IntakeManagement />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('请先在查询窗口登录。');
+    expect(screen.queryByRole('button', { name: /第 1 版/ })).not.toBeInTheDocument();
+    window.dashboardIntake!.command = vi.fn(async () => ({
+      ok: false as const, code: 'UNAVAILABLE', message: '管理服务不可用，请刷新。', view: null,
+    }));
+    window.dashboardIntake!.current = async () => ({
+      ok: false, code: 'UNAVAILABLE', message: '管理服务不可用，请刷新。', view: null,
+    });
+    await f.user.click(screen.getByRole('button', { name: '重新读取当前状态' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('管理服务不可用，请刷新。'));
+    expect(screen.getByRole('button', { name: '重新读取当前状态' })).toBeEnabled();
+    window.dashboardIntake!.current = async () => ({ ok: true, view: f.main.view() });
+    await f.user.click(screen.getByRole('button', { name: '重新读取当前状态' }));
+    expect(await screen.findByText('合成审核员')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
