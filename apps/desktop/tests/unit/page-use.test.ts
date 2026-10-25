@@ -87,7 +87,7 @@ it('keeps page-use channel literals identical in main and the dashboard preload'
 it('does not write the previous person lists after the session epoch changes', async () => {
   const fixture = intakePermissionsData(['query']);
   let epoch = 1;
-  let signedIn = true;
+  const signedIn = true;
   let authorizationCount = 0;
   let releaseHold: () => void = () => undefined;
   let hold = Promise.resolve();
