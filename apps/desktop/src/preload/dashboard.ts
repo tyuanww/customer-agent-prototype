@@ -1,6 +1,6 @@
 import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
-import { isPageUseSnapshot, type PageUseApi, type PageUseSnapshot } from '../shared/page-use';
+import type { PageUseApi, PageUseSnapshot } from '../shared/page-use';
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import type { DeskCommand, DeskKnowledgeApi } from '../shared/desk-knowledge';
@@ -537,16 +537,37 @@ contextBridge.exposeInMainWorld('dashboardDesk', {
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
 } satisfies DeskKnowledgeApi);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function pageUseSnapshot(value: unknown): value is PageUseSnapshot {
+  if (!isRecord(value)) return false;
+  if (value.phase === 'signed-out') return !('permissions' in value) && !('sop' in value);
+  if (value.phase !== 'ready' || typeof value.epoch !== 'number' || !Number.isSafeInteger(value.epoch)) return false;
+  const permissions = value.permissions;
+  const sop = value.sop;
+  if (!isRecord(permissions) || !isRecord(sop)) return false;
+  const permissionsClosed = permissions.state === 'pending' || permissions.state === 'unavailable'
+    || (permissions.state === 'closed' && (permissions.recovery === null || typeof permissions.recovery === 'string'));
+  const permissionsOk = permissionsClosed
+    ? !('body' in permissions)
+    : permissions.state === 'open' && (permissions.body === null || isRecord(permissions.body));
+  const sopClosed = sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed';
+  const sopOk = sopClosed ? !('nodes' in sop) : sop.state === 'open' && Array.isArray(sop.nodes);
+  return permissionsOk && sopOk;
+}
+
 const SIGNED_OUT: PageUseSnapshot = { phase: 'signed-out' };
 
 contextBridge.exposeInMainWorld('dashboardPageUse', {
   current: async () => {
     const value: unknown = await ipcRenderer.invoke(PAGE_USE_CURRENT);
-    return isPageUseSnapshot(value) ? value : SIGNED_OUT;
+    return pageUseSnapshot(value) ? value : SIGNED_OUT;
   },
   onChanged: (listener: (snapshot: PageUseSnapshot) => void) => {
     const handler = (_event: unknown, snapshot: unknown) => {
-      if (isPageUseSnapshot(snapshot)) listener(snapshot);
+      if (pageUseSnapshot(snapshot)) listener(snapshot);
     };
     ipcRenderer.on(PAGE_USE_CHANGED, handler);
     return () => { ipcRenderer.removeListener(PAGE_USE_CHANGED, handler); };
