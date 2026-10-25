@@ -1,6 +1,5 @@
 import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
-import type { PageUseApi, PageUseSnapshot } from '../shared/page-use';
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import type { DeskCommand, DeskKnowledgeApi } from '../shared/desk-knowledge';
@@ -537,7 +536,11 @@ contextBridge.exposeInMainWorld('dashboardDesk', {
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
 } satisfies DeskKnowledgeApi);
 
-function pageUseSnapshot(value: unknown): value is PageUseSnapshot {
+type DashboardPageSnapshot =
+  | { phase: 'signed-out' }
+  | { phase: 'ready'; epoch: number; permissions: Record<string, unknown>; sop: Record<string, unknown> };
+
+function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot {
   if (!isRecord(value)) return false;
   if (value.phase === 'signed-out') return !('permissions' in value) && !('sop' in value);
   if (value.phase !== 'ready' || typeof value.epoch !== 'number' || !Number.isSafeInteger(value.epoch)) return false;
@@ -554,21 +557,21 @@ function pageUseSnapshot(value: unknown): value is PageUseSnapshot {
   return permissionsOk && sopOk;
 }
 
-const SIGNED_OUT: PageUseSnapshot = { phase: 'signed-out' };
+const SIGNED_OUT: DashboardPageSnapshot = { phase: 'signed-out' };
 
 contextBridge.exposeInMainWorld('dashboardPageUse', {
   current: async () => {
     const value: unknown = await ipcRenderer.invoke(PAGE_USE_CURRENT);
     return pageUseSnapshot(value) ? value : SIGNED_OUT;
   },
-  onChanged: (listener: (snapshot: PageUseSnapshot) => void) => {
+  onChanged: (listener: (snapshot: DashboardPageSnapshot) => void) => {
     const handler = (_event: unknown, snapshot: unknown) => {
       if (pageUseSnapshot(snapshot)) listener(snapshot);
     };
     ipcRenderer.on(PAGE_USE_CHANGED, handler);
     return () => { ipcRenderer.removeListener(PAGE_USE_CHANGED, handler); };
   },
-} satisfies PageUseApi);
+});
 
 contextBridge.exposeInMainWorld('dashboardPermissions', {
   current: () => ipcRenderer.invoke('dashboard:permissions-current'),
