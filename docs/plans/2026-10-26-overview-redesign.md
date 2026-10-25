@@ -2,7 +2,7 @@
 
 本文对应任务卡 D5（`docs/plans/2026-10-24-saas-refactor-task-cards.md` 第 6 节）。只描述现状、目标展示和与 C3 口径的对应关系。不写数据库迁移，也不改 Dashboard 代码。
 
-依赖 C3 的分析层口径见 `docs/plans/2026-10-25-analytics-schema.md`。实现阶段另开卡，须在该口径与 D4 清理完成后再动 renderer。
+依赖 C3 的分析层口径见 `docs/plans/2026-10-25-analytics-schema.md`。实现阶段另开卡。旧 profile 页面已经不在概览这条路径上。本说明不删除 `dashboard:wording-list`，也不删除 Query 与 Fox 的产品公告。
 
 ## 目标
 
@@ -31,7 +31,7 @@ FAQ 合成 profile 下，导航 id `overview` 挂载 `IntakeOverview`（`apps/de
 
 使用记录在 Main 侧未挂载时，磁贴不填数字，状态区写「坐席查询后会出现」（`USAGE_LATER`）。读失败时写「没读到。」并可重试。就绪后在磁贴下方展示 `USAGE_SCOPE`，说明查询次数、没查到和被复制只含当前登录者最近读到的查询，不是全店。
 
-`countOverviewUsage` 把 `viewed` 与 `copied` 都计入查询次数，但只把 `copied` 计入「被复制」。这与 `apps/desktop/src/shared/usage-log-csv.ts` 里 `aggregateUsage` 的分组方式不同，后者把非 `miss` 行算作 use。概览页没有调用 `aggregateUsage`，也没有展示命中率或「较上期」类文案（测试在 `intake-overview.test.tsx` 中断言不存在）。
+`countOverviewUsage` 把窗口内每一行都计入查询次数，包括 `miss`、`viewed` 和 `copied`。只有 `copied` 计入「被复制」。只有 `miss` 计入「没查到」。这与 `apps/desktop/src/shared/usage-log-csv.ts` 里 `aggregateUsage` 的分组方式不同。后者把非 `miss` 行算作 use。概览页没有调用 `aggregateUsage`，也没有展示命中率或「较上期」类文案（测试在 `intake-overview.test.tsx` 中断言不存在）。
 
 ### 待办
 
@@ -71,7 +71,7 @@ C3 口径（`docs/plans/2026-10-25-analytics-schema.md`）提议只读视图 `an
 | 无命中率 | `hit_status = no_hit` 的行数 | 同窗 `query_events` 行数 | 「没查到」磁贴是同窗 miss 行计数，可视为无命中次数的本地投影。C3 比率是分母归一化后的值，且分母是服务端事件行，不是按问题文案去重后的 `rankMissRows` |
 | 不准反馈率 | `ops_loop.inaccuracy_reports` 行数 | 同窗 `query_events` 行数 | 「不准次数」磁贴是待办开单阈值聚合后的样本计数总和，分子语义是「记下的样本」，不是同窗全部 inaccuracy 报告行，也不除以查询数 |
 
-无查询时，C3 提议视图把比率留空而不是写 0。概览 today 在读成功但窗口内零行时，磁贴显示数字 0（测试 `shows the digit 0 when the signed-in reads are empty`）。重做后顶栏比率应遵循 C3 空窗语义，列表区仍可用 0 表示「没有行可排」。
+无查询时，C3 提议视图把比率留空而不是写 0。概览在读成功但窗口内零行时，磁贴显示数字 0（测试 `shows the digit 0 when the signed-in reads are empty`）。重做后顶栏比率应遵循 C3 空窗语义，列表区仍可用 0 表示「没有行可排」。
 
 「被复制」没有对应 C3 三比率之一。`vw_owner_agent_daily.copy_rate` 是复制除以提问，属于按人按日视图，与 `analytics.question_v1` 不是同一指标。重做时可保留为补充计数，或移到明细导出，不在三比率磁贴里硬凑。
 
