@@ -93,7 +93,7 @@
 
 ## 查询文本和到期
 
-`query_text_redacted` 存脱敏后的文本。搜索路由在 `apps/api/src/search-routes.ts`。`collection_mode` 为 `synthetic` 时保留这段文本。`pilot_recorded` 只有 `hasAcceptedCurrentNotice` 为真才保留。没接受时，模式改成 `synthetic`，文本不保留，`text_storage_status` 写成 `suppressed`。
+`query_text_redacted` 存脱敏后的文本。搜索路由在 `apps/api/src/search-routes.ts`。请求进来时 `collection_mode` 已是 `synthetic`，文本会保留。`pilot_recorded` 并且调用方注入了 `hasAcceptedCurrentNotice`、结果为未接受时，模式改成 `synthetic`，文本不保留，`text_storage_status` 写成 `suppressed`。依赖没注入时，这段检查不跑。
 
 `query_events.text_expires_at` 和 `event_expires_at` 允许为空。约束 `query_expiry_shape` 要求两者都有值时，文本到期不晚于事件到期。
 
