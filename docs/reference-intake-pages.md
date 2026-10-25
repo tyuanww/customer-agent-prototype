@@ -43,9 +43,13 @@
 
 运行脚本映射的失败文案还有：请选择岗位。请设定密码。人员没有写入，已停止。口令没有写入，已停止。账号没有读取。未知错误码变成「账号没有保存。」IPC 在调用脚本前还会返回：账号输入无效。无权访问此窗口能力。账号还不能在这里改。node 没启动、15 秒超时、标准输出超过 64KiB，或回复通不过 `seatAccountReply`，也是「账号没有保存。」
 
-Electron 主进程把意图交给 `scripts/synthetic-stack/seat-account-runtime.ts`。人员写入合成库 `customer_agent_synthetic`（Unix socket，端口 43199）。口令只以 salt 和 scrypt 哈希写入 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，默认目录是用户主目录的 `.customer-agent-synthetic-stack`。明文密码不进页面、不进数据库、不进 git。
+Electron 主进程把意图交给产品 API 的三个路由（`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0067` 的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
 
-`127.0.0.1:43101` 的 `POST /password` 每次调用 `reloadPasswordAccounts`。口令文件读失败返回 503，错误是 `accounts_unavailable`。读成功后，用户名必须等于 `SYNTHETIC_IDENTITIES` 里的 `bindingId`，再查口令文件。已登记主体改了哈希，下次登录就会读到，不用重启身份服务。新建外包坐席不在这组名字里，所以仍是 401 `invalid_credentials`。`POST /exchange` 只接受 `ALLOWED_BINDINGS`，也就是同一组登记主体。
+口令只以 salt 和 scrypt 哈希写入服务端 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，由身份服务的 `/password` 每次重读，所以写入立即生效。明文密码不进页面、不进数据库、不进 git。
+
+旧路径（桌面 `spawn` `scripts/synthetic-stack/seat-account-runtime.ts` 并以 `stack_owner` 连 `customer_agent_synthetic`）已删除：那个脚本不在安装包内，那个 socket 也不在坐席的机器上，所以按钮在打包版里从未成功过。
+
+`127.0.0.1:43101` 的 `POST /password` 每次调用 `reloadPasswordAccounts`。口令文件读失败返回 503，错误是 `accounts_unavailable`。固定名单里的用户名仍按 `SYNTHETIC_IDENTITIES` 核验。名单之外，只有口令文件里的 `bindingId` 正好是 `synthetic_seat_<登录名>`、且数据库里该绑定 `enabled = true`，才发登录码。停用后同一口令被拒。`POST /exchange` 对固定名单照旧；对坐席绑定再查一次 `enabled`，所以停用发生在发码之后也不能换票。
 
 浏览器地址带 `preview=intake` 且主机是 `127.0.0.1` 或 `localhost` 时，坐席列表、新建、重置、停用只改这块页面的内存，不写口令文件，也不写数据库。
 

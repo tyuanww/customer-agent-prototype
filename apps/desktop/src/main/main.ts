@@ -275,7 +275,7 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakePermissions = registerContentIntakePermissionsIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
-    seatAccounts = registerSeatAccountIpc(
+    seatAccounts = registerSeatAccountIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
       () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench,

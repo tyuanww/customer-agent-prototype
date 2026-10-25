@@ -152,6 +152,23 @@ export function passwordMatches(account: PasswordAccount, password: string): boo
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+/** True only when the binding is an enabled seat row. A throw is treated as no. */
+export type SeatBindingEnabled = (bindingId: string) => Promise<boolean>;
+
+const SEAT_USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The binding id `create_seat` derives. A password-file row that names any other
+ *  binding is not a seat login, even if the username looks plausible. */
+export function seatBindingIdFor(username: string): string | null {
+  if (!SEAT_USERNAME.test(username)) return null;
+  return `synthetic_seat_${username}`;
+}
+
+export function isSeatBindingId(bindingId: string): boolean {
+  if (!bindingId.startsWith('synthetic_seat_')) return false;
+  return seatBindingIdFor(bindingId.slice('synthetic_seat_'.length)) === bindingId;
+}
+
 /** Builds one account row for a given password. Used by the setup command and tests. */
 export function buildAccount(username: string, bindingId: string, password: string): PasswordAccount {
   const salt = randomBytes(16).toString('hex');

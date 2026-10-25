@@ -260,6 +260,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0066_policy_version_restamp',
     requiresPredecessor: 'Inaccuracy outcome read requires the policy restamp',
   },
+  {
+    index: 67,
+    minimumCatalogueLength: 68,
+    id: '0068_seat_lifecycle',
+    predecessorId: '0067_inaccuracy_outcome',
+    requiresPredecessor: 'Seat lifecycle requires the inaccuracy outcome read',
+  },
 ];
 
 function requiredSuccessorStep(

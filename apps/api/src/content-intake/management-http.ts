@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { validateContractSchema } from '@customer-agent/contracts';
 import { qualityReceipt } from './quality-access.js';
 import { QUALITY_LIMITS } from './quality.js';
@@ -7,12 +8,20 @@ import type { ProductAuthService } from '../auth-service.js';
 import { CONTENT_UPLOAD_MAX_BYTES, type ContentObjectStore } from '../content-object-store.js';
 import { createContentIntakeService } from './service.js';
 import { contentIntakeGrantRoutes } from './grants-http.js';
+import { contentIntakeSeatRoutes } from './seats-http.js';
+import { createSeatServiceFromEnv, seatHome, type SeatService } from './seats.js';
 import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import type { IntakePrincipalLabels } from './discovery.js';
 import { intakeFailure, intakeHttpBoundary, intakePageQuery, materialPageQuery, sendIntake } from './http-boundary.js';
 
 const MAX_PENDING_PARSE = 10;
+
+/** `seatHome` throws when the tenant or app is missing, which is the answer: no home means no
+ *  seat routes, and the operator sees a 404 instead of a create that silently lands nowhere. */
+function seatHomeConfigured(): boolean {
+  try { seatHome(process.env); return true; } catch { return false; }
+}
 const noQuery = (request: FastifyRequest) => Object.keys(request.query as object).length === 0;
 const params = (request: FastifyRequest) => request.params as Record<string, string>;
 function version(request: FastifyRequest): number {
@@ -47,6 +56,14 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   const service = createContentIntakeService(pool, store, report, approval,
     { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
   await app.register(contentIntakeGrantRoutes, { auth, service, ...(report ? { report } : {}) });
+
+  // Seat accounts need two things the intake plugin cannot invent: the stack root, to find the
+  // identity server's password file, and the home a seat belongs to. Without both, the routes must
+  // not exist at all rather than answer half of an operation.
+  const seatStackRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
+  const seats: SeatService | null = seatStackRoot && path.isAbsolute(seatStackRoot) && seatHomeConfigured()
+    ? createSeatServiceFromEnv(pool, seatStackRoot, process.env) : null;
+  if (seats) await app.register(contentIntakeSeatRoutes, { auth, seats, ...(report ? { report } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request) || request.body !== undefined || request.headers['transfer-encoding'] !== undefined
       || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {
