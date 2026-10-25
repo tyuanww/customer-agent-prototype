@@ -2,7 +2,7 @@
 
 本文件由 `pnpm --filter @customer-agent/database dictionary` 从真实库生成。不要手改：下一次生成会覆盖，`--check` 会因此失败。
 
-## 关系（4）
+## 关系（5）
 
 ### capability_bindings
 
@@ -29,6 +29,27 @@
 | 名称 | 定义 |
 | --- | --- |
 | `capability_bindings_pkey` | CREATE UNIQUE INDEX capability_bindings_pkey ON backend_identity.capability_bindings USING btree (user_id, capability) |
+
+### feishu_login_links
+
+| 列 | 类型 | 可空 | 默认 | 备注 |
+| --- | --- | --- | --- | --- |
+| `open_id` | `text` | 否 |  |  |
+| `binding_id` | `text` | 否 |  |  |
+
+约束：
+
+| 名称 | 类型 | 定义 |
+| --- | --- | --- |
+| `feishu_login_links_binding_id_fkey` | F | FOREIGN KEY (binding_id) REFERENCES backend_identity.subject_bindings(binding_id) |
+| `feishu_login_links_open_id_check` | C | CHECK ((open_id ~ '^ou_[A-Za-z0-9]{6,64}$'::text)) |
+| `feishu_login_links_pkey` | P | PRIMARY KEY (open_id) |
+
+索引：
+
+| 名称 | 定义 |
+| --- | --- |
+| `feishu_login_links_pkey` | CREATE UNIQUE INDEX feishu_login_links_pkey ON backend_identity.feishu_login_links USING btree (open_id) |
 
 ### login_requests
 
@@ -137,16 +158,22 @@
 | `subject_bindings_provider_tenant_subject_key` | CREATE UNIQUE INDEX subject_bindings_provider_tenant_subject_key ON backend_identity.subject_bindings USING btree (provider, tenant, subject) |
 | `subject_bindings_user_id_key` | CREATE UNIQUE INDEX subject_bindings_user_id_key ON backend_identity.subject_bindings USING btree (user_id) |
 
-## 函数（8）
+## 函数（14）
 
 | 函数 | 参数 | 返回 | 语言 | SECURITY DEFINER | 配置 | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `actor` | `p_token text` | TABLE(user_id text, role text, subject_hash text) | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `admit_feishu_agent` | `p_open_id text` | void | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `attach_feishu_login` | `p_open_id text, p_principal_id text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `begin_callback` | `p_state text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `bind_feishu_subject` | `p_open_id text, p_binding_id text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `complete_callback` | `p_id text, p_binding text` | void | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `create_login` | `p_id text, p_state_hash text, p_challenge text` | void | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `create_seat` | `p_username text, p_display_name text, p_post text, p_tenant_id text, p_app_id text, p_department_id text, p_assigned_by text` | TABLE(out_principal_id text, out_binding_id text, out_user_id text, out_job_id text, out_role text) | plpgsql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
+| `disable_seat` | `p_username text, p_tenant_id text, p_app_id text` | void | plpgsql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
+| `establish_feishu_login` | `p_login_id text, p_open_id text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `exchange` | `p_id text, p_verifier text, p_new_token text` | timestamp with time zone | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `list_seats` | `p_tenant_id text, p_app_id text` | TABLE(out_username text, out_display_name text, out_post text, out_enabled boolean) | sql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
 | `logout` | `p_token text` | void | sql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `sessions_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 

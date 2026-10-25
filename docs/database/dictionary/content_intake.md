@@ -2,7 +2,7 @@
 
 本文件由 `pnpm --filter @customer-agent/database dictionary` 从真实库生成。不要手改：下一次生成会覆盖，`--check` 会因此失败。
 
-## 关系（57）
+## 关系（58）
 
 ### approval_current
 
@@ -1050,6 +1050,33 @@
 | `scopes_scope_id_tenant_id_app_id_key` | CREATE UNIQUE INDEX scopes_scope_id_tenant_id_app_id_key ON content_intake.scopes USING btree (scope_id, tenant_id, app_id) |
 | `scopes_tenant_id_app_id_brand_id_shop_id_domain_key` | CREATE UNIQUE INDEX scopes_tenant_id_app_id_brand_id_shop_id_domain_key ON content_intake.scopes USING btree (tenant_id, app_id, brand_id, shop_id, domain) NULLS NOT DISTINCT |
 
+### seat_posts
+
+| 列 | 类型 | 可空 | 默认 | 备注 |
+| --- | --- | --- | --- | --- |
+| `principal_id` | `content_intake.identifier` | 否 |  |  |
+| `tenant_id` | `content_intake.identifier` | 否 |  |  |
+| `app_id` | `content_intake.identifier` | 否 |  |  |
+| `department_id` | `content_intake.identifier` | 否 |  |  |
+| `job_id` | `content_intake.identifier` | 否 |  |  |
+| `assigned_at` | `timestamp with time zone` | 否 | `clock_timestamp()` |  |
+| `assigned_by` | `text` | 否 |  |  |
+
+约束：
+
+| 名称 | 类型 | 定义 |
+| --- | --- | --- |
+| `seat_posts_assigned_at_check` | C | CHECK (isfinite(assigned_at)) |
+| `seat_posts_assigned_by_check` | C | CHECK (((length(assigned_by) >= 1) AND (length(assigned_by) <= 128))) |
+| `seat_posts_pkey` | P | PRIMARY KEY (principal_id) |
+| `seat_posts_principal_id_tenant_id_app_id_fkey` | F | FOREIGN KEY (principal_id, tenant_id, app_id) REFERENCES content_intake.principals(principal_id, tenant_id, app_id) |
+
+索引：
+
+| 名称 | 定义 |
+| --- | --- |
+| `seat_posts_pkey` | CREATE UNIQUE INDEX seat_posts_pkey ON content_intake.seat_posts USING btree (principal_id) |
+
 ### shop_directory_key_events
 
 | 列 | 类型 | 可空 | 默认 | 备注 |
@@ -1774,7 +1801,7 @@
 | `write_attempts_import_batch_id_key` | CREATE UNIQUE INDEX write_attempts_import_batch_id_key ON content_intake.write_attempts USING btree (import_batch_id) |
 | `write_attempts_pkey` | CREATE UNIQUE INDEX write_attempts_pkey ON content_intake.write_attempts USING btree (actor_id, action, operation_id) |
 
-## 函数（83）
+## 函数（87）
 
 | 函数 | 参数 | 返回 | 语言 | SECURITY DEFINER | 配置 | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1817,6 +1844,7 @@
 | `preview_rollback` | `p_actor text, p_base text, p_target text` | jsonb | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `principal_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 | `project_feishu_roster` | `p_principal_id text, p_user_id text, p_tenant_id text, p_app_id text, p_identity_scope text, p_person_key text, p_department_ids text[], p_job_id text, p_role text, p_actions text[]` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `project_seat_login` | `p_binding_id text` | text | plpgsql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
 | `project_sop_release_media` | `` | trigger | plpgsql | 是 | `search_path=pg_catalog` | 本仓 |
 | `publication_family_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 | `publish_candidate` | `p_actor text, p_request jsonb, p_observation jsonb` | jsonb | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
@@ -1829,6 +1857,7 @@
 | `register_sop_candidate_rows` | `p_actor text, p_id text, p_version bigint, p_rows jsonb` | void | plpgsql | 是 | `search_path=pg_catalog` | 本仓 |
 | `reserve_sop_media_payload` | `p_actor text, p_job text, p_media text, p_sha text, p_bytes bigint, p_mime text` | jsonb | sql | 是 | `search_path=pg_catalog` | 本仓 |
 | `restamp_query_grants` | `` | trigger | plpgsql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
+| `restamp_query_grants_for_policy` | `` | trigger | plpgsql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
 | `review_binding_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 | `review_package_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 | `revise_unused_sop_row` | `p_actor text, p_id text, p_version bigint, p_digest text, p_row text` | jsonb | plpgsql | 是 | `search_path=pg_catalog` | 本仓 |
@@ -1839,6 +1868,8 @@
 | `roster_day_one` | `p_tenant_id text, p_app_id text` | TABLE(policy_version bigint, store_set_version bigint, provenance text, grant_id text, source_id text, roster_job_id text) | sql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `roster_permission_for_user` | `p_user_id text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `rotate_shop_directory_key` | `p_tenant text, p_app text, p_key_id text, p_material text, p_valid_until timestamp with time zone, p_expected_version bigint, p_reason text, p_operation text` | jsonb | plpgsql | 是 | `search_path=pg_catalog` | 本仓 |
+| `seat_administration_allowed` | `p_user_id text` | boolean | sql | 是 | `search_path=pg_catalog, pg_temp` | 本仓 |
+| `seat_post_mapping` | `p_post text` | TABLE(out_job_id text, out_role text, out_session_role text) | sql | 否 | `search_path=pg_catalog` | 本仓 |
 | `selection_ids_valid` | `ids text[]` | boolean | sql | 否 | `search_path=pg_catalog` | 本仓 |
 | `shop_directory_event_immutable` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 | `shop_directory_revision_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
@@ -1862,7 +1893,7 @@
 | `withdraw_roster_query` | `p_principal_id text, p_tenant_id text, p_app_id text` | text | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `write_attempt_guard` | `` | trigger | plpgsql | 否 | `search_path=pg_catalog` | 本仓 |
 
-## 触发器（72）
+## 触发器（73）
 
 | 触发器 | 表 | 定义 | 状态 |
 | --- | --- | --- | --- |
@@ -1897,6 +1928,7 @@
 | `intake_worker_terminal_only` | `parse_jobs` | CREATE TRIGGER intake_worker_terminal_only BEFORE UPDATE ON content_intake.parse_jobs FOR EACH ROW EXECUTE FUNCTION intake_runtime.worker_terminal_only() | 启用 |
 | `parse_format` | `parse_jobs` | CREATE TRIGGER parse_format BEFORE INSERT ON content_intake.parse_jobs FOR EACH ROW EXECUTE FUNCTION content_intake.parse_format_guard() | 启用 |
 | `parse_object` | `parse_jobs` | CREATE TRIGGER parse_object BEFORE INSERT OR DELETE OR UPDATE ON content_intake.parse_jobs FOR EACH ROW EXECUTE FUNCTION content_intake.parse_object_guard() | 启用 |
+| `restamp_query_grants_for_policy` | `policy_versions` | CREATE TRIGGER restamp_query_grants_for_policy AFTER UPDATE OF version ON content_intake.policy_versions FOR EACH ROW EXECUTE FUNCTION content_intake.restamp_query_grants_for_policy() | 启用 |
 | `immutable_history` | `principal_facts` | CREATE TRIGGER immutable_history BEFORE DELETE OR UPDATE ON content_intake.principal_facts FOR EACH ROW EXECUTE FUNCTION content_intake.immutable_history() | 启用 |
 | `organization_fact_evidence` | `principal_facts` | CREATE CONSTRAINT TRIGGER organization_fact_evidence AFTER INSERT ON content_intake.principal_facts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN ((CURRENT_USER = 'intake_org_writer'::name)) EXECUTE FUNCTION intake_organization.fact_evidence_required() | 启用 |
 | `principal_version` | `principals` | CREATE TRIGGER principal_version BEFORE DELETE OR UPDATE ON content_intake.principals FOR EACH ROW EXECUTE FUNCTION content_intake.principal_guard() | 启用 |

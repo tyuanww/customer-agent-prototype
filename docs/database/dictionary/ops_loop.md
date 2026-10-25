@@ -140,7 +140,7 @@
 | `sop_nodes_pkey` | CREATE UNIQUE INDEX sop_nodes_pkey ON ops_loop.sop_nodes USING btree (node_id) |
 | `sop_nodes_session_lifecycle` | CREATE INDEX sop_nodes_session_lifecycle ON ops_loop.sop_nodes USING btree (product_session_id, lifecycle, sort_key, node_id) |
 
-## 函数（10）
+## 函数（11）
 
 | 函数 | 参数 | 返回 | 语言 | SECURITY DEFINER | 配置 | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -148,6 +148,7 @@
 | `delete_sop_node` | `p_node_id text, p_expected_version integer, p_actor_role text` | ops_loop.sop_nodes | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `evidence_hash` | `p_script_version integer, p_rank integer, p_content_hash text` | text | sql | 否 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `import_sop_catalog` | `p_product_session_id text, p_nodes jsonb, p_actor_user_id text, p_actor_role text` | TABLE(ok boolean, product_session_id text, node_count integer) | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
+| `list_resolved_inaccuracy_outcomes` | `p_actor_role text` | TABLE(script_id text, resolved_at timestamp with time zone, ready boolean, before_count integer, after_count integer, window_days integer) | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `list_software_releases` | `p_actor_role text` | TABLE(version text, platform text, sha256 text, download_url text, created_at timestamp with time zone, signed boolean) | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `mutate_script` | `p_script_id text, p_action text, p_expected_version integer, p_title text, p_answer_text text, p_effective_from timestamp with time zone, p_effective_to timestamp with time zone, p_actor_user_id text, p_actor_role text` | TABLE(ok boolean, script_id text, mutation_id text, review_status text) | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
 | `patch_sop_node` | `p_node_id text, p_expected_version integer, p_title text, p_body text, p_sort_key integer, p_actor_role text` | ops_loop.sop_nodes | plpgsql | 是 | `search_path=pg_catalog, public, pg_temp` | 本仓 |
