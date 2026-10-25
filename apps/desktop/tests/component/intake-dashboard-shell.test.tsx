@@ -80,7 +80,20 @@ function cleanupDashboardWithWindowBridges() {
   delete window.dashboardIntakeCatalog;
   delete window.dashboardContent;
   delete window.dashboardPermissions;
+  delete window.dashboardPageUse;
   vi.unstubAllGlobals();
+}
+
+function showPermissionsNav() {
+  window.dashboardPageUse = {
+    current: async () => ({
+      phase: 'ready' as const,
+      epoch: 1,
+      permissions: { state: 'open' as const, body: null },
+      sop: { state: 'closed' as const },
+    }),
+    onChanged: () => () => undefined,
+  };
 }
 
 afterEach(cleanupDashboardWithWindowBridges);
@@ -175,6 +188,7 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
 it('preserves an unsaved permission preview across outer navigation',async()=>{
   const fixture=intakePermissionsData(),owner=new ContentIntakePermissions(fixture.session),user=userEvent.setup();
   window.dashboardPermissions={current:async()=>({ok:true,view:owner.view()}),command:async c=>({ok:true,view:await owner.command(c)}),onInvalidated:fn=>owner.subscribe(fn)};
+  showPermissionsNav();
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();allowGrant();render(<DashboardApp/>);
     expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
@@ -222,6 +236,7 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
   };
   const owner = new ContentIntakePermissions(intakePermissionsData().session);
   window.dashboardPermissions = { current: async () => ({ ok: true, view: owner.view() }), command: async (command) => ({ ok: true, view: await owner.command(command) }), onInvalidated: (fn) => owner.subscribe(fn) };
+  showPermissionsNav();
   window.dashboardSeats = { command: async (intent) => (intent.action === 'list' ? { ok: true, action: 'list' as const, seats: [] } : { ok: false, message: '未保存' }) };
   installShippedDashboardCss();
   document.documentElement.style.width = '980px';
@@ -250,8 +265,7 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP');
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('上传 CSV 会替换现在的 SOP');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('没有权限，请找人开通。');
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
@@ -292,6 +306,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
   };
   const owner = new ContentIntakePermissions(intakePermissionsData().session);
   window.dashboardPermissions = { current: async () => ({ ok: true, view: owner.view() }), command: async (command) => ({ ok: true, view: await owner.command(command) }), onInvalidated: (fn) => owner.subscribe(fn) };
+  showPermissionsNav();
   window.dashboardSeats = { command: async (intent) => (intent.action === 'list' ? { ok: true, action: 'list' as const, seats: [] } : { ok: false, message: '未保存' }) };
   const usageRows: UsageLogRow[] = [
     { id: '1', askedAt: '2026-10-13T01:02:03.000Z', agent: '坐席甲', question: '退货多久', scriptTitle: '退货时效', result: 'copied', snapshotStale: false },

@@ -2,6 +2,7 @@ import { Button, Empty, Input, Modal, Select, Table, type ButtonProps, type Tabl
 import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import './workbench-v9.css';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionReply, type IntakePermissionView } from '@shared/content-intake-permissions';
+import type { PermissionsUse } from '@shared/page-use';
 import { type AsyncResource } from '@shared/async-resource';
 import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
@@ -175,14 +176,12 @@ function resourceFromReply(reply: IntakePermissionReply): { resource: AsyncResou
   return { resource: { status: 'ready', value: reply.view }, problem: '' };
 }
 
-/** `grantAccess` is the display decision for the grant button, computed by the shell from the
- *  session job. `grantBlock` is the older single-sentence form, still accepted from callers that
- *  have not moved to the structured block. Neither decides access: the server still checks. */
-export function IntakePermissions({ active, canGrant = false, grantBlock = '', grantAccess = null }: {
+export function IntakePermissions({ active, canGrant = false, grantBlock = '', grantAccess = null, gate = null }: {
   active: boolean;
   canGrant?: boolean;
   grantBlock?: string;
   grantAccess?: AccessBlock | null;
+  gate?: Extract<PermissionsUse, { state: 'open' }> | null;
 }) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
@@ -217,7 +216,8 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     }
   }, [allowRead], active ? { status: 'loading' } : { status: 'idle' }, { retainReady: true });
   resourceRef.current = resource;
-  const view = resource.status === 'ready' ? resource.value : null;
+  const view = gate?.body ?? (resource.status === 'ready' ? resource.value : null);
+  const loading = view === null && resource.status === 'loading';
   const apply = useCallback(async (command?: IntakePermissionCommand): Promise<boolean> => {
     if (pending.current && command?.action !== 'stop') return false;
     const gen = ++generation.current;
@@ -251,7 +251,6 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     }
   }, [replace]);
   useEffect(()=>{
-    // 切走再回来时页面仍挂着。再读一次会清掉还没保存的预览。
     if(active)setAllowRead(true);
   },[active]);
   useEffect(()=>{
@@ -270,7 +269,6 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   const disabled=busy || !!view?.busy || !!view?.pending;
   const readAgain=()=>{
     if(pending.current)return;
-    // A later read must not replace the logged-out sentence with a loading flash.
     if(resource.status==='forbidden'){reload();return;}
     void apply({action:'refresh'});
   };
@@ -318,9 +316,9 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   ];
   return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="权限配置">
     <h1 className="desk-sr">权限配置</h1>
-    {resource.status === 'loading' ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
-    {resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
-    {resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
+    {loading ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
+    {!gate && resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
+    {!gate && resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
     {error && !grantOpen && <WorkbenchFailed message={error} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" />}{view?.notice && <p role="status">{view.notice}</p>}
     {view?.pending && <WorkbenchUncertain
       message={view.resultUnknown ? '不确定授权是否已保存。请按原请求确认，不要重新开通；关闭窗口会丢失这次请求。' : '正在确认授权结果，请勿重复开通。'}
@@ -340,14 +338,14 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
           {job==='grants'
-            ? (canGrant
+            ? ((gate || canGrant)
               ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
               : null)
             : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建坐席</DeskButton>}
         </span>
       </div>
-      {job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
-        : grantBlock ? <p role="status">{grantBlock}</p> : null}
+      {!gate && job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
+        : !gate && grantBlock ? <p role="status">{grantBlock}</p> : null}
       <div hidden={job!=='grants'}>
         <div className="sub"><label className="lbl" htmlFor="permissions-scope">配置范围</label>
           <Select<string> id="permissions-scope" aria-label="配置范围" style={{width:260}} disabled={disabled || !!view.preview} value={view.source ?? undefined} placeholder="请选择已有范围" virtual={false}

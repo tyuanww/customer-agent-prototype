@@ -6,7 +6,6 @@ import {
   SOP_UPLOAD_MAX_BYTES,
   sopAllergyStepNeedsStopCopy,
   sopCsvAllergyStopMissing,
-  sopUploadRefusal,
   type DashboardOpsFailure,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
@@ -58,7 +57,7 @@ function asFailure(error: unknown): DashboardOpsFailure {
 
 async function withSession<T>(
   session: DashboardOpsSessionClient | null,
-  roles: readonly string[],
+  roles: readonly string[] | null,
   work: (client: DashboardOpsSessionClient, epoch: number) => Promise<T | DashboardOpsFailure>,
 ): Promise<T | DashboardOpsFailure> {
   if (!session) return dashboardOpsFailure('UNAVAILABLE', OPS_LOOP_COPY.noProduct);
@@ -67,7 +66,7 @@ async function withSession<T>(
   if (!view.signedIn || view.role === null) {
     return dashboardOpsFailure('UNAUTHORIZED', OPS_LOOP_COPY.noSession);
   }
-  if (!roles.includes(view.role)) return dashboardOpsFailure('FORBIDDEN', OPS_LOOP_COPY.forbidden);
+  if (roles && !roles.includes(view.role)) return dashboardOpsFailure('FORBIDDEN', OPS_LOOP_COPY.forbidden);
   try {
     return await work(session, view.sessionEpoch);
   } catch (error) {
@@ -97,7 +96,7 @@ export async function dashboardRetrievalMetrics(
 export async function dashboardSopCatalog(
   session: DashboardOpsSessionClient | null,
 ): Promise<DashboardSopCatalog | DashboardOpsFailure> {
-  return withSession(session, ['agent', 'coach', 'owner'], async (client, epoch) => {
+  return withSession(session, null, async (client, epoch) => {
     const result = await client.request(epoch, '/v1/sop/catalog');
     const parsed = parseContractSchema('SopCatalogResponse', result.value);
     return Object.freeze({
@@ -118,9 +117,7 @@ export async function dashboardSopImport(
   if (sopCsvAllergyStopMissing(csvText)) {
     return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
   }
-  return withSession(session, ['coach', 'owner'], async (client, epoch) => {
-    const refusal = sopUploadRefusal(client.view().job);
-    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
+  return withSession(session, null, async (client, epoch) => {
     const form = new FormData();
     form.append('file', new Blob([csvText], { type: 'text/csv' }), 'sop.csv');
     const result = await client.request(epoch, '/v1/sop/import', {
@@ -151,9 +148,7 @@ export async function dashboardSopPatch(
     && sopAllergyStepNeedsStopCopy(record.title, record.body)) {
     return dashboardOpsFailure('VALIDATION', OPS_LOOP_COPY.allergyStop);
   }
-  return withSession(session, ['coach', 'owner'], async (client, epoch) => {
-    const refusal = sopUploadRefusal(client.view().job);
-    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
+  return withSession(session, null, async (client, epoch) => {
     const result = await client.request(
       epoch,
       `/v1/sop/nodes/${encodeURIComponent(nodeId)}`,
@@ -184,9 +179,7 @@ export async function dashboardSopDelete(
   if (typeof nodeId !== 'string' || !Number.isInteger(expectedVersion)) {
     return dashboardOpsFailure('VALIDATION');
   }
-  return withSession(session, ['owner'], async (client, epoch) => {
-    const refusal = sopUploadRefusal(client.view().job);
-    if (refusal) return dashboardOpsFailure(refusal.code, refusal.message);
+  return withSession(session, null, async (client, epoch) => {
     const result = await client.request(
       epoch,
       `/v1/sop/nodes/${encodeURIComponent(nodeId)}`,

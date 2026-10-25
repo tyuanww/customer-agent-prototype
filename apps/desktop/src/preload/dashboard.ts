@@ -27,6 +27,8 @@ const OPS_SCRIPT_DELETE = 'dashboard:ops-script-delete';
 const OPS_SOFTWARE = 'dashboard:ops-software';
 const OPS_SOFTWARE_OPEN = 'dashboard:ops-software-open';
 const PRODUCT_SESSION_CHANGED = 'product:session-changed';
+const PAGE_USE_CURRENT = 'dashboard:page-use-current';
+const PAGE_USE_CHANGED = 'dashboard:page-use-changed';
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -533,6 +535,57 @@ contextBridge.exposeInMainWorld('dashboardDesk', {
   current: () => ipcRenderer.invoke('dashboard:desk-current'),
   command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
 } satisfies DeskKnowledgeApi);
+
+type DashboardPageSnapshot =
+  | { phase: 'signed-out' }
+  | { phase: 'ready'; epoch: number; permissions: Record<string, unknown>; sop: Record<string, unknown> };
+
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function permissionsPayload(permissions: Record<string, unknown>): boolean {
+  if (permissions.state === 'pending' || permissions.state === 'unavailable') return onlyKeys(permissions, ['state']);
+  if (permissions.state === 'closed') {
+    return onlyKeys(permissions, ['state', 'recovery'])
+      && (permissions.recovery === null || typeof permissions.recovery === 'string');
+  }
+  return permissions.state === 'open'
+    && onlyKeys(permissions, ['state', 'body'])
+    && (permissions.body === null || isRecord(permissions.body));
+}
+
+function sopPayload(sop: Record<string, unknown>): boolean {
+  if (sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed') return onlyKeys(sop, ['state']);
+  return sop.state === 'open' && onlyKeys(sop, ['state', 'nodes']) && Array.isArray(sop.nodes);
+}
+
+function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot {
+  if (!isRecord(value)) return false;
+  if (value.phase === 'signed-out') return onlyKeys(value, ['phase']);
+  if (value.phase !== 'ready' || typeof value.epoch !== 'number' || !Number.isSafeInteger(value.epoch)) return false;
+  if (!onlyKeys(value, ['phase', 'epoch', 'permissions', 'sop'])) return false;
+  const permissions = value.permissions;
+  const sop = value.sop;
+  if (!isRecord(permissions) || !isRecord(sop)) return false;
+  return permissionsPayload(permissions) && sopPayload(sop);
+}
+
+const SIGNED_OUT: DashboardPageSnapshot = { phase: 'signed-out' };
+
+contextBridge.exposeInMainWorld('dashboardPageUse', {
+  current: async () => {
+    const value: unknown = await ipcRenderer.invoke(PAGE_USE_CURRENT);
+    return pageUseSnapshot(value) ? value : SIGNED_OUT;
+  },
+  onChanged: (listener: (snapshot: DashboardPageSnapshot) => void) => {
+    const handler = (_event: unknown, snapshot: unknown) => {
+      if (pageUseSnapshot(snapshot)) listener(snapshot);
+    };
+    ipcRenderer.on(PAGE_USE_CHANGED, handler);
+    return () => { ipcRenderer.removeListener(PAGE_USE_CHANGED, handler); };
+  },
+});
 
 contextBridge.exposeInMainWorld('dashboardPermissions', {
   current: () => ipcRenderer.invoke('dashboard:permissions-current'),

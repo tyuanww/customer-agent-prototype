@@ -50,7 +50,7 @@ export const INTAKE_DESTINATION_ROWS = [
     blurb: '授权',
     group: '治理与架构',
     audience: 'staff',
-    needsPermissionBridge: true,
+    needsPermissionBridge: false,
     keepAlive: true,
   },
 ] as const satisfies readonly {
@@ -115,14 +115,22 @@ export function readIntakePreviewPage(
   return 'overview';
 }
 
+export function intakeRowVisible(
+  row: IntakeDestinationRow,
+  canOpenPermissions: boolean,
+  seatLibraryOnly: boolean,
+  jobKnown: boolean,
+): boolean {
+  if (row.id === 'permissions') return canOpenPermissions;
+  if (row.audience === 'staff' && (!jobKnown || seatLibraryOnly)) return false;
+  if (row.needsPermissionBridge && !canOpenPermissions) return false;
+  return true;
+}
+
 export function intakeSidebarItems(
   canOpenPermissions: boolean,
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): readonly IntakeSidebarItem[] {
-  return INTAKE_DESTINATION_ROWS.filter((row) => {
-    if (row.audience === 'staff' && (!jobKnown || seatLibraryOnly)) return false;
-    if (row.needsPermissionBridge && !canOpenPermissions) return false;
-    return true;
-  });
+  return INTAKE_DESTINATION_ROWS.filter((row) => intakeRowVisible(row, canOpenPermissions, seatLibraryOnly, jobKnown));
 }

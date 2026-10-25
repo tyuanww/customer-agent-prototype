@@ -61,6 +61,7 @@ export function registerSeatAccountIpc(
   devUrl: () => string | undefined,
   enabled: () => boolean,
   allowsWrite: () => boolean,
+  listSeats: ((epoch: number) => Promise<{ readonly seats: readonly SeatAccountRecord[] } | { readonly state: 'closed' }>) | null = null,
 ) {
   async function request(epoch: number, path: string, init: { method: 'GET' | 'POST' | 'DELETE'; body?: unknown }) {
     const response = await session!.request(epoch, path, { ...init, maxResponseBytes: 262_144 });
@@ -72,16 +73,10 @@ export function registerSeatAccountIpc(
     const epoch = session.view().sessionEpoch;
     try {
       if (intent.action === 'list') {
-        const value = await request(epoch, '/v1/intake/seats', { method: 'GET' });
-        const rows = (value as { seats?: unknown }).seats;
-        if (!Array.isArray(rows)) return NOT_SAVED;
-        const seats: SeatAccountRecord[] = [];
-        for (const row of rows) {
-          const seat = sameRow(row);
-          if (!seat) return NOT_SAVED;
-          seats.push(seat as SeatAccountRecord);
-        }
-        return { ok: true, action: 'list', seats };
+        if (!listSeats) return DENIED;
+        const listed = await listSeats(epoch);
+        if (!('seats' in listed)) return DENIED;
+        return { ok: true, action: 'list', seats: [...listed.seats] };
       }
       if (intent.action === 'create') {
         const value = await request(epoch, '/v1/intake/seats', {

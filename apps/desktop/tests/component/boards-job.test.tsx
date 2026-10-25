@@ -1,18 +1,27 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
-import { observeSessionJob, UNRESOLVED_JOB_LABEL, type SessionJobView } from '../../src/shared/product-session';
+import { observeSessionJob, type SessionJobView } from '../../src/shared/product-session';
+import type { PageUseSnapshot } from '../../src/shared/page-use';
 afterEach(() => {
   cleanup();
   delete window.dashboardIntake;
   delete window.dashboardContent;
   delete window.dashboardPermissions;
+  delete window.dashboardPageUse;
 });
 
-function install(job: SessionJobView) {
+const openPage: PageUseSnapshot = {
+  phase: 'ready',
+  epoch: 1,
+  permissions: { state: 'open', body: null },
+  sop: { state: 'closed' },
+};
+
+function install(job: SessionJobView, pageOpen = false) {
   const fixture = intakePermissionsData();
   const owner = new ContentIntakePermissions(fixture.session);
   window.dashboardPermissions = {
@@ -20,6 +29,12 @@ function install(job: SessionJobView) {
     command: async (command) => ({ ok: true, view: await owner.command(command) }),
     onInvalidated: (fn) => owner.subscribe(fn),
   };
+  if (pageOpen) {
+    window.dashboardPageUse = {
+      current: async () => openPage,
+      onChanged: () => () => undefined,
+    };
+  }
   window.dashboardIntake = {
     mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
@@ -61,7 +76,7 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
     delete window.dashboardIntake;
     delete window.dashboardContent;
     delete window.dashboardPermissions;
-    const owner = install(job);
+    const owner = install(job, true);
     try {
       render(<DashboardApp />);
       expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('话术库');
@@ -70,7 +85,7 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
         expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
         expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
         expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
-        expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+        expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
         expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
         expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
         continue;
@@ -79,19 +94,8 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
       expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
-      const grant = job.rights.grant
-        ? await screen.findByRole('button', { name: '新增授权' })
-        : null;
-      if (job.rights.grant && grant) {
-        await waitFor(() => expect(grant).toBeEnabled());
-        expect(screen.queryByText(UNRESOLVED_JOB_LABEL)).not.toBeInTheDocument();
-      } else {
-        await waitFor(() => {
-          expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
-          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('你还不能给他人开通权限');
-          expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('没有权限，请找人开通。');
-        });
-      }
+      expect(screen.getByRole('region', { name: '权限配置' })).toBeInTheDocument();
+      expect(screen.queryByTestId('workbench-no-access')).not.toBeInTheDocument();
       await user.click(screen.getByTestId('nav-materials'));
       expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
       expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
@@ -148,7 +152,7 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
     directory: [{ name: '客服主管', enabled: true }],
     actions: { query: true, import: true, publish: true, rollback: true },
   });
-  const again = install(supervisor);
+  const again = install(supervisor, true);
   try {
     render(<DashboardApp />);
     expect(await screen.findByTestId('nav-content')).toBeInTheDocument();
@@ -185,15 +189,12 @@ it('says please sign in after the session returns logged out', async () => {
   }
 });
 
-it('keeps 权限 reachable when the job snapshot is missing and asks for a fresh login', async () => {
-  const user = userEvent.setup();
+it('keeps 权限 hidden when the job snapshot is missing and the page snapshot is closed', async () => {
   const owner = install(observeSessionJob(null));
   try {
     render(<DashboardApp />);
-    expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
-    await user.click(screen.getByTestId('nav-permissions'));
-    await waitFor(() => expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull());
-    expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('请重新登录后再查看职务。');
+    expect(await screen.findByTestId('nav-wording')).toBeInTheDocument();
+    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
   } finally {
     owner.dispose();
   }

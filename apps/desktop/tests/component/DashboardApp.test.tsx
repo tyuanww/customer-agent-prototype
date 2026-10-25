@@ -100,6 +100,7 @@ describe('DashboardApp', () => {
     delete window.dashboardIteration;
     delete window.dashboardIntake;
     delete window.dashboardPermissions;
+    delete window.dashboardPageUse;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -141,6 +142,8 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.getByTestId('sop-delete')).toBeDisabled();
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
@@ -184,10 +187,20 @@ describe('DashboardApp', () => {
       onInvalidated: () => () => undefined,
       shellLine: async () => ({ ok: true, profileMode: 'synthetic-local', contentIntake: 'faq-v2' }),
     };
+    window.dashboardPageUse = {
+      current: async () => ({
+        phase: 'ready',
+        epoch: 1,
+        permissions: { state: 'open', body: null },
+        sop: { state: 'closed' },
+      }),
+      onChanged: () => () => undefined,
+    };
     render(<DashboardApp />);
     const materials = await screen.findByTestId('nav-materials');
     expect(materials).toHaveAccessibleName('资料');
     expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
+    await screen.findByTestId('nav-permissions');
     expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid')).filter((id) => id?.startsWith('nav-'))).toEqual([
       'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-materials', 'nav-permissions',
     ]);

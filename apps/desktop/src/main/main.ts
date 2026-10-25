@@ -1,5 +1,8 @@
 import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
+import { ContentIntakePermissions } from './content-intake-permissions';
+import { PageUseReader, registerPageUseIpc } from './page-use';
+import { canOpenPermissions } from '../shared/page-use';
 import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerDeskKnowledgeIpc } from './desk-knowledge-ipc';
@@ -105,6 +108,8 @@ if (!gotLock) {
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
   let deskKnowledge: ReturnType<typeof registerDeskKnowledgeIpc> | null = null;
   let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
+  let pageUseReader: PageUseReader | null = null;
+  let disposePageUse: (() => void) | null = null;
   let seatAccounts: ReturnType<typeof registerSeatAccountIpc> | null = null;
   let disposeIntakeCatalog: (() => void) | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
@@ -141,6 +146,8 @@ if (!gotLock) {
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
     deskKnowledge?.dispose(); deskKnowledge = null;
+    disposePageUse?.(); disposePageUse = null;
+    pageUseReader?.dispose(); pageUseReader = null;
     intakePermissions?.dispose(); intakePermissions = null;
     seatAccounts?.dispose(); seatAccounts = null;
     disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
@@ -271,18 +278,21 @@ if (!gotLock) {
       () => [controller?.dashboardWebContents() ?? null]);
     const hangzhouWorkbench = productProfile?.apiOrigin.startsWith('https://') === true;
     const workbenchSession = productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench ? productSession : null;
+    const pagePermissions = workbenchSession ? new ContentIntakePermissions(workbenchSession) : null;
+    pageUseReader = workbenchSession && pagePermissions ? new PageUseReader(workbenchSession, pagePermissions) : null;
+    disposePageUse = registerPageUseIpc(pageUseReader,
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     disposeIntakeCatalog = registerContentIntakeCatalogIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     intakePermissions = registerContentIntakePermissionsIpc(workbenchSession,
-      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl,
+      pageUseReader && pagePermissions ? { pageUse: pageUseReader, permissions: pagePermissions } : null);
     seatAccounts = registerSeatAccountIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
       () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench,
-      () => {
-        const job = workbenchSession?.view().job ?? null;
-        return job?.status === 'resolved' && job.rights.grant === true;
-      });
+      () => pageUseReader ? canOpenPermissions(pageUseReader.current()) : false,
+      (epoch) => pageUseReader ? pageUseReader.listSeats(epoch) : Promise.resolve({ state: 'closed' as const }));
     intakeManagement = registerContentIntakeManagementIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
@@ -354,6 +364,8 @@ if (!gotLock) {
       productSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
+      undefined,
+      pageUseReader,
     );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {
