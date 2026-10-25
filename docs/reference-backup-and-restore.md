@@ -35,7 +35,25 @@
 
 ## 异地副本
 
-`CUSTOMER_AGENT_BACKUP_COPY_TO` 指向另一块盘或另一台机器的目录。未设置时脚本退出 3 并写一行 `offsite copy: NOT CONFIGURED`。这一项**必须在生产上配置成真**，否则「备份」只在同一块盘上，与盘一起丢。
+`CUSTOMER_AGENT_BACKUP_COPY_TO` 是副本目录。脚本在 `scripts/ops/customer-agent-backup.sh`。变量为空时，脚本写下面这一行，然后退出 3。
+
+```text
+offsite copy: NOT CONFIGURED (set CUSTOMER_AGENT_BACKUP_COPY_TO); this backup exists on one disk only
+```
+
+2026-10-25 选定的副本路径是 `/mnt/c/customer-agent-backups`。这是 Windows 的 C 盘，经 WSL 挂到这个路径。选定这个路径，是为了躲开 WSL 虚拟磁盘被换掉。整块系统盘损坏时，这份副本一起丢。
+
+杭州单元没有改到这个路径。这次没有登录杭州。下一节记录的 drop-in 仍把副本指到 `/srv/customer-agent/catalog-backups/offsite`。那一节没有改。
+
+仓库里的 `scripts/ops/customer-agent-backup.service` 有 `ProtectSystem=strict`。没写进 `ReadWritePaths` 的路径，服务写不进去。选定但没有装上杭州单元的片段如下。
+
+```ini
+[Service]
+Environment=CUSTOMER_AGENT_BACKUP_COPY_TO=/mnt/c/customer-agent-backups
+ReadWritePaths=/srv/customer-agent/catalog-backups /mnt/c/customer-agent-backups
+```
+
+服务用户是 `customer-agent`。脚本会对副本目录执行 `mkdir -p`。路径不可写时，副本失败。上面这段没有写入杭州的单元。
 
 ## 杭州机器上的实际安装（2026-10-24 已执行）
 
