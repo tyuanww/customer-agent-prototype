@@ -2,10 +2,11 @@
 
 本目录由 `packages/database/scripts/generate-data-dictionary.mjs` 从真实库生成，只读 catalog，不读业务行。不要手改：下一次生成会覆盖，`--check` 会因此失败。
 
-共 8 个 schema、116 张表。
+共 9 个 schema、116 张表。
 
 | schema | 表 | 视图 | 列 | 函数 | 触发器 |
 | --- | --- | --- | --- | --- | --- |
+| [`analytics`](analytics.md) | 0 | 0 | 0 | 1 | 0 |
 | [`backend_identity`](backend_identity.md) | 5 | 0 | 31 | 14 | 1 |
 | [`backend_review`](backend_review.md) | 3 | 0 | 28 | 15 | 3 |
 | [`content_intake`](content_intake.md) | 57 | 1 | 451 | 87 | 73 |

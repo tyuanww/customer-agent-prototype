@@ -4,9 +4,9 @@
 
 ## 字典规模
 
-`docs/database/dictionary/index.md` 写着 8 个 schema、116 张表。这里的「表」是基表。视图另计。
+`docs/database/dictionary/index.md` 写着 9 个 schema、116 张表。这里的「表」是基表。视图另计。
 
-计数范围是该目录里除 `index.md` 以外的 8 个 schema 文件。基表是没有 `类型：VIEW` 的关系。视图是有这行的关系。列定义只取每个关系标题下的列定义表，表头为列、类型、可空、默认、备注。约束表和索引表不计入。
+计数范围是该目录里除 `index.md` 以外的 9 个 schema 文件。基表是没有 `类型：VIEW` 的关系。视图是有这行的关系。列定义只取每个关系标题下的列定义表，表头为列、类型、可空、默认、备注。约束表和索引表不计入。
 
 计数结果与 `index.md` 一致。基表 116。视图 7。列定义 1140。非基表关系都标着 `类型：VIEW`。
 
@@ -18,6 +18,7 @@
 
 | schema | 表 | 视图 | 列 | 管什么 | 谁写 |
 | --- | --- | --- | --- | --- | --- |
+| `analytics` | 0 | 0 | 0 | 窗口内的查询与不准反馈比率 | 没有表。`question_v1` 由 `cs_ai_definer` 执行，`app_owner_read` 有 EXECUTE |
 | `backend_identity` | 5 | 0 | 31 | 登录绑定、坐席、飞书 open id | 写入走 `SECURITY DEFINER` 函数，包括 `create_seat` 和 `establish_feishu_login`。迁移对 PUBLIC 收回表权限，另有 SELECT 和列级 UPDATE |
 | `backend_review` | 3 | 0 | 28 | 审核回执与等待 | 迁移 `0033_intake_runtime_v1_23.sql` 把 `receipts` 的 INSERT 授给 `intake_business` |
 | `content_intake` | 57 | 1 | 451 | 授权、发布、角色上限、坐席岗位 | 授权和发布事务。撤销填写 `grants.revoked_at` |
@@ -27,7 +28,7 @@
 | `ops_loop` | 4 | 0 | 38 | SOP 与不准反馈 | `record_inaccuracy_report` 插入 `inaccuracy_reports`。SOP 在 `sop_nodes` |
 | `public` | 43 | 6 | 561 | 查询事件与业主视图 | 查询插入 `query_events`。迁移 `0018_owner_read_views.sql` 把四个 `vw_owner_*` 的 SELECT 授给 `app_owner_read` |
 
-8 个 schema 的表数相加是 116。视图数相加是 7。列数相加是 1140。
+9 个 schema 的表数相加是 116。视图数相加是 7。列数相加是 1140。
 
 `content_intake.grant_history.grant_id` 的外键在字典里标了 `NOT VALID`，指向 `grants`。2026-10-24 的还原经过记在 [备份与恢复演练](reference-backup-and-restore.md)。这次没有重跑演练。
 
