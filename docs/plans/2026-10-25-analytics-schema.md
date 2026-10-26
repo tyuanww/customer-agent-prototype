@@ -1,6 +1,6 @@
 # 分析层口径
 
-只定口径。本文不写迁移，也不建新角色。字典里的 8 个 schema 没有 `analytics`。`analytics.question_v1` 只是提议中的视图名，现在不存在。
+口径仍以本文为准。迁移 `0070` 已经落地函数 `analytics.question_v1`，它不是无参视图。字典见 `docs/database/dictionary/analytics.md`。本文不建新角色。
 
 ## 现成的只读面
 
@@ -8,13 +8,13 @@
 
 `app_owner_read` 在同一份 `0018` 迁移里创建，属性是 `NOLOGIN`。它得到这四个视图的 SELECT，得不到基表。`packages/database/migrations` 里的 `CREATE ROLE` 有 17 处，每一处都写了 `NOLOGIN`。能登录的账号不在这些迁移里建。
 
-以后若要给数仓一个稳定接口，用带版本的视图，例如 `analytics.question_v1`。第一版只投影下面三个比率。分子和分母都限制在同一个时间窗，并且只算 `query_events` 里已经写入的行。
+数仓接口是函数 `analytics.question_v1(p_start, p_end)`。第一版返回三个比率。分子和分母都限制在同一个闭区间，查询行来自 `query_events`，不准反馈来自同一窗口的 `ops_loop.inaccuracy_reports`。
 
 ## 命中率
 
 命中率是同一时间窗里 `hit_status` 为 `hit` 的 `query_events` 行数，除以该时间窗的 `query_events` 行数。
 
-没有查询时，提议中的视图把比率留空，不写成 0。`copied_to_clipboard` 不进入分子。复制不是命中。
+没有查询时，函数把三个比率留空，不写成 0。`copied_to_clipboard` 不进入分子。复制不是命中。
 
 ## 无命中率
 
