@@ -274,6 +274,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0068_seat_lifecycle',
     requiresPredecessor: 'Feishu login link requires the seat lifecycle',
   },
+  {
+    index: 69,
+    minimumCatalogueLength: 70,
+    id: '0070_analytics_question_v1',
+    predecessorId: '0069_feishu_login_link',
+    requiresPredecessor: 'Question ratios require the Feishu login link',
+  },
 ];
 
 function requiredSuccessorStep(
