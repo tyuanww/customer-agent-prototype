@@ -598,6 +598,7 @@ it('shows an empty shop window as 没有查询 and keeps the personal counts at 
       queryCount: 0,
       hitCount: 0,
       noHitCount: 0,
+      otherCount: 0,
       inaccuracyCount: 0,
       hitRate: null,
       noHitRate: null,
@@ -613,13 +614,14 @@ it('shows an empty shop window as 没有查询 and keeps the personal counts at 
   expect(tileText('查询次数')).toBe('查询次数0');
 });
 
-it('rounds 23 of 80 queries to 28.8 percent', async () => {
+it('rounds 23 of 80 queries so the two rates sum to 100', async () => {
   window.dashboardOps = {
     questionRates: vi.fn(async () => ({
       ok: true as const,
       queryCount: 80,
       hitCount: 23,
       noHitCount: 57,
+      otherCount: 0,
       inaccuracyCount: 87,
       hitRate: '0.2875',
       noHitRate: '0.7125',
@@ -627,10 +629,11 @@ it('rounds 23 of 80 queries to 28.8 percent', async () => {
     })),
   } as unknown as Window['dashboardOps'];
   render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findByText('28.8%')).toBeInTheDocument();
+  expect(await screen.findByText('28.7%')).toBeInTheDocument();
   expect(screen.getByText('71.3%')).toBeInTheDocument();
   expect(screen.getByText('108.8%')).toBeInTheDocument();
-  expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
+  expect(screen.getByText('报告数除以查询数，可以超过 100%。')).toBeInTheDocument();
+  expect(screen.queryByText('28.8%')).not.toBeInTheDocument();
 });
 
 it('shows the digit 0 when the signed-in reads are empty', async () => {

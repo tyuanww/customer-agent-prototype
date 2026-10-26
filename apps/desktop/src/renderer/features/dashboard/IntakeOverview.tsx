@@ -215,10 +215,53 @@ function formatShopRate(value: string | null): string {
   return `${scaled / 10n}.${scaled % 10n}%`;
 }
 
-function RateTile({ label, value }: { label: string; value: string }) {
+function allocateShopTenths(hitCount: number, noHitCount: number, queryCount: number): [bigint, bigint] {
+  const total = BigInt(queryCount);
+  let hitTenths = (BigInt(hitCount) * 1000n) / total;
+  let noHitTenths = (BigInt(noHitCount) * 1000n) / total;
+  const hitRemainder = (BigInt(hitCount) * 1000n) % total;
+  const noHitRemainder = (BigInt(noHitCount) * 1000n) % total;
+  if (hitTenths + noHitTenths === 1000n) return [hitTenths, noHitTenths];
+  if (hitRemainder > noHitRemainder || (hitRemainder === noHitRemainder && hitCount >= noHitCount)) {
+    hitTenths += 1n;
+  } else {
+    noHitTenths += 1n;
+  }
+  return [hitTenths, noHitTenths];
+}
+
+function tenthsText(tenths: bigint): string {
+  return `${tenths / 10n}.${tenths % 10n}%`;
+}
+
+function shopRateText(rates: {
+  queryCount: number;
+  hitCount: number;
+  noHitCount: number;
+  hitRate: string | null;
+  noHitRate: string | null;
+  inaccuracyRate: string | null;
+}): { hit: string; noHit: string; inaccuracy: string } {
+  const inaccuracy = formatShopRate(rates.inaccuracyRate);
+  if (rates.queryCount === 0 || rates.hitRate === null || rates.noHitRate === null) {
+    return { hit: '没有查询', noHit: '没有查询', inaccuracy };
+  }
+  if (rates.hitCount + rates.noHitCount === rates.queryCount) {
+    const [hitTenths, noHitTenths] = allocateShopTenths(rates.hitCount, rates.noHitCount, rates.queryCount);
+    return { hit: tenthsText(hitTenths), noHit: tenthsText(noHitTenths), inaccuracy };
+  }
+  return {
+    hit: formatShopRate(rates.hitRate),
+    noHit: formatShopRate(rates.noHitRate),
+    inaccuracy,
+  };
+}
+
+function RateTile({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return <div className="tile">
     <span className="t-lbl">{label}</span>
     <b>{value}</b>
+    {detail ? <span className="t-sub">{detail}</span> : null}
   </div>;
 }
 
@@ -512,7 +555,11 @@ export function IntakeOverview({
           const start = dates?.[0];
           const end = dates?.[1];
           if (!start || !end) return;
-          setSpan({ start: start.startOf('day').valueOf(), end: end.endOf('day').valueOf() });
+          const startAt = start.startOf('day');
+          let endAt = end.endOf('day');
+          const limit = startAt.add(365, 'day').endOf('day');
+          if (endAt.isAfter(limit)) endAt = limit;
+          setSpan({ start: startAt.valueOf(), end: endAt.valueOf() });
         }}
       />
     </div>
@@ -520,15 +567,15 @@ export function IntakeOverview({
       {shopRates.status === 'ready' && shopRates.value
         && shopRates.value.windowStart === span.start
         && shopRates.value.windowEnd === span.end ? <>
-        <RateTile label="命中率" value={formatShopRate(shopRates.value.hitRate)} />
-        <RateTile label="无命中率" value={formatShopRate(shopRates.value.noHitRate)} />
-        <RateTile label="不准反馈率" value={formatShopRate(shopRates.value.inaccuracyRate)} />
-      </> : null}
+        <RateTile label="命中率" value={shopRateText(shopRates.value).hit} />
+        <RateTile label="无命中率" value={shopRateText(shopRates.value).noHit} />
+        <RateTile label="不准反馈率" value={shopRateText(shopRates.value).inaccuracy} detail={/^\d{3,}\./.test(shopRateText(shopRates.value).inaccuracy) ? '报告数除以查询数，可以超过 100%。' : undefined} />
+      </> : shopRates.status === 'loading' ? <WorkbenchLoading rows={1} label="正在读取全店比率" /> : null}
     </div>
     {shopRates.status === 'ready' && shopRates.value
       && shopRates.value.windowStart === span.start
       && shopRates.value.windowEnd === span.end
-      ? <p className="t-sub">{QUESTION_SCOPE}</p> : null}
+      ? <p className="t-sub">{QUESTION_SCOPE}{shopRates.value.otherCount > 0 ? '另有未归入命中或无命中的查询。' : ''}</p> : null}
     {shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
     {shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
     <div className="tiles">

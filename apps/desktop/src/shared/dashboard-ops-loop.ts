@@ -120,6 +120,7 @@ export type DashboardQuestionRates = Readonly<{
   queryCount: number;
   hitCount: number;
   noHitCount: number;
+  otherCount: number;
   inaccuracyCount: number;
   hitRate: string | null;
   noHitRate: string | null;

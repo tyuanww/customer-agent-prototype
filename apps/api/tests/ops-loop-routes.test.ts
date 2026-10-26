@@ -115,6 +115,7 @@ function repository(): OpsLoopRepository {
         query_count: 0,
         hit_count: 0,
         no_hit_count: 0,
+        other_count: 0,
         inaccuracy_count: 0,
         hit_rate: null,
         no_hit_rate: null,
@@ -765,6 +766,7 @@ describe('ops-loop HTTP routes', () => {
       query_count: 0,
       hit_count: 0,
       no_hit_count: 0,
+      other_count: 0,
       inaccuracy_count: 0,
       hit_rate: null,
       no_hit_rate: null,
@@ -772,6 +774,13 @@ describe('ops-loop HTTP routes', () => {
     });
     expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[1].toISOString()).toBe(start);
     expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[2].toISOString()).toBe(end);
+    const tooLong = await app.inject({
+      method: 'GET',
+      url: '/v1/metrics/question?start=2020-01-01T00:00:00.000Z&end=2026-03-02T00:00:00.000Z',
+      headers: coachHeaders,
+    });
+    expect(tooLong.statusCode).toBe(400);
+    expect(ops.readQuestionRates).toHaveBeenCalledTimes(1);
   });
 
   it('lists the signed-in seat and leaves another seat out', async () => {

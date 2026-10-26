@@ -27,6 +27,7 @@ export type OpsLoopRouteDependencies = Readonly<{
 }>;
 
 const WINDOWS = new Set<RetrievalWindow>(['current_release', 'last_7d']);
+const SHOP_RATE_WINDOW_MS = 366 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
 
@@ -386,6 +387,7 @@ export function registerOpsLoopRoutes(
     if (start === null || end === null || Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf()) || start > end) {
       return sendValidationError(reply);
     }
+    if (end.getTime() - start.getTime() >= SHOP_RATE_WINDOW_MS) return sendValidationError(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
     if (!limit('question', actor.user_id, 60)) return sendRateLimited(reply);
     const result = await dependencies.repository.readQuestionRates(actor, start, end);

@@ -195,7 +195,7 @@ dashboardOps           ──scriptDelete pending_review──> 话术库下架
 dashboardIteration     ──iteration-tasks──> 管理概览待办
 dashboardContent       ──parse / publishDraft (import-then-publish)──> 内容管理
 dashboardOps           ──sop catalog/import/patch/delete──> SOP
-dashboardOps           ──metrics/retrieval──> 管理概览 KPI
+dashboardOps           ──metrics/retrieval、metrics/question──> 管理概览 KPI
 dashboardOps           ──software/releases──> 系统同步软件目录
 productSearch.reportInaccuracy ──POST /v1/inaccuracy-reports──> 话术不准
 

@@ -115,7 +115,7 @@ export async function dashboardQuestionRates(
     const value = result.value;
     if (!value || typeof value !== 'object') throw new ProductHttpError('VALIDATION');
     const row = value as Record<string, unknown>;
-    if (!wholeCount(row.query_count) || !wholeCount(row.hit_count) || !wholeCount(row.no_hit_count) || !wholeCount(row.inaccuracy_count)) {
+    if (!wholeCount(row.query_count) || !wholeCount(row.hit_count) || !wholeCount(row.no_hit_count) || !wholeCount(row.other_count) || !wholeCount(row.inaccuracy_count)) {
       throw new ProductHttpError('VALIDATION');
     }
     if (!rateText(row.hit_rate) || !rateText(row.no_hit_rate) || !rateText(row.inaccuracy_rate)) {
@@ -126,6 +126,7 @@ export async function dashboardQuestionRates(
       queryCount: row.query_count,
       hitCount: row.hit_count,
       noHitCount: row.no_hit_count,
+      otherCount: row.other_count,
       inaccuracyCount: row.inaccuracy_count,
       hitRate: row.hit_rate,
       noHitRate: row.no_hit_rate,

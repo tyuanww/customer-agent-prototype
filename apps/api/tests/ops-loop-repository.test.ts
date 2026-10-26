@@ -449,4 +449,15 @@ describe('ops-loop repository', () => {
     expect(await createOpsLoopRepository(current.pool as never).currentSoftwareRelease(owner))
       .toEqual({ ok: true, response: { ...softwareRow, signed: true } });
   });
+
+  it('turns a missing question-rate grant into overloaded instead of forbidden', async () => {
+    const denied = scriptedPool(() => {
+      throw Object.assign(new Error('permission denied'), { code: '42501' });
+    });
+    await expect(createOpsLoopRepository(denied.pool as never).readQuestionRates(
+      coach,
+      new Date('2026-03-01T00:00:00.000Z'),
+      new Date('2026-03-02T00:00:00.000Z'),
+    )).resolves.toEqual({ ok: false, code: 'OVERLOADED' });
+  });
 });
