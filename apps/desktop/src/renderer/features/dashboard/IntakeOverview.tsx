@@ -197,9 +197,22 @@ function CountTile({ label, value, detail }: { label: string; value: number | nu
 
 function formatShopRate(value: string | null): string {
   if (value === null) return '没有查询';
-  const number = Number(value);
-  if (!Number.isFinite(number)) return '没有查询';
-  return `${(number * 100).toFixed(1)}%`;
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(value);
+  if (!match) return '没有查询';
+  const digits = `${match[1]}${match[2] ?? ''}`;
+  const scale = match[2]?.length ?? 0;
+  const shift = 3 - scale;
+  let scaled: bigint;
+  if (shift >= 0) {
+    scaled = BigInt(digits) * (10n ** BigInt(shift));
+  } else {
+    const cut = -shift;
+    const body = digits.slice(0, digits.length - cut);
+    const rest = digits.slice(digits.length - cut);
+    const base = BigInt(body === '' ? '0' : body);
+    scaled = base + (rest[0] !== undefined && rest[0] >= '5' ? 1n : 0n);
+  }
+  return `${scaled / 10n}.${scaled % 10n}%`;
 }
 
 function RateTile({ label, value }: { label: string; value: string }) {
@@ -339,7 +352,10 @@ export function IntakeOverview({
         }
         return { status: 'error' as const, message: USAGE_FAILED };
       }
-      return { status: 'ready' as const, value: result };
+      return {
+        status: 'ready' as const,
+        value: { ...result, windowStart: span.start, windowEnd: span.end },
+      };
     } catch {
       return { status: 'error' as const, message: USAGE_FAILED };
     }
@@ -501,13 +517,18 @@ export function IntakeOverview({
       />
     </div>
     <div className="tiles" data-testid="shop-rates">
-      {shopRates.status === 'ready' && shopRates.value ? <>
+      {shopRates.status === 'ready' && shopRates.value
+        && shopRates.value.windowStart === span.start
+        && shopRates.value.windowEnd === span.end ? <>
         <RateTile label="命中率" value={formatShopRate(shopRates.value.hitRate)} />
         <RateTile label="无命中率" value={formatShopRate(shopRates.value.noHitRate)} />
         <RateTile label="不准反馈率" value={formatShopRate(shopRates.value.inaccuracyRate)} />
       </> : null}
     </div>
-    {shopRates.status === 'ready' ? <p className="t-sub">{QUESTION_SCOPE}</p> : null}
+    {shopRates.status === 'ready' && shopRates.value
+      && shopRates.value.windowStart === span.start
+      && shopRates.value.windowEnd === span.end
+      ? <p className="t-sub">{QUESTION_SCOPE}</p> : null}
     {shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
     {shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
     <div className="tiles">
