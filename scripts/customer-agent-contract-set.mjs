@@ -780,7 +780,9 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
     assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness predecessor migration');
     if (sha256(file)!==expected.sha256 || lstatSync(file).size!==expected.bytes) throw new Error(`Readiness predecessor bytes drift: ${expected.file}`);
   }
-  if (actual.migrations.length >= 41 && actual.migrations.length <= 57) {
+  // Position 41 stays the readiness migration after every later product overlay.
+  // A length cap here would accept a rewritten 0041 once the catalogue grew past it.
+  if (actual.migrations.length >= 41) {
     const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
     assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
     const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));
