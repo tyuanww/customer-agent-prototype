@@ -700,7 +700,7 @@ it('keeps 366 inclusive days and clamps a longer shop window', async () => {
   const endOf = (year: number, month: number, day: number) => new Date(year, month, day, 23, 59, 59, 999).toISOString();
   async function pick(endText: string): Promise<readonly [string, string]> {
     cleanup();
-    const questionRates = vi.fn(async () => ({
+    const questionRates = vi.fn(async (_start: string, _end: string) => ({
       ok: true as const,
       queryCount: 0,
       hitCount: 0,
