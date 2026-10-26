@@ -46,6 +46,7 @@ const SOP_REPAIR_SUFFIX = [
   '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid',
   '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link',
   '0070_analytics_question_v1',
+  '0071_analytics_runtime_execute',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -536,7 +537,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(70);
+      expect(fresh.pending).toHaveLength(71);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -553,7 +554,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 61-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 62-migration current suffix',
         },
       });
 

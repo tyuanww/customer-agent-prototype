@@ -181,9 +181,10 @@ describe.skipIf(!enabled)('analytics.question_v1', () => {
     }
   });
 
-  it('lets app_owner_read execute and keeps the base tables closed', async () => {
+  it('lets app_owner_read and app_runtime execute and keeps the base tables closed', async () => {
     await ask(client, START, END, 'app_owner_read');
-    await expect(asRole(client, 'app_runtime', () => client.query(
+    await ask(client, START, END, 'app_runtime');
+    await expect(asRole(client, 'app_content_admin', () => client.query(
       'SELECT * FROM analytics.question_v1($1::timestamptz, $2::timestamptz)',
       [START, END],
     ))).rejects.toMatchObject({ code: '42501' });

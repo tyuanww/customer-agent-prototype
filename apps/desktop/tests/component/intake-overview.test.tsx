@@ -92,6 +92,7 @@ afterEach(() => {
   delete window.dashboardWording;
   delete window.dashboardDesk;
   delete window.dashboardUsageLog;
+  delete window.dashboardOps;
   window.history.pushState({}, '', '/');
 });
 
@@ -576,6 +577,40 @@ it('says 没读到 when a mounted usage read fails for another reason', async ()
   expect(status).not.toHaveTextContent('坐席查询后会出现');
   expect(status).not.toHaveTextContent('请先登录');
   expect(tileText('查询次数')).toBe('查询次数');
+});
+
+const SHOP_RATE_SCOPE = '命中率、无命中率和不准反馈率是全店这段时间的查询，不是当前登录者的使用记录。';
+
+it('shows an empty shop window as 没有查询 and keeps the personal counts at 0', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
+    start: vi.fn(),
+    close: vi.fn(),
+  };
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })),
+    previewExport: vi.fn(async () => ({ ok: true as const, exportable: 0, redacted: 0, withoutConsent: 0 })),
+    export: vi.fn(async () => ({ ok: true as const, written: 0 })),
+  };
+  window.dashboardOps = {
+    questionRates: vi.fn(async () => ({
+      ok: true as const,
+      queryCount: 0,
+      hitCount: 0,
+      noHitCount: 0,
+      inaccuracyCount: 0,
+      hitRate: null,
+      noHitRate: null,
+      inaccuracyRate: null,
+    })),
+  } as Window['dashboardOps'];
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findAllByText('没有查询')).toHaveLength(3);
+  expect(tileText('命中率')).toBe('命中率没有查询');
+  expect(tileText('无命中率')).toBe('无命中率没有查询');
+  expect(tileText('不准反馈率')).toBe('不准反馈率没有查询');
+  expect(screen.getByText(SHOP_RATE_SCOPE)).toBeInTheDocument();
+  expect(tileText('查询次数')).toBe('查询次数0');
 });
 
 it('shows the digit 0 when the signed-in reads are empty', async () => {

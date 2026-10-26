@@ -7,6 +7,7 @@ import {
   sopAllergyStepNeedsStopCopy,
   sopCsvAllergyStopMissing,
   type DashboardOpsFailure,
+  type DashboardQuestionRates,
   type DashboardRetrievalMetrics,
   type DashboardScriptMutation,
   isSoftwareDownloadUrl,
@@ -89,6 +90,46 @@ export async function dashboardRetrievalMetrics(
       currentReleaseScriptCount: parsed.current_release_script_count,
       window: parsed.window,
       releaseId: parsed.release_id,
+    });
+  });
+}
+
+function wholeCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+function rateText(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value));
+}
+
+export async function dashboardQuestionRates(
+  session: DashboardOpsSessionClient | null,
+  start: string,
+  end: string,
+): Promise<DashboardQuestionRates | DashboardOpsFailure> {
+  return withSession(session, ['coach', 'owner'], async (client, epoch) => {
+    const result = await client.request(
+      epoch,
+      `/v1/metrics/question?${new URLSearchParams({ start, end })}`,
+    );
+    const value = result.value;
+    if (!value || typeof value !== 'object') throw new ProductHttpError('VALIDATION');
+    const row = value as Record<string, unknown>;
+    if (!wholeCount(row.query_count) || !wholeCount(row.hit_count) || !wholeCount(row.no_hit_count) || !wholeCount(row.inaccuracy_count)) {
+      throw new ProductHttpError('VALIDATION');
+    }
+    if (!rateText(row.hit_rate) || !rateText(row.no_hit_rate) || !rateText(row.inaccuracy_rate)) {
+      throw new ProductHttpError('VALIDATION');
+    }
+    return Object.freeze({
+      ok: true as const,
+      queryCount: row.query_count,
+      hitCount: row.hit_count,
+      noHitCount: row.no_hit_count,
+      inaccuracyCount: row.inaccuracy_count,
+      hitRate: row.hit_rate,
+      noHitRate: row.no_hit_rate,
+      inaccuracyRate: row.inaccuracy_rate,
     });
   });
 }

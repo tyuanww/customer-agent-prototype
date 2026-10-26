@@ -18,6 +18,16 @@ type SopImportAccepted = components['schemas']['SopImportAccepted'];
 type ScriptMutationResponse = components['schemas']['ScriptMutationResponse'];
 type RetrievalMetrics = components['schemas']['RetrievalMetrics'];
 type RetrievalWindow = components['schemas']['RetrievalWindow'];
+
+export type QuestionRateRow = Readonly<{
+  query_count: number;
+  hit_count: number;
+  no_hit_count: number;
+  inaccuracy_count: number;
+  hit_rate: string | null;
+  no_hit_rate: string | null;
+  inaccuracy_rate: string | null;
+}>;
 type SoftwareRelease = components['schemas']['SoftwareRelease'];
 type SoftwareReleaseList = components['schemas']['SoftwareReleaseList'];
 
@@ -100,6 +110,11 @@ export type OpsLoopRepository = Readonly<{
     actor: AuthenticatedUser,
     window: RetrievalWindow,
   ) => Promise<OperationResult<RetrievalMetrics>>;
+  readQuestionRates: (
+    actor: AuthenticatedUser,
+    start: Date,
+    end: Date,
+  ) => Promise<OperationResult<QuestionRateRow>>;
   readOwnUsage: (actor: AuthenticatedUser) => Promise<OperationResult<OwnUsageEvent[]>>;
   listSoftwareReleases: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareReleaseList>>;
   currentSoftwareRelease: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareRelease>>;
@@ -528,6 +543,46 @@ export function createOpsLoopRepository(
           window: row.metric_window,
           release_id: row.release_id ?? null,
         });
+      });
+    },
+
+    readQuestionRates(actor, start, end) {
+      if (actor.role !== 'coach' && actor.role !== 'owner') return Promise.resolve(failure('FORBIDDEN'));
+      return read(async (client) => {
+        const result = await client.query<{
+          query_count: string;
+          hit_count: string;
+          no_hit_count: string;
+          inaccuracy_count: string;
+          hit_rate: string | null;
+          no_hit_rate: string | null;
+          inaccuracy_rate: string | null;
+        }>(
+          `SELECT query_count::text, hit_count::text, no_hit_count::text, inaccuracy_count::text,
+                  hit_rate::text, no_hit_rate::text, inaccuracy_rate::text
+           FROM analytics.question_v1($1::timestamptz, $2::timestamptz)`,
+          [start, end],
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error('QUESTION_RATES_SHAPE');
+        const count = (value: string) => {
+          if (!/^\d+$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
+          return Number(value);
+        };
+        const rate = (value: string | null) => {
+          if (value === null) return null;
+          if (!/^\d+(\.\d+)?$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
+          return value;
+        };
+        return {
+          query_count: count(row.query_count),
+          hit_count: count(row.hit_count),
+          no_hit_count: count(row.no_hit_count),
+          inaccuracy_count: count(row.inaccuracy_count),
+          hit_rate: rate(row.hit_rate),
+          no_hit_rate: rate(row.no_hit_rate),
+          inaccuracy_rate: rate(row.inaccuracy_rate),
+        };
       });
     },
 

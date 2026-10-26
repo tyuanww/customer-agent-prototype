@@ -313,7 +313,7 @@ ${renderSearchBoundaryFunctions()}
             JOIN LATERAL pg_catalog.aclexplode(guarded_schema.nspacl) acl ON true
             WHERE acl.grantee = runtime_role.oid
               AND (
-                guarded_schema.nspname NOT IN ('public', 'ops_loop')
+                guarded_schema.nspname NOT IN ('public', 'ops_loop', 'analytics')
                 OR acl.privilege_type <> 'USAGE'
                 OR acl.is_grantable
               )
@@ -332,6 +332,15 @@ ${renderSearchBoundaryFunctions()}
             FROM pg_catalog.pg_namespace ops_loop_schema
             JOIN LATERAL pg_catalog.aclexplode(ops_loop_schema.nspacl) acl ON true
             WHERE ops_loop_schema.nspname = 'ops_loop'
+              AND acl.grantee = runtime_role.oid
+              AND acl.privilege_type = 'USAGE'
+              AND NOT acl.is_grantable
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_namespace analytics_schema
+            JOIN LATERAL pg_catalog.aclexplode(analytics_schema.nspacl) acl ON true
+            WHERE analytics_schema.nspname = 'analytics'
               AND acl.grantee = runtime_role.oid
               AND acl.privilege_type = 'USAGE'
               AND NOT acl.is_grantable

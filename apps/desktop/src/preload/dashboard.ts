@@ -19,6 +19,7 @@ const ITERATION_START = 'dashboard:iteration-start';
 const ITERATION_CLOSE = 'dashboard:iteration-close';
 const INACCURACY_OUTCOMES = 'dashboard:inaccuracy-outcomes';
 const OPS_RETRIEVAL = 'dashboard:ops-retrieval';
+const OPS_QUESTION_RATES = 'dashboard:ops-question-rates';
 const OPS_SOP_CATALOG = 'dashboard:ops-sop-catalog';
 const OPS_SOP_IMPORT = 'dashboard:ops-sop-import';
 const OPS_SOP_PATCH = 'dashboard:ops-sop-patch';
@@ -378,6 +379,9 @@ async function invokeOps(channel: string, ...args: unknown[]) {
 contextBridge.exposeInMainWorld('dashboardOps', {
   retrieval(window: unknown) {
     return invokeOps(OPS_RETRIEVAL, window);
+  },
+  questionRates(start: unknown, end: unknown) {
+    return invokeOps(OPS_QUESTION_RATES, start, end);
   },
   sopCatalog() {
     return invokeOps(OPS_SOP_CATALOG);

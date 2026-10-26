@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest';
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import { registerDashboardOpsLoopIpc } from '../../src/main/dashboard-ops-loop-ipc';
 import {
+  dashboardQuestionRates,
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
   dashboardSoftwareCatalog,
@@ -508,4 +509,39 @@ it('refuses SOP import for a signed-in owner whose job cannot upload', async () 
     ok: true, productSessionId: 'default', nodeCount: 1,
   });
   expect(engineer.paths).toContain('/v1/sop/import');
+});
+
+it('asks the shop question rates for the chosen window', async () => {
+  const coach = fakeSession('coach');
+  const start = '2026-03-01T00:00:00.000Z';
+  const end = '2026-03-02T00:00:00.000Z';
+  vi.mocked(coach.request).mockResolvedValueOnce({
+    status: 200,
+    value: {
+      query_count: 3,
+      hit_count: 1,
+      no_hit_count: 1,
+      inaccuracy_count: 4,
+      hit_rate: '0.33333333333333333333',
+      no_hit_rate: '0.33333333333333333333',
+      inaccuracy_rate: '1.33333333333333333333',
+    },
+  });
+  expect(await dashboardQuestionRates(coach, start, end)).toEqual({
+    ok: true,
+    queryCount: 3,
+    hitCount: 1,
+    noHitCount: 1,
+    inaccuracyCount: 4,
+    hitRate: '0.33333333333333333333',
+    noHitRate: '0.33333333333333333333',
+    inaccuracyRate: '1.33333333333333333333',
+  });
+  expect(vi.mocked(coach.request).mock.calls[0]?.[1]).toBe(
+    `/v1/metrics/question?${new URLSearchParams({ start, end })}`,
+  );
+  expect(await dashboardQuestionRates(fakeSession('agent'), start, end)).toMatchObject({
+    ok: false,
+    code: 'FORBIDDEN',
+  });
 });

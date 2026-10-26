@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { dashboardOpsFailure, type DashboardOpsFailure } from '../shared/dashboard-ops-loop';
 import { isTrustedMainFrameSender } from './sender-guard';
 import {
+  dashboardQuestionRates,
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
   dashboardSoftwareCatalog,
@@ -51,6 +52,18 @@ export function registerDashboardOpsLoopIpc(
         return Promise.resolve(dashboardOpsFailure('VALIDATION'));
       }
       return dashboardRetrievalMetrics(session, window);
+    }));
+  ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_QUESTION_RATES, (event, ...args: unknown[]) =>
+    wrap(event, args, 2, () => {
+      const start = args[0];
+      const end = args[1];
+      if (typeof start !== 'string' || typeof end !== 'string') return Promise.resolve(dashboardOpsFailure('VALIDATION'));
+      const startAt = new Date(start);
+      const endAt = new Date(end);
+      if (Number.isNaN(startAt.valueOf()) || Number.isNaN(endAt.valueOf()) || startAt > endAt) {
+        return Promise.resolve(dashboardOpsFailure('VALIDATION'));
+      }
+      return dashboardQuestionRates(session, start, end);
     }));
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG, (event, ...args: unknown[]) =>
     wrap(event, args, 0, () => dashboardSopCatalog(session)));

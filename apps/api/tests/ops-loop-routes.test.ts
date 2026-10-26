@@ -109,6 +109,18 @@ function repository(): OpsLoopRepository {
         release_id: 'rel_1',
       },
     }),
+    readQuestionRates: vi.fn<OpsLoopRepository['readQuestionRates']>().mockResolvedValue({
+      ok: true,
+      response: {
+        query_count: 0,
+        hit_count: 0,
+        no_hit_count: 0,
+        inaccuracy_count: 0,
+        hit_rate: null,
+        no_hit_rate: null,
+        inaccuracy_rate: null,
+      },
+    }),
     listSoftwareReleases: vi.fn<OpsLoopRepository['listSoftwareReleases']>().mockResolvedValue({
       ok: true,
       response: { items: [] },
@@ -727,6 +739,39 @@ describe('ops-loop HTTP routes', () => {
     });
     expect(agent.statusCode).toBe(403);
     expect(ops.readRetrievalMetrics).not.toHaveBeenCalled();
+  });
+
+  it('returns shop question rates to a coach and refuses a seat', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const start = '2026-03-01T00:00:00.000Z';
+    const end = '2026-03-02T00:00:00.000Z';
+    const unsigned = await app.inject({ method: 'GET', url: `/v1/metrics/question?start=${start}&end=${end}` });
+    expect(unsigned.statusCode).toBe(401);
+    const agent = await app.inject({
+      method: 'GET', url: `/v1/metrics/question?start=${start}&end=${end}`, headers: agentHeaders,
+    });
+    expect(agent.statusCode).toBe(403);
+    expect(ops.readQuestionRates).not.toHaveBeenCalled();
+    const reversed = await app.inject({
+      method: 'GET', url: `/v1/metrics/question?start=${end}&end=${start}`, headers: coachHeaders,
+    });
+    expect(reversed.statusCode).toBe(400);
+    const listed = await app.inject({
+      method: 'GET', url: `/v1/metrics/question?start=${start}&end=${end}`, headers: coachHeaders,
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual({
+      query_count: 0,
+      hit_count: 0,
+      no_hit_count: 0,
+      inaccuracy_count: 0,
+      hit_rate: null,
+      no_hit_rate: null,
+      inaccuracy_rate: null,
+    });
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[1].toISOString()).toBe(start);
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[2].toISOString()).toBe(end);
   });
 
   it('lists the signed-in seat and leaves another seat out', async () => {

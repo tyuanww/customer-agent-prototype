@@ -51,6 +51,7 @@ const TODO_EMPTY = '现在没有待办。';
 const READ_SENTENCES = { forbidden: LOGGED_OUT, error: USAGE_FAILED } as const;
 const INACCURACY_EMPTY = '当前没有达到开单阈值的不准稿。';
 const USAGE_SCOPE = '查询次数、没查到和被复制只含当前登录者最近读到的查询，不是全店。不准次数不随上面的日期变化。';
+const QUESTION_SCOPE = '命中率、无命中率和不准反馈率是全店这段时间的查询，不是当前登录者的使用记录。';
 const INACCURACY_SCOPE = '只含已开待办记下的样本，不是这段时间的全部。';
 const MISS_ALL_ANSWERED = '这段时间所有查询都有结果。';
 const COPY_ONLY = '只表示复制了';
@@ -194,6 +195,20 @@ function CountTile({ label, value, detail }: { label: string; value: number | nu
   </div>;
 }
 
+function formatShopRate(value: string | null): string {
+  if (value === null) return '没有查询';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '没有查询';
+  return `${(number * 100).toFixed(1)}%`;
+}
+
+function RateTile({ label, value }: { label: string; value: string }) {
+  return <div className="tile">
+    <span className="t-lbl">{label}</span>
+    <b>{value}</b>
+  </div>;
+}
+
 function usageStatusText(read: AsyncResource<UsageLoad>): string | null {
   switch (read.status) {
     case 'ready':
@@ -313,6 +328,22 @@ export function IntakeOverview({
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const mutation = useRef(false);
   const [span, setSpan] = useState<DayWindow>(() => recentWindow(7));
+  const { resource: shopRates, reload: retryShopRates } = useAsyncResource(async () => {
+    const read = window.dashboardOps?.questionRates;
+    if (!read) return { status: 'idle' as const };
+    try {
+      const result = await read(new Date(span.start).toISOString(), new Date(span.end).toISOString());
+      if (!result.ok) {
+        if (result.code === 'FORBIDDEN' || result.code === 'UNAUTHORIZED') {
+          return { status: 'forbidden' as const, message: result.message };
+        }
+        return { status: 'error' as const, message: USAGE_FAILED };
+      }
+      return { status: 'ready' as const, value: result };
+    } catch {
+      return { status: 'error' as const, message: USAGE_FAILED };
+    }
+  }, [span.start, span.end], window.dashboardOps?.questionRates ? { status: 'loading' } : { status: 'idle' });
 
   useEffect(() => {
     const api = window.dashboardWording;
@@ -469,6 +500,16 @@ export function IntakeOverview({
         }}
       />
     </div>
+    <div className="tiles" data-testid="shop-rates">
+      {shopRates.status === 'ready' ? <>
+        <RateTile label="命中率" value={formatShopRate(shopRates.value.hitRate)} />
+        <RateTile label="无命中率" value={formatShopRate(shopRates.value.noHitRate)} />
+        <RateTile label="不准反馈率" value={formatShopRate(shopRates.value.inaccuracyRate)} />
+      </> : null}
+    </div>
+    {shopRates.status === 'ready' ? <p className="t-sub">{QUESTION_SCOPE}</p> : null}
+    {shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
+    {shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
     <div className="tiles">
       <CountTile label="查询次数" value={usageCounts?.queries ?? null} />
       <CountTile label="没查到" value={usageCounts?.misses ?? null} />
