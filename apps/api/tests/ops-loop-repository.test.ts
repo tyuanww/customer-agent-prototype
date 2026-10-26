@@ -460,4 +460,61 @@ describe('ops-loop repository', () => {
       new Date('2026-03-02T00:00:00.000Z'),
     )).resolves.toEqual({ ok: false, code: 'OVERLOADED' });
   });
+
+  // Value: protects=readQuestionRates blocks an agent before connect and accepts only safe integer counts with numeric-or-null rates; fails_when=an agent reaches the pool, or a fractional, unsafe, or non-numeric value is returned ok; why_new=the repository suite only asserts PostgreSQL 42501 becomes OVERLOADED; seam=none; no_claim=scripted pool stands in for analytics.question_v1
+  it('parses safe question-rate counts and refuses an agent before connect', async () => {
+    const start = new Date('2026-03-01T00:00:00.000Z');
+    const end = new Date('2026-03-02T00:00:00.000Z');
+    const connect = vi.fn();
+    await expect(createOpsLoopRepository({ connect } as never).readQuestionRates(agent, start, end))
+      .resolves.toEqual({ ok: false, code: 'FORBIDDEN' });
+    expect(connect).not.toHaveBeenCalled();
+    const dead = { connect: async () => { throw new Error('too many clients'); } };
+    await expect(createOpsLoopRepository(dead as never).readQuestionRates(owner, start, end))
+      .resolves.toEqual({ ok: false, code: 'OVERLOADED' });
+
+    const row = {
+      query_count: '2',
+      hit_count: '1',
+      no_hit_count: '0',
+      other_count: '1',
+      inaccuracy_count: '0',
+      hit_rate: '0.5',
+      no_hit_rate: null,
+      inaccuracy_rate: '0',
+    };
+    const good = scriptedPool((sql, params) => {
+      expect(sql).toContain('analytics.question_v1');
+      expect(params).toEqual([start, end]);
+      return { rows: [row] };
+    });
+    await expect(createOpsLoopRepository(good.pool as never).readQuestionRates(owner, start, end))
+      .resolves.toEqual({
+        ok: true,
+        response: {
+          query_count: 2,
+          hit_count: 1,
+          no_hit_count: 0,
+          other_count: 1,
+          inaccuracy_count: 0,
+          hit_rate: '0.5',
+          no_hit_rate: null,
+          inaccuracy_rate: '0',
+        },
+      });
+    for (const broken of [
+      { ...row, query_count: '1.5' },
+      { ...row, inaccuracy_count: '9007199254740993' },
+      { ...row, hit_rate: 'NaN' },
+      { ...row, other_count: '9' },
+      { ...row, hit_rate: `1.${'0'.repeat(64)}` },
+    ]) {
+      const pool = scriptedPool(() => ({ rows: [broken] }));
+      await expect(createOpsLoopRepository(pool.pool as never).readQuestionRates(coach, start, end))
+        .resolves.toEqual({ ok: false, code: 'INTERNAL' });
+    }
+    const empty = scriptedPool(() => ({ rows: [] }));
+    await expect(createOpsLoopRepository(empty.pool as never).readQuestionRates(coach, start, end))
+      .resolves.toEqual({ ok: false, code: 'INTERNAL' });
+  });
 });

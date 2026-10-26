@@ -231,6 +231,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 
 .wb9 .ov-head{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:24px}
 .wb9 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.wb9 .shop-rates-loading{grid-column:1 / -1}
 .wb9 .tile{border:var(--wb-hair) solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:2px}
 .wb9 .t-lbl{color:var(--mute);font-size:var(--wb-text-meta)}
 .wb9 .tile b{font-size:var(--wb-text-title);line-height:36px;font-weight:600;letter-spacing:0}

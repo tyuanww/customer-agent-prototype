@@ -532,6 +532,11 @@ export function IntakeOverview({
     >补充话术</Button>;
   }
 
+  const readyShop = shopRates.status === 'ready' && shopRates.value
+    && shopRates.value.windowStart === span.start
+    && shopRates.value.windowEnd === span.end
+    ? shopRates.value : null;
+  const readyShopText = readyShop ? shopRateText(readyShop) : null;
   return <section className="dash-module intake-management intake-overview wb9" data-testid="module-overview">
     <h1 className="desk-sr">概览</h1>
     <div className="ov-head"><span className="mute">数据范围</span>
@@ -559,23 +564,22 @@ export function IntakeOverview({
           let endAt = end.endOf('day');
           const limit = startAt.add(365, 'day').endOf('day');
           if (endAt.isAfter(limit)) endAt = limit;
+          const shopRateWindowMs = 366 * 24 * 60 * 60 * 1000;
+          if (endAt.valueOf() - startAt.valueOf() >= shopRateWindowMs) {
+            endAt = dayjs(startAt.valueOf() + shopRateWindowMs - 1);
+          }
           setSpan({ start: startAt.valueOf(), end: endAt.valueOf() });
         }}
       />
     </div>
     <div className="tiles" data-testid="shop-rates">
-      {shopRates.status === 'ready' && shopRates.value
-        && shopRates.value.windowStart === span.start
-        && shopRates.value.windowEnd === span.end ? <>
-        <RateTile label="命中率" value={shopRateText(shopRates.value).hit} />
-        <RateTile label="无命中率" value={shopRateText(shopRates.value).noHit} />
-        <RateTile label="不准反馈率" value={shopRateText(shopRates.value).inaccuracy} detail={/^\d{3,}\./.test(shopRateText(shopRates.value).inaccuracy) ? '报告数除以查询数，可以超过 100%。' : undefined} />
-      </> : shopRates.status === 'loading' ? <WorkbenchLoading rows={1} label="正在读取全店比率" /> : null}
+      {readyShop && readyShopText ? <>
+        <RateTile label="命中率" value={readyShopText.hit} />
+        <RateTile label="无命中率" value={readyShopText.noHit} />
+        <RateTile label="不准反馈率" value={readyShopText.inaccuracy} detail={/^\d{3,}\./.test(readyShopText.inaccuracy) ? '报告数除以查询数，可以超过 100%。' : undefined} />
+      </> : shopRates.status === 'loading' ? <div className="shop-rates-loading"><WorkbenchLoading rows={1} label="正在读取全店比率" /></div> : null}
     </div>
-    {shopRates.status === 'ready' && shopRates.value
-      && shopRates.value.windowStart === span.start
-      && shopRates.value.windowEnd === span.end
-      ? <p className="t-sub">{QUESTION_SCOPE}{shopRates.value.otherCount > 0 ? '另有未归入命中或无命中的查询。' : ''}</p> : null}
+    {readyShop ? <p className="t-sub">{QUESTION_SCOPE}{readyShop.otherCount > 0 ? '另有未归入命中或无命中的查询。' : ''}</p> : null}
     {shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
     {shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
     <div className="tiles">

@@ -783,6 +783,82 @@ describe('ops-loop HTTP routes', () => {
     expect(ops.readQuestionRates).toHaveBeenCalledTimes(1);
   });
 
+  // Value: protects=owner and start===end get 200, exactly 366 days gets 400, and 1ms less gets 200; fails_when=equality or the owner is rejected, or the 366-day comparison is inverted; why_new=the existing route test uses a one-day coach span and a multi-year window; seam=none; no_claim=mocked repository; does not prove PostgreSQL or the desktop picker
+  it('accepts an owner on an equal window and stops at exactly 366 days', async () => {
+    const ops = repository();
+    const app = appWith(ops);
+    const start = '2026-03-01T00:00:00.000Z';
+    const same = await app.inject({
+      method: 'GET',
+      url: `/v1/metrics/question?start=${encodeURIComponent(start)}&end=${encodeURIComponent(start)}`,
+      headers: ownerHeaders,
+    });
+    expect(same.statusCode).toBe(200);
+    expect(same.headers['cache-control']).toBe('no-store');
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[0]).toMatchObject({
+      role: 'owner',
+      user_id: 'usr_synthetic_owner_001',
+    });
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[1].toISOString()).toBe(start);
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[0]?.[2].toISOString()).toBe(start);
+    const bogus = await app.inject({
+      method: 'GET',
+      url: `/v1/metrics/question?start=not-a-date&end=${encodeURIComponent(start)}`,
+      headers: coachHeaders,
+    });
+    expect(bogus.statusCode).toBe(400);
+    const day = 24 * 60 * 60 * 1000;
+    const bound = '2026-01-01T00:00:00.000Z';
+    const exactly = new Date(Date.parse(bound) + 366 * day).toISOString();
+    const exact = await app.inject({
+      method: 'GET',
+      url: `/v1/metrics/question?start=${encodeURIComponent(bound)}&end=${encodeURIComponent(exactly)}`,
+      headers: coachHeaders,
+    });
+    expect(exact.statusCode).toBe(400);
+    expect(ops.readQuestionRates).toHaveBeenCalledTimes(1);
+    const under = new Date(Date.parse(bound) + 366 * day - 1).toISOString();
+    const allowed = await app.inject({
+      method: 'GET',
+      url: `/v1/metrics/question?start=${encodeURIComponent(bound)}&end=${encodeURIComponent(under)}`,
+      headers: coachHeaders,
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(vi.mocked(ops.readQuestionRates).mock.calls[1]?.[2].toISOString()).toBe(under);
+    expect(ops.readQuestionRates).toHaveBeenCalledTimes(2);
+  });
+
+  // Value: protects=an unwired question route is 503 and the 61st coach read in the window is 429; fails_when=a missing repository returns 200 or the 61st read still calls the repository; why_new=the question route tests always pass a repository and stay under the limit; seam=none; no_claim=in-memory limiter, not a multi-process gateway
+  it('returns 503 when question rates are unwired and 429 on the 61st read', async () => {
+    const unwired = appWith();
+    const missing = await unwired.inject({
+      method: 'GET',
+      url: '/v1/metrics/question?start=2026-03-01T00:00:00.000Z&end=2026-03-02T00:00:00.000Z',
+      headers: coachHeaders,
+    });
+    expect(missing.statusCode).toBe(503);
+    expect(missing.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+    const ops = repository();
+    const app = appWith(ops);
+    const headers = { 'x-mock-user': 'usr_synthetic_coach_question_limit', 'x-mock-role': 'coach' };
+    for (let index = 0; index < 60; index += 1) {
+      const allowed = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/question?start=2026-03-01T00:00:00.000Z&end=2026-03-02T00:00:00.000Z',
+        headers,
+      });
+      expect(allowed.statusCode).toBe(200);
+    }
+    const limited = await app.inject({
+      method: 'GET',
+      url: '/v1/metrics/question?start=2026-03-01T00:00:00.000Z&end=2026-03-02T00:00:00.000Z',
+      headers,
+    });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({ error: { code: 'RATE_LIMITED' } });
+    expect(ops.readQuestionRates).toHaveBeenCalledTimes(60);
+  });
+
   it('lists the signed-in seat and leaves another seat out', async () => {
     const ops = repository();
     const app = appWith(ops);

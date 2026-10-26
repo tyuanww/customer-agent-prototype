@@ -63,7 +63,8 @@ export function registerDashboardOpsLoopIpc(
       if (Number.isNaN(startAt.valueOf()) || Number.isNaN(endAt.valueOf()) || startAt > endAt) {
         return Promise.resolve(dashboardOpsFailure('VALIDATION'));
       }
-      if (endAt.getTime() - startAt.getTime() >= 366 * 24 * 60 * 60 * 1000) {
+      const shopRateWindowMs = 366 * 24 * 60 * 60 * 1000;
+      if (endAt.getTime() - startAt.getTime() >= shopRateWindowMs) {
         return Promise.resolve(dashboardOpsFailure('VALIDATION'));
       }
       return dashboardQuestionRates(session, start, end);

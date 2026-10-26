@@ -99,7 +99,7 @@ function wholeCount(value: unknown): value is number {
 }
 
 function rateText(value: unknown): value is string | null {
-  return value === null || (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value));
+  return value === null || (typeof value === 'string' && value.length <= 64 && /^\d+(\.\d+)?$/.test(value));
 }
 
 export async function dashboardQuestionRates(

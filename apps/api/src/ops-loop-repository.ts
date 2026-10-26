@@ -578,16 +578,21 @@ export function createOpsLoopRepository(
           };
           const rate = (value: string | null) => {
             if (value === null) return null;
-            if (!/^\d+(\.\d+)?$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
+            if (value.length > 64 || !/^\d+(\.\d+)?$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
             return value;
           };
+          const queryCount = count(row.query_count);
+          const hitCount = count(row.hit_count);
+          const noHitCount = count(row.no_hit_count);
+          const otherCount = count(row.other_count);
+          if (hitCount + noHitCount + otherCount !== queryCount) throw new Error('QUESTION_RATES_SHAPE');
           return Object.freeze({
             ok: true as const,
             response: {
-              query_count: count(row.query_count),
-              hit_count: count(row.hit_count),
-              no_hit_count: count(row.no_hit_count),
-              other_count: count(row.other_count),
+              query_count: queryCount,
+              hit_count: hitCount,
+              no_hit_count: noHitCount,
+              other_count: otherCount,
               inaccuracy_count: count(row.inaccuracy_count),
               hit_rate: rate(row.hit_rate),
               no_hit_rate: rate(row.no_hit_rate),
