@@ -501,7 +501,7 @@ export function IntakeOverview({
       />
     </div>
     <div className="tiles" data-testid="shop-rates">
-      {shopRates.status === 'ready' ? <>
+      {shopRates.status === 'ready' && shopRates.value ? <>
         <RateTile label="命中率" value={formatShopRate(shopRates.value.hitRate)} />
         <RateTile label="无命中率" value={formatShopRate(shopRates.value.noHitRate)} />
         <RateTile label="不准反馈率" value={formatShopRate(shopRates.value.inaccuracyRate)} />

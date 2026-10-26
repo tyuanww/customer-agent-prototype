@@ -603,7 +603,7 @@ it('shows an empty shop window as 没有查询 and keeps the personal counts at 
       noHitRate: null,
       inaccuracyRate: null,
     })),
-  } as Window['dashboardOps'];
+  } as unknown as Window['dashboardOps'];
   render(<IntakeOverview onOpen={() => undefined} />);
   expect(await screen.findAllByText('没有查询')).toHaveLength(3);
   expect(tileText('命中率')).toBe('命中率没有查询');
