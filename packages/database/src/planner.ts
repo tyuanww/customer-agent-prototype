@@ -281,6 +281,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0069_feishu_login_link',
     requiresPredecessor: 'Question ratios require the Feishu login link',
   },
+  {
+    index: 70,
+    minimumCatalogueLength: 71,
+    id: '0071_analytics_runtime_execute',
+    predecessorId: '0070_analytics_question_v1',
+    requiresPredecessor: 'Runtime execute requires the question function',
+  },
 ];
 
 function requiredSuccessorStep(

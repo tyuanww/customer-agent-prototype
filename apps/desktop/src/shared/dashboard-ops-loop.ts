@@ -115,6 +115,18 @@ export type DashboardRetrievalMetrics = Readonly<{
   releaseId: string | null;
 }>;
 
+export type DashboardQuestionRates = Readonly<{
+  ok: true;
+  queryCount: number;
+  hitCount: number;
+  noHitCount: number;
+  otherCount: number;
+  inaccuracyCount: number;
+  hitRate: string | null;
+  noHitRate: string | null;
+  inaccuracyRate: string | null;
+}>;
+
 export type DashboardSopNode = Readonly<{
   nodeId: string;
   parentNodeId: string | null;
@@ -167,6 +179,7 @@ export type DashboardSoftwareOpenDownload = Readonly<{
 
 export type DashboardOpsApi = {
   retrieval(window: RetrievalWindow): Promise<DashboardRetrievalMetrics | DashboardOpsFailure>;
+  questionRates?(start: string, end: string): Promise<DashboardQuestionRates | DashboardOpsFailure>;
   sopCatalog(): Promise<DashboardSopCatalog | DashboardOpsFailure>;
   sopImport(csvText: string): Promise<DashboardSopImport | DashboardOpsFailure>;
   sopPatch(request: {

@@ -696,7 +696,7 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length === 39 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Repair predecessor manifest drift');
   if (actual.migrations.length >= 41 && !existsSync(path.join(projectRoot, UPSTREAM_ROOT, READINESS_LOCK))) throw new Error('Readiness lock required for 41 migrations');
   if (actual.migrations.length >= 42 && actual.migrations[41]?.id !== '0042_intake_occupied_domain_publish') throw new Error('Unrecognized occupied-domain publication');
@@ -771,7 +771,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length === 40 && sha256(manifestPath) !== predecessor.manifestSha256) throw new Error('Readiness predecessor manifest drift');
   for (const expected of predecessor.migrations) {
     const found = actual.migrations[expected.position - 1];
@@ -780,7 +780,9 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
     assertPathInsideRoot(projectRoot,file); assertRegularFile(file,'Readiness predecessor migration');
     if (sha256(file)!==expected.sha256 || lstatSync(file).size!==expected.bytes) throw new Error(`Readiness predecessor bytes drift: ${expected.file}`);
   }
-  if (actual.migrations.length >= 41 && actual.migrations.length <= 57) {
+  // Position 41 stays the readiness migration after every later product overlay.
+  // A length cap here would accept a rewritten 0041 once the catalogue grew past it.
+  if (actual.migrations.length >= 41) {
     const lockPath=path.join(projectRoot,UPSTREAM_ROOT,READINESS_LOCK);
     assertPathInsideRoot(projectRoot,lockPath); assertRegularFile(lockPath,'Readiness lock');
     const lock=validateConsumptionLock(readJson(lockPath,'Readiness lock'));

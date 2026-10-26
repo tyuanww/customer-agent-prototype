@@ -266,7 +266,7 @@ Demo `validity.ts`：
    ▼
 [Dashboard 只读 Adapter]      ← 新窗也要独立受信面
    │  GET /v1/metrics/iteration-tasks 与 POST start/close 已接线（coach/owner）
-   │  GET /v1/metrics/retrieval、/v1/sop/*、/v1/content/scripts/*、/v1/software/releases 经 dashboardOps
+   │  GET /v1/metrics/retrieval、/v1/metrics/question、/v1/sop/*、/v1/content/scripts/*、/v1/software/releases 经 dashboardOps
    │  /work-orders/* 仍未接；待办页不展示不准按稿次数
    │  角色 403 原样展示；禁止用合成数字填空；空列表合法
 ```

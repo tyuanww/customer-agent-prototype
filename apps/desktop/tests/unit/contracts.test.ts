@@ -73,6 +73,7 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE,
       IPC_CHANNELS.DASHBOARD_INACCURACY_OUTCOMES,
       IPC_CHANNELS.DASHBOARD_OPS_RETRIEVAL,
+      IPC_CHANNELS.DASHBOARD_OPS_QUESTION_RATES,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT,
       IPC_CHANNELS.DASHBOARD_OPS_SOP_PATCH,
@@ -142,6 +143,7 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_START}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_ITERATION_CLOSE}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_OPS_RETRIEVAL}'`);
+    expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_OPS_QUESTION_RATES}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE}'`);
     expect(dashboardPreload).toContain(`'${IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE_OPEN}'`);
     expect(dashboardPreload).toContain('dashboardOps');

@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest';
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import { registerDashboardOpsLoopIpc } from '../../src/main/dashboard-ops-loop-ipc';
 import {
+  dashboardQuestionRates,
   dashboardRetrievalMetrics,
   dashboardScriptDelete,
   dashboardSoftwareCatalog,
@@ -508,4 +509,77 @@ it('refuses SOP import for a signed-in owner whose job cannot upload', async () 
     ok: true, productSessionId: 'default', nodeCount: 1,
   });
   expect(engineer.paths).toContain('/v1/sop/import');
+});
+
+it('asks the shop question rates for the chosen window', async () => {
+  const coach = fakeSession('coach');
+  const start = '2026-03-01T00:00:00.000Z';
+  const end = '2026-03-02T00:00:00.000Z';
+  vi.mocked(coach.request).mockResolvedValueOnce({
+    status: 200,
+    value: {
+      query_count: 3,
+      hit_count: 1,
+      no_hit_count: 1,
+      other_count: 1,
+      inaccuracy_count: 4,
+      hit_rate: '0.33333333333333333333',
+      no_hit_rate: '0.33333333333333333333',
+      inaccuracy_rate: '1.33333333333333333333',
+    },
+  });
+  expect(await dashboardQuestionRates(coach, start, end)).toEqual({
+    ok: true,
+    queryCount: 3,
+    hitCount: 1,
+    noHitCount: 1,
+    otherCount: 1,
+    inaccuracyCount: 4,
+    hitRate: '0.33333333333333333333',
+    noHitRate: '0.33333333333333333333',
+    inaccuracyRate: '1.33333333333333333333',
+  });
+  expect(vi.mocked(coach.request).mock.calls[0]?.[1]).toBe(
+    `/v1/metrics/question?${new URLSearchParams({ start, end })}`,
+  );
+  expect(await dashboardQuestionRates(fakeSession('agent'), start, end)).toMatchObject({
+    ok: false,
+    code: 'FORBIDDEN',
+  });
+  vi.mocked(coach.request).mockResolvedValueOnce({
+    status: 200,
+    value: { query_count: '3', hit_count: 1, no_hit_count: 1, other_count: 1, inaccuracy_count: 0, hit_rate: null, no_hit_rate: null, inaccuracy_rate: null },
+  });
+  expect(await dashboardQuestionRates(coach, start, end)).toMatchObject({ ok: false, code: 'VALIDATION' });
+  vi.mocked(coach.request).mockResolvedValueOnce({
+    status: 200,
+    value: {
+      query_count: 3, hit_count: 1, no_hit_count: 1, other_count: 1, inaccuracy_count: 0,
+      hit_rate: `1.${'0'.repeat(64)}`, no_hit_rate: null, inaccuracy_rate: null,
+    },
+  });
+  expect(await dashboardQuestionRates(coach, start, end)).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(coach.request).toHaveBeenCalledTimes(3);
+
+  const { dashboard, event } = trustedDashboard();
+  const session = fakeSession('owner');
+  registerDashboardOpsLoopIpc(session as ProductSession, () => dashboard, () => 'http://127.0.0.1:5173/');
+  const rates = handlers.get(IPC_CHANNELS.DASHBOARD_OPS_QUESTION_RATES)!;
+  const day = 24 * 60 * 60 * 1000;
+  const windowStart = '2026-01-01T00:00:00.000Z';
+  expect(await rates(event(dashboard), 1, windowStart)).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await rates(event(dashboard), windowStart, '2025-01-01T00:00:00.000Z')).toMatchObject({ ok: false, code: 'VALIDATION' });
+  const tooLong = new Date(Date.parse(windowStart) + 366 * day).toISOString();
+  expect(await rates(event(dashboard), windowStart, tooLong)).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(session.request).not.toHaveBeenCalled();
+  vi.mocked(session.request).mockResolvedValueOnce({
+    status: 200,
+    value: {
+      query_count: 1, hit_count: 1, no_hit_count: 0, other_count: 0, inaccuracy_count: 0,
+      hit_rate: '1', no_hit_rate: '0', inaccuracy_rate: '0',
+    },
+  });
+  const under = new Date(Date.parse(windowStart) + 366 * day - 1).toISOString();
+  expect(await rates(event(dashboard), windowStart, under)).toMatchObject({ ok: true, queryCount: 1 });
+  expect(session.request).toHaveBeenCalledTimes(1);
 });

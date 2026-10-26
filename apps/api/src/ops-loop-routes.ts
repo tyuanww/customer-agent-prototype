@@ -27,6 +27,7 @@ export type OpsLoopRouteDependencies = Readonly<{
 }>;
 
 const WINDOWS = new Set<RetrievalWindow>(['current_release', 'last_7d']);
+const SHOP_RATE_WINDOW_MS = 366 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOP_UPLOAD_MAX_BYTES = 256 * 1024;
 
@@ -373,6 +374,25 @@ export function registerOpsLoopRoutes(
     const result = await dependencies.repository.readRetrievalMetrics(actor, window as RetrievalWindow);
     if (!result.ok) return sendOperationFailure(reply, result);
     return parseContractSchema('RetrievalMetrics', result.response);
+  });
+
+  app.get('/v1/metrics/question', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const actor = await authenticateRequestHeaders(authService, request.headers);
+    if (actor === null) return sendUnauthorized(reply);
+    if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    const query = request.query as { start?: unknown; end?: unknown };
+    const start = typeof query.start === 'string' ? new Date(query.start) : null;
+    const end = typeof query.end === 'string' ? new Date(query.end) : null;
+    if (start === null || end === null || Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf()) || start > end) {
+      return sendValidationError(reply);
+    }
+    if (end.getTime() - start.getTime() >= SHOP_RATE_WINDOW_MS) return sendValidationError(reply);
+    if (dependencies === undefined) return sendOverloaded(reply);
+    if (!limit('question', actor.user_id, 60)) return sendRateLimited(reply);
+    const result = await dependencies.repository.readQuestionRates(actor, start, end);
+    if (!result.ok) return sendOperationFailure(reply, result);
+    return result.response;
   });
 
   app.get('/v1/events/usage', async (request, reply) => {

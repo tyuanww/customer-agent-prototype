@@ -92,6 +92,7 @@ afterEach(() => {
   delete window.dashboardWording;
   delete window.dashboardDesk;
   delete window.dashboardUsageLog;
+  delete window.dashboardOps;
   window.history.pushState({}, '', '/');
 });
 
@@ -577,6 +578,163 @@ it('says 没读到 when a mounted usage read fails for another reason', async ()
   expect(status).not.toHaveTextContent('请先登录');
   expect(tileText('查询次数')).toBe('查询次数');
 });
+
+const SHOP_RATE_SCOPE = '命中率、无命中率和不准反馈率是全店这段时间的查询，不是当前登录者的使用记录。';
+
+it('shows an empty shop window as 没有查询 and keeps the personal counts at 0', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [], nextCursor: null })),
+    start: vi.fn(),
+    close: vi.fn(),
+  };
+  window.dashboardUsageLog = {
+    list: vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false })),
+    previewExport: vi.fn(async () => ({ ok: true as const, exportable: 0, redacted: 0, withoutConsent: 0 })),
+    export: vi.fn(async () => ({ ok: true as const, written: 0 })),
+  };
+  window.dashboardOps = {
+    questionRates: vi.fn(async () => ({
+      ok: true as const,
+      queryCount: 0,
+      hitCount: 0,
+      noHitCount: 0,
+      otherCount: 0,
+      inaccuracyCount: 0,
+      hitRate: null,
+      noHitRate: null,
+      inaccuracyRate: null,
+    })),
+  } as unknown as Window['dashboardOps'];
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findAllByText('没有查询')).toHaveLength(3);
+  expect(tileText('命中率')).toBe('命中率没有查询');
+  expect(tileText('无命中率')).toBe('无命中率没有查询');
+  expect(tileText('不准反馈率')).toBe('不准反馈率没有查询');
+  expect(screen.getByText(SHOP_RATE_SCOPE)).toBeInTheDocument();
+  expect(tileText('查询次数')).toBe('查询次数0');
+});
+
+it('rounds 23 of 80 queries so the two rates sum to 100', async () => {
+  window.dashboardOps = {
+    questionRates: vi.fn(async () => ({
+      ok: true as const,
+      queryCount: 80,
+      hitCount: 23,
+      noHitCount: 57,
+      otherCount: 0,
+      inaccuracyCount: 87,
+      hitRate: '0.2875',
+      noHitRate: '0.7125',
+      inaccuracyRate: '1.0875',
+    })),
+  } as unknown as Window['dashboardOps'];
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findByText('28.7%')).toBeInTheDocument();
+  expect(screen.getByText('71.3%')).toBeInTheDocument();
+  expect(screen.getByText('108.8%')).toBeInTheDocument();
+  expect(screen.getByText('报告数除以查询数，可以超过 100%。')).toBeInTheDocument();
+  expect(screen.queryByText('28.8%')).not.toBeInTheDocument();
+});
+
+// Value: protects=when hit plus no-hit is not the query count, 0.2875 displays 28.8% and the other-count note; fails_when=the UI always allocates tenths from counts or truncates the rate text; why_new=the 23 and 57 of 80 test covers only a complete pair and forbids 28.8%; seam=none; no_claim=mocked questionRates payload, not the HTTP API
+it('rounds an incomplete pair from the decimal text instead of the 100 percent split', async () => {
+  window.dashboardOps = {
+    questionRates: vi.fn(async () => ({
+      ok: true as const,
+      queryCount: 100,
+      hitCount: 23,
+      noHitCount: 57,
+      otherCount: 20,
+      inaccuracyCount: 0,
+      hitRate: '0.2875',
+      noHitRate: '0.7125',
+      inaccuracyRate: '0.1',
+    })),
+  } as unknown as Window['dashboardOps'];
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findByText('28.8%')).toBeInTheDocument();
+  expect(screen.getByText('71.3%')).toBeInTheDocument();
+  expect(screen.getByText('10.0%')).toBeInTheDocument();
+  expect(screen.getByText(/另有未归入命中或无命中的查询/)).toBeInTheDocument();
+  expect(screen.queryByText('23.0%')).not.toBeInTheDocument();
+  expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
+  expect(screen.queryByText('报告数除以查询数，可以超过 100%。')).not.toBeInTheDocument();
+});
+
+// Value: protects=in-flight shop rates show 正在读取全店比率 and a new window hides the previous percentages; fails_when=loading is omitted or ready tiles render for a mismatched window; why_new=both shop-rate tests resolve a single window before the assertion; seam=none; no_claim=mocked questionRates; the 近 30 天 preset stands in for a slow response
+it('shows a loading row and hides the previous rates when the window changes', async () => {
+  const shown = {
+    ok: true as const,
+    queryCount: 80,
+    hitCount: 23,
+    noHitCount: 57,
+    otherCount: 0,
+    inaccuracyCount: 0,
+    hitRate: '0.2875',
+    noHitRate: '0.7125',
+    inaccuracyRate: '0',
+  };
+  let releaseFirst: (value: typeof shown) => void = () => undefined;
+  const first = new Promise<typeof shown>((resolve) => { releaseFirst = resolve; });
+  const questionRates = vi.fn()
+    .mockImplementationOnce(() => first)
+    .mockImplementationOnce(() => new Promise(() => undefined));
+  window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+  render(<IntakeOverview onOpen={() => undefined} />);
+  expect(await screen.findByRole('status', { name: '正在读取全店比率' })).toBeInTheDocument();
+  expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
+  await act(async () => { releaseFirst(shown); });
+  expect(await screen.findByText('28.7%')).toBeInTheDocument();
+  const user = userEvent.setup({ delay: null });
+  await user.click(screen.getByPlaceholderText('开始日期'));
+  await user.click(await screen.findByText('近 30 天'));
+  expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
+  expect(await screen.findByRole('status', { name: '正在读取全店比率' })).toBeInTheDocument();
+  expect(questionRates).toHaveBeenCalledTimes(2);
+  expect(questionRates.mock.calls[1]?.[0]).not.toBe(questionRates.mock.calls[0]?.[0]);
+});
+
+// Value: protects=a 366-day inclusive range is kept and a longer range is clamped to that end of day; fails_when=the picker submits an end past start plus 365 days or shortens the exact inclusive range; why_new=no overview test changes the range picker off the default week; seam=none; no_claim=jsdom RangePicker, not the packaged Electron calendar
+it('keeps 366 inclusive days and clamps a longer shop window', async () => {
+  const startOf = (year: number, month: number, day: number) => new Date(year, month, day, 0, 0, 0, 0).toISOString();
+  const endOf = (year: number, month: number, day: number) => new Date(year, month, day, 23, 59, 59, 999).toISOString();
+  async function pick(endText: string): Promise<readonly [string, string]> {
+    cleanup();
+    const questionRates = vi.fn(async (_start: string, _end: string) => ({
+      ok: true as const,
+      queryCount: 0,
+      hitCount: 0,
+      noHitCount: 0,
+      otherCount: 0,
+      inaccuracyCount: 0,
+      hitRate: null,
+      noHitRate: null,
+      inaccuracyRate: null,
+    }));
+    window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+    render(<IntakeOverview onOpen={() => undefined} />);
+    await screen.findAllByText('没有查询');
+    const user = userEvent.setup({ delay: null });
+    const startInput = screen.getByPlaceholderText('开始日期');
+    const endInput = screen.getByPlaceholderText('结束日期');
+    await user.click(startInput);
+    await user.clear(startInput);
+    await user.type(startInput, '2025-01-01');
+    await user.click(endInput);
+    await user.clear(endInput);
+    await user.type(endInput, `${endText}{Enter}`);
+    await waitFor(() => expect(questionRates.mock.calls.length).toBeGreaterThan(1));
+    const call = questionRates.mock.calls.at(-1);
+    return [String(call?.[0]), String(call?.[1])];
+  }
+  const inclusive = await pick('2026-01-01');
+  expect(inclusive[0]).toBe(startOf(2025, 0, 1));
+  expect(inclusive[1]).toBe(endOf(2026, 0, 1));
+  const clamped = await pick('2026-06-01');
+  expect(clamped[0]).toBe(startOf(2025, 0, 1));
+  expect(clamped[1]).toBe(endOf(2026, 0, 1));
+  expect(clamped[1]).not.toBe(endOf(2026, 5, 1));
+}, 15000);
 
 it('shows the digit 0 when the signed-in reads are empty', async () => {
   window.dashboardIteration = {

@@ -33,6 +33,7 @@ export const OPS_FUNCTION_GRANTS = Object.freeze([
   'ops_loop.delete_sop_node(text,integer,text)',
   'ops_loop.mutate_script(text,text,integer,text,text,timestamp with time zone,timestamp with time zone,text,text)',
   'ops_loop.read_retrieval_metrics(text,text)',
+  'analytics.question_v1(timestamp with time zone,timestamp with time zone)',
   'ops_loop.list_software_releases(text)',
   'ops_loop.current_software_release(text)',
 ] as const satisfies readonly RuntimeFunctionGrant[]);

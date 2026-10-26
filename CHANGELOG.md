@@ -2,6 +2,14 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.33] - 2026-10-26
+
+### Added
+
+- 主管和运营可以在概览里按选定日期看全店命中率、无命中率和不准反馈率。没有查询的窗口写「没有查询」。坐席看不到这三块。
+- 仓库版本是 `0.3.33`。根目录 `VERSION` 与 `apps/desktop/package.json` 是同一串。
+- 这一版不发布安装包，也不改杭州进程。话术指针仍是 `rel_27`。
+
 ## [0.3.32] - 2026-10-23
 
 ### Changed

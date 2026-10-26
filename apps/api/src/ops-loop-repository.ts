@@ -18,6 +18,17 @@ type SopImportAccepted = components['schemas']['SopImportAccepted'];
 type ScriptMutationResponse = components['schemas']['ScriptMutationResponse'];
 type RetrievalMetrics = components['schemas']['RetrievalMetrics'];
 type RetrievalWindow = components['schemas']['RetrievalWindow'];
+
+export type QuestionRateRow = Readonly<{
+  query_count: number;
+  hit_count: number;
+  no_hit_count: number;
+  other_count: number;
+  inaccuracy_count: number;
+  hit_rate: string | null;
+  no_hit_rate: string | null;
+  inaccuracy_rate: string | null;
+}>;
 type SoftwareRelease = components['schemas']['SoftwareRelease'];
 type SoftwareReleaseList = components['schemas']['SoftwareReleaseList'];
 
@@ -100,6 +111,11 @@ export type OpsLoopRepository = Readonly<{
     actor: AuthenticatedUser,
     window: RetrievalWindow,
   ) => Promise<OperationResult<RetrievalMetrics>>;
+  readQuestionRates: (
+    actor: AuthenticatedUser,
+    start: Date,
+    end: Date,
+  ) => Promise<OperationResult<QuestionRateRow>>;
   readOwnUsage: (actor: AuthenticatedUser) => Promise<OperationResult<OwnUsageEvent[]>>;
   listSoftwareReleases: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareReleaseList>>;
   currentSoftwareRelease: (actor: AuthenticatedUser) => Promise<OperationResult<SoftwareRelease>>;
@@ -529,6 +545,71 @@ export function createOpsLoopRepository(
           release_id: row.release_id ?? null,
         });
       });
+    },
+
+    readQuestionRates(actor, start, end) {
+      if (actor.role !== 'coach' && actor.role !== 'owner') return Promise.resolve(failure('FORBIDDEN'));
+      return (async () => {
+        const client = await pool.connect().catch(() => null);
+        if (client === null) return failure('OVERLOADED');
+        try {
+          const result = await client.query<{
+            query_count: string;
+            hit_count: string;
+            no_hit_count: string;
+            other_count: string;
+            inaccuracy_count: string;
+            hit_rate: string | null;
+            no_hit_rate: string | null;
+            inaccuracy_rate: string | null;
+          }>(
+            `SELECT query_count::text, hit_count::text, no_hit_count::text, other_count::text,
+                    inaccuracy_count::text, hit_rate::text, no_hit_rate::text, inaccuracy_rate::text
+             FROM analytics.question_v1($1::timestamptz, $2::timestamptz)`,
+            [start, end],
+          );
+          const row = result.rows[0];
+          if (!row) throw new Error('QUESTION_RATES_SHAPE');
+          const count = (value: string) => {
+            if (!/^\d+$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
+            const parsed = Number(value);
+            if (!Number.isSafeInteger(parsed)) throw new Error('QUESTION_RATES_SHAPE');
+            return parsed;
+          };
+          const rate = (value: string | null) => {
+            if (value === null) return null;
+            if (value.length > 64 || !/^\d+(\.\d+)?$/.test(value)) throw new Error('QUESTION_RATES_SHAPE');
+            return value;
+          };
+          const queryCount = count(row.query_count);
+          const hitCount = count(row.hit_count);
+          const noHitCount = count(row.no_hit_count);
+          const otherCount = count(row.other_count);
+          if (hitCount + noHitCount + otherCount !== queryCount) throw new Error('QUESTION_RATES_SHAPE');
+          return Object.freeze({
+            ok: true as const,
+            response: {
+              query_count: queryCount,
+              hit_count: hitCount,
+              no_hit_count: noHitCount,
+              other_count: otherCount,
+              inaccuracy_count: count(row.inaccuracy_count),
+              hit_rate: rate(row.hit_rate),
+              no_hit_rate: rate(row.no_hit_rate),
+              inaccuracy_rate: rate(row.inaccuracy_rate),
+            },
+          });
+        } catch (error: unknown) {
+          if (error !== null && typeof error === 'object' && Reflect.get(error, 'code') === '42501') {
+            return failure('OVERLOADED');
+          }
+          const code = mapDatabaseContractError(error);
+          if (code === 'INTERNAL') reportFailure(error);
+          return failure(code);
+        } finally {
+          client.release();
+        }
+      })();
     },
 
     readOwnUsage(actor) {

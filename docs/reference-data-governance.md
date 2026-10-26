@@ -18,7 +18,7 @@
 
 | schema | 表 | 视图 | 列 | 管什么 | 谁写 |
 | --- | --- | --- | --- | --- | --- |
-| `analytics` | 0 | 0 | 0 | 窗口内的查询与不准反馈比率 | 没有表。`question_v1` 由 `cs_ai_definer` 执行，`app_owner_read` 有 EXECUTE |
+| `analytics` | 0 | 0 | 0 | 窗口内的查询与不准反馈比率 | 没有表。`question_v1` 由 `cs_ai_definer` 执行。`app_owner_read` 和 `app_runtime` 有 EXECUTE。`app_runtime` 本来就能 SELECT `query_events`。不准反馈表仍不对 `app_runtime` 开放 |
 | `backend_identity` | 5 | 0 | 31 | 登录绑定、坐席、飞书 open id | 写入走 `SECURITY DEFINER` 函数，包括 `create_seat` 和 `establish_feishu_login`。迁移对 PUBLIC 收回表权限，另有 SELECT 和列级 UPDATE |
 | `backend_review` | 3 | 0 | 28 | 审核回执与等待 | 迁移 `0033_intake_runtime_v1_23.sql` 把 `receipts` 的 INSERT 授给 `intake_business` |
 | `content_intake` | 57 | 1 | 451 | 授权、发布、角色上限、坐席岗位 | 授权和发布事务。撤销填写 `grants.revoked_at` |
