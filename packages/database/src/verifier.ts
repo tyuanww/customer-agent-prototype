@@ -1225,7 +1225,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   69: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
   // Measured after 0070.
   70: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
-  // Measured after 0071. The two grants do not move this manifest.
+  // This manifest's schema list does not include analytics, so these two grants are outside it.
   71: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
 };
 
