@@ -781,13 +781,13 @@ export const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.
   Object.freeze({
     position: 71,
     id: "0071_analytics_runtime_execute",
-    sha256: "ae869d9bc19dc404cb0671518c447d1f08b4cab4ff8fa4059783c1f660a83c71",
-    bytes: 779,
+    sha256: "f533d170061e90805c42b79e6a9449713b21d2ac43d6c26d3eef2b995b85494e",
+    bytes: 863,
     contractSetId: "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
     sourceGitSha: "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
     sourceSchemaSha256: "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998",
     sourceRanges: Object.freeze([]),
-    sql: "-- GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.\n-- 0071_analytics_runtime_execute; product overlay (not a frozen contract snapshot slice)\n-- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780\n-- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e\n-- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998\n-- The overview API uses the runtime role. That role may execute this function\n-- and use the schema. It still cannot select the base tables.\n-- The function stays owned by cs_ai_definer.\nSET LOCAL search_path = public, pg_catalog, pg_temp;\n\nGRANT USAGE ON SCHEMA analytics TO app_runtime;\nGRANT EXECUTE ON FUNCTION analytics.question_v1(timestamptz, timestamptz) TO app_runtime;\n",
+    sql: "-- GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.\n-- 0071_analytics_runtime_execute; product overlay (not a frozen contract snapshot slice)\n-- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780\n-- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e\n-- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998\n-- The overview API uses the runtime role. That role receives USAGE and EXECUTE here.\n-- app_runtime already has SELECT on public.query_events from 0008. This migration\n-- does not grant SELECT on ops_loop.inaccuracy_reports. The function stays owned\n-- by cs_ai_definer.\nSET LOCAL search_path = public, pg_catalog, pg_temp;\n\nGRANT USAGE ON SCHEMA analytics TO app_runtime;\nGRANT EXECUTE ON FUNCTION analytics.question_v1(timestamptz, timestamptz) TO app_runtime;\n",
   })
   ]),
 });

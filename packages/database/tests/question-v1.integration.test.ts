@@ -181,7 +181,7 @@ describe.skipIf(!enabled)('analytics.question_v1', () => {
     }
   });
 
-  it('lets app_owner_read and app_runtime execute and keeps the base tables closed', async () => {
+  it('lets app_owner_read and app_runtime execute and keeps inaccuracy reports closed', async () => {
     await ask(client, START, END, 'app_owner_read');
     await ask(client, START, END, 'app_runtime');
     await expect(asRole(client, 'app_content_admin', () => client.query(
@@ -192,6 +192,9 @@ describe.skipIf(!enabled)('analytics.question_v1', () => {
       'SELECT query_id FROM public.query_events',
     ))).rejects.toMatchObject({ code: '42501' });
     await expect(asRole(client, 'app_owner_read', () => client.query(
+      'SELECT query_id FROM ops_loop.inaccuracy_reports',
+    ))).rejects.toMatchObject({ code: '42501' });
+    await expect(asRole(client, 'app_runtime', () => client.query(
       'SELECT query_id FROM ops_loop.inaccuracy_reports',
     ))).rejects.toMatchObject({ code: '42501' });
   });
