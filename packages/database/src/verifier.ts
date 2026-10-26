@@ -1180,7 +1180,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0069 adds the Feishu login link. The first probe fills any digest that moved.
   69: { tables: 111, functions: 294, objectEntries: 3436, objectSha256: 'e7847606ad50cf3d26136c3524080dc963fae27051b6c76a0c336665350cfe0f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   // Measured after 0070.
-  70: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'f6ca460a1e3c115f77ae8d7abaa9de2ccd0bfeab52d958fde7a5976314b0af86', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  70: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: '279577857d0264a48d56f96b66607859050ab8dd9be3638525fa8a0e62fa3e9f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },

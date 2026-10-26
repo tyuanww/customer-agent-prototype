@@ -7,7 +7,6 @@ SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 CREATE SCHEMA analytics;
 REVOKE ALL ON SCHEMA analytics FROM PUBLIC;
-ALTER SCHEMA analytics OWNER TO cs_ai_definer;
 GRANT USAGE ON SCHEMA analytics TO app_owner_read;
 
 CREATE FUNCTION analytics.question_v1(p_start timestamptz, p_end timestamptz)
