@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest } from '../material.js';
-import { clock, type IntakePool } from '../transaction.js';
+import { clock, principalFactWindowMs, type IntakePool } from '../transaction.js';
 
 export type OrganizationFactsSnapshot = {
   principalId: string; expectedFactsVersion: number; departmentIds: string[];
@@ -18,25 +18,35 @@ const Rejected = OrganizationFactsRejected;
  * fact payload, facts version, deadline, transaction, or recovery decision. */
 export type OrganizationFactsAssociation = (client: PoolClient, snapshot: Readonly<OrganizationFactsSnapshot>, factsVersion: number, replay: boolean) => Promise<void>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function snapshot(raw: unknown): OrganizationFactsSnapshot {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Rejected('INVALID_INPUT');
-  const r = raw as Record<string, unknown>;
+  if (!isRecord(raw)) throw new Rejected('INVALID_INPUT');
   const keys = ['principalId','expectedFactsVersion','departmentIds','jobId','enabled','checkedAt','validUntil'];
-  if (Object.keys(r).length !== keys.length || keys.some(k => !Object.hasOwn(r,k))) throw new Rejected('INVALID_INPUT');
+  if (Object.keys(raw).length !== keys.length || keys.some(k => !Object.hasOwn(raw,k))) throw new Rejected('INVALID_INPUT');
   const id = (v: unknown) => parseContractSchema('IntakeId',v);
-  if (!Number.isSafeInteger(r.expectedFactsVersion) || (r.expectedFactsVersion as number)<1
-    || (r.expectedFactsVersion as number)>=Number.MAX_SAFE_INTEGER || typeof r.enabled!=='boolean'
-    || !Array.isArray(r.departmentIds) || r.departmentIds.length<1 || r.departmentIds.length>100) throw new Rejected('INVALID_INPUT');
-  const departmentIds = r.departmentIds.map(id).sort();
-  if (new Set(departmentIds).size!==departmentIds.length) throw new Rejected('INVALID_INPUT');
-  for (const field of ['checkedAt','validUntil'] as const) {
-    const value=r[field];
-    if (typeof value!=='string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString()!==value) throw new Rejected('INVALID_INPUT');
+  const version = raw.expectedFactsVersion;
+  if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1
+    || version >= Number.MAX_SAFE_INTEGER || typeof raw.enabled !== 'boolean'
+    || !Array.isArray(raw.departmentIds) || raw.departmentIds.length < 1 || raw.departmentIds.length > 100) {
+    throw new Rejected('INVALID_INPUT');
   }
-  const checkedAt=r.checkedAt as string, validUntil=r.validUntil as string;
-  if (Date.parse(validUntil)<=Date.parse(checkedAt) || Date.parse(validUntil)>Date.parse(checkedAt)+300_000) throw new Rejected('INVALID_INPUT');
-  return { principalId:id(r.principalId),expectedFactsVersion:r.expectedFactsVersion as number,
-    departmentIds,jobId:id(r.jobId),enabled:r.enabled,checkedAt,validUntil };
+  const departmentIds = raw.departmentIds.map(id).sort();
+  if (new Set(departmentIds).size !== departmentIds.length) throw new Rejected('INVALID_INPUT');
+  const checkedAt = raw.checkedAt;
+  const validUntil = raw.validUntil;
+  if (typeof checkedAt !== 'string' || typeof validUntil !== 'string'
+    || !Number.isFinite(Date.parse(checkedAt)) || new Date(checkedAt).toISOString() !== checkedAt
+    || !Number.isFinite(Date.parse(validUntil)) || new Date(validUntil).toISOString() !== validUntil) {
+    throw new Rejected('INVALID_INPUT');
+  }
+  if (Date.parse(validUntil) <= Date.parse(checkedAt) || Date.parse(validUntil) > Date.parse(checkedAt) + principalFactWindowMs) {
+    throw new Rejected('INVALID_INPUT');
+  }
+  return { principalId: id(raw.principalId), expectedFactsVersion: version,
+    departmentIds, jobId: id(raw.jobId), enabled: raw.enabled, checkedAt, validUntil };
 }
 
 /** Internal trusted writer; no HTTP registration. The caller is

@@ -48,6 +48,7 @@ const SOP_REPAIR_SUFFIX = [
   '0070_analytics_question_v1',
   '0071_analytics_runtime_execute',
   '0072_seat_post_grants',
+  '0073_feishu_query_grant',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -532,13 +533,107 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     } finally {await client.end();}
   });
 
+  it('accepts a 24 hour principal fact and does not grant an empty store', async () => {
+    const database = harness.createDatabase('fact_window');
+    const client = await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);
+      const check = await client.query<TextRow>(
+        `SELECT pg_get_constraintdef(oid) AS value FROM pg_constraint WHERE conname = 'principal_facts_check'`,
+      );
+      expect(check.rows[0]?.value).toContain('24:00:00');
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_testcursor001')`);
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_testcursor001')`);
+      const grants = await client.query<CountRow>(
+        `SELECT count(*)::int AS count FROM content_intake.grants WHERE reason = '飞书登录按来源签发。'`,
+      );
+      expect(grants.rows[0]?.count).toBe(0);
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO content_intake.principals(
+          principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version)
+        SELECT 'prin_window', user_id, 'tenant-a', 'app-a', 'feishu-job-roster', 'ou_testcursor001', 1
+          FROM backend_identity.subject_bindings WHERE binding_id = 'ou_testcursor001'`);
+      await client.query(`INSERT INTO content_intake.principal_facts(
+          principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+        VALUES ('prin_window', 1, ARRAY['dept-a'], 'job-seat', true, clock_timestamp(),
+          clock_timestamp() + interval '24 hours', repeat('ab', 32))`);
+      await client.query('COMMIT');
+      await expect(client.query(`INSERT INTO content_intake.principal_facts(
+          principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+        VALUES ('prin_window', 2, ARRAY['dept-a'], 'job-seat', true, clock_timestamp(),
+          clock_timestamp() + interval '25 hours', repeat('cd', 32))`)).rejects.toMatchObject({ code: '23514' });
+    } finally {
+      await client.end();
+    }
+  });
+
+  it('grants query for a new Feishu binding when one preview source has a live parent', async () => {
+    const database = harness.createDatabase('feishu_grant');
+    const client = await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
+        VALUES ('tenant-menokin','app-customer-agent',1)`);
+      await client.query(`INSERT INTO backend_identity.subject_bindings
+          (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+        VALUES ('operator','synthetic','tenant-menokin','建席人','operator',repeat('ab',32),true,'owner')`);
+      await client.query(`INSERT INTO content_intake.principals
+          (principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version,revocation_generation)
+        VALUES ('operator','operator','tenant-menokin','app-customer-agent','confirmed-synthetic','operator',1,0)`);
+      await client.query(`INSERT INTO content_intake.principal_facts
+          (principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+        VALUES ('operator',1,ARRAY['dept-menokin'],'job-director',true,
+          clock_timestamp()-interval '1 second', clock_timestamp()+interval '4 minutes', repeat('a',64))`);
+      await client.query(`INSERT INTO content_intake.role_rules
+          (tenant_id,app_id,department_id,job_id,policy_version,role)
+        VALUES ('tenant-menokin','app-customer-agent','dept-menokin','job-director',1,'director')`);
+      await client.query(`INSERT INTO content_intake.scopes(scope_id,tenant_id,app_id,brand_id,domain)
+        VALUES ('scope-product','tenant-menokin','app-customer-agent','brand-a','product')`);
+      await client.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+        VALUES ('source-a','scope-product',1,'v2-preview')`);
+      await client.query(`INSERT INTO content_intake.source_mappings
+          (source_id,version,template_version,rule_version,mapping_version,structure_digest)
+        VALUES ('source-a',1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`);
+      await client.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+        VALUES ('tenant-menokin','app-customer-agent',1,clock_timestamp(),'proof')`);
+      await client.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+        VALUES ('tenant-menokin','app-customer-agent',1)`);
+      await client.query(`INSERT INTO content_intake.store_set_members
+          (tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-menokin','app-customer-agent',1,'scope-product','source-a',clock_timestamp()+interval '1 day')`);
+      await client.query(`INSERT INTO content_intake.grants
+          (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+        VALUES ('root-query','allocation','operator','operator','tenant-menokin','app-customer-agent','scope-product','query',
+          clock_timestamp()-interval '1 hour', clock_timestamp()+interval '1 day','合成根资格','operator')`);
+      await client.query('COMMIT');
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_newfeishu01')`);
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_newfeishu01')`);
+      const rows = await client.query<{
+        action: string; source_id: string; kind: string; has_issuer: boolean; day_window: boolean;
+      }>(`SELECT g.action, g.source_id, g.kind, (g.issuer_id IS NOT NULL) AS has_issuer,
+            (f.valid_until = f.checked_at + interval '24 hours') AS day_window
+          FROM content_intake.grants g
+          JOIN content_intake.principals p ON p.principal_id = g.recipient_id
+          JOIN content_intake.principal_facts f
+            ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
+         WHERE p.principal_id = 'prin_' || left(encode(pg_catalog.sha256(pg_catalog.convert_to('ou_newfeishu01','UTF8')), 'hex'), 32)
+           AND g.revoked_at IS NULL AND g.action = 'query'`);
+      expect(rows.rows).toEqual([
+        { action: 'query', source_id: 'source-a', kind: 'business', has_issuer: true, day_window: true },
+      ]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it('installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op', async () => {
     const database = harness.createDatabase('clean_install');
     const client = await harness.connect(database.config);
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(72);
+      expect(fresh.pending).toHaveLength(73);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -550,12 +645,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
         inventory: { tables: 111, views: 7, functions: 294 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 63-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 64-migration current suffix',
         },
       });
 
@@ -702,7 +797,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
       });
     } finally {
       await client.end();
@@ -958,7 +1053,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
       });
     } finally {
       await client.end();

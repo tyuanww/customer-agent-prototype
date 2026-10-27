@@ -573,7 +573,7 @@
 | 名称 | 类型 | 定义 |
 | --- | --- | --- |
 | `organization_fact_evidence` | t | TRIGGER DEFERRABLE INITIALLY DEFERRED |
-| `principal_facts_check` | C | CHECK (((valid_until > checked_at) AND (valid_until <= (checked_at + '00:05:00'::interval)))) |
+| `principal_facts_check` | C | CHECK (((valid_until > checked_at) AND (valid_until <= (checked_at + '24:00:00'::interval)))) |
 | `principal_facts_checked_at_check` | C | CHECK (isfinite(checked_at)) |
 | `principal_facts_department_ids_check` | C | CHECK ((((cardinality(department_ids) >= 1) AND (cardinality(department_ids) <= 100)) AND (array_position(department_ids, NULL::text) IS NULL))) |
 | `principal_facts_pkey` | P | PRIMARY KEY (principal_id, facts_version) |

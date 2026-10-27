@@ -73,7 +73,7 @@ describe('database migration planner', () => {
     const prior = generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.at(-1)!;
     expect(prior.migrationCount).toBe(34);
     const prefix = deriveMigrationStatus(generatedMigrationCatalogue.migrations.slice(0,34).map((_,index)=>ledgerRow(index)),generatedMigrationCatalogue);
-    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit', '0046_project_feishu_roster', '0047_roster_query_signer', '0048_roster_store_set', '0049_roster_lifecycle', '0050_authorization_sources', '0051_publish_source_set', '0052_import_source_set', '0053_search_source_set', '0054_legacy_batch_owner_only', '0055_grant_steward_required', '0056_cancel_import_owner_only', '0057_role_ceiling', '0058_grant_steward_no_restore', '0059_query_grant_restamp', '0060_grant_issuer_authority', '0061_sop_entry_code_identity', '0062_store_set_authority_retention', '0063_store_set_keep_members_boundary', '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid', '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link', '0070_analytics_question_v1', '0071_analytics_runtime_execute', '0072_seat_post_grants']);
+    expect(prefix.pending.map(m=>m.id)).toEqual(['0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit', '0046_project_feishu_roster', '0047_roster_query_signer', '0048_roster_store_set', '0049_roster_lifecycle', '0050_authorization_sources', '0051_publish_source_set', '0052_import_source_set', '0053_search_source_set', '0054_legacy_batch_owner_only', '0055_grant_steward_required', '0056_cancel_import_owner_only', '0057_role_ceiling', '0058_grant_steward_no_restore', '0059_query_grant_restamp', '0060_grant_issuer_authority', '0061_sop_entry_code_identity', '0062_store_set_authority_retention', '0063_store_set_keep_members_boundary', '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid', '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link', '0070_analytics_question_v1', '0071_analytics_runtime_execute', '0072_seat_post_grants', '0073_feishu_query_grant']);
     for (const change of [{ sourceSchemaSha256: 'f'.repeat(64) }, { contractSetId: generatedMigrationCatalogue.contractSetId }, { migrationCount: generatedMigrationCatalogue.migrations.length + 1 }]) {
       const invalid = { ...generatedMigrationCatalogue, compatibility: { ...generatedMigrationCatalogue.compatibility,
         priorReviewedUpgrades: [...generatedMigrationCatalogue.compatibility.priorReviewedUpgrades.slice(0, -1), { ...prior, ...change }] } };
@@ -94,14 +94,14 @@ describe('database migration planner', () => {
     expect(complete.state).toBe('COMPLETE');
     expect(planMigrationCatalogue(complete).migrations).toEqual([]);
     expect(complete.compatibility.priorUpgrade).toBe(
-      'SUPPORTED · immutable 9-migration baseline → 63-migration current suffix',
+      'SUPPORTED · immutable 9-migration baseline → 64-migration current suffix',
     );
   });
 
   it('keeps the applied 0042 checksum and rejects a rewritten occupied-domain ledger or catalogue', () => {
     const frozen = 'c692968890cef90c1f72651901a326a8e816347992c7795d58f56cbcc31d6f37';
     const rewritten = '245e31b1993edc5017da5006f9f2e31062604d29c1189892fd8908d761d298fd';
-    expect(generatedMigrationCatalogue.migrations).toHaveLength(72);
+    expect(generatedMigrationCatalogue.migrations).toHaveLength(73);
     expect(generatedMigrationCatalogue.migrations[41]).toMatchObject({
       id: '0042_intake_occupied_domain_publish',
       sha256: frozen,
@@ -167,7 +167,7 @@ describe('database migration planner', () => {
       '0016_office_owner_publish',
       '0017_rollback_previous_target',
       '0018_owner_read_views',
-      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24', '0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit', '0046_project_feishu_roster', '0047_roster_query_signer', '0048_roster_store_set', '0049_roster_lifecycle', '0050_authorization_sources', '0051_publish_source_set', '0052_import_source_set', '0053_search_source_set', '0054_legacy_batch_owner_only', '0055_grant_steward_required', '0056_cancel_import_owner_only', '0057_role_ceiling', '0058_grant_steward_no_restore', '0059_query_grant_restamp', '0060_grant_issuer_authority', '0061_sop_entry_code_identity', '0062_store_set_authority_retention', '0063_store_set_keep_members_boundary', '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid', '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link', '0070_analytics_question_v1', '0071_analytics_runtime_execute', '0072_seat_post_grants',
+      '0019_candidate_client_snapshot', '0020_coach_publish_v1_19', '0021_content_intake_v1_20', '0022_intake_legacy_fence', '0023_intake_quality', '0024_intake_publication', '0025_intake_usage_v1_21', '0026_intake_discovery_index', '0027_intake_rollback', '0028_intake_family', '0029_intake_capacity', '0030_intake_role_ceiling', '0031_intake_direct_v1_22', '0032_intake_direct_publication', '0033_intake_runtime_v1_23', '0034_intake_csv_v1_24', '0035_intake_legacy_check_acl_v1_25', '0036_intake_sop_v1_26', '0037_menokin_source_registration', '0038_menokin_sop_domain_v1_27', '0039_menokin_sop_stage_media', '0040_intake_repair_successor_v1_28', '0041_intake_readiness_v1_29', '0042_intake_occupied_domain_publish', '0043_intake_publish_default_tenant', '0044_intake_role_defaults', '0045_feishu_agent_admit', '0046_project_feishu_roster', '0047_roster_query_signer', '0048_roster_store_set', '0049_roster_lifecycle', '0050_authorization_sources', '0051_publish_source_set', '0052_import_source_set', '0053_search_source_set', '0054_legacy_batch_owner_only', '0055_grant_steward_required', '0056_cancel_import_owner_only', '0057_role_ceiling', '0058_grant_steward_no_restore', '0059_query_grant_restamp', '0060_grant_issuer_authority', '0061_sop_entry_code_identity', '0062_store_set_authority_retention', '0063_store_set_keep_members_boundary', '0064_roster_query_requires_reader', '0065_legacy_orphan_fk_not_valid', '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link', '0070_analytics_question_v1', '0071_analytics_runtime_execute', '0072_seat_post_grants', '0073_feishu_query_grant',
     ]);
     expect(status.applied.every(({ contractSetId }) => contractSetId.includes('schema-1.12-'))).toBe(true);
   });
@@ -241,7 +241,7 @@ describe('database migration planner', () => {
 
     const status = await inspectMigrationCatalogue(client, generatedMigrationCatalogue);
     expect(status.state).toBe('FRESH');
-    expect(status.pending).toHaveLength(72);
+    expect(status.pending).toHaveLength(73);
     expect(status.pending.every((migration) => !('sql' in migration))).toBe(true);
   });
 });
