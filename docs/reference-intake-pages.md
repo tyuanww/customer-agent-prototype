@@ -22,7 +22,7 @@
 | 客服 | `query` |
 | 客服主管 | `content-manage`、`import`、`source-confirm`、`publish` |
 
-不包含 `rollback`、`candidate-cancel`、`review`。页面不能新增、改名或删除岗位。未知岗位返回 `unknown-post`。
+不包含 `rollback`、`candidate-cancel`、`review`。页面不能新增、改名或删除岗位。未知岗位返回 `unknown-post`。新建坐席不会因为选了岗位就拿到这些动作，对照见[坐席岗位和角色上限](reports/2026-10-27-seat-post-role-ceiling.md)。
 
 纯函数在 `apps/desktop/src/shared/intake-post-actions.ts`：`INTAKE_POSTS`、`DEFAULT_INTAKE_POST`、`actionsForIntakePost`、`intakePostForActions`、`intakePostsCoveredBy`、`intakePostStatusForGrants`。
 
