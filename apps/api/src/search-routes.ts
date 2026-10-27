@@ -72,8 +72,8 @@ export type SearchRouteDependencies = Readonly<{
   idempotencyHmac: ApiHmacKeyRing;
   /**
    * Optional observation of the current notice decision. A missing check keeps
-   * pilot_recorded and stores the redacted text. A decline or a thrown check still
-   * returns the search, records collection_mode synthetic, and stores no query text.
+   * pilot_recorded and stores the redacted text. A decline or a thrown check
+   * returns 403 and does not run the search.
    */
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
@@ -140,10 +140,14 @@ export function registerSearchRoute(
     let collectionMode = contract.value.collection_mode;
     let retainQueryText = true;
     if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
-      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      let accepted = false;
+      try {
+        accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id);
+      } catch {
+        accepted = false;
+      }
       if (!accepted) {
-        collectionMode = 'synthetic';
-        retainQueryText = false;
+        return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED', { notice: 'current-required' });
       }
     }
     const actorSubjectHash = hmacSafeValue(

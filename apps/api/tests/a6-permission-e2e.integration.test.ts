@@ -245,7 +245,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
         const created = await asIntakeBusiness<{
           out_principal_id: string; out_binding_id: string; out_user_id: string; out_role: string;
         }>(client, 'SELECT * FROM backend_identity.create_seat($1,$2,$3,$4,$5,$6,$7)', [
-          SEAT_USERNAME, '合成主管', '客服主管', HOME.tenant, HOME.app, HOME.department, 'operator',
+          SEAT_USERNAME, '合成主管', '客服主管', HOME.tenant, HOME.app, HOME.department, 'user-director',
         ]);
         expect(created[0]).toMatchObject({
           out_principal_id: 'seat_a6lead',
@@ -262,7 +262,10 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           [created[0]!.out_binding_id]);
         expect(seatBinding.rows).toEqual([{ role: 'coach' }]);
         const seat = actor(seatUserId, 'coach');
-        expect(await read(seat, 'query')).toMatchObject({ ok: false, code: 'NOT_FOUND', reason: 'SCOPE_DENIED' });
+        expect(await read(seat, 'query')).toMatchObject({
+          ok: true,
+          value: { sourceId: 'source-a', action: 'query' },
+        });
 
         const policyVersion = await numberAt(client,
           `SELECT version::text AS value FROM content_intake.policy_versions

@@ -38,6 +38,46 @@ async function asIntakeBusiness(client: Client, sql: string, values: readonly un
 async function seedHome(client: Client): Promise<void> {
   await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
     VALUES ($1,$2,1) ON CONFLICT DO NOTHING`, [HOME.tenant, HOME.app]);
+  await client.query('BEGIN');
+  try {
+    await client.query(`INSERT INTO backend_identity.subject_bindings
+        (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ('operator','synthetic',$1,'建席人','operator',repeat('ab',32),true,'owner')`, [HOME.tenant]);
+    await client.query(`INSERT INTO content_intake.principals
+        (principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version,revocation_generation)
+      VALUES ('operator','operator',$1,$2,'confirmed-synthetic','operator',1,0)`, [HOME.tenant, HOME.app]);
+    await client.query(`INSERT INTO content_intake.principal_facts
+        (principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+      VALUES ('operator',1,ARRAY[$1],'job-director',true,
+        clock_timestamp()-interval '1 second', clock_timestamp()+interval '4 minutes', repeat('a',64))`,
+    [HOME.department]);
+    await client.query(`INSERT INTO content_intake.role_rules
+        (tenant_id,app_id,department_id,job_id,policy_version,role)
+      VALUES ($1,$2,$3,'job-director',1,'director')`, [HOME.tenant, HOME.app, HOME.department]);
+    await client.query(`INSERT INTO content_intake.scopes(scope_id,tenant_id,app_id,brand_id,domain)
+      VALUES ('scope-product',$1,$2,'brand-a','product')`, [HOME.tenant, HOME.app]);
+    await client.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+      VALUES ('source-a','scope-product',1,'v2-preview')`);
+    await client.query(`INSERT INTO content_intake.source_mappings
+        (source_id,version,template_version,rule_version,mapping_version,structure_digest)
+      VALUES ('source-a',1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`);
+    await client.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+      VALUES ($1,$2,1,clock_timestamp(),'proof')`, [HOME.tenant, HOME.app]);
+    await client.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+      VALUES ($1,$2,1)`, [HOME.tenant, HOME.app]);
+    await client.query(`INSERT INTO content_intake.store_set_members
+        (tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+      VALUES ($1,$2,1,'scope-product','source-a',clock_timestamp()+interval '1 day')`, [HOME.tenant, HOME.app]);
+    await client.query(`INSERT INTO content_intake.grants
+        (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+      VALUES ('root-query','allocation','operator','operator',$1,$2,'scope-product','query',
+        clock_timestamp()-interval '1 hour', clock_timestamp()+interval '1 day','合成根资格','operator')`,
+    [HOME.tenant, HOME.app]);
+    await client.query('COMMIT');
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch { /* the thrown error is the outcome */ }
+    throw error;
+  }
 }
 
 const createSeat = (client: Client, username: unknown, display: unknown, post: unknown) => asIntakeBusiness(client,
@@ -78,6 +118,10 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
         { job_id: 'job-seat', department_ids: [HOME.department], capped: true },
         { job_id: 'job-seat-supervisor', department_ids: [HOME.department], capped: true },
       ]);
+
+      const querySources = await client.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM content_intake.authorization_sources('seat_a', 'query', clock_timestamp())`);
+      expect(Number(querySources.rows[0]?.n ?? '0')).toBeGreaterThan(0);
 
       const rules = await client.query<{ job_id: string; role: string }>(
         `SELECT job_id, role FROM content_intake.role_rules

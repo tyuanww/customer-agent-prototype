@@ -288,6 +288,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0070_analytics_question_v1',
     requiresPredecessor: 'Runtime execute requires the question function',
   },
+  {
+    index: 71,
+    minimumCatalogueLength: 72,
+    id: '0072_seat_post_grants',
+    predecessorId: '0071_analytics_runtime_execute',
+    requiresPredecessor: 'Seat post grants require runtime execute',
+  },
 ];
 
 function requiredSuccessorStep(
