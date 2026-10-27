@@ -97,7 +97,7 @@ export async function registeredPrincipalPage(client: Queryable, who: Principal,
 }
 
 export function requireFresh(p: Principal, now: number): void {
-  if (!p.enabled || p.checkedAt > now || now >= p.validUntil || p.validUntil > p.checkedAt + 300_000) {
+  if (!p.enabled || p.checkedAt > now || now >= p.validUntil || p.validUntil > p.checkedAt + 24 * 60 * 60 * 1000) {
     throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
   }
 }

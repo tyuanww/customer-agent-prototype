@@ -34,7 +34,7 @@ function snapshot(raw: unknown): OrganizationFactsSnapshot {
     if (typeof value!=='string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString()!==value) throw new Rejected('INVALID_INPUT');
   }
   const checkedAt=r.checkedAt as string, validUntil=r.validUntil as string;
-  if (Date.parse(validUntil)<=Date.parse(checkedAt) || Date.parse(validUntil)>Date.parse(checkedAt)+300_000) throw new Rejected('INVALID_INPUT');
+  if (Date.parse(validUntil)<=Date.parse(checkedAt) || Date.parse(validUntil)>Date.parse(checkedAt)+24*60*60*1000) throw new Rejected('INVALID_INPUT');
   return { principalId:id(r.principalId),expectedFactsVersion:r.expectedFactsVersion as number,
     departmentIds,jobId:id(r.jobId),enabled:r.enabled,checkedAt,validUntil };
 }

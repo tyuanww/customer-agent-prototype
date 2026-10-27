@@ -48,6 +48,7 @@ const SOP_REPAIR_SUFFIX = [
   '0070_analytics_question_v1',
   '0071_analytics_runtime_execute',
   '0072_seat_post_grants',
+  '0073_feishu_query_grant',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -532,13 +533,47 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     } finally {await client.end();}
   });
 
+  it('accepts a 24 hour principal fact and does not grant an empty store', async () => {
+    const database = harness.createDatabase('fact_window');
+    const client = await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);
+      const check = await client.query<TextRow>(
+        `SELECT pg_get_constraintdef(oid) AS value FROM pg_constraint WHERE conname = 'principal_facts_check'`,
+      );
+      expect(check.rows[0]?.value).toContain('24:00:00');
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_testcursor001')`);
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_testcursor001')`);
+      const grants = await client.query<CountRow>(
+        `SELECT count(*)::int AS count FROM content_intake.grants WHERE reason = '飞书登录按来源签发。'`,
+      );
+      expect(grants.rows[0]?.count).toBe(0);
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO content_intake.principals(
+          principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version)
+        SELECT 'prin_window', user_id, 'tenant-a', 'app-a', 'feishu-job-roster', 'ou_testcursor001', 1
+          FROM backend_identity.subject_bindings WHERE binding_id = 'ou_testcursor001'`);
+      await client.query(`INSERT INTO content_intake.principal_facts(
+          principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+        VALUES ('prin_window', 1, ARRAY['dept-a'], 'job-seat', true, clock_timestamp(),
+          clock_timestamp() + interval '24 hours', repeat('ab', 32))`);
+      await client.query('COMMIT');
+      await expect(client.query(`INSERT INTO content_intake.principal_facts(
+          principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
+        VALUES ('prin_window', 2, ARRAY['dept-a'], 'job-seat', true, clock_timestamp(),
+          clock_timestamp() + interval '25 hours', repeat('cd', 32))`)).rejects.toMatchObject({ code: '23514' });
+    } finally {
+      await client.end();
+    }
+  });
+
   it('installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op', async () => {
     const database = harness.createDatabase('clean_install');
     const client = await harness.connect(database.config);
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(72);
+      expect(fresh.pending).toHaveLength(73);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -550,12 +585,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
         inventory: { tables: 111, views: 7, functions: 294 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 63-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 64-migration current suffix',
         },
       });
 
@@ -702,7 +737,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
       });
     } finally {
       await client.end();
@@ -958,7 +993,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 72,
+        migrationCount: 73,
       });
     } finally {
       await client.end();

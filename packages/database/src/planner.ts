@@ -295,6 +295,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0071_analytics_runtime_execute',
     requiresPredecessor: 'Seat post grants require runtime execute',
   },
+  {
+    index: 72,
+    minimumCatalogueLength: 73,
+    id: '0073_feishu_query_grant',
+    predecessorId: '0072_seat_post_grants',
+    requiresPredecessor: 'Feishu query grants require seat post grants',
+  },
 ];
 
 function requiredSuccessorStep(

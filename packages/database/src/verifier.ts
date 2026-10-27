@@ -1119,6 +1119,7 @@ const READINESS_SUFFIX = [
   { length: 70, index: 69, id: '0070_analytics_question_v1' },
   { length: 71, index: 70, id: '0071_analytics_runtime_execute' },
   { length: 72, index: 71, id: '0072_seat_post_grants' },
+  { length: 73, index: 72, id: '0073_feishu_query_grant' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1186,6 +1187,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   // 0071 only grants. The object inventory stays on the 0070 digest until a probe says otherwise.
   71: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: '279577857d0264a48d56f96b66607859050ab8dd9be3638525fa8a0e62fa3e9f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   72: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: '279577857d0264a48d56f96b66607859050ab8dd9be3638525fa8a0e62fa3e9f', functionEntries: 294, functionSha256: 'a88a90fbeb255f3a6e3f7a2b0e596db2d69c8306a41c69ad9575062454f6b471', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  73: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: 'ce9c14523b18d305b21ce65567285c996793568739e8f92211d7737e0d78e221', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1230,6 +1232,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   // This manifest's schema list does not include analytics, so these two grants are outside it.
   71: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
   72: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
+  73: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
 };
 
 export async function verifyReadinessSuccessor(

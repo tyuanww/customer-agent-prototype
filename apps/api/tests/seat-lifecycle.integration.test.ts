@@ -108,7 +108,7 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
 
       const facts = await client.query<{ job_id: string; department_ids: string[]; capped: boolean }>(
         `SELECT facts.job_id, facts.department_ids,
-                (facts.valid_until <= facts.checked_at + interval '5 minutes') AS capped
+                (facts.valid_until = facts.checked_at + interval '24 hours') AS capped
            FROM content_intake.principals person
            JOIN content_intake.principal_facts facts
              ON facts.principal_id = person.principal_id
