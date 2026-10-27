@@ -11,7 +11,7 @@ it('puts the catalog upload on the six-page SOP slot and keeps the seat window o
   const rows = readFileSync(resolve(desktopRoot, 'src/renderer/features/dashboard/intake-destination-rows.ts'), 'utf8');
   const windowController = readFileSync(resolve(desktopRoot, 'src/main/sop-window-controller.ts'), 'utf8');
   const ops = readFileSync(resolve(desktopRoot, 'src/main/dashboard-ops-loop.ts'), 'utf8');
-  expect(destinations).toContain('sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === \'ready\' ? ctx.snapshot.sop : undefined} />');
+  expect(destinations).toContain('sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === \'ready\' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />');
   expect(app).not.toContain('sopUploadRefusal');
   expect(app).toContain('renderIntakeDestinations');
   expect(app).not.toContain('<SopLibraryModule');

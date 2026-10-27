@@ -50,12 +50,7 @@ const INTAKE_DESTINATION_MOUNTS: {
 } = {
   overview: (ctx) => <IntakeOverview key={ctx.sessionKey} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
-  sop: (ctx) => (
-    <SopLibraryModule
-      sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined}
-      canUploadSop={ctx.canUploadSop}
-    />
-  ),
+  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />,
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
   materials: () => <IntakeManagement />,
   permissions: (ctx) => (
