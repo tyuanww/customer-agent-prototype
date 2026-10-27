@@ -9,7 +9,7 @@ import {
 } from './features/dashboard/intake-destinations';
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
-import { canOpenPermissions, type PageUseSnapshot } from '../shared/page-use';
+import { canGrant, canOpenPermissions, canUploadSop, type PageUseSnapshot } from '../shared/page-use';
 import {
   useCallback,
   useMemo,
@@ -118,6 +118,8 @@ function usePageUse(): PageUseSnapshot {
 function DashboardWorkspace() {
   const snapshot = usePageUse();
   const permissionsOpen = canOpenPermissions(snapshot);
+  const grantAllowed = canGrant(snapshot);
+  const sopUpload = canUploadSop(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
     () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
@@ -791,6 +793,8 @@ function DashboardWorkspace() {
           {renderIntakeDestinations({
             active,
             canOpenPermissions: permissionsOpen,
+            canGrant: grantAllowed,
+            canUploadSop: sopUpload,
             seatLibraryOnly,
             jobKnown,
             jobPending: sessionPhase === 'pending',
