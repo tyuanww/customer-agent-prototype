@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { principalFactWindowMs } from './transaction.js';
 
 /** Only the row projection is used, so callers may adapt any driver to this. */
 export type Queryable = {
@@ -66,7 +65,7 @@ export async function bindKnownPrincipal(client: Queryable, input: KnownPrincipa
           principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest
         )
         SELECT versioned.principal_id, versioned.current_facts_version, $7::text[], $8, true, stamp.checked_at,
-          stamp.checked_at + (${principalFactWindowMs} * interval '1 millisecond'), $9
+          stamp.checked_at + interval '24 hours', $9
         FROM versioned CROSS JOIN stamp
         RETURNING principal_id
       )
