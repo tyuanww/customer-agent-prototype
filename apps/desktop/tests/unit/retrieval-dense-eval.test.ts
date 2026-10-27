@@ -153,7 +153,7 @@ export function parseDenseEvalFile(raw: string): DenseFile | null {
   };
 }
 
-function reorder<T extends RetrievalScript>(ranked: readonly T[], orderedIds: readonly string[] | undefined): T[] {
+function reorder<T extends RetrievalScript>(ranked: readonly T[], orderedIds: readonly string[] | undefined): readonly T[] {
   if (!orderedIds || orderedIds.length === 0) return ranked;
   const byScript = new Map(ranked.map((row) => [row.scriptId, row]));
   const next = [];
