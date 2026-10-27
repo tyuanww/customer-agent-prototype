@@ -1,6 +1,6 @@
-# 处理仓库里已经写出的十种故障句
+# 处理仓库里已经写出的十二种故障句
 
-你已经看到其中一句时，按该节做。每句都写在被引用的文件里。本文不新增告警，不新增指标，不新增主机。
+你已经看到其中一句时，按该节做。每句都写在被引用的文件里。已有的告警是健康探针连续失败，以及 `FEISHU_ALERT_WEBHOOK` 已设置时的备份失败和租约刷新失败。本文不新增指标，不新增主机。
 
 ## 访问日志把 userId 写成 anonymous
 
@@ -130,6 +130,28 @@ journalctl -u customer-agent-backup.service --no-pager
 2. 句子含 `offsite copy to` 和 `failed` 时，夜间 dump 保留。修好目标目录后再运行。脚本会用新的序号另写一份，不会覆盖已经存在的文件名。
 
 **确认。** 日志出现 `offsite copy done`。退出码是 0。目标目录里有同名的 `.dump`。
+
+## 备份失败写出 diagnostic=BACKUP_FAILED
+
+`scripts/ops/customer-agent-backup.sh` 的 `fail` 在退出码 1 之前写下 `diagnostic=BACKUP_FAILED`，并调用同目录的 `send-ops-alert.sh`。`FEISHU_ALERT_WEBHOOK` 未设置，且监控环境文件里也没有这个键时，脚本不发起连接，退出码仍是 1。键已设置且值以 `http://` 或 `https://` 开头时，POST 的 JSON 只有 `diagnostic` 和 `text`。`text` 是 `backup failed`。
+
+退出码 3 的 `offsite copy: NOT CONFIGURED` 不调用这个脚本。
+
+**先看。** 同一段日志里的 `FATAL` 和 `diagnostic=BACKUP_FAILED`。然后看有没有 `alert sent` 或 `WARN alert delivery failed`。
+
+**修复。** 按 `FATAL` 后面的原因处理 dump、目录或保留。告警没送出时，先确认 `FEISHU_ALERT_WEBHOOK` 仍是健康探针在用的那个值。不要把查询正文写进这个 POST。
+
+**确认。** 下一次失败仍是退出码 1，并且日志有 `diagnostic=BACKUP_FAILED`。副本未配置的那次仍是退出码 3，监听端没有收到 `BACKUP_FAILED`。
+
+## 租约刷新失败写出 diagnostic=LEASE_REFRESH_FAILED
+
+`apps/desktop/src/main/product-announce.ts` 在公告刷新失败时写下 `[desktop] announce refresh failed`，后面有错误码、错误名和 `diagnostic=LEASE_REFRESH_FAILED`。`FEISHU_ALERT_WEBHOOK` 未设置时不发起连接。已设置且是 `http` 或 `https` 时，主进程 POST JSON，键只有 `diagnostic` 和 `text`。`text` 是这次的错误码，不是问句。Renderer 和 preload 不读取这个地址。
+
+**先看。** 在桌面进程日志里找 `diagnostic=LEASE_REFRESH_FAILED`。同一行的错误码是 `UNAVAILABLE` 时，刷新请求没有完成。
+
+**修复。** 先按错误码看公告服务和登录状态。要收到告警时，只在运行桌面主进程的环境里设置 `FEISHU_ALERT_WEBHOOK`。坐席安装包没有这个变量时，只保留日志。
+
+**确认。** 下一次刷新失败仍写出 `diagnostic=LEASE_REFRESH_FAILED`。变量未设置时没有新的连接。
 
 ## SOP 页面写出没有权限，请找人开通
 
