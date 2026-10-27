@@ -43,17 +43,19 @@ offsite copy: NOT CONFIGURED (set CUSTOMER_AGENT_BACKUP_COPY_TO); this backup ex
 
 2026-10-25 选定的副本路径是 `/mnt/c/customer-agent-backups`。这是 Windows 的 C 盘，经 WSL 挂到这个路径。选定这个路径，是为了躲开 WSL 虚拟磁盘被换掉。整块系统盘损坏时，这份副本一起丢。
 
-2026-10-27 操作者接受这份副本就放在这台 Windows 机器的 C 盘。杭州单元已经把 `CUSTOMER_AGENT_BACKUP_COPY_TO` 指到 `/mnt/c/customer-agent-backups`。同日备份退出码是 0，恢复演练 `DRILL PASSED`，生产库没有被改写。这不是另一台机器。整块盘损坏、勒索软件或主机丢失时，生产库和这份副本会一起没。挂载文件的权限是 `rwxrwxrwx`。不再把本机另一个目录当作下一步。
+2026-10-27 杭州单元把 `CUSTOMER_AGENT_BACKUP_COPY_TO` 设为 `/mnt/c/customer-agent-backups`。操作者接受副本和数据库在同一台 Windows 机器上。当天备份退出码是 0。恢复演练打印 `DRILL PASSED`。生产库没有被这次演练改写。`/mnt/c` 上的文件权限是 `rwxrwxrwx`。
 
-仓库里的 `scripts/ops/customer-agent-backup.service` 有 `ProtectSystem=strict`。没写进 `ReadWritePaths` 的路径，服务写不进去。选定但没有装上杭州单元的片段如下。
+仓库里的 `scripts/ops/customer-agent-backup.service` 有 `ProtectSystem=strict`。没写进 `ReadWritePaths` 的路径，服务写不进去。杭州现在的 drop-in 是 `customer-agent-backup.service.d/offsite.conf`。
 
 ```ini
 [Service]
+Environment=CUSTOMER_AGENT_BACKUP_ROOT=/srv/customer-agent/catalog-backups
 Environment=CUSTOMER_AGENT_BACKUP_COPY_TO=/mnt/c/customer-agent-backups
-ReadWritePaths=/srv/customer-agent/catalog-backups /mnt/c/customer-agent-backups
+ReadWritePaths=/srv/customer-agent/catalog-backups
+ReadWritePaths=/mnt/c/customer-agent-backups
 ```
 
-服务用户是 `customer-agent`。脚本会对副本目录执行 `mkdir -p`。路径不可写时，副本失败。上面这段没有写入杭州的单元。
+服务用户是 `customer-agent`。脚本会对副本目录执行 `mkdir -p`。路径不可写时，副本失败。上面这段是 2026-10-27 写入杭州的 drop-in。
 
 ## 杭州机器上的实际安装（2026-10-24 已执行）
 

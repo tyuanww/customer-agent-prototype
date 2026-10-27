@@ -3,11 +3,6 @@
 -- contract_set_id=cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780
 -- source_git_sha=db6ba13d4780a3abb1558e8673e016f7bfb5604e
 -- source_schema_sha256=0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998
--- A new seat can query only when this function also writes the business grants.
--- Rewriting 0068 would change a pinned migration, so the body is replaced here.
--- A business grant must hang under the caller's live allocation. There is no
--- INSERT grant for app_runtime. If the caller has no covering allocation, or the
--- shop has no current store set, creation stops before any identity row is kept.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 CREATE OR REPLACE FUNCTION backend_identity.create_seat(

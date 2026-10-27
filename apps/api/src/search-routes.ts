@@ -70,11 +70,6 @@ export type SearchRouteDependencies = Readonly<{
   operation: SearchOperation;
   logHash: Readonly<{ version: string; key: string }>;
   idempotencyHmac: ApiHmacKeyRing;
-  /**
-   * Optional observation of the current notice decision. A missing check keeps
-   * pilot_recorded and stores the redacted text. A decline or a thrown check
-   * returns 403 and does not run the search.
-   */
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
 

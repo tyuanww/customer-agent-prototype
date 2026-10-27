@@ -1,8 +1,3 @@
--- A new seat can query only when this function also writes the business grants.
--- Rewriting 0068 would change a pinned migration, so the body is replaced here.
--- A business grant must hang under the caller's live allocation. There is no
--- INSERT grant for app_runtime. If the caller has no covering allocation, or the
--- shop has no current store set, creation stops before any identity row is kept.
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 CREATE OR REPLACE FUNCTION backend_identity.create_seat(
