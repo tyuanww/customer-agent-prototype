@@ -132,8 +132,8 @@ export function registerSearchRoute(
     }
     if (dependencies === undefined) return sendOverloaded(reply);
     const redacted = redactQueryText(contract.value.query_text);
-    let collectionMode = contract.value.collection_mode;
-    let retainQueryText = true;
+    const collectionMode = contract.value.collection_mode;
+    const retainQueryText = true;
     if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
       let accepted = false;
       try {

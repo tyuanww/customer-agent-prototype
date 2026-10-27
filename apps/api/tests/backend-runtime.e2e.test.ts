@@ -314,6 +314,18 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     let release = await published.json() as { release_id: string; release_seq: number };
     expect(release.release_seq).toBe(1);
     const firstRelease = release;
+    const noticeVersion = 'notice-t6-v1';
+    const noticeText = '试点采集告知：坐席提问正文将在脱敏后用于改进客服话术。';
+    await admin.query(
+      `INSERT INTO public.privacy_notices(notice_version, notice_text, content_hash, status, published_at)
+       VALUES ($1, $2, $3, 'current', clock_timestamp())`,
+      [noticeVersion, noticeText, sha('sha256').update(noticeText).digest('hex')],
+    );
+    await admin.query(
+      `INSERT INTO public.notice_decisions(notice_version, user_id, decision, decision_source)
+       VALUES ($1, 'usr_t6_owner', 'accepted', 'first_run_prompt')`,
+      [noticeVersion],
+    );
     const desktop = await connectDesktopAdapter(address);
     const firstSearch = await desktop.search.search(1, {
       sessionEpoch: desktop.epoch(), generation: 1, queryText: '什么时候发货', platform: 'qianniu',
