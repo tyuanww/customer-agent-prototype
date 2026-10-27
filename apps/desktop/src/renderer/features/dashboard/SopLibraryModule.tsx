@@ -44,7 +44,7 @@ function toCsv(items: readonly DashboardSopNode[]): string {
 
 export function SopLibraryModule({
   sop,
-  canUploadSop: uploadProp = false,
+  canUploadSop: uploadProp,
   canUpdateSop: updateProp = false,
   canDeleteSop: deleteProp = false,
   uploadBlock: uploadBlockProp = '',
@@ -57,7 +57,7 @@ export function SopLibraryModule({
 } = {}) {
   const usingSnapshot = sop !== undefined;
   const open = sop?.state === 'open';
-  const canUploadSop = usingSnapshot ? open === true : uploadProp;
+  const canUploadSop = usingSnapshot ? open === true && uploadProp !== false : uploadProp === true;
   const canUpdateSop = usingSnapshot ? open === true : updateProp;
   const canDeleteSop = usingSnapshot ? false : deleteProp;
   const uploadBlock = sopStatusText(sop?.state, uploadBlockProp);

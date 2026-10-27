@@ -31,6 +31,8 @@ export {
 export type IntakeDestinationContext = {
   active: IntakeDestination;
   canOpenPermissions: boolean;
+  canGrant: boolean;
+  canUploadSop: boolean;
   seatLibraryOnly: boolean;
   jobKnown: boolean;
   jobPending: boolean;
@@ -48,13 +50,18 @@ const INTAKE_DESTINATION_MOUNTS: {
 } = {
   overview: (ctx) => <IntakeOverview key={ctx.sessionKey} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
-  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} />,
+  sop: (ctx) => (
+    <SopLibraryModule
+      sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined}
+      canUploadSop={ctx.canUploadSop}
+    />
+  ),
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
   materials: () => <IntakeManagement />,
   permissions: (ctx) => (
     <div hidden={ctx.active !== 'permissions'}>
       {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
-        ? <IntakePermissions active={ctx.active === 'permissions'} gate={ctx.snapshot.permissions} />
+        ? <IntakePermissions active={ctx.active === 'permissions'} canGrant={ctx.canGrant} gate={ctx.snapshot.permissions} />
         : null}
     </div>
   ),

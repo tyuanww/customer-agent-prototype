@@ -148,6 +148,55 @@ describe('DashboardApp', () => {
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
+  it('keeps grant and sop upload closed when the server snapshot is closed', async () => {
+    const user = userEvent.setup();
+    window.dashboardPageUse = {
+      current: async () => ({
+        phase: 'ready',
+        epoch: 1,
+        permissions: { state: 'closed', recovery: '没有权限，请找人开通。' },
+        sop: { state: 'closed' },
+      }),
+      onChanged: () => () => undefined,
+    };
+    render(<DashboardApp />);
+    await screen.findByTestId('nav-sop');
+    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-sop'));
+    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
+    expect(screen.queryByText('停手')).not.toBeInTheDocument();
+  });
+
+  it('opens grant navigation and sop upload only from an open server snapshot', async () => {
+    const user = userEvent.setup();
+    window.dashboardPageUse = {
+      current: async () => ({
+        phase: 'ready',
+        epoch: 2,
+        permissions: { state: 'open', body: null },
+        sop: {
+          state: 'open',
+          nodes: [{
+            nodeId: 'n1',
+            parentNodeId: null,
+            title: '停手',
+            body: '先停手',
+            sortKey: 0,
+            version: 1,
+            lifecycle: 'active',
+          }],
+        },
+      }),
+      onChanged: () => () => undefined,
+    };
+    render(<DashboardApp />);
+    await screen.findByTestId('nav-permissions');
+    await user.click(screen.getByTestId('nav-sop'));
+    expect(await screen.findByText('停手')).toBeInTheDocument();
+    expect(screen.getByTestId('sop-upload')).toBeEnabled();
+  });
+
   it('keyboard-walks 话术运营 from wording through SOP into content', async () => {
     render(<DashboardApp />);
     const sopNav = screen.getByTestId('nav-sop');
