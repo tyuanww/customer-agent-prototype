@@ -35,6 +35,8 @@
 
 `apps/api/src/search-routes.ts` 在组装搜索前调用 `redactQueryText`（`apps/api/src/request-boundary.ts`）。若请求体 `collection_mode` 为 `pilot_recorded` 且注入了 `hasAcceptedCurrentNotice`，则未接受或检查抛错时把写入侧的 `collectionMode` 改为 `synthetic`，并设 `retainQueryText = false`。检索仍继续，HTTP 不因此返回 403。`apps/api/tests/search-routes.test.ts` 钉住了这一降级语义。
 
+勘误（2026-10-27）。上一段是这篇评审写下时的观察，保留不改。当前 `apps/api/src/search-routes.ts` 在检查函数已注入、且未接受或检查抛错时返回 403。错误码是 `POLICY_DENIED`，`details.notice` 是 `current-required`。检索函数不会被调用。检查函数没注入时，请求仍以 `pilot_recorded` 继续，`retainQueryText` 仍为 true。现行测试是 `refuses pilot_recorded when the current notice was not accepted` 与 `records pilot_recorded when the acceptance check is missing`。
+
 `apps/api/src/event-repository.ts` 插入 `query_events` 时，若 `retainQueryText` 为 false，则 `query_text_redacted` 与 `query_text_hash` 为 NULL，`text_storage_status` 为 `suppressed`；为 true 时写入脱敏正文与哈希，`text_storage_status` 为 `stored`。
 
 冻结合同 OpenAPI（例如 `contracts/upstream/customer-agent/cs-ai-c11-openapi-1.24.0-schema-1.28-379b793811ed/openapi.v1.yaml` 中 `CollectionMode` 与 `/v1/search` 说明）文字要求 `pilot_recorded` 时服务端确认当前告知已被接受，未接受时 fail-closed。本评审只记录「合同条文」与「上述路由实现」并存，不在此裁定以哪一方为准。
@@ -46,6 +48,8 @@
 `apps/desktop/src/main/product-search.ts` 的 `collectionMode` 在调用 `currentNotice()` 后仍固定返回 `pilot_recorded`，并不根据 `decision` 切换为 `synthetic`。因此同意门在服务端写入路径上生效，而不是靠客户端改 `collection_mode`。
 
 `docs/how-to-pilot-collection-consent.md` 描述弹窗、决策入库顺序，以及 2026-10-15 草稿告知尚未入库的状态。该 how-to 与 `search-routes.ts` 在「未同意是否 403」上的表述不一致，实施时应以代码与测试为准。
+
+勘误（2026-10-27）。`docs/how-to-pilot-collection-consent.md` 现在写明未同意返回 403，并且检索不执行。这与当前路由一致。上文保留为 2026-10-26 的记录。
 
 ## 3. 脱敏策略（姓名、地址、订单号、昵称）
 
