@@ -110,28 +110,16 @@ describe.skipIf(!enabled)('a created seat can log in and keeps an agent ceiling'
       expect(seeded.status).toBe(200);
       expect(await seeded.json()).toEqual({ code: 'synthetic_agent' });
 
-      const versions = await admin.query<{ policy_version: string; store_version: string }>(`
-        SELECT pol.version::text AS policy_version, cur.version::text AS store_version
-          FROM content_intake.policy_versions pol
-          JOIN content_intake.store_set_current cur USING (tenant_id, app_id)
-         WHERE pol.tenant_id = 'tenant-menokin' AND pol.app_id = 'app-customer-agent'`);
-      const policyVersion = versions.rows[0]!.policy_version;
-      const storeVersion = versions.rows[0]!.store_version;
       await admin.query(`INSERT INTO content_intake.grants(
           grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
           starts_at, expires_at, reason, parent_grant_id, policy_version, store_set_version, steward_id)
         VALUES
-          ('grant-seat-query','business','signer','seat_flow1','tenant-menokin','app-customer-agent',
-            'scope-product','source-a','query',
-            clock_timestamp() - interval '1 minute', clock_timestamp() + interval '30 minutes',
-            '坐席查询。','grant-alloc-query',$1::int,$2::int,'signer'),
           ('grant-seat-publish','business','signer','seat_flow1','tenant-menokin','app-customer-agent',
             'scope-product',NULL,'publish',
             clock_timestamp() - interval '1 minute', clock_timestamp() + interval '30 minutes',
-            '坐席发布，角色天花板应挡住。','grant-alloc-publish',NULL,NULL,'signer')`,
-      [policyVersion, storeVersion]);
+            '坐席发布，角色天花板应挡住。','grant-alloc-publish',NULL,NULL,'signer')`);
 
-      expect((await fixture.sources('seat_flow1', 'query')).map((row) => row.source_id)).toEqual(['source-a']);
+      expect((await fixture.sources('seat_flow1', 'query')).map((row) => row.source_id).sort()).toEqual(['source-a', 'source-b']);
       expect(await fixture.sources('seat_flow1', 'publish')).toEqual([]);
 
       await asBusiness(fixture, 'SELECT backend_identity.disable_seat($1,$2,$3)',

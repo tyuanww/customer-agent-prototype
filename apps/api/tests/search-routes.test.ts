@@ -162,11 +162,10 @@ describe('search HTTP route', () => {
       method: 'POST', url: '/v1/search', headers: authHeaders,
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
-    expect(result.statusCode).not.toBe(403);
+    expect(result.statusCode).toBe(403);
+    expect(result.json()).toMatchObject({ error: { code: 'POLICY_DENIED', details: { notice: 'current-required' } } });
     expect(declined).toHaveBeenCalledWith('usr_synthetic_agent_001');
-    expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
-    expect(execute.mock.calls[0]?.[0]?.retainQueryText).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('records pilot_recorded when the acceptance check is missing', async () => {
@@ -192,10 +191,9 @@ describe('search HTTP route', () => {
       method: 'POST', url: '/v1/search', headers: authHeaders,
       payload: validRequest({ collection_mode: 'pilot_recorded' }),
     });
-    expect(result.statusCode).not.toBe(403);
-    expect(execute).toHaveBeenCalledOnce();
-    expect(execute.mock.calls[0]?.[0]?.collectionMode).toBe('synthetic');
-    expect(execute.mock.calls[0]?.[0]?.retainQueryText).toBe(false);
+    expect(result.statusCode).toBe(403);
+    expect(result.json()).toMatchObject({ error: { code: 'POLICY_DENIED', details: { notice: 'current-required' } } });
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('keeps the route fail-closed until the W3 atomic event operation is composed', async () => {

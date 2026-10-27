@@ -50,7 +50,7 @@ function asFailure(error: unknown): DashboardOpsFailure {
   if (error.code === 'SOURCE_GATE_NOT_READY' || error.code === 'CLIPBOARD_FAILED' || error.code === 'STALE' || error.code === 'CANCELLED') {
     return dashboardOpsFailure('UNAVAILABLE');
   }
-  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED' || error.code === 'CONSENT_REQUIRED') {
     return dashboardOpsFailure('FORBIDDEN', PRODUCT_ERRORS[error.code]);
   }
   return dashboardOpsFailure(error.code, error.message);

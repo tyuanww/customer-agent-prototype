@@ -149,6 +149,9 @@ async function mapFailure(response: Response): Promise<{ code: ProductErrorCode;
   try {
     const parsed = JSON.parse(await readBounded(response)) as { error?: { message?: unknown; details?: { reason?: unknown } } };
     if (typeof parsed?.error?.details?.reason === 'string') reason = parsed.error.details.reason;
+    const notice = parsed?.error?.details && typeof parsed.error.details === 'object'
+      ? Reflect.get(parsed.error.details, 'notice') : undefined;
+    if (notice === 'current-required') mapped = 'CONSENT_REQUIRED';
     if (parsed?.error?.message === '没有权限，请找人开通。' || parsed?.error?.message === '资料资格过期了，请稍后重试。') {
       reason = parsed.error.message;
     }

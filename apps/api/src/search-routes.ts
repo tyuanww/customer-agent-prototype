@@ -70,11 +70,6 @@ export type SearchRouteDependencies = Readonly<{
   operation: SearchOperation;
   logHash: Readonly<{ version: string; key: string }>;
   idempotencyHmac: ApiHmacKeyRing;
-  /**
-   * Optional observation of the current notice decision. A missing check keeps
-   * pilot_recorded and stores the redacted text. A decline or a thrown check still
-   * returns the search, records collection_mode synthetic, and stores no query text.
-   */
   hasAcceptedCurrentNotice?: (userId: string) => Promise<boolean>;
 }>;
 
@@ -137,13 +132,17 @@ export function registerSearchRoute(
     }
     if (dependencies === undefined) return sendOverloaded(reply);
     const redacted = redactQueryText(contract.value.query_text);
-    let collectionMode = contract.value.collection_mode;
-    let retainQueryText = true;
+    const collectionMode = contract.value.collection_mode;
+    const retainQueryText = true;
     if (collectionMode === 'pilot_recorded' && dependencies.hasAcceptedCurrentNotice !== undefined) {
-      const accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id).catch(() => false);
+      let accepted = false;
+      try {
+        accepted = await dependencies.hasAcceptedCurrentNotice(actor.user_id);
+      } catch {
+        accepted = false;
+      }
       if (!accepted) {
-        collectionMode = 'synthetic';
-        retainQueryText = false;
+        return sendForbiddenOrPolicyDenied(reply, 'POLICY_DENIED', { notice: 'current-required' });
       }
     }
     const actorSubjectHash = hmacSafeValue(

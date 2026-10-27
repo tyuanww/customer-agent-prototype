@@ -617,7 +617,7 @@ describePg15('DEV-M1 query and event PostgreSQL 15 transactions', () => {
   });
 });
 
-describePg15('pilot_recorded is recorded without an accepted notice', () => {
+describePg15('pilot_recorded search stops until the notice is accepted', () => {
   let harness: Pg15Harness;
   let owner: Client;
   let pool: Pool;
@@ -645,7 +645,7 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
     harness?.stop();
   }, 60_000);
 
-  it('records a search before a notice decision exists, then keeps the notice tables', async () => {
+  it('does not record a search before the notice is accepted', async () => {
     const service = createServiceRepositoryForPool(pool as never, {});
     const noticeService = createNoticeServiceForPool(pool, false);
     const repository = createEventRepository(pool);
@@ -698,19 +698,11 @@ describePg15('pilot_recorded is recorded without an accepted notice', () => {
         product_context_type: null, product_context_ref: null, top_k: 3,
       },
     });
-    expect(recorded.statusCode).not.toBe(403);
+    expect(recorded.statusCode).toBe(403);
     await expect(owner.query(
-      `SELECT collection_mode, text_storage_status, query_text_redacted, query_text_hash
-       FROM public.query_events WHERE query_id = $1`,
+      `SELECT count(*)::text AS n FROM public.query_events WHERE query_id = $1`,
       [queryId],
-    )).resolves.toMatchObject({
-      rows: [{
-        collection_mode: 'synthetic',
-        text_storage_status: 'suppressed',
-        query_text_redacted: null,
-        query_text_hash: null,
-      }],
-    });
+    )).resolves.toMatchObject({ rows: [{ n: '0' }] });
     acceptedNotice = true;
 
     // Publish a notice and accept it as the actor.

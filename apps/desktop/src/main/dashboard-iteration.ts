@@ -27,9 +27,7 @@ function asFailure(error: unknown): DashboardIterationFailure {
   if (error.code === 'UNAVAILABLE' || error.code === 'OVERLOADED') {
     return dashboardIterationFailure(error.code, ITERATION_COPY.unavailable);
   }
-  // The search door's own sentences are authorization refusals here; this plate states its
-  // own copy, so they collapse back to the generic refusal it already showed.
-  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED' || error.code === 'CONSENT_REQUIRED') {
     return dashboardIterationFailure('FORBIDDEN');
   }
   return dashboardIterationFailure(error.code);

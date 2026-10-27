@@ -47,6 +47,7 @@ const SOP_REPAIR_SUFFIX = [
   '0066_policy_version_restamp', '0067_inaccuracy_outcome', '0068_seat_lifecycle', '0069_feishu_login_link',
   '0070_analytics_question_v1',
   '0071_analytics_runtime_execute',
+  '0072_seat_post_grants',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -537,7 +538,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(71);
+      expect(fresh.pending).toHaveLength(72);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -549,12 +550,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 71,
+        migrationCount: 72,
         inventory: { tables: 111, views: 7, functions: 294 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 62-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 63-migration current suffix',
         },
       });
 
@@ -701,7 +702,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 71,
+        migrationCount: 72,
       });
     } finally {
       await client.end();
@@ -957,7 +958,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 71,
+        migrationCount: 72,
       });
     } finally {
       await client.end();

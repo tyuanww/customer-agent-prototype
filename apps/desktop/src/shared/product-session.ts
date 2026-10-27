@@ -101,6 +101,7 @@ export const PRODUCT_ERRORS = {
   // than FORBIDDEN copies so the sentence an operator reads is the sentence the server sent.
   NO_GRANT: '没有权限，请找人开通。',
   FACTS_EXPIRED: '资料资格过期了，请稍后重试。',
+  CONSENT_REQUIRED: '请先同意采集协议',
 } as const;
 export type ProductErrorCode = keyof typeof PRODUCT_ERRORS;
 export type ProductFailure = { ok: false; sessionEpoch: number; code: ProductErrorCode; message: string };

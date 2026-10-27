@@ -60,9 +60,7 @@ function asFailure(error: unknown): DashboardContentFailure {
     }
     return dashboardContentFailure('FORBIDDEN');
   }
-  // The search door's sentences are the same two refusals this plate already states, and
-  // this plate carries its own copy for them.
-  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED') {
+  if (error.code === 'NO_GRANT' || error.code === 'FACTS_EXPIRED' || error.code === 'CONSENT_REQUIRED') {
     return dashboardContentFailure('FORBIDDEN', PRODUCT_ERRORS[error.code]);
   }
   return dashboardContentFailure(error.code);
