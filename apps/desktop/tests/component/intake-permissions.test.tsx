@@ -400,3 +400,91 @@ it('does not read again or close an unsaved preview when the page is left and op
   expect(screen.getByRole('dialog', { name: '预览，尚未保存' })).toBeInTheDocument();
   expect(commands).toEqual(['refresh']);
 });
+
+it('shows a revoked grant as closed and does not offer a way to restore it', async () => {
+  const f = intakePermissionsData();
+  f.grants.push({
+    grantId: 'revoked-business',
+    version: 2,
+    kind: 'business',
+    issuerPrincipalId: 'registered-director',
+    recipientPrincipalId: f.person.principalId,
+    action: 'query',
+    scope: f.scope,
+    startsAt: '2026-10-08T02:00:00.000Z',
+    expiresAt: '2099-10-09T02:00:00.000Z',
+    revokedAt: '2026-10-08T03:00:00.000Z',
+    stewardPrincipalId: null,
+    reason: '合成授予',
+    mayRedelegate: false,
+    lastChangeReason: '合成撤销',
+  });
+  const main = new ContentIntakePermissions(f.session);
+  const commands: IntakePermissionCommand[] = [];
+  window.dashboardPermissions = {
+    current: async () => ({ ok: true, view: main.view() }),
+    command: async (command) => {
+      commands.push(command);
+      return { ok: true, view: await main.command(command) };
+    },
+    onInvalidated: (fn) => main.subscribe(fn),
+  };
+  try {
+    render(<IntakePermissions canGrant active />);
+    const grants = await screen.findByRole('table', { name: '已有业务权限' });
+    expect(grants).toHaveTextContent('已撤销');
+    expect(grants).not.toHaveTextContent('已过期');
+    const revoke = within(grants).getByRole('button', { name: '撤销该权限' });
+    expect(revoke).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /恢复|重新开通/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '撤销原因' })).not.toBeInTheDocument();
+    expect(commands.map((command) => command.action)).toEqual(['refresh']);
+    expect(f.grants[0]!.revokedAt).toBe('2026-10-08T03:00:00.000Z');
+  } finally {
+    main.dispose();
+  }
+});
+
+it('shows a revoked grant as closed and does not offer a way to restore it', async () => {
+  const f = intakePermissionsData();
+  f.grants.push({
+    grantId: 'revoked-business',
+    version: 2,
+    kind: 'business',
+    issuerPrincipalId: 'registered-director',
+    recipientPrincipalId: f.person.principalId,
+    action: 'query',
+    scope: f.scope,
+    startsAt: '2026-10-08T02:00:00.000Z',
+    expiresAt: '2099-10-09T02:00:00.000Z',
+    revokedAt: '2026-10-08T03:00:00.000Z',
+    stewardPrincipalId: null,
+    reason: '合成授予',
+    mayRedelegate: false,
+    lastChangeReason: '合成撤销',
+  });
+  const main = new ContentIntakePermissions(f.session);
+  const commands: IntakePermissionCommand[] = [];
+  window.dashboardPermissions = {
+    current: async () => ({ ok: true, view: main.view() }),
+    command: async (command) => {
+      commands.push(command);
+      return { ok: true, view: await main.command(command) };
+    },
+    onInvalidated: (fn) => main.subscribe(fn),
+  };
+  try {
+    render(<IntakePermissions canGrant active />);
+    const grants = await screen.findByRole('table', { name: '已有业务权限' });
+    expect(grants).toHaveTextContent('已撤销');
+    expect(grants).not.toHaveTextContent('已过期');
+    const revoke = within(grants).getByRole('button', { name: '撤销该权限' });
+    expect(revoke).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /恢复|重新开通/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '撤销原因' })).not.toBeInTheDocument();
+    expect(commands.map((command) => command.action)).toEqual(['refresh']);
+    expect(f.grants[0]!.revokedAt).toBe('2026-10-08T03:00:00.000Z');
+  } finally {
+    main.dispose();
+  }
+});
