@@ -96,8 +96,23 @@ export async function registeredPrincipalPage(client: Queryable, who: Principal,
   return rows.map(projectedPrincipal);
 }
 
+const PRINCIPAL_FACT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+type PrincipalFactWindowMs = number & { readonly __brand: 'PrincipalFactWindowMs' };
+
+function isPrincipalFactWindowMs(value: number): value is PrincipalFactWindowMs {
+  return value === PRINCIPAL_FACT_WINDOW_MS;
+}
+
+export const principalFactWindowMs = (() => {
+  if (!isPrincipalFactWindowMs(PRINCIPAL_FACT_WINDOW_MS)) {
+    throw new Error('principal fact window');
+  }
+  return PRINCIPAL_FACT_WINDOW_MS;
+})();
+
 export function requireFresh(p: Principal, now: number): void {
-  if (!p.enabled || p.checkedAt > now || now >= p.validUntil || p.validUntil > p.checkedAt + 24 * 60 * 60 * 1000) {
+  if (!p.enabled || p.checkedAt > now || now >= p.validUntil || p.validUntil > p.checkedAt + principalFactWindowMs) {
     throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
   }
 }

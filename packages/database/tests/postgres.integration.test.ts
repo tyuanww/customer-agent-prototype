@@ -567,6 +567,66 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     }
   });
 
+  it('grants query for a new Feishu binding when one preview source has a live parent', async () => {
+    const database = harness.createDatabase('feishu_grant');
+    const client = await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
+        VALUES ('tenant-menokin','app-customer-agent',1)`);
+      await client.query(`INSERT INTO backend_identity.subject_bindings
+          (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+        VALUES ('operator','synthetic','tenant-menokin','建席人','operator',repeat('ab',32),true,'owner')`);
+      await client.query(`INSERT INTO content_intake.principals
+          (principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version,revocation_generation)
+        VALUES ('operator','operator','tenant-menokin','app-customer-agent','confirmed-synthetic','operator',1,0)`);
+      await client.query(`INSERT INTO content_intake.principal_facts
+          (principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+        VALUES ('operator',1,ARRAY['dept-menokin'],'job-director',true,
+          clock_timestamp()-interval '1 second', clock_timestamp()+interval '4 minutes', repeat('a',64))`);
+      await client.query(`INSERT INTO content_intake.role_rules
+          (tenant_id,app_id,department_id,job_id,policy_version,role)
+        VALUES ('tenant-menokin','app-customer-agent','dept-menokin','job-director',1,'director')`);
+      await client.query(`INSERT INTO content_intake.scopes(scope_id,tenant_id,app_id,brand_id,domain)
+        VALUES ('scope-product','tenant-menokin','app-customer-agent','brand-a','product')`);
+      await client.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+        VALUES ('source-a','scope-product',1,'v2-preview')`);
+      await client.query(`INSERT INTO content_intake.source_mappings
+          (source_id,version,template_version,rule_version,mapping_version,structure_digest)
+        VALUES ('source-a',1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`);
+      await client.query(`INSERT INTO content_intake.store_sets(tenant_id,app_id,version,approved_at,provenance)
+        VALUES ('tenant-menokin','app-customer-agent',1,clock_timestamp(),'proof')`);
+      await client.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+        VALUES ('tenant-menokin','app-customer-agent',1)`);
+      await client.query(`INSERT INTO content_intake.store_set_members
+          (tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-menokin','app-customer-agent',1,'scope-product','source-a',clock_timestamp()+interval '1 day')`);
+      await client.query(`INSERT INTO content_intake.grants
+          (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+        VALUES ('root-query','allocation','operator','operator','tenant-menokin','app-customer-agent','scope-product','query',
+          clock_timestamp()-interval '1 hour', clock_timestamp()+interval '1 day','合成根资格','operator')`);
+      await client.query('COMMIT');
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_newfeishu01')`);
+      await client.query(`SELECT backend_identity.admit_feishu_agent('ou_newfeishu01')`);
+      const rows = await client.query<{
+        action: string; source_id: string; kind: string; has_issuer: boolean; day_window: boolean;
+      }>(`SELECT g.action, g.source_id, g.kind, (g.issuer_id IS NOT NULL) AS has_issuer,
+            (f.valid_until = f.checked_at + interval '24 hours') AS day_window
+          FROM content_intake.grants g
+          JOIN content_intake.principals p ON p.principal_id = g.recipient_id
+          JOIN content_intake.principal_facts f
+            ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
+         WHERE p.principal_id = 'prin_' || left(encode(pg_catalog.sha256(pg_catalog.convert_to('ou_newfeishu01','UTF8')), 'hex'), 32)
+           AND g.revoked_at IS NULL AND g.action = 'query'`);
+      expect(rows.rows).toEqual([
+        { action: 'query', source_id: 'source-a', kind: 'business', has_issuer: true, day_window: true },
+      ]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it('installs N from empty, verifies inventory/ACL, exposes stable SQLSTATE, and reruns as a no-op', async () => {
     const database = harness.createDatabase('clean_install');
     const client = await harness.connect(database.config);
