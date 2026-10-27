@@ -2,6 +2,15 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.34] - 2026-10-27
+
+### Changed
+
+- 建席写入查询授权。`pilot_recorded` 搜索在当前告知未接受时返回 403。
+- 杭州正式库账本是 `72 0072_seat_post_grants`。健康检查版本随这一版改为 `0.3.34`。
+- 未签名安装包、下载页和应用内下载目录随这一版改为 `0.3.34`。`v0.3.33` 没有安装包。`v0.3.32` 和更早 tag 的附件不覆盖。
+- 话术指针仍是 `rel_27`。这一版不发布售前、活动、售后或 FAQ。
+
 ## [0.3.33] - 2026-10-26
 
 ### Added
