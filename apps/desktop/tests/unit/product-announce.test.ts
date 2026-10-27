@@ -492,6 +492,44 @@ describe('content-updated fan-out and unread', () => {
     expect(unread).toMatchObject({ ok: false, unread: false, domains: [] });
     expect(isProductAnnounceUnreadValue(unread)).toBe(true);
   });
+
+  it('logs a lease refresh failure and does not open a webhook when the variable is unset', async () => {
+    const previous = process.env.FEISHU_ALERT_WEBHOOK;
+    delete process.env.FEISHU_ALERT_WEBHOOK;
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const fetched = vi.spyOn(globalThis, 'fetch');
+    try {
+      const f = await setup(() => { throw new Error('down'); });
+      await f.announce.refresh(f.identity);
+      expect(info.mock.calls.some((call) => String(call[0]).includes('diagnostic=LEASE_REFRESH_FAILED'))).toBe(true);
+      expect(fetched).not.toHaveBeenCalled();
+    } finally {
+      info.mockRestore();
+      fetched.mockRestore();
+      if (previous === undefined) delete process.env.FEISHU_ALERT_WEBHOOK;
+      else process.env.FEISHU_ALERT_WEBHOOK = previous;
+    }
+  });
+
+  it('posts only diagnostic and text when the lease refresh webhook is set', async () => {
+    const previous = process.env.FEISHU_ALERT_WEBHOOK;
+    const bodies: string[] = [];
+    const fetched = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      bodies.push(String(init?.body));
+      return new Response('ok');
+    });
+    process.env.FEISHU_ALERT_WEBHOOK = 'http://127.0.0.1:9/hook';
+    try {
+      const f = await setup(() => { throw new Error('down'); });
+      await f.announce.refresh(f.identity);
+      await vi.waitFor(() => expect(bodies.length).toBe(1));
+      expect(JSON.parse(bodies[0] ?? '{}')).toEqual({ diagnostic: 'LEASE_REFRESH_FAILED', text: 'UNAVAILABLE' });
+    } finally {
+      fetched.mockRestore();
+      if (previous === undefined) delete process.env.FEISHU_ALERT_WEBHOOK;
+      else process.env.FEISHU_ALERT_WEBHOOK = previous;
+    }
+  });
 });
 
 function isProductAnnounceUnreadValue(value: unknown): boolean {

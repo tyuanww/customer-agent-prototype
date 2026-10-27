@@ -30,7 +30,15 @@ PG_PORT="${CUSTOMER_AGENT_BACKUP_PORT:-43199}"
 PG_SOCKET="${CUSTOMER_AGENT_BACKUP_SOCKET:-$STACK_ROOT/data/pg15-socket}"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
-fail() { log "FATAL $*"; exit 1; }
+fail() {
+  log "FATAL $* diagnostic=BACKUP_FAILED"
+  local dir
+  dir="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+  if [ -x "$dir/send-ops-alert.sh" ]; then
+    "$dir/send-ops-alert.sh" BACKUP_FAILED || log "WARN alert delivery failed"
+  fi
+  exit 1
+}
 
 case "$KEEP" in ''|*[!0-9]*) fail "retention must be a positive integer, got '$KEEP'" ;; esac
 if [ "$KEEP" -lt 1 ]; then fail "retention must be at least 1"; fi

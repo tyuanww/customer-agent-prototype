@@ -20,6 +20,25 @@ import {
 } from './hydrate-catalog.ts';
 
 const LEASE = /^osl_[0-9a-f]{64}$/;
+const LEASE_REFRESH_FAILED = 'LEASE_REFRESH_FAILED';
+
+function notifyLeaseRefreshFailed(code: string, name: string): void {
+  console.info(`[desktop] announce refresh failed ${code} ${name} diagnostic=${LEASE_REFRESH_FAILED}`);
+  const webhook = process.env.FEISHU_ALERT_WEBHOOK;
+  if (!webhook) return;
+  let target: URL;
+  try {
+    target = new URL(webhook);
+  } catch {
+    return;
+  }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') return;
+  void fetch(target, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ diagnostic: LEASE_REFRESH_FAILED, text: code }),
+  }).catch(() => undefined);
+}
 type SnapshotState = { releaseId: string; cursor: string | null };
 
 /** Owns current release, short lease, ACK and snapshot paging. Renderer never sees the lease token. */
@@ -253,7 +272,7 @@ export class ProductAnnounce implements AnnounceGate {
     } catch (error) {
       const code = error instanceof ProductHttpError ? error.code : 'UNAVAILABLE';
       const name = error instanceof Error ? error.name : 'unknown';
-      console.info(`[desktop] announce refresh failed ${code} ${name}`);
+      notifyLeaseRefreshFailed(code, name);
       if (code === 'SOURCE_GATE_NOT_READY') this.drop('source_gate');
       else if (code !== 'STALE' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') this.drop('unavailable');
       return announceFailure(code, identity);
