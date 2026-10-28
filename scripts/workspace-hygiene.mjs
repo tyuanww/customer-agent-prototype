@@ -52,7 +52,11 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // unapplied rollback script. GitHub Linux read source-inputs 40.8 KiB over
 // 21.8 MiB and the remainder 20.8 KiB over 47.8 MiB. 21.9 and 47.9 cover that
 // reading. source-inputs stays the tighter of the two.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 47.9 * 1024 * 1024;
+// 2026-10-28: migrations 0074 and 0075 fix authorization_deadline for engineer role,
+// add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
+// Linux read source-inputs 110 KiB over 21.9 MiB and the remainder 90.4 KiB over
+// 47.9 MiB. 22.0 and 48.0 cover that reading and leave minimal headroom.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.0 * 1024 * 1024;
 // 2026-10-23: the Linux runner read the remainder at 46.6 MiB on the SOP intake change,
 // 0.1 over the previous 46.5. The added files also cost block rounding, so 47.0 covers
 // it while source-inputs stays the tighter of the two.
@@ -78,7 +82,10 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // the difference is block rounding on 21 added files. 21.0 covers the Linux reading
   // and keeps the same headroom the earlier entries left. A one-shot red-team prompt
   // document was deleted first, so this bump covers source, not prose.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 21.9 * 1024 * 1024 }),
+  // 2026-10-28: migrations 0074 and 0075 fix authorization_deadline for engineer role,
+  // add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
+  // Linux read source-inputs 110 KiB over 21.9 MiB. 22.0 covers that reading.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.0 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
