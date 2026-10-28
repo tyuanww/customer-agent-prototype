@@ -105,7 +105,7 @@ bash scripts/monitor-authorization-metrics.sh > \
 ### 4.2 部署报告
 - `packages/database/DEPLOYMENT-REPORT-0074.md`
 - `packages/database/DEPLOYMENT-REPORT-0075.md`
-- `packages/database/DEPLOYMENT-SUMMARY-0074-0075.md`
+- `../packages/database/DEPLOYMENT-SUMMARY-0074-0075.md`
 
 ---
 
@@ -172,7 +172,7 @@ bash scripts/monitor-authorization-metrics.sh > \
 
 **A:** 
 1. 运行监控脚本查看当前状态
-2. 参考文档：`docs/authorization-model.md` 第七节"故障排查"
+2. 参考文档：`authorization-model.md` 第七节"故障排查"
 3. 使用 `scripts/test-engineer-authorization.sh` 验证具体主体
 
 ---
@@ -186,7 +186,7 @@ bash scripts/monitor-authorization-metrics.sh > \
 
 **紧急情况：**
 - 如果生产环境授权判断大面积失败，请立即联系 on-call 团队
-- 回滚迁移：参考 `DEPLOYMENT-SUMMARY-0074-0075.md` 的回滚部分
+- 回滚迁移：参考 `../packages/database/DEPLOYMENT-SUMMARY-0074-0075.md` 的回滚部分
 
 ---
 
@@ -201,6 +201,6 @@ bash scripts/monitor-authorization-metrics.sh > \
 **发送人：** Database Migration Team  
 **时间：** 2026-10-28 13:00 CST  
 **附件：**
-- [首次监控报告](docs/monitoring-report-2026-10-28.md)
-- [授权模型文档](docs/authorization-model.md)
-- [部署总结](packages/database/DEPLOYMENT-SUMMARY-0074-0075.md)
+- [首次监控报告](monitoring-report-2026-10-28.md)
+- [授权模型文档](authorization-model.md)
+- [部署总结](../packages/database/DEPLOYMENT-SUMMARY-0074-0075.md)
