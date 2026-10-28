@@ -84,8 +84,9 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // document was deleted first, so this bump covers source, not prose.
   // 2026-10-28: migrations 0074 and 0075 fix authorization_deadline for engineer role,
   // add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
-  // Linux read source-inputs 110 KiB over 21.9 MiB. 22.0 covers that reading.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.0 * 1024 * 1024 }),
+  // Linux read source-inputs 110 KiB over 21.9 MiB, then 8 KiB over 22.0 MiB on second
+  // run. 22.1 MiB covers that reading with headroom.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.1 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
