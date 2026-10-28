@@ -1069,6 +1069,28 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 74,
+      "id": "0074_authorization_deadline_engineer",
+      "file": "0074_authorization_deadline_engineer.sql",
+      "source_ranges": [],
+      "sha256": "1698c3ebf6b4b9ed4f5121ed2d2eeffea5968dda0851290947eb6dc9f3d6bc7a",
+      "bytes": 3070,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 75,
+      "id": "0075_authorization_deadline_source_null",
+      "file": "0075_authorization_deadline_source_null.sql",
+      "source_ranges": [],
+      "sha256": "a0c2dce9fb147e364ad6f4513fd5e143abb491d8a9bb44b2a4de82b3c711e592",
+      "bytes": 2613,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }
