@@ -31,6 +31,13 @@ PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOME
 `0028_intake_family` 仅追加产品 overlay，不改冻结合同或旧迁移字节。私有 `content_intake.assert_family_catalog(releaseId)` 对完整目录验证显式通用根、同租户/应用/品牌/域、店铺不可自设品牌强制及商品/场景/半开时间三维交集；标题不建立关系。启用店铺稿要求根启用；停用历史保留引用，可同时停用根与店铺稿。根仍参与结构校验，即使它的生效时间已经结束。正常发布和纠正回退在既有内容锁与 current 事务内通过 publication trigger 共用校验；API 签发/续签资格复用该私有函数。旧发布入口遇显式家族目录明确拒绝继承，不丢失关系；只有既有不可登录 definer 获 candidate_versions SELECT 用于此拒绝，应用角色 ACL 保持关闭。真实 PG 门禁覆盖 27→28 精确前缀、冲突矩阵、ACL/trigger 篡改，以及 5,000 条完整目录与 50,000 条未引用历史条目的有界验证；另覆盖同一家族 1 个根与 4,999 个覆盖的商品互斥、场景互斥、全不限半开时间不交叠三种稠密合法目录。区间以 running-max 结束时间划分相交分量，每分量按商品或场景倒排桶预计配对数选择更稀疏的一维，wildcard 单独处理；最后仍验证真实三维交集。无关联条目的本地字段检查不进入根关联扫描，品牌根物化后供结构/品牌强制复用；5,000 条无关联目录连续 50 次逐页 guard 共享 5 秒数据库预算，避免把家族判定成本施加到普通分页。固定 seed `0x5eed0028` 的 85 个目录与独立朴素逐对 oracle 比对，覆盖长区间桥接、空集、多词项和停用。
 
 `0030_intake_role_ceiling` 是角色上限 overlay：只替换当前业务操作的 `authorization_deadline`，不删除历史 grant，不改冻结合同，也不授予应用角色权限。
+
+**`overlays/0074_authorization_deadline_engineer.sql`** (2026-10-28)：修复 `authorization_deadline` 函数对 engineer 角色的支持。将硬编码角色列表改为动态检查 `role_ceiling` 表，使所有业务角色（agent, enabler, lead, supervisor, manager, director, engineer）都能通过授权判断。部署报告见 `DEPLOYMENT-REPORT-0074.md`。
+
+**`overlays/0075_authorization_deadline_source_null.sql`** (2026-10-28)：修复 `authorization_deadline` 函数对通配符授权（`source_id IS NULL`）的支持。添加 OR 分支以正确处理通配符授权语义，同时保留精确授权的 source 存在性检查。部署报告见 `DEPLOYMENT-REPORT-0075.md`。
+
+完整部署总结和监控指南见 `DEPLOYMENT-SUMMARY-0074-0075.md`。授权模型详细文档见 `../../docs/authorization-model.md`。
+
 `0029_intake_capacity` 增加 `object_reservations`（reserved/persisted/adopted/releasing/released）及 tenant 容量索引，不授予应用角色任何权限。API 在落盘前持久预留，业务事务原子采用；未知提交保留额度，清理成功且目录 fsync 后才能释放。历史保留期未批准，已登记对象及引用全部保留，干跑命令不能 apply。生命周期、真实 PG 并发及十倍历史证据见[容量收尾验收](../../evidence/qa/content-intake-p2-capacity/README.md)。
 
 `0033_intake_runtime_v1_23` 从已验证完整 v2 包消费 roles→organization→session→directory→directoryAcl→acl；不重复安装完整参考 schema。生成器绑定 installation 摘要、全部伴随输入及原 32 段依赖 manifest/overlay 摘要；安装缺函数或同名角色冲突时整体回滚，不修补未知角色。七个新能力/属主角色均不可登录，环境 LOGIN 绑定不写入 migration，正式生产账号不由本包创建。新用途权限只供可信服务按已批准合同消费，不能把 capability 当作用户授权。
