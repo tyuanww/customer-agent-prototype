@@ -24,11 +24,16 @@ THRESHOLD_POLICY_PENDING_RATE=1 # policy-pending 率超过 1% 告警
 # 通知配置
 EMAIL_TO="5DJgDkyjvPY1E@shinemage.cn"
 FEISHU_GROUP="customer-agent-health"
-LOG_DIR="/var/log/customer-agent"
+LOG_DIR="${CUSTOMER_AGENT_LOG_DIR:-$PROJECT_ROOT/logs}"
 METRICS_FILE="$LOG_DIR/auth-metrics-$(date +%Y%m%d).json"
 
 # 确保日志目录存在
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || {
+    # 回退到临时目录
+    LOG_DIR="/tmp/customer-agent-logs"
+    mkdir -p "$LOG_DIR"
+    warn "无法创建日志目录，回退到: $LOG_DIR"
+}
 
 # 颜色输出
 RED='\033[0;31m'
@@ -66,9 +71,8 @@ send_feishu_alert() {
     local content="$2"
 
     # 使用 lark-cli 发送消息到群聊
-    lark-cli im +send-message \
-        --chat "$FEISHU_GROUP" \
-        --type text \
+    lark-cli im message send \
+        --chat-title "$FEISHU_GROUP" \
         --text "【授权监控告警】
 $title
 
@@ -230,29 +234,33 @@ alert_messages=()
 # 3.1 检查授权成功率
 if [ $auth_success_rate -lt $THRESHOLD_AUTH_SUCCESS_RATE ]; then
     alert_triggered=1
-    alert_messages+=("授权成功率低于阈值: ${auth_success_rate}% < ${THRESHOLD_AUTH_SUCCESS_RATE}%")
-    error "告警: ${alert_messages[-1]}"
+    msg="授权成功率低于阈值: ${auth_success_rate}% < ${THRESHOLD_AUTH_SUCCESS_RATE}%"
+    alert_messages+=("$msg")
+    error "告警: $msg"
 fi
 
 # 3.2 检查授权判断延迟
 if [ $avg_latency_ms -gt $THRESHOLD_P99_LATENCY_MS ]; then
     alert_triggered=1
-    alert_messages+=("授权判断延迟超过阈值: ${avg_latency_ms}ms > ${THRESHOLD_P99_LATENCY_MS}ms")
-    error "告警: ${alert_messages[-1]}"
+    msg="授权判断延迟超过阈值: ${avg_latency_ms}ms > ${THRESHOLD_P99_LATENCY_MS}ms"
+    alert_messages+=("$msg")
+    error "告警: $msg"
 fi
 
 # 3.3 检查事实过期率
 if [ $fact_expiry_rate -gt $THRESHOLD_FACT_EXPIRY_RATE ]; then
     alert_triggered=1
-    alert_messages+=("事实过期率超过阈值: ${fact_expiry_rate}% > ${THRESHOLD_FACT_EXPIRY_RATE}%")
-    error "告警: ${alert_messages[-1]}"
+    msg="事实过期率超过阈值: ${fact_expiry_rate}% > ${THRESHOLD_FACT_EXPIRY_RATE}%"
+    alert_messages+=("$msg")
+    error "告警: $msg"
 fi
 
 # 3.4 检查数据库连接
 if ! $PSQL -c "SELECT 1" > /dev/null 2>&1; then
     alert_triggered=1
-    alert_messages+=("数据库连接失败")
-    error "告警: ${alert_messages[-1]}"
+    msg="数据库连接失败"
+    alert_messages+=("$msg")
+    error "告警: $msg"
 fi
 
 # 4. 发送告警
