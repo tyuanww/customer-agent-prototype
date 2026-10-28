@@ -184,6 +184,5 @@ psql ... -c "EXPLAIN (ANALYZE, BUFFERS) SELECT ..."
 **报告人：** Database Migration Team  
 **下次运行：** 2026-10-29 12:38 CST  
 **相关文档：**
-- [授权模型完整文档](authorization-model.md)
-- [飞书用户流程调查](investigation-feishu-user-flow.md)
 - [监控脚本源码](../scripts/monitor-authorization-metrics.sh)
+- [授权模型文档](../packages/database/README.md)

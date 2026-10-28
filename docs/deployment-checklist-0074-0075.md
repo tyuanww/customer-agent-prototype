@@ -20,8 +20,7 @@
 - [x] 首次监控运行成功（5.7ms 延迟）
 
 ### 3. 文档
-- [x] 授权模型完整文档 `docs/authorization-model.md`
-- [x] 飞书用户流程调查 `docs/investigation-feishu-user-flow.md`
+- [x] 授权文档 `packages/database/README.md`
 - [x] Overlay 迁移流程规范 `docs/guides/overlay-migration-workflow.md`
 - [x] 快速响应手册 `docs/runbook/authorization-incident-response.md`
 - [x] 告警规则配置 `docs/monitoring-alert-rules.md`
@@ -236,7 +235,7 @@ psql ... -c "EXPLAIN (ANALYZE, BUFFERS) SELECT content_intake.authorization_dead
 
 ## 📚 相关文档
 
-- 授权模型：`docs/authorization-model.md`
+- 授权模型：`packages/database/README.md`
 - 快速响应手册：`docs/runbook/authorization-incident-response.md`
 - 告警规则：`docs/monitoring-alert-rules.md`
 - 部署总结：`packages/database/DEPLOYMENT-SUMMARY-0074-0075.md`

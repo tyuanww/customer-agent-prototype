@@ -82,14 +82,13 @@ bash scripts/monitor-authorization-metrics.sh > \
 
 ### 4.1 新增文档
 
-1. **授权模型完整文档**
-   - 位置：`docs/authorization-model.md`
+1. **授权模型文档**
+   - 位置：`packages/database/README.md`
    - 内容：主体、事实、角色规则、授权记录的关系和判断流程
    - 读者：开发、测试、运维团队
 
-2. **飞书用户流程调查报告**
-   - 位置：`docs/investigation-feishu-user-flow.md`
-   - 内容：飞书用户登录和授权的完整流程分析
+2. **工作流程调查报告**
+   - 涵盖飞书用户登录和授权的完整流程分析
    - 读者：产品、开发团队
 
 3. **Overlay 迁移发布流程**
@@ -172,7 +171,7 @@ bash scripts/monitor-authorization-metrics.sh > \
 
 **A:** 
 1. 运行监控脚本查看当前状态
-2. 参考文档：`authorization-model.md` 第七节"故障排查"
+2. 参考文档：`packages/database/README.md`（授权模型章节）
 3. 使用 `scripts/test-engineer-authorization.sh` 验证具体主体
 
 ---
@@ -202,5 +201,5 @@ bash scripts/monitor-authorization-metrics.sh > \
 **时间：** 2026-10-28 13:00 CST  
 **附件：**
 - [首次监控报告](monitoring-report-2026-10-28.md)
-- [授权模型文档](authorization-model.md)
+- [授权模型文档](../packages/database/README.md)
 - [部署总结](../packages/database/DEPLOYMENT-SUMMARY-0074-0075.md)
