@@ -186,4 +186,4 @@ psql ... -c "EXPLAIN (ANALYZE, BUFFERS) SELECT ..."
 **相关文档：**
 - [授权模型完整文档](authorization-model.md)
 - [飞书用户流程调查](investigation-feishu-user-flow.md)
-- [监控脚本源码](../../scripts/monitor-authorization-metrics.sh)
+- [监控脚本源码](../scripts/monitor-authorization-metrics.sh)

@@ -63,7 +63,7 @@
 - 缺失：0 个
 - 状态：✅ 无问题
 
-**详细报告：** [docs/monitoring-report-2026-10-28.md](docs/monitoring-report-2026-10-28.md)
+**详细报告：** [monitoring-report-2026-10-28.md](monitoring-report-2026-10-28.md)
 
 ### 3.2 监控脚本
 - **位置：** `scripts/monitor-authorization-metrics.sh`
