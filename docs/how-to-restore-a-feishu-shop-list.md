@@ -4,7 +4,7 @@
 
 这篇不写入授权。`backend_identity.admit_feishu_agent` 只插入一条 `subject_bindings`。会话使用的 principal id 由 `rosterPrincipalId` 和 `content_intake.project_feishu_roster` 计算，形式是 `prin_` 加上 open id 的 sha256 前 32 位十六进制。查询授权在投影状态成为 `registered` 之后，由 `content_intake.issue_roster_query` 签发，动作只有 `query`，有效期不超过 1 天。
 
-店铺要出现，来源模式必须是 `v2-preview`，店铺 ID 非空，并且有一条未撤销的 `query` 授权。该授权的 `source_id`、`policy_version`、`store_set_version` 必须等于当前行。事实窗口是 5 分钟。重新登录会重写事实。点「刷新店铺」不会重写事实，但会重新读取授权。店铺下拉不跟着 10 秒一次的会话轮询走。事实重写之后要点「刷新店铺」。`source_id` 为空的根授权不会出现在店铺里。
+店铺要出现，来源模式必须是 `v2-preview`，店铺 ID 非空，并且有一条未撤销的 `query` 授权。该授权的 `source_id`、`policy_version`、`store_set_version` 必须等于当前行。事实窗口长度见迁移 [`0073_feishu_query_grant.sql`](../packages/database/migrations/0073_feishu_query_grant.sql) 中的 `principal_facts_check` 约束（24 小时）。重新登录会重写事实。点「刷新店铺」不会重写事实，但会重新读取授权。店铺下拉不跟着 10 秒一次的会话轮询走。事实重写之后要点「刷新店铺」。`source_id` 为空的根授权不会出现在店铺里。
 
 这次恢复不追加 `publish`、`import` 或 `rollback`。`0072_seat_post_grants` 给「客服」和「客服主管」签发的也只有 `query`。
 
@@ -56,7 +56,7 @@ LIMIT 20;
 - 没有职务快照，或职务标题对不上花名册。`projectRosterLogin` 返回 `unmatched`，不会调用 `issue_roster_query`。先让飞书职务原文对上目录。
 - 投影状态是 `policy-pending`。岗位规则没有对上。先补规则，再让对方登录。
 - 投影已经 `registered`，当前发布谱系里没有 `v2-preview` 来源。先发布这些来源。改准入函数不会造出店铺。
-- 已有 `query` 授权，但最新事实的 `valid_until` 已过。请对方重新登录。窗口是 5 分钟。
+- 已有 `query` 授权，但最新事实的 `valid_until` 已过。请对方重新登录。窗口长度见迁移 [`0073_feishu_query_grant.sql`](../packages/database/migrations/0073_feishu_query_grant.sql) 中的 `principal_facts_check` 约束（24 小时）。
 - 事实仍有效，授权行也在，店铺列表仍空。把 `source_id`、`policy_version`、`store_set_version` 和当前策略版本、当前店铺集版本并排列出来。把这几行带回来，再决定要不要改代码。
 
 ## 怎样确认
@@ -64,7 +64,7 @@ LIMIT 20;
 - principal id 以 `prin_` 开头，并且和 `apps/api/src/project-roster-login.ts` 里的 `rosterPrincipalId` 使用同一种 sha256 截取。
 - 授权原因若是系统签发，正文是「职位名单系统签发。」动作是 `query`。
 - 桌面只把模式为 `v2-preview`、带店铺 ID、且动作含 `query` 的来源放进下拉。空列表在主进程里是 `NO_GRANT`，下拉文字是「暂无可用店铺」。
-- `authorization_deadline` 返回的时间如果等于事实的 `valid_until`，查询授权还在，店铺列表会跟着这 5 分钟结束。结束之后重新登录，再点「刷新店铺」。
+- `authorization_deadline` 返回的时间如果等于事实的 `valid_until`，查询授权还在，店铺列表会跟着事实窗口结束。窗口长度见迁移 [`0073_feishu_query_grant.sql`](../packages/database/migrations/0073_feishu_query_grant.sql) 中的 `principal_facts_check` 约束（24 小时）。结束之后重新登录，再点「刷新店铺」。
 
 ## 失败时
 

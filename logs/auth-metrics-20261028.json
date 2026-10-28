@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-10-28T12:55:09+08:00",
+  "database": "customer_agent_synthetic",
+  "metrics": {
+    "engineer_principals": 3,
+    "total_principals": 5,
+    "active_grants": 3,
+    "expired_facts": 3,
+    "fact_expiry_rate_percent": 60,
+    "auth_success_rate_percent": 60,
+    "avg_latency_ms": 0,
+    "latency_samples": 0
+  },
+  "thresholds": {
+    "auth_success_rate_min": 95,
+    "p99_latency_max_ms": 50,
+    "fact_expiry_rate_max": 5
+  }
+}

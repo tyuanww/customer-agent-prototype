@@ -1,0 +1,14 @@
+# 安装监控脚本到 cron
+# 每 6 小时运行一次监控（06:00, 12:00, 18:00, 00:00）
+
+# 项目根目录
+PROJECT_ROOT="/Users/hutou/Desktop/customer-agent-prototype"
+
+# 监控脚本（带告警）- 每 6 小时
+0 */6 * * * cd $PROJECT_ROOT && bash scripts/monitor-and-alert.sh >> /var/log/customer-agent/monitor-cron.log 2>&1
+
+# 详细监控报告 - 每天 08:00（工作日）
+0 8 * * 1-5 cd $PROJECT_ROOT && bash scripts/monitor-authorization-metrics.sh > /var/log/customer-agent/auth-metrics-$(date +\%Y\%m\%d)-detailed.log 2>&1
+
+# 日志清理 - 每周日 02:00
+0 2 * * 0 find /var/log/customer-agent -name "*.log" -mtime +30 -delete 2>/dev/null

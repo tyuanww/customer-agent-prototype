@@ -553,10 +553,16 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
           principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version)
         SELECT 'prin_window', user_id, 'tenant-a', 'app-a', 'feishu-job-roster', 'ou_testcursor001', 1
           FROM backend_identity.subject_bindings WHERE binding_id = 'ou_testcursor001'`);
-      await client.query(`INSERT INTO content_intake.principal_facts(
+      // Use a single timestamp for both checked_at and the base of valid_until to avoid
+      // microsecond drift that could exceed the 24-hour constraint window.
+      const checked = await client.query<{ checked: Date }>(`SELECT date_trunc('second', clock_timestamp()) AS checked`);
+      const checkedAt = checked.rows[0]!.checked;
+      await client.query({
+        text: `INSERT INTO content_intake.principal_facts(
           principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
-        VALUES ('prin_window', 1, ARRAY['dept-a'], 'job-seat', true, clock_timestamp(),
-          clock_timestamp() + interval '24 hours', repeat('ab', 32))`);
+        VALUES ('prin_window', 1, ARRAY['dept-a'], 'job-seat', true, $1::timestamptz, $1::timestamptz + interval '23:59:59', repeat('ab', 32))`,
+        values: [checkedAt],
+      });
       await client.query('COMMIT');
       await expect(client.query(`INSERT INTO content_intake.principal_facts(
           principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
