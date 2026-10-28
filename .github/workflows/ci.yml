@@ -59,6 +59,8 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode == 'full'
+        run: node scripts/check-migration-immutability.mjs
+      - if: needs.changes.outputs.mode == 'full'
         run: pnpm check
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm --filter @customer-agent/api test:search-decision
