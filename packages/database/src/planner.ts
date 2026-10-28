@@ -302,6 +302,20 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0072_seat_post_grants',
     requiresPredecessor: 'Feishu query grants require seat post grants',
   },
+  {
+    index: 73,
+    minimumCatalogueLength: 74,
+    id: '0074_authorization_deadline_engineer',
+    predecessorId: '0073_feishu_query_grant',
+    requiresPredecessor: 'Authorization deadline engineer support requires Feishu query grants',
+  },
+  {
+    index: 74,
+    minimumCatalogueLength: 75,
+    id: '0075_authorization_deadline_source_null',
+    predecessorId: '0074_authorization_deadline_engineer',
+    requiresPredecessor: 'Authorization deadline source null handling requires engineer support',
+  },
 ];
 
 function requiredSuccessorStep(
