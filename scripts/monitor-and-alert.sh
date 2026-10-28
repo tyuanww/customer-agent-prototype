@@ -70,20 +70,32 @@ send_feishu_alert() {
     local title="$1"
     local content="$2"
 
-    # 使用 lark-cli 发送消息到群聊
-    lark-cli im message send \
-        --chat-title "$FEISHU_GROUP" \
-        --text "【授权监控告警】
+    local message="【授权监控告警】
 $title
 
 $content
 
 时间: $(date '+%Y-%m-%d %H:%M:%S')
-数据库: $DB_NAME@$DB_HOST:$DB_PORT" || {
-        error "飞书消息发送失败"
-        return 1
-    }
-    info "飞书告警已发送: $title"
+数据库: $DB_NAME@$DB_HOST:$DB_PORT"
+
+    # 尝试使用 lark-cli 发送消息
+    # 注意：需要群 chat_id 或通过群名搜索群
+    if lark-cli im +chat-search --name "$FEISHU_GROUP" --type 2 > /tmp/lark-chat-search.json 2>&1; then
+        chat_id=$(jq -r '.data.items[0].chat_id // empty' /tmp/lark-chat-search.json 2>/dev/null)
+        if [ -n "$chat_id" ]; then
+            echo "$message" | lark-cli im +messages-send --chat-id "$chat_id" --text - || {
+                error "飞书消息发送失败"
+                return 1
+            }
+            info "飞书告警已发送: $title"
+            return 0
+        fi
+    fi
+
+    # 如果搜索失败，记录日志但不中断
+    warn "无法找到飞书群 $FEISHU_GROUP 或发送失败，告警已记录到日志"
+    echo "[$(date)] 飞书告警失败: $title" >> "$LOG_DIR/feishu-alerts-failed.log"
+    return 1
 }
 
 # 1. 收集指标
