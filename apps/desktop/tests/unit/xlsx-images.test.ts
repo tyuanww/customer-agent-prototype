@@ -121,7 +121,11 @@ describe('xlsx images follow their wording row', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.rows).toHaveLength(1);
-    expect(result.sourceName).toBe('【售前】合成话术.xlsx · 已跳过空白或不完整 1 行（第 4 行）。已跳过含 { } 的 1 行（第 3 行），只允许 {订单号}、{日期}。');
+    expect(result.sourceName).toBe('【售前】合成话术.xlsx');
+    expect(result.notices).toEqual([
+      '已跳过空白或不完整 1 行（第 4 行）。',
+      '已跳过含 { } 的 1 行（第 3 行），只允许 {订单号}、{日期}。',
+    ]);
   });
 
   it('gives a specific message for unsupported or broken pictures', () => {

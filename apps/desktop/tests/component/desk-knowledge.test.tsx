@@ -87,6 +87,21 @@ it('keeps the knowledge columns and dismisses the add layer without saving', asy
   expect(screen.queryByText('读取资格已到期')).not.toBeInTheDocument();
 });
 
+it('shows skipped-row notices when the CSV filename has leading spaces', async () => {
+  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
+  window.dashboardDesk = {
+    current: async () => desk.reply('operator', '合成经理'),
+    command: async command => desk.command('operator', command, '合成经理'),
+  };
+  const user = userEvent.setup();
+  render(<DeskKnowledge />);
+  await user.click(await screen.findByRole('button', { name: '添加话术' }));
+  await user.upload(screen.getByLabelText('导入 CSV 或 Excel'), new File([
+    'scene,script\n合成正常问题,合成正常回答\n合成缺答问题,',
+  ], ' 合成话术.csv', { type: 'text/csv' }));
+  expect(await screen.findByText(/已跳过空白或不完整 1 行/)).toHaveTextContent('第 3 行');
+});
+
 it('closes the import confirmation with the add layer and does not import', async () => {
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
   const commands: string[] = [];

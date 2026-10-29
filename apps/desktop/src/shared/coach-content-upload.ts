@@ -25,7 +25,7 @@ export type CoachUploadSuccess = Readonly<{
   sourceRows?: readonly number[];
   /** Index into `rows`; set only by the Main xlsx parser. */
   images?: readonly { index: number; dataUrl: string }[];
-  /** Workbook content that was not imported (background, comments, extra sheets…). */
+  /** Skipped rows and workbook content that was not imported. */
   notices?: readonly string[];
 }>;
 
@@ -194,13 +194,14 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
     'scene,script,domain',
     ...rows.map((row) => [row.scene, row.script, row.domain ?? ''].map(csvCell).join(',')),
   ].join('\n');
-  const skippedNote = [
+  const notices = [
     incompleteRows.length > 0 ? `已跳过空白或不完整 ${String(incompleteRows.length)} 行（${rowList(incompleteRows)}）。` : '',
     braceRows.length > 0 ? `已跳过含 { } 的 ${String(braceRows.length)} 行（${rowList(braceRows)}），只允许 {订单号}、{日期}。` : '',
-  ].join('');
+  ].filter(Boolean);
   return Object.freeze({
     ok: true,
-    sourceName: skippedNote ? `${sourceName} · ${skippedNote}` : sourceName,
+    sourceName,
+    notices: Object.freeze(notices),
     rows: Object.freeze(rows),
     sourceRows: Object.freeze(sourceRows),
     csvText,

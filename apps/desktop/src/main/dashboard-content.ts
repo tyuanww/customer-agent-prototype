@@ -198,7 +198,7 @@ export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof
     if (index < 0) return { ok: false, code: 'invalid-table', message: `第 ${String(image.row)} 行有图片，但这一行不会导入。请补全或修改这一行后重试。` };
     images.push({ index, dataUrl: image.dataUrl });
   }
-  return { ...parsed, images, notices: workbook.notices };
+  return { ...parsed, images, notices: [...(parsed.notices ?? []), ...workbook.notices] };
 }
 
 export function dashboardContentSession(

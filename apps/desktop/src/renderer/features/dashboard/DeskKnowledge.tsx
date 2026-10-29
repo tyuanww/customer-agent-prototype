@@ -129,11 +129,9 @@ export function DeskKnowledge({
         const row = result.rows[image.index];
         return !row || row.scene.trim().length < 2 || row.scene.trim().length > 80 || row.script.trim().length > 200_000;
       })) { setFileError('图片所在话术无法导入，请检查该行后重试。'); return; }
-      const skipped = result.sourceName.startsWith(file.name) ? result.sourceName.slice(file.name.length).replace(/^\s*·\s*/, '') : '';
       const notices = [
-        ...(skipped ? [skipped] : []),
-        ...(usable.length !== result.rows.length ? [`跳过 ${String(result.rows.length - usable.length)} 条问题不是 2 到 80 个字的话术。`] : []),
         ...(result.notices ?? []),
+        ...(usable.length !== result.rows.length ? [`跳过 ${String(result.rows.length - usable.length)} 条问题不是 2 到 80 个字的话术。`] : []),
       ];
       setCsv({ fileName: file.name, size: file.size, csvText: result.csvText, images: result.images ?? [], notices, count: usable.length,
         sample: usable.slice(0, 3).map((row) => [row.scene, row.domain ?? ''] as const) });
