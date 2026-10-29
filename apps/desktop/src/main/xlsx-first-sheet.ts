@@ -1,4 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
+import { posix } from 'node:path';
 
 const XLSX_MAX_ZIP_ENTRIES = 128;
 const XLSX_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
@@ -44,7 +45,10 @@ function keepZipEntry(name: string): boolean {
   return name === 'xl/workbook.xml'
     || name === 'xl/_rels/workbook.xml.rels'
     || name === 'xl/sharedStrings.xml'
-    || /^xl\/worksheets\/[^/]+\.xml$/u.test(name);
+    || /^xl\/worksheets\/[^/]+\.xml$/u.test(name)
+    || /^xl\/worksheets\/_rels\/[^/]+\.xml\.rels$/u.test(name)
+    || /^xl\/drawings\/(?:_rels\/)?[^/]+\.(?:xml|xml\.rels)$/u.test(name)
+    || /^xl\/media\/[^/]+$/u.test(name);
 }
 
 function readZipLocalFiles(buffer: Buffer, startedAt: number): ReadonlyMap<string, Buffer> {
@@ -130,7 +134,69 @@ function cellValue(inner: string, attrs: string, strings: readonly string[]): st
   return decodeXml(raw);
 }
 
-export function parseXlsxFirstSheet(buffer: Buffer): string[][] {
+type WorkbookImage = { row: number; dataUrl: string };
+
+function relationship(files: ReadonlyMap<string, Buffer>, source: string, id: string): string {
+  const relPath = posix.join(posix.dirname(source), '_rels', `${posix.basename(source)}.rels`);
+  const xml = files.get(relPath)?.toString('utf8');
+  if (!xml) throw new Error('IMAGE_RELATIONSHIP_MISSING');
+  for (const match of xml.matchAll(/<Relationship\b([^>]*?)(?:\/?>)/g)) {
+    const attrs = match[1];
+    const foundId = attrs.match(/\bId="([^"]+)"/)?.[1];
+    const target = attrs.match(/\bTarget="([^"]+)"/)?.[1];
+    if (foundId !== id || !target) continue;
+    const resolved = posix.normalize(target.startsWith('/') ? target.slice(1) : posix.join(posix.dirname(source), target));
+    if (!resolved.startsWith('xl/')) throw new Error('IMAGE_RELATIONSHIP_INVALID');
+    return resolved;
+  }
+  throw new Error('IMAGE_RELATIONSHIP_MISSING');
+}
+
+function sheetImages(files: ReadonlyMap<string, Buffer>, path: string, xml: string, notices: string[]): WorkbookImage[] {
+  const drawingId = xml.match(/<(?:\w+:)?drawing\b[^>]*\br:id="([^"]+)"/)?.[1];
+  if (!drawingId) return [];
+  const drawingPath = relationship(files, path, drawingId);
+  const drawing = files.get(drawingPath)?.toString('utf8');
+  if (!drawing) throw new Error('IMAGE_DRAWING_MISSING');
+  const images: WorkbookImage[] = [];
+  let totalBytes = 0;
+  let unsupported = 0;
+  for (const match of drawing.matchAll(/<(?:\w+:)?(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[^>]*>([\s\S]*?)<\/(?:\w+:)?\1>/g)) {
+    const anchor = match[2];
+    const id = match[1] === 'absoluteAnchor' ? undefined : anchor.match(/<(?:\w+:)?blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
+    // Shapes, charts, linked pictures and page-anchored pictures have no row to attach to.
+    if (!id) { unsupported += 1; continue; }
+    const row = Number(anchor.match(/<(?:\w+:)?from\b[^>]*>[\s\S]*?<(?:\w+:)?row>(\d+)<\/(?:\w+:)?row>/)?.[1]);
+    if (!Number.isSafeInteger(row) || row < 0) throw new Error('IMAGE_ROW_INVALID');
+    const mediaPath = relationship(files, drawingPath, id);
+    if (!mediaPath.startsWith('xl/media/')) throw new Error('IMAGE_RELATIONSHIP_INVALID');
+    const bytes = files.get(mediaPath);
+    if (!bytes) throw new Error('IMAGE_MISSING');
+    const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    const jpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (!png && !jpeg) throw new Error('IMAGE_FORMAT_UNSUPPORTED');
+    totalBytes += bytes.length;
+    if (bytes.length > 5 * 1024 * 1024 || totalBytes > 8 * 1024 * 1024 || images.length >= 100) throw new Error('IMAGE_LIMIT');
+    // DrawingML rows are 0-based; sheet rows are 1-based. The image belongs to the row its top-left corner sits in.
+    images.push({ row: row + 1, dataUrl: `data:image/${png ? 'png' : 'jpeg'};base64,${bytes.toString('base64')}` });
+  }
+  if (unsupported > 0) notices.push(`有 ${String(unsupported)} 个图形、图表或链接图片无法对应到话术行，未导入。`);
+  return images;
+}
+
+/** Content Excel shows but this importer does not carry. Each is reported, never dropped silently. */
+function workbookNotices(files: ReadonlyMap<string, Buffer>, xml: string): string[] {
+  const notices: string[] = [];
+  const sheets = files.get('xl/workbook.xml')?.toString('utf8').match(/<(?:\w+:)?sheet\b/g)?.length ?? 0;
+  if (sheets > 1) notices.push(`工作簿有 ${String(sheets)} 张工作表，只导入第一张。`);
+  if (/<(?:\w+:)?picture\b/.test(xml)) notices.push('工作表背景图不属于任何话术，未导入。');
+  if (/<(?:\w+:)?legacyDrawing\b/.test(xml)) notices.push('单元格批注未导入。');
+  const links = xml.match(/<(?:\w+:)?hyperlink\b/g)?.length ?? 0;
+  if (links > 0) notices.push(`${String(links)} 个超链接只保留显示文字，链接地址未导入。`);
+  return notices;
+}
+
+export function parseXlsxWorkbook(buffer: Buffer): { table: string[][]; images: WorkbookImage[]; notices: string[] } {
   const startedAt = Date.now();
   const files = readZipLocalFiles(buffer, startedAt);
   const strings = files.has('xl/sharedStrings.xml')
@@ -143,7 +209,9 @@ export function parseXlsxFirstSheet(buffer: Buffer): string[][] {
   const rows = new Map<number, Map<number, string>>();
   let maxCol = 0;
   let maxRow = 0;
-  for (const match of xml.matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+  // Lazy attrs so a self-closing empty cell (`<c r="A2" s="5"/>`) ends at its own `/>`
+  // instead of swallowing the next cell's value.
+  for (const match of xml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
     assertBudget(startedAt);
     const attrs = match[1];
     const ref = attrs.match(/\br="([A-Z]+)(\d+)"/);
@@ -164,5 +232,10 @@ export function parseXlsxFirstSheet(buffer: Buffer): string[][] {
     for (let col = 0; col <= maxCol; col += 1) line.push(record?.get(col) ?? '');
     table.push(line);
   }
-  return table;
+  const notices = workbookNotices(files, xml);
+  return { table, images: sheetImages(files, path, xml, notices), notices };
+}
+
+export function parseXlsxFirstSheet(buffer: Buffer): string[][] {
+  return parseXlsxWorkbook(buffer).table;
 }

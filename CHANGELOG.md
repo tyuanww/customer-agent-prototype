@@ -2,6 +2,24 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.39] - 2026-10-29
+
+### Changed
+
+- 概览日期范围的「近 7 天」「近 30 天」两个按钮对齐。
+- 查询窗口的店铺 / 商品 / 场景筛选默认收起；收起时仍显示读取错误，窗口高度随之重算。
+- 工作台侧栏左下显示当前账号，可从这里退出登录。退出撤销服务端会话并同步查询窗口；服务端未确认时如实提示。
+- 知识库「添加话术」可直接选 Excel。锚在单元格上的图片随对应话术保存和显示；单元格换行保留；跳过的行、背景图和其他未导入内容在预览里写明。仍只写本机，不发布到查询。
+
+### Fixed
+
+- xlsx 里空的自闭合单元格不再吞掉下一格的内容。之前会漏掉整行并让后面的图片对错行。
+
+### Release
+
+- 仓库版本是 `0.3.39`。根目录 `VERSION` 与 `apps/desktop/package.json` 是同一串。
+- 只改桌面客户端；服务端和数据库迁移仍是 0.3.38 / 78。话术指针仍是 `rel_27`，这一版不发布话术。
+
 ## [0.3.34] - 2026-10-27
 
 ### Changed
@@ -428,7 +446,7 @@ All notable changes to this customer-agent product implementation repository are
 - Hydrate rows must match the copy contract (`content_hash` 64 hex, non-empty answer). Cancelled searches no longer commit. Long customer sentences stay in the MiniMax plan.
 - The retrieval toggle is visually separate from 合成登录, cancels an in-flight search when flipped, and keeps the last good OFF value if the preference file is corrupt.
 
-## [Unreleased]
+## [0.3.39] - 2026-10-29
 
 - After-sale allergy SOP is a dedicated draggable window (PR #95). Query search stays Top 3; agents open「打开过敏售后流程」from the gold query. SOP copy is local feedback only, not Query `COPIED`. Slice 1 is the synthetic allergy tree.
 - Coach「内容与发布」parses a local CSV into unpublished drafts (PR #96). Publish stays disabled. After-sale remains a DEMO sample and does not take this page's upload.

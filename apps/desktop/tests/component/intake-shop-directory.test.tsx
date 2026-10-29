@@ -7,7 +7,7 @@ import type { useIntakeShops } from '../../src/renderer/features/search/use-inta
 const state=():ReturnType<typeof useIntakeShops>=>({...emptyIntakeQueryContext(),shops:['shop-a','shop-b'],shopId:'shop-a',busy:false,error:'',load:vi.fn(),selectConditions:vi.fn()});
 function Filters({ state: filterState }: { state: ReturnType<typeof useIntakeShops> }) {
   const [open, setOpen] = useState(false);
-  return <IntakeQueryFilters state={filterState} signedIn open={open} onToggle={() => setOpen(current => !current)} onOpen={() => setOpen(true)} onLayoutChange={() => undefined} />;
+  return <IntakeQueryFilters state={filterState} signedIn open={open} onToggle={() => setOpen(current => !current)} onLayoutChange={() => undefined} />;
 }
 it('shows names with ID disambiguation and emits only the stable shop ID',()=>{
  const s=state();s.shopNames=[{id:'shop-a',label:'合成同名店'},{id:'shop-b',label:'合成同名店'}];s.shopNamesValidUntil=new Date(Date.now()+60000).toISOString();
@@ -53,9 +53,12 @@ it('sends only the chosen product id when a condition is checked',()=>{
  expect(s.selectConditions).toHaveBeenCalledWith({ productIds: ['product-a'], scenarioIds: [] });
  expect(s.load).not.toHaveBeenCalled();
 });
-it('opens the filter line when a shop refresh error arrives',()=>{
+it('keeps the filter line collapsed but shows a shop refresh error, and still opens on demand',()=>{
  const s=state();s.error='筛选条件更新失败，请刷新店铺。';
  render(<Filters state={s}/>);
- expect(screen.getByRole('button',{name:'刷新店铺'})).toBeVisible();
- expect(screen.getByText('筛选条件更新失败，请刷新店铺。')).toBeVisible();
+ expect(screen.queryByRole('button',{name:'刷新店铺'})).toBeNull();
+ expect(screen.getByRole('alert')).toHaveTextContent('筛选条件更新失败，请刷新店铺。');
+ fireEvent.click(screen.getByRole('button',{name:'筛选'}));
+ expect(screen.getByRole('button',{name:'刷新店铺'})).toBeEnabled();
+ expect(screen.getAllByRole('alert')).toHaveLength(1);
 });

@@ -10,6 +10,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // chunk the Windows sandbox cannot load, and Query stays parked.
 const LIST = 'dashboard:wording-list';
 const CONTENT_SESSION = 'dashboard:content-session';
+const DASHBOARD_LOGOUT = 'dashboard:logout';
 const CONTENT_PARSE = 'dashboard:content-parse';
 const CONTENT_PUBLISH = 'dashboard:content-publish';
 const CONTENT_ROLLBACK_PREVIOUS = 'dashboard:content-rollback-previous';
@@ -320,6 +321,16 @@ contextBridge.exposeInMainWorld('dashboardContent', {
     try {
       const value: unknown = await ipcRenderer.invoke(CONTENT_SESSION);
       return isContentSession(value) ? value : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  async logout() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(DASHBOARD_LOGOUT);
+      if (isContentFailure(value)) return value;
+      if (value && typeof value === 'object' && exactKeys(value, ['ok']) && (value as { ok?: unknown }).ok === true) return { ok: true as const };
+      return unavailable;
     } catch {
       return unavailable;
     }

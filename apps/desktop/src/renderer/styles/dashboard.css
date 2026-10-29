@@ -368,6 +368,15 @@ html[data-role='dashboard'][data-dashboard-theme='dark'] .dashboard-shell :is(bu
   padding: 0 8px 12px;
 }
 
+.dashboard-account { margin-top: auto; padding: 8px; border-top: 1px solid var(--dash-line); }
+.dashboard-account-button.ant-btn, .dashboard-account-signed-out { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 10px; text-align: left; }
+.dashboard-account-copy { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; overflow: hidden; }
+.dashboard-account-copy strong, .dashboard-account-copy small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-account-copy small, .dashboard-account-signed-out { color: var(--dash-muted); }
+.dashboard-account p { margin: 4px 0 0; font-size: 12px; }
+.dashboard-shell.is-nav-collapsed .dashboard-account-button, .dashboard-shell.is-nav-collapsed .dashboard-account-signed-out { justify-content: center; }
+.dashboard-shell.is-nav-collapsed .dashboard-account-copy, .dashboard-shell.is-nav-collapsed .dashboard-account-signed-out span { display: none; }
+
 .dashboard-nav-item > button {
   --dash-nav-icon-slot: calc(var(--dash-nav-icon-slot-width, var(--dash-collapsed-surface-width, 72px)) - 16px);
 

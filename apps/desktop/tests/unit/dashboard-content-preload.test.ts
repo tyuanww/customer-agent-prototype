@@ -113,3 +113,16 @@ it('notifies dashboardContent.onSessionChanged from product:session-changed', as
   (sessionCall?.[1] as () => void)();
   expect(listener).toHaveBeenCalledOnce();
 });
+
+it('logs out over the dedicated channel without arguments and fail-closes extra fields', async () => {
+  const api = contentApi();
+  invoke.mockResolvedValueOnce({ ok: true });
+  await expect(api.logout!()).resolves.toEqual({ ok: true });
+  expect(invoke).toHaveBeenLastCalledWith('dashboard:logout');
+  invoke.mockResolvedValueOnce({ ok: true, token: 'x' });
+  await expect(api.logout!()).resolves.toEqual(unavailable);
+  invoke.mockResolvedValueOnce({ ok: false, code: 'UNAVAILABLE', message: '已退出本机，服务端退出未确认。' });
+  await expect(api.logout!()).resolves.toMatchObject({ ok: false, message: '已退出本机，服务端退出未确认。' });
+  invoke.mockRejectedValueOnce(new Error('ipc down'));
+  await expect(api.logout!()).resolves.toEqual(unavailable);
+});

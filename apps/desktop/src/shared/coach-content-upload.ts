@@ -22,6 +22,11 @@ export type CoachUploadSuccess = Readonly<{
   sourceName: string;
   rows: readonly CoachUploadRow[];
   csvText: string;
+  sourceRows?: readonly number[];
+  /** Index into `rows`; set only by the Main xlsx parser. */
+  images?: readonly { index: number; dataUrl: string }[];
+  /** Workbook content that was not imported (background, comments, extra sheets…). */
+  notices?: readonly string[];
 }>;
 
 export type CoachUploadFailure = Readonly<{
@@ -142,25 +147,24 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
   }
   const fallbackDomain = domainFromSourceName(sourceName);
   const rows: CoachUploadRow[] = [];
-  let skippedEmpty = 0;
-  let skippedBraces = 0;
+  const sourceRows: number[] = [];
+  const incompleteRows: number[] = [];
+  const braceRows: number[] = [];
   for (let index = 1; index < table.length; index += 1) {
     const record = table[index] ?? [];
     const product = productIndex >= 0 ? (record[productIndex] ?? '').trim() : '';
     const shortcut = (record[sceneIndex] ?? '').trim();
     const script = (record[scriptIndex] ?? '').trim();
     const rawDomain = domainIndex >= 0 ? (record[domainIndex] ?? '').trim() : '';
-    if (!product && !shortcut && !script && !rawDomain) {
-      skippedEmpty += 1;
-      continue;
-    }
+    // Fully blank rows are spreadsheet padding, not content; they are not reported.
+    if (!product && !shortcut && !script && !rawDomain) continue;
     const sheetRow = index + 1;
     if (!shortcut || !script) {
-      skippedEmpty += 1;
+      incompleteRows.push(sheetRow);
       continue;
     }
     if (/[{}]/u.test(script.replaceAll('{订单号}', '').replaceAll('{日期}', ''))) {
-      skippedBraces += 1;
+      braceRows.push(sheetRow);
       continue;
     }
     let domain: DashboardContentDomain | undefined;
@@ -177,10 +181,11 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
     }
     const scene = product && product !== shortcut ? `${product} · ${shortcut}` : shortcut;
     rows.push(domain ? { scene, script, domain } : { scene, script });
+    sourceRows.push(sheetRow);
   }
   if (rows.length === 0) {
-    return fail('empty', skippedBraces > 0
-      ? `没有可预览的数据行。已跳过 ${String(skippedBraces)} 行模板里不能出现的符号。`
+    return fail('empty', braceRows.length > 0
+      ? `没有可预览的数据行。已跳过 ${String(braceRows.length)} 行模板里不能出现的符号（${rowList(braceRows)}）。`
       : '没有可预览的数据行。');
   }
   if (rows.length > COACH_UPLOAD_MAX_ROWS) {
@@ -190,15 +195,22 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
     'scene,script,domain',
     ...rows.map((row) => [row.scene, row.script, row.domain ?? ''].map(csvCell).join(',')),
   ].join('\n');
-  const skippedNote = skippedEmpty > 0 || skippedBraces > 0
-    ? `已跳过空白或不完整 ${String(skippedEmpty)} 行` + (skippedBraces > 0 ? `、不能出现的符号 ${String(skippedBraces)} 行。` : '。')
-    : '';
+  const skippedNote = [
+    incompleteRows.length > 0 ? `已跳过空白或不完整 ${String(incompleteRows.length)} 行（${rowList(incompleteRows)}）。` : '',
+    braceRows.length > 0 ? `已跳过含 { } 的 ${String(braceRows.length)} 行（${rowList(braceRows)}），只允许 {订单号}、{日期}。` : '',
+  ].join('');
   return Object.freeze({
     ok: true,
     sourceName: skippedNote ? `${sourceName} · ${skippedNote}` : sourceName,
     rows: Object.freeze(rows),
+    sourceRows: Object.freeze(sourceRows),
     csvText,
   });
+}
+
+function rowList(rows: readonly number[]): string {
+  const shown = rows.slice(0, 10).map((row) => `第 ${String(row)} 行`).join('、');
+  return rows.length > 10 ? `${shown} 等` : shown;
 }
 
 function csvCell(value: string): string {

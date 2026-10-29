@@ -146,7 +146,7 @@ export type DashboardContentParseRequest = Readonly<{
 }>;
 
 export type DashboardContentParseResult =
-  | Readonly<{ ok: true; sourceName: string; rows: readonly DashboardContentRow[]; csvText: string }>
+  | Readonly<{ ok: true; sourceName: string; rows: readonly DashboardContentRow[]; csvText: string; images?: readonly { index: number; dataUrl: string }[]; notices?: readonly string[] }>
   | DashboardContentFailure
   | Readonly<{ ok: false; code: string; message: string }>;
 
@@ -164,6 +164,7 @@ export type DashboardContentRollbackResult = DashboardContentRollbackView | Dash
 
 export type DashboardContentApi = {
   session(): Promise<DashboardContentSessionResult>;
+  logout?(): Promise<DashboardContentFailure | { ok: true }>;
   parseUpload(request: DashboardContentParseRequest): Promise<DashboardContentParseResult>;
   publishDraft(request: DashboardContentPublishRequest): Promise<DashboardContentPublishResult>;
   rollbackPrevious(): Promise<DashboardContentRollbackResult>;

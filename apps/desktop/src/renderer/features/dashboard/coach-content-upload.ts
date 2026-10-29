@@ -81,6 +81,8 @@ export async function readCoachUploadFile(file: File): Promise<CoachUploadResult
         sourceName: parsed.sourceName,
         rows: parsed.rows,
         csvText: parsed.csvText,
+        ...(parsed.images ? { images: parsed.images } : {}),
+        ...(parsed.notices ? { notices: parsed.notices } : {}),
       };
     }
     return fail('binary-workbook', BINARY_MESSAGE);

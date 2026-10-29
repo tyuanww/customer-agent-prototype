@@ -35,10 +35,10 @@ it('uploads a sheet and shows it as what the seat receives', async () => {
   expect(screen.queryByText(/坐席会收到/)).not.toBeInTheDocument();
   const file = new File(['问题,标准话术,分类\n退货多久,七天内可退,售后\n'], '售后.csv', { type: 'text/csv' });
   await user.click(screen.getByRole('button', { name: '改为上传文档' }));
-  await user.upload(screen.getByLabelText('导入 CSV'), file);
+  await user.upload(screen.getByLabelText('导入 CSV 或 Excel'), file);
   expect(await screen.findByText('退货多久')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '导入 1 条' }));
-  expect(screen.getByText(/将导入 1 条话术/)).toBeInTheDocument();
+  expect(screen.getByText('将导入 1 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '确认导入 1 条' }));
   expect(await screen.findByText('已导入 1 条，状态是未生效。')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '售后客服' }));
@@ -98,9 +98,9 @@ it('closes the import confirmation with the add layer and does not import', asyn
   render(<DeskKnowledge />);
   await user.click(await screen.findByRole('button', { name: '添加话术' }));
   const file = new File(['问题,标准话术,分类\n退货多久,七天内可退,售后\n'], '售后.csv', { type: 'text/csv' });
-  await user.upload(screen.getByLabelText('导入 CSV'), file);
+  await user.upload(screen.getByLabelText('导入 CSV 或 Excel'), file);
   await user.click(await screen.findByRole('button', { name: '导入 1 条' }));
-  expect(screen.getByText(/将导入 1 条话术/)).toBeInTheDocument();
+  expect(screen.getByText('将导入 1 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '关闭' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByText(/将导入 1 条话术/)).not.toBeInTheDocument();

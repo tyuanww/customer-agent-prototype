@@ -1785,7 +1785,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           <QueryResultsPane
             contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
               onToggle={() => { setFiltersOpen(current => !current); setLayoutReady(false); }}
-              onOpen={() => { setFiltersOpen(true); setLayoutReady(false); }}
               onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
