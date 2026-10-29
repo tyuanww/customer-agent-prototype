@@ -13,7 +13,6 @@ import { bindKnownPrincipal } from '../../apps/api/src/content-intake/bind-known
 const root = mkdtempSync(path.join(os.tmpdir(), 'password-entry-test-'));
 const previousRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
 process.env.CUSTOMER_AGENT_STACK_ROOT = root;
-// The production lookup captures its profile location at module load.
 const { passwordBindingAllowedFromStack: lookup } = await import('./seat-binding-lookup.ts');
 const profileFile = path.join(root, 'profile.json');
 const password = 'synthetic-password-entry-test';
@@ -208,7 +207,6 @@ test('restarting an existing Menokin test stack preserves short, expired and rev
       await client.query(`INSERT INTO content_intake.role_rules VALUES
         ('tenant-menokin','app-customer-agent','dept-menokin',$1,1,$2)`, [`job-${job}`, role]);
     }
-    // Historical short and already expired grants must survive startup byte-for-byte.
     for (const [domain, source, parentMinutes, childMinutes] of [['product', 'faq', 10, 5], ['presale', 'presale', -1, -2]]) {
       const rootId = `menokin-root2-scope-menokin-${domain}-query`;
       await client.query(`INSERT INTO content_intake.grants

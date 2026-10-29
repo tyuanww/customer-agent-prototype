@@ -37,7 +37,6 @@ async function emptyGetBody(request: FastifyRequest): Promise<boolean> {
     const data = (chunk: Buffer) => { if (chunk.length) finish(false); };
     const end = () => finish(true);
     const failed = () => finish(false);
-    // Absolute deadline: extra chunks must not keep an unfinished read alive.
     const deadline = setTimeout(failed, 5_000);
     stream.on('data', data);
     stream.once('end', end);

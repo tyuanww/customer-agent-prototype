@@ -156,7 +156,6 @@ export function parseCoachUploadTable(table: readonly string[][], sourceName: st
     const shortcut = (record[sceneIndex] ?? '').trim();
     const script = (record[scriptIndex] ?? '').trim();
     const rawDomain = domainIndex >= 0 ? (record[domainIndex] ?? '').trim() : '';
-    // Fully blank rows are spreadsheet padding, not content; they are not reported.
     if (!product && !shortcut && !script && !rawDomain) continue;
     const sheetRow = index + 1;
     if (!shortcut || !script) {

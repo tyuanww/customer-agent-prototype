@@ -129,7 +129,6 @@ export function DeskKnowledge({
         const row = result.rows[image.index];
         return !row || row.scene.trim().length < 2 || row.scene.trim().length > 80 || row.script.trim().length > 200_000;
       })) { setFileError('图片所在话术无法导入，请检查该行后重试。'); return; }
-      // The shared parser appends its skip summary to sourceName; surface it as a notice, not an error.
       const skipped = result.sourceName.startsWith(file.name) ? result.sourceName.slice(file.name.length).replace(/^\s*·\s*/, '') : '';
       const notices = [
         ...(skipped ? [skipped] : []),

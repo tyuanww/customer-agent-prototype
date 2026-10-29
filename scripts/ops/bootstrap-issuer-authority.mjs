@@ -90,8 +90,6 @@ async function planGrant(client, admin, item, at, effective) {
     return { ...item, decision: 'keep', existingGrantId: root.grant_id,
       existingStartsAt: root.starts_at, existingExpiresAt: root.expires_at };
   }
-  // An inherited grant is not a stable root. Replacing it here would bypass its
-  // parent's revocation, and renewing a dead root could revive dependent grants.
   if (rows.length) throw new Error(`existing authority requires review: ${item.kind}/${item.scopeId}/${item.sourceId ?? '*'}/${item.action}`);
   if (effective) throw new Error('effective source without a provable root requires review');
   return { ...item, decision: 'create', existingGrantId: null };
@@ -108,8 +106,6 @@ export async function bootstrapIssuerAuthority(client, argv) {
     await client.query("SET LOCAL lock_timeout='10s'");
     await client.query("SET LOCAL statement_timeout='30s'");
     await client.query('SELECT backend_review.lock_content()');
-    // Identity configuration does not always take lock_content. SHARE prevents a
-    // concurrent identity/policy rewrite while this owner checks and inserts grants.
     if (!options.dryRun) await client.query(`LOCK TABLE backend_identity.subject_bindings, public.app_users,
       content_intake.principals, content_intake.principal_facts, content_intake.seat_posts,
       content_intake.role_rules, content_intake.policy_versions, content_intake.scopes,

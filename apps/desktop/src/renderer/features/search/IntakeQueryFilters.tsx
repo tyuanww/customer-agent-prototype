@@ -62,7 +62,6 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutCh
   const names = new Map(state.shopNamesValidUntil && Date.parse(state.shopNamesValidUntil)>Date.now()
     ? state.shopNames.map(n=>[n.id,n.label]) : []);
   const repeats = new Map<string,number>(); for (const name of names.values()) repeats.set(name,(repeats.get(name)??0)+1);
-  // Errors stay visible while collapsed; the line changes overlay height, so Main must re-measure.
   const layoutRef = useRef(onLayoutChange);
   layoutRef.current = onLayoutChange;
   useEffect(() => { layoutRef.current(); }, [state.error]);

@@ -68,8 +68,6 @@ describe.skipIf(!enabled)('a grant issuer is checked against its own source set'
   });
 });
 
-/** These checks cover only the listed entry points. Login grant behavior is exercised
- * against PostgreSQL in manual-identity-grants and project-roster-login integration tests. */
 describe('login entry points do not bootstrap or issue authority directly', () => {
   const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 

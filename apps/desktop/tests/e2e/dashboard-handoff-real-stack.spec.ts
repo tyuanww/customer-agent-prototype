@@ -7,7 +7,6 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-// Synthetic workbook only: 3 rows, one cell-anchored PNG on sheet row 3, a background picture.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 function zipLocal(name: string, payload: Buffer): Buffer {
   const nameBytes = Buffer.from(name, 'utf8'); const body = deflateRawSync(payload); const header = Buffer.alloc(30);
@@ -63,7 +62,6 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
     await expect.poll(() => query.evaluate(async () => { const v = await window.customerAgent!.product!.sessionStatus(); return v.ok && v.signedIn; })).toBe(true);
 
-    // 2. Filters stay collapsed after sign-in; opening them still works.
     await query.getByRole('textbox').first().fill('洁面');
     await query.getByRole('button', { name: '查询', exact: true }).click();
     const filters = query.getByTestId('intake-query-filters');
@@ -81,7 +79,6 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
 
-    // 1. The two presets share one baseline and select 7 / 30 inclusive days ending today.
     await dashboard.getByTestId('nav-overview').click();
     await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
     const presets = dashboard.locator('.overview-range-popup .ant-picker-presets li');
@@ -99,7 +96,6 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     }
     await dashboard.keyboard.press('Escape');
 
-    // 4. Excel import: picture follows its row, background is reported, only the local store is written.
     await dashboard.getByTestId('nav-content').click();
     await dashboard.getByRole('button', { name: '添加话术' }).click();
     await dashboard.locator('input[type=file]').setInputFiles(workbookPath);
@@ -115,7 +111,6 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     await expect(dashboard.getByRole('img', { name: /合成问题一的图片/ })).toHaveCount(0);
     await dashboard.screenshot({ path: path.join(evidence, 'xlsx-imported.png') });
 
-    // 3. Account menu: logout revokes the server session and both windows see it.
     const before = (await host.status()).requests.filter(p => p === '/v1/auth/logout').length;
     const account = dashboard.getByRole('button', { name: '账号信息' });
     await expect(account).toBeVisible();

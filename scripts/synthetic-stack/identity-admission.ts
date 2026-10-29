@@ -155,7 +155,6 @@ export function passwordMatches(account: PasswordAccount, password: string): boo
 
 /** Database decision for a non-built-in password binding. A throw is treated as no. */
 export type PasswordBindingAllowed = (bindingId: string) => Promise<boolean>;
-/** Compatibility name for callers that still describe the password predicate as seat lookup. */
 export type SeatBindingEnabled = PasswordBindingAllowed;
 
 const SEAT_USERNAME = /^[A-Za-z0-9_-]{1,64}$/;

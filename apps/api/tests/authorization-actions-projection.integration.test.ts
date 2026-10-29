@@ -70,7 +70,6 @@ describe.skipIf(!enabled)('authorization actions projection', () => {
     try {
       const owner = await readAuthorizationActions(admin, { user_id: 'usr_owner-seat', role: 'owner' });
       const coach = await readAuthorizationActions(admin, { user_id: 'usr_coach-seat', role: 'coach' });
-      // Both seats hold the same grant; only the binding role differs.
       expect({ owner: owner.import, coach: coach.import }).toEqual({ owner: true, coach: false });
     } finally {
       await admin.query('RESET ROLE');

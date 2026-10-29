@@ -5,7 +5,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// This command accepts an output file, never a database address or credentials.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Use the repository Node.js 24 runtime');
 assert(process.argv.length <= 3, 'Usage: node .agents/skills/verify-intake-parent-revocation/verify.mjs [report.json]');
@@ -90,7 +89,6 @@ async function scenario(state) {
       FROM content_intake.policy_versions WHERE tenant_id='proof-tenant' AND app_id='proof-app'`,
     [state.action, new Date(instant.getTime() - 15000), new Date(instant.getTime() + 300000),
       state.childRevoked ? new Date(instant.getTime() - 1000) : null, state.steward ? 'proof-issuer' : null]);
-    // Check deferred foreign keys too: an impossible database state is not a counterexample.
     await client.query('SET CONSTRAINTS ALL IMMEDIATE');
     const before = await decisions();
     await client.query(`UPDATE content_intake.grants SET revoked_at=$1,version=version+1,
@@ -161,7 +159,6 @@ try {
   assert.equal([...original.matchAll(guard)].length, 1, 'Mutation anchor changed; review the actual SQL');
   let broken;
   try {
-    // Scratch mutation of the real installed function, not a parallel model of its logic.
     await client.query(original.replace(guard, 'TRUE /* synthetic mutation: ancestor revocation guard removed */'));
     broken = await scenario(witness);
     assert(broken.after.deadline || broken.after.sources, 'Checker missed the real-code mutation');

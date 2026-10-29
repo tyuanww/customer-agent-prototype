@@ -195,7 +195,6 @@ export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof
   const images: { index: number; dataUrl: string }[] = [];
   for (const image of workbook.images) {
     const index = parsed.sourceRows?.indexOf(image.row) ?? -1;
-    // An image whose row is not imported would be lost; refuse the whole file instead.
     if (index < 0) return { ok: false, code: 'invalid-table', message: `第 ${String(image.row)} 行有图片，但这一行不会导入。请补全或修改这一行后重试。` };
     images.push({ index, dataUrl: image.dataUrl });
   }

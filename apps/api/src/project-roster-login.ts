@@ -275,7 +275,6 @@ export async function projectRosterLogin(
     snapshot.departmentIds,
     match.row.jobId,
     match.row.role,
-    // The legacy projection signature accepts only query; registration issues no grant.
     ['query'],
   ]);
   const status = projected.rows[0]?.status;

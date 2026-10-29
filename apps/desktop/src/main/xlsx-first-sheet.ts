@@ -164,7 +164,6 @@ function sheetImages(files: ReadonlyMap<string, Buffer>, path: string, xml: stri
   for (const match of drawing.matchAll(/<(?:\w+:)?(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[^>]*>([\s\S]*?)<\/(?:\w+:)?\1>/g)) {
     const anchor = match[2];
     const id = match[1] === 'absoluteAnchor' ? undefined : anchor.match(/<(?:\w+:)?blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
-    // Shapes, charts, linked pictures and page-anchored pictures have no row to attach to.
     if (!id) { unsupported += 1; continue; }
     const row = Number(anchor.match(/<(?:\w+:)?from\b[^>]*>[\s\S]*?<(?:\w+:)?row>(\d+)<\/(?:\w+:)?row>/)?.[1]);
     if (!Number.isSafeInteger(row) || row < 0) throw new Error('IMAGE_ROW_INVALID');
@@ -184,7 +183,6 @@ function sheetImages(files: ReadonlyMap<string, Buffer>, path: string, xml: stri
   return images;
 }
 
-/** Content Excel shows but this importer does not carry. Each is reported, never dropped silently. */
 function workbookNotices(files: ReadonlyMap<string, Buffer>, xml: string): string[] {
   const notices: string[] = [];
   const sheets = files.get('xl/workbook.xml')?.toString('utf8').match(/<(?:\w+:)?sheet\b/g)?.length ?? 0;
@@ -209,8 +207,6 @@ export function parseXlsxWorkbook(buffer: Buffer): { table: string[][]; images: 
   const rows = new Map<number, Map<number, string>>();
   let maxCol = 0;
   let maxRow = 0;
-  // Lazy attrs so a self-closing empty cell (`<c r="A2" s="5"/>`) ends at its own `/>`
-  // instead of swallowing the next cell's value.
   for (const match of xml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
     assertBudget(startedAt);
     const attrs = match[1];

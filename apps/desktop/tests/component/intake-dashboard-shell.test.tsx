@@ -454,7 +454,6 @@ it('shows the signed-in account at the bottom of the sidebar and logs out throug
   await user.click(await screen.findByRole('menuitem', { name: /退出登录/ }));
   expect(logout).toHaveBeenCalledWith();
   expect(await screen.findByRole('alert')).toHaveTextContent('已退出本机，服务端退出未确认。');
-  // Main clears the local session first and broadcasts product:session-changed to every window.
   signedIn = false;
   changed.notify?.();
   expect(await screen.findByText('未登录')).toBeInTheDocument();

@@ -24,11 +24,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/**
- * Owns one backup-set protocol. Creation, verification, retention, and restore
- * share the manifest, object, PostgreSQL, role, and scratch-cleanup invariants;
- * callers use these exported operations instead of composing protocol stages.
- */
 export const BACKUP_SET_SCHEMA = 'customer-agent-backup-set/v1';
 export const MANIFEST_FILE = 'manifest.json';
 export const MANIFEST_DIGEST_FILE = 'manifest.sha256';

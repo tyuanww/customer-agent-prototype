@@ -4,8 +4,6 @@ import type { Client, ClientConfig } from 'pg';
 import { Pg15Harness } from '../src/testkit/index.js';
 import { applyDatabaseMigrations } from '../src/index.js';
 
-// Exercise both public decision shapes against the same synthetic grants in real PG15.
-// sources emits per-grant rows; deadline returns their maximum expiry for one source.
 const enabled = process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1';
 
 const TENANT = 'tenant-agreement';
@@ -17,8 +15,6 @@ const ISSUER_DEPARTMENT = 'dept-agreement-issuer';
 const ISSUER_JOB = 'job-agreement-issuer';
 const ACTOR = 'prn-agreement-actor';
 const USER = 'usr-agreement-actor';
-// 0060 checks the issuer's current facts and role whenever a parented business grant is
-// inserted. Keep the issuer as a fresh director so the property varies only the reader.
 const ISSUER = 'prn-agreement-issuer';
 const ISSUER_USER = 'usr-agreement-issuer';
 
@@ -96,7 +92,6 @@ const caseArb: fc.Arbitrary<CaseSpec> = fc.record({
   storeSetCurrent: fc.boolean(),
   memberListed: fc.boolean(),
 }).map(spec => {
-  // Generate only rows accepted by the 24-hour facts constraint.
   const checked = spec.factsCheckedOffsetMs;
   const valid = Math.min(Math.max(spec.factsValidOffsetMs, checked + 1_000), checked + 86_400_000);
   return { ...spec, factsValidOffsetMs: valid };
@@ -234,9 +229,6 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
         const startsAt = new Date(at.getTime() + grant.startsOffsetMs);
         const expiresAt = new Date(at.getTime() + grant.expiresOffsetMs);
         if (expiresAt <= startsAt) continue;
-        // A business grant hangs off an allocation with the same issuer, scope and action,
-        // a null-or-equal source, a wider window and no revocation. The parent is part of
-        // the authorization graph, not merely insert-time metadata.
         const parentId = grant.kind === 'business' ? `alloc-agreement-${index}` : null;
         if (parentId !== null) {
           await client.query(

@@ -2,8 +2,6 @@
 Description=Refresh customer-agent roster facts every four minutes
 
 [Timer]
-# Poll every four minutes; the script renews facts before their 24-hour deadline.
-# This timer never issues business grants.
 OnBootSec=90s
 OnUnitActiveSec=4min
 AccuracySec=15s

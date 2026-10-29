@@ -19,7 +19,6 @@ const MAX_SOURCES = 5_000;
 const RETIRED_HANGZHOU_FACT_VERSIONS = new Map([['hz-allocator', 8], ['hz-reviewer', 5]]);
 
 function isRetiredDirectoryIdentity(principal: Principal & { hasNewIdentityActivity: boolean }, actorId: string, label: string | null | undefined): boolean {
-  // Old facts do not imply retirement once a person, login, or name is attached.
   return principal.id !== actorId && principal.identityScope === 'confirmed-hangzhou' && !label && !principal.hasNewIdentityActivity
     && RETIRED_HANGZHOU_FACT_VERSIONS.get(principal.id) === principal.factsVersion;
 }

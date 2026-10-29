@@ -363,7 +363,6 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .dashboard-nav-item
 .desk-knowledge .acts { flex-wrap: nowrap; }
 .desk-knowledge .ant-table-thead > tr > th { height: auto; font-size:var(--wb-text-body); font-weight: 500; padding: 12px; }
 .desk-knowledge .ant-table-tbody > tr > td { height: auto; padding: 12px; }
-/* Keep the sheet's line breaks; three lines keep the table scannable, the title shows the rest. */
 .desk-knowledge .desk-body { display: -webkit-box; max-width: 100%; white-space: pre-line; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .desk-knowledge .ant-table-tbody > tr.ant-table-measure-row > td { height: 0; padding: 0; border: 0; font-size: 0; line-height: 0; }
 .desk-knowledge .ant-select-selection-search-input,

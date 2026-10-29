@@ -37,8 +37,6 @@ describe('loopback synthetic identity provider', () => {
     try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
     finally { provider.close(); }
   });
-  // The provider validates the receipt format. Database eligibility for a master
-  // binding is exercised by manual-identity-grants.integration.test.ts.
   it.each(['binding-manual-admin', 'a', 'a'.repeat(128)])('accepts a valid binding receipt: %s', async (bindingId) => {
     const provider = createSyntheticIdentityProvider(await origin(200, JSON.stringify({
       binding_id: bindingId, provider: 'synthetic',

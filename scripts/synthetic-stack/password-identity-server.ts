@@ -58,7 +58,6 @@ export function createPasswordIdentityServer(
     port: number;
     accountsFile?: string;
     bindingAllowed?: PasswordBindingAllowed;
-    /** Existing test seam; production passes `bindingAllowed`. */
     seatBindingEnabled?: PasswordBindingAllowed;
   }>,
 ) {

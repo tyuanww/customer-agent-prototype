@@ -202,7 +202,6 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     async function confirmSourceAndCheck(version: number) {
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
-    // Preserve the navigation-loss failure while continuing the remaining flow.
     await dashboard.getByTestId('nav-overview').click();
     await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'overview');
     await dashboard.getByTestId('nav-materials').click();

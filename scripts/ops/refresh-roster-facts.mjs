@@ -1,17 +1,5 @@
 #!/usr/bin/env node
 /**
- * Keeps roster facts fresh between logins.
- *
- * Login writes a facts window of at most 24 hours and nothing refreshes it, so an operator
- * who uploads a workbook
- * and then works through parsing, human review and publication loses authority mid-flight.
- * This script re-reads the same Feishu data login reads and re-projects it, which extends the
- * window without weakening the cap: an organisational change still takes effect within one
- * interval.
- *
- * It only refreshes directory facts. Business grants are a separate manual command;
- * this scheduler never issues or extends authority.
- *
  * Emits counts and statuses only. Job titles and department lists are personal data and must
  * not reach a log, a terminal transcript, or this repository.
  */
@@ -27,9 +15,6 @@ const IDENTITY_SCOPE = 'feishu-job-roster';
 const ROSTER_DEPARTMENT_TYPE = 'open_department_id';
 const FEISHU_ORIGIN = 'https://open.feishu.cn';
 const REQUEST_TIMEOUT_MS = 8_000;
-/** Refresh only when the current window is this close to ending. The timer runs every four
- *  minutes, so ten minutes leaves more than two ticks of operational margin. Refreshing every
- *  tick would append facts forever, and `facts_version` is referenced by grants. */
 const RENEW_BEFORE_MS = 10 * 60 * 1000;
 /** Above this the run is reported as degraded rather than silently partial. */
 const MAX_FAILURES_BEFORE_UNHEALTHY = 1;
@@ -135,7 +120,6 @@ async function main() {
       try {
         const remaining = row.valid_until === null ? 0 : Date.parse(row.valid_until) - Date.now();
         if (remaining > RENEW_BEFORE_MS) {
-          // Facts are still good. Nothing is issued from a directory refresh.
           skipped += 1;
           log(`hold ${row.principal_id}: ${String(Math.round(remaining / 1000))}s left`);
           continue;

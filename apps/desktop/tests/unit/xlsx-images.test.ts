@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { dashboardContentParseUpload } from '../../src/main/dashboard-content';
 import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 
-// Synthetic fixtures only: no real wording, images or workbook bytes.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 const GIF = Buffer.from('GIF89a', 'latin1');
@@ -38,7 +37,6 @@ type Options = {
   sheets?: number;
 };
 
-/** Mirrors the real workbook layout: 快捷短语/产品话术 header, drawing1 anchors in column C, optional background picture. */
 function workbook({ rows = [], anchors = [], media = {}, sheetExtra = '', sheets = 1 }: Options): Buffer {
   const strings = ['快捷短语', '产品话术', ...rows.flat()];
   const shared = Buffer.from(`<?xml version="1.0"?><sst>${strings.map((value) => `<si><t xml:space="preserve">${value}</t></si>`).join('')}</sst>`);
@@ -78,7 +76,6 @@ const rows = [
 
 describe('xlsx images follow their wording row', () => {
   it('maps each anchored picture to the row its top-left corner sits in and keeps line breaks', () => {
-    // 0-based anchor rows 1 and 3 are sheet rows 2 and 4 → wording indexes 0 and 2.
     const result = parse(workbook({ rows, anchors: [anchor(1, 'rId1'), anchor(3, 'rId2')], media: { 'a.png': PNG, 'b.jpeg': JPEG } }));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -146,7 +143,6 @@ describe('xlsx images follow their wording row', () => {
       action: 'import-csv', personaId: 'shop', fileName: '【售前】合成话术.xlsx', csvText: parsed.csvText, category: 'product', images: parsed.images,
     }, '合成运营');
     expect(reply.ok).toBe(true);
-    // 售前 rows land in the 售前 persona; reopen the file as a fresh store, as after an app restart.
     const reopenedStore = new DeskKnowledgeStore(clock);
     const reopened = reopenedStore.command('operator', { action: 'select-persona', personaId: 'presale' }, '合成运营');
     if (!reopened.ok) throw new Error('reload must succeed');
