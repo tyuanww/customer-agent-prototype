@@ -7,6 +7,8 @@ import { Pg15Harness } from '../../packages/database/dist/testkit/index.js';
 import { applyDatabaseMigrations } from '../../packages/database/dist/index.js';
 import { createSeatPasswordFile } from '../../apps/api/src/content-intake/seat-password-file.ts';
 import { buildAccount, loadPasswordAccounts, passwordMatches, seatBindingIdFor } from './identity-admission.ts';
+import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
+import { bindKnownPrincipal } from '../../apps/api/src/content-intake/bind-known-principal.ts';
 
 const root = mkdtempSync(path.join(os.tmpdir(), 'password-entry-test-'));
 const previousRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
@@ -186,3 +188,58 @@ test('failed SET ROLE and unavailable profile/database fail closed without owner
     assert.equal(await lookup('binding-master'), false);
   } finally { writeFileSync(profileFile, saved); }
 });
+
+test('restarting an existing Menokin test stack preserves short, expired and revoked grants', async () => {
+  const { seedReferenceData } = await import('./bootstrap.ts');
+  const isolated = new Pg15Harness();
+  let client;
+  try {
+    isolated.start();
+    const db = isolated.createDatabase('menokin_restart');
+    client = await isolated.connect(db.config);
+    await applyDatabaseMigrations(client);
+    await seedReferenceData(client);
+    assert.equal((await client.query(`SELECT count(*)::int AS count FROM content_intake.scopes
+      WHERE tenant_id='tenant-menokin' AND app_id='app-customer-agent' AND domain<>'sop'`)).rows[0].count, 4);
+    for (const [id, job, role] of [['owner', 'director', 'director'], ['coach', 'lead', 'lead'], ['agent', 'agent', 'agent']]) {
+      await bindKnownPrincipal(client, { principalId: `synthetic_${id}`, userId: `usr_synthetic_${id}`,
+        tenantId: 'tenant-menokin', appId: 'app-customer-agent', identityScope: 'confirmed-synthetic',
+        personKey: `synthetic_${id}`, departmentIds: ['dept-menokin'], jobId: `job-${job}` });
+      await client.query(`INSERT INTO content_intake.role_rules VALUES
+        ('tenant-menokin','app-customer-agent','dept-menokin',$1,1,$2)`, [`job-${job}`, role]);
+    }
+    // Historical short and already expired grants must survive startup byte-for-byte.
+    for (const [domain, source, parentMinutes, childMinutes] of [['product', 'faq', 10, 5], ['presale', 'presale', -1, -2]]) {
+      const rootId = `menokin-root2-scope-menokin-${domain}-query`;
+      await client.query(`INSERT INTO content_intake.grants
+        (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+        VALUES ($1,'allocation','synthetic_owner','synthetic_owner','tenant-menokin','app-customer-agent',$2,'query',
+          clock_timestamp()-interval '1 hour',clock_timestamp()+$3*interval '1 minute','合成历史根授权','synthetic_owner')`,
+      [rootId, `scope-menokin-${domain}`, parentMinutes]);
+      for (const person of ['agent', 'coach']) await client.query(`INSERT INTO content_intake.grants
+        (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,steward_id,parent_grant_id)
+        VALUES ($1,'business','synthetic_owner',$2,'tenant-menokin','app-customer-agent',$3,$4,'query',
+          clock_timestamp()-interval '10 minutes',clock_timestamp()+$5*interval '1 minute','合成历史子授权','synthetic_owner',$6)`,
+      [`menokin-${person}2-scope-menokin-${domain}-query`, `synthetic_${person}`, `scope-menokin-${domain}`, `src-menokin-${source}`, childMinutes, rootId]);
+    }
+    await bindMenokinTestIdentities(client, db.name);
+    const saved = await client.query(`SELECT to_jsonb(g) AS row FROM content_intake.grants g ORDER BY grant_id`);
+    // A BEFORE INSERT trigger runs even for a conflicting primary key. Reproduce that
+    // exact failure using an oversized hypothetical child, without changing the stored row.
+    await assert.rejects(client.query(`INSERT INTO content_intake.grants
+      SELECT (jsonb_populate_record(NULL::content_intake.grants,to_jsonb(g)||
+        jsonb_build_object('expires_at',clock_timestamp()+interval '3 days'))).*
+      FROM content_intake.grants g WHERE grant_id='menokin-agent2-scope-menokin-product-query'
+      ON CONFLICT (grant_id) DO NOTHING`), /GRANT_PARENT_MISMATCH/);
+    await client.query(`UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,
+      last_change_reason='合成重启撤权验收' WHERE grant_id='menokin-agent2-scope-menokin-product-query'`);
+    const before = await client.query(`SELECT to_jsonb(g) AS row FROM content_intake.grants g ORDER BY grant_id`);
+    const history = await client.query('SELECT count(*)::int AS count FROM content_intake.grant_history');
+    await bindMenokinTestIdentities(client, db.name);
+    assert.deepEqual((await client.query(`SELECT to_jsonb(g) AS row FROM content_intake.grants g ORDER BY grant_id`)).rows, before.rows);
+    assert.deepEqual((await client.query('SELECT count(*)::int AS count FROM content_intake.grant_history')).rows, history.rows);
+    assert.equal(saved.rows.length, before.rows.length);
+  } finally {
+    try { await client?.end(); } finally { isolated.stop(); }
+  }
+}, { timeout: 120000 });

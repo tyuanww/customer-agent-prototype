@@ -58,16 +58,20 @@ export async function bindMenokinTestIdentities(client: Queryable, databaseName:
       );
     }
     const queryRoot = `menokin-root2-${scopeId}-query`;
+    // BEFORE INSERT validates the parent even when ON CONFLICT would discard the row.
+    // Reusing a fixture must retain its original deadline and revocation history.
     await client.query(
       `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id)
-       VALUES ($1, 'business', 'synthetic_owner', 'synthetic_agent', $2, $3, $4, $5, 'query', clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试坐席查询', 'synthetic_owner', $6)
+       SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_agent', $2, $3, $4, $5, 'query', clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试坐席查询', 'synthetic_owner', $6
+       WHERE NOT EXISTS (SELECT 1 FROM content_intake.grants WHERE grant_id=$1::content_intake.identifier)
        ON CONFLICT (grant_id) DO NOTHING`,
       [`menokin-agent2-${scopeId}-query`, TENANT, APP, scopeId, sourceId, queryRoot],
     );
     for (const action of OWNER_ACTIONS) {
       await client.query(
         `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id)
-         VALUES ($1, 'business', 'synthetic_owner', 'synthetic_coach', $2, $3, $4, $5, $6, clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试整理授权', 'synthetic_owner', $7)
+         SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_coach', $2, $3, $4, $5, $6, clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试整理授权', 'synthetic_owner', $7
+         WHERE NOT EXISTS (SELECT 1 FROM content_intake.grants WHERE grant_id=$1::content_intake.identifier)
          ON CONFLICT (grant_id) DO NOTHING`,
         [`menokin-coach2-${scopeId}-${action}`, TENANT, APP, scopeId, sourceId, action, `menokin-root2-${scopeId}-${action}`],
       );
