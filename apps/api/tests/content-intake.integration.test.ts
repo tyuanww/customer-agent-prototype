@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import Fastify from 'fastify';
 import { once } from 'node:events';
@@ -1915,6 +1916,18 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       const valid = await fetch(`${host.origin}/v1/intake/sources/${id}/management-context`, { headers: host.headers });
       expect(valid.status).toBe(200); expect(parseContractSchema('IntakeManagementContext', await valid.json()).sourceId).toBe(id);
       const url = '/v1/intake/sources/source-a/management-context';
+      const emptyChunked = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const request = httpRequest(`${host.origin}${url}`, { headers: { ...host.headers, 'transfer-encoding': 'chunked' } }, response => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', chunk => { body += chunk; });
+          response.on('end', () => resolve({ status: response.statusCode!, body }));
+        });
+        request.on('error', reject);
+        request.end();
+      });
+      expect(emptyChunked.status).toBe(200);
+      expect(parseContractSchema('IntakeManagementContext', JSON.parse(emptyChunked.body)).sourceId).toBe('source-a');
       for (const query of ['?sourceVersion=1', '?limit=1', '?sourceId=source-a', '?x=1&x=2', '?=']) {
         const response = await host.app.inject({ url: url + query, headers: host.headers });
         expect(response.statusCode).toBe(400); expect(parseContractSchema('IntakeError', response.json()).error.details.reason).toBe('FILE_INVALID');

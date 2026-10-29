@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { request as httpRequest } from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { validateContractSchema, type components } from '@customer-agent/contracts';
 import type { ProductAuthService } from '../src/auth-service.js';
@@ -29,6 +30,25 @@ async function host(result: IntakeResult<C['IntakeEntitlement']> = { ok: true, v
   return { app, auth, issueEntitlement, snapshot, authorizations, sources, report };
 }
 const headers = { authorization: 'Bearer synthetic-token' };
+
+it('accepts an empty chunked GET through the actual HTTP server', async () => {
+  const f = await host();
+  const origin = await f.app.listen({ host: '127.0.0.1', port: 0 });
+  const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const request = httpRequest(`${origin}/v1/intake/shop-directory`, {
+      headers: { ...headers, 'transfer-encoding': 'chunked' },
+    }, response => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode!, body }));
+    });
+    request.on('error', reject);
+    request.end();
+  });
+  expect(response.status).toBe(200);
+  expect(validateContractSchema('IntakeShopDirectory', JSON.parse(response.body)).ok).toBe(true);
+});
 
 it('requires authentication before parsing and preserves the private actor object identity', async () => {
   const f = await host();

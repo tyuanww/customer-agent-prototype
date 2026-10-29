@@ -13,6 +13,40 @@ const STATUS: Record<Failure['code'], number> = {
   VALIDATION: 400, UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404,
   CONFLICT: 409, RATE_LIMITED: 429, OVERLOADED: 503, INTERNAL_ERROR: 500,
 };
+
+async function emptyGetBody(request: FastifyRequest): Promise<boolean> {
+  const length = request.headers['content-length'];
+  if (length !== undefined && length !== '0') return false;
+  const stream = request.raw;
+  // Fastify skips GET body parsing. A parent intake hook may already have drained
+  // this stream; readableEnded then proves the same request was fully consumed.
+  if (stream.readableEnded) return true;
+  if (stream.destroyed) return false;
+  if (request.headers['transfer-encoding'] === undefined) return true;
+  return new Promise(resolve => {
+    const finish = (empty: boolean) => {
+      clearTimeout(deadline);
+      stream.off('data', data);
+      stream.off('end', end);
+      stream.off('error', failed);
+      stream.off('aborted', failed);
+      stream.off('close', failed);
+      if (!empty) stream.pause();
+      resolve(empty);
+    };
+    const data = (chunk: Buffer) => { if (chunk.length) finish(false); };
+    const end = () => finish(true);
+    const failed = () => finish(false);
+    // Absolute deadline: extra chunks must not keep an unfinished read alive.
+    const deadline = setTimeout(failed, 5_000);
+    stream.on('data', data);
+    stream.once('end', end);
+    stream.once('error', failed);
+    stream.once('aborted', failed);
+    stream.once('close', failed);
+  });
+}
+
 export function intakeFailure(reply: FastifyReply, code: Failure['code'], reason: Failure['details']['reason'], diagnosticId: string = randomUUID()) {
   const value: components['schemas']['IntakeError'] = { error: { code, message: '资料请求未完成。', details: { reason, diagnosticId } } };
   // Only the new quality contract opts into 413; preserve predecessor error wire.
@@ -34,6 +68,11 @@ export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
     reply.header('cache-control', 'no-store');
     const actor = await authenticateRequestHeaders(auth, request.headers);
     if (!actor) return intakeFailure(reply, 'UNAUTHORIZED', request.routeOptions.url === '/v1/intake/shop-directory' ? 'SHOP_DIRECTORY_SESSION' : 'SCOPE_DENIED');
+    if (request.method === 'GET' && !await emptyGetBody(request)) {
+      if (request.raw.destroyed) return reply.hijack();
+      reply.header('connection', 'close');
+      return intakeFailure(reply, 'VALIDATION', request.routeOptions.url === '/v1/intake/shop-directory' ? 'SHOP_DIRECTORY_CURSOR' : 'FILE_INVALID');
+    }
     actors.set(request, actor);
   });
   app.setErrorHandler((error, request, reply) => {

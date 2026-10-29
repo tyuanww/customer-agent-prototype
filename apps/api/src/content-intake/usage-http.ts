@@ -34,8 +34,6 @@ export const contentIntakeUsageRoutes: FastifyPluginAsync<{
     ['authorization', 'authorizations', 'IntakeAuthorization'],
     ['sources', 'sources', 'IntakeSourceList'],
   ] as const) app.get(`/v1/intake/${path}`, { exposeHeadRoute: false }, async (request, reply) => {
-    if (path==='shop-directory' && (request.body !== undefined || request.headers['transfer-encoding'] !== undefined
-      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0'))) return intakeFailure(reply,'VALIDATION','SHOP_DIRECTORY_CURSOR');
     return sendIntake(reply, await usage[method](actor(request), intakePageQuery(request)), schema);
   });
 };
