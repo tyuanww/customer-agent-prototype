@@ -2360,6 +2360,50 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     expect(await service.authorizations(user,{})).toMatchObject({ok:false,code:'UNAUTHORIZED'});
   });
 
+  it.each([false, true])('grant HTTP ignores a revoked allocation under delegation; live alternative=%s', async liveAlternative => {
+    value(await service.grantBatch(actor('director'), batch('manager', 'publish', 'delegation', 'lineage-delegation')));
+    await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,
+      starts_at,expires_at,reason,steward_id,parent_grant_id)
+      VALUES ('manager-independent','business','reviewer','manager','tenant-a','app-a','scope-a','source-a','publish',
+        statement_timestamp()-interval '5 minutes',statement_timestamp()+interval '45 minutes','合成独立业务权限','reviewer','alloc-reviewer-source-a-publish')`);
+    await admin.query(`UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,
+      last_change_reason='合成根资格撤销' WHERE grant_id='root-publish'`);
+    if (liveAlternative) {
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,
+        starts_at,expires_at,reason,steward_id)
+        VALUES ('z-live-root','allocation','director','director','tenant-a','app-a','scope-a','publish',
+          statement_timestamp()-interval '1 hour',statement_timestamp()+interval '1 day','合成有效根资格','director')`);
+      await admin.query(`INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,
+        starts_at,expires_at,reason,steward_id,parent_grant_id)
+        VALUES ('z-live-delegation','delegation','director','manager','tenant-a','app-a','scope-a','source-a','publish',
+          statement_timestamp()-interval '5 minutes',statement_timestamp()+interval '1 hour','合成有效委派','director','z-live-root')`);
+    }
+    const host = await managementHost(store, pool, provider.transport, label, 'manager');
+    try {
+      const request = batch('supervisor', 'publish', 'business', 'lineage-business');
+      request.items[0]!.expiresAt = new Date(Date.now() + 60_000).toISOString();
+      const capabilities = parseContractSchema('IntakeAuthorization', (await host.app.inject({ url: '/v1/intake/authorization', headers: host.headers })).json()).capabilities;
+      const preview = await host.app.inject({ method: 'POST', url: '/v1/intake/grants/preview', headers: host.headers, payload: request });
+      const saved = await host.app.inject({ method: 'POST', url: '/v1/intake/grants', headers: host.headers, payload: request });
+      expect(capabilities[0]!.actions).toEqual(['publish']);
+      expect(capabilities[0]!.mayAllocate).toEqual(liveAlternative ? ['publish'] : []);
+      if (liveAlternative) {
+        expect(preview.statusCode).toBe(200);
+        expect(saved.statusCode).toBe(200);
+        const grant = parseContractSchema('IntakeGrantList', saved.json()).items[0]!;
+        const parent = await admin.query('SELECT parent_grant_id FROM content_intake.grants WHERE grant_id=$1', [grant.grantId]);
+        expect(parent.rows).toEqual([{ parent_grant_id: 'z-live-delegation' }]);
+        expect(await service.authorization((await seat('supervisor')).actor, 'source-a', 'publish')).toMatchObject({ ok: true });
+      } else {
+        for (const response of [preview, saved]) {
+          expect(response.statusCode).toBe(404);
+          expect(parseContractSchema('IntakeError', response.json()).error.details.reason).toBe('GRANT_AUTHORITY_DENIED');
+        }
+        expect((await admin.query("SELECT count(*) FROM content_intake.grants WHERE recipient_id='supervisor'")).rows[0].count).toBe('0');
+      }
+    } finally { await host.app.close(); }
+  });
+
   it('discovery: shows allocation separately and keeps non-allocator ceilings empty', async () => {
     const director=value(await service.authorizations((await seat('director')).actor,{})).capabilities[0]!;
     // An issuer has to reach the sources it hands out, so the director holds business rows too.

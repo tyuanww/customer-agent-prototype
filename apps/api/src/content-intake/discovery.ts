@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { allocationKinds, authorize, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
+import { allocationKinds, authorize, LIVE_ALLOCATION_GRANTS_SQL, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
@@ -56,12 +56,10 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
       FROM business_sources allowed
       UNION ALL
       SELECT g.scope_id,src.source_id,g.action,g.kind,max(g.expires_at) AS until
-      FROM content_intake.grants g CROSS JOIN stamp
+      FROM (${LIVE_ALLOCATION_GRANTS_SQL}) g
       JOIN content_intake.sources src ON src.scope_id=g.scope_id
         AND (g.source_id IS NULL OR g.source_id=src.source_id)
-      WHERE g.recipient_id=$1 AND g.revoked_at IS NULL
-        AND g.starts_at<=stamp.at AND stamp.at<g.expires_at
-        AND g.kind=ANY($4::text[]) AND g.steward_id IS NOT NULL
+      WHERE g.kind=ANY($4::text[])
       GROUP BY g.scope_id,src.source_id,g.action,g.kind
     ), rights AS (
       SELECT scope_id,source_id,
