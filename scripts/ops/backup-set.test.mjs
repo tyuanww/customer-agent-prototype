@@ -23,7 +23,6 @@ import {
   MANIFEST_FILE,
   OBJECTS_ARCHIVE_FILE,
   ROLES_FILE,
-  acquireBackupLock,
   createBackupSet,
   extractObjectArchive,
   inspectObjectArchive,
@@ -291,23 +290,7 @@ test('profile is the source for the database and object paths', () => {
   }
 });
 
-test('concurrent backup lock fails closed until the owner releases it', () => {
-  const root = temporaryDirectory('customer-agent-backup-lock-');
-  try {
-    const release = acquireBackupLock(root);
-    assert.throws(
-      () => acquireBackupLock(root),
-      (error) => error instanceof Error && 'code' in error && error.code === 'BACKUP_LOCKED',
-    );
-    release();
-    const second = acquireBackupLock(root);
-    second();
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('failed backup removes its staging directory and releases the lock', async () => {
+test('an unavailable database prevents backup staging', async () => {
   const root = temporaryDirectory('customer-agent-backup-failure-');
   try {
     const backupRoot = path.join(root, 'backups');
@@ -322,11 +305,9 @@ test('failed backup removes its staging directory and releases the lock', async 
         },
         pgBin: path.join(root, 'unused-pg-bin'),
       }),
-      (error) => error instanceof Error && 'code' in error && error.code === 'DATABASE_SNAPSHOT_FAILED',
+      (error) => error instanceof Error && 'code' in error && error.code === 'BACKUP_LOCK_FAILED',
     );
-    assert.deepEqual(readdirSync(path.join(backupRoot, 'backup-sets')), []);
-    const release = acquireBackupLock(backupRoot);
-    release();
+    assert.deepEqual(readdirSync(backupRoot), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -573,6 +554,24 @@ test('retention removes only verified matching backup sets and preserves corrupt
     assert.equal(existsSync(path.join(root, ids[2])), true);
     assert.equal(existsSync(path.join(root, `${databaseName}-20251231T235959Z-001`)), true);
     assert.equal(existsSync(path.join(root, 'unrelated-backup')), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const corruptIndex of [0, 1, 2]) test(`corrupt backup ${corruptIndex + 1} does not consume a verified retention slot`, async () => {
+  const root = temporaryDirectory('customer-agent-backup-valid-retention-');
+  try {
+    const ids = [1, 2, 3].map(n => `${databaseName}-20260101T00000${n}Z-001`);
+    for (const [index, id] of ids.entries()) {
+      if (index === corruptIndex) mkdirSync(path.join(root, id));
+      else fixtureSet(root, id);
+    }
+    const currentBackupId = ids.filter((_, index) => index !== corruptIndex).at(-1);
+    const result = await pruneVerifiedBackupSets({ root, databaseName, keep: 2, currentBackupId });
+    assert.equal(result.removed, 0);
+    assert.equal(result.preserved, 1);
+    assert.deepEqual(readdirSync(root).sort(), ids);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -49,7 +49,6 @@ const MIGRATION_ID = /^[0-9]{4}_[a-z0-9_]+$/u;
 const GIT_SHA = /^[0-9a-f]{40}$/u;
 const TAR_BLOCK = 512;
 const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
-const LOCK_FILE = '.backup.lock';
 const BACKUP_SETS_DIRECTORY = 'backup-sets';
 
 export class BackupSetError extends Error {
@@ -275,32 +274,28 @@ export function loadStackProfile(options = {}) {
   });
 }
 
-export function acquireBackupLock(backupRoot) {
+export async function acquireBackupLock(backupRoot, profile) {
   mkdirSync(backupRoot, { recursive: true, mode: 0o700 });
-  const lockPath = path.join(backupRoot, LOCK_FILE);
-  let descriptor;
+  const { Client } = await import('pg');
+  const client = new Client({
+    host: profile.pgSocketDirectory,
+    port: profile.pgPort,
+    user: resolvePostgresRole(profile),
+    database: profile.databaseName,
+    connectionTimeoutMillis: 5_000,
+    query_timeout: 5_000,
+  });
   try {
-    descriptor = openSync(lockPath, 'wx', 0o600);
+    await client.connect();
+    const result = await client.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired',
+      [`customer-agent-backup:${safeRealDirectory(backupRoot, 'BACKUP_LOCK_FAILED')}`]);
+    if (!result.rows[0]?.acquired) fail('BACKUP_LOCKED', 'Another backup is already running');
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST') {
-      fail('BACKUP_LOCKED', 'Another backup is already running');
-    }
+    await client.end();
+    if (error instanceof BackupSetError) throw error;
     fail('BACKUP_LOCK_FAILED', 'Cannot acquire the backup lock');
   }
-  try {
-    writeSync(descriptor, `${JSON.stringify({ pid: process.pid, createdAt: utcNow() })}\n`);
-    fsyncSync(descriptor);
-    fsyncDirectory(backupRoot);
-  } finally {
-    closeSync(descriptor);
-  }
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    rmSync(lockPath, { force: true });
-    fsyncDirectory(backupRoot);
-  };
+  return () => client.end();
 }
 
 function resolvePostgresRole(profile) {
@@ -1362,12 +1357,10 @@ export async function pruneVerifiedBackupSets(options) {
     .filter((name) => BACKUP_ID_PATTERN.exec(name)?.[1] === databaseName)
     .sort()
     .reverse();
-  const retained = new Set(candidates.slice(0, keep));
-  if (currentBackupId) retained.add(currentBackupId);
   let removed = 0;
   let preserved = 0;
+  let verifiedCount = 0;
   for (const name of candidates) {
-    if (retained.has(name)) continue;
     const directory = path.join(root, name);
     try {
       const verified = await verifyBackupSet(directory, { pgBin: options.pgBin });
@@ -1375,6 +1368,8 @@ export async function pruneVerifiedBackupSets(options) {
         preserved += 1;
         continue;
       }
+      verifiedCount += 1;
+      if (verifiedCount <= keep || name === currentBackupId) continue;
       removeVerifiedBackupSet(directory);
       removed += 1;
     } catch {
@@ -1402,7 +1397,7 @@ export async function createBackupSet(options = {}) {
   if (copyRoot && pathsOverlap(copyRoot, stack.objectStoreDirectory)) {
     fail('COPY_DESTINATION_INVALID', 'Copy destination overlaps the object store');
   }
-  const releaseLock = acquireBackupLock(backupRoot);
+  const releaseLock = await acquireBackupLock(backupRoot, stack);
   let staging = null;
   let copyStaging = null;
   let snapshot = null;
@@ -1558,7 +1553,7 @@ export async function createBackupSet(options = {}) {
       }
     }
     try {
-      releaseLock();
+      await releaseLock();
     } catch (error) {
       cleanupErrors.push(error);
     }

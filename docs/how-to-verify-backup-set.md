@@ -11,7 +11,7 @@ export CUSTOMER_AGENT_PG15_BIN=/absolute/path/to/postgresql15/bin
 pnpm test:backup:integration
 ```
 
-该命令先构建数据库运行模块，再分别以迁移 75、76 前缀和当前迁移 77 的完整目录运行真实 PG15 备份与 full restore。普通归档、校验、锁和保留策略用例随 `pnpm test:workflow` 执行。测试通过不等于生产演练通过。
+该命令先构建数据库运行模块，再分别以迁移 75、76、77 前缀和当前完整目录运行真实 PG15 备份与 full restore。它还验证并发备份被拒绝、失败后释放锁，以及进程被强制终止后可以重新备份。普通归档、校验和保留策略用例随 `pnpm test:workflow` 执行。测试通过不等于生产演练通过。
 
 ## 受控备份
 

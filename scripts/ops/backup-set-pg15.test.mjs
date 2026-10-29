@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import {
   cpSync,
   mkdirSync,
@@ -25,6 +26,8 @@ import {
   MANIFEST_DIGEST_FILE,
   MANIFEST_FILE,
   OBJECTS_ARCHIVE_FILE,
+  acquireBackupLock,
+  createBackupSet,
   extractObjectArchive,
   verifyBackupSet,
 } from './backup-set.mjs';
@@ -473,7 +476,54 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
   }
 }
 
-for (const migrationCount of [75, 76, 77]) {
+test('backup exclusion releases after success, failure, and a killed owner', {
+  skip: !enabled,
+  timeout: 30_000,
+}, async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-lock-'));
+  const harness = new Pg15Harness();
+  let child;
+  let release;
+  try {
+    harness.start();
+    const db = harness.createDatabase('backup_lock');
+    const stack = { databaseName: db.name, pgPort: harness.port, pgSocketDirectory: harness.socket, pgUser: harness.owner,
+      objectStoreDirectory: path.join(root, 'objects') };
+    const backupRoot = path.join(root, 'backups');
+    release = await acquireBackupLock(backupRoot, stack);
+    await assert.rejects(acquireBackupLock(backupRoot, stack), { code: 'BACKUP_LOCKED' });
+    await release();
+    release = null;
+    await assert.rejects(createBackupSet({ stack, backupRoot, pgBin: path.join(root, 'missing-pg-bin') }));
+    assert.deepEqual(readdirSync(path.join(backupRoot, 'backup-sets')), []);
+    const moduleUrl = new URL('./backup-set.mjs', import.meta.url).href;
+    const code = `import {acquireBackupLock} from ${JSON.stringify(moduleUrl)};
+      await acquireBackupLock(${JSON.stringify(backupRoot)},${JSON.stringify(stack)});
+      process.send('locked');`;
+    child = spawn(process.execPath, ['--input-type=module', '-e', code], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+    await once(child, 'message');
+    await assert.rejects(acquireBackupLock(backupRoot, stack), { code: 'BACKUP_LOCKED' });
+    const ended = once(child, 'close');
+    child.kill('SIGKILL');
+    await ended;
+    // The OS has closed the socket; PostgreSQL may still be observing that close.
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      try { release = await acquireBackupLock(backupRoot, stack); break; }
+      catch (error) {
+        if (error.code !== 'BACKUP_LOCKED' || Date.now() >= deadline) throw error;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+  } finally {
+    child?.kill('SIGKILL');
+    if (release) await release();
+    harness.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const migrationCount of [75, 76, 77, generatedMigrationCatalogue.migrations.length]) {
   test(
     `backup and restore consume a real PG15 snapshot at migration ${migrationCount} with objects, owners, roles, ACL, and verifier`,
     {
