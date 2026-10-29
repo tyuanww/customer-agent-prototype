@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -201,7 +202,7 @@ async function seedSyntheticDatabase(client, migrationCount) {
 
 async function exerciseBackupSetForMigrationCount(migrationCount) {
   const previousTmpdir = process.env.TMPDIR;
-  process.env.TMPDIR = '/private/tmp';
+  process.env.TMPDIR = realpathSync('/tmp');
   const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-integration-'));
   const stackRoot = path.join(root, 'stack');
   const objectStore = path.join(root, 'object-store');

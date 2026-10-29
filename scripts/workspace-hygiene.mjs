@@ -2,6 +2,7 @@ import {
   existsSync,
   lstatSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   realpathSync,
   rmSync,
@@ -37,61 +38,12 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // allowed to make the source budget fail.
 // Approved 2026-10-09: each retained input remains budgeted. A group cannot
 // borrow unused space from another group, even with a larger aggregate override.
-// 2026-10-24: a 2 832 330-byte Menokin SOP workbook had been committed under docs/ in
-// 360336b5 and is now out of the tree and out of history. Measured source-inputs after
-// the removal is 20.97 MiB, which clears the 21.0 set by 31 KiB, and the Linux runner
-// reads about 0.02 MiB above the Mac on the same tree, so the pass was a coin flip.
-// 21.5 restores real headroom; measured remainder is 46.62 MiB, so 47.5 keeps the gap.
-// 2026-10-25: GitHub Linux read source-inputs 16 KiB over 21.5 MiB on the Feishu
-// link change. 21.6 and 47.6 cover that reading and leave headroom.
-// 2026-10-26: GitHub Linux read source-inputs 49.6 KiB over 21.6 MiB and the
-// remainder 29.6 KiB over 47.6 MiB on the shop question-rate path (migration
-// 0071, the overview tiles, and their tests). The same tree read 21.3 MiB and
-// 46.9 MiB on the maintainer Mac. 21.8 and 47.8 cover the Linux reading.
-// 2026-10-27: migration 0073 replaces the live fact writers and adds the
-// unapplied rollback script. GitHub Linux read source-inputs 40.8 KiB over
-// 21.8 MiB and the remainder 20.8 KiB over 47.8 MiB. 21.9 and 47.9 cover that
-// reading. source-inputs stays the tighter of the two.
-// 2026-10-28: migrations 0074 and 0075 fix authorization_deadline for engineer role,
-// add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
-// Linux read source-inputs 110 KiB over 21.9 MiB and the remainder 90.4 KiB over
-// 47.9 MiB. 22.0 and 48.0 cover that reading and leave minimal headroom.
-// 2026-10-29: the directory identity migration and its integration tests need
-// another 17.8 KiB on APFS; retain a small allowance for filesystem rounding.
+// Budgets use logical file/link bytes per retained path, independent of filesystem
+// allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
 export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.1 * 1024 * 1024;
-// 2026-10-23: the Linux runner read the remainder at 46.6 MiB on the SOP intake change,
-// 0.1 over the previous 46.5. The added files also cost block rounding, so 47.0 covers
-// it while source-inputs stays the tighter of the two.
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
-  // 2026-10-14: after the standalone v9 HTML mock left the repo, measured
-  // source-inputs were 19.0 MiB on the maintainer Mac. 19.25 MiB covered that
-  // reading.
-  // 2026-10-20: roster source, migrations, and tests put GitHub's clean
-  // checkout 128 KiB over 19.25 MiB and 364 KiB over 45 MiB. 19.5 and 45.5
-  // cover that reading.
-  // 2026-10-21: the four source-set migrations and their tests read 316 KiB over
-  // source-inputs and 296 KiB over the remainder. This budget sums allocated
-  // bytes, so it follows the filesystem: the checkout is 42.48 MiB apparent
-  // against 46.93 MiB allocated over 2027 files on APFS, a 4.5 MiB
-  // block-rounding gap, and the Linux runner reads it 40 KiB higher. 20.5 and
-  // 46.5 cover both. The permission migrations above this one stay inside that
-  // headroom on purpose, so the stack does not need a second bump.
-  // 2026-10-23: the SOP intake change adds three source modules, eight tests, three
-  // scripts and five records, 2835 inserted lines in total. GitHub's Linux runner read
-  // source-inputs at 20.63 MiB, 132 KiB over, while macOS read 20.3 on the same tree;
-  // the difference is block rounding on 21 added files. 21.0 covers the Linux reading
-  // and keeps the same headroom the earlier entries left. A one-shot red-team prompt
-  // document was deleted first, so this bump covers source, not prose.
-  // 2026-10-28: migrations 0074 and 0075 fix authorization_deadline for engineer role,
-  // add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
-  // Linux read source-inputs 110 KiB over 21.9 MiB, then 8 KiB over 22.0 MiB on second
-  // run. 22.1 MiB covers that reading with headroom.
-  // 2026-10-29: identity lifecycle migrations and real PG race/password/restore
-  // regressions exceed 22.1 MiB by 23.9 KiB on APFS after condensing the SOP
-  // proposal. Keep every input counted. The directory identity migration and
-  // real PostgreSQL regressions require the 22.3 MiB allowance above.
   Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.3 * 1024 * 1024 }),
 ]);
 
@@ -199,25 +151,39 @@ function allocatedBytes(stats) {
     : stats.size;
 }
 
-export function measureAllocatedBytes(targetPath, seen = new Set()) {
-  if (!existsSync(targetPath)) {
+function measureBytes(targetPath, seen, metric) {
+  if (metric === 'allocated' && !existsSync(targetPath)) {
     return 0;
   }
-  const stats = lstatSync(targetPath);
-  const key = inodeKey(stats, targetPath);
+  const stats = lstatSync(targetPath, { throwIfNoEntry: false });
+  if (!stats) {
+    return 0;
+  }
+  const key = metric === 'logical' ? path.resolve(targetPath) : inodeKey(stats, targetPath);
   if (seen.has(key)) {
     return 0;
   }
   seen.add(key);
 
-  let total = allocatedBytes(stats);
+  let total = 0;
+  if (metric === 'allocated') {
+    total = allocatedBytes(stats);
+  } else if (stats.isSymbolicLink()) {
+    total = readlinkSync(targetPath, { encoding: 'buffer' }).length;
+  } else if (stats.isFile()) {
+    total = stats.size;
+  }
   if (!stats.isDirectory() || stats.isSymbolicLink()) {
     return total;
   }
   for (const entry of readdirSync(targetPath)) {
-    total += measureAllocatedBytes(path.join(targetPath, entry), seen);
+    total += measureBytes(path.join(targetPath, entry), seen, metric);
   }
   return total;
+}
+
+export function measureAllocatedBytes(targetPath, seen = new Set()) {
+  return measureBytes(targetPath, seen, 'allocated');
 }
 
 export function assertWorkspaceRoot(projectRoot) {
@@ -564,28 +530,33 @@ export function workspaceInventory(projectRoot) {
     ...category,
     bytes: measureAllocatedBytes(path.join(resolvedRoot, category.path), seen),
   }));
-  // These are budgeted groups, not exclusions. Use the same inode set as the
-  // whole inventory so hard links and rebuildable output are counted once.
+  // These are budgeted groups, not exclusions. Claim paths separately from disk
+  // inodes: distinct retained paths still count when hard-linked to another owner.
+  const sourcePaths = new Set(INVENTORY_CATEGORIES.map(
+    (category) => path.resolve(resolvedRoot, category.path),
+  ));
   const sourceBudgetGroups = SOURCE_BUDGET_GROUPS.filter((group) => group.path).map((group) => ({
     ...group,
     // Entering a nested group directly must not follow an ancestor symlink.
     // Leave that link for the original root traversal to count without following.
     bytes: workspaceDirectoryStatus(resolvedRoot, path.posix.dirname(group.path)) === 'safe'
-      ? measureAllocatedBytes(path.join(resolvedRoot, group.path), seen) : 0,
+      ? measureBytes(path.join(resolvedRoot, group.path), sourcePaths, 'logical') : 0,
   }));
   let sourceInputBytes = 0;
+  let allocatedRemainderBytes = 0;
   for (const entry of readdirSync(resolvedRoot)) {
     if (!claimedTopLevel.has(entry)) {
-      sourceInputBytes += measureAllocatedBytes(path.join(resolvedRoot, entry), seen);
+      const targetPath = path.join(resolvedRoot, entry);
+      sourceInputBytes += measureBytes(targetPath, sourcePaths, 'logical');
+      allocatedRemainderBytes += measureAllocatedBytes(targetPath, seen);
     }
   }
   sourceBudgetGroups.push({ ...SOURCE_BUDGET_GROUPS.at(-1), bytes: sourceInputBytes });
-  const remainderBytes = sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0);
   categories.push({
     key: 'workspace-remainder',
     label: 'source, tests, docs, assets and small build inputs',
     path: '(remainder)',
-    bytes: remainderBytes,
+    bytes: allocatedRemainderBytes,
   });
   categories.sort((left, right) => right.bytes - left.bytes);
   return {
@@ -604,10 +575,7 @@ export function checkWorkspaceBudget(
     throw new Error(`Invalid workspace remainder budget: ${String(remainderBudgetBytes)}`);
   }
   const inventory = workspaceInventory(projectRoot);
-  const remainder = inventory.categories.find(
-    (category) => category.key === 'workspace-remainder',
-  );
-  const remainderBytes = remainder?.bytes ?? 0;
+  const remainderBytes = inventory.sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0);
   const violations = remainderBytes > remainderBudgetBytes
     ? [{
         key: 'workspace-remainder',
@@ -728,7 +696,7 @@ function runCli() {
     const policy = checkWorkspacePolicy(projectRoot);
     console.log(
       `Workspace source budget: ${result.pass ? 'PASS' : 'FAIL'} `
-      + `(remainder ${formatBytes(result.remainderBytes)} / `
+      + `(logical bytes; remainder ${formatBytes(result.remainderBytes)} / `
       + `${formatBytes(result.remainderBudgetBytes)})`,
     );
     for (const group of result.sourceBudgetGroups) {
