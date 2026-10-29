@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { startApi } from '../src/server.js';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -161,6 +161,28 @@ describe.skipIf(!enabled)('synthetic persistent product identity', () => {
     expect(rows.rows[0].token_hash).toBe(createHash('sha256').update(token).digest('hex'));
     for (let n = 0; n < 2; n++) expect((await app.inject({ method: 'POST', url: '/v1/auth/logout', headers })).statusCode).toBe(204);
     expect((await app.inject({ url: '/v1/auth/me', headers })).statusCode).toBe(401);
+  });
+
+  it('revokes an empty chunked HTTP logout without accepting a declared payload', async () => {
+    const { token } = await session();
+    const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const headers = { authorization: `Bearer ${token}` };
+    const logout = (body?: string, contentType?: string) => new Promise<number>((resolve, reject) => {
+      const request = httpRequest(`${origin}/v1/auth/logout`, {
+        method: 'POST',
+        headers: { ...headers, 'transfer-encoding': 'chunked', ...(contentType ? { 'content-type': contentType } : {}) },
+      }, response => { response.resume(); response.on('end', () => resolve(response.statusCode ?? 0)); });
+      request.on('error', reject);
+      request.end(body);
+    });
+    for (const [body, type] of [['null', 'application/json'], ['{}', 'application/json'],
+      ['not-empty', 'text/plain'], ['null', undefined], [undefined, 'application/json']]) {
+      expect(await logout(body, type)).toBe(400);
+      expect((await app.inject({ url: '/v1/auth/me', headers })).statusCode).toBe(200);
+    }
+    expect(await logout()).toBe(204);
+    expect((await app.inject({ url: '/v1/auth/me', headers })).statusCode).toBe(401);
+    expect(await logout()).toBe(204);
   });
 
   it('never registers mock login or accepts forged/mock credentials', async () => {

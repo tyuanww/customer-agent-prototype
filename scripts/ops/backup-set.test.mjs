@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -8,6 +8,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -39,6 +40,27 @@ const productVersion = readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8'
 const databaseName = 'customer_agent_intake_test';
 const objectId = `obj_${'1'.repeat(64)}`;
 const otherObjectId = `obj_${'2'.repeat(64)}`;
+
+for (const wrapper of ['customer-agent-backup.sh', 'customer-agent-restore-drill.sh']) {
+  test(`${wrapper} CLI refuses invalid input through a symbolic release path`, { skip: process.platform === 'win32' }, () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-cli-'));
+    try {
+      const current = path.join(root, 'current');
+      symlinkSync(testDirectory, current, 'dir');
+      const child = spawnSync('/bin/bash', [path.join(current, wrapper)], {
+        encoding: 'utf8', timeout: 30_000,
+        env: { ...process.env,
+          CUSTOMER_AGENT_STACK_ROOT: path.join(root, 'missing-profile'),
+          CUSTOMER_AGENT_BACKUP_ROOT: path.join(root, 'backups'),
+          CUSTOMER_AGENT_BACKUP_COPY_TO: '',
+          CUSTOMER_AGENT_PG15_BIN: path.join(root, 'missing-pg15'),
+        },
+      });
+      assert.equal(child.status, 1, `invalid input must fail; stderr=${child.stderr}`);
+      assert.match(child.stderr, /FATAL (PROFILE_INVALID|PG15_REQUIRED|BACKUP_SET_FAILED)/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
 const batchId = 'imp_backup_fixture_01';
 
 function sha256(value) {
