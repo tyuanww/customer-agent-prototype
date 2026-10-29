@@ -111,12 +111,10 @@ function readPermissionState(value: unknown): RosterPermissionState | null {
 export const ROSTER_DENIAL_MESSAGE = '没有权限，请找人开通。';
 /** An expired facts window needs a refresh, not a person to open access. */
 export const FACTS_EXPIRED_MESSAGE = '资料资格过期了，请稍后重试。';
-/** A registered seat whose tenant has nothing published yet. It reaches `pending`, and the
- *  denial sentence would be wrong there: no one can grant around missing content. */
-export const ROSTER_PENDING_MESSAGE = '资料尚未发布，暂时没有可查询内容。发布后重新登录即可。';
+/** `pending` does not distinguish missing grants from unavailable published content. */
+export const ROSTER_PENDING_MESSAGE = '查询权限或资料尚未就绪，请联系管理员核对。';
 
-/** The one owner of which sentence a state carries. The three refusals have different
- *  causes and different owners, so they must not flatten into one string. */
+/** The one owner of which sentence a state carries. Pending does not prove a specific cause. */
 export function rosterMessageFor(state: RosterPermissionState): string | null {
   if (state === 'ready' || state === 'unknown') return null;
   if (state === 'expired') return FACTS_EXPIRED_MESSAGE;

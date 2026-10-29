@@ -305,7 +305,6 @@ export function IntakeManagement() {
   };
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('open');
-  const [rollbackFocus, setRollbackFocus] = useState(0);
   const onDirty = useCallback((id: string, dirty: boolean) => setDirtyIds(previous => {
     if (previous.has(id) === dirty) return previous;
     const next = new Set(previous); if (dirty) next.add(id); else next.delete(id); return next;
@@ -402,13 +401,6 @@ export function IntakeManagement() {
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
   }, []);
-  useEffect(() => {
-    if (rollbackFocus === 0) return;
-    const region = document.querySelector<HTMLElement>('[aria-label="已发布目录纠正回退"]');
-    if (!region) return;
-    region.focus();
-    if (typeof region.scrollIntoView === 'function') region.scrollIntoView({ block: 'start' });
-  }, [rollbackFocus, view?.selected]);
   const upload = view?.upload;
   const disabled = busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
@@ -424,7 +416,6 @@ export function IntakeManagement() {
   const candidateColumns: TableColumnsType<CandidateRow> = [
     { title: '名称', key: 'name', render: (_value, row) => <>
       <ActionButton type="text" disabled={rowDisabled} onClick={() => void apply({ action: 'select', selection: row.selection })}>{candidateTitle(row.scopeLabel, row.candidate.key.version, row.candidate.sourceId)}</ActionButton>
-      {row.candidate.state === 'published' && <ActionButton type="text" disabled={rowDisabled} onClick={() => { setRollbackFocus(focus => focus + 1); void apply({ action: 'select', selection: row.selection }); }}>回退</ActionButton>}
     </> },
     { title: '范围', key: 'scope', render: (_value, row) => scopeWording(row.scopeLabel, row.candidate.sourceId) },
     { title: '状态', key: 'state', render: (_value, row) => states[row.candidate.state] ?? row.candidate.state },
@@ -455,7 +446,7 @@ export function IntakeManagement() {
       <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
         {view.pending.retryAllowed !== false && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
         {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
-    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || (view.rollback.available && view.selected?.state === 'published')) && <IntakeRollback view={view} busy={busy || rereading || stopping}
+    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || !!view.rollback.result) && <IntakeRollback view={view} busy={busy || rereading || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}

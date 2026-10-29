@@ -11,7 +11,6 @@ import { launchIntakeElectron } from '../support/intake-electron';
  * real Feishu, manual OS focus, Stage Manager or Windows compositor evidence. */
 test('native FAQ upload, revision and cancellation preserve the confirmed release consumed by an ordinary seat through real API/PG', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
-  test.fixme(true, 'Dashboard content is the persona knowledge desk. This proof still drives the unmounted candidate publish page. Query still reads the old catalog.');
   test.setTimeout(180_000);
   // Keep ungated test discovery independent of built API artifacts and PG.
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, createIntakeSyntheticCsv, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -97,34 +96,33 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await dashboard.getByTestId('nav-materials').click();
     const upload = dashboard.getByRole('region', { name: '上传 FAQ 资料', exact: true });
     const sources = upload.getByRole('combobox', { name: '上传来源', exact: true });
-    await expect(sources.getByRole('option').filter({ hasText: 'source-a' })).toHaveCount(1);
-    const sourceChoice = await sources.getByRole('option').filter({ hasText: 'source-a' }).getAttribute('value');
+    await expect(sources).toBeEnabled();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
-    // 权限 sits beside the five modules for an intake session. It is not a sixth module id.
-    await expect(dashboard.getByRole('tab')).toHaveCount(6);
-    await expect(dashboard.getByTestId('nav-content')).toHaveAttribute('aria-selected', 'true');
+    await expect(dashboard.getByRole('tab')).toHaveCount(5);
+    await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(0);
+    await expect(dashboard.getByTestId('nav-materials')).toHaveAttribute('aria-selected', 'true');
     async function appearance(mode: 'light' | 'dark') {
       await dashboard.getByTestId('dashboard-theme-trigger').click();
       await dashboard.getByTestId(`dashboard-theme-${mode}`).click();
-      await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', mode);
+      await expect.poll(() => dashboard.getByRole('combobox', { name: '上传来源' }).evaluate(el => getComputedStyle(el).colorScheme)).toBe(mode);
       // Wait for the shared feedback transition before judging rendered colors.
-      await expect.poll(() => dashboard.locator('.intake-management select:enabled').first().evaluate(el => getComputedStyle(el).backgroundColor)).toBe(mode === 'dark' ? 'rgb(28, 27, 32)' : 'rgb(255, 255, 255)');
+      await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', mode);
     }
     async function captureWorkspace(name: string) {
       const layout = await dashboard.evaluate(() => {
         const panel = document.querySelector<HTMLElement>('.dashboard-content')!;
-        const input = document.querySelector('select')!;
+        const input = document.querySelector<HTMLElement>('[aria-label="上传来源"]')!.closest<HTMLElement>('.ant-select')!;
         const form = document.querySelector('.intake-management')!;
         return { width: innerWidth, height: innerHeight, bodyOverflow: document.documentElement.scrollWidth > innerWidth,
           panelOverflow: panel.scrollWidth > panel.clientWidth, font: getComputedStyle(form).fontSize,
           inputFont: getComputedStyle(input).fontSize, radius: getComputedStyle(input).borderRadius,
-          theme: document.documentElement.dataset.dashboardTheme, colorScheme: getComputedStyle(input).colorScheme,
-          inputAppearance: getComputedStyle(input).appearance };
+          theme: document.documentElement.dataset.dashboardTheme, colorScheme: getComputedStyle(input).colorScheme };
       });
-      expect(layout).toMatchObject({ bodyOverflow: false, panelOverflow: false, font: '14px', inputFont: '16px', radius: '8px', inputAppearance: 'auto' });
+      expect(layout).toMatchObject({ bodyOverflow: false, panelOverflow: false, font: '14px', inputFont: '14px', radius: '6px', colorScheme: name.includes('dark') ? 'dark' : 'light' });
       writeFileSync(path.join(evidence, `${name}.json`), JSON.stringify(layout, null, 2));
       await dashboard.screenshot({ path: path.join(evidence, `${name}.png`) });
     }
@@ -143,13 +141,15 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await captureWorkspace('dashboard-intake-minimum-dark');
     await resizeDashboard(1180, 760);
     await appearance('light');
-    expect(sourceChoice).toBeTruthy(); await sources.selectOption(sourceChoice!);
+    await sources.click();
+    await dashboard.getByRole('option', { name: /产品/ }).first().click();
     async function selectAndSubmit(filename: string) {
       await upload.getByRole('button', { name: '选择 CSV / Excel 文件', exact: true }).click();
-      await expect(upload.getByText(filename, { exact: true })).toBeVisible();
+      await expect(upload.getByRole('status').filter({ hasText: filename })).toBeVisible();
       const confirmation = upload.getByRole('checkbox', { name: '我已核对整理责任人及全部实际改稿人', exact: true });
       await expect(confirmation).not.toBeChecked();
-      await upload.getByRole('combobox', { name: '整理责任人', exact: true }).selectOption({ label: '合成整理人' });
+      await upload.getByRole('combobox', { name: '整理责任人', exact: true }).click();
+      await dashboard.getByRole('option', { name: '合成整理人', exact: true }).click();
       await upload.getByRole('checkbox', { name: '实际改稿人 合成整理人', exact: true }).check();
       await expect(upload.getByRole('button', { name: '上传并校验', exact: true })).toBeDisabled();
       await confirmation.check();
@@ -196,18 +196,20 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer, { exact: true })).toHaveCSS('white-space', 'pre-wrap');
     await material.getByRole('article').first().scrollIntoViewIfNeeded();
     await expect(dashboard.getByText(/待确认来源版本/)).toBeVisible();
-    await expect(dashboard.getByText(/风险等级：常规内容/)).toBeVisible();
+    await expect(material.getByText('风险等级', { exact: true })).toBeVisible();
+    await expect(material.getByText('常规内容', { exact: true })).toBeVisible();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-uploaded-material.png') });
     async function confirmSourceAndCheck(version: number) {
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
-    // The original content workspace stays mounted while the same window visits
-    // other modules. Unsaved source evidence must survive without a write.
+    // Preserve the navigation-loss failure while continuing the remaining flow.
     await dashboard.getByTestId('nav-overview').click();
     await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'overview');
-    await dashboard.getByTestId('nav-content').click();
-    await expect(dashboard.getByRole('textbox', { name: '来源版本', exact: true })).toHaveValue(`synthetic-export-${version}`);
-    await expect(dashboard.getByRole('textbox', { name: '来源确认说明', exact: true })).toHaveValue('已人工核对本轮合成导出及三条材料');
+    await dashboard.getByTestId('nav-materials').click();
+    await expect.soft(dashboard.getByRole('textbox', { name: '来源版本', exact: true })).toHaveValue(`synthetic-export-${version}`, { timeout: 1_000 });
+    await expect.soft(dashboard.getByRole('textbox', { name: '来源确认说明', exact: true })).toHaveValue('已人工核对本轮合成导出及三条材料', { timeout: 1_000 });
+    await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
+    await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
     await expect(dashboard.getByRole('button', { name: '发起组织审批', exact: true })).toHaveCount(0);
@@ -220,7 +222,11 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(quality.getByRole('article')).toHaveCount(3);
     for (const faq of INTAKE_SYNTHETIC_FAQ) {
       const row = quality.getByRole('article').filter({ has: dashboard.getByRole('combobox', { name: `检查结论 ${faq.title}`, exact: true }) });
-      await row.getByRole('combobox').selectOption('pass');
+      const decision = row.getByRole('combobox');
+      await decision.click();
+      const listId = await decision.getAttribute('aria-controls');
+      expect(listId).toBeTruthy();
+      await dashboard.locator(`[id="${listId}"]`).getByRole('option', { name: '无缺陷', exact: true }).click();
       await row.getByRole('button', { name: '保存本条判断', exact: true }).click();
     }
     await dashboard.getByRole('button', { name: '提交本轮人工检查', exact: true }).click();
@@ -229,8 +235,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     }
     await confirmSourceAndCheck(1);
     const old = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
-    dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '修订当前候选', exact: true }).click();
+    await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(upload.getByText(/正在准备修订/)).toContainText('原版本 1');
     await expect(sources).toBeDisabled();
     await selectAndSubmit(path.basename(badFile));
@@ -253,9 +259,13 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;
     await dashboard.getByTestId('nav-sop').click();
-    await expect(dashboard.getByTestId('dashboard-content')).toContainText('请先登录');
-    await dashboard.getByTestId('nav-content').click();
-    await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
+    await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
+    await expect(dashboard.getByRole('heading', { name: 'SOP', exact: true })).toBeVisible();
+    await dashboard.getByTestId('nav-materials').click();
+    await expect.soft(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布', { timeout: 1_000 });
+    await expect.soft(dashboard.getByRole('textbox', { name: '发布摘要', exact: true })).toHaveValue('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认', { timeout: 1_000 });
+    await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
+    await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
     await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
     await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeEnabled();
@@ -263,11 +273,11 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect((await host.status()).publications).toBe(0);
     await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
     await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
-    await expect(dashboard.getByRole('status').filter({ hasText: '当前候选已发布：' })).toBeVisible();
+    await expect(dashboard.getByRole('status').filter({ hasText: '本次操作结果：已发布' })).toBeVisible();
     const result = await host.status();
     expect(result.publications).toBe(1); expect(result.currentReleaseId).not.toBe('rel_native_base'); expect(result.diagnostics).toEqual([]);
-    await expect(dashboard.getByRole('status').filter({ hasText: '当前候选已发布：' })).toContainText(result.currentReleaseId);
-    await dashboard.getByRole('status').filter({ hasText: '当前候选已发布：' }).scrollIntoViewIfNeeded();
+    await expect(dashboard.getByRole('status').filter({ hasText: '本次操作结果：已发布' })).toContainText(result.currentReleaseId);
+    await dashboard.getByRole('status').filter({ hasText: '本次操作结果：已发布' }).scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-published.png') });
     expect(await dashboard.evaluate(() => ({ node: typeof window.require, overlay: !!window.customerAgent }))).toEqual({ node: 'undefined', overlay: false });
     const security = await app.evaluate(({ BrowserWindow }) => {
@@ -277,23 +287,23 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     });
     expect(security).toEqual({ sandbox: true, nodeIntegration: false, contextIsolation: true });
     // Explicitly discard completed local UI state before closing the window.
-    dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
+    await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toHaveCount(0);
     // A separate unpublished candidate can be cancelled without withdrawing the live release.
     await selectAndSubmit(path.basename(goodFile));
     await settleParse('校验通过，候选已形成');
     const cancelled = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     expect(cancelled.key.candidateId).not.toBe(revised.key.candidateId);
-    dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '取消当前候选', exact: true }).click();
-    await expect(dashboard.getByText(/已取消 · 此版本不再接受修改或发布/)).toBeVisible();
+    await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(dashboard.getByText(/已取消：此版本不再接受修改或发布/)).toBeVisible();
     expect(await (await host.requestAs('enabler', `/v1/intake/candidates/${cancelled.key.candidateId}/versions/1`)).json()).toMatchObject({ state: 'cancelled' });
     expect((await host.status()).currentReleaseId).toBe(result.currentReleaseId);
     expect((await host.status()).publications).toBe(1);
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-cancelled.png') });
-    dashboard.once('dialog', dialog => dialog.accept());
     await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
+    await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
     host.selectIdentity('agent');
     await openQuery();
@@ -347,7 +357,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(final.requests.filter(p => /^\/v1\/intake\/parse-jobs\/[^/]+\/report$/.test(p))).toHaveLength(1);
     expect(rendererErrors).toEqual([]);
     expect(mainStderr).not.toContain("No handler registered for 'product:announce-unread'");
-    console.info(JSON.stringify({ status: 'PASS', profile, inputFormat: format, purposeQueries: final.purposeQueries, electron: process.platform, api: 'actual', postgres: 15,
+    console.info(JSON.stringify({ status: test.info().errors.length ? 'PARTIAL_WITH_ASSERTION_FAILURES' : 'PASS', profile, inputFormat: format, purposeQueries: final.purposeQueries, electron: process.platform, api: 'actual', postgres: 15,
       nativeDialog: 'controlled-path-and-confirmation-responses', upload: 'actual-multipart', issueReport: 'saved-and-read-with-exceljs',
       publicationPolicy: 'direct-v1', approvalRows: 0, revision: 'same-id-v2-fresh-evidence', cancellation: 'server-confirmed-live-release-unchanged', ordinarySeat: true, releaseId: final.currentReleaseId, screenshots: evidence }));
   } catch (error) {

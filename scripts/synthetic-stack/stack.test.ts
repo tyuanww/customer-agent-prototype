@@ -74,6 +74,8 @@ describe('stack profile', () => {
     } as const;
     const environment = apiEnvironment(profile);
     assert.equal(environment.CUSTOMER_AGENT_PROFILE, 'formal-dev');
+    assert.equal(environment.CUSTOMER_AGENT_STACK_ROOT, profile.stackRoot);
+    assert.equal(apiEnvironment(profile, { CUSTOMER_AGENT_STACK_ROOT: '/tmp/other' }).CUSTOMER_AGENT_STACK_ROOT, profile.stackRoot);
     assert.equal(environment.CUSTOMER_AGENT_API_HOST, '127.0.0.1');
     assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, 'http://127.0.0.1:43101');
     const logins = ['DATABASE_URL', 'CONTENT_ADMIN_DATABASE_URL', 'AUTH_DATABASE_URL', 'CONTENT_REVIEW_DATABASE_URL', 'CONTENT_WORKER_DATABASE_URL']
@@ -851,6 +853,7 @@ describe('stack production env', () => {
     // nobody looks. Each of these must be a start-time error naming the key.
     const derived = [
       'PATH=/usr/bin',
+      'CUSTOMER_AGENT_STACK_ROOT=/tmp/other-stack',
       'CUSTOMER_AGENT_API_HOST=127.0.0.1',
       'CUSTOMER_AGENT_API_PORT=43110',
       'DATABASE_URL=postgresql://stack_runtime@localhost/db',

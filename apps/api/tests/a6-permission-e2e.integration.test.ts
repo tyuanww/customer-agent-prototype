@@ -342,10 +342,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           [created[0]!.out_binding_id]);
         expect(seatBinding.rows).toEqual([{ role: 'coach' }]);
         const seat = actor(seatUserId, 'coach');
-        expect(await read(seat, 'query')).toMatchObject({
-          ok: true,
-          value: { sourceId: 'source-a', action: 'query' },
-        });
+        expect(await read(seat, 'query')).toMatchObject({ ok: false, code: 'NOT_FOUND', reason: 'SCOPE_DENIED' });
 
         const policyVersion = await numberAt(client,
           `SELECT version::text AS value FROM content_intake.policy_versions

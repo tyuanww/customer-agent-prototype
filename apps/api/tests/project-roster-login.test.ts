@@ -147,10 +147,8 @@ describe('roster login projection', () => {
     await expect(projectRosterLogin(db, openId)).resolves.toBe('registered');
   });
 
-  it('gives each refusal the sentence its cause needs', () => {
-    // These three are not interchangeable. A missing grant needs a person. An expired
-    // facts window needs a refresh. An empty tenant needs someone to publish, and no
-    // amount of granting or refreshing changes that.
+  it('does not claim a missing release when the pending cause is unknown', () => {
+    expect(ROSTER_PENDING_MESSAGE).toBe('查询权限或资料尚未就绪，请联系管理员核对。');
     expect(rosterPreparation('projected')).toEqual({ state: 'ready', reason: 'projected', message: null });
     expect(rosterPreparation('registered')).toEqual({
       state: 'pending', reason: 'registered', message: ROSTER_PENDING_MESSAGE,

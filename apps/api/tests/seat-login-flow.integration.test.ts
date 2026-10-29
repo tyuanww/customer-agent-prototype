@@ -76,6 +76,11 @@ describe.skipIf(!enabled)('a created seat can log in and keeps an agent ceiling'
       expect(created[0]).toMatchObject({
         out_principal_id: 'seat_flow1', out_binding_id: 'synthetic_seat_flow1', out_role: 'agent',
       });
+      const seatGrants = () => admin.query<{ grant_id: string; revoked_at: Date | null }>(
+        `SELECT grant_id, revoked_at FROM content_intake.grants
+          WHERE recipient_id = 'seat_flow1' AND kind = 'business' ORDER BY grant_id`);
+      expect((await seatGrants()).rows).toEqual([]);
+      expect(await fixture.sources('seat_flow1', 'query')).toEqual([]);
 
       const port = await freePort();
       const provider = createIdentityProvider({
@@ -106,9 +111,27 @@ describe.skipIf(!enabled)('a created seat can log in and keeps an agent ceiling'
       });
       expect(exchanged.status).toBe(200);
       expect(await exchanged.json()).toEqual({ provider: 'synthetic', binding_id: 'synthetic_seat_flow1' });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        expect(await asBusiness(fixture, 'SELECT content_intake.project_seat_login($1) AS status',
+          ['synthetic_seat_flow1'])).toEqual([{ status: 'projected' }]);
+        expect((await post('flow1')).status).toBe(200);
+        expect((await seatGrants()).rows).toEqual([]);
+        expect(await fixture.sources('seat_flow1', 'query')).toEqual([]);
+      }
       const seeded = await post('synthetic_agent');
       expect(seeded.status).toBe(200);
       expect(await seeded.json()).toEqual({ code: 'synthetic_agent' });
+
+      await admin.query(`INSERT INTO content_intake.grants(
+          grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+          starts_at, expires_at, reason, parent_grant_id, policy_version, store_set_version, steward_id)
+        SELECT 'grant-seat-manual-query','business','signer','seat_flow1','tenant-menokin',
+          'app-customer-agent','scope-product','source-a','query',
+          clock_timestamp() - interval '1 minute', clock_timestamp() + interval '30 minutes',
+          '人工授权查询。','grant-alloc-query',version,1,'signer'
+        FROM content_intake.policy_versions
+        WHERE tenant_id = 'tenant-menokin' AND app_id = 'app-customer-agent'`);
+      expect((await fixture.sources('seat_flow1', 'query')).map((row) => row.source_id)).toEqual(['source-a']);
 
       await admin.query(`INSERT INTO content_intake.grants(
           grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
@@ -119,8 +142,19 @@ describe.skipIf(!enabled)('a created seat can log in and keeps an agent ceiling'
             clock_timestamp() - interval '1 minute', clock_timestamp() + interval '30 minutes',
             '坐席发布，角色天花板应挡住。','grant-alloc-publish',NULL,NULL,'signer')`);
 
-      expect((await fixture.sources('seat_flow1', 'query')).map((row) => row.source_id).sort()).toEqual(['source-a', 'source-b']);
       expect(await fixture.sources('seat_flow1', 'publish')).toEqual([]);
+
+      await admin.query(`UPDATE content_intake.grants SET revoked_at = clock_timestamp(), version = version + 1,
+        last_change_reason = '人工撤销测试授权。'
+        WHERE grant_id = 'grant-seat-manual-query'`);
+      const revoked = (await seatGrants()).rows;
+      expect(revoked.find((grant) => grant.grant_id === 'grant-seat-manual-query')?.revoked_at).toBeInstanceOf(Date);
+      expect(await fixture.sources('seat_flow1', 'query')).toEqual([]);
+      expect(await asBusiness(fixture, 'SELECT content_intake.project_seat_login($1) AS status',
+        ['synthetic_seat_flow1'])).toEqual([{ status: 'projected' }]);
+      expect((await post('flow1')).status).toBe(200);
+      expect((await seatGrants()).rows).toEqual(revoked);
+      expect(await fixture.sources('seat_flow1', 'query')).toEqual([]);
 
       await asBusiness(fixture, 'SELECT backend_identity.disable_seat($1,$2,$3)',
         ['flow1', 'tenant-menokin', 'app-customer-agent']);

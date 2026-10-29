@@ -6,10 +6,8 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-/** Denial lane. A director title whose only live grant is query must see no write control,
- * and the sentence the operator specified. This is the review state the plan asks for, driven
- * through real Electron, HTTP and PG, with no renderer stub. */
-test('a director title with a query grant only sees no write control and the denial sentence', async () => {
+/** A query-only director has no allocation authority, regardless of title. */
+test('a director with query but no allocation cannot grant permissions', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -21,7 +19,33 @@ test('a director title with a query grant only sees no write control and the den
   mkdirSync(evidence, { recursive: true });
   let app: ElectronApplication | undefined;
   try {
-    Reflect.apply(host.selectIdentity, host, ['roster-readonly']);
+    host.selectIdentity('roster-query-only');
+    const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
+    const authorizationResponse = await host.requestAs('roster-query-only', '/v1/intake/authorization');
+    expect(authorizationResponse.status).toBe(200);
+    const authorization = parseContractSchema('IntakeAuthorization', await authorizationResponse.json());
+    const scope = authorization.capabilities.find(row => row.scope.sourceId === 'source-a');
+    expect(scope).toMatchObject({ actions: ['query'], mayAllocate: [], mayDelegate: [] });
+    expect(scope).toBeDefined();
+    const grant = {
+      operationId: 'synthetic-denied-query-grant', issuerFactsVersion: authorization.factsVersion,
+      policyVersion: authorization.policyVersion, items: [{ kind: 'business', recipientPrincipalId: 'roster-agent',
+        recipientFactsVersion: 1, action: 'query', scope: scope!.scope,
+        startsAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(), reason: '合成拒绝验收' }],
+    };
+    const preview = (identity: 'roster-query-only' | 'roster-director') => host.requestAs(identity, '/v1/intake/grants/preview', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(grant),
+    });
+    const control = await preview('roster-director');
+    expect(control.status).toBe(200);
+    const denied = await preview('roster-query-only');
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toMatchObject({ error: { details: { reason: 'GRANT_AUTHORITY_DENIED' } } });
+    const deniedSave = await host.requestAs('roster-query-only', '/v1/intake/grants', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(grant),
+    });
+    expect(deniedSave.status).toBe(404);
+    expect(await deniedSave.json()).toMatchObject({ error: { details: { reason: 'GRANT_AUTHORITY_DENIED' } } });
     app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
       apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
     // Recording starts a capture layer, so the first window can take longer to appear.
@@ -60,22 +84,14 @@ test('a director title with a query grant only sees no write control and the den
     await expect(dashboard.getByTestId('module-content')).toHaveCount(0);
     await dashboard.screenshot({ path: path.join(evidence, 'denied-publish.png') });
 
-    // The permission page still lists a scope, so the missing grant button cannot be blamed on
-    // an empty list.
-    await dashboard.getByTestId('nav-permissions').click();
-    const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
-    // Read the projection the panel renders from, so "no scope" cannot be mistaken for "no bit".
-    // The first read is asynchronous, so wait for the panel to finish before judging it.
-    const readPermission = () => dashboard.evaluate(async () => {
-      const api = (window as unknown as { dashboardPermissions?: { current: () => Promise<unknown> } }).dashboardPermissions;
-      return api ? await api.current() : null;
-    }) as Promise<{ ok: boolean; view: { available: boolean; busy: boolean; sources: unknown[] } } | null>;
-    await expect.poll(async () => (await readPermission())?.view.available).toBe(true);
-    const permission = await readPermission();
-    expect(permission?.ok).toBe(true);
-    expect(permission?.view.sources.length).toBeGreaterThan(0);
-    await expect(panel.getByRole('button', { name: '新增授权', exact: true })).toHaveCount(0);
-    await expect(panel.getByText('没有权限，请找人开通。')).toBeVisible();
+    await expect.poll(async () => (await dashboard.evaluate(() => window.dashboardPageUse!.current())).phase).toBe('ready');
+    await expect.poll(async () => {
+      const snapshot = await dashboard.evaluate(() => window.dashboardPageUse!.current());
+      return snapshot.phase === 'ready' ? snapshot.permissions.state : snapshot.phase;
+    }).toBe('closed');
+    await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(0);
+    await expect(dashboard.getByRole('region', { name: '权限配置', exact: true })).toHaveCount(0);
+    await expect(dashboard.getByRole('button', { name: '新增授权', exact: true })).toHaveCount(0);
 
     await dashboard.screenshot({ path: path.join(evidence, 'denied-grant.png') });
     console.info(JSON.stringify({

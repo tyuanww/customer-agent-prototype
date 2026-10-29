@@ -1113,6 +1113,17 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 78,
+      "id": "0078_seat_manual_grants",
+      "file": "0078_seat_manual_grants.sql",
+      "source_ranges": [],
+      "sha256": "cc9d706f5459462ccc120bcedb236db56b6d4e9c5f4dc292231f20e466643166",
+      "bytes": 5346,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

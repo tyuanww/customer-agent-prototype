@@ -124,7 +124,7 @@ function isContentJob(value: unknown): boolean {
   const noticeFor = job.permission === 'expired'
     ? '资料资格过期了，请稍后重试。'
     : job.permission === 'pending'
-      ? '资料尚未发布，暂时没有可查询内容。发布后重新登录即可。'
+      ? '查询权限或资料尚未就绪，请联系管理员核对。'
       : job.permission === 'ready' || job.permission === 'unknown' || job.permission === null
         ? null
         : '没有权限，请找人开通。';

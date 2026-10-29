@@ -330,6 +330,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0076_authorization_decision',
     requiresPredecessor: 'Manual identity grants require unified authorization',
   },
+  {
+    index: 77,
+    minimumCatalogueLength: 78,
+    id: '0078_seat_manual_grants',
+    predecessorId: '0077_manual_identity_grants',
+    requiresPredecessor: 'Manual seat grants require manual identity grants',
+  },
 ];
 
 function requiredSuccessorStep(

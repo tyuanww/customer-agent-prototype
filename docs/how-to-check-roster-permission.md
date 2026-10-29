@@ -30,7 +30,7 @@
 
 ## 怎样确认
 
-- `pending`、`denied`、`expired` 和 `revoked` 的响应必须有那句固定句子，而且不能改字。`ready` 和 `unknown` 的 `message` 为 `null`，但 `unknown` 不等于放行。
+- `pending` 显示「查询权限或资料尚未就绪，请联系管理员核对。」，不推断一定缺发布。`denied`、`expired` 和 `revoked` 显示各自的拒绝提示。`ready` 和 `unknown` 的 `message` 为 `null`，但 `unknown` 不等于放行。
 - 未知职务编号不会被当成标题。标题来自目录或本次登录快照。
 - 人工 query grant 只能通过权限页面撤销。登录、目录刷新和候选 fallback 都不能重建它。
 

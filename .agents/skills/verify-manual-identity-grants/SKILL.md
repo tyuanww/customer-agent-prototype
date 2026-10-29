@@ -6,7 +6,7 @@ description: Verify the PostgreSQL identity boundary where password and Feishu l
 # Verify manual identity grants
 
 Run this after changing identity admission, roster projection, password login,
-production-admin configuration, grants, or migration 0077.
+production-admin configuration, grants, or migrations 0077 and 0078.
 
 ## Properties
 
@@ -32,6 +32,9 @@ production-admin configuration, grants, or migration 0077.
    enabled password facts may renew; disabled facts may not.
 10. Verified directory promotion changes only candidate classification and facts;
     stable identity keys and direct capability restrictions remain intact.
+11. Seat creation succeeds without a published or allocatable source. Creation,
+    login and repeated login issue no business grants. Existing grants survive
+    migration 0078 unchanged, and revoked manual grants do not revive on login.
 
 ## Run
 
@@ -48,12 +51,14 @@ pnpm --filter @customer-agent/api exec vitest run \
   tests/roster-authority.integration.test.ts \
   tests/a6-permission-e2e.integration.test.ts \
   tests/p0-live-lanes.integration.test.ts \
-  tests/feishu-login-link.integration.test.ts
+  tests/feishu-login-link.integration.test.ts \
+  tests/seat-login-flow.integration.test.ts \
+  tests/seat-lifecycle.integration.test.ts
 ```
 
 The tests use the checked-in migration catalogue. Do not apply an overlay a
 second time after `applyDatabaseMigrations`; a SQL change requires regenerating
-0077 before running this command.
+the catalogue and rebuilding the database runtime before running this command.
 
 ## Coverage
 
@@ -69,15 +74,14 @@ credentials, deployment, or an actual macOS/Windows install.
 
 ## Keep it current
 
-When 0077 or its tests change, regenerate the migration and pins, rerun the
+When 0077, 0078 or their tests change, regenerate the catalogue and pins, rerun the
 command, and record the tested source hashes with the result. A matching Git
 base alone does not identify an uncommitted candidate.
 
 ## Source provenance
 
-The worktree base is `4635ef01581877edfd17b3763b7de66e4a60393c`.
-Migration 0077 and these checks are uncommitted candidate changes; that base
-does not contain or prove the candidate implementation.
+Record the current worktree base and status with each run. A base commit alone
+does not identify uncommitted overlays or tests.
 
 Read the current SQL hash from `packages/database/migrations/manifest.generated.json`
 and the expected PostgreSQL function/ACL pins from `packages/database/src/verifier.ts`.

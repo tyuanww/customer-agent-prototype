@@ -43,7 +43,9 @@
 
 运行脚本映射的失败文案还有：请选择岗位。请设定密码。人员没有写入，已停止。口令没有写入，已停止。账号没有读取。未知错误码变成「账号没有保存。」IPC 在调用脚本前还会返回：账号输入无效。无权访问此窗口能力。账号还不能在这里改。node 没启动、15 秒超时、标准输出超过 64KiB，或回复通不过 `seatAccountReply`，也是「账号没有保存。」
 
-Electron 主进程把意图交给产品 API 的三个路由（`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0067` 的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
+Electron 主进程把意图交给产品 API 的三个路由（`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0068` 引入的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
+
+迁移 `0078` 将建席与业务授权分开。创建和登录只建立身份、岗位及其事实，不签发或恢复业务授权，也不要求存在已发布或可分配来源。管理员需另行人工授予查询权限。迁移不修改已有授权；已有自动授权需要按实际业务情况另行审查。
 
 口令只以 salt 和 scrypt 哈希写入服务端 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，由身份服务的 `/password` 每次重读，所以写入立即生效。明文密码不进页面、不进数据库、不进 git。
 

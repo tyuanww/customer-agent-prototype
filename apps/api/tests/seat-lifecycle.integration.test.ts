@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations } from '@customer-agent/database';
+import { applyDatabaseMigrations, applyMigrationPrefix } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { ROLE_CEILING } from '../src/content-intake/role-ceiling.js';
 
@@ -121,7 +121,7 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
 
       const querySources = await client.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM content_intake.authorization_sources('seat_a', 'query', clock_timestamp())`);
-      expect(Number(querySources.rows[0]?.n ?? '0')).toBeGreaterThan(0);
+      expect(querySources.rows[0]?.n).toBe('0');
 
       const rules = await client.query<{ job_id: string; role: string }>(
         `SELECT job_id, role FROM content_intake.role_rules
@@ -139,6 +139,77 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
           { out_username: 'b', out_display_name: '合成客服主管', out_post: '客服主管', out_enabled: true },
         ]);
       }
+    } finally { await client.end(); harness.stop(); }
+  }, 180_000);
+
+  it('creates an identity when its home has no published or allocatable sources', async () => {
+    const harness = new Pg15Harness();
+    harness.start();
+    const client: Client = await harness.connect(harness.createDatabase('seat_empty_home').config);
+    try {
+      await applyDatabaseMigrations(client);
+      await seedHome(client);
+      await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
+        VALUES ('tenant-empty','app-empty',1)`);
+      await client.query('BEGIN');
+      await client.query(`INSERT INTO backend_identity.subject_bindings
+          (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+        VALUES ('empty-operator','synthetic','tenant-empty','无来源管理员','empty-operator',repeat('ab',32),true,'owner')`);
+      await client.query(`INSERT INTO content_intake.principals(
+          principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version)
+        VALUES ('empty-operator','empty-operator','tenant-empty','app-empty','confirmed-synthetic','empty-operator',1)`);
+      await client.query(`INSERT INTO content_intake.principal_facts
+          (principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+        VALUES ('empty-operator',1,ARRAY[$1],'job-director',true,clock_timestamp(),
+          clock_timestamp()+interval '4 minutes',repeat('a',64))`, [HOME.department]);
+      await client.query(`INSERT INTO content_intake.role_rules
+          (tenant_id,app_id,department_id,job_id,policy_version,role)
+        VALUES ('tenant-empty','app-empty',$1,'job-director',1,'director')`, [HOME.department]);
+      await client.query(`INSERT INTO content_intake.scopes(scope_id,tenant_id,app_id,brand_id,domain)
+        VALUES ('scope-empty','tenant-empty','app-empty','brand-empty','product')`);
+      await client.query(`INSERT INTO content_intake.grants
+          (grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)
+        VALUES ('empty-allocation','allocation','empty-operator','empty-operator','tenant-empty','app-empty',
+          'scope-empty','query',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour',
+          '合成坐席管理资格','empty-operator')`);
+      await client.query('COMMIT');
+      const allowed = await asIntakeBusiness(client,
+        'SELECT content_intake.seat_administration_allowed($1) AS allowed', ['empty-operator']);
+      expect(allowed.ok && allowed.rows[0]).toEqual({ allowed: true });
+      const created = await asIntakeBusiness(client,
+        'SELECT * FROM backend_identity.create_seat($1,$2,$3,$4,$5,$6,$7)',
+        ['empty', '无来源坐席', '客服', 'tenant-empty', 'app-empty', HOME.department, 'empty-operator']);
+      expect(created.ok, JSON.stringify(created)).toBe(true);
+      const grants = await client.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM content_intake.grants WHERE recipient_id='seat_empty'`);
+      expect(grants.rows[0]?.n).toBe('0');
+      const sources = await client.query(`SELECT * FROM content_intake.authorization_sources('seat_empty','query',clock_timestamp())`);
+      expect(sources.rows).toEqual([]);
+    } finally { await client.end(); harness.stop(); }
+  }, 180_000);
+
+  it('preserves existing seat grants while upgrading from 0077', async () => {
+    const harness = new Pg15Harness();
+    harness.start();
+    const client: Client = await harness.connect(harness.createDatabase('seat_upgrade').config);
+    try {
+      await applyMigrationPrefix(client, 77);
+      await seedHome(client);
+      expect((await createSeat(client, 'legacy', '已有坐席', '客服')).ok).toBe(true);
+      const snapshot = () => client.query<{ grant: unknown }>(
+        `SELECT to_jsonb(g) AS grant FROM content_intake.grants g ORDER BY grant_id`);
+      const before = (await snapshot()).rows;
+      expect(before.length).toBeGreaterThan(1);
+      expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
+        'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);
+      const result = await applyDatabaseMigrations(client);
+      expect(result.applied.map((migration) => migration.id)).toEqual(['0078_seat_manual_grants']);
+      expect((await snapshot()).rows).toEqual(before);
+      expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
+        'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);
+      expect((await createSeat(client, 'new', '新坐席', '客服')).ok).toBe(true);
+      expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
+        'seat_new','query',clock_timestamp())`)).rowCount).toBe(0);
     } finally { await client.end(); harness.stop(); }
   }, 180_000);
 
