@@ -337,6 +337,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0077_manual_identity_grants',
     requiresPredecessor: 'Manual seat grants require manual identity grants',
   },
+  {
+    index: 78,
+    minimumCatalogueLength: 79,
+    id: '0079_directory_identity_activity',
+    predecessorId: '0078_seat_manual_grants',
+    requiresPredecessor: 'Directory link status requires manual seat grants',
+  },
 ];
 
 function requiredSuccessorStep(

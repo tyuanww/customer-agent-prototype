@@ -1141,6 +1141,7 @@ const READINESS_SUFFIX = [
   { length: 76, index: 75, id: '0076_authorization_decision' },
   { length: 77, index: 76, id: '0077_manual_identity_grants' },
   { length: 78, index: 77, id: '0078_seat_manual_grants' },
+  { length: 79, index: 78, id: '0079_directory_identity_activity' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1214,6 +1215,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   76: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: '44d80cfdfabc3fee42b6a4b1848245fd3491fa3053cef711450fd467fd80fceb', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   77: { tables: 111, functions: 299, objectEntries: 3443, objectSha256: 'de15fb78bd355d1926f2544fd6625b22c3b4c4d32f826ed507aeac0f56d8d328', functionEntries: 299, functionSha256: 'a7f7a1efec5d6a93042be4dd2d505d16ee818c8244bd2571a982f9d2400fa579', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   78: { tables: 111, functions: 299, objectEntries: 3443, objectSha256: 'de15fb78bd355d1926f2544fd6625b22c3b4c4d32f826ed507aeac0f56d8d328', functionEntries: 299, functionSha256: '961313240944ec1ce51e7fb2036297371262e0696750b4e6a76ebdcee084c846', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  79: { tables: 111, functions: 300, objectEntries: 3444, objectSha256: '43b61731970b249e58fcb03a1e64cd05cc030df93e5d38b918a158dbf3175c6d', functionEntries: 300, functionSha256: '1040ddfdfd2d0c093c28532fff035c0f1ce20467d0328bcf95bc1e0353de5b2d', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1264,6 +1266,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   76: { entries: 649, sha256: 'acd4ff8c55c3b5fde3d3eb320b0ae60f1961de551b15151b3738671d8ef597a9' },
   77: { entries: 654, sha256: 'cf90d1c23de6e40d9c43ab6c14f5028c62731ceb1f64958a0938442c37e14940' },
   78: { entries: 654, sha256: 'cf90d1c23de6e40d9c43ab6c14f5028c62731ceb1f64958a0938442c37e14940' },
+  79: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
 };
 
 export async function verifyReadinessSuccessor(

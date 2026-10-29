@@ -56,7 +56,9 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
 // Linux read source-inputs 110 KiB over 21.9 MiB and the remainder 90.4 KiB over
 // 47.9 MiB. 22.0 and 48.0 cover that reading and leave minimal headroom.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.0 * 1024 * 1024;
+// 2026-10-29: the directory identity migration and its integration tests need
+// another 17.8 KiB on APFS; retain a small allowance for filesystem rounding.
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.1 * 1024 * 1024;
 // 2026-10-23: the Linux runner read the remainder at 46.6 MiB on the SOP intake change,
 // 0.1 over the previous 46.5. The added files also cost block rounding, so 47.0 covers
 // it while source-inputs stays the tighter of the two.
@@ -88,8 +90,9 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // run. 22.1 MiB covers that reading with headroom.
   // 2026-10-29: identity lifecycle migrations and real PG race/password/restore
   // regressions exceed 22.1 MiB by 23.9 KiB on APFS after condensing the SOP
-  // proposal. Keep every input counted and the aggregate cap at 48.0 MiB.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.2 * 1024 * 1024 }),
+  // proposal. Keep every input counted. The directory identity migration and
+  // real PostgreSQL regressions require the 22.3 MiB allowance above.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.3 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

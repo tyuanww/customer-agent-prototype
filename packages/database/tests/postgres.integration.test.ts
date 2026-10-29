@@ -54,6 +54,7 @@ const SOP_REPAIR_SUFFIX = [
   '0076_authorization_decision',
   '0077_manual_identity_grants',
   '0078_seat_manual_grants',
+  '0079_directory_identity_activity',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -188,6 +189,25 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   let harness: Pg15Harness;
   beforeEach(() => { harness = new Pg15Harness(); harness.start(); }, 60_000);
   afterEach(() => harness.stop(), 60_000);
+
+  it.each([
+    ['default function privileges', 'ALTER DEFAULT PRIVILEGES IN SCHEMA content_intake GRANT EXECUTE ON FUNCTIONS TO intake_usage',
+      'ALTER DEFAULT PRIVILEGES IN SCHEMA content_intake REVOKE EXECUTE ON FUNCTIONS FROM intake_usage'],
+    ['capability membership', 'GRANT intake_business TO intake_usage', 'REVOKE intake_business FROM intake_usage'],
+  ])('rolls back the directory function and ledger when %s drifts', async (_name, drift, repair) => {
+    const database = harness.createDatabase('directory_acl_upgrade');
+    const client = await harness.connect(database.config);
+    try {
+      await applyMigrationCatalogue(client, { ...generatedMigrationCatalogue, migrations: generatedMigrationCatalogue.migrations.slice(0, 78) });
+      await client.query(drift);
+      await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_APPLY_FAILED', migrationId: '0079_directory_identity_activity' });
+      expect((await client.query('SELECT max(position)::int AS position FROM customer_agent_meta.schema_migrations')).rows).toEqual([{ position: 78 }]);
+      expect((await client.query("SELECT to_regprocedure('content_intake.principal_has_new_identity_activity(text)') AS function")).rows).toEqual([{ function: null }]);
+      await client.query(repair);
+      expect((await applyDatabaseMigrations(client)).applied.map(migration => migration.id)).toEqual(['0079_directory_identity_activity']);
+      expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
+    } finally { await client.end(); }
+  }, 120_000);
 
   it('appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes', async () => {
     const database = harness.createDatabase('legacy_check_upgrade'); const client = await harness.connect(database.config);
@@ -649,7 +669,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(78);
+      expect(fresh.pending).toHaveLength(79);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -661,12 +681,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 78,
-        inventory: { tables: 111, views: 7, functions: 299 },
+        migrationCount: 79,
+        inventory: { tables: 111, views: 7, functions: 300 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 69-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 70-migration current suffix',
         },
       });
 
@@ -813,7 +833,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 78,
+        migrationCount: 79,
       });
     } finally {
       await client.end();
@@ -1069,7 +1089,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 78,
+        migrationCount: 79,
       });
     } finally {
       await client.end();
