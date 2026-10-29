@@ -42,6 +42,7 @@ it('projects only synthetic-local and faq-v2 when an intake session exists', asy
   const frame = { parent: null };
   const dashboard = { id: 1, mainFrame: frame, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=dashboard' } as unknown as WebContents;
   const owned = registerContentIntakeManagementIpc({} as never, () => dashboard, () => 'http://127.0.0.1:5173/', {
+    mode: 'synthetic-local',
     apiOrigin: 'http://127.0.0.1:43100',
     identityOrigin: 'http://127.0.0.1:43101',
     contentIntake: 'faq-v2',

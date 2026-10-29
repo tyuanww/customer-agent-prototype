@@ -186,6 +186,22 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+// PG15 flattens these AND nodes when pg_restore reparses their CHECK definitions.
+// Match whole entries so altered bounds, validation flags and other constraints still fail.
+function canonicalObjectManifest(manifest: string): string {
+  const equivalents = new Map<string, string>();
+  for (const [relation, column, nullExpression] of [
+    ['parse_jobs', 'contributor_ids', '(NULL::text)::content_intake.identifier'],
+    ['principal_facts', 'department_ids', 'NULL::text'],
+  ] as const) {
+    const prefix = `constraint|content_intake.${relation}.${relation}_${column}_check|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK (`;
+    const bounds = `(cardinality(${column}) >= 1) AND (cardinality(${column}) <= 100)`;
+    const noNulls = `(array_position(${column}, ${nullExpression}) IS NULL)`;
+    equivalents.set(`${prefix}(${bounds} AND ${noNulls}))`, `${prefix}((${bounds}) AND ${noNulls}))`);
+  }
+  return manifest.split('\n').map((entry) => equivalents.get(entry) ?? entry).join('\n');
+}
+
 function explainImportBatchEnablement(manifest: string): Readonly<{ sha256: string; disabledTriggers: readonly string[] }> {
   const disabledTriggers: string[] = [];
   const rewritten = manifest.split('\n').map((entry) => {
@@ -881,9 +897,9 @@ async function verifyCatalogueState(
   if (
     !objects
     || objects.entries !== expectedInventory.objectEntries
-    || sha256(objects.manifest) !== expectedInventory.objectSha256
+    || sha256(canonicalObjectManifest(objects.manifest)) !== expectedInventory.objectSha256
   ) {
-    failures.push(`exact database object/owner manifest [${objects?.entries ?? 'missing'}:${objects ? sha256(objects.manifest) : 'missing'}]`);
+    failures.push(`exact database object/owner manifest [${objects?.entries ?? 'missing'}:${objects ? sha256(canonicalObjectManifest(objects.manifest)) : 'missing'}]`);
   }
   if (
     !functionSecurity
@@ -1120,6 +1136,10 @@ const READINESS_SUFFIX = [
   { length: 71, index: 70, id: '0071_analytics_runtime_execute' },
   { length: 72, index: 71, id: '0072_seat_post_grants' },
   { length: 73, index: 72, id: '0073_feishu_query_grant' },
+  { length: 74, index: 73, id: '0074_authorization_deadline_engineer' },
+  { length: 75, index: 74, id: '0075_authorization_deadline_source_null' },
+  { length: 76, index: 75, id: '0076_authorization_decision' },
+  { length: 77, index: 76, id: '0077_manual_identity_grants' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1188,6 +1208,10 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   71: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: '279577857d0264a48d56f96b66607859050ab8dd9be3638525fa8a0e62fa3e9f', functionEntries: 294, functionSha256: '653f32268837c49fd224ea913ab92567612ba865f0b8d7b613be35dcf7c50dd5', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   72: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: '279577857d0264a48d56f96b66607859050ab8dd9be3638525fa8a0e62fa3e9f', functionEntries: 294, functionSha256: 'a88a90fbeb255f3a6e3f7a2b0e596db2d69c8306a41c69ad9575062454f6b471', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   73: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: 'ce9c14523b18d305b21ce65567285c996793568739e8f92211d7737e0d78e221', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  74: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: '5654bee2dfd86ec91cc14f82ffd625296e738fcb10b7f1aab156eac42b0df4d4', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  75: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: '17f929934ff5e223ee2d66e23ff90a7ecb79f6cf62b7c91757d51d67c0ca6228', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  76: { tables: 111, functions: 294, objectEntries: 3438, objectSha256: 'a82f5b2ac6493a56df1385e2c3d6063d15981014d8f5d87d3e9a0f8559a35de7', functionEntries: 294, functionSha256: '44d80cfdfabc3fee42b6a4b1848245fd3491fa3053cef711450fd467fd80fceb', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  77: { tables: 111, functions: 299, objectEntries: 3443, objectSha256: 'de15fb78bd355d1926f2544fd6625b22c3b4c4d32f826ed507aeac0f56d8d328', functionEntries: 299, functionSha256: 'a7f7a1efec5d6a93042be4dd2d505d16ee818c8244bd2571a982f9d2400fa579', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1233,6 +1257,10 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   71: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
   72: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
   73: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
+  74: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
+  75: { entries: 648, sha256: '6439e2c62e5db795960110e45b62f7b38c9ebacc6fff0a1cf03327c54fe6c652' },
+  76: { entries: 649, sha256: 'acd4ff8c55c3b5fde3d3eb320b0ae60f1961de551b15151b3738671d8ef597a9' },
+  77: { entries: 654, sha256: 'cf90d1c23de6e40d9c43ab6c14f5028c62731ceb1f64958a0938442c37e14940' },
 };
 
 export async function verifyReadinessSuccessor(

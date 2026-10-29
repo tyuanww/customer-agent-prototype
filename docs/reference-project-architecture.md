@@ -81,7 +81,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/contracts/` | 在共享快照锁内确定性生成 OpenAPI bundle、TS 类型和 component runtime validator；构建 Node 可执行 `dist`，拥有生成物指纹、验证扩展与有上限的脱敏错误形状 | HTTP host、路由策略、DB migration、renderer、凭证或真实数据 |
 | `packages/retrieval-core/` | 纯 TypeScript 检索算法：BM25、RRF、余弦相似度、分数门槛和字符分词；通过显式输入隐藏算法细节，不拥有产品字段、HTTP、Electron、数据库或 UI 策略 | `apps/*` 依赖、产品字段权重、合成/真实数据读取、运行时 I/O |
 | `packages/content-intake/` | 标准 FAQ 的 XLSX / CSV 解析、预算前检、错误/模板实物及可取消子进程；`faq-rules.ts` 独占格式无关业务校验，`csv.ts` 拥有原字节 CSV 格式边界；同一 runner 按服务端来源上下文选择解析器，P2 API 消费正式编译产物 | 不拥有授权/审批/正式候选、renderer IPC、真实来源或自行发布；experiments/csv 只保存合成原字节夹具 |
-| `packages/job-roster/` | 稳定职务目录、有限别名窗口，以及 `GET /v1/auth/job` 响应解析。登录登记和桌面按钮都读 `JOB_ROSTER`。登录仍只自动签发 `query` | 不连接数据库，不签发授权。Electron 预加载不能引用这个包，权利表在预加载里手写同一份句子 |
+| `packages/job-roster/` | 稳定职务目录、有限别名窗口，以及 `GET /v1/auth/job` 响应解析。登录登记和桌面按钮都读 `JOB_ROSTER` | 不连接数据库，不签发授权。Electron 预加载不能引用这个包，权利表在预加载里手写同一份句子 |
 | `apps/api/src/content-intake/` | 产品会话主体到组织／岗位／业务授权交集；原子授权、接收／解析、服务端 direct-v1 材料冻结、修订／取消与来源确认；候选质量计划及逐条人工检查复用封闭 DB 存储；publication 拥有确认意图、精确原操作恢复与内部 SQL 原子发布；仅在事务确认成功或已提交回执恢复后登记图片预览，回滚和未知提交不提前投影；rollback 拥有上一版完整影响预检、全部影响范围复核及新发布回执；evidence 保留来源确认与只读旧审批历史，四个审批写口拒绝 MODE_CONFLICT；usage 统一拥有会话／店铺／选择绑定、来源材料一致性、混合政策谱系、最早截止、逐页重验和坐席投影；discovery 投影来源资格及绑定会话／完整权限版本的分页 | 仅隔离 PG 合成消费者，无生产 HTTP factory／新 ACL；不安装新审批 provider，不制造审批通过，不创建第二 current，不隐式 bootstrap／认领旧同域内容 |
 | `apps/api/src/content-intake/usage-http.ts` | 六条发现/词表/店铺目录/资格/快照 HTTP 路由的认证、查询解码、正式错误与响应校验；保留认证私有引用，复用既有 usage 事务 | 仅隔离合成宿主显式注册；不导入桌面，不注册生产工厂，不授予新应用 ACL |
 | `apps/api/src/content-intake/grants-http.ts` / `authority.ts` / `discovery.ts` grants | 冻结授权合同的列表、只读预览、创建与撤销/接管 HTTP；预览与创建共用批次校验，列表在 SQL 扫描前按当前可管理范围收窄，最终仍复核母授权；管理插件借出同一个 requireProductSession service | 仅合成宿主注册；不建立第二权限规则、不创建 root allocation；游标不携带无权范围的扫描行，预览没有持久写或回执 |
@@ -330,7 +330,7 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 ### T1 身份所有权
 
-`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`AUTH_MODE=feishu` 且配了 loopback 口令 origin 时，`workforce-identity-provider.ts` 组合飞书 OAuth 与口令一次性 code；`feishu-identity-provider.ts` 只拥有飞书 authorize/token/user_info：`user_info` GET 跟随 HTTPS 跳转到 `open.feishu.cn` / `accounts.feishu.cn`（空或非 HTTPS 失败关闭），token POST 保持 `redirect: error`，写仓外显示名失败不得让登录失败。`product-auth-service.ts` 封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有 mock 合成 wire。口令 HTTP 在 `scripts/synthetic-stack/password-identity-server.ts`。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 不直连；D1 Query 已通过窄 IPC 使用产品会话。
+`runtime-config.ts` 唯一解析显式产品会话配置和三池总预算；`server.ts` 组合受控提供方与身份服务，失败时不建 mock。`AUTH_MODE=feishu` 且配了 loopback 口令 origin 时，`workforce-identity-provider.ts` 组合飞书 OAuth 与口令一次性 code；`feishu-identity-provider.ts` 只拥有飞书 authorize/token/user_info：`user_info` GET 跟随 HTTPS 跳转到 `open.feishu.cn` / `accounts.feishu.cn`（空或非 HTTPS 失败关闭），token POST 保持 `redirect: error`。Feishu user_info 姓名先经进程内一次性交接；`product-auth-service.ts` 在 `app_backend_auth` 能力内按 binding 更新既有 `app_users.display_name`，姓名失败不阻断登录。`product-auth-service.ts` 同时封装持久登录、会话、最小数据库角色和关闭；`synthetic-identity-provider.ts` 仅拥有 mock 合成 wire。口令 HTTP 在 `scripts/synthetic-stack/password-identity-server.ts`。`product-auth-routes.ts` 拥有封闭 HTTP 输入、静态完成页、错误响应和固定限流窗口。现有 auth/search/event/policy 路由统一等待异步认证；renderer 不直连；D1 Query 已通过窄 IPC 使用产品会话。
 
 ### D1 桌面产品会话所有权
 

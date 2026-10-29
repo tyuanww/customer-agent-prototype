@@ -86,7 +86,10 @@ export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // add rollback script 0074, monitoring scripts, and demonstration scripts. GitHub
   // Linux read source-inputs 110 KiB over 21.9 MiB, then 8 KiB over 22.0 MiB on second
   // run. 22.1 MiB covers that reading with headroom.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.1 * 1024 * 1024 }),
+  // 2026-10-29: identity lifecycle migrations and real PG race/password/restore
+  // regressions exceed 22.1 MiB by 23.9 KiB on APFS after condensing the SOP
+  // proposal. Keep every input counted and the aggregate cap at 48.0 MiB.
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.2 * 1024 * 1024 }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

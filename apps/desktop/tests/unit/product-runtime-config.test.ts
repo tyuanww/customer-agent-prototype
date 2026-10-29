@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { workbenchKind } from '../../src/shared/workbench-mode';
 import {
   PackagedProfileError,
   SYNTHETIC_OFFLINE_PROFILE_JSON,
@@ -51,6 +52,7 @@ describe('packaged synthetic product profile', () => {
       identityOrigin: 'https://agent-id.jianghua.site',
     });
     expect(readPackagedProductProfile(directory)).toEqual({
+      mode: 'product-remote',
       apiOrigin: 'https://agent-auth.jianghua.site',
       identityOrigin: 'https://agent-id.jianghua.site',
     });
@@ -72,6 +74,7 @@ describe('packaged synthetic product profile', () => {
     const directory = userDataDirectory();
     write(directory, STACK_PROFILE);
     expect(readPackagedProductProfile(directory)).toEqual({
+      mode: 'synthetic-local',
       apiOrigin: 'http://127.0.0.1:43100',
       identityOrigin: 'http://127.0.0.1:43101',
     });
@@ -253,11 +256,13 @@ describe('packaged synthetic product profile', () => {
 
     write(directory, STACK_PROFILE);
     expect(resolveProductProfile(true, directory, LOOPBACK_ENV)).toEqual({
+      mode: 'synthetic-local',
       apiOrigin: 'http://127.0.0.1:43100',
       identityOrigin: 'http://127.0.0.1:43101',
     });
     expect(resolveProductProfile(false, directory, {})).toBeUndefined();
     expect(resolveProductProfile(false, directory, LOOPBACK_ENV)).toEqual({
+      mode: 'synthetic-local',
       apiOrigin: 'http://127.0.0.1:43110',
       identityOrigin: 'http://127.0.0.1:43111',
     });
@@ -265,6 +270,7 @@ describe('packaged synthetic product profile', () => {
       CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://agent-auth.jianghua.site',
       CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'https://agent-id.jianghua.site',
     })).toEqual({
+      mode: 'product-remote',
       apiOrigin: 'https://agent-auth.jianghua.site',
       identityOrigin: 'https://agent-id.jianghua.site',
     });
@@ -294,12 +300,12 @@ describe('packaged synthetic product profile', () => {
     expect(stackProfile).toContain("'synthetic-stack.json'");
   });
 
-  it('reads development origins only when both are exact loopback origins', () => {
+  it('normalizes loopback development origins and rejects incomplete or invalid origins', () => {
     expect(developmentProductProfile({})).toBeUndefined();
     expect(developmentProductProfile({
       CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'http://127.0.0.1:43100/',
       CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'http://127.0.0.1:43101/',
-    })).toEqual({ apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' });
+    })).toEqual({ mode: 'synthetic-local', apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' });
     // A half-configured or widened pair must fail loudly rather than silently
     // falling back to the offline fixture profile.
     for (const environment of [
@@ -313,7 +319,7 @@ describe('packaged synthetic product profile', () => {
   });
 });
 
-it('enables FAQ only through explicit synthetic loopback configuration', () => {
+it('preserves the explicit synthetic FAQ shell projection and remote compatibility', () => {
   expect(developmentProductProfile({ ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2' })).toMatchObject({ contentIntake: 'faq-v2' });
   for (const env of [
     { CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2' },
@@ -323,10 +329,11 @@ it('enables FAQ only through explicit synthetic loopback configuration', () => {
   const directory = userDataDirectory();
   write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2' });
   const parsed = readPackagedProductProfile(directory);
-  expect(parsed).toMatchObject({ contentIntake: 'faq-v2' });
+  expect(parsed).toMatchObject({ mode: 'synthetic-local', contentIntake: 'faq-v2' });
   expect(projectIntakeShellLine(parsed)).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   write(directory, { mode: 'product-remote', apiOrigin: 'https://synthetic-api.invalid', identityOrigin: 'https://synthetic-id.invalid', contentIntake: 'faq-v2' });
   expect(readPackagedProductProfile(directory)).toMatchObject({
+    mode: 'product-remote',
     apiOrigin: 'https://synthetic-api.invalid',
     identityOrigin: 'https://synthetic-id.invalid',
     contentIntake: 'faq-v2',
@@ -334,16 +341,43 @@ it('enables FAQ only through explicit synthetic loopback configuration', () => {
   expect(projectIntakeShellLine(readPackagedProductProfile(directory))).toBeNull();
   expect(projectIntakeShellLine({ contentIntake: 'faq-v2' })).toBeNull();
   expect(projectIntakeShellLine({
+    mode: 'synthetic-local',
     apiOrigin: 'http://127.0.0.1:43100',
     identityOrigin: 'http://127.0.0.1:43101',
     contentIntake: 'faq-v2',
   })).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   expect(JSON.stringify(projectIntakeShellLine({
+    mode: 'synthetic-local',
     apiOrigin: 'http://127.0.0.1:43100',
     identityOrigin: 'http://127.0.0.1:43101',
     contentIntake: 'faq-v2',
   }))).not.toMatch(/43100|password|DATABASE|secret/);
-  expect(projectIntakeShellLine({ apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' })).toBeNull();
+  expect(projectIntakeShellLine({ mode: 'synthetic-local', apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' })).toBeNull();
   expect(projectIntakeShellLine(null)).toBeNull();
   expect(projectIntakeShellLine(undefined)).toBeNull();
+});
+
+it.each([
+  { input: STACK_PROFILE, mode: 'synthetic-local', kind: 'legacy' },
+  { input: { ...STACK_PROFILE, contentIntake: 'faq-v2' }, mode: 'synthetic-local', kind: 'faq-v2' },
+  { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com/', identityOrigin: 'https://id.example.com:443/' }, mode: 'product-remote', kind: 'product-remote' },
+  { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com', identityOrigin: 'https://id.example.com', contentIntake: 'faq-v2' }, mode: 'product-remote', kind: 'faq-v2' },
+  { input: { mode: 'synthetic-offline' }, mode: undefined, kind: 'legacy' },
+])('retains $mode and the existing $kind navigation when resolving a packaged profile', ({ input, mode, kind }) => {
+  const directory = userDataDirectory();
+  write(directory, input);
+  const profile = resolveProductProfile(true, directory, LOOPBACK_ENV);
+  expect(profile?.mode).toBe(mode);
+  expect(workbenchKind(profile)).toBe(kind);
+  if (profile) expect(Object.isFrozen(profile)).toBe(true);
+});
+
+it.each([
+  { api: 'https://api.example.com', identity: 'http://127.0.0.1:43101', mode: 'product-remote' },
+  { api: 'http://127.0.0.1:43100', identity: 'https://id.example.com', mode: 'synthetic-local' },
+])('preserves existing development origin combinations with API mode $mode', ({ api, identity, mode }) => {
+  expect(developmentProductProfile({
+    CUSTOMER_AGENT_DESKTOP_API_ORIGIN: api,
+    CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: identity,
+  })).toEqual({ mode, apiOrigin: api, identityOrigin: identity });
 });

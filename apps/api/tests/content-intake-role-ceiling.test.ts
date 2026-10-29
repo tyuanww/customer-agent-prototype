@@ -6,7 +6,8 @@ const actions = ['query', 'content-manage', 'import', 'source-confirm', 'review'
 const now = Date.now();
 const actor = (role: Principal['role']): Principal => ({
   id: 'p', userId: 'u', tenantId: 'tenant-a', appId: 'app-a', identityScope: 'confirmed-synthetic', personKey: 'k',
-  factsVersion: 1, generation: 0, enabled: true, checkedAt: now - 1_000, validUntil: now + 60_000, role,
+  factsVersion: 1, generation: 0, enabled: true, checkedAt: now - 1_000, validUntil: now + 60_000,
+  role,
 });
 
 describe('content intake role ceiling', () => {

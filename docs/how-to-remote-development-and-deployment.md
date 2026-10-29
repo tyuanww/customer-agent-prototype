@@ -152,7 +152,7 @@
        .stackRoot == "/srv/customer-agent/test-stack"
        and .apiOrigin == "http://127.0.0.1:43180"
        and .identityOrigin == "http://127.0.0.1:43181"
-       and .databaseName == "customer_agent_synthetic"
+       and .databaseName == "customer_agent_intake_test"
        and .pgSocketDirectory == "/srv/customer-agent/test-stack/data/pg15-socket"
        and .objectStoreDirectory == "/srv/customer-agent/test-stack/objects"
      ' /srv/customer-agent/test-stack/profile.json >/dev/null
@@ -161,7 +161,7 @@
      check_test_profile
    fi
    if sudo -n -u customer-agent-test test -e /srv/customer-agent/test-stack/content.env; then
-     sudo -n -u customer-agent-test grep -Eq '^DATABASE_NAME=customer_agent_synthetic[[:space:]]*$' /srv/customer-agent/test-stack/content.env
+     sudo -n -u customer-agent-test grep -Eq '^DATABASE_NAME=customer_agent_intake_test[[:space:]]*$' /srv/customer-agent/test-stack/content.env
    fi
    sudo -n systemctl stop "$TEST_UNIT"
    sudo -n systemctl start "$TEST_UNIT"

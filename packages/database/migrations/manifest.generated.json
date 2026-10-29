@@ -1091,6 +1091,28 @@
       "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
       "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
       "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 76,
+      "id": "0076_authorization_decision",
+      "file": "0076_authorization_decision.sql",
+      "source_ranges": [],
+      "sha256": "a12f5ca4b05c394c3545788bf3cce8b2c6e5bcac0eeba17994e239a1d0dbc2d4",
+      "bytes": 4873,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+    },
+    {
+      "position": 77,
+      "id": "0077_manual_identity_grants",
+      "file": "0077_manual_identity_grants.sql",
+      "source_ranges": [],
+      "sha256": "58585d257a3e164f3b8d6d3610792aad84b509543d476aa7d26a2bbe596ec35d",
+      "bytes": 30095,
+      "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+      "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+      "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
     }
   ]
 }

@@ -95,11 +95,11 @@ export class ContentIntakePermissions {
   }
   dispose() { this.disposed=true; this.stop(); this.clear(); this.pending=null; this.unsubscribe(); this.listeners.clear(); }
   async command(command: IntakePermissionCommand): Promise<IntakePermissionView> {
-    if (command.action==='stop') { this.stop(); this.preview=null; this.previewView=null; this.notice=this.pending?'已停止本机等待；服务端结果仍须按原请求确认。':'已停止读取。'; return this.view(); }
+    if (command.action==='stop') { this.stop(); this.preview=null; this.previewView=null; this.notice=this.pending?'已停止本机等待；服务端结果仍须按原请求确认。':'已停止读取。'; this.emit(); return this.view(); }
     if (this.active || this.disposed || !this.session.view().signedIn) return reject();
     if (this.pending && command.action!=='retry') throw new ProductHttpError('CONFLICT');
     if (command.action==='retry' && !this.pending) throw new ProductHttpError('CONFLICT');
-    if (command.action==='discard') { this.preview=null;this.previewView=null;return this.view(); }
+    if (command.action==='discard') { this.preview=null;this.previewView=null;this.emit();return this.view(); }
     const controller = new AbortController(), gen=++this.generation, epoch=this.session.view().sessionEpoch;
     this.active=controller; this.notice=null;
     const check=()=>{if(this.disposed || gen!==this.generation || controller.signal.aborted || !this.session.view().signedIn || this.session.view().sessionEpoch!==epoch) reject();};

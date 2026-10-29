@@ -240,14 +240,6 @@ if (!gotLock) {
       getOverlay: () => controller,
       getSop: () => sopController,
     });
-    // Development reads loopback origins from the environment; a packaged build
-    // reads the same values from its own userData file so an installed client
-    // can run the synthetic chain without any environment setup. Both paths are
-    // validated to bare loopback origins. A packaged build ignores origin
-    // environment variables and fail-closes if the file is missing or invalid.
-    // Absence is not S0. Explicit `{ "mode": "synthetic-offline" }` starts S0.
-    // Retrieval hydrate / BM25 use the known off-repo stack files, not leftover
-    // `/v1/search`, and also must not require a developer shell.
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
       applyPackagedRetrievalDefaults(process.env, { apiOrigin: productProfile.apiOrigin });
@@ -276,8 +268,8 @@ if (!gotLock) {
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
-    const hangzhouWorkbench = productProfile?.apiOrigin.startsWith('https://') === true;
-    const workbenchSession = productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench ? productSession : null;
+    const intakeWorkbench = productProfile?.contentIntake === 'faq-v2' || productProfile?.mode === 'product-remote';
+    const workbenchSession = intakeWorkbench ? productSession : null;
     const pagePermissions = workbenchSession ? new ContentIntakePermissions(workbenchSession) : null;
     pageUseReader = workbenchSession && pagePermissions ? new PageUseReader(workbenchSession, pagePermissions) : null;
     disposePageUse = registerPageUseIpc(pageUseReader,
@@ -290,7 +282,7 @@ if (!gotLock) {
     seatAccounts = registerSeatAccountIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
-      () => productProfile?.contentIntake === 'faq-v2' || hangzhouWorkbench,
+      () => intakeWorkbench,
       () => pageUseReader ? canOpenPermissions(pageUseReader.current()) : false,
       (epoch) => pageUseReader ? pageUseReader.listSeats(epoch) : Promise.resolve({ state: 'closed' as const }));
     intakeManagement = registerContentIntakeManagementIpc(workbenchSession,

@@ -49,6 +49,10 @@ const SOP_REPAIR_SUFFIX = [
   '0071_analytics_runtime_execute',
   '0072_seat_post_grants',
   '0073_feishu_query_grant',
+  '0074_authorization_deadline_engineer',
+  '0075_authorization_deadline_source_null',
+  '0076_authorization_decision',
+  '0077_manual_identity_grants',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -573,7 +577,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     }
   });
 
-  it('grants query for a new Feishu binding when one preview source has a live parent', async () => {
+  it('admits only the Feishu identity even when a preview source has a live query parent', async () => {
     const database = harness.createDatabase('feishu_grant');
     const client = await harness.connect(database.config);
     try {
@@ -625,8 +629,13 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
             ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
          WHERE p.principal_id = 'prin_' || left(encode(pg_catalog.sha256(pg_catalog.convert_to('ou_newfeishu01','UTF8')), 'hex'), 32)
            AND g.revoked_at IS NULL AND g.action = 'query'`);
-      expect(rows.rows).toEqual([
-        { action: 'query', source_id: 'source-a', kind: 'business', has_issuer: true, day_window: true },
+      expect(rows.rows).toEqual([]);
+      expect((await client.query(`SELECT binding.role, binding.enabled,
+          EXISTS (SELECT 1 FROM content_intake.principals p
+            WHERE p.user_id=binding.user_id) AS has_business_identity
+        FROM backend_identity.subject_bindings binding
+        WHERE binding.binding_id='ou_newfeishu01'`)).rows).toEqual([
+        { role: 'agent', enabled: true, has_business_identity: false },
       ]);
     } finally {
       await client.end();
@@ -639,7 +648,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(73);
+      expect(fresh.pending).toHaveLength(77);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -651,12 +660,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 73,
-        inventory: { tables: 111, views: 7, functions: 294 },
+        migrationCount: 77,
+        inventory: { tables: 111, views: 7, functions: 299 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 64-migration current suffix',
+          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 68-migration current suffix',
         },
       });
 
@@ -803,7 +812,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 73,
+        migrationCount: 77,
       });
     } finally {
       await client.end();
@@ -1059,7 +1068,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 73,
+        migrationCount: 77,
       });
     } finally {
       await client.end();

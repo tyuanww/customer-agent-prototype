@@ -2,17 +2,15 @@
 /**
  * Keeps roster facts fresh between logins.
  *
- * Login writes a five-minute facts window (principal_facts_check caps every row at
- * `checked_at + 5 minutes`) and nothing refreshes it, so an operator who uploads a workbook
+ * Login writes a facts window of at most 24 hours and nothing refreshes it, so an operator
+ * who uploads a workbook
  * and then works through parsing, human review and publication loses authority mid-flight.
  * This script re-reads the same Feishu data login reads and re-projects it, which extends the
  * window without weakening the cap: an organisational change still takes effect within one
  * interval.
  *
- * It refreshes facts and then re-runs the same issuance login runs. Issuance is idempotent
- * while the job, policy version and store set are unchanged, and 0062 stops it from promoting
- * a version with no members, so a tick cannot take authority away. Running it here instead of
- * only at login means a published source becomes readable without a second manual login.
+ * It only refreshes directory facts. Business grants are a separate manual command;
+ * this scheduler never issues or extends authority.
  *
  * Emits counts and statuses only. Job titles and department lists are personal data and must
  * not reach a log, a terminal transcript, or this repository.
@@ -29,11 +27,10 @@ const IDENTITY_SCOPE = 'feishu-job-roster';
 const ROSTER_DEPARTMENT_TYPE = 'open_department_id';
 const FEISHU_ORIGIN = 'https://open.feishu.cn';
 const REQUEST_TIMEOUT_MS = 8_000;
-/** Refresh only when the current window is this close to ending. A tick that refreshed every
- *  time would append a facts row per principal per tick forever, and `facts_version` is
- *  referenced by grants, so those rows can never be deleted. The cap is five minutes, so this
- *  leaves a margin while keeping the table flat between ticks. */
-const RENEW_BEFORE_MS = 120_000;
+/** Refresh only when the current window is this close to ending. The timer runs every four
+ *  minutes, so ten minutes leaves more than two ticks of operational margin. Refreshing every
+ *  tick would append facts forever, and `facts_version` is referenced by grants. */
+const RENEW_BEFORE_MS = 10 * 60 * 1000;
 /** Above this the run is reported as degraded rather than silently partial. */
 const MAX_FAILURES_BEFORE_UNHEALTHY = 1;
 
@@ -138,13 +135,9 @@ async function main() {
       try {
         const remaining = row.valid_until === null ? 0 : Date.parse(row.valid_until) - Date.now();
         if (remaining > RENEW_BEFORE_MS) {
-          // Facts are still good. Issuance is still worth a call: it is what brings a freshly
-          // published source into the store set, and it appends no facts row for this person.
-          const issued = await client.query(
-            'SELECT content_intake.issue_roster_query($1,$2,$3) AS status',
-            [row.principal_id, TENANT, APP]);
+          // Facts are still good. Nothing is issued from a directory refresh.
           skipped += 1;
-          log(`hold ${row.principal_id}: ${String(Math.round(remaining / 1000))}s left, issue ${String(issued.rows[0]?.status)}`);
+          log(`hold ${row.principal_id}: ${String(Math.round(remaining / 1000))}s left`);
           continue;
         }
         const facts = await directoryFacts(token, row.person_key);
@@ -177,10 +170,6 @@ async function main() {
           log(`skip ${row.principal_id}: projection returned ${String(status)}`);
           continue;
         }
-        const issued = await client.query(
-          'SELECT content_intake.issue_roster_query($1,$2,$3) AS status',
-          [row.principal_id, TENANT, APP]);
-        log(`issue ${row.principal_id}: ${String(issued.rows[0]?.status)}`);
       } catch (error) {
         failed += 1;
         log(`fail ${row.principal_id}: ${error.message ?? 'error'}`);

@@ -50,7 +50,7 @@ export function createSyntheticIdentityProvider(origin: string, callbackUrl: str
           || Object.keys(value).sort().join(',') !== 'binding_id,provider'
           || Reflect.get(value, 'provider') !== 'synthetic'
           || typeof Reflect.get(value, 'binding_id') !== 'string'
-          || !/^synthetic_[A-Za-z0-9_-]{1,100}$/.test(Reflect.get(value, 'binding_id'))) {
+          || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(String(Reflect.get(value, 'binding_id')))) {
           throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
         }
         return Reflect.get(value, 'binding_id') as string;

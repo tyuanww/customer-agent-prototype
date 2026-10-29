@@ -168,7 +168,7 @@ describe.skipIf(!enabled)('one Feishu open id shares an existing principal', () 
     }
   }, 180_000);
 
-  it('uses the attached binding and leaves grant rows unchanged', async () => {
+  it('uses the attached binding and disables its actual principal on departure', async () => {
     const database = harness.createDatabase('feishu_attach');
     const client = await harness.connect(database.config);
     const feishu: string[] = [];
@@ -183,24 +183,70 @@ describe.skipIf(!enabled)('one Feishu open id shares an existing principal', () 
       expect(await attach(client, linked, 'director')).toBe('already-attached');
       expect(await linkRows(client)).toEqual([{ open_id: linked, binding_id: 'director' }]);
       expect(await principalRows(client)).toEqual(beforePeople);
+      rememberJobSnapshot(linked, {
+        title: '客服总监',
+        directory: [{ name: '客服总监', enabled: true }],
+        departmentIds: ['dept-a'],
+      });
       auth = await openAuth(harness, database.name, client, async (openId) => {
         feishu.push(openId);
-      }, async (bindingId) => {
-        passwords.push(bindingId);
         await client.query('SET ROLE intake_business');
         try {
-          await client.query('SELECT content_intake.project_seat_login($1)', [bindingId]);
+          await projectRosterLogin(client, openId);
         } finally {
           await client.query('RESET ROLE');
         }
+      }, async (bindingId) => {
+        passwords.push(bindingId);
       });
       const user = await signIn(auth, linked);
       expect(user).toMatchObject({ user_id: 'user-director', role: 'owner' });
-      expect(feishu).toEqual([]);
-      expect(passwords).toEqual(['director']);
+      expect(feishu).toEqual([linked]);
+      expect(passwords).toEqual([]);
       expect(await principalRows(client)).toEqual(beforePeople);
+      expect((await client.query<{ job_id: string; department_ids: string[] }>(`
+        SELECT facts.job_id, facts.department_ids
+        FROM content_intake.principals person
+        JOIN content_intake.principal_facts facts
+          ON facts.principal_id=person.principal_id
+         AND facts.facts_version=person.current_facts_version
+        WHERE person.principal_id='director'`)).rows).toEqual([{
+        job_id: 'job-customer-service-director',
+        department_ids: ['dept-a'],
+      }]);
       expect(await grantRows(client)).toEqual(beforeGrants);
       expect((await principalRows(client)).some((row) => row.principal_id === rosterPrincipalId(linked))).toBe(false);
+      await client.query('SET ROLE intake_business');
+      try {
+        expect((await client.query(`SELECT content_intake.withdraw_feishu_roster(
+          $1,'tenant-a','wrong-app') AS status`, [linked])).rows).toEqual([{ status: 'conflict' }]);
+        expect((await client.query(`SELECT content_intake.withdraw_feishu_roster(
+          'ou_unlinkedmissing','tenant-a','app-a') AS status`)).rows).toEqual([{ status: 'absent' }]);
+      } finally {
+        await client.query('RESET ROLE');
+      }
+      expect((await client.query(`SELECT facts.enabled
+        FROM content_intake.principals person
+        JOIN content_intake.principal_facts facts USING (principal_id)
+        WHERE person.principal_id='director'
+          AND facts.facts_version=person.current_facts_version`)).rows).toEqual([{ enabled: true }]);
+      rememberJobSnapshot(linked, {
+        title: '客服总监', directory: [{ name: '客服总监', enabled: false }],
+        departmentIds: ['dept-a'], departed: true,
+      });
+      await client.query('SET ROLE intake_business');
+      try {
+        expect(await projectRosterLogin(client, linked)).toBe('revoked');
+      } finally {
+        await client.query('RESET ROLE');
+      }
+      expect((await client.query(`SELECT facts.enabled
+        FROM content_intake.principals person
+        JOIN content_intake.principal_facts facts USING (principal_id)
+        WHERE person.principal_id='director'
+          AND facts.facts_version=person.current_facts_version`)).rows).toEqual([{ enabled: false }]);
+      expect((await client.query(`SELECT * FROM content_intake.authorization_sources(
+        'director','query',clock_timestamp())`)).rows).toEqual([]);
     } finally {
       await auth?.close();
       await client.end();

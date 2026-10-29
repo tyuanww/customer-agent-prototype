@@ -13,7 +13,7 @@ function remember(openId: string, title: string) {
   rememberJobSnapshot(openId, { title, directory: [{ name: title, enabled: true }], departmentIds: ['dept-a'] });
 }
 
-describe.skipIf(!enabled)('roster projection writes one principal and only content-backed query grants', () => {
+describe.skipIf(!enabled)('roster projection registers identity without issuing grants', () => {
   let harness: Pg15Harness;
   beforeEach(() => { harness = new Pg15Harness(); harness.start(); }, 120_000);
   afterEach(() => {
@@ -95,7 +95,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
     }
   }, 60_000);
 
-  it('keeps a query grant outside the current store set closed', async () => {
+  it('registers without content and does not invent a query grant', async () => {
     const database = harness.createDatabase('roster_deadline');
     const client = await harness.connect(database.config);
     try {
@@ -117,33 +117,19 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
       const job = composeRosterJob(null, stored, true);
       expect(job?.permission_state).toBe('pending');
       expect(job?.message).toBe(ROSTER_PENDING_MESSAGE);
-      await client.query(`
-        INSERT INTO content_intake.grants(
-          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)
-        SELECT 'grant-system-query','business',principal_id,$1,'tenant-a','app-a','scope-a','source-a','query',
-          clock_timestamp()-interval '1 minute', clock_timestamp()+interval '1 day','职位名单系统签发。',NULL
-        FROM content_intake.principals
-        WHERE identity_scope = 'content-intake-system' AND person_key = 'query-signer' AND tenant_id = 'tenant-a'`,
-      [rosterPrincipalId(seat)]);
-      const issued = await client.query<{ issuer_scope: string; parent_grant_id: string | null; action: string }>(`
-        SELECT p.identity_scope AS issuer_scope, g.parent_grant_id, g.action
-        FROM content_intake.grants g
-        JOIN content_intake.principals p ON p.principal_id = g.issuer_id
-        WHERE g.grant_id = 'grant-system-query'`);
-      expect(issued.rows).toEqual([{ issuer_scope: 'content-intake-system', parent_grant_id: null, action: 'query' }]);
+      expect((await client.query(
+        `SELECT 1 FROM content_intake.grants WHERE recipient_id=$1 AND kind='business'`,
+        [rosterPrincipalId(seat)],
+      )).rowCount).toBe(0);
       expect(await deadline('query')).toBeNull();
       expect(await deadline('publish')).toBeNull();
-      await client.query(`UPDATE content_intake.grants
-        SET version = version + 1, last_change_reason = '撤销。', revoked_at = clock_timestamp()
-        WHERE grant_id = 'grant-system-query'`);
-      expect(await deadline('query')).toBeNull();
     } finally {
       await client.query('ROLLBACK').catch(() => undefined);
       await client.end();
     }
   }, 60_000);
 
-  it('issues one system query grant when the current release names the source', async () => {
+  it('keeps a matched login read-only until a human grants query', async () => {
     const database = harness.createDatabase('roster_lineage');
     const client = await harness.connect(database.config);
     try {
@@ -151,7 +137,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
       await publishLineage(client);
       await client.query('SET ROLE intake_business');
       remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
       await client.query('RESET ROLE');
       const grants = await client.query<{ action: string; parent_grant_id: string | null; issuer_scope: string; policy_version: string; store_set_version: string }>(`
         SELECT g.action, g.parent_grant_id, p.identity_scope AS issuer_scope,
@@ -160,21 +146,18 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
         JOIN content_intake.principals p ON p.principal_id = g.issuer_id
         WHERE g.recipient_id = $1 AND g.kind = 'business' AND g.revoked_at IS NULL
         ORDER BY g.action`, [rosterPrincipalId(seat)]);
-      expect(grants.rows).toEqual([{
-        action: 'query', parent_grant_id: null, issuer_scope: 'content-intake-system',
-        policy_version: '2', store_set_version: '1',
-      }]);
+      expect(grants.rows).toEqual([]);
       const until = await client.query<{ until: Date | null }>(
         `SELECT content_intake.authorization_deadline($1,'query','scope-a','source-a',clock_timestamp()) AS until`,
         [rosterPrincipalId(seat)]);
-      expect(until.rows[0]?.until).not.toBeNull();
+      expect(until.rows[0]?.until).toBeNull();
     } finally {
       await client.query('ROLLBACK').catch(() => undefined);
       await client.end();
     }
   }, 60_000);
 
-  it('revokes the system query grant when the source leaves the current release', async () => {
+  it('does not create or revive authority when published content changes', async () => {
     const database = harness.createDatabase('roster_remove');
     const client = await harness.connect(database.config);
     try {
@@ -182,7 +165,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
       await publishLineage(client);
       await client.query('SET ROLE intake_business');
       remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
       await client.query('RESET ROLE');
       await client.query('BEGIN');
       await client.query("SELECT set_config('app.publishing','on',true)");
@@ -196,7 +179,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
       await client.query("UPDATE public.content_current SET current_release_id='rel-empty', updated_at=clock_timestamp() WHERE id=1");
       await client.query('COMMIT');
       await client.query('SET ROLE intake_business');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('revoked');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
       await client.query('RESET ROLE');
       const live = await client.query(
         `SELECT 1 FROM content_intake.grants WHERE recipient_id=$1 AND kind='business' AND action='query' AND revoked_at IS NULL`,
@@ -212,7 +195,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
     }
   }, 60_000);
 
-  it('does not treat a human query grant as a system projection', async () => {
+  it('keeps a human query grant through later logins without adding another', async () => {
     const database = harness.createDatabase('roster_human');
     const client = await harness.connect(database.config);
     try {
@@ -231,7 +214,7 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
       await client.query('RESET ROLE');
       await publishLineage(client);
       await client.query('SET ROLE intake_business');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
+      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
       await client.query('RESET ROLE');
       const grants = await client.query<{ parent_grant_id: string | null; issuer_scope: string }>(`
         SELECT g.parent_grant_id, p.identity_scope AS issuer_scope
@@ -241,7 +224,6 @@ describe.skipIf(!enabled)('roster projection writes one principal and only conte
         ORDER BY g.parent_grant_id NULLS LAST`, [rosterPrincipalId(seat)]);
       expect(grants.rows).toEqual([
         { parent_grant_id: 'root-query', issuer_scope: 'confirmed-synthetic' },
-        { parent_grant_id: null, issuer_scope: 'content-intake-system' },
       ]);
     } finally {
       await client.query('ROLLBACK').catch(() => undefined);

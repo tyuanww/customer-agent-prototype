@@ -46,7 +46,7 @@
 | 对象存储 | `/srv/customer-agent/stack/objects/` |
 | 桌面 profile | `/srv/customer-agent/desktop-profile/`（栈启动时写入 loopback origin） |
 | 日志 | `/srv/customer-agent/stack/logs/`，以及 `journalctl -u customer-agent-stack` |
-| 库备份 | `/srv/customer-agent/backups/` |
+| 库备份 | `/srv/customer-agent/catalog-backups/`；启用新备份集后同时包含数据库与对象 |
 | 隧道 token | `/etc/cloudflared/customer-agent-hangzhou.token`（root 0600） |
 | 运行身份 | 非 root 用户 `customer-agent` |
 
@@ -61,6 +61,8 @@
 | `feishu.env` | 飞书 OAuth 客户端与角色绑定；**有它 `AUTH_MODE` 才变成 `feishu`** |
 | `content.env` | 内容侧常量，以及生产库名 `DATABASE_NAME` |
 | `api.env` | 可搬运的生产密钥（profile 名、HMAC 材料），**只放这一个** |
+
+生产身份配置分成三条通道。飞书 OAuth 客户端写入 `feishu.env`；`ROSTER_TENANT_ID`、`ROSTER_APP_ID`、`ROSTER_CANDIDATE_DEPARTMENT_ID` 和 `ROSTER_CANDIDATE_JOB_ID` 通过既有运行配置传入；独立主账号的岗位由数据库受控初始化函数写入。主账号口令只保存为 stack root 下 `password-accounts.json` 的 scrypt 哈希。不要把这些主体 ID、口令、hash 或飞书原始资料写进文档。初始化、候选、授权和核验步骤见[如何管理生产身份](how-to-manage-production-identities.md)。
 
 ### `api.env` 只收「搬得走」的东西
 
@@ -83,59 +85,17 @@ LOG_HASH_KEY  LOG_HASH_KEY_VERSION
 
 ## 更新代码
 
-2026-10-17 换到 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8` 时，落地的是 Mac 上的 bundle，不是在杭州 `git clone`。跑通的取分支是 `refs/remotes/origin/main` 到 `refs/heads/main`。先导出 `SHA`。
+候选必须绑定完整 Git SHA、版本和迁移目录，先在独立测试栈完成验收。不能只修改 `CUSTOMER_AGENT_BUILD_VERSION` 宣称升级，也不要复用历史一次性部署脚本覆盖已有 release 目录。
 
-```bash
-SHA="${SHA:?set SHA to the 40-character git sha}"
-git fetch origin
-git bundle create "/tmp/${SHA}.bundle" origin/main
-git bundle list-heads "/tmp/${SHA}.bundle"
-# 期望一行：<同一 SHA> refs/remotes/origin/main
-scp -i ~/.ssh/id_ed25519_pc2 "/tmp/${SHA}.bundle" "root@100.93.46.46:/var/lib/ca-build/${SHA}.bundle"
-ssh -i ~/.ssh/id_ed25519_pc2 root@100.93.46.46 bash -s -- "$SHA" <<'EOF'
-set -eu
-SHA="$1"
-DEST="/srv/customer-agent/releases/$SHA"
-rm -rf "$DEST"
-mkdir -p "$DEST"
-git -C "$DEST" init -b scratch
-git -C "$DEST" fetch "/var/lib/ca-build/${SHA}.bundle" refs/remotes/origin/main:refs/heads/main
-git -C "$DEST" checkout "$SHA"
-cd "$DEST"
-pnpm install --frozen-lockfile
-pnpm build:services
-chown -R customer-agent:customer-agent "$DEST"
-ln -sfn "$DEST" /srv/customer-agent/current
-systemctl restart customer-agent-stack
-EOF
-```
+部署前保存当前 release 指针、配置摘要和已经验证可恢复的备份集。新 release 目录必须不存在；获取代码后核对 HEAD 和 clean 状态，使用锁定依赖构建，再按候选执行迁移后验。测试栈和生产栈使用不同的 stack root、数据库、端口和对象目录。测试必须使用合成数据。
 
-`git clone` 这种 bundle 会得到空仓库，随后 `fatal: reference is not a tree`。`git init` 默认分支是 `main` 时，再 fetch 到 `refs/heads/main` 会被拒绝，原句是 `refusing to fetch into branch 'refs/heads/main' checked out`。先 `git init -b scratch`，再把 `refs/remotes/origin/main` 取到 `refs/heads/main`。`$SHA:refs/heads/main` 这一种写法没有在这次切换里试过。
+切换生产需要本次候选的明确发布授权。只在候选全部检查通过后原子替换 `current` 并重启受管 unit，随后核对代码目录、进程 cwd、版本、端口、客户端配置和公网探针。`scripts/ops/production-consistency.mjs --help` 提供只读核对入口，具体 origins 来自现有部署配置，不另建端点真源。
 
-不要删 `profile.json`。删了之后端口会按目录重算，不再是 `43115` / `43116`。`api.env` 留在 `/srv/customer-agent/stack/`，换代码软链不会带走它。只改 `CUSTOMER_AGENT_BUILD_VERSION` 时先复制一份 `api.env`。这个值是健康检查里的版本字符串，不是 git SHA。杭州上的 pnpm 保持 `11.19.0`，不要跟着安装提示升到 12。
+不要删 `profile.json`，它固定已有端口。`api.env` 留在 stack root，候选版本必须同时与 `VERSION`、桌面 package 和 `/health` 对齐。迁移只允许追加；代码回退不等于模式回退。需要恢复数据库时使用事先验证的完整备份集，不能直接改写迁移账本。
 
-核对：
+`content.env` 声明 `DATABASE_NAME` 时栈会跳过合成播种；生产 unit 同时保留 `--no-seed`。不得将测试 fixture 导入正式库。完整远端隔离构建和测试流程见[远端开发与交付](how-to-remote-development-and-deployment.md)。
 
-```bash
-readlink -f /srv/customer-agent/current
-curl --fail --show-error --max-time 5 http://127.0.0.1:43115/health
-curl --silent --output /dev/null --write-out '%{http_code}\n' --max-time 5 http://127.0.0.1:43115/v1/intake/sources
-curl --silent --output /dev/null --write-out '%{http_code}\n' --max-time 5 http://127.0.0.1:43115/v1/events/usage
-```
-
-2026-10-17 的结果是软链指向 `ddeec39052a4353dd623be2b5b9a10ddfe40feb8`，健康检查是 `{"status":"ok","service":"cs-ai-api","version":"0.3.28"}`，后两个地址都是 `401`。回滚是 `ln -sfn` 到上一份 release（这次之前是 `72380feb0baeb90d7e5a4ac61b223b8c53aedeba`）再 `systemctl restart`。代码切换不移动 `content_current`。
-
-保留 `releases/<sha>` 而不是原地 `git pull`，是为了「上一版还在，能立刻切回去」。回滚就是 `ln -sfn` 到旧 sha 再 `systemctl restart`。
-
-`systemctl restart` 会重跑迁移与角色授权（两者都是幂等的），**不动数据**。
-
-这条栈**不会被播种**，这是从 `content.env` 推出来的，不靠命令行旗标。理由：`stack.ts start` 在不带 `--no-seed` 时会把演示话术当作线上目录发布，而 `--no-seed` 是逐次传的——单元文件里有，但人 ssh 进来修栈时打的是 `restart`，不会带。所以现在只要 `content.env` 声明了自己的 `DATABASE_NAME`，就一律跳过播种，日志会写明原因：
-
-```
-[stack] seed: skipped (content.env names its own database); this stack serves a real catalog
-```
-
-要一套**会**播种的栈，就别在它的 `content.env` 里写 `DATABASE_NAME`。
+生产备份与隔离恢复命令见[备份集与恢复验证](how-to-verify-backup-set.md)。本页记录操作边界，不表示本轮候选已经发布。
 
 ## 迁数据
 

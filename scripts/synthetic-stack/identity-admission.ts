@@ -123,7 +123,8 @@ export function loadPasswordAccounts(file: string): Map<string, PasswordAccount>
     const hash = Reflect.get(row, 'hash');
     if (typeof username !== 'string' || typeof bindingId !== 'string'
       || typeof salt !== 'string' || typeof hash !== 'string') continue;
-    if (!/^synthetic_[A-Za-z0-9_-]{1,100}$/.test(bindingId)) continue;
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(bindingId)) continue;
+    if (!SEAT_USERNAME.test(username) && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(username)) continue;
     if (!/^[0-9a-f]{32}$/.test(salt) || !/^[0-9a-f]{128}$/.test(hash)) continue;
     accounts.set(username, Object.freeze({ username, bindingId, salt, hash }));
   }
@@ -152,8 +153,10 @@ export function passwordMatches(account: PasswordAccount, password: string): boo
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-/** True only when the binding is an enabled seat row. A throw is treated as no. */
-export type SeatBindingEnabled = (bindingId: string) => Promise<boolean>;
+/** Database decision for a non-built-in password binding. A throw is treated as no. */
+export type PasswordBindingAllowed = (bindingId: string) => Promise<boolean>;
+/** Compatibility name for callers that still describe the password predicate as seat lookup. */
+export type SeatBindingEnabled = PasswordBindingAllowed;
 
 const SEAT_USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
 

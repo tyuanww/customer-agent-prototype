@@ -1,6 +1,6 @@
 import { createProductAuthService } from './product-auth-service.js';
 import { createFeishuIdentityProvider } from './feishu-identity-provider.js';
-import { projectRosterLogin, rosterHomeFromEnv } from './project-roster-login.js';
+import { projectRosterLogin, rosterCandidateFromEnv, rosterHomeFromEnv } from './project-roster-login.js';
 import { createWorkforceIdentityProvider } from './workforce-identity-provider.js';
 import { createSyntheticIdentityProvider } from './synthetic-identity-provider.js';
 import { createContentObjectStore } from './content-object-store.js';
@@ -121,8 +121,13 @@ export async function startApi(
             }
             const client = await business.connect();
             try {
-              const reason = await projectRosterLogin(client, openId, rosterHomeFromEnv(process.env));
-              if (reason !== 'projected') console.info(`[api] roster projection ${reason}`);
+              const reason = await projectRosterLogin(
+                client,
+                openId,
+                rosterHomeFromEnv(process.env),
+                rosterCandidateFromEnv(process.env),
+              );
+              if (reason !== 'registered') console.info(`[api] roster projection ${reason}`);
             } finally { client.release(); }
           },
           async (bindingId) => {

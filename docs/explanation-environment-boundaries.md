@@ -35,17 +35,19 @@ loopback 只限制网络范围，不能证明请求者是谁。生产 API 当前
 
 这套边界多了一次构建和一次切换，但换来了可回滚、可审计和不污染生产数据。保留有限数量的旧 release 会占空间，应该按回滚窗口清理，而不是为了省磁盘复用生产工作树。
 
-## 当前本地与办公的边界
+## 桌面 profile 的装配边界
 
-这次对齐的是 Mac 上正在测试的那一套，不是办公机，也不是生产。
+`product-runtime-config.ts` 校验配置，并保留 `mode` 给 Main。打包客户端只读 userData 下的 `synthetic-stack.json`，忽略环境变量。没有用户配置时，包内显式离线配置可以按既有流程初始化；没有可用配置或配置无效时拒绝启动。只有显式 `synthetic-offline` 才进入离线 S0。
 
-本地打包客户端保持 `synthetic-local`。六页工作台（管理概览、话术库、知识库、SOP、系统同步、权限）只在这份配置里已经写着 `contentIntake: faq-v2` 时继续使用。刷新配置可以改两个 loopback 地址，但不能凭空加上这个标记，也不能在非 loopback 地址上保留它。
+`synthetic-local` 只接受两个不同的 HTTP loopback origin。只有显式提供 `contentIntake: faq-v2`，Main 才给该合成模式装配 intake 查询、目录、资料、权限和账号管理。未提供标记时保留原有行为。
 
-办公机 `product-remote` 仍走旧工作台：登录后读公告目录，再搜索和复制。当前代码不接受在 `product-remote` 上打开 faq-v2。
+`product-remote` 只接受两个不同的 HTTPS 公网主机名 origin。现有 Main 已为这个模式装配上述 intake 服务，不再把远程客户端描述成只走旧工作台。Main 与 shared 工作台导航共同消费校验后的 `mode`，不再从 HTTPS 字符串回猜模式。导航保留 `faq-v2` 优先级；没有该标记且缺少 `mode` 时保持 legacy。已有远程配置即使没有 `contentIntake` 也使用该接线；带 `faq-v2` 的历史远程配置仍被接受，但不会得到仅限 loopback 的合成环境标识。
 
-生产端口 43115/43116、合同激活和 `productionConsumerReady` 都不属于这次改动。六页工作台读 intake 快照。旧公告目录里的 `rel_20` 仍留在公告链上，不会被复制进 intake。intake 表在迁移之后如果还没有上传并发布，查询结果是空的。
+开发态仍由配置模块校验两个 origin，并根据 API origin 归类 `mode`。它保留既有 HTTP loopback 与 HTTPS origin 支持范围。显式 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2` 仍要求两个 origin 都是 loopback。这个开发兼容入口不改变打包配置的限制。
 
-Mac 人机验收和办公机 Windows 验收清单保持未观察。本文不把任何一项写成通过，也不把这次本地对齐称作上线。
+Profile 只决定客户端装配，不授予业务权限。现有 sender、窗口角色、主 frame、会话及服务端授权检查继续生效。该修复不增加 IPC，不改变生产端口、合同激活或 `productionConsumerReady`，也不构成真实数据接入、部署或上线批准。
+
+Intake 查询读取其发布快照。旧公告目录不会因 profile 改变而自动迁入 intake；仍需验证来源模式、业务权限与可用发布物。配置解析单测不能替代 Mac 人机验收、办公机 Windows 验收或真实业务验收。
 
 ## 开发、测试和生产各用哪一套库
 

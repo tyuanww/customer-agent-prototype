@@ -145,6 +145,16 @@ it('expires selected person and preview before caller deadline and notifies the 
   expect(main.view().people).toEqual([]);expect(main.view().preview).toBeNull();expect(changed).toHaveBeenCalled();await expect(main.command({action:'save'})).rejects.toThrow();
  }finally{main.dispose();}
 });
+it('notifies subscribers when stop or discard clears a local preview',async()=>{
+ const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session),changed=vi.fn();main.subscribe(changed);
+ try{
+  const view=await main.command({action:'refresh'});await main.command(f.command(view.people[0]!.selection));
+  expect(main.view().preview?.person).toBe('合成坐席');changed.mockClear();
+  const stopped=await main.command({action:'stop'});expect(stopped.preview).toBeNull();expect(stopped.notice).toBe('已停止读取。');expect(changed).toHaveBeenCalledTimes(1);
+  await main.command(f.command(view.people[0]!.selection));expect(main.view().preview).not.toBeNull();changed.mockClear();
+  const discarded=await main.command({action:'discard'});expect(discarded.preview).toBeNull();expect(changed).toHaveBeenCalledTimes(1);
+ }finally{main.dispose();}
+});
 it('cancels pending reads, discards late results and invalidates prior-session selections',async()=>{
  const f=intakePermissionsData(),original=f.session.request;let release!:()=>void;
  f.session.request=async(epoch,path,options)=>{if(path.startsWith('/v1/intake/principals'))await new Promise<void>(resolve=>{release=resolve;});return original(epoch,path,options);};

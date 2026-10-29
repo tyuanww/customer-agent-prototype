@@ -27,15 +27,15 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STACK_ROOT, SYNTHETIC_IDENTITIES } from './profile.ts';
-import { seatBindingEnabledFromStack } from './seat-binding-lookup.ts';
+import { passwordBindingAllowedFromStack } from './seat-binding-lookup.ts';
 import {
   isAdmittedHost, isSeatBindingId, loadPasswordAccounts, passwordMatches,
-  reloadPasswordAccounts, seatBindingIdFor, type SeatBindingEnabled,
+  reloadPasswordAccounts, seatBindingIdFor, type PasswordBindingAllowed,
 } from './identity-admission.ts';
 
-export type { SeatBindingEnabled };
+export type { PasswordBindingAllowed };
 
-async function seatIsEnabled(lookup: SeatBindingEnabled | undefined, bindingId: string): Promise<boolean> {
+async function bindingIsAllowed(lookup: PasswordBindingAllowed | undefined, bindingId: string): Promise<boolean> {
   if (!lookup || !isSeatBindingId(bindingId)) return false;
   try {
     return await lookup(bindingId) === true;
@@ -78,12 +78,15 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 export function createIdentityProvider(
-  { port, accountsFile = ACCOUNTS_FILE, seatBindingEnabled }: Readonly<{
+  { port, accountsFile = ACCOUNTS_FILE, bindingAllowed, seatBindingEnabled }: Readonly<{
     port: number;
     accountsFile?: string;
-    seatBindingEnabled?: SeatBindingEnabled;
+    bindingAllowed?: PasswordBindingAllowed;
+    /** Existing test seam; production passes `bindingAllowed`. */
+    seatBindingEnabled?: PasswordBindingAllowed;
   }>,
 ) {
+  const eligible = bindingAllowed ?? seatBindingEnabled;
   // Startup still requires a usable file, and still has no built-in password.
   // Each /password reads the file again so a reset is visible without a restart.
   // A broken file refuses that attempt; it does not reuse this startup snapshot.
@@ -139,7 +142,7 @@ export function createIdentityProvider(
         if (!seatBinding || !account || account.bindingId !== seatBinding || !passwordMatches(account, password)) {
           send(response, 401, '{"error":"invalid_credentials"}'); return;
         }
-        void seatIsEnabled(seatBindingEnabled, seatBinding).then((enabled) => {
+        void bindingIsAllowed(eligible, seatBinding).then((enabled) => {
           if (!enabled) { send(response, 401, '{"error":"invalid_credentials"}'); return; }
           send(response, 200, JSON.stringify({ code: seatBinding }));
         });
@@ -166,7 +169,7 @@ export function createIdentityProvider(
         // same shape the fixed list uses. Recheck enabled here so a disable
         // between /password and /exchange cannot still be exchanged.
         if (!isSeatBindingId(code)) { send(response, 401, '{"error":"unknown_subject"}'); return; }
-        void seatIsEnabled(seatBindingEnabled, code).then((enabled) => {
+        void bindingIsAllowed(eligible, code).then((enabled) => {
           if (!enabled) { send(response, 401, '{"error":"unknown_subject"}'); return; }
           send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: code }));
         });
@@ -193,7 +196,7 @@ export function createIdentityProvider(
 
 /** Entry point when spawned as a child process by the stack. */
 export async function runIdentityProvider(port: number): Promise<void> {
-  const provider = createIdentityProvider({ port, seatBindingEnabled: seatBindingEnabledFromStack });
+  const provider = createIdentityProvider({ port, bindingAllowed: passwordBindingAllowedFromStack });
   const origin = await provider.listen();
   console.info(`[identity] listening at ${origin} provider=synthetic`);
   const stop = () => { void provider.close().then(() => { process.exitCode = 0; }); };

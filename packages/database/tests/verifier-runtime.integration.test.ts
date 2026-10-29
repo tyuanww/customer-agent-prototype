@@ -17,15 +17,33 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   }, 60_000);
   afterAll(async () => { await client?.end(); harness?.stop(); }, 60_000);
 
-  it('verifies the actual 41-migration installation with both new schemas and all 17 sealed roles', async () => {
+  it('verifies the actual current installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 73,
-      inventory: { tables: 111, views: 7, functions: 294 },
+      status: 'PASS', migrationCount: 77,
+      inventory: { tables: 111, views: 7, functions: 299 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
     const empty = await client.query(`SELECT script_id FROM ops_loop.list_resolved_inaccuracy_outcomes('coach')`);
     expect(empty.rows).toEqual([]);
     await expect(client.query(`SELECT script_id FROM ops_loop.list_resolved_inaccuracy_outcomes('agent')`)).rejects.toMatchObject({ code: 'ZA005' });
+  });
+
+  it('accepts the CHECK definitions reparsed by a full pg_dump/restore', async () => {
+    await client.query('BEGIN');
+    try {
+      for (const [relation, constraint] of [
+        ['parse_jobs', 'parse_jobs_contributor_ids_check'],
+        ['principal_facts', 'principal_facts_department_ids_check'],
+      ]) {
+        const result = await client.query<{ definition: string }>(`
+          SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+          WHERE conrelid = $1::regclass AND conname = $2
+        `, [`content_intake.${relation}`, constraint]);
+        await client.query(`ALTER TABLE content_intake.${relation} DROP CONSTRAINT ${constraint}`);
+        await client.query(`ALTER TABLE content_intake.${relation} ADD CONSTRAINT ${constraint} ${result.rows[0]!.definition}`);
+      }
+      expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
+    } finally { await client.query('ROLLBACK'); }
   });
 
   it('accepts separate low-power environment LOGINs with exactly one capability and actual SET ROLE admission', async () => {
@@ -53,6 +71,16 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   });
 
   it.each([
+    ['restored CHECK weakened bound', `ALTER TABLE content_intake.principal_facts DROP CONSTRAINT principal_facts_department_ids_check;
+      ALTER TABLE content_intake.principal_facts ADD CONSTRAINT principal_facts_department_ids_check
+      CHECK (cardinality(department_ids) >= 1 AND cardinality(department_ids) <= 101 AND array_position(department_ids, NULL::text) IS NULL)`],
+    ['restored CHECK weakened Boolean logic', `ALTER TABLE content_intake.principal_facts DROP CONSTRAINT principal_facts_department_ids_check;
+      ALTER TABLE content_intake.principal_facts ADD CONSTRAINT principal_facts_department_ids_check
+      CHECK (cardinality(department_ids) >= 1 OR cardinality(department_ids) <= 100 OR array_position(department_ids, NULL::text) IS NULL)`],
+    ['restored CHECK unvalidated', `ALTER TABLE content_intake.principal_facts DROP CONSTRAINT principal_facts_department_ids_check;
+      ALTER TABLE content_intake.principal_facts ADD CONSTRAINT principal_facts_department_ids_check
+      CHECK (cardinality(department_ids) >= 1 AND cardinality(department_ids) <= 100 AND array_position(department_ids, NULL::text) IS NULL) NOT VALID`],
+    ['restored CHECK missing', 'ALTER TABLE content_intake.parse_jobs DROP CONSTRAINT parse_jobs_contributor_ids_check'],
     ['legacy helper removed', 'REVOKE EXECUTE ON FUNCTION public.content_question_hash(jsonb) FROM intake_runtime_fn_owner'],
     ['legacy helper leaked to business', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_business'],
     ['legacy helper grant option', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner WITH GRANT OPTION'],
@@ -156,7 +184,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
       expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
         status: 'PASS',
-        migrationCount: 73,
+        migrationCount: 77,
         triggerFingerprint: {
           entries: 115,
           frozenSha256: 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b',

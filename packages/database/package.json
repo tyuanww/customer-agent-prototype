@@ -25,7 +25,7 @@
     "build:runtime": "tsc -p tsconfig.build.json",
     "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs",
     "test:unit": "vitest run --exclude tests/postgres.integration.test.ts",
-    "test:integration": "CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 vitest run tests/postgres.integration.test.ts tests/verifier-runtime.integration.test.ts",
+    "test:integration": "CUSTOMER_AGENT_DB_PG15_INTEGRATION=1 vitest run tests/postgres.integration.test.ts tests/verifier-runtime.integration.test.ts tests/authorization-set-agreement.test.ts tests/authorization-lifecycle.integration.test.ts",
     "test": "pnpm check:generated && pnpm test:unit && pnpm test:package",
     "test:all": "pnpm test && pnpm test:integration",
     "build": "pnpm check:generated && pnpm build:runtime",

@@ -6,9 +6,9 @@ import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-const domains = { product: '产品话术', campaign: '活动话术', presale: '售前流程', aftersale: '售后流程' } as const;
+const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
 for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, string][]) {
-  test(`unified workspace reads the qualified ${domain} publication without old adapters or Query selection coupling`, async () => {
+  test(`unified workspace reads the qualified ${domain} publication without legacy content adapters or Query selection coupling`, async () => {
     test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit synthetic PG15/Electron gate');
     test.setTimeout(120_000);
     const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
@@ -62,16 +62,28 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
       const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-      await expect(dashboard.getByTestId('nav-content')).toHaveAttribute('aria-selected', 'true');
-      for (const module of ['overview', 'sop']) {
-        await dashboard.getByTestId(`nav-${module}`).click();
-        await expect(dashboard.getByTestId('dashboard-content')).toContainText('请先登录');
-      }
+      const knowledgeNav = dashboard.getByTestId('nav-content');
+      await knowledgeNav.click();
+      await expect(knowledgeNav).toHaveAttribute('aria-selected', 'true');
+      await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'content');
+      await expect(dashboard.getByRole('region', { name: '知识库', exact: true })).toBeVisible();
+      await dashboard.getByTestId('nav-overview').click();
+      await expect(dashboard.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
+      await expect(dashboard.getByTestId('module-overview')).toBeVisible();
+      await dashboard.getByTestId('nav-sop').click();
+      await expect(dashboard.getByTestId('nav-sop')).toHaveAttribute('aria-selected', 'true');
+      await expect(dashboard.getByTestId('module-sop')).toBeVisible();
+      await expect(dashboard.getByTestId('dashboard-content')).not.toContainText('未接入');
       await dashboard.getByTestId('nav-wording').click();
       const library = dashboard.getByRole('region', { name: '可用话术目录', exact: true });
       const shops = library.getByRole('combobox', { name: '目录店铺', exact: true });
-      await expect(shops.getByRole('option').filter({ hasText: '合成示例店' })).toHaveCount(1);
-      await expect(shops).toHaveValue('shop-a');
+      await expect(shops).toBeEnabled();
+      await shops.click();
+      const shopOption = dashboard.getByRole('option', { name: '合成示例店', exact: true });
+      await expect(shopOption).toHaveCount(1);
+      await shopOption.click();
+      const selectedShop = shops.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]');
+      await expect(selectedShop).toContainText('合成示例店');
       // Opening Dashboard intentionally parks Query and cancels its old results.
       // Acquire after that lifecycle boundary to isolate directory refresh effects.
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
@@ -82,13 +94,15 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
       await library.getByRole('button', { name: '刷新可用资料', exact: true }).click();
       await library.getByRole('tab', { name: label, exact: true }).click();
-      await expect(library.getByRole('article')).toHaveCount(3);
+      const scripts = library.getByRole('table', { name: '可用话术', exact: true });
+      await expect(scripts.getByRole('row')).toHaveCount(4);
       for (const faq of INTAKE_SYNTHETIC_FAQ) await expect(library.getByText(faq.answer, { exact: true })).toBeVisible();
-      await expect(library).toContainText(receipt.releaseId!);
+      await expect(library.getByRole('status')).toContainText('当前可用 3 条');
       await expect(library.getByRole('button', { name: /复制|下架|导出/ })).toHaveCount(0);
       for (const other of Object.values(domains).filter(value => value !== label)) {
         await library.getByRole('tab', { name: other, exact: true }).click();
-        await expect(library.getByRole('article')).toHaveCount(0);
+        await expect(scripts.getByRole('row')).toHaveCount(2);
+        await expect(scripts.getByText('当前条件下没有此类可用话术。')).toBeVisible();
       }
       await library.getByRole('tab', { name: label, exact: true }).click();
       const nativeDashboard = await app.browserWindow(dashboard);
@@ -98,15 +112,16 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
         await dashboard.getByTestId(`dashboard-theme-${theme}`).click();
         await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', theme);
         // Observe settled shared theme tokens, not a screenshot mid-transition.
-        await expect.poll(() => shops.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme === 'dark' ? 'rgb(28, 27, 32)' : 'rgb(255, 255, 255)');
-        if (theme === 'dark') await expect.poll(() => library.getByRole('tab', { name: label, exact: true }).evaluate(el => getComputedStyle(el).color)).toBe('rgb(245, 243, 247)');
+        await expect.poll(() => selectedShop.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(theme === 'dark' ? 'rgb(18, 17, 19)' : 'rgb(253, 252, 253)');
+        if (theme === 'dark') await expect.poll(() => library.getByRole('tab', { name: label, exact: true }).evaluate(el => getComputedStyle(el).color)).toBe('rgb(110, 86, 207)');
         expect(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth
           && document.querySelector<HTMLElement>('.dashboard-content')!.scrollWidth <= document.querySelector<HTMLElement>('.dashboard-content')!.clientWidth)).toBe(true);
         await dashboard.screenshot({ path: path.join(evidence, `library-${theme}.png`) });
       }
       await expect(library.getByRole('button', { name: /安装|下载|已读/ })).toHaveCount(0);
       await dashboard.getByTestId('nav-overview').click();
-      await expect(dashboard.getByText('暂无使用记录', { exact: true })).toBeVisible();
+      await expect(dashboard.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
+      await expect(dashboard.getByTestId('module-overview')).toBeVisible();
       await dashboard.screenshot({ path: path.join(evidence, 'current-version.png') });
       // Directory refresh/navigation must leave Query's original qualification
       // intact; its still-valid opaque key remains usable in its own window.
@@ -115,15 +130,19 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       await host.revokeSyntheticQuery();
       await dashboard.getByTestId('nav-wording').click();
       await library.getByRole('button', { name: '刷新可用资料', exact: true }).click();
-      await expect(library.getByRole('article')).toHaveCount(0);
+      for (const faq of INTAKE_SYNTHETIC_FAQ) await expect(library.getByText(faq.answer, { exact: true })).toHaveCount(0);
+      await expect(library.getByText('请选择有权查看的店铺；没有可用店铺时请核对身份与范围。')).toBeVisible();
       expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }))).toMatchObject({ ok: false });
       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: false });
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(false);
       const status = await host.status();
-      expect(status.requests.some(p => /^\/v1\/(announce|content|iteration|metrics|sop|software)(\/|\?|$)/.test(p))).toBe(false);
+      const legacyRequests = status.requests.filter(p => /^\/v1\/(announce|content|iteration|metrics|software)(\/|\?|$)/.test(p));
+      expect(legacyRequests, JSON.stringify(status.requests)).toEqual([]);
+      expect(status.requests).toContain('/v1/sop/catalog');
+      expect(status.requests).toContain('/v1/events/usage');
       expect(status.approvalFacts).toBe(0); expect(status.directPublications).toBe(1); expect(errors).toEqual([]);
-      console.info(JSON.stringify({ status: 'PASS', domain, flow: 'restricted-publication-to-unified-workspace', screenshots: evidence, oldAdapters: false }));
+      console.info(JSON.stringify({ status: 'PASS', domain, flow: 'restricted-publication-to-unified-workspace', screenshots: evidence, legacyContentAdapters: false }));
     } finally {
       try { if (app) await closeOwnedElectron(app); }
       finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }

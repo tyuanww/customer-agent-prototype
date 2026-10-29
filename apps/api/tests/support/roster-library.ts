@@ -20,6 +20,7 @@ export async function seedLibrary(client: Client, liveAllocation = true) {
         statement_timestamp()-interval '1 second', statement_timestamp()+interval '4 minutes', repeat('a',64))`);
     await client.query(`INSERT INTO content_intake.role_rules
       VALUES
+        ('tenant-a','app-a','dept-a','job-director',1,'director'),
         ('tenant-a','app-a','dept-a','job-customer-service-director',1,'director'),
         ('tenant-a','app-a','dept-a','job-customer-service-seat',1,'agent')`);
     await client.query(`INSERT INTO content_intake.scopes

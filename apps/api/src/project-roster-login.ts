@@ -15,8 +15,16 @@ type Queryable = {
 };
 
 export const ROSTER_IDENTITY_SCOPE = 'feishu-job-roster';
+export const CANDIDATE_IDENTITY_SCOPE = 'feishu-candidate';
+export const CANDIDATE_DISPLAY_LABEL = '已登记候选（岗位待核实）';
 
 export type RosterHome = Readonly<{ tenantId: string; appId: string }>;
+export type RosterCandidateProfile = Readonly<{
+  tenantId: string;
+  appId: string;
+  departmentId: string;
+  jobId: string;
+}>;
 
 export function rosterHomeFromEnv(env: Readonly<Record<string, string | undefined>>): RosterHome | null {
   const tenantId = env.ROSTER_TENANT_ID?.trim() ?? '';
@@ -25,12 +33,28 @@ export function rosterHomeFromEnv(env: Readonly<Record<string, string | undefine
   return { tenantId, appId };
 }
 
+/** A candidate post is trusted deployment configuration. It is deliberately not
+ *  derived from a Feishu job title and grants no business authority. */
+export function rosterCandidateFromEnv(
+  env: Readonly<Record<string, string | undefined>>,
+): RosterCandidateProfile | null {
+  const tenantId = env.ROSTER_TENANT_ID?.trim() ?? '';
+  const appId = env.ROSTER_APP_ID?.trim() ?? '';
+  const departmentId = env.ROSTER_CANDIDATE_DEPARTMENT_ID?.trim() ?? '';
+  const jobId = env.ROSTER_CANDIDATE_JOB_ID?.trim() ?? '';
+  const id = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  if (![tenantId, appId, departmentId, jobId].every((value) => id.test(value))) return null;
+  return { tenantId, appId, departmentId, jobId };
+}
+
 export function rosterPrincipalId(openId: string): string {
   return `prin_${createHash('sha256').update(openId).digest('hex').slice(0, 32)}`;
 }
 
 const PROJECT_SQL = `SELECT content_intake.project_feishu_roster(
   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS status`;
+const CANDIDATE_SQL = `SELECT content_intake.project_feishu_candidate(
+  $1,$2,$3,$4,$5,$6) AS status`;
 
 export type RosterProjectionStatus =
   | 'unmatched'
@@ -64,12 +88,12 @@ export type StoredRosterPermission = Readonly<{
 
 const PERMISSION_SQL = `SELECT content_intake.roster_permission_for_user($1) AS state`;
 
-const JOB_ID_SQL = `SELECT facts.job_id
+const JOB_ID_SQL = `SELECT facts.job_id, person.identity_scope
 FROM content_intake.principals person
 JOIN content_intake.principal_facts facts
   ON facts.principal_id = person.principal_id
  AND facts.facts_version = person.current_facts_version
-WHERE person.user_id = $1 AND person.identity_scope = $2`;
+WHERE person.user_id = $1 AND person.identity_scope IN ($2,$3)`;
 
 function databasePermissionState(value: unknown): DatabasePermissionState | null {
   if (value === 'pending' || value === 'ready' || value === 'expired' || value === 'revoked') return value;
@@ -155,8 +179,15 @@ export async function readStoredRosterPermission(
 ): Promise<StoredRosterPermission | null> {
   const state = await rosterPermissionForUser(client, userId);
   if (!state) return null;
-  const facts = await client.query<{ job_id: string }>(JOB_ID_SQL, [userId, ROSTER_IDENTITY_SCOPE]);
+  const facts = await client.query<{ job_id: string; identity_scope: string }>(
+    JOB_ID_SQL,
+    [userId, ROSTER_IDENTITY_SCOPE, CANDIDATE_IDENTITY_SCOPE],
+  );
+  const identityScope = facts.rows[0]?.identity_scope;
   const jobId = facts.rows[0]?.job_id;
+  if (identityScope === CANDIDATE_IDENTITY_SCOPE) {
+    return { title: CANDIDATE_DISPLAY_LABEL, state: state === 'pending' ? 'denied' : state };
+  }
   const rosterTitle = jobId === undefined ? undefined : JOB_ROSTER.find((item) => item.jobId === jobId)?.title;
   if (rosterTitle) return { title: rosterTitle, state };
   const snapshotTitle = snapshotTitleForUser(userId);
@@ -190,26 +221,49 @@ export async function projectRosterLogin(
   client: Queryable,
   openId: string,
   trustedHome: RosterHome | null = null,
+  candidateProfile: RosterCandidateProfile | null = null,
 ): Promise<RosterProjectionStatus> {
+  const projectCandidate = async (selected: RosterCandidateProfile): Promise<RosterProjectionStatus> => {
+    const registered = await client.query<{ status: string }>(CANDIDATE_SQL, [
+      feishuUserId(openId),
+      selected.tenantId,
+      selected.appId,
+      openId,
+      selected.departmentId,
+      selected.jobId,
+    ]);
+    const status = registered.rows[0]?.status;
+    if (status === 'policy-pending') return 'policy-pending';
+    if (status === 'missing' || status === 'missing-principal') return 'missing-binding';
+    if (status === 'inactive') return 'revoked';
+    if (status === 'conflict' || status === 'invalid') return 'denied';
+    return status === 'registered' || status === 'confirmed' ? 'registered' : 'skipped';
+  };
   const snapshot = snapshotForOpenId(openId);
-  if (!snapshot) return 'unmatched';
-  const match = matchJobRoster(snapshot.title);
-  if (match.status !== 'matched') return 'unmatched';
   const homes = await client.query<{ tenant_id: string; app_id: string }>(
     `SELECT tenant_id, app_id FROM content_intake.principals
      UNION
      SELECT tenant_id, app_id FROM content_intake.policy_versions`);
   const home = selectedHome(homes.rows, trustedHome);
+  const candidate = candidateProfile
+    && home
+    && candidateProfile.tenantId === home.tenantId
+    && candidateProfile.appId === home.appId
+    ? candidateProfile : null;
   if (!home) return 'skipped';
-  if (!snapshot.departmentIds?.length || snapshot.departed === true) {
-    await client.query(
-      'SELECT content_intake.withdraw_roster_query($1,$2,$3) AS status',
-      [rosterPrincipalId(openId), home.tenantId, home.appId],
+  if (snapshot?.departed === true) {
+    const withdrawal = await client.query<{ status: string }>(
+      'SELECT content_intake.withdraw_feishu_roster($1,$2,$3) AS status',
+      [openId, home.tenantId, home.appId],
     );
-    const state = await rosterPermissionForUser(client, feishuUserId(openId));
-    if (state) return state;
-    if (snapshot.departed === true) return 'unmatched';
-    return 'denied';
+    const status = withdrawal.rows[0]?.status;
+    if (status === 'revoked') return 'revoked';
+    return status === 'absent' ? 'unmatched' : 'denied';
+  }
+  const match = snapshot ? matchJobRoster(snapshot.title) : null;
+  if (!snapshot || !snapshot.departmentIds?.length || match?.status !== 'matched') {
+    if (!candidate) return 'unmatched';
+    return projectCandidate(candidate);
   }
   const projected = await client.query<{ status: string }>(PROJECT_SQL, [
     rosterPrincipalId(openId),
@@ -221,19 +275,18 @@ export async function projectRosterLogin(
     snapshot.departmentIds,
     match.row.jobId,
     match.row.role,
-    // Login may prepare the automatic query path only. publish/import remain
-    // explicit grants and are never derived from the desktop rights table.
+    // The legacy projection signature accepts only query; registration issues no grant.
     ['query'],
   ]);
   const status = projected.rows[0]?.status;
-  if (status === 'policy-pending') return 'policy-pending';
+  if (status === 'policy-pending') {
+    if (candidate) {
+      const fallback = await projectCandidate(candidate);
+      if (fallback !== 'registered') return fallback;
+    }
+    return 'policy-pending';
+  }
   if (status === 'missing') return 'missing-binding';
   if (status !== 'registered') return 'skipped';
-  const issued = await client.query<{ status: string }>(
-    'SELECT content_intake.issue_roster_query($1,$2,$3) AS status',
-    [rosterPrincipalId(openId), home.tenantId, home.appId],
-  );
-  const issuedStatus = issued.rows[0]?.status;
-  if (issuedStatus === 'projected' || issuedStatus === 'expired' || issuedStatus === 'revoked') return issuedStatus;
   return 'registered';
 }

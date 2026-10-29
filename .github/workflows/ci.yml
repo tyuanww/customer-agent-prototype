@@ -105,7 +105,11 @@ jobs:
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm test:db:integration
       - if: needs.changes.outputs.mode == 'full'
+        run: pnpm test:backup:integration
+      - if: needs.changes.outputs.mode == 'full'
         run: pnpm --filter @customer-agent/api test:integration
+      - if: needs.changes.outputs.mode == 'full'
+        run: pnpm test:identity:integration
       - if: needs.changes.outputs.mode == 'full'
         run: pnpm --filter @customer-agent/api test:e2e:backend
       - if: needs.changes.outputs.mode == 'full'
