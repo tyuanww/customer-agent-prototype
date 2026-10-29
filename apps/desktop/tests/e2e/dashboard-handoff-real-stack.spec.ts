@@ -91,9 +91,10 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     await dashboard.screenshot({ path: path.join(evidence, 'date-presets.png') });
     for (const [label, days] of [['近 7 天', 7], ['近 30 天', 30]] as const) {
       await dashboard.locator('.overview-range-popup .ant-picker-presets li', { hasText: label }).click();
-      const values = await dashboard.getByRole('textbox', { name: '时间范围' }).evaluateAll(inputs => inputs.map(i => (i as HTMLInputElement).value));
-      const span = (Date.parse(values.at(-1)!) - Date.parse(values[0]!)) / 86_400_000 + 1;
-      expect(span, `${label} ${values.join('~')}`).toBe(days);
+      await expect.poll(async () => {
+        const values = await dashboard.getByRole('textbox', { name: '时间范围' }).evaluateAll(inputs => inputs.map(i => (i as HTMLInputElement).value));
+        return (Date.parse(values.at(-1)!) - Date.parse(values[0]!)) / 86_400_000 + 1;
+      }, { message: label }).toBe(days);
       await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
     }
     await dashboard.keyboard.press('Escape');

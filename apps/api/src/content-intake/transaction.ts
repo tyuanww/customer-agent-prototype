@@ -90,15 +90,17 @@ export async function principal(client: Queryable, selector: { userId: string } 
 /** At most limit identities plus one lookahead, including ineligible targets.
  * Resolve confirmed identity/current facts in one join, never N+1 per person.
  * Call under the same content lock after authorizing the directory's source. */
-export async function registeredPrincipalPage(client: Queryable, who: Principal, after: string, limit: number): Promise<(Principal & { displayName: string | null })[]> {
-  const { rows } = await client.query<PrincipalRow & { display_name: string | null }>(`WITH registered AS MATERIALIZED (
+export async function registeredPrincipalPage(client: Queryable, who: Principal, after: string, limit: number): Promise<(Principal & { displayName: string | null; hasNewIdentityActivity: boolean })[]> {
+  const { rows } = await client.query<PrincipalRow & { display_name: string | null; has_new_identity_activity: boolean }>(`WITH registered AS MATERIALIZED (
       SELECT * FROM content_intake.principals WHERE tenant_id=$1 AND app_id=$2 AND principal_id COLLATE "C">$3 COLLATE "C"
       ORDER BY principal_id COLLATE "C" LIMIT $4), projected AS (
       ${principalProjection('registered')})
-    SELECT projected.*, account.display_name FROM projected
+    SELECT projected.*, account.display_name,
+      CASE WHEN projected.identity_scope='confirmed-hangzhou'
+        THEN content_intake.principal_has_new_identity_activity(projected.principal_id) ELSE false END AS has_new_identity_activity FROM projected
     LEFT JOIN public.app_users account ON account.user_id=projected.user_id
     ORDER BY projected.principal_id COLLATE "C"`, [who.tenantId, who.appId, after, limit + 1]);
-  return rows.map(row => ({ ...projectedPrincipal(row), displayName: row.display_name }));
+  return rows.map(row => ({ ...projectedPrincipal(row), displayName: row.display_name, hasNewIdentityActivity: row.has_new_identity_activity }));
 }
 
 const PRINCIPAL_FACT_WINDOW_MS = 24 * 60 * 60 * 1000;

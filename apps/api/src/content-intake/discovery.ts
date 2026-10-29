@@ -16,6 +16,13 @@ type Page = { limit: number; cursor?: string };
 export type IntakePrincipalLabels = (identity: Readonly<{ principalId: string; tenantId: string; appId: string }>) => string | null;
 // Discovery is a bounded menu, never a grant or a cached authorization decision.
 const MAX_SOURCES = 5_000;
+const RETIRED_HANGZHOU_FACT_VERSIONS = new Map([['hz-allocator', 8], ['hz-reviewer', 5]]);
+
+function isRetiredDirectoryIdentity(principal: Principal & { hasNewIdentityActivity: boolean }, actorId: string, label: string | null | undefined): boolean {
+  // Old facts do not imply retirement once a person, login, or name is attached.
+  return principal.id !== actorId && principal.identityScope === 'confirmed-hangzhou' && !label && !principal.hasNewIdentityActivity
+    && RETIRED_HANGZHOU_FACT_VERSIONS.get(principal.id) === principal.factsVersion;
+}
 function page(raw: unknown): Page {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(k => k !== 'cursor' && k !== 'limit')) {
     throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
@@ -290,6 +297,7 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
         const scanned = rows.slice(0, request.limit), items: C['IntakePrincipalPage']['items'] = [];
         const now = await clock(client);
         for (const target of scanned) {
+          if (target.identityScope === 'content-intake-system') continue;
           if (purpose === 'grant-recipient') {
             try { requireFresh(target, now); }
             catch (error) {
@@ -298,10 +306,11 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
             }
             if (samePerson(who, target) || !(capability.mayAllocate.some(action => recipientRoleAllows(target.role, 'business', action))
               || capability.mayDelegate.some(action => recipientRoleAllows(target.role, 'delegation', action)))) continue;
-            client.validUntil(target.validUntil);
           }
           const displayLabel = target.displayName
             ?? labels?.({ principalId: target.id, tenantId: target.tenantId, appId: target.appId });
+          if (isRetiredDirectoryIdentity(target, who.id, displayLabel)) continue;
+          if (purpose === 'grant-recipient') client.validUntil(target.validUntil);
           if (typeof displayLabel !== 'string' || !displayLabel.trim() || [...displayLabel].length > 256) {
             throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'OVERLOADED');
           }

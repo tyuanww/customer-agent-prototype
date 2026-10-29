@@ -1727,16 +1727,16 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     }
   }
 
-  async function registerDirectoryIdentity(id: string, options: { tenant?: string; app?: string; enabled?: boolean; role?: string; display?: string } = {}) {
+  async function registerDirectoryIdentity(id: string, options: { tenant?: string; app?: string; enabled?: boolean; role?: string; display?: string; identityScope?: string; factsVersion?: number } = {}) {
     const tenant = options.tenant ?? 'tenant-a', app = options.app ?? 'app-a';
     const userId = `directory-${digest(id).slice(0, 32)}`;
     await admin.query('BEGIN');
     try {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
         VALUES ($1,'synthetic',$2,$1,$3,repeat('a',64),true,'agent')`, [id, tenant, userId]);
-      await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,$3,$4,'confirmed-synthetic',$1,1,0)`, [id, userId, tenant, app]);
-      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ($1,1,ARRAY['dept-a'],$2,$3,
-        statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id, `job-${options.role ?? 'enabler'}`, options.enabled ?? true]);
+      await admin.query(`INSERT INTO content_intake.principals VALUES ($1,$2,$3,$4,$5,$1,$6,0)`, [id, userId, tenant, app, options.identityScope ?? 'confirmed-synthetic', options.factsVersion ?? 1]);
+      await admin.query(`INSERT INTO content_intake.principal_facts VALUES ($1,$4,ARRAY['dept-a'],$2,$3,
+        statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`, [id, `job-${options.role ?? 'enabler'}`, options.enabled ?? true, options.factsVersion ?? 1]);
       await admin.query('COMMIT');
     } catch (error) { await admin.query('ROLLBACK'); throw error; }
     principalLabels.set(id, options.display ?? '合成已登记参与人');
@@ -1992,6 +1992,106 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(await service.principals(actor('enabler'), directoryQuery)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
       expect(await service.principals({ ...(await seat('enabler')).actor }, directoryQuery)).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
     } finally { await host.app.close(); }
+  });
+
+  it('principals: skip system and retired identities while retaining people, pagination and missing-name failure', async () => {
+    for (const [id, identityScope, factsVersion] of [['A-system', 'content-intake-system', 1],
+      ['hz-allocator', 'confirmed-hangzhou', 8], ['hz-reviewer', 'confirmed-hangzhou', 5]] as const) {
+      await registerDirectoryIdentity(id, { identityScope, factsVersion, role: 'lead' });
+      principalLabels.delete(id);
+    }
+    await registerDirectoryIdentity('hz-history-other', { identityScope: 'confirmed-hangzhou' });
+    const logged = await seat('enabler');
+    await admin.query('CREATE ROLE synthetic_directory_business LOGIN NOINHERIT; GRANT intake_business TO synthetic_directory_business');
+    publicationPool = createIntakePurposePool({ ...pool.options, user: 'synthetic_directory_business', max: 2 }, 'business');
+    const restricted = createContentIntakeService(publicationPool, store, undefined, undefined,
+      { requireProductSession: true, principalLabels: label });
+    expect(value(await restricted.principals(logged.actor, { ...directoryQuery, limit: 100 })).items
+      .some(item => ['A-system', 'hz-allocator', 'hz-reviewer'].includes(item.principalId))).toBe(false);
+    const query = { ...directoryQuery, limit: 1 };
+    const first = value(await service.principals(logged.actor, query));
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const selected: string[] = [];
+    let cursor: string | null = first.nextCursor;
+    for (let page = 0; cursor && page < 20; page++) {
+      const result = value(await service.principals(logged.actor, { ...query, cursor }));
+      selected.push(...result.items.map(item => item.principalId));
+      cursor = result.nextCursor;
+    }
+    expect(cursor).toBeNull();
+    expect(selected).toEqual(['agent', 'director', 'enabler', 'hz-history-other', 'legacy-enabler', 'manager', 'other', 'reviewer', 'supervisor']);
+    const recipients = value(await service.principals((await seat('director')).actor,
+      { sourceId: 'source-a', purpose: 'grant-recipient', limit: 100 }));
+    expect(recipients.items.some(item => ['A-system', 'hz-allocator', 'hz-reviewer'].includes(item.principalId))).toBe(false);
+    expect(recipients.items.some(item => item.principalId === 'hz-history-other')).toBe(true);
+    const functionAcl = await admin.query(`SELECT
+      has_function_privilege('intake_business', 'content_intake.principal_has_new_identity_activity(text)', 'EXECUTE') AS business,
+      has_function_privilege('intake_usage', 'content_intake.principal_has_new_identity_activity(text)', 'EXECUTE') AS usage,
+      EXISTS (SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) acl
+        WHERE p.oid='content_intake.principal_has_new_identity_activity(text)'::regprocedure AND acl.grantee=0 AND acl.privilege_type='EXECUTE') AS public`);
+    expect(functionAcl.rows).toEqual([{ business: true, usage: false, public: false }]);
+    const activityVisibleToBusiness = async (expected: boolean) => {
+      await admin.query('BEGIN');
+      try {
+        await admin.query('SET LOCAL ROLE intake_business');
+        expect((await admin.query("SELECT content_intake.principal_has_new_identity_activity('hz-allocator') AS linked")).rows)
+          .toEqual([{ linked: expected }]);
+        await expect(admin.query('SELECT open_id FROM backend_identity.feishu_login_links')).rejects.toMatchObject({ code: '42501' });
+      } finally { await admin.query('ROLLBACK'); }
+    };
+    await activityVisibleToBusiness(false);
+    const resumedGrant = batch('hz-allocator');
+    resumedGrant.items[0]!.recipientFactsVersion = 8;
+    value(await service.grantBatch(actor('director'), resumedGrant));
+    expect(await service.principals((await seat('hz-allocator')).actor, { ...directoryQuery, limit: 100 }))
+      .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    await admin.query(`UPDATE backend_identity.sessions SET issued_at='2026-11-01T12:00:00Z', expires_at='2026-11-01T12:15:00Z'
+      WHERE binding_id='hz-allocator'`);
+    await admin.query(`UPDATE backend_identity.login_requests SET issued_at='2026-11-01T12:00:00Z',
+      expires_at='2026-11-01T12:05:00Z', consumed_at='2026-11-01T12:01:00Z' WHERE binding_id='hz-allocator'`);
+    await activityVisibleToBusiness(true);
+    for (const [identity, purpose] of [['enabler', 'contributor'], ['director', 'grant-recipient']] as const) {
+      expect(await service.principals((await seat(identity)).actor, { sourceId: 'source-a', purpose, limit: 100 }))
+        .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    }
+    await admin.query("DELETE FROM backend_identity.sessions WHERE binding_id='hz-allocator'");
+    await activityVisibleToBusiness(true);
+    await admin.query("DELETE FROM backend_identity.login_requests WHERE binding_id='hz-allocator'");
+    await activityVisibleToBusiness(false);
+    const attached = await admin.query("SELECT backend_identity.attach_feishu_login('ou_synthetic1234','hz-allocator') AS status");
+    expect(attached.rows[0].status).toBe('attached');
+    await activityVisibleToBusiness(true);
+    for (const [identity, purpose] of [['enabler', 'contributor'], ['director', 'grant-recipient']] as const) {
+      expect(await service.principals((await seat(identity)).actor, { sourceId: 'source-a', purpose, limit: 100 }))
+        .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    }
+    expect(await restricted.principals(logged.actor, { ...directoryQuery, limit: 100 }))
+      .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    principalLabels.set('hz-allocator', '合成关联用户');
+    expect(value(await service.principals(logged.actor, { ...directoryQuery, limit: 100 })).items)
+      .toContainEqual(expect.objectContaining({ principalId: 'hz-allocator', displayLabel: '合成关联用户' }));
+    principalLabels.delete('hz-allocator');
+    const projected = await admin.query(`SELECT content_intake.project_feishu_roster(
+      'hz-allocator', user_id, 'tenant-a', 'app-a', 'feishu-job-roster', 'ou_synthetic1234',
+      ARRAY['dept-a'], 'job-lead', 'lead', ARRAY['query']) AS status
+      FROM content_intake.principals WHERE principal_id='hz-allocator'`);
+    expect(projected.rows[0].status).toBe('registered');
+    expect(await service.principals(logged.actor, { ...directoryQuery, limit: 100 }))
+      .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    await admin.query(`INSERT INTO public.app_users(user_id,display_name,role)
+      SELECT user_id,'合成重新启用人员','agent' FROM content_intake.principals WHERE principal_id='hz-allocator'`);
+    expect(value(await service.principals(logged.actor, { ...directoryQuery, limit: 100 })).items)
+      .toContainEqual(expect.objectContaining({ principalId: 'hz-allocator', displayLabel: '合成重新启用人员' }));
+    await admin.query(`INSERT INTO intake_organization.bindings(tenant_id,app_id,principal_id,binding_version,binding_digest,open_id,enabled,valid_until)
+      SELECT tenant_id,app_id,principal_id,1,repeat('a',64),'ou_synthetic_org1',true,clock_timestamp()+interval '1 day'
+      FROM content_intake.principals WHERE principal_id='hz-reviewer'`);
+    expect(await service.principals(logged.actor, { ...directoryQuery, limit: 100 }))
+      .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
+    await registerDirectoryIdentity('A-person-without-name');
+    principalLabels.delete('A-person-without-name');
+    expect(await service.principals(logged.actor, { ...directoryQuery, limit: 100 }))
+      .toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'ORG_FACTS_UNAVAILABLE' });
   });
 
   it('principals: grant recipients include first-time targets, exclude stale/ineligible/self identities and advance an empty filtered page', async () => {
