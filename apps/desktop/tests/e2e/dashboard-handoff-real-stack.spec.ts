@@ -45,11 +45,13 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const evidence = path.resolve(desktopRoot, '../../.gstack/dashboard-handoff', new Date().toISOString().replace(/[:.]/g, '-'));
   mkdirSync(evidence, { recursive: true });
+  const userData = path.join(directory, 'user');
+  mkdirSync(userData);
   const workbookPath = path.join(directory, '【售前】合成话术.xlsx');
   writeFileSync(workbookPath, syntheticWorkbook());
   let app: ElectronApplication | undefined;
   try {
-    app = await launchIntakeElectron({ desktopRoot, userDataDirectory: path.join(directory, 'user'), apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
+    app = await launchIntakeElectron({ desktopRoot, userDataDirectory: userData, apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
