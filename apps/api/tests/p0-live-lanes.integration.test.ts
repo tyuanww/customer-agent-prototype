@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { availableParallelism, uptime } from 'node:os';
 import type { Client, ClientConfig } from 'pg';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, applyMigrationPrefix } from '@customer-agent/database';
@@ -184,12 +184,10 @@ describe.skipIf(!enabled)('P0 live lanes', () => {
   }, 120_000);
 
   it('measures authorization_deadline across prefix and head without a latency budget', async () => {
-    const uptime = execFileSync('uptime', { encoding: 'utf8' }).trim();
-    const cores = execFileSync('sysctl', ['-n', 'hw.ncpu'], { encoding: 'utf8' }).trim();
     console.log(JSON.stringify({
       claim: '本测量只计本机 Postgres 上 authorization_deadline 的往返。没有约定的 p95 预算。',
-      uptime,
-      cores,
+      uptimeSeconds: uptime(),
+      cores: availableParallelism(),
     }));
     const trunk = await open('perf_trunk');
     const head = await open('perf_head');

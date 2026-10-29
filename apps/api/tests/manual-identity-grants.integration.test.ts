@@ -609,7 +609,7 @@ describe.skipIf(!enabled)('manual identity grant lifecycle on PostgreSQL 15', ()
         ) INSERT INTO content_intake.principal_facts(
           principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
         SELECT principal_id,current_facts_version,ARRAY['dept-candidate'],'job-seat',true,
-          clock_timestamp()-interval '26 hours',clock_timestamp()-interval '2 hours',repeat('e',64)
+          statement_timestamp()-interval '26 hours',statement_timestamp()-interval '2 hours',repeat('e',64)
         FROM versioned`, [principalId]);
         await client.query('COMMIT');
       } catch (error) { await client.query('ROLLBACK'); throw error; }
