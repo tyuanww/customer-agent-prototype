@@ -200,6 +200,7 @@ export type ApiStackConfig = Readonly<Record<string, string>>;
 const API_ENV_DERIVED_KEYS: readonly string[] = Object.freeze([
   // Resolved from the stack root by `resolveProfile` / `apiEnvironment`.
   'PATH',
+  'CUSTOMER_AGENT_STACK_ROOT',
   'CUSTOMER_AGENT_API_HOST',
   'CUSTOMER_AGENT_API_PORT',
   'DATABASE_URL',
@@ -512,7 +513,7 @@ export function apiEnvironment(
     environment.FEISHU_APP_SECRET = feishu.clientSecret;
     environment.FEISHU_REDIRECT_URI = feishu.redirectUri;
   }
-  return { ...environment, ...overrides };
+  return { ...environment, ...overrides, CUSTOMER_AGENT_STACK_ROOT: profile.stackRoot };
 }
 
 export function pgEnvironment(): NodeJS.ProcessEnv {

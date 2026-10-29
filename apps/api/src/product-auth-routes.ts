@@ -56,6 +56,13 @@ export function registerProductAuthRoutes(app: FastifyInstance, auth: ProductAut
     scope.setErrorHandler((error, _request, reply) => sendIdentityFailure(reply,
       error instanceof IdentityFailure ? error : new IdentityFailure(
         isRequestBodyValidationError(error) ? 'REQUEST_INVALID' : 'DEPENDENCY_UNAVAILABLE')));
+    // Proxies can frame an empty logout as chunked with no Content-Type.
+    // Consume that empty stream; reject every non-empty or differently routed body.
+    scope.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit: 1 }, (request, body, done) => {
+      if (request.routeOptions.url === '/v1/auth/logout'
+        && request.headers['content-type'] === undefined && body.length === 0) done(null, undefined);
+      else done(new IdentityFailure('REQUEST_INVALID'));
+    });
     registerRoutes(scope, auth);
   });
 }

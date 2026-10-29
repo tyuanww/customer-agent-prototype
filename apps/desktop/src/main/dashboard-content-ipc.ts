@@ -18,7 +18,7 @@ import {
 } from './dashboard-content';
 
 export function registerDashboardContentIpc(
-  session: DashboardContentSessionClient | null,
+  session: (DashboardContentSessionClient & Pick<import('./product-session').ProductSession, 'logout'>) | null,
   dashboardContents: () => WebContents | null,
   devUrl: () => string | undefined,
   afterPublish?: DashboardContentAfterPublish,
@@ -40,6 +40,18 @@ export function registerDashboardContentIpc(
       }
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.DASHBOARD_LOGOUT, async (event, ...args: unknown[]) => {
+    if (!guard(event)) return dashboardContentFailure('FORBIDDEN');
+    if (args.length !== 0) return dashboardContentFailure('VALIDATION');
+    if (!session) return dashboardContentFailure('UNAVAILABLE');
+    try {
+      const result = await session.logout();
+      return result.ok ? { ok: true as const } : dashboardContentFailure('UNAVAILABLE', '已退出本机，服务端退出未确认。');
+    } catch {
+      return dashboardContentFailure('UNAVAILABLE', '退出未完成，请重试。');
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.DASHBOARD_CONTENT_PARSE,

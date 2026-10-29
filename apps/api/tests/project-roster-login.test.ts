@@ -1,11 +1,11 @@
 import type { QueryResult } from 'pg';
 import fastify from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createMockAuthService } from '../src/auth-service.js';
+import { createMockAuthService, type AuthenticatedUser } from '../src/auth-service.js';
 import { registerAuthRoutes } from '../src/auth-routes.js';
 import { bindSessionSubject, forgetJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 import { feishuUserId } from '../src/feishu-admit.js';
-import { composeRosterJob, NO_AUTHORIZATION_ACTIONS, projectRosterLogin, readStoredRosterPermission, rosterHomeFromEnv, rosterPermissionState, rosterPreparation, rosterPrincipalId, ROSTER_DENIAL_MESSAGE } from '../src/project-roster-login.js';
+import { composeRosterJob, NO_AUTHORIZATION_ACTIONS, projectRosterLogin, readStoredRosterPermission, rosterCandidateFromEnv, rosterHomeFromEnv, rosterPermissionState, rosterPreparation, rosterPrincipalId, ROSTER_DENIAL_MESSAGE } from '../src/project-roster-login.js';
 import { FACTS_EXPIRED_MESSAGE, ROSTER_PENDING_MESSAGE } from '@customer-agent/job-roster';
 import { JOB_ROSTER } from '@customer-agent/job-roster';
 
@@ -38,8 +38,9 @@ function client(
         const registration = status === 'projected' || status === 'registered' ? 'registered' : status;
         return result([{ status: registration }]);
       }
+      if (sql.includes('project_feishu_candidate')) return result([{ status }]);
       if (sql.includes('issue_roster_query')) return result([{ status }]);
-      if (sql.includes('withdraw_roster_query')) return result([{ status: 'revoked' }]);
+      if (sql.includes('withdraw_feishu_roster')) return result([{ status: permission === 'revoked' ? 'revoked' : 'absent' }]);
       return result([]);
     }),
   };
@@ -52,13 +53,13 @@ describe('roster login projection', () => {
     remember('服务赋能师');
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
     await expect(projectRosterLogin(db, openId)).resolves.toBe('unmatched');
-    expect(db.query).not.toHaveBeenCalled();
+    expect(db.query).toHaveBeenCalledTimes(1);
   });
 
   it('does not write when login collected no title', async () => {
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
     await expect(projectRosterLogin(db, openId)).resolves.toBe('unmatched');
-    expect(db.query).not.toHaveBeenCalled();
+    expect(db.query).toHaveBeenCalledTimes(1);
   });
 
   it('skips when the library does not have exactly one tenant and app', async () => {
@@ -72,12 +73,44 @@ describe('roster login projection', () => {
     remember('客服坐席');
     const trusted = { tenantId: 'tenant-menokin', appId: 'app-customer-agent' };
     const db = client([]);
-    await expect(projectRosterLogin(db, openId, trusted)).resolves.toBe('projected');
+    await expect(projectRosterLogin(db, openId, trusted)).resolves.toBe('registered');
     const params = db.query.mock.calls[1]?.[1] as unknown[];
     expect(params[2]).toBe('tenant-menokin');
     expect(params[3]).toBe('app-customer-agent');
     expect(rosterHomeFromEnv({ ROSTER_TENANT_ID: 'tenant-menokin', ROSTER_APP_ID: 'app-customer-agent' })).toEqual(trusted);
     expect(rosterHomeFromEnv({})).toBeNull();
+    const candidate = {
+      tenantId: 'tenant-menokin',
+      appId: 'app-customer-agent',
+      departmentId: 'dept-candidate',
+      jobId: 'job-candidate-agent',
+    };
+    expect(rosterCandidateFromEnv({
+      ROSTER_TENANT_ID: candidate.tenantId,
+      ROSTER_APP_ID: candidate.appId,
+      ROSTER_CANDIDATE_DEPARTMENT_ID: candidate.departmentId,
+      ROSTER_CANDIDATE_JOB_ID: candidate.jobId,
+    })).toEqual(candidate);
+  });
+
+  it('registers only a configured minimum candidate when directory facts are unavailable', async () => {
+    const trusted = { tenantId: 'tenant-menokin', appId: 'app-customer-agent' };
+    const candidate = {
+      ...trusted,
+      departmentId: 'dept-candidate',
+      jobId: 'job-candidate-agent',
+    };
+    const db = client([], 'registered');
+    await expect(projectRosterLogin(db, openId, trusted, candidate)).resolves.toBe('registered');
+    const candidateCall = db.query.mock.calls.find(([sql]) => String(sql).includes('project_feishu_candidate'));
+    expect(candidateCall?.[1]).toEqual([
+      feishuUserId(openId),
+      trusted.tenantId,
+      trusted.appId,
+      openId,
+      candidate.departmentId,
+      candidate.jobId,
+    ]);
   });
 
   it('skips when the library home disagrees with the trusted home', async () => {
@@ -87,10 +120,10 @@ describe('roster login projection', () => {
     expect(db.query).toHaveBeenCalledTimes(1);
   });
 
-  it('projects both seat and director with query only', async () => {
+  it('projects both seat and director without issuing query', async () => {
     remember('客服坐席');
     const seat = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
-    await expect(projectRosterLogin(seat, openId)).resolves.toBe('projected');
+    await expect(projectRosterLogin(seat, openId)).resolves.toBe('registered');
     const seatParams = seat.query.mock.calls[1]?.[1] as unknown[];
     expect(seatParams[0]).toBe(rosterPrincipalId(openId));
     expect(seatParams[1]).toBe(feishuUserId(openId));
@@ -101,7 +134,7 @@ describe('roster login projection', () => {
     forgetJobSnapshot(openId);
     remember('客服总监');
     const director = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
-    await expect(projectRosterLogin(director, openId)).resolves.toBe('projected');
+    await expect(projectRosterLogin(director, openId)).resolves.toBe('registered');
     const directorParams = director.query.mock.calls[1]?.[1] as unknown[];
     expect(directorParams[7]).toBe('job-customer-service-director');
     expect(directorParams[9]).toEqual(['query']);
@@ -114,10 +147,8 @@ describe('roster login projection', () => {
     await expect(projectRosterLogin(db, openId)).resolves.toBe('registered');
   });
 
-  it('gives each refusal the sentence its cause needs', () => {
-    // These three are not interchangeable. A missing grant needs a person. An expired
-    // facts window needs a refresh. An empty tenant needs someone to publish, and no
-    // amount of granting or refreshing changes that.
+  it('does not claim a missing release when the pending cause is unknown', () => {
+    expect(ROSTER_PENDING_MESSAGE).toBe('查询权限或资料尚未就绪，请联系管理员核对。');
     expect(rosterPreparation('projected')).toEqual({ state: 'ready', reason: 'projected', message: null });
     expect(rosterPreparation('registered')).toEqual({
       state: 'pending', reason: 'registered', message: ROSTER_PENDING_MESSAGE,
@@ -137,18 +168,22 @@ describe('roster login projection', () => {
   it('does not invent a department when the provider omits one', async () => {
     rememberJobSnapshot(openId, { title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }]);
-    await expect(projectRosterLogin(db, openId)).resolves.toBe('denied');
+    await expect(projectRosterLogin(db, openId)).resolves.toBe('unmatched');
     expect(db.query.mock.calls.some((call) => String(call[0]).includes('project_feishu_roster'))).toBe(false);
-    expect(db.query.mock.calls.some((call) => String(call[0]).includes('withdraw_roster_query'))).toBe(true);
-    expect(db.query.mock.calls.some((call) => String(call[0]).includes('roster_permission_for_user'))).toBe(true);
+    expect(db.query.mock.calls.some((call) => String(call[0]).includes('withdraw_feishu_roster'))).toBe(false);
     expect(rosterPermissionState('denied')).toBe('denied');
     expect(rosterPreparation('denied').message).toBe(ROSTER_DENIAL_MESSAGE);
   });
 
-  it('returns the stored permission after a department is missing', async () => {
+  it('uses the configured candidate when a department is missing', async () => {
     rememberJobSnapshot(openId, { title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
-    const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }], 'projected', 'pending');
-    await expect(projectRosterLogin(db, openId)).resolves.toBe('pending');
+    const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }], 'registered', 'pending');
+    await expect(projectRosterLogin(db, openId, null, {
+      tenantId: 'tenant-a',
+      appId: 'app-a',
+      departmentId: 'dept-candidate',
+      jobId: 'job-candidate-agent',
+    })).resolves.toBe('registered');
   });
 
   it('withdraws query access when the provider says the person has left', async () => {
@@ -156,7 +191,7 @@ describe('roster login projection', () => {
     const db = client([{ tenant_id: 'tenant-a', app_id: 'app-a' }], 'projected', 'revoked');
     await expect(projectRosterLogin(db, openId)).resolves.toBe('revoked');
     expect(db.query.mock.calls.some((call) => String(call[0]).includes('project_feishu_roster'))).toBe(false);
-    expect(db.query.mock.calls.some((call) => String(call[0]).includes('roster_permission_for_user'))).toBe(true);
+    expect(db.query.mock.calls[1]?.[1]).toEqual([openId, 'tenant-a', 'app-a']);
   });
 
   it('returns unmatched when a departed person has no stored permission', async () => {
@@ -241,7 +276,7 @@ describe('roster login projection', () => {
 describe('GET /v1/auth/job', () => {
   async function appWithPermission(
     readPermission?: (userId: string) => Promise<{ title: string; state: 'pending' | 'ready' | 'expired' | 'revoked' | 'denied' } | null>,
-    readActions?: (userId: string) => Promise<{ query: boolean; import: boolean; publish: boolean; rollback: boolean }>,
+    readActions?: (user: AuthenticatedUser) => Promise<{ query: boolean; import: boolean; publish: boolean; rollback: boolean }>,
   ) {
     const auth = createMockAuthService(() => 'tok_' + 'a'.repeat(40));
     const app = fastify();
@@ -385,7 +420,7 @@ describe('GET /v1/auth/job', () => {
         message: null,
         actions: { query: true, import: false, publish: true, rollback: false },
       });
-      expect(readActions).toHaveBeenCalledWith('usr_ou_abcdef');
+      expect(readActions).toHaveBeenCalledWith({ user_id: 'usr_ou_abcdef', role: 'owner', auth_mode: 'mock' });
     } finally {
       await app.close();
     }

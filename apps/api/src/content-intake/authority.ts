@@ -9,6 +9,20 @@ type Grant = C['IntakeGrant'];
 export type Source = { scopeId: string; scope: C['IntakeSourceScope']; version: number;
   templateVersion: string; ruleVersion: string; mappingVersion: string; structureDigest: string; mode: string };
 
+/** Bind $1 to the recipient. Shared by allocation discovery and grant selection;
+ * grant_parent_guard permits delegation only under a root allocation. */
+export const LIVE_ALLOCATION_GRANTS_SQL = `
+  WITH stamp AS MATERIALIZED (SELECT clock_timestamp() AS at)
+  SELECT g.* FROM content_intake.grants g CROSS JOIN stamp
+  LEFT JOIN content_intake.grants parent ON parent.grant_id=g.parent_grant_id
+  WHERE g.recipient_id=$1 AND g.kind IN ('allocation','delegation')
+    AND g.revoked_at IS NULL AND g.steward_id IS NOT NULL
+    AND g.starts_at<=stamp.at AND stamp.at<g.expires_at
+    AND (g.parent_grant_id IS NULL OR (
+      parent.kind='allocation' AND parent.parent_grant_id IS NULL
+      AND parent.revoked_at IS NULL AND parent.starts_at<=stamp.at AND stamp.at<parent.expires_at
+    ))`;
+
 export async function source(client: IntakeTransaction, id: string): Promise<Source> {
   const { rows } = await client.query<{ scope_id: string; tenant_id: string; app_id: string; brand_id: string;
     shop_id: string | null; domain: Scope['domain']; current_mapping_version: string;
@@ -75,9 +89,8 @@ async function parentAuthority(client: IntakeTransaction, issuer: Principal, kin
   if (!kinds.length) throw new IntakeRejection('REDELEGATION_DENIED', 'FORBIDDEN');
   const id = await scopeId(client, scope);
   const { rows } = await client.query<{ grant_id: string; expires_at: Date }>(`
-    SELECT grant_id,expires_at FROM content_intake.grants WHERE recipient_id=$1 AND scope_id=$2 AND action=$3
-      AND (source_id IS NULL OR source_id IS NOT DISTINCT FROM $4) AND revoked_at IS NULL
-      AND steward_id IS NOT NULL AND starts_at<=clock_timestamp() AND expires_at>clock_timestamp()
+    SELECT grant_id,expires_at FROM (${LIVE_ALLOCATION_GRANTS_SQL}) live WHERE scope_id=$2 AND action=$3
+      AND (source_id IS NULL OR source_id IS NOT DISTINCT FROM $4)
       AND ($5::timestamptz IS NULL OR (starts_at<=$5 AND expires_at>=$6))
       AND kind=ANY($7::text[]) ORDER BY grant_id LIMIT 1`,
   [issuer.id, id, action, scope.sourceId, period?.startsAt ?? null, period?.expiresAt ?? null, kinds]);

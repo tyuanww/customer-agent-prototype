@@ -1,6 +1,16 @@
 # 访问控制现状审计（A1）
 
+> 历史审计记录。文中的五分钟窗口对应当时实现。0073 后现行事实上限为 24 小时；0076 修复共享授权决策与祖先撤销检查；0077 停止自动查询签发，并加入唯一生产主账号、最低 Feishu 候选和姓名投影边界。当前规则见[权限模型](reference-job-roster-permission-model.md)，初始化步骤见[如何管理生产身份](how-to-manage-production-identities.md)。下文保留 2026-10-24 的测量和当时的失败结论，不表示当前部署仍有同样缺口。
+
 只读审计，不含任何代码或迁移改动。审计对象：仓库 `main@6dc485b0`，生产 `customer_agent_formal`（杭州，2026-10-24 实测）。目标模型见任务卡第 2 节。
+
+当前实现已取代本文中关于主账号、自动查询授权和登录后权限的旧路径：
+
+- 生产复用唯一 `production-admin` 独立主账号，只允许一个 enabled synthetic owner binding。`configure_production_admin_post` 配置固定 `job-master-account` 岗位，不创建主体、绑定、口令或 grant。
+- 主账号口令登录经 `password_login_allowed` 和 `project_seat_login` 只刷新 24 小时事实。再次登录不会恢复已撤销的 grant。
+- 业务授权只来自权限页面。旧定时器现在只刷新 `feishu-job-roster` 的事实，不调用 `issue_roster_query`。0077 已撤销旧系统签发原因对应的查询授权，并收回 `intake_business` 的签发执行权。
+- Feishu OAuth 可在没有通讯录权限时登记最低 `feishu-candidate`。内部候选岗位不是 HR 职务，也不会自动产生业务授权。
+- 姓名以 `public.app_users.display_name` 为单源。Feishu 姓名只更新已有行，不创建账号，也不改变授权。
 
 每条结论后附证据位置。标「未验证」的是我没有实际跑到或没有读到实现的。
 

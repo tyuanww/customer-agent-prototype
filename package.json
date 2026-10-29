@@ -78,7 +78,7 @@
     "content:retention": "node scripts/content-retention.ts",
     "identity:accounts:init": "node scripts/synthetic-stack/identity-accounts-init.ts",
     "verify:plan": "node scripts/verification-policy.mjs plan",
-    "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/repair-contract-intake.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs scripts/ops/customer-agent-release.test.mjs scripts/version-identity.test.mjs",
+    "test:workflow": "node --test scripts/verification-policy.test.mjs scripts/repair-contract-intake.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs scripts/ops/customer-agent-release.test.mjs scripts/version-identity.test.mjs scripts/ops/production-consistency.test.mjs scripts/ops/backup-set.test.mjs",
     "download-page:update": "node scripts/update-download-page.mjs",
     "download-page:check": "node scripts/update-download-page.mjs --check",
     "test:g1a:e0:ci": "node scripts/run-g1a-synthetic.mjs",
@@ -86,7 +86,9 @@
     "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package",
     "test:content-intake:p1": "pnpm --filter @customer-agent/content-intake test && pnpm --filter @customer-agent/api exec vitest run tests/content-intake-p1.test.ts",
     "content:intake:probe": "pnpm --filter @customer-agent/content-intake probe",
-    "test:repair-intake": "node --test scripts/repair-contract-intake.test.mjs"
+    "test:repair-intake": "node --test scripts/repair-contract-intake.test.mjs",
+    "test:backup:integration": "pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION=1 node --test scripts/ops/backup-set-pg15.test.mjs",
+    "test:identity:integration": "pnpm build:services && node --test scripts/ops/bootstrap-issuer-authority.test.mjs scripts/synthetic-stack/password-entry-pg15.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

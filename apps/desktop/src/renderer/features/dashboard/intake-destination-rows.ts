@@ -38,11 +38,11 @@ export const INTAKE_DESTINATION_ROWS = [
   {
     id: 'materials',
     label: '资料',
-    blurb: '上传、确认来源、发布、回退',
+    blurb: '上传、确认来源、发布',
     group: '治理与架构',
     audience: 'staff',
     needsPermissionBridge: false,
-    keepAlive: false,
+    keepAlive: true,
   },
   {
     id: 'permissions',

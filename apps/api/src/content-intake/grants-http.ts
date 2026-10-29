@@ -11,8 +11,6 @@ export const contentIntakeGrantRoutes: FastifyPluginAsync<{
 }> = async (app, { auth, service, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
   app.get('/v1/intake/grants', { exposeHeadRoute: false }, async (request, reply) => {
-    if (request.body !== undefined || request.headers['transfer-encoding'] !== undefined
-      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) return intakeFailure(reply,'VALIDATION','FILE_INVALID');
     return sendIntake(reply, await service.grants(actor(request), intakePageQuery(request)), 'IntakeGrantList');
   });
   for (const [path, method] of [['/v1/intake/grants/preview','previewGrants'],['/v1/intake/grants','grantBatch']] as const) {

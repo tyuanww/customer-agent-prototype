@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
-import { allocationKinds, authorize, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
+import { allocationKinds, authorize, LIVE_ALLOCATION_GRANTS_SQL, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
@@ -16,6 +16,12 @@ type Page = { limit: number; cursor?: string };
 export type IntakePrincipalLabels = (identity: Readonly<{ principalId: string; tenantId: string; appId: string }>) => string | null;
 // Discovery is a bounded menu, never a grant or a cached authorization decision.
 const MAX_SOURCES = 5_000;
+const RETIRED_HANGZHOU_FACT_VERSIONS = new Map([['hz-allocator', 8], ['hz-reviewer', 5]]);
+
+function isRetiredDirectoryIdentity(principal: Principal & { hasNewIdentityActivity: boolean }, actorId: string, label: string | null | undefined): boolean {
+  return principal.id !== actorId && principal.identityScope === 'confirmed-hangzhou' && !label && !principal.hasNewIdentityActivity
+    && RETIRED_HANGZHOU_FACT_VERSIONS.get(principal.id) === principal.factsVersion;
+}
 function page(raw: unknown): Page {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(k => k !== 'cursor' && k !== 'limit')) {
     throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
@@ -32,6 +38,33 @@ function page(raw: unknown): Page {
 async function discover(client: IntakeTransaction, who: Principal, sessionUntil: number) {
   const allocating = allocationKinds(who, 'business'), delegating = allocationKinds(who, 'delegation');
   const result = await client.query<{ source: C['IntakeSource']; rights: { action: C['IntakeAction']; kind: string; until: string }[] }>(`
+    WITH stamp AS MATERIALIZED (
+      SELECT clock_timestamp() AS at
+    ), business_actions AS MATERIALIZED (
+      SELECT DISTINCT g.action
+      FROM content_intake.grants g CROSS JOIN stamp
+      WHERE g.recipient_id=$1 AND g.kind='business' AND g.revoked_at IS NULL
+        AND g.starts_at<=stamp.at AND stamp.at<g.expires_at
+    ), business_sources AS MATERIALIZED (
+      SELECT actions.action, allowed.scope_id, allowed.source_id, max(allowed.valid_until) AS until
+      FROM business_actions actions CROSS JOIN stamp
+      CROSS JOIN LATERAL content_intake.authorization_sources($1,actions.action,stamp.at) allowed
+      GROUP BY actions.action,allowed.scope_id,allowed.source_id
+    ), effective AS (
+      SELECT allowed.scope_id,allowed.source_id,allowed.action,'business'::text AS kind,allowed.until
+      FROM business_sources allowed
+      UNION ALL
+      SELECT g.scope_id,src.source_id,g.action,g.kind,max(g.expires_at) AS until
+      FROM (${LIVE_ALLOCATION_GRANTS_SQL}) g
+      JOIN content_intake.sources src ON src.scope_id=g.scope_id
+        AND (g.source_id IS NULL OR g.source_id=src.source_id)
+      WHERE g.kind=ANY($4::text[])
+      GROUP BY g.scope_id,src.source_id,g.action,g.kind
+    ), rights AS (
+      SELECT scope_id,source_id,
+        jsonb_agg(jsonb_build_object('action',action,'kind',kind,'until',until) ORDER BY kind,action) AS items
+      FROM effective WHERE until IS NOT NULL GROUP BY scope_id,source_id
+    )
     SELECT jsonb_build_object('scope',jsonb_build_object('tenantId',s.tenant_id,'appId',s.app_id,
       'brandId',s.brand_id,'shopId',s.shop_id,'domain',s.domain,'sourceId',src.source_id),
       'version',src.current_mapping_version,'templateVersion',m.template_version,'ruleVersion',m.rule_version,
@@ -39,21 +72,8 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
       'contentIntakeMode',src.mode,'modeVersion',src.mode_version) AS source, rights.items AS rights
     FROM content_intake.sources src JOIN content_intake.scopes s USING(scope_id)
     JOIN content_intake.source_mappings m ON m.source_id=src.source_id AND m.version=src.current_mapping_version
-    CROSS JOIN LATERAL (
-      SELECT jsonb_agg(jsonb_build_object('action',action,'kind',kind,'until',until) ORDER BY kind,action) AS items FROM (
-        -- The business predicate already aggregates the effective grant set.
-        -- Evaluate it once per action/kind, not once per overlapping grant.
-        SELECT g.action,g.kind,CASE WHEN g.kind='business' THEN
-          content_intake.authorization_deadline($1,g.action,s.scope_id,src.source_id,clock_timestamp())
-          ELSE max(g.expires_at) END AS until
-        FROM content_intake.grants g WHERE g.recipient_id=$1 AND g.scope_id=s.scope_id
-          AND (g.source_id IS NULL OR g.source_id=src.source_id) AND g.revoked_at IS NULL
-          AND g.starts_at<=clock_timestamp() AND g.expires_at>clock_timestamp()
-          AND (g.kind='business' OR (g.kind=ANY($4::text[]) AND g.steward_id IS NOT NULL))
-        GROUP BY g.action,g.kind
-      ) effective WHERE until IS NOT NULL
-    ) rights
-    WHERE s.tenant_id=$2 AND s.app_id=$3 AND rights.items IS NOT NULL
+    JOIN rights ON rights.scope_id=s.scope_id AND rights.source_id=src.source_id
+    WHERE s.tenant_id=$2 AND s.app_id=$3
     ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1]);
   if (result.rows.length > MAX_SOURCES) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [who.tenantId, who.appId]);
@@ -274,6 +294,7 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
         const scanned = rows.slice(0, request.limit), items: C['IntakePrincipalPage']['items'] = [];
         const now = await clock(client);
         for (const target of scanned) {
+          if (target.identityScope === 'content-intake-system') continue;
           if (purpose === 'grant-recipient') {
             try { requireFresh(target, now); }
             catch (error) {
@@ -282,9 +303,11 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
             }
             if (samePerson(who, target) || !(capability.mayAllocate.some(action => recipientRoleAllows(target.role, 'business', action))
               || capability.mayDelegate.some(action => recipientRoleAllows(target.role, 'delegation', action)))) continue;
-            client.validUntil(target.validUntil);
           }
-          const displayLabel = labels?.({ principalId: target.id, tenantId: target.tenantId, appId: target.appId });
+          const displayLabel = target.displayName
+            ?? labels?.({ principalId: target.id, tenantId: target.tenantId, appId: target.appId });
+          if (isRetiredDirectoryIdentity(target, who.id, displayLabel)) continue;
+          if (purpose === 'grant-recipient') client.validUntil(target.validUntil);
           if (typeof displayLabel !== 'string' || !displayLabel.trim() || [...displayLabel].length > 256) {
             throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'OVERLOADED');
           }

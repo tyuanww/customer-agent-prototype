@@ -4,10 +4,13 @@ export type WorkbenchModeReply =
   | { ok: true; kind: WorkbenchKind }
   | { ok: false; code: 'FORBIDDEN' };
 
-export function workbenchKind(profile: { apiOrigin: string; contentIntake?: 'faq-v2' } | null | undefined): WorkbenchKind {
+export function workbenchKind(profile: {
+  readonly mode?: 'synthetic-local' | 'product-remote';
+  readonly contentIntake?: 'faq-v2';
+} | null | undefined): WorkbenchKind {
   if (!profile) return 'legacy';
   if (profile.contentIntake === 'faq-v2') return 'faq-v2';
-  if (profile.apiOrigin.startsWith('https://')) return 'product-remote';
+  if (profile.mode === 'product-remote') return 'product-remote';
   return 'legacy';
 }
 

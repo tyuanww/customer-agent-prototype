@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IntakeManagement } from '../../src/renderer/features/dashboard/IntakeManagement';
+import { renderIntakeDestinations, type IntakeDestinationContext } from '../../src/renderer/features/dashboard/intake-destinations';
 import { ContentIntakeManagement } from '../../src/main/content-intake-management';
 import type { ProductSession } from '../../src/main/product-session';
 import { intakeManagementData } from '../fixtures/intake-management-data';
@@ -26,6 +27,91 @@ async function choose(user: ReturnType<typeof userEvent.setup>, name: string, op
   await user.click(screen.getByRole('combobox', { name }));
   await user.click(await screen.findByRole('option', { name: option }));
 }
+
+function destinationContext(overrides: Partial<IntakeDestinationContext> = {}): IntakeDestinationContext {
+  return {
+    active: 'materials', canOpenPermissions: false, canGrant: false, canUploadSop: false,
+    seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'owner:director',
+    snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
+    onSupplyScript: () => undefined, scriptDraft: null, onDraftConsumed: () => undefined,
+    ...overrides,
+  };
+}
+
+it('does not read materials before the page is opened', async () => {
+  const f = setup();
+  const page = render(renderIntakeDestinations(destinationContext({ active: 'overview' })));
+  try {
+    await act(async () => {});
+    expect(f.command).not.toHaveBeenCalled();
+    page.rerender(renderIntakeDestinations(destinationContext()));
+    expect(await screen.findByRole('button', { name: /第 1 版/ })).toBeInTheDocument();
+    expect(f.command).toHaveBeenCalled();
+  } finally { f.main.dispose(); }
+});
+
+it('preserves source and publication input across navigation', async () => {
+  const f = setup(); f.data.status.state = 'passed';
+  const page = render(renderIntakeDestinations(destinationContext()));
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'export-v1');
+    await f.user.type(screen.getByRole('textbox', { name: '来源确认说明' }), '核对来源');
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview' })));
+    expect(screen.queryByRole('textbox', { name: '来源版本' })).not.toBeInTheDocument();
+    page.rerender(renderIntakeDestinations(destinationContext()));
+    expect(screen.getByRole('textbox', { name: '来源版本' })).toHaveValue('export-v1');
+    expect(screen.getByRole('textbox', { name: '来源确认说明' })).toHaveValue('核对来源');
+    await f.user.click(screen.getByRole('button', { name: '确认来源版本' }));
+    await f.user.type(await screen.findByRole('textbox', { name: '发布标题' }), '合成标题');
+    await f.user.type(screen.getByRole('textbox', { name: '发布摘要' }), '合成摘要');
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview' })));
+    page.rerender(renderIntakeDestinations(destinationContext()));
+    expect(screen.getByRole('textbox', { name: '发布标题' })).toHaveValue('合成标题');
+    expect(screen.getByRole('textbox', { name: '发布摘要' })).toHaveValue('合成摘要');
+  } finally { f.main.dispose(); }
+});
+
+it('clears hidden materials on logout, session change and invalidation', async () => {
+  const f = setup();
+  const page = render(renderIntakeDestinations(destinationContext()));
+  try {
+    const fill = async () => {
+      await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
+      await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+      await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'private-draft');
+    };
+    await fill();
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview', jobKnown: false, sessionKey: 'signed-out' })));
+    expect(screen.queryByDisplayValue('private-draft')).not.toBeInTheDocument();
+    page.rerender(renderIntakeDestinations(destinationContext()));
+    await fill();
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview', sessionKey: 'coach:other' })));
+    expect(screen.queryByDisplayValue('private-draft')).not.toBeInTheDocument();
+    page.rerender(renderIntakeDestinations(destinationContext({ sessionKey: 'coach:other' })));
+    await fill();
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview', sessionKey: 'coach:other' })));
+    window.dashboardIntake!.current = async () => ({ ok: false, code: 'UNAUTHORIZED', message: '未登录', view: null });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByDisplayValue('private-draft')).not.toBeInTheDocument();
+    page.rerender(renderIntakeDestinations(destinationContext({ sessionKey: 'coach:other' })));
+    expect(screen.queryByDisplayValue('private-draft')).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
+
+it('clears a hidden draft when invalidation immediately returns a fresh authorized view', async () => {
+  const f = setup();
+  const page = render(renderIntakeDestinations(destinationContext()));
+  try {
+    await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    await f.user.type(screen.getByRole('textbox', { name: '来源版本' }), 'private-draft');
+    page.rerender(renderIntakeDestinations(destinationContext({ active: 'overview' })));
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByDisplayValue('private-draft')).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
 it('loads after a development remount instead of sticking on 会话待确认', async () => {
   const f = setup();
   let release!: (value: { ok: true; view: ReturnType<ContentIntakeManagement['view']> }) => void;
@@ -281,7 +367,7 @@ it('directs an unknown publication to its original recovery and removes the guid
   } finally { f.main.dispose(); }
 });
 
-it('leaves rollback input, an active plan and unknown recovery with the rollback panel instead of candidate guidance', async () => {
+it('preserves an existing rollback plan and unknown recovery without exposing a new rollback entry', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
     await f.user.click(await screen.findByRole('button', { name: /第 1 版/ }));
@@ -291,7 +377,7 @@ it('leaves rollback input, an active plan and unknown recovery with the rollback
     window.dashboardIntake!.current = async () => ({ ok: true, view: structuredClone(view) });
     await act(async () => { f.listeners.forEach(listener => listener()); });
     expect(screen.getByRole('region', { name: '当前步骤' })).toBeInTheDocument();
-    expect(screen.getByText('请先读取当前版和上一版。')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '已发布目录纠正回退' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /发布编号/ })).not.toBeInTheDocument();
     view.rollback.impact = { baseReleaseId: 'rel_2', targetReleaseId: 'rel_1', scopes: [], requiresCorrectiveCandidate: false };
     await act(async () => { f.listeners.forEach(listener => listener()); });
@@ -303,6 +389,11 @@ it('leaves rollback input, an active plan and unknown recovery with the rollback
     expect(screen.queryByRole('region', { name: '当前步骤' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查询原回退回执' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '发布当前候选' })).not.toBeInTheDocument();
+    view.rollback.pending = null;
+    view.rollback.result = { state: 'published', releaseId: 'rel_3' };
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.getByText('回退已发布。')).toBeInTheDocument();
+    expect(screen.getByText(/发布号 rel_3/)).toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
 
@@ -346,20 +437,19 @@ it('opens the materials page as a candidate table and expands only the current s
   } finally { f.main.dispose(); }
 });
 
-it('keeps rollback on the published row', async () => {
+it('opens published materials without an unavailable rollback entry', async () => {
   const f = setup(); f.data.candidate.state = 'published'; f.data.state.rollback = true; render(<IntakeManagement />);
   try {
     await screen.findByRole('columnheader', { name: '名称' });
     expect(screen.getByText('这个筛选下没有候选。')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '回退' })).not.toBeInTheDocument();
     await f.user.click(within(screen.getByRole('radiogroup', { name: '候选筛选' })).getByText('已发布'));
-    expect(screen.getByRole('button', { name: '回退' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '回退' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /第 1 版/ })).toBeInTheDocument();
     await f.user.click(screen.getByRole('button', { name: /第 1 版/ }));
-    const named = await screen.findByRole('region', { name: '已发布目录纠正回退' });
-    expect(named).not.toHaveFocus();
-    await f.user.click(screen.getByRole('button', { name: '回退' }));
-    expect(await screen.findByRole('region', { name: '已发布目录纠正回退' })).toHaveFocus();
+    expect(await screen.findByRole('region', { name: '当前候选' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '已发布目录纠正回退' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '查看回退影响' })).not.toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
 

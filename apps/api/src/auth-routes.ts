@@ -3,6 +3,7 @@ import { parseContractSchema, validateContractSchema } from '@customer-agent/con
 import {
   authenticateRequestHeaders,
   bearerToken,
+  type AuthenticatedUser,
   type AuthService,
 } from './auth-service.js';
 import {
@@ -24,7 +25,7 @@ export function registerAuthRoutes(
   app: FastifyInstance,
   authService: AuthService,
   readPermission?: (userId: string) => Promise<StoredRosterPermission | null>,
-  readActions?: (userId: string) => Promise<AuthorizationActions>,
+  readActions?: (user: AuthenticatedUser) => Promise<AuthorizationActions>,
 ): void {
   if (authService.kind === 'mock') app.post('/v1/auth/mock-login', async (request, reply) => {
     if (!hasExactKeys(request.body, ['user_id', 'role'])) return sendValidationError(reply);
@@ -76,7 +77,7 @@ export function registerAuthRoutes(
     // ACL or migration fault behind every button saying 没有权限. Log it and keep the response
     // shape, the same way the roster permission read above is handled.
     const actions = readActions
-      ? await readActions(user.user_id).catch(() => {
+      ? await readActions(user).catch(() => {
         request.log.warn('[api] authorization actions read failed');
         return NO_AUTHORIZATION_ACTIONS;
       })

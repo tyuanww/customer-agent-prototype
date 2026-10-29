@@ -1,10 +1,10 @@
-import { execFileSync } from 'node:child_process';
+import { availableParallelism, uptime } from 'node:os';
 import type { Client, ClientConfig } from 'pg';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, applyMigrationPrefix } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { forgetJobSnapshot, rememberJobSnapshot } from '../src/feishu-job-snapshot.js';
-import { projectRosterLogin, rosterPreparation, rosterPrincipalId } from '../src/project-roster-login.js';
+import { projectRosterLogin, rosterPrincipalId } from '../src/project-roster-login.js';
 import { publishLineage, seedLibrary } from './support/roster-library.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -12,12 +12,26 @@ const seat = 'ou_rosterseat01';
 const rounds = 5;
 const samplesPerRound = 40;
 
-function remember(openId: string, title: string) {
-  rememberJobSnapshot(openId, { title, directory: [{ name: title, enabled: true }], departmentIds: ['dept-a'] });
+function remember(title: string) {
+  rememberJobSnapshot(seat, {
+    title,
+    directory: [{ name: title, enabled: true }],
+    departmentIds: ['dept-a'],
+  });
 }
 
-function applyPrefix(client: Client) {
-  return applyMigrationPrefix(client, 45);
+async function ensureStoreSet(client: Client): Promise<void> {
+  await client.query(`INSERT INTO content_intake.store_sets(
+    tenant_id,app_id,version,approved_at,provenance)
+    VALUES ('tenant-a','app-a',1,clock_timestamp(),'p0-live-test')
+    ON CONFLICT DO NOTHING`);
+  await client.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+    VALUES ('tenant-a','app-a',1)
+    ON CONFLICT (tenant_id,app_id) DO UPDATE SET version=EXCLUDED.version`);
+  await client.query(`INSERT INTO content_intake.store_set_members(
+    tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+    VALUES ('tenant-a','app-a',1,'scope-a','source-a',clock_timestamp()+interval '1 day')
+    ON CONFLICT DO NOTHING`);
 }
 
 async function seedEngineer(client: Client) {
@@ -30,7 +44,7 @@ async function seedEngineer(client: Client) {
       VALUES ('engineer','user-engineer','tenant-a','app-a','confirmed-synthetic','engineer',1,0)`);
     await client.query(`INSERT INTO content_intake.principal_facts
       VALUES ('engineer',1,ARRAY['dept-a'],'job-engineer',true,
-        statement_timestamp()-interval '1 second', statement_timestamp()+interval '4 minutes', repeat('a',64))`);
+        statement_timestamp()-interval '1 second',statement_timestamp()+interval '4 minutes',repeat('a',64))`);
     await client.query(`INSERT INTO content_intake.role_rules
       VALUES ('tenant-a','app-a','dept-a','job-engineer',1,'engineer')`);
     await client.query(`INSERT INTO content_intake.scopes
@@ -46,20 +60,12 @@ async function seedEngineer(client: Client) {
   }
 }
 
-async function deadline(client: Client, principal: string, action: string) {
-  const row = await client.query<{ until: Date | null }>(
-    `SELECT content_intake.authorization_deadline($1,$2,'scope-a','source-a',clock_timestamp()) AS until`,
-    [principal, action]);
-  return row.rows[0]?.until ?? null;
-}
-
-async function liveGrants(client: Client) {
-  return client.query<{ action: string; parent_grant_id: string | null; issuer_scope: string }>(`
-    SELECT g.action, g.parent_grant_id, p.identity_scope AS issuer_scope
-    FROM content_intake.grants g
-    JOIN content_intake.principals p ON p.principal_id = g.issuer_id
-    WHERE g.recipient_id = $1 AND g.kind = 'business' AND g.revoked_at IS NULL
-    ORDER BY g.action`, [rosterPrincipalId(seat)]);
+async function deadline(client: Client, principal: string) {
+  return (await client.query<{ until: Date | null }>(
+    `SELECT content_intake.authorization_deadline(
+      $1,'query','scope-a','source-a',clock_timestamp()) AS until`,
+    [principal],
+  )).rows[0]?.until ?? null;
 }
 
 describe.skipIf(!enabled)('P0 live lanes', () => {
@@ -95,227 +101,123 @@ describe.skipIf(!enabled)('P0 live lanes', () => {
     return client;
   }
 
-  it('lane 1 trunk prefix allows an engineer query with no business grant and head does not', async () => {
+  it('preserves the historical prefix check that removed role-only query authority', async () => {
     const trunk = await open('lane1_trunk');
     const head = await open('lane1_head');
-    try {
-      await applyPrefix(trunk);
-      await seedEngineer(trunk);
-      const signer = await trunk.query(`SELECT to_regprocedure('content_intake.issue_roster_query(text,text,text)') AS proc`);
-      expect(signer.rows[0]?.proc).toBeNull();
-      expect(await deadline(trunk, 'engineer', 'query')).not.toBeNull();
-      await applyDatabaseMigrations(head);
-      await seedEngineer(head);
-      expect(await deadline(head, 'engineer', 'query')).toBeNull();
-    } finally {
-      await trunk.end();
-      await head.end();
+    await applyMigrationPrefix(trunk, 45);
+    await seedEngineer(trunk);
+    expect(await deadline(trunk, 'engineer')).not.toBeNull();
+    await applyDatabaseMigrations(head);
+    await seedEngineer(head);
+    expect(await deadline(head, 'engineer')).toBeNull();
+  }, 120_000);
+
+  it('records matched Feishu identity facts without issuing a query grant', async () => {
+    const client = await open('lane2_manual');
+    await seedLibrary(client, false);
+    await publishLineage(client);
+    await client.query('SET ROLE intake_business');
+    remember('客服坐席');
+    await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
+    await client.query('RESET ROLE');
+    expect((await client.query(
+      `SELECT 1 FROM content_intake.principal_facts WHERE principal_id=$1`,
+      [rosterPrincipalId(seat)],
+    )).rowCount).toBe(1);
+    expect((await client.query(
+      `SELECT 1 FROM content_intake.grants
+       WHERE recipient_id=$1 AND kind='business'`,
+      [rosterPrincipalId(seat)],
+    )).rowCount).toBe(0);
+  }, 120_000);
+
+  it('rejects an unknown job without creating principal, facts or grants', async () => {
+    const client = await open('lane3_unknown');
+    await seedLibrary(client, false);
+    await client.query('SET ROLE intake_business');
+    remember('服务赋能师');
+    await expect(projectRosterLogin(client, seat)).resolves.toBe('unmatched');
+    await client.query('RESET ROLE');
+    for (const table of ['principals', 'principal_facts', 'grants']) {
+      const key = table === 'grants' ? 'recipient_id' : 'principal_id';
+      expect((await client.query(
+        `SELECT 1 FROM content_intake.${table} WHERE ${key}=$1`,
+        [rosterPrincipalId(seat)],
+      )).rowCount).toBe(0);
     }
   }, 120_000);
 
-  it('lane 2 mapped login records facts and a system issuer', async () => {
-    const client = await open('lane2_mapped');
-    try {
-      await seedLibrary(client, true);
-      await publishLineage(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
-      await client.query('RESET ROLE');
-      const facts = await client.query(`SELECT 1 FROM content_intake.principal_facts WHERE principal_id = $1`, [rosterPrincipalId(seat)]);
-      expect(facts.rowCount).toBe(1);
-      expect((await liveGrants(client)).rows).toEqual([
-        { action: 'query', parent_grant_id: null, issuer_scope: 'content-intake-system' },
-      ]);
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 3 unknown job creates no principal, facts, or grant', async () => {
-    const client = await open('lane3_unknown');
-    try {
-      await seedLibrary(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '服务赋能师');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('unmatched');
-      await client.query('RESET ROLE');
-      const people = await client.query(`SELECT count(*)::int AS count FROM content_intake.principals WHERE principal_id = $1`, [rosterPrincipalId(seat)]);
-      const facts = await client.query(`SELECT count(*)::int AS count FROM content_intake.principal_facts WHERE principal_id = $1`, [rosterPrincipalId(seat)]);
-      const grants = await client.query(`SELECT count(*)::int AS count FROM content_intake.grants WHERE recipient_id = $1`, [rosterPrincipalId(seat)]);
-      expect(people.rows[0]?.count).toBe(0);
-      expect(facts.rows[0]?.count).toBe(0);
-      expect(grants.rows[0]?.count).toBe(0);
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 4 an already expired system query grant leaves the deadline empty', async () => {
-    const client = await open('lane4_expired');
-    try {
-      await seedLibrary(client, false);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
-      await client.query('RESET ROLE');
-      await client.query(`
-        INSERT INTO content_intake.grants(
-          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)
-        SELECT 'grant-expired-query','business',principal_id,$1,'tenant-a','app-a','scope-a','source-a','query',
-          clock_timestamp()-interval '1 hour', clock_timestamp()-interval '1 minute','职位名单系统签发。',NULL
-        FROM content_intake.principals
-        WHERE identity_scope = 'content-intake-system' AND person_key = 'query-signer'`, [rosterPrincipalId(seat)]);
-      const stored = await client.query<{ expired: boolean }>(
-        `SELECT expires_at < clock_timestamp() AS expired FROM content_intake.grants WHERE grant_id = 'grant-expired-query'`);
-      expect(stored.rows[0]?.expired).toBe(true);
-      expect(await deadline(client, rosterPrincipalId(seat), 'query')).toBeNull();
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 5 revoking the system query grant closes the deadline', async () => {
-    const client = await open('lane5_revoked');
-    try {
-      await seedLibrary(client, false);
-      await publishLineage(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
-      await client.query('RESET ROLE');
-      expect(await deadline(client, rosterPrincipalId(seat), 'query')).not.toBeNull();
-      await client.query(`UPDATE content_intake.grants
-        SET version = version + 1, last_change_reason = '撤销。', revoked_at = clock_timestamp()
-        WHERE recipient_id = $1 AND kind = 'business' AND action = 'query' AND revoked_at IS NULL`, [rosterPrincipalId(seat)]);
-      expect(await deadline(client, rosterPrincipalId(seat), 'query')).toBeNull();
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 6 a matched login with no live allocation still receives the system query', async () => {
-    const client = await open('lane6_no_allocation');
-    try {
-      await seedLibrary(client, false);
-      await publishLineage(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
-      await client.query('RESET ROLE');
-      const allocations = await client.query(`SELECT count(*)::int AS count FROM content_intake.grants
-        WHERE kind = 'allocation' AND expires_at > clock_timestamp() AND revoked_at IS NULL`);
-      expect(allocations.rows[0]?.count).toBe(0);
-      expect((await liveGrants(client)).rows).toEqual([
-        { action: 'query', parent_grant_id: null, issuer_scope: 'content-intake-system' },
-      ]);
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 7 no published lineage creates no grant and keeps the fixed sentence', async () => {
-    const client = await open('lane7_no_content');
-    try {
-      await seedLibrary(client, false);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('registered');
-      await client.query('RESET ROLE');
-      expect((await liveGrants(client)).rows).toEqual([]);
-      expect(rosterPreparation('registered')).toEqual({
-        state: 'pending', reason: 'registered', message: '没有权限，请找人开通。',
-      });
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 8 a query-only principal cannot publish', async () => {
-    const client = await open('lane8_publish');
-    try {
-      await seedLibrary(client, false);
-      await publishLineage(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
-      await client.query('RESET ROLE');
-      expect(await deadline(client, rosterPrincipalId(seat), 'publish')).toBeNull();
-      await expect(client.query(`
-        INSERT INTO content_intake.grants(
-          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)
-        SELECT 'grant-publish','business',principal_id,$1,'tenant-a','app-a','scope-a','source-a','publish',
-          clock_timestamp(), clock_timestamp()+interval '1 hour','职位名单系统签发。',NULL
-        FROM content_intake.principals
-        WHERE identity_scope = 'content-intake-system' AND person_key = 'query-signer'`,
-      [rosterPrincipalId(seat)])).rejects.toMatchObject({ message: 'GRANT_PARENT_MISMATCH' });
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 9 a query-only principal cannot import', async () => {
-    const client = await open('lane9_import');
-    try {
-      await seedLibrary(client, false);
-      await publishLineage(client);
-      await client.query('SET ROLE intake_business');
-      remember(seat, '客服坐席');
-      await expect(projectRosterLogin(client, seat)).resolves.toBe('projected');
-      await client.query('RESET ROLE');
-      expect(await deadline(client, rosterPrincipalId(seat), 'import')).toBeNull();
-      await expect(client.query(`
-        INSERT INTO content_intake.grants(
-          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,starts_at,expires_at,reason,parent_grant_id)
-        SELECT 'grant-import','business',principal_id,$1,'tenant-a','app-a','scope-a','source-a','import',
-          clock_timestamp(), clock_timestamp()+interval '1 hour','职位名单系统签发。',NULL
-        FROM content_intake.principals
-        WHERE identity_scope = 'content-intake-system' AND person_key = 'query-signer'`,
-      [rosterPrincipalId(seat)])).rejects.toMatchObject({ message: 'GRANT_PARENT_MISMATCH' });
-    } finally { await client.end(); }
-  }, 120_000);
-
-  it('lane 10 a new connection still sees the database grant', async () => {
-    const first = await open('lane10_restart');
-    await seedLibrary(first, false);
+  it('keeps a manual grant across reconnect and does not revive it after revoke', async () => {
+    const first = await open('lane4_reconnect');
+    await seedLibrary(first, true);
     await publishLineage(first);
+    await ensureStoreSet(first);
+    remember('客服坐席');
     await first.query('SET ROLE intake_business');
-    remember(seat, '客服坐席');
-    await expect(projectRosterLogin(first, seat)).resolves.toBe('projected');
+    await expect(projectRosterLogin(first, seat)).resolves.toBe('registered');
     await first.query('RESET ROLE');
+    const inserted = await first.query(`INSERT INTO content_intake.grants(
+      grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,
+      starts_at,expires_at,reason,parent_grant_id,steward_id,policy_version,store_set_version)
+      SELECT 'grant-reconnect','business',parent.recipient_id,$1,parent.tenant_id,parent.app_id,
+        parent.scope_id,'source-a',parent.action,parent.starts_at,parent.expires_at-interval '1 second',
+        '人工查询。',parent.grant_id,parent.recipient_id,policy.version,current_set.version
+      FROM content_intake.grants parent
+      JOIN content_intake.policy_versions policy
+        ON policy.tenant_id=parent.tenant_id AND policy.app_id=parent.app_id
+      JOIN content_intake.store_set_current current_set
+        ON current_set.tenant_id=parent.tenant_id AND current_set.app_id=parent.app_id
+      WHERE parent.grant_id='root-query'`,
+    [rosterPrincipalId(seat)]);
+    expect(inserted.rowCount, 'manual grant must exist').toBe(1);
     await first.end();
+
     const second = await reconnect();
-    expect((await liveGrants(second)).rows).toEqual([
-      { action: 'query', parent_grant_id: null, issuer_scope: 'content-intake-system' },
-    ]);
-    expect(await deadline(second, rosterPrincipalId(seat), 'query')).not.toBeNull();
+    expect(await deadline(second, rosterPrincipalId(seat))).not.toBeNull();
+    await second.query(`UPDATE content_intake.grants
+      SET version=version+1,last_change_reason='人工撤销。',revoked_at=clock_timestamp()
+      WHERE grant_id='grant-reconnect'`);
+    await second.query('SET ROLE intake_business');
+    await expect(projectRosterLogin(second, seat)).resolves.toBe('registered');
+    await second.query('RESET ROLE');
+    expect(await deadline(second, rosterPrincipalId(seat))).toBeNull();
   }, 120_000);
 
-  it('measures authorization_deadline on the trunk prefix and the head', async () => {
-    const uptime = execFileSync('uptime', { encoding: 'utf8' }).trim();
-    const cores = execFileSync('sysctl', ['-n', 'hw.ncpu'], { encoding: 'utf8' }).trim();
-    const claim = '本测量只计本机 Postgres 上 authorization_deadline 的往返。没有约定的 p95 预算。预期限制是本地往返。';
-    console.log(JSON.stringify({ claim, uptime, cores }));
+  it('measures authorization_deadline across prefix and head without a latency budget', async () => {
+    console.log(JSON.stringify({
+      claim: '本测量只计本机 Postgres 上 authorization_deadline 的往返。没有约定的 p95 预算。',
+      uptimeSeconds: uptime(),
+      cores: availableParallelism(),
+    }));
     const trunk = await open('perf_trunk');
     const head = await open('perf_head');
+    await applyMigrationPrefix(trunk, 45);
+    await seedEngineer(trunk);
+    await applyDatabaseMigrations(head);
+    await seedEngineer(head);
+    for (let index = 0; index < 15; index += 1) {
+      await deadline(trunk, 'engineer');
+      await deadline(head, 'engineer');
+    }
     let errors = 0;
     const trunkRounds: number[] = [];
     const headRounds: number[] = [];
-    try {
-      await applyPrefix(trunk);
-      await seedEngineer(trunk);
-      await applyDatabaseMigrations(head);
-      await seedEngineer(head);
-      for (let i = 0; i < 15; i += 1) {
-        await deadline(trunk, 'engineer', 'query');
-        await deadline(head, 'engineer', 'query');
-      }
-      for (let round = 0; round < rounds; round += 1) {
-        trunkRounds.push(await sample(trunk, true));
-        headRounds.push(await sample(head, false));
-      }
-    } finally {
-      await trunk.end();
-      await head.end();
+    for (let round = 0; round < rounds; round += 1) {
+      trunkRounds.push(await sample(trunk, true));
+      headRounds.push(await sample(head, false));
     }
+    expect(errors).toBe(0);
     console.log(JSON.stringify({
       errors,
       trunkMs: summarize(trunkRounds),
       headMs: summarize(headRounds),
     }));
-    expect(errors).toBe(0);
 
     async function sample(client: Client, expectOpen: boolean) {
       const elapsed: number[] = [];
-      for (let i = 0; i < samplesPerRound; i += 1) {
+      for (let index = 0; index < samplesPerRound; index += 1) {
         const started = performance.now();
-        const until = await deadline(client, 'engineer', 'query');
+        const until = await deadline(client, 'engineer');
         elapsed.push(performance.now() - started);
         if ((until !== null) !== expectOpen) errors += 1;
       }
@@ -326,8 +228,10 @@ describe.skipIf(!enabled)('P0 live lanes', () => {
 
 function median(values: number[]) {
   const sorted = [...values].sort((left, right) => left - right);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2 : (sorted[mid] ?? 0);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+    : (sorted[middle] ?? 0);
 }
 
 function summarize(values: number[]) {

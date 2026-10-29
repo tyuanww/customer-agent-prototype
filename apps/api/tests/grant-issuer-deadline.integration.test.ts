@@ -68,10 +68,7 @@ describe.skipIf(!enabled)('a grant issuer is checked against its own source set'
   });
 });
 
-/** The two "leave alone" clauses. They are read from source text because the property
- * is about which call does not exist, which no runtime fixture can observe: a login that
- * silently started creating grants would still pass every runtime test above. */
-describe('login authority stays on the roster function', () => {
+describe('login entry points do not bootstrap or issue authority directly', () => {
   const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 
   it('never calls bootstrapRootAllocation outside its own definition', () => {
@@ -82,15 +79,6 @@ describe('login authority stays on the roster function', () => {
     for (const file of ['../src/project-roster-login.ts', '../src/auth-routes.ts', '../src/product-auth-routes.ts']) {
       expect(read(file), `${file} must not call bootstrapRootAllocation`).not.toContain('bootstrapRootAllocation');
     }
-  });
-
-  it('issues query only, through issue_roster_query with no action argument', () => {
-    const login = read('../src/project-roster-login.ts');
-    const calls = login.match(/issue_roster_query\([^)]*\)/g) ?? [];
-    expect(calls).toHaveLength(1);
-    // Three positional arguments mean the function has no action parameter, so login cannot
-    // ask it for publish, import or rollback even if a caller wanted to.
-    expect(calls[0]).toBe('issue_roster_query($1,$2,$3)');
   });
 
   it('creates no grant and no grant batch from any login route', () => {

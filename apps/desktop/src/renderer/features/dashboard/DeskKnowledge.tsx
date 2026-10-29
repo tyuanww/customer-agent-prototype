@@ -1,10 +1,11 @@
 import { createElement, useEffect, useRef, useState, type AriaAttributes, type ComponentType } from 'react';
-import { Button, Empty, Input, Modal, Segmented, Select, Table, Upload, type ButtonProps, type TableColumnsType, type TableProps, type UploadProps } from 'antd';
+import { Button, Empty, Image, Input, Modal, Segmented, Select, Table, Upload, type ButtonProps, type TableColumnsType, type TableProps, type UploadProps } from 'antd';
 import { InboxOutlined, FileTextOutlined } from '@ant-design/icons';
 import { asyncFailure } from '@shared/async-resource';
 import {
   DESK_CATEGORIES,
   type DeskCommand,
+  type DeskImportImage,
   type DeskItemView,
   type DeskView,
   type Validity,
@@ -16,46 +17,9 @@ import './intake-management.css';
 import './workbench-v9.css';
 import { useAsyncResource } from './use-async-resource';
 import { WorkbenchLoading } from './WorkbenchState';
+import { readCoachUploadFile } from './coach-content-upload';
 
-type CsvPreview = { fileName: string; size: number; csvText: string; count: number; sample: ReadonlyArray<readonly [string, string]> };
-
-function splitCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let quoted = false;
-  const source = text.replace(/^\uFEFF/, '');
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index]!;
-    if (quoted) {
-      if (char === '"' && source[index + 1] === '"') { cell += '"'; index += 1; }
-      else if (char === '"') quoted = false;
-      else cell += char;
-    } else if (char === '"') quoted = true;
-    else if (char === ',') { row.push(cell); cell = ''; }
-    else if (char === '\n' || char === '\r') {
-      if (char === '\r' && source[index + 1] === '\n') index += 1;
-      row.push(cell); cell = '';
-      if (row.some((value) => value.trim() !== '')) rows.push(row);
-      row = [];
-    } else cell += char;
-  }
-  row.push(cell);
-  if (row.some((value) => value.trim() !== '')) rows.push(row);
-  return rows;
-}
-
-function previewCsv(fileName: string, size: number, csvText: string): CsvPreview {
-  const rows = splitCsv(csvText);
-  const header = rows[0] ?? [];
-  const questionAt = Math.max(0, header.findIndex((value) => value.trim() === '问题'));
-  const categoryAt = header.findIndex((value) => value.trim() === '分类');
-  const usable = rows.slice(1).filter((row) => (row[questionAt]?.trim() ?? '') !== '');
-  return {
-    fileName, size, csvText, count: usable.length,
-    sample: usable.slice(0, 3).map((row) => [row[questionAt]?.trim() ?? '', categoryAt >= 0 ? row[categoryAt]?.trim() ?? '' : ''] as const),
-  };
-}
+type CsvPreview = { fileName: string; size: number; csvText: string; images: readonly DeskImportImage[]; notices: readonly string[]; count: number; sample: ReadonlyArray<readonly [string, string]> };
 
 const formatSize = (bytes: number) => bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
@@ -114,22 +78,18 @@ function KnowledgeEmpty({ description }: { description: string }) {
  *  intersecting with `AriaAttributes` types that without widening every other field to `any`. */
 function useCsvDragger(
   disabled: boolean,
-  onFile: (fileName: string, size: number, csvText: string) => void,
+  onFile: (file: File) => void,
 ): UploadProps & Pick<AriaAttributes, 'aria-label'> {
   return {
-    'aria-label': '导入 CSV',
-    accept: '.csv,text/csv',
+    'aria-label': '导入 CSV 或 Excel',
+    accept: '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     multiple: false,
     disabled,
     showUploadList: false,
     openFileDialogOnClick: !disabled,
     beforeUpload: (file) => {
       if (disabled) return false;
-      const csvFile = file.type === 'text/csv' || file.type === 'application/vnd.ms-excel' || /\.csv$/i.test(file.name);
-      if (!csvFile) return false;
-      const reader = new FileReader();
-      reader.onload = () => onFile(file.name, file.size, typeof reader.result === 'string' ? reader.result : '');
-      reader.readAsText(file);
+      onFile(file);
       return false;
     },
   };
@@ -155,9 +115,31 @@ export function DeskKnowledge({
   const [writing, setWriting] = useState(false);
   const [addMode, setAddMode] = useState<'upload' | 'manual'>('upload');
   const [csv, setCsv] = useState<CsvPreview | null>(null);
-  const csvDragger = useCsvDragger(busy, (fileName, size, csvText) => setCsv(previewCsv(fileName, size, csvText)));
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileReading, setFileReading] = useState(false);
+  const fileGeneration = useRef(0);
+  const csvDragger = useCsvDragger(busy || fileReading, (file) => {
+    const generation = ++fileGeneration.current;
+    setFileError(null); setFileReading(true);
+    void readCoachUploadFile(file).then((result) => {
+      if (generation !== fileGeneration.current) return;
+      if (!result.ok) { setFileError(result.message); return; }
+      const usable = result.rows.filter((row) => row.scene.trim().length >= 2 && row.scene.trim().length <= 80 && row.script.trim().length <= 200_000);
+      if (result.images?.some((image) => {
+        const row = result.rows[image.index];
+        return !row || row.scene.trim().length < 2 || row.scene.trim().length > 80 || row.script.trim().length > 200_000;
+      })) { setFileError('图片所在话术无法导入，请检查该行后重试。'); return; }
+      const notices = [
+        ...(result.notices ?? []),
+        ...(usable.length !== result.rows.length ? [`跳过 ${String(result.rows.length - usable.length)} 条问题不是 2 到 80 个字的话术。`] : []),
+      ];
+      setCsv({ fileName: file.name, size: file.size, csvText: result.csvText, images: result.images ?? [], notices, count: usable.length,
+        sample: usable.slice(0, 3).map((row) => [row.scene, row.domain ?? ''] as const) });
+    }).catch(() => { if (generation === fileGeneration.current) setFileError('文件读取失败，请重新选择。'); })
+      .finally(() => { if (generation === fileGeneration.current) setFileReading(false); });
+  });
   const [confirmImport, setConfirmImport] = useState(false);
-  const closeWriting = () => { setWriting(false); setConfirmImport(false); };
+  const closeWriting = () => { fileGeneration.current += 1; setFileReading(false); setFileError(null); setWriting(false); setConfirmImport(false); };
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('product');
@@ -238,7 +220,11 @@ export function DeskKnowledge({
     : (operator ? '还没有知识。' : '还没有生效知识。');
   const columns: TableColumnsType<DeskItemView> = [
     { title: '话术名称', dataIndex: 'name', key: 'name', ellipsis: true },
-    { title: '话术内容', dataIndex: 'body', key: 'body', ellipsis: true, render: (body: string) => <span className="desk-body" title={body}>{body}</span> },
+    { title: '话术内容', dataIndex: 'body', key: 'body', render: (body: string, item) => <div>
+      <span className="desk-body" title={body}>{body}</span>
+      {item.images?.length ? <Image.PreviewGroup><div className="desk-item-images">{item.images.map((image, index) =>
+        <Image key={index} width={72} src={image} alt={`${item.name}的图片 ${index + 1}`} />)}</div></Image.PreviewGroup> : null}
+    </div> },
     {
       title: '状态', dataIndex: 'statusLabel', key: 'status', width: 96,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
@@ -305,12 +291,14 @@ export function DeskKnowledge({
           >
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>
             <p className="ant-upload-text">拖拽文档到这里，或点击选择</p>
-            <p className="ant-upload-hint">支持 .csv，表头沿用「问题 / 标准话术 / 分类」</p>
+            <p className="ant-upload-hint">支持 CSV 或 Excel，表头可使用「快捷短语 / 产品话术」</p>
           </Upload.Dragger> : <div className="file-card">
             <div className="file-row"><FileTextOutlined className="ico" />
               <div><b>{csv.fileName}</b><span className="hint">{formatSize(csv.size)}</span></div>
               <DeskButton type="text" onClick={() => setCsv(null)}>移除</DeskButton></div>
             <div className="result">识别到 <span className="ok">{csv.count} 条话术</span>。导入后状态是未生效。</div>
+            {csv.images.length ? <p>包含 {csv.images.length} 张图片，将随对应话术保存。</p> : null}
+            {csv.notices.length ? <ul className="desk-import-notices" aria-label="未导入的内容">{csv.notices.map((notice) => <li key={notice}>{notice}</li>)}</ul> : null}
             {csv.count > 0 ? <KnowledgeTable<{ key: number; question: string; category: string }>
               aria-label="导入预览"
               pagination={false}
@@ -321,6 +309,8 @@ export function DeskKnowledge({
             /> : null}
             {csv.count > 3 ? <p className="hint" style={{ margin: '6px 0 0' }}>仅显示前 3 条</p> : null}
           </div>}
+          {fileReading ? <p role="status">正在读取文件…</p> : null}
+          {fileError ? <p role="alert">{fileError}</p> : null}
           <p className="hint alt"><DeskButton type="text" onClick={() => { setAddMode('manual'); setCsv(null); }}>没有文档？手动填写一条</DeskButton></p>
           <footer><DeskButton onClick={closeWriting}>取消</DeskButton>
             <DeskButton type="primary" disabled={busy || !csv || csv.count === 0} onClick={() => setConfirmImport(true)}>{csv ? `导入 ${csv.count} 条` : '导入'}</DeskButton></footer>
@@ -359,11 +349,11 @@ export function DeskKnowledge({
       footer={csv ? [
         <DeskButton key="back" disabled={busy} onClick={() => setConfirmImport(false)}>返回</DeskButton>,
         <DeskButton key="ok" type="primary" disabled={busy} onClick={() => void apply({
-          action: 'import-csv', personaId: view.selectedPersonaId, fileName: csv.fileName, csvText: csv.csvText, category, customCategory,
+          action: 'import-csv', personaId: view.selectedPersonaId, fileName: csv.fileName, csvText: csv.csvText, images: csv.images, category, customCategory,
         })}>{`确认导入 ${csv.count} 条`}</DeskButton>,
       ] : null}
     >
-      <p>将导入 {csv?.count ?? 0} 条话术，导入后状态是未生效，不会覆盖已有话术。</p>
+      <p>将导入 {csv?.count ?? 0} 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。</p>
     </Modal>
     <Modal
       open={pendingDelete !== null}

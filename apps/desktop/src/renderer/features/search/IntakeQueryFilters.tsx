@@ -55,21 +55,16 @@ function filterSummary(state: IntakeFilterState, names: Map<string, string>, rep
   ].join(' · ');
 }
 
-export function IntakeQueryFilters({ state, signedIn, open, onToggle, onOpen, onLayoutChange }: {
-  state: IntakeFilterState; signedIn: boolean; open: boolean; onToggle: () => void; onOpen: () => void; onLayoutChange: () => void;
+export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutChange }: {
+  state: IntakeFilterState; signedIn: boolean; open: boolean; onToggle: () => void; onLayoutChange: () => void;
 }) {
   const disabled = state.busy || !signedIn;
   const names = new Map(state.shopNamesValidUntil && Date.parse(state.shopNamesValidUntil)>Date.now()
     ? state.shopNames.map(n=>[n.id,n.label]) : []);
   const repeats = new Map<string,number>(); for (const name of names.values()) repeats.set(name,(repeats.get(name)??0)+1);
-  const openRef = useRef(open);
-  const onOpenRef = useRef(onOpen);
-  openRef.current = open;
-  onOpenRef.current = onOpen;
-  useEffect(() => {
-    if (!state.error || openRef.current) return;
-    onOpenRef.current();
-  }, [state.error]);
+  const layoutRef = useRef(onLayoutChange);
+  layoutRef.current = onLayoutChange;
+  useEffect(() => { layoutRef.current(); }, [state.error]);
   return <div className="intake-query-filters" data-testid="intake-query-filters" data-open={open ? 'true' : 'false'}>
     <div className="intake-filter-bar">
       <p className="intake-filter-summary" data-testid="intake-filter-summary">{filterSummary(state, names, repeats)}</p>
@@ -77,6 +72,7 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onOpen, on
         {open ? '收起' : '筛选'}
       </button>
     </div>
+    {!open && state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
     {open ? <div className="intake-filter-body" id="intake-filter-body">
       <div className="intake-shop-control">
         <label htmlFor="intake-shop">当前店铺</label>

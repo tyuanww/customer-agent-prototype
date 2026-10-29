@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parseCoachUploadCsv, parseCoachUploadTable } from '../shared/coach-content-upload';
 import { frozenImportCsv } from '../shared/content-frozen-import';
-import { parseXlsxFirstSheet } from './xlsx-first-sheet';
+import { parseXlsxWorkbook } from './xlsx-first-sheet';
 import {
   CONTENT_IMPORT_FAILURE_COPY,
   CONTENT_IMPORT_MAX_BYTES,
@@ -153,6 +153,16 @@ function parsePublishRelease(value: unknown): { releaseId: string; releaseSeq: n
   return { releaseId: record.release_id, releaseSeq: seq as number };
 }
 
+const XLSX_IMAGE_FAILURE: Readonly<Record<string, string>> = {
+  IMAGE_FORMAT_UNSUPPORTED: 'Excel 里有图片不是 PNG 或 JPEG，请另存为这两种格式后重试。',
+  IMAGE_LIMIT: 'Excel 里的图片过大：单张不超过 5MiB，合计不超过 8MiB，最多 100 张。',
+  IMAGE_MISSING: 'Excel 里有图片文件缺失，请在 Excel 中重新插入图片后重试。',
+  IMAGE_DRAWING_MISSING: 'Excel 里有图片文件缺失，请在 Excel 中重新插入图片后重试。',
+  IMAGE_RELATIONSHIP_MISSING: 'Excel 里有图片文件缺失，请在 Excel 中重新插入图片后重试。',
+  IMAGE_RELATIONSHIP_INVALID: 'Excel 里的图片位置无法识别，请在 Excel 中重新插入图片后重试。',
+  IMAGE_ROW_INVALID: 'Excel 里的图片位置无法识别，请在 Excel 中重新插入图片后重试。',
+};
+
 export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof parseCoachUploadCsv> {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return { ok: false, code: 'invalid-table', message: '无法解析上传文件。' };
@@ -172,12 +182,23 @@ export function dashboardContentParseUpload(payload: unknown): ReturnType<typeof
   if (bytes.length > CONTENT_IMPORT_MAX_BYTES) {
     return { ok: false, code: 'too-large', message: `文件超过 ${String(CONTENT_IMPORT_MAX_BYTES / (1024 * 1024))}MiB。请缩小表格后重新选择。` };
   }
+  let workbook: ReturnType<typeof parseXlsxWorkbook>;
   try {
-    const table = parseXlsxFirstSheet(bytes);
-    return parseCoachUploadTable(table, sourceName);
-  } catch {
-    return { ok: false, code: 'binary-workbook', message: 'Excel 未能解析。未连接飞书或 Wiki。' };
+    workbook = parseXlsxWorkbook(bytes);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : '';
+    const message = XLSX_IMAGE_FAILURE[reason] ?? 'Excel 未能解析，请确认是 .xlsx 文件后重试。';
+    return { ok: false, code: 'binary-workbook', message };
   }
+  const parsed = parseCoachUploadTable(workbook.table, sourceName);
+  if (!parsed.ok) return parsed;
+  const images: { index: number; dataUrl: string }[] = [];
+  for (const image of workbook.images) {
+    const index = parsed.sourceRows?.indexOf(image.row) ?? -1;
+    if (index < 0) return { ok: false, code: 'invalid-table', message: `第 ${String(image.row)} 行有图片，但这一行不会导入。请补全或修改这一行后重试。` };
+    images.push({ index, dataUrl: image.dataUrl });
+  }
+  return { ...parsed, images, notices: [...(parsed.notices ?? []), ...workbook.notices] };
 }
 
 export function dashboardContentSession(

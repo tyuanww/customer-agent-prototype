@@ -1,6 +1,7 @@
 import {
   existsSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -17,6 +18,7 @@ import {
   checkWorkspaceBudget,
   checkWorkspacePolicy,
   cleanWorkspace,
+  measureAllocatedBytes,
   parseCliArguments,
   resolveCleanupTarget,
   workspaceInventory,
@@ -473,18 +475,86 @@ describe('workspace hygiene', () => {
     expect(checkWorkspaceBudget(root, { remainderBudgetBytes: 64 * 1024 * 1024 }).pass).toBe(false);
   });
 
-  it('counts hard-linked retained input once across contract and evidence groups', () => {
+  it.each([
+    { key: 'frozen-contracts', directory: 'contracts/upstream/byte-probe' },
+    { key: 'frozen-evidence', directory: 'evidence/byte-probe' },
+    { key: 'source-inputs', directory: 'docs/byte-probe' },
+  ])('counts exact logical bytes in $key without directory metadata or symlink traversal', ({ key, directory }) => {
     const root = createWorkspaceFixture();
-    const contractPath = path.join(root, 'contracts/upstream/frozen/input.sql');
-    mkdirSync(path.dirname(contractPath), { recursive: true });
-    writeFileSync(contractPath, Buffer.alloc(1024 * 1024, 'x'));
     const before = checkWorkspaceBudget(root);
-    linkSync(contractPath, path.join(root, 'evidence/qa/same-input.sql'));
+    const target = path.join(root, directory);
+    mkdirSync(path.join(target, 'empty/nested'), { recursive: true });
+    expect(checkWorkspaceBudget(root).sourceBudgetGroups).toEqual(before.sourceBudgetGroups);
+
+    const binary = Buffer.alloc(4097, 'x');
+    const text = '逻辑字节\n';
+    writeFileSync(path.join(target, 'payload.bin'), binary);
+    writeFileSync(path.join(target, 'text.txt'), text);
+    writeFileSync(path.join(target, 'empty.txt'), '');
+    const linkTargets = ['./payload.bin', '.', 'missing-未到'];
+    for (const [index, linkTarget] of linkTargets.entries()) {
+      symlinkSync(linkTarget, path.join(target, `link-${index}`));
+    }
+    const expectedGrowth = binary.length + Buffer.byteLength(text)
+      + linkTargets.reduce((sum, linkTarget) => sum + Buffer.byteLength(linkTarget), 0);
     const after = checkWorkspaceBudget(root);
 
     expect(after.pass).toBe(true);
-    expect(after.remainderBytes - before.remainderBytes).toBeLessThan(4096);
+    expect(after.remainderBytes - before.remainderBytes).toBe(expectedGrowth);
+    expect(after.sourceBudgetGroups).toEqual(before.sourceBudgetGroups.map(group => ({
+      ...group,
+      bytes: group.bytes + (group.key === key ? expectedGrowth : 0),
+    })));
     expect(after.sourceBudgetGroups.reduce((sum, group) => sum + group.bytes, 0)).toBe(after.remainderBytes);
+  });
+
+  it('counts distinct retained paths in their owners even when hard-linked to excluded output', () => {
+    const root = createWorkspaceFixture();
+    const excluded = path.join(root, 'node_modules/shared.bin');
+    const content = Buffer.alloc(1027, 'x');
+    writeFileSync(excluded, content);
+    const before = checkWorkspaceBudget(root);
+    for (const relativePath of [
+      'contracts/upstream/frozen/input.bin',
+      'evidence/qa/input.bin',
+      'docs/input.bin',
+      'docs/second-path.bin',
+    ]) {
+      const target = path.join(root, relativePath);
+      mkdirSync(path.dirname(target), { recursive: true });
+      linkSync(excluded, target);
+    }
+    writeFileSync(path.join(root, 'docs/independent-copy.bin'), content);
+    const after = checkWorkspaceBudget(root);
+
+    expect(after.sourceBudgetGroups).toEqual(before.sourceBudgetGroups.map(group => ({
+      ...group,
+      bytes: group.bytes + content.length * (group.key === 'source-inputs' ? 3 : 1),
+    })));
+    expect(after.remainderBytes - before.remainderBytes).toBe(5 * content.length);
+    const seen = new Set<string>();
+    expect(measureAllocatedBytes(excluded, seen)).toBeGreaterThan(0);
+    expect(measureAllocatedBytes(path.join(root, 'docs/input.bin'), seen)).toBe(0);
+  });
+
+  it('keeps inventory and cleanup reports in allocated disk bytes', () => {
+    const root = createWorkspaceFixture();
+    const relativePath = 'apps/desktop/build/icon.png';
+    const target = path.join(root, relativePath);
+    writeFileSync(target, 'x');
+    const stats = lstatSync(target);
+    const diskBytes = stats.blocks > 0 ? stats.blocks * 512 : stats.size;
+
+    expect(measureAllocatedBytes(target)).toBe(diskBytes);
+    const inventory = workspaceInventory(root);
+    expect(inventory.categories.find(category => category.key === 'derived-icon-png')?.bytes).toBe(diskBytes);
+    expect(inventory.totalBytes).toBe(inventory.categories.reduce((sum, category) => sum + category.bytes, 0));
+    const rootStats = lstatSync(root);
+    const rootDiskBytes = rootStats.blocks > 0 ? rootStats.blocks * 512 : rootStats.size;
+    expect(inventory.totalBytes).toBe(measureAllocatedBytes(root) - rootDiskBytes);
+    const cleanup = cleanWorkspace({ projectRoot: root });
+    expect(cleanup.results.find(result => result.relativeTarget === relativePath)?.bytes).toBe(diskBytes);
+    expect(existsSync(target)).toBe(true);
   });
 
   it('does not follow a symlinked ancestor when grouping frozen contracts', () => {
@@ -493,11 +563,12 @@ describe('workspace hygiene', () => {
     fixtures.push(external);
     mkdirSync(path.join(external, 'upstream'));
     writeFileSync(path.join(external, 'upstream/input.sql'), Buffer.alloc(16 * 1024 * 1024, 'x'));
+    const before = checkWorkspaceBudget(root);
     symlinkSync(external, path.join(root, 'contracts'));
 
     const result = checkWorkspaceBudget(root);
     expect(result.pass).toBe(true);
-    expect(result.remainderBytes).toBeLessThan(1024 * 1024);
+    expect(result.remainderBytes - before.remainderBytes).toBe(Buffer.byteLength(external));
     expect(result.sourceBudgetGroups.find(group => group.key === 'frozen-contracts')?.bytes).toBe(0);
   });
 
@@ -512,7 +583,7 @@ describe('workspace hygiene', () => {
     const result = checkWorkspaceBudget(root);
     expect(result.pass).toBe(true);
     expect(result.remainderBytes).toBeLessThan(1024 * 1024);
-    expect(result.sourceBudgetGroups.find(group => group.key === 'frozen-evidence')?.bytes).toBeLessThan(4096);
+    expect(result.sourceBudgetGroups.find(group => group.key === 'frozen-evidence')?.bytes).toBe(Buffer.byteLength(external));
   });
 
   it('keeps an explicitly tighter aggregate budget even when every group fits', () => {

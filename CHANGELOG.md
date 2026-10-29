@@ -2,6 +2,31 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.39] - 2026-10-29
+
+### Changed
+
+- 概览日期范围的「近 7 天」「近 30 天」两个按钮对齐。
+- 查询窗口的店铺 / 商品 / 场景筛选默认收起；收起时仍显示读取错误，窗口高度随之重算。
+- 工作台侧栏左下显示当前账号，可从这里退出登录。退出撤销服务端会话并同步查询窗口；服务端未确认时如实提示。
+- 知识库「添加话术」可直接选 Excel。锚在单元格上的图片随对应话术保存和显示；单元格换行保留；跳过的行、背景图和其他未导入内容在预览里写明。仍只写本机，不发布到查询。
+
+### Fixed
+
+- xlsx 里空的自闭合单元格不再吞掉下一格的内容。之前会漏掉整行并让后面的图片对错行。
+- 岗位动作提示使用已认证账号的角色，不再要求业务数据库连接读取身份角色列。
+- 资料读取接受实际正文为空的分块 GET，非空或未结束的正文仍被拒绝。
+- 权限菜单和签发共用有效分配授权选择，失效父链下的委派不能再生成不可用的子授权。
+- 备份改用 PostgreSQL 会话锁，进程异常退出后释放。损坏目录不再占用有效恢复点的保留名额。
+- 集成测试使用跨平台系统信息和固定取时，修复 Ubuntu 命令不兼容及24小时边界夹具偶发失败。
+- 导入跳过摘要通过独立 `notices` 传递，文件名前有空格时仍显示行号；文件名不再混入摘要。
+- 源内容预算按文件实际字节计量，避免 macOS 与 Linux 的分块差异；限额、分组和排除范围保持不变。磁盘清理仍报告分配空间。
+
+### Release
+
+- 仓库版本是 `0.3.39`。根目录 `VERSION` 与 `apps/desktop/package.json` 是同一串。
+- 源码候选同时包含 API、迁移79和桌面改动。服务部署、安装包和正式内容各自验收，不由版本号推断已发布。
+
 ## [0.3.34] - 2026-10-27
 
 ### Changed
@@ -428,7 +453,7 @@ All notable changes to this customer-agent product implementation repository are
 - Hydrate rows must match the copy contract (`content_hash` 64 hex, non-empty answer). Cancelled searches no longer commit. Long customer sentences stay in the MiniMax plan.
 - The retrieval toggle is visually separate from 合成登录, cancels an in-flight search when flipped, and keeps the last good OFF value if the preference file is corrupt.
 
-## [Unreleased]
+## [0.3.39] - 2026-10-29
 
 - After-sale allergy SOP is a dedicated draggable window (PR #95). Query search stays Top 3; agents open「打开过敏售后流程」from the gold query. SOP copy is local feedback only, not Query `COPIED`. Slice 1 is the synthetic allergy tree.
 - Coach「内容与发布」parses a local CSV into unpublished drafts (PR #96). Publish stays disabled. After-sale remains a DEMO sample and does not take this page's upload.

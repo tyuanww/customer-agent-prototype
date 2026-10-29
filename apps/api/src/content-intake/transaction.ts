@@ -62,7 +62,8 @@ type PrincipalRow = {
 // This module owns identity/facts/role projection for both command actors and
 // bounded directory pages. Login role is never a business authority.
 function principalProjection(relation: 'content_intake.principals' | 'registered'): string {
-  return `SELECT p.*, (f.enabled AND b.enabled) AS enabled, f.checked_at, f.valid_until,
+  return `SELECT p.*, (f.enabled AND b.enabled) AS enabled,
+      f.checked_at, f.valid_until,
       ARRAY(SELECT DISTINCT r.role FROM content_intake.role_rules r WHERE r.tenant_id=p.tenant_id
         AND r.app_id=p.app_id AND r.job_id=f.job_id AND r.department_id=ANY(f.department_ids)) AS roles
     FROM ${relation} p JOIN content_intake.principal_facts f
@@ -73,7 +74,8 @@ function projectedPrincipal(row: PrincipalRow): Principal {
   return { id: row.principal_id, userId: row.user_id, tenantId: row.tenant_id, appId: row.app_id,
     identityScope: row.identity_scope, personKey: row.person_key, factsVersion: Number(row.current_facts_version),
     generation: Number(row.revocation_generation), enabled: row.enabled, checkedAt: row.checked_at.getTime(),
-    validUntil: row.valid_until.getTime(), role: row.roles.length === 1 ? row.roles[0]! : null };
+    validUntil: row.valid_until.getTime(),
+    role: row.roles.length === 1 ? row.roles[0]! : null };
 }
 
 /** Called under the content lock. */
@@ -88,12 +90,17 @@ export async function principal(client: Queryable, selector: { userId: string } 
 /** At most limit identities plus one lookahead, including ineligible targets.
  * Resolve confirmed identity/current facts in one join, never N+1 per person.
  * Call under the same content lock after authorizing the directory's source. */
-export async function registeredPrincipalPage(client: Queryable, who: Principal, after: string, limit: number): Promise<Principal[]> {
-  const { rows } = await client.query<PrincipalRow>(`WITH registered AS MATERIALIZED (
+export async function registeredPrincipalPage(client: Queryable, who: Principal, after: string, limit: number): Promise<(Principal & { displayName: string | null; hasNewIdentityActivity: boolean })[]> {
+  const { rows } = await client.query<PrincipalRow & { display_name: string | null; has_new_identity_activity: boolean }>(`WITH registered AS MATERIALIZED (
       SELECT * FROM content_intake.principals WHERE tenant_id=$1 AND app_id=$2 AND principal_id COLLATE "C">$3 COLLATE "C"
-      ORDER BY principal_id COLLATE "C" LIMIT $4)
-    ${principalProjection('registered')} ORDER BY p.principal_id COLLATE "C"`, [who.tenantId, who.appId, after, limit + 1]);
-  return rows.map(projectedPrincipal);
+      ORDER BY principal_id COLLATE "C" LIMIT $4), projected AS (
+      ${principalProjection('registered')})
+    SELECT projected.*, account.display_name,
+      CASE WHEN projected.identity_scope='confirmed-hangzhou'
+        THEN content_intake.principal_has_new_identity_activity(projected.principal_id) ELSE false END AS has_new_identity_activity FROM projected
+    LEFT JOIN public.app_users account ON account.user_id=projected.user_id
+    ORDER BY projected.principal_id COLLATE "C"`, [who.tenantId, who.appId, after, limit + 1]);
+  return rows.map(row => ({ ...projectedPrincipal(row), displayName: row.display_name, hasNewIdentityActivity: row.has_new_identity_activity }));
 }
 
 const PRINCIPAL_FACT_WINDOW_MS = 24 * 60 * 60 * 1000;

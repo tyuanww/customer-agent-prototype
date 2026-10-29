@@ -14,7 +14,8 @@ import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.
 import { feishuAdmitOpenId, feishuUserId } from '../src/feishu-admit.js';
 import { forgetJobSnapshot, rememberJobSnapshot } from '../src/feishu-job-snapshot.js';
 import { createProductAuthService } from '../src/product-auth-service.js';
-import { projectRosterLogin, readAuthorizationActions } from '../src/project-roster-login.js';
+import { persistOperatorDisplayName } from '../src/operator-display-names.js';
+import { projectRosterLogin, readAuthorizationActions, rosterPrincipalId } from '../src/project-roster-login.js';
 import { publishLineage, seedLibrary } from './support/roster-library.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
@@ -32,7 +33,7 @@ const SCOPE: components['schemas']['IntakeScope'] = {
 };
 
 const SCENARIOS = [
-  'feishu-new-open-id-can-query',
+  'feishu-new-open-id-registered-with-manual-query',
   'password-seat-query-after-login-projection',
   'publish-grant-visible-on-intake-read',
   'publish-revoke-hidden-on-next-read',
@@ -197,6 +198,55 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
       await seedLibrary(client);
       await publishLineage(client);
       await advanceFacts(client, 'director', 'fresh', 'job-customer-service-director');
+      await client.query(`INSERT INTO content_intake.store_sets(
+        tenant_id,app_id,version,approved_at,provenance)
+        VALUES ($1,$2,1,clock_timestamp(),'a6-manual') ON CONFLICT DO NOTHING`,
+      [HOME.tenant, HOME.app]);
+      await client.query(`INSERT INTO content_intake.store_set_current(tenant_id,app_id,version)
+        VALUES ($1,$2,1) ON CONFLICT DO NOTHING`, [HOME.tenant, HOME.app]);
+      await client.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ($1,$2,1,'scope-a','source-a',clock_timestamp()+interval '1 day')
+        ON CONFLICT DO NOTHING`, [HOME.tenant, HOME.app]);
+      await client.query('BEGIN');
+      try {
+        await client.query(`INSERT INTO backend_identity.subject_bindings(
+          binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+          VALUES ('a6-source-issuer','synthetic',$1,'A6 Source Issuer',
+            'user-a6-source',repeat('ae',32),true,'owner')`, [HOME.tenant]);
+        await client.query(`INSERT INTO content_intake.principals(
+          principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version)
+          VALUES ('a6-source-issuer','user-a6-source',$1,$2,'content-intake-system',
+            'a6-source-issuer',1)`, [HOME.tenant, HOME.app]);
+        await client.query(`INSERT INTO content_intake.principal_facts(
+          principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+          VALUES ('a6-source-issuer',1,ARRAY['dept-a'],'job-customer-service-director',true,
+            clock_timestamp()-interval '1 second',clock_timestamp()+interval '4 minutes',repeat('ae',32))`);
+        await client.query(`INSERT INTO content_intake.grants(
+          grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,
+          starts_at,expires_at,reason,steward_id)
+          VALUES ('a6-source-allocation','allocation','a6-source-issuer','a6-source-issuer',
+            $1,$2,'scope-a','query',clock_timestamp()-interval '1 hour',
+            clock_timestamp()+interval '1 day','A6 来源根授权。','a6-source-issuer')`,
+        [HOME.tenant, HOME.app]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+      await client.query(`INSERT INTO content_intake.grants(
+        grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,source_id,action,
+        starts_at,expires_at,reason,parent_grant_id,steward_id,policy_version,store_set_version)
+        SELECT 'a6-director-query','business',parent.recipient_id,'director',
+          parent.tenant_id,parent.app_id,parent.scope_id,'source-a',parent.action,
+          parent.starts_at,parent.expires_at-interval '1 second','人工查询。',
+          parent.grant_id,parent.recipient_id,policy.version,current_set.version
+        FROM content_intake.grants parent
+        JOIN content_intake.policy_versions policy
+          ON policy.tenant_id=parent.tenant_id AND policy.app_id=parent.app_id
+        JOIN content_intake.store_set_current current_set
+          ON current_set.tenant_id=parent.tenant_id AND current_set.app_id=parent.app_id
+        WHERE parent.grant_id='a6-source-allocation'`);
 
       const projected: string[] = [];
       auth = await openAuth(harness, database.name, client, async (openId) => {
@@ -213,7 +263,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
       let publishGrantId = '';
       let publishVersion = 0;
 
-      await step('feishu-new-open-id-can-query', async () => {
+      await step('feishu-new-open-id-registered-with-manual-query', async () => {
         const before = await client.query<{ n: string }>(
           `SELECT count(*)::text AS n FROM backend_identity.subject_bindings WHERE binding_id = $1`,
           [OPEN_ID]);
@@ -224,19 +274,49 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           directory: [{ name: '客服坐席', enabled: true }],
           departmentIds: [HOME.department],
         });
+        await client.query(`INSERT INTO public.app_users(user_id,display_name,role,is_active)
+          VALUES ($1,'待更新','agent',true)`, [feishuUserId(OPEN_ID)]);
+        persistOperatorDisplayName(feishuUserId(OPEN_ID), '飞书回调姓名');
         const user = await signIn(auth!, OPEN_ID);
         expect(user).toMatchObject({ user_id: feishuUserId(OPEN_ID), role: 'agent' });
-        expect(projected).toEqual(['projected']);
+        expect(projected).toEqual(['registered']);
         const binding = await client.query<{ role: string; enabled: boolean }>(
           `SELECT role, enabled FROM backend_identity.subject_bindings WHERE binding_id = $1`,
           [OPEN_ID]);
         expect(binding.rows).toEqual([{ role: 'agent', enabled: true }]);
+        expect((await client.query<{ display_name: string }>(
+          'SELECT display_name FROM public.app_users WHERE user_id=$1',
+          [feishuUserId(OPEN_ID)],
+        )).rows).toEqual([{ display_name: '飞书回调姓名' }]);
+        const policyVersion = await numberAt(client,
+          `SELECT version::text AS value FROM content_intake.policy_versions
+            WHERE tenant_id = $1 AND app_id = $2`, [HOME.tenant, HOME.app]);
+        const recipientFactsVersion = await numberAt(client,
+          `SELECT current_facts_version::text AS value
+             FROM content_intake.principals WHERE principal_id=$1`,
+          [rosterPrincipalId(OPEN_ID)]);
+        const issuerFactsVersion = await numberAt(client,
+          `SELECT current_facts_version::text AS value
+             FROM content_intake.principals WHERE principal_id='director'`);
+        const window = await client.query<{ starts_at: Date; expires_at: Date }>(
+          `SELECT clock_timestamp()-interval '1 second' AS starts_at,
+                  clock_timestamp()+interval '10 minutes' AS expires_at`);
+        accepted(await service.grantBatch(owner, grantBatch(
+          'query',
+          'a6-manual-feishu-query',
+          issuerFactsVersion,
+          rosterPrincipalId(OPEN_ID),
+          recipientFactsVersion,
+          policyVersion,
+          window.rows[0]!.starts_at.toISOString(),
+          window.rows[0]!.expires_at.toISOString(),
+        )), 'manual Feishu query grant');
         const feishu = actor(feishuUserId(OPEN_ID), 'agent');
         expect(await read(feishu, 'query')).toMatchObject({
           ok: true,
           value: { sourceId: 'source-a', action: 'query' },
         });
-        expect(await readAuthorizationActions(client, feishu.user_id)).toEqual({
+        expect(await readAuthorizationActions(client, feishu)).toEqual({
           query: true, import: false, publish: false, rollback: false,
         });
       });
@@ -262,10 +342,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           [created[0]!.out_binding_id]);
         expect(seatBinding.rows).toEqual([{ role: 'coach' }]);
         const seat = actor(seatUserId, 'coach');
-        expect(await read(seat, 'query')).toMatchObject({
-          ok: true,
-          value: { sourceId: 'source-a', action: 'query' },
-        });
+        expect(await read(seat, 'query')).toMatchObject({ ok: false, code: 'NOT_FOUND', reason: 'SCOPE_DENIED' });
 
         const policyVersion = await numberAt(client,
           `SELECT version::text AS value FROM content_intake.policy_versions
@@ -355,7 +432,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           ok: true,
           value: { sourceId: 'source-a', action: 'publish' },
         });
-        expect(await readAuthorizationActions(client, seatUserId)).toEqual({
+        expect(await readAuthorizationActions(client, seat)).toEqual({
           query: true, import: false, publish: false, rollback: false,
         });
       });

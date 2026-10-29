@@ -479,3 +479,24 @@ it('publishes after import becomes staged', async () => {
     '/v1/content/publish',
   ]);
 });
+
+it('revokes the product session only for the dashboard main frame and reports an unconfirmed remote logout', async () => {
+  const frame = { parent: null };
+  const dashboard = { id: 10, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=dashboard', mainFrame: frame } as unknown as WebContents;
+  const query = { ...dashboard, id: 1 } as WebContents;
+  const logout = vi.fn(async () => ({ ok: true as const }) as Awaited<ReturnType<ProductSession['logout']>>);
+  const session = { ...fakeSession('owner'), logout } as unknown as ProductSession;
+  registerDashboardContentIpc(session, () => dashboard, () => 'http://127.0.0.1:5173/');
+  const event = (sender: WebContents, senderFrame: unknown = frame) => ({ sender, senderFrame }) as IpcMainInvokeEvent;
+  const handler = handlers.get(IPC_CHANNELS.DASHBOARD_LOGOUT)!;
+  expect(await handler(event(query))).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  expect(await handler(event(dashboard, { parent: frame }))).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  expect(await handler(event(dashboard), 'token')).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(logout).not.toHaveBeenCalled();
+  expect(await handler(event(dashboard))).toEqual({ ok: true });
+  expect(logout).toHaveBeenCalledTimes(1);
+  logout.mockResolvedValueOnce({ ok: false, code: 'UNAVAILABLE', sessionEpoch: 2 } as unknown as Awaited<ReturnType<ProductSession['logout']>>);
+  expect(await handler(event(dashboard))).toMatchObject({ ok: false, code: 'UNAVAILABLE', message: '已退出本机，服务端退出未确认。' });
+  logout.mockRejectedValueOnce(new Error('boom'));
+  expect(await handler(event(dashboard))).toMatchObject({ ok: false, code: 'UNAVAILABLE', message: '退出未完成，请重试。' });
+});

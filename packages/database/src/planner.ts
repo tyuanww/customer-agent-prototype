@@ -316,6 +316,34 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0074_authorization_deadline_engineer',
     requiresPredecessor: 'Authorization deadline source null handling requires engineer support',
   },
+  {
+    index: 75,
+    minimumCatalogueLength: 76,
+    id: '0076_authorization_decision',
+    predecessorId: '0075_authorization_deadline_source_null',
+    requiresPredecessor: 'Unified authorization requires the source-null successor',
+  },
+  {
+    index: 76,
+    minimumCatalogueLength: 77,
+    id: '0077_manual_identity_grants',
+    predecessorId: '0076_authorization_decision',
+    requiresPredecessor: 'Manual identity grants require unified authorization',
+  },
+  {
+    index: 77,
+    minimumCatalogueLength: 78,
+    id: '0078_seat_manual_grants',
+    predecessorId: '0077_manual_identity_grants',
+    requiresPredecessor: 'Manual seat grants require manual identity grants',
+  },
+  {
+    index: 78,
+    minimumCatalogueLength: 79,
+    id: '0079_directory_identity_activity',
+    predecessorId: '0078_seat_manual_grants',
+    requiresPredecessor: 'Directory link status requires manual seat grants',
+  },
 ];
 
 function requiredSuccessorStep(

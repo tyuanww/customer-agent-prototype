@@ -37,6 +37,7 @@ export type CategoryCode = (typeof DESK_CATEGORIES)[number]['code'];
 export type TacitKind = (typeof TACIT_KINDS)[number]['code'];
 export type Validity = 'always' | 'inactive' | 'scheduled';
 export type ParseState = 'ok' | 'file_failed' | 'service_failed';
+export type DeskImportImage = { index: number; dataUrl: string };
 
 export type KnowledgeItem = {
   id: string;
@@ -46,6 +47,7 @@ export type KnowledgeItem = {
   customCategory: string | null;
   fileName: string;
   body: string;
+  images?: string[];
   parseState: ParseState;
   validity: Validity;
   validFrom: string | null;
@@ -82,7 +84,7 @@ export type DeskView = {
 export type DeskCommand =
   | { action: 'select-persona'; personaId: string }
   | { action: 'upload'; personaId: string; name: string; category: string; customCategory?: string; fileName: string; text: string; validity: string; validFrom?: string; validUntil?: string }
-  | { action: 'import-csv'; personaId: string; fileName: string; csvText: string; category: string; customCategory?: string }
+  | { action: 'import-csv'; personaId: string; fileName: string; csvText: string; category: string; customCategory?: string; images?: readonly DeskImportImage[] }
   | { action: 'set-validity'; id: string; validity: string; validFrom?: string; validUntil?: string }
   | { action: 'retry'; id: string }
   | { action: 'remove'; id: string }
@@ -116,6 +118,17 @@ function optionalText(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function isImageDataUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 7 * 1024 * 1024) return false;
+  return /^(?:data:image\/png;base64,iVBORw0KGgo|data:image\/jpeg;base64,\/9j\/)[A-Za-z0-9+/]*={0,2}$/.test(value);
+}
+
+function isImportImages(value: unknown): value is DeskImportImage[] {
+  return Array.isArray(value) && value.length <= 100
+    && value.every((image) => isRecord(image) && Number.isSafeInteger(image.index) && Number(image.index) >= 0 && isImageDataUrl(image.dataUrl))
+    && value.reduce((sum, image) => sum + image.dataUrl.length, 0) <= 12 * 1024 * 1024;
+}
+
 export function isDeskCommand(value: unknown): value is DeskCommand {
   if (!isRecord(value) || typeof value.action !== 'string') return false;
   if (value.action === 'select-persona') return typeof value.personaId === 'string';
@@ -136,7 +149,8 @@ export function isDeskCommand(value: unknown): value is DeskCommand {
   }
   if (value.action === 'import-csv') {
     return typeof value.personaId === 'string' && typeof value.fileName === 'string' && typeof value.csvText === 'string'
-      && typeof value.category === 'string' && (value.customCategory === undefined || typeof value.customCategory === 'string');
+      && typeof value.category === 'string' && (value.customCategory === undefined || typeof value.customCategory === 'string')
+      && (value.images === undefined || isImportImages(value.images));
   }
   return false;
 }
@@ -179,6 +193,7 @@ function isItem(value: unknown): value is KnowledgeItem {
   return typeof value.id === 'string' && isPersonaId(String(value.personaId)) && typeof value.name === 'string'
     && CATEGORY_CODES.has(String(value.category)) && (value.customCategory === null || typeof value.customCategory === 'string')
     && typeof value.fileName === 'string' && typeof value.body === 'string'
+    && (value.images === undefined || (Array.isArray(value.images) && value.images.length <= 100 && value.images.every(isImageDataUrl)))
     && (value.parseState === 'ok' || value.parseState === 'file_failed' || value.parseState === 'service_failed')
     && VALIDITY.has(String(value.validity))
     && (value.validFrom === null || typeof value.validFrom === 'string')
@@ -304,10 +319,13 @@ export class DeskKnowledgeStore {
     if (new TextEncoder().encode(command.csvText).length > 10 * 1024 * 1024) return '文件超过限制。请选择不大于 10 MiB 的 CSV。';
     const parsed = parseCoachUploadCsv(command.csvText, command.fileName || '导入.csv');
     if (!parsed.ok) return parsed.message;
+    if (command.images?.some((image) => image.index >= parsed.rows.length
+      || parsed.rows[image.index]!.scene.trim().length < 2 || parsed.rows[image.index]!.scene.trim().length > 80
+      || parsed.rows[image.index]!.script.trim().length > 200_000)) return '图片所在话术无法导入，请检查该行后重试。';
     const fileName = fileNameOf(command.fileName) ?? '导入.csv';
     let skipped = 0;
     const rows: KnowledgeItem[] = [];
-    for (const row of parsed.rows) {
+    for (const [index, row] of parsed.rows.entries()) {
       const name = row.scene.trim();
       const body = row.script.trim();
       if (name.length < 2 || name.length > 80 || body.length < 1 || body.length > 200_000) {
@@ -315,9 +333,10 @@ export class DeskKnowledgeStore {
         continue;
       }
       const place = placeImported(row.domain, command.personaId, fallback);
+      const images = command.images?.filter((image) => image.index === index).map((image) => image.dataUrl) ?? [];
       rows.push({
         id: `k${++this.snapshot.seq}`, personaId: place.personaId, name, category: place.category, customCategory: place.customCategory,
-        fileName, body, parseState: 'ok', validity: 'inactive', validFrom: null, validUntil: null, updatedAt: this.clock.now(),
+        fileName, body, ...(images.length ? { images } : {}), parseState: 'ok', validity: 'inactive', validFrom: null, validUntil: null, updatedAt: this.clock.now(),
       });
     }
     if (rows.length === 0) return '没有可以导入的问答。问题需要 2 到 80 个字。';

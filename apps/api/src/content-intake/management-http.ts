@@ -65,17 +65,12 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
     ? createSeatServiceFromEnv(pool, seatStackRoot, process.env) : null;
   if (seats) await app.register(contentIntakeSeatRoutes, { auth, seats, ...(report ? { report } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
-    if (!noQuery(request) || request.body !== undefined || request.headers['transfer-encoding'] !== undefined
-      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {
+    if (!noQuery(request)) {
       return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
     }
     return sendIntake(reply, await service.managementContext(actor(request), params(request).sourceId!), 'IntakeManagementContext');
   });
   app.get('/v1/intake/principals', { exposeHeadRoute: false }, async (request, reply) => {
-    if (request.body !== undefined || request.headers['transfer-encoding'] !== undefined
-      || (request.headers['content-length'] !== undefined && request.headers['content-length'] !== '0')) {
-      return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
-    }
     return sendIntake(reply, await service.principals(actor(request), intakePageQuery(request)), 'IntakePrincipalPage');
   });
   app.get('/v1/intake/candidates', { exposeHeadRoute: false }, async (request, reply) =>
@@ -191,8 +186,7 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
       return sendIntake(reply,await service[method](actor(request),params(request).rollbackPlanId!,request.body),'IntakeRollbackReview',202);
     });
   app.get('/v1/intake/rollback/:rollbackPlanId/review',{exposeHeadRoute:false},async(request,reply)=>{
-    if(!noQuery(request)||request.body!==undefined||request.headers['transfer-encoding']!==undefined
-      ||(request.headers['content-length']!==undefined&&request.headers['content-length']!=='0'))return intakeFailure(reply,'VALIDATION','FILE_INVALID');
+    if(!noQuery(request))return intakeFailure(reply,'VALIDATION','FILE_INVALID');
     return sendIntake(reply,await service.rollbackReview(actor(request),params(request).rollbackPlanId!),'IntakeRollbackReview');
   });
   app.get('/v1/intake/operations/:operationId', { exposeHeadRoute: false }, async (request, reply) => {

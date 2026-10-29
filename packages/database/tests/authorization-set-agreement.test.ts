@@ -4,21 +4,6 @@ import type { Client, ClientConfig } from 'pg';
 import { Pg15Harness } from '../src/testkit/index.js';
 import { applyDatabaseMigrations } from '../src/index.js';
 
-/**
- * Property: `authorization_sources` and `authorization_deadline` must agree.
- *
- * Four product doors ask one question in two shapes. The search door and the workbench
- * button bits read the set (`authorization_sources`); the intake query surface that the
- * shipped capsule actually calls reads the deadline (`authorization_deadline`, in
- * apps/api/src/content-intake/usage.ts). A drift between the two means one door serves a
- * source that another door refuses, for the same principal, action and instant.
- *
- * The assertion compares membership only, never the returned timestamp: the set emits one
- * row per grant while the deadline collapses a principal's grants into the latest expiry,
- * so the values legitimately differ while the yes/no answer must not.
- *
- * Runs only against a disposable PG15 cluster.
- */
 const enabled = process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1';
 
 const TENANT = 'tenant-agreement';
@@ -26,10 +11,10 @@ const APP = 'app-agreement';
 const BRAND = 'brand-agreement';
 const DEPARTMENT = 'dept-agreement';
 const JOB = 'job-agreement';
+const ISSUER_DEPARTMENT = 'dept-agreement-issuer';
+const ISSUER_JOB = 'job-agreement-issuer';
 const ACTOR = 'prn-agreement-actor';
 const USER = 'usr-agreement-actor';
-// A business grant must name a different issuer than its recipient, so the issuer is its
-// own principal. Its own facts window is irrelevant here: the functions judge the recipient.
 const ISSUER = 'prn-agreement-issuer';
 const ISSUER_USER = 'usr-agreement-issuer';
 
@@ -96,7 +81,7 @@ const caseArb: fc.Arbitrary<CaseSpec> = fc.record({
   factsEnabled: fc.boolean(),
   // A window that opens late or closes early is the interesting case, so both ends move.
   factsCheckedOffsetMs: secondsArb(-280, 20).map(seconds => seconds * 1_000),
-  factsValidOffsetMs: secondsArb(-60, 290).map(seconds => seconds * 1_000),
+  factsValidOffsetMs: secondsArb(-60, 86_400).map(seconds => seconds * 1_000),
   // role_rules is keyed by (tenant, app, department, job), so a job carries at most one
   // current role. Zero roles is the interesting case: the ceiling then rejects every action.
   // Every role the ceiling mentions. supervisor and engineer were missing, and they are
@@ -107,15 +92,11 @@ const caseArb: fc.Arbitrary<CaseSpec> = fc.record({
   storeSetCurrent: fc.boolean(),
   memberListed: fc.boolean(),
 }).map(spec => {
-  // Stay inside the facts table's own contract: valid_until > checked_at and at most five
-  // minutes after it. A generator that inserts a row the schema forbids proves nothing.
   const checked = spec.factsCheckedOffsetMs;
-  const valid = Math.min(Math.max(spec.factsValidOffsetMs, checked + 1_000), checked + 295_000);
+  const valid = Math.min(Math.max(spec.factsValidOffsetMs, checked + 1_000), checked + 86_400_000);
   return { ...spec, factsValidOffsetMs: valid };
 });
 
-/** The scope a named source belongs to, so a grant can be placed on the scope its source
- * lives in or, for the cross-scope case, on the other one. */
 function scopeOfSource(source: string): string {
   for (const entry of UNIVERSE) if ((entry.sources as readonly string[]).includes(source)) return entry.scope;
   return UNIVERSE[0]!.scope;
@@ -166,6 +147,14 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
             `INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
              VALUES ($1, $2, 1, 'v2-preview') ON CONFLICT (source_id) DO NOTHING`,
             [source, entry.scope]);
+          await client.query(
+            `INSERT INTO content_intake.source_mappings(
+               source_id, version, template_version, rule_version, mapping_version, structure_digest)
+             VALUES ($1, 1, 'faq-p1.1', 'intake-p1.1', 'not-imported',
+               '4e042c857f9bb13d37496c5e1aad0d8cd3ca5f614bacf657e49f755555295024')
+             ON CONFLICT (source_id, version) DO NOTHING`,
+            [source],
+          );
         }
       }
       await client.query(
@@ -181,7 +170,11 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
            binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
          VALUES ('binding-agreement-issuer', 'synthetic', $1, 'binding-agreement-issuer', $2, repeat('ab',32), true, 'owner')
          ON CONFLICT (binding_id) DO NOTHING`, [TENANT, ISSUER_USER]);
-      for (const [principalId, userId] of [[ACTOR, USER], [ISSUER, ISSUER_USER]] as const) {
+      for (const [principalId, userId, department, job, enabled, factsCheckedAt, factsValidUntil] of [
+        [ACTOR, USER, DEPARTMENT, JOB, spec.factsEnabled, checkedAt, validUntil],
+        [ISSUER, ISSUER_USER, ISSUER_DEPARTMENT, ISSUER_JOB, true,
+          new Date(at.getTime() - 1_000), new Date(at.getTime() + 86_399_000)],
+      ] as const) {
         await client.query(
           `INSERT INTO content_intake.principals(
              principal_id, user_id, tenant_id, app_id, identity_scope, person_key,
@@ -191,13 +184,18 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
           `INSERT INTO content_intake.principal_facts(
              principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
            VALUES ($1, 1, ARRAY[$2]::text[], $3, $4, $5, $6, repeat('ab',32))`,
-          [principalId, DEPARTMENT, JOB, spec.factsEnabled, checkedAt, validUntil]);
+          [principalId, department, job, enabled, factsCheckedAt, factsValidUntil]);
       }
       if (spec.role !== null) {
         await client.query(
           `INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
            VALUES ($1, $2, $3, $4, 1, $5)`, [TENANT, APP, DEPARTMENT, JOB, spec.role]);
       }
+      await client.query(
+        `INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
+         VALUES ($1, $2, $3, $4, 1, 'director')`,
+        [TENANT, APP, ISSUER_DEPARTMENT, ISSUER_JOB],
+      );
 
       const policy = await client.query<{ version: string }>(
         `SELECT version::text AS version FROM content_intake.policy_versions
@@ -228,14 +226,9 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
       for (const grant of spec.grants) {
         index += 1;
         const scope = grant.source === 'null' ? UNIVERSE[0]!.scope : scopeOfSource(grant.source);
-        // A grant that names a source in the other scope is allowed by the table and is
-        // exactly the case a door could disagree about.
         const startsAt = new Date(at.getTime() + grant.startsOffsetMs);
         const expiresAt = new Date(at.getTime() + grant.expiresOffsetMs);
         if (expiresAt <= startsAt) continue;
-        // A business grant has to hang off an allocation with the same issuer, scope and
-        // action, a null-or-equal source, a wider window and no revocation. The functions
-        // ignore allocation rows, so this parent exists only to satisfy the table's guard.
         const parentId = grant.kind === 'business' ? `alloc-agreement-${index}` : null;
         if (parentId !== null) {
           await client.query(
@@ -268,6 +261,7 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
         }
       }
 
+      await client.query('SET CONSTRAINTS ALL IMMEDIATE');
       // Compare over the whole universe, for every action, at the one instant.
       const found: string[] = [];
       for (const action of ACTIONS) {
@@ -323,7 +317,11 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
 
   /** One deterministic case the falsification test can also use: a live publish grant that
    * names a single source, so the other source in the same scope must stay invisible. */
-  async function seedSingleSourceCase(client: Client, at: Date): Promise<void> {
+  async function seedSingleSourceCase(
+    client: Client,
+    at: Date,
+    { parentRevoked = false }: Readonly<{ parentRevoked?: boolean }> = {},
+  ): Promise<void> {
     await client.query('BEGIN');
     await client.query('SET CONSTRAINTS ALL DEFERRED');
     await client.query(
@@ -344,12 +342,22 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
         await client.query(
           `INSERT INTO content_intake.sources(source_id, scope_id, current_mapping_version, mode)
            VALUES ($1, $2, 1, 'v2-preview')`, [source, entry.scope]);
+        await client.query(
+          `INSERT INTO content_intake.source_mappings(
+             source_id, version, template_version, rule_version, mapping_version, structure_digest)
+           VALUES ($1, 1, 'faq-p1.1', 'intake-p1.1', 'not-imported',
+             '4e042c857f9bb13d37496c5e1aad0d8cd3ca5f614bacf657e49f755555295024')`,
+          [source],
+        );
       }
     }
     await client.query(
       `INSERT INTO content_intake.policy_versions(tenant_id, app_id, version) VALUES ($1, $2, 1)`,
       [TENANT, APP]);
-    for (const [principalId, userId] of [[ACTOR, USER], [ISSUER, ISSUER_USER]] as const) {
+    for (const [principalId, userId, department, job] of [
+      [ACTOR, USER, DEPARTMENT, JOB],
+      [ISSUER, ISSUER_USER, ISSUER_DEPARTMENT, ISSUER_JOB],
+    ] as const) {
       await client.query(
         `INSERT INTO content_intake.principals(
            principal_id, user_id, tenant_id, app_id, identity_scope, person_key,
@@ -359,11 +367,15 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
         `INSERT INTO content_intake.principal_facts(
            principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest)
          VALUES ($1, 1, ARRAY[$2]::text[], $3, true, $4, $5, repeat('ab',32))`,
-        [principalId, DEPARTMENT, JOB, new Date(at.getTime() - 1_000), new Date(at.getTime() + 240_000)]);
+        [principalId, department, job, new Date(at.getTime() - 1_000), new Date(at.getTime() + 86_399_000)]);
     }
     await client.query(
       `INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
        VALUES ($1, $2, $3, $4, 1, 'director')`, [TENANT, APP, DEPARTMENT, JOB]);
+    await client.query(
+      `INSERT INTO content_intake.role_rules(tenant_id, app_id, department_id, job_id, policy_version, role)
+       VALUES ($1, $2, $3, $4, 1, 'director')`,
+      [TENANT, APP, ISSUER_DEPARTMENT, ISSUER_JOB]);
     await client.query(
       `INSERT INTO content_intake.grants(
          grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
@@ -379,6 +391,15 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
          $6, $7, 'single source', $1, 'alloc-single')`,
       [ISSUER, ACTOR, TENANT, APP, UNIVERSE[0]!.scope,
         new Date(at.getTime() - 30_000), new Date(at.getTime() + 240_000)]);
+    if (parentRevoked) {
+      await client.query(
+        `UPDATE content_intake.grants
+         SET revoked_at = $2, version = version + 1, last_change_reason = 'agreement parent revoke'
+         WHERE grant_id = $1`,
+        ['alloc-single', new Date(at.getTime() - 1_500)],
+      );
+    }
+    await client.query('SET CONSTRAINTS ALL IMMEDIATE');
   }
 
   /** The answers for one (scope, source, action): does the deadline see it, does the set. */
@@ -392,6 +413,39 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
          WHERE scope_id = $4 AND source_id = $5) AS present`,
       [ACTOR, action, at, scope, source]);
     return { live: deadline.rows[0]?.until != null, present: set.rows[0]?.present === true };
+  }
+
+  async function installSourceFanoutMutation(client: Client): Promise<string> {
+    const original = await client.query<{ definition: string }>(
+      `SELECT pg_catalog.pg_get_functiondef(
+         'content_intake.authorization_sources(text,text,timestamptz)'::pg_catalog.regprocedure) AS definition`);
+    await client.query(`
+      CREATE OR REPLACE FUNCTION content_intake.authorization_sources(
+        p_principal TEXT, p_action TEXT, p_at TIMESTAMPTZ
+      ) RETURNS TABLE (
+        scope_id content_intake.identifier,
+        source_id content_intake.identifier,
+        policy_version content_intake.version,
+        store_set_version content_intake.version,
+        valid_until TIMESTAMPTZ
+      ) LANGUAGE sql STABLE SET search_path = pg_catalog AS $$
+        SELECT s.scope_id, expanded.source_id, g.policy_version, g.store_set_version,
+          least(f.valid_until, g.expires_at)
+        FROM content_intake.principals p
+        JOIN content_intake.principal_facts f
+          ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
+        JOIN content_intake.grants g
+          ON g.recipient_id = p.principal_id AND g.action = p_action AND g.kind = 'business'
+          AND g.revoked_at IS NULL AND g.starts_at <= p_at AND p_at < g.expires_at
+        JOIN content_intake.scopes s
+          ON s.scope_id = g.scope_id AND s.tenant_id = p.tenant_id AND s.app_id = p.app_id
+        JOIN LATERAL (
+          SELECT src.source_id FROM content_intake.sources src WHERE src.scope_id = s.scope_id
+        ) expanded ON TRUE
+        WHERE p.principal_id = p_principal AND f.enabled
+          AND f.checked_at <= p_at AND p_at < f.valid_until
+      $$`);
+    return original.rows[0]?.definition ?? '';
   }
 
   it('sees a named source and not its sibling, so the property is not vacuous', async () => {
@@ -410,103 +464,40 @@ describe.skipIf(!enabled)('authorization_sources agrees with authorization_deadl
     }
   }, 120_000);
 
-  it('fails when the set function drifts from the deadline', async () => {
-    // A check nobody has seen fail proves nothing. Replace the set function with a variant
-    // that ignores the grant's source for non-query actions — the exact drift this property
-    // exists to catch — confirm the property reports it, then restore the real body and
-    // confirm it reports nothing again.
+  it('catches source fanout by the contract decision when both doors share the mutation', async () => {
     const client = await harness.connect(database.config);
-    const original = await client.query<{ definition: string }>(
-      `SELECT pg_catalog.pg_get_functiondef(
-         'content_intake.authorization_sources(text,text,timestamptz)'::pg_catalog.regprocedure) AS definition`);
-    // A named-source publish grant on a scope that holds two sources. The deadline answers
-    // "named source only"; a set that ignores the source answers for both.
-    const spec: CaseSpec = {
-      factsEnabled: true, factsCheckedOffsetMs: -1_000, factsValidOffsetMs: 240_000,
-      role: 'director',
-      grants: [{
-        action: 'publish', source: 'source-agreement-a', kind: 'business',
-        startsOffsetMs: -30_000, expiresOffsetMs: 180_000, revoked: false,
-        hasSteward: true, parentRevoked: false,
-      }],
-      policyCurrent: true, storeSetCurrent: true, memberListed: true,
-    };
     try {
-      await expect(runCase(spec)).resolves.toEqual([]);
-
-      await client.query(`
-        CREATE OR REPLACE FUNCTION content_intake.authorization_sources(
-          p_principal TEXT, p_action TEXT, p_at TIMESTAMPTZ
-        ) RETURNS TABLE (
-          scope_id content_intake.identifier,
-          source_id content_intake.identifier,
-          policy_version content_intake.version,
-          store_set_version content_intake.version,
-          valid_until TIMESTAMPTZ
-        ) LANGUAGE sql STABLE SET search_path = pg_catalog AS $$
-          SELECT s.scope_id, expanded.source_id, g.policy_version, g.store_set_version,
-            least(f.valid_until, g.expires_at)
-          FROM content_intake.principals p
-          JOIN content_intake.principal_facts f
-            ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
-          JOIN content_intake.grants g
-            ON g.recipient_id = p.principal_id AND g.action = p_action AND g.kind = 'business'
-            AND g.revoked_at IS NULL AND g.starts_at <= p_at AND p_at < g.expires_at
-          JOIN content_intake.scopes s
-            ON s.scope_id = g.scope_id AND s.tenant_id = p.tenant_id AND s.app_id = p.app_id
-          JOIN LATERAL (
-            -- DRIFT: the grant's source is ignored for every action.
-            SELECT src.source_id FROM content_intake.sources src WHERE src.scope_id = s.scope_id
-          ) expanded ON TRUE
-          WHERE p.principal_id = p_principal AND f.enabled
-            AND f.checked_at <= p_at AND p_at < f.valid_until
-        $$`);
-
-      const broken = await runCase(spec);
-      expect(broken.length, 'the drifted function must produce a disagreement').toBeGreaterThan(0);
-      expect(broken.join('\n')).toContain('source-agreement-b');
+      await seedSingleSourceCase(client, at);
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-b'))
+        .resolves.toEqual({ live: false, present: false });
+      const original = await installSourceFanoutMutation(client);
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-b'))
+        .resolves.toEqual({ live: true, present: true });
+      if (original) await client.query(original);
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-b'))
+        .resolves.toEqual({ live: false, present: false });
     } finally {
-      if (original.rows[0]?.definition) await client.query(original.rows[0].definition);
+      await client.query('ROLLBACK').catch(() => undefined);
       await client.end();
     }
-    // Restored: the same case agrees again, so the failure above was the drift, not noise.
-    await expect(runCase(spec)).resolves.toEqual([]);
   }, 180_000);
 
-  it('fails when the set function drops the parent-liveness check', async () => {
-    // The steward and parent dimensions exist because a revocation can leave a child with a
-    // live steward under a dead parent. Prove the property sees that drift: take the real
-    // definition, remove the parent clause, and require a disagreement naming the shape.
+  it('catches a revoked parent by the contract decision when both doors share the mutation', async () => {
     const client = await harness.connect(database.config);
-    const original = await client.query<{ definition: string }>(
-      `SELECT pg_catalog.pg_get_functiondef(
-         'content_intake.authorization_sources(text,text,timestamptz)'::pg_catalog.regprocedure) AS definition`);
-    const parentClause = /AND \(g\.parent_grant_id IS NULL OR \(g\.steward_id IS NOT NULL AND EXISTS \([\s\S]*?revoked_at IS NULL\)\)\)/;
-    const real = original.rows[0]?.definition ?? '';
-    if (!parentClause.test(real)) throw new Error('the installed function no longer carries the parent clause');
-    // A parented grant whose parent is revoked, keeping its steward: the state a second
-    // revocation leaves behind.
-    const spec: CaseSpec = {
-      factsEnabled: true, factsCheckedOffsetMs: -1_000, factsValidOffsetMs: 240_000,
-      role: 'director',
-      grants: [{
-        action: 'publish', source: 'source-agreement-a', kind: 'business',
-        startsOffsetMs: -30_000, expiresOffsetMs: 180_000, revoked: false,
-        hasSteward: true, parentRevoked: true,
-      }],
-      policyCurrent: true, storeSetCurrent: true, memberListed: true,
-    };
     try {
-      await expect(runCase(spec)).resolves.toEqual([]);
-      await client.query(real.replace(parentClause, 'AND (g.parent_grant_id IS NULL OR g.steward_id IS NOT NULL)'));
-      const broken = await runCase(spec);
-      expect(broken.length, 'dropping the parent check must produce a disagreement').toBeGreaterThan(0);
-      expect(broken.join('\n')).toContain('parent-revoked');
+      await seedSingleSourceCase(client, at, { parentRevoked: true });
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-a'))
+        .resolves.toEqual({ live: false, present: false });
+      const original = await installSourceFanoutMutation(client);
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-a'))
+        .resolves.toEqual({ live: true, present: true });
+      if (original) await client.query(original);
+      await expect(answers(client, 'publish', UNIVERSE[0]!.scope, 'source-agreement-a'))
+        .resolves.toEqual({ live: false, present: false });
     } finally {
-      if (real) await client.query(real);
+      await client.query('ROLLBACK').catch(() => undefined);
       await client.end();
     }
-    await expect(runCase(spec)).resolves.toEqual([]);
   }, 180_000);
 
   it('reports no disagreement for any generated grant shape', async () => {

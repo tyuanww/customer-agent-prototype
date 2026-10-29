@@ -10,7 +10,7 @@ import { launchIntakeElectron } from '../support/intake-electron';
  * then crosses renderer/preload/Main/HTTP/PG and a separately signed-in seat. */
 test('confirmed rollback creates a new release whose historical FAQ is consumed by another seat', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
-  test.fixme(true, 'Dashboard content is the persona knowledge desk. Rollback still targets the unmounted candidate page.');
+  test.fixme(true, 'Previous-preview excluded from the launch candidate; retained for later verification.');
   test.setTimeout(180_000);
   const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -84,42 +84,54 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await dashboard.getByTestId('nav-materials').click();
     const rollback = dashboard.getByRole('region', { name: '已发布目录纠正回退' });
     await dashboard.getByRole('radiogroup', { name: '候选筛选', exact: true }).getByText('已发布', { exact: true }).click();
     await dashboard.getByRole('button', { name: '回退', exact: true }).first().click();
     await expect(rollback).toBeVisible();
-    await rollback.getByLabel('当前发布版本', { exact: true }).fill(base);
-    await rollback.getByLabel('目标历史版本', { exact: true }).fill(target);
+    await expect(rollback.getByRole('button', { name: '查看回退影响' })).toBeVisible();
     await rollback.getByRole('button', { name: '查看回退影响' }).click();
+    await expect(rollback.getByText(`当前版 ${base}`, { exact: true })).toBeVisible();
+    await expect(rollback.getByText(`上一版 ${target}`, { exact: true })).toBeVisible();
     await expect(rollback.getByText(/来源 source-a/)).toBeVisible();
     await expect(rollback.getByRole('button', { name: '发起回退复核', exact: true })).toHaveCount(0);
     await expect(rollback.getByRole('button', { name: '确认回退并发布' })).toBeEnabled();
+    const backgrounds: string[] = [];
     for (const mode of ['light', 'dark']) {
       await dashboard.getByTestId('dashboard-theme-trigger').click();
       await dashboard.getByTestId(`dashboard-theme-${mode}`).click();
       await expect(dashboard.getByTestId('dashboard-shell')).toHaveAttribute('data-theme', mode);
-      await expect.poll(() => rollback.getByRole('button', { name: '关闭回退计划' }).evaluate(el => getComputedStyle(el).backgroundColor))
-        .toBe(mode === 'dark' ? 'rgb(28, 27, 32)' : 'rgb(255, 255, 255)');
+      const buttonBackground = () => rollback.getByRole('button', { name: '关闭回退计划' }).evaluate(el => getComputedStyle(el).backgroundColor);
+      if (mode === 'dark') await expect.poll(buttonBackground).not.toBe(backgrounds[0]);
+      const background = await buttonBackground();
+      expect(background).not.toBe('rgba(0, 0, 0, 0)');
+      backgrounds.push(background);
       await rollback.scrollIntoViewIfNeeded();
       expect(await dashboard.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
       await dashboard.screenshot({ path: path.join(evidence, `rollback-${mode}.png`) });
     }
+    expect(backgrounds[0]).not.toBe(backgrounds[1]);
     await app.evaluate(({ dialog }, expected) => { dialog.showMessageBox = (async (_window, options) => {
       if (options.defaultId !== 0 || options.cancelId !== 0 || !options.detail?.includes(expected.target)
         || !options.detail?.includes(expected.base) || !options.detail?.includes('来源 source-a')) throw new Error('Unbound rollback confirmation');
       return { response: 0, checkboxChecked: false };
     }) as typeof dialog.showMessageBox; }, { target, base });
     await rollback.getByRole('button', { name: '确认回退并发布' }).click();
+    await dashboard.getByRole('dialog', { name: '回退整个发布目录到上一版' }).getByRole('button', { name: '确认回退', exact: true }).click();
     await expect(rollback.getByRole('button', { name: '确认回退并发布' })).toBeEnabled();
     expect((await host.status()).publications).toBe(2);
     await app.evaluate(({ dialog }) => { dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as typeof dialog.showMessageBox; });
     await rollback.getByRole('button', { name: '确认回退并发布' }).click();
+    await dashboard.getByRole('dialog', { name: '回退整个发布目录到上一版' }).getByRole('button', { name: '确认回退', exact: true }).click();
     await expect(rollback.getByText(/回退已发布/)).toBeVisible();
     const result = await host.status();
     expect(result.publications).toBe(3);
     expect(result.reviewBindings).toBe(0); expect(result.approvalFacts).toBe(0);
     expect(result.requests.filter(p => p.endsWith('/review') || p.endsWith('/review/refresh'))).toHaveLength(0);
     expect(result.currentReleaseId).not.toBe(base); expect(result.currentReleaseId).not.toBe(target);
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBoxSync = (() => 1) as typeof dialog.showMessageBoxSync;
+    });
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
     host.selectIdentity('agent'); await openQuery();
     await query.getByRole('button', { name: / · 退出$/ }).click();

@@ -85,8 +85,9 @@ test('director previews without saving, grants a named seat query access, then r
     await end.press('Enter');
     await dialog.getByLabel('授权原因', { exact: true }).fill('合成桌面验收授予查询');
     await dialog.getByRole('button', { name: '预览权限', exact: true }).click();
-    const preview = dashboard.getByRole('dialog', { name: '预览 · 尚未保存', exact: true });
+    const preview = dashboard.getByRole('dialog', { name: '预览，尚未保存', exact: true });
     await expect(preview).toBeVisible();
+    await expect(preview.getByRole('region', { name: '权限预览', exact: true })).toBeVisible();
     expect((await entitlement()).ok).toBe(false);
     // While the preview is open the mask owns the pointer, so an outer tab click cannot move the
     // page. The preview has to survive that blocked attempt, not be dropped by it.
@@ -99,7 +100,7 @@ test('director previews without saving, grants a named seat query access, then r
     expect((await entitlement()).ok).toBe(false);
     await dialog.getByRole('button', { name: '预览权限', exact: true }).click();
     await preview.getByRole('button', { name: '确认保存权限', exact: true }).click();
-    await expect(dashboard.getByRole('dialog', { name: '预览 · 尚未保存', exact: true })).toHaveCount(0);
+    await expect(dashboard.getByRole('dialog', { name: '预览，尚未保存', exact: true })).toHaveCount(0);
     await expect(panel.getByRole('status')).toContainText('已保存');
     const granted = await entitlement(); expect(granted.status).toBe(200);
     await panel.getByRole('button', { name: '刷新权限列表', exact: true }).click();
@@ -109,6 +110,13 @@ test('director previews without saving, grants a named seat query access, then r
     await record.getByRole('button', { name: '撤销该权限', exact: true }).click();
     await panel.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
     await panel.getByRole('button', { name: '确认撤销', exact: true }).click();
+    const revokeDialog = dashboard.getByRole('dialog', {
+      name: '收回 合成坐席 在 该店铺 / 产品 / 该来源的查询复制',
+      exact: true,
+    });
+    await expect(revokeDialog).toBeVisible();
+    await expect(revokeDialog).toContainText('收回之后不能撤销。以后要用，需要重新开通。');
+    await revokeDialog.getByRole('button', { name: '确认收回', exact: true }).click();
     await expect(panel.getByRole('status')).toContainText('已保存');
     expect((await entitlement()).ok).toBe(false);
     console.info(JSON.stringify({status:'PASS',flow:'director-named-seat-preview-cancel-save-revoke',profile:'purpose-runtime',entitlements:'denied-enabled-denied',appearance:'980x680-light-dark',screenshots:evidence}));

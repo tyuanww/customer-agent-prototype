@@ -2,7 +2,7 @@
 
 桌面下拉显示「暂无可用店铺」时，先查出登录停在哪一步。顶栏那句「没有权限，请找人开通。」是另一条路径，见[如何核对职位名单查询权](how-to-check-roster-permission.md)。字段和放行规则见[职位名单权限模型](reference-job-roster-permission-model.md)。
 
-这篇不写入授权。`backend_identity.admit_feishu_agent` 只插入一条 `subject_bindings`。会话使用的 principal id 由 `rosterPrincipalId` 和 `content_intake.project_feishu_roster` 计算，形式是 `prin_` 加上 open id 的 sha256 前 32 位十六进制。查询授权在投影状态成为 `registered` 之后，由 `content_intake.issue_roster_query` 签发，动作只有 `query`，有效期不超过 1 天。
+这篇不写入授权。`backend_identity.admit_feishu_agent` 只插入一条 `subject_bindings`。正式 Feishu 主体的 principal id 由 `rosterPrincipalId` 和 `content_intake.project_feishu_roster` 计算，形式是 `prin_` 加上 open id 的 sha256 前 32 位十六进制。0077 后投影不签发 query；没有手工 grant 时状态是 `pending` 或 `denied`。
 
 店铺要出现，来源模式必须是 `v2-preview`，店铺 ID 非空，并且有一条未撤销的 `query` 授权。该授权的 `source_id`、`policy_version`、`store_set_version` 必须等于当前行。事实窗口长度见迁移 [`0073_feishu_query_grant.sql`](../packages/database/migrations/0073_feishu_query_grant.sql) 中的 `principal_facts_check` 约束（24 小时）。重新登录会重写事实。点「刷新店铺」不会重写事实，但会重新读取授权。店铺下拉不跟着 10 秒一次的会话轮询走。事实重写之后要点「刷新店铺」。`source_id` 为空的根授权不会出现在店铺里。
 
@@ -53,7 +53,7 @@ LIMIT 20;
 
 - 没有绑定行。请对方重新登录一次。`admit_feishu_agent` 会在回调找不到启用绑定时插入绑定。不要手写 principal。
 - 有绑定行，并且 `enabled` 为假。准入冲突时不会把这一行重新打开。先处理停用，再让对方登录。
-- 没有职务快照，或职务标题对不上花名册。`projectRosterLogin` 返回 `unmatched`，不会调用 `issue_roster_query`。先让飞书职务原文对上目录。
+- 没有职务快照，或职务标题对不上花名册。配置了 `ROSTER_CANDIDATE_DEPARTMENT_ID` 与 `ROSTER_CANDIDATE_JOB_ID` 时会登记最低候选；否则返回 `unmatched`。两种路径都不签发 grant。
 - 投影状态是 `policy-pending`。岗位规则没有对上。先补规则，再让对方登录。
 - 投影已经 `registered`，当前发布谱系里没有 `v2-preview` 来源。先发布这些来源。改准入函数不会造出店铺。
 - 已有 `query` 授权，但最新事实的 `valid_until` 已过。请对方重新登录。窗口长度见迁移 [`0073_feishu_query_grant.sql`](../packages/database/migrations/0073_feishu_query_grant.sql) 中的 `principal_facts_check` 约束（24 小时）。

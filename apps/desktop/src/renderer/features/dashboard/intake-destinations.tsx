@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import type { PageUseSnapshot } from '@shared/page-use';
 import { DeskKnowledge } from './DeskKnowledge';
 import { IntakeLibrary } from './IntakeLibrary';
@@ -52,7 +52,7 @@ const INTAKE_DESTINATION_MOUNTS: {
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
   sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />,
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
-  materials: () => <IntakeManagement />,
+  materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials'} />,
   permissions: (ctx) => (
     <div hidden={ctx.active !== 'permissions'}>
       {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
@@ -61,6 +61,17 @@ const INTAKE_DESTINATION_MOUNTS: {
     </div>
   ),
 };
+
+function MaterialsDestination({ active }: { active: boolean }) {
+  const [visited, setVisited] = useState(active);
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => { if (active) setVisited(true); }, [active]);
+  useEffect(() => {
+    if (!visited && !active) return undefined;
+    return window.dashboardIntake?.onInvalidated(() => setGeneration(value => value + 1));
+  }, [visited, active]);
+  return <div hidden={!active}>{(visited || active) && <IntakeManagement key={generation} />}</div>;
+}
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {
   if (!intakeRowVisible(row, ctx.canOpenPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return false;

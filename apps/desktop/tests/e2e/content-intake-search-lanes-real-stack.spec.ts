@@ -28,7 +28,7 @@ type Lane = Readonly<{
   identity: 'roster-readonly' | 'roster-agent' | 'roster-nogrant';
   /** State written before sign-in, or after sign-in for `expire`. */
   before: 'revoke' | 'expire' | 'empty' | null;
-  expect: 'granted' | 'denied' | 'stale';
+  expect: 'granted' | 'pending' | 'stale';
 }>;
 
 const LANES: readonly Lane[] = [
@@ -36,10 +36,10 @@ const LANES: readonly Lane[] = [
   { slug: 'pr-a-grant', identity: 'roster-readonly', before: null, expect: 'granted' },
   // The grant is withdrawn before the session exists: the projection carries no query bit, so
   // the capsule refuses without asking the server.
-  { slug: 'pr-a-revoked', identity: 'roster-readonly', before: 'revoke', expect: 'denied' },
+  { slug: 'pr-a-revoked', identity: 'roster-readonly', before: 'revoke', expect: 'pending' },
   // A director title, a fresh window, and no grant at all. The session role is `owner`, so
   // this is the state where the role alone does not open the door.
-  { slug: 'pr-a-no-grant', identity: 'roster-nogrant', before: null, expect: 'denied' },
+  { slug: 'pr-a-no-grant', identity: 'roster-nogrant', before: null, expect: 'pending' },
   // A seat title with role `agent` and a live query grant: the role ceiling permits reading,
   // so the grant still decides and the door answers.
   { slug: 'pr-a-agent-grant', identity: 'roster-agent', before: null, expect: 'granted' },
@@ -50,21 +50,21 @@ const LANES: readonly Lane[] = [
   // No membership in the current store set, so no query grant is live. Last, because it
   // changes the answer for every principal at once, and on a principal whose window is still
   // fresh: an expired window would take precedence and hide the store-set cause.
-  { slug: 'pr-a-empty-stores', identity: 'roster-agent', before: 'empty', expect: 'denied' },
+  { slug: 'pr-a-empty-stores', identity: 'roster-agent', before: 'empty', expect: 'pending' },
 ];
 
 test('the search door tells a session apart from its grant, its facts and its store set', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(600_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime' });
   const evidence = path.resolve(fileURLToPath(new URL('../..', import.meta.url)), '../../.gstack/pr-a-search-lanes',
     new Date().toISOString().replaceAll(':', '-'));
   mkdirSync(evidence, { recursive: true });
-  let app: ElectronApplication | undefined;
-  const directories: string[] = [];
-  try {
-    for (const lane of LANES) {
+  for (const lane of LANES) {
+    const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime' });
+    const userData = mkdtempSync(path.join(tmpdir(), `${lane.slug}-`));
+    let app: ElectronApplication | undefined;
+    try {
       // State that must exist before the session is created.
       if (lane.before === 'revoke') {
         expect(await host.revokeQueryFor(lane.identity), `${lane.slug}: revoke`).toBeGreaterThan(0);
@@ -73,8 +73,6 @@ test('the search door tells a session apart from its grant, its facts and its st
         expect(await host.emptyStoreSet(), `${lane.slug}: empty store set`).toBeGreaterThan(0);
       }
       Reflect.apply(host.selectIdentity, host, [lane.identity]);
-      const userData = mkdtempSync(path.join(tmpdir(), `${lane.slug}-`));
-      directories.push(userData);
       app = await launchIntakeElectron({ desktopRoot: fileURLToPath(new URL('../..', import.meta.url)),
         userDataDirectory: userData, apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin,
         evidenceDirectory: evidence });
@@ -110,19 +108,18 @@ test('the search door tells a session apart from its grant, its facts and its st
         await expect(query.getByTestId('error-state')).toHaveCount(0);
         await expect.poll(async () => await query.getByTestId('no-hit').isVisible()).toBe(true);
       } else {
-        const sentence = lane.expect === 'stale' ? '资料资格过期了，请稍后重试。' : '没有权限，请找人开通。';
+        const sentence = lane.expect === 'stale' ? '资料资格过期了，请稍后重试。' : '查询权限或资料尚未就绪，请联系管理员核对。';
         await expect(query.getByTestId('error-state')).toContainText(sentence);
-        // The two refusals must not be confused for one another: whichever sentence shows,
-        // the other one must not.
         await expect(query.getByTestId('error-state')).not.toContainText(
-          lane.expect === 'stale' ? '没有权限，请找人开通。' : '资料资格过期了，请稍后重试。');
-        // A session the door refuses has no shop it may read, so the capsule offers no shop
-        // control at all. Asserting the control is absent is stronger than asserting an empty
-        // list: an empty picker could still mean "no shops named yet".
-        await expect(query.getByRole('button', { name: '筛选', exact: true })).toHaveCount(0);
-        // The control may still render as an inert shell; what matters is that it offers no
-        // shop the search could never use. A placeholder carries an empty value.
-        expect(await query.evaluate(() => {
+          lane.expect === 'stale' ? '查询权限或资料尚未就绪，请联系管理员核对。' : '资料资格过期了，请稍后重试。');
+        const denied = await host.requestAs(lane.identity, '/v1/intake/entitlements', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ shopId: 'shop-a', contextGeneration: 1, productIds: [], scenarioIds: [], releaseId: null }),
+        });
+        expect([403, 404]).toContain(denied.status);
+        const filter = query.getByRole('button', { name: '筛选', exact: true });
+        if (await filter.count()) await filter.click();
+        await expect.poll(() => query.evaluate(() => {
           const select = document.querySelector<HTMLSelectElement>('select[aria-label="当前店铺"]');
           return select === null ? 0 : [...select.options].filter(option => option.value !== '').length;
         })).toBe(0);
@@ -133,14 +130,9 @@ test('the search door tells a session apart from its grant, its facts and its st
       await query.screenshot({ path: path.join(evidence, `${lane.slug}.png`), animations: 'disabled', timeout: 20_000 });
       console.info(JSON.stringify({ status: 'PASS', lane: lane.slug, expect: lane.expect,
         screenshot: path.join(evidence, `${lane.slug}.png`) }));
-      await closeOwnedElectron(app);
-      app = undefined;
-    }
-  } finally {
-    try { if (app) await closeOwnedElectron(app); }
-    finally {
-      try { await host.close(); }
-      finally { for (const directory of directories) rmSync(directory, { recursive: true, force: true }); }
+    } finally {
+      try { if (app) await closeOwnedElectron(app); }
+      finally { try { await host.close(); } finally { rmSync(userData, { recursive: true, force: true }); } }
     }
   }
 });

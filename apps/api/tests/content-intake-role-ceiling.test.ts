@@ -6,7 +6,8 @@ const actions = ['query', 'content-manage', 'import', 'source-confirm', 'review'
 const now = Date.now();
 const actor = (role: Principal['role']): Principal => ({
   id: 'p', userId: 'u', tenantId: 'tenant-a', appId: 'app-a', identityScope: 'confirmed-synthetic', personKey: 'k',
-  factsVersion: 1, generation: 0, enabled: true, checkedAt: now - 1_000, validUntil: now + 60_000, role,
+  factsVersion: 1, generation: 0, enabled: true, checkedAt: now - 1_000, validUntil: now + 60_000,
+  role,
 });
 
 describe('content intake role ceiling', () => {
@@ -58,7 +59,7 @@ describe('content intake role ceiling', () => {
       beforeCommit() {},
       query: (async (sql: string, params?: unknown[]) => {
         if (sql.includes('policy_versions')) return { rows: [{ version: '1' }] };
-        if (sql.includes('clock_timestamp() AS at') || sql.includes('clock_timestamp() AS time')) return { rows: [{ at: new Date(now), time: new Date(now) }] };
+        if (['SELECT clock_timestamp() AS at', 'SELECT clock_timestamp() AS time'].includes(sql.trim())) return { rows: [{ at: new Date(now), time: new Date(now) }] };
         if (sql.includes('content_intake.authorization_sources')) return { rows: [{ source_id: 'source-a' }] };
         if (sql.includes('AS roles')) {
           const id = String(params?.[0]);

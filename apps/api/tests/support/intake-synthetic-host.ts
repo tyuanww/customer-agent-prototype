@@ -34,7 +34,7 @@ export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'age
 /** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
  * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
 export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly'
-  | 'roster-stale' | 'roster-nogrant' | 'roster-agent';
+  | 'roster-stale' | 'roster-nogrant' | 'roster-agent' | 'roster-query-only';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -283,7 +283,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
     for (const [identity, userId] of [['roster-nogrant', 'user-roster-nogrant'],
-      ['roster-agent', 'user-roster-agent']] as const) {
+      ['roster-agent', 'user-roster-agent'], ['roster-query-only', 'user-roster-query-only']] as const) {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(
           binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,'owner')`, [identity, userId]);
@@ -296,12 +296,22 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await admin.query(`INSERT INTO content_intake.principal_facts VALUES
         ('roster-agent',1,ARRAY['dept-a'],'job-customer-service-seat',true,
          statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES
+        ('roster-query-only',1,ARRAY['dept-a'],'job-customer-service-director',true,
+         statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
         starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
       VALUES ('business-roster-agent-query','business','director','roster-agent',
         'tenant-a','app-a','scope-a','source-a','query',
         clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成坐席查询','director','root-query',
+        (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
+        starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+      VALUES ('business-roster-query-only','business','director','roster-query-only',
+        'tenant-a','app-a','scope-a','source-a','query',
+        clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成只查询','director','root-query',
         (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
     await admin.query('COMMIT');
     await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
@@ -339,7 +349,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
     });
     registerProductAuthRoutes(app, auth);
-    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (userId) => readAuthorizationActions(admin!, userId));
+    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
     // The real search door, on a real app_runtime LOGIN: the search function is executable
     // only by that capability, so the lanes cannot borrow the intake pools. The keys are
     // throwaway fixture material and are never printed. The login inherits app_runtime
@@ -372,6 +382,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
             : principalId === 'roster-stale' ? '合成过期总监'
             : principalId === 'roster-nogrant' ? '合成无授权总监'
             : principalId === 'roster-agent' ? '合成名单坐席'
+            : principalId === 'roster-query-only' ? '合成仅查询总监'
             : null)
         : null });
     apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -408,7 +419,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: DesktopSyntheticIdentity) {
         if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',
-      'roster-stale', 'roster-nogrant', 'roster-agent'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+      'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
       /** Revoke one principal's live query grant. The grant history is append-only, so this
        * is a versioned revoke rather than a delete, exactly like the product path. */

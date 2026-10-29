@@ -2,7 +2,7 @@ import { readFileSync, lstatSync, writeFileSync, type Stats } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Resolves the synthetic product profile for a packaged build.
+ * Resolves the product profile for a packaged build.
  *
  * The packaged client must be able to run the synthetic query chain without
  * weakening the original protections, so the origins are *not* taken from the
@@ -43,6 +43,7 @@ const UNREADABLE_PROFILE_ERROR =
   'Packaged desktop could not read synthetic-stack.json under userData';
 
 export type PackagedProductProfile = Readonly<{
+  mode: typeof MODE | typeof REMOTE_MODE;
   apiOrigin: string;
   identityOrigin: string;
   contentIntake?: 'faq-v2';
@@ -172,7 +173,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
       return { ok: false, kind: 'invalid' };
     }
-    return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin,
+    return { ok: true, profile: Object.freeze({ mode: REMOTE_MODE, apiOrigin, identityOrigin,
       ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
   }
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
@@ -181,11 +182,11 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
     return { ok: false, kind: 'invalid' };
   }
-  return { ok: true, profile: Object.freeze({ apiOrigin, identityOrigin,
+  return { ok: true, profile: Object.freeze({ mode: MODE, apiOrigin, identityOrigin,
     ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
 }
 
-/** Read and validate the packaged synthetic profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
+/** Read and validate the packaged profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
 export function readPackagedProductProfile(userDataDirectory: string): PackagedProductProfile | undefined {
   const result = parsePackagedProductProfile(userDataDirectory);
   if (!result.ok) throw new PackagedProfileError(result.kind);
@@ -245,7 +246,7 @@ export function seedPackagedOfflineProfile(options: {
 
 /**
  * Choose the product origin source. Packaged builds read only the userData
- * file and ignore `environment`; unpackaged builds read loopback env vars.
+ * file and ignore `environment`; unpackaged builds validate origin env vars.
  */
 export function resolveProductProfile(
   packaged: boolean,
@@ -282,6 +283,6 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   if (api === undefined || identity === undefined || api === identity) {
     throw new Error('Synthetic desktop requires both exact loopback or https origins in development');
   }
-  return Object.freeze({ apiOrigin: api, identityOrigin: identity,
+  return Object.freeze({ mode: httpsOrigin(api) ? REMOTE_MODE : MODE, apiOrigin: api, identityOrigin: identity,
     ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) });
 }

@@ -74,6 +74,8 @@ describe('stack profile', () => {
     } as const;
     const environment = apiEnvironment(profile);
     assert.equal(environment.CUSTOMER_AGENT_PROFILE, 'formal-dev');
+    assert.equal(environment.CUSTOMER_AGENT_STACK_ROOT, profile.stackRoot);
+    assert.equal(apiEnvironment(profile, { CUSTOMER_AGENT_STACK_ROOT: '/tmp/other' }).CUSTOMER_AGENT_STACK_ROOT, profile.stackRoot);
     assert.equal(environment.CUSTOMER_AGENT_API_HOST, '127.0.0.1');
     assert.equal(environment.SYNTHETIC_IDENTITY_PROVIDER_ORIGIN, 'http://127.0.0.1:43101');
     const logins = ['DATABASE_URL', 'CONTENT_ADMIN_DATABASE_URL', 'AUTH_DATABASE_URL', 'CONTENT_REVIEW_DATABASE_URL', 'CONTENT_WORKER_DATABASE_URL']
@@ -614,7 +616,11 @@ describe('password identity server reload', () => {
       body: JSON.stringify({ username, password }),
     });
     try {
-      const server = createPasswordIdentityServer({ port, accountsFile });
+      const server = createPasswordIdentityServer({
+        port,
+        accountsFile,
+        bindingAllowed: async (bindingId) => bindingId === 'synthetic_seatok',
+      });
       await server.listen();
       try {
         assert.equal((await postPassword('synthetic_agent', first)).status, 200);
@@ -686,6 +692,57 @@ describe('identity admission', () => {
       writeFileSync(empty, '[]');
       assert.throws(() => loadPasswordAccounts(empty), /contains no usable account/);
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy synthetic entry closed to private administrator bindings', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'identity-private-admin-'));
+    const accountsFile = path.join(dir, 'password-accounts.json');
+    const password = 'private-admin-password';
+    writeFileSync(accountsFile, JSON.stringify([
+      buildAccount('a', 'synthetic_seat_a', password),
+      buildAccount('master', 'binding-private-admin', password),
+    ]));
+    const legacyPort = await freeLoopbackPort();
+    const productPort = await freeLoopbackPort();
+    const legacy = createIdentityProvider({
+      port: legacyPort,
+      accountsFile,
+      bindingAllowed: async (bindingId) =>
+        bindingId === 'binding-private-admin' || bindingId === 'synthetic_seat_a',
+    });
+    const product = createPasswordIdentityServer({
+      port: productPort,
+      accountsFile,
+      bindingAllowed: async (bindingId) => bindingId === 'binding-private-admin',
+    });
+    try {
+      const legacyOrigin = await legacy.listen();
+      await product.listen();
+      const post = (origin: string, username: string) => fetch(`${origin}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      assert.equal((await post(legacyOrigin, 'master')).status, 401);
+      assert.equal((await post(legacyOrigin, 'a')).status, 200);
+      const issued = await post(`http://127.0.0.1:${String(productPort)}`, 'master');
+      assert.equal(issued.status, 200);
+      const code = (await issued.json() as { code: string }).code;
+      const exchanged = await fetch(`http://127.0.0.1:${String(productPort)}/exchange`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      assert.equal(exchanged.status, 200);
+      assert.deepEqual(await exchanged.json(), {
+        provider: 'synthetic',
+        binding_id: 'binding-private-admin',
+      });
+    } finally {
+      await legacy.close();
+      await product.close();
       rmSync(dir, { recursive: true, force: true });
     }
   });
@@ -796,6 +853,7 @@ describe('stack production env', () => {
     // nobody looks. Each of these must be a start-time error naming the key.
     const derived = [
       'PATH=/usr/bin',
+      'CUSTOMER_AGENT_STACK_ROOT=/tmp/other-stack',
       'CUSTOMER_AGENT_API_HOST=127.0.0.1',
       'CUSTOMER_AGENT_API_PORT=43110',
       'DATABASE_URL=postgresql://stack_runtime@localhost/db',

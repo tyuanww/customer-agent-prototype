@@ -21,9 +21,10 @@ import {
   loadPasswordAccounts,
   passwordMatches,
   reloadPasswordAccounts,
-  seatBindingIdFor, type SeatBindingEnabled,
+  seatBindingIdFor, type PasswordBindingAllowed,
 } from './identity-admission.ts';
-import { seatBindingEnabledFromStack } from './seat-binding-lookup.ts';
+import { passwordBindingAllowedFromStack } from './seat-binding-lookup.ts';
+import { SYNTHETIC_IDENTITIES } from './profile.ts';
 
 const MAX_BODY_BYTES = 4_096;
 const CODE_TTL_MS = 120_000;
@@ -53,12 +54,14 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 export function createPasswordIdentityServer(
-  { port, accountsFile = ACCOUNTS_FILE, seatBindingEnabled }: Readonly<{
+  { port, accountsFile = ACCOUNTS_FILE, bindingAllowed, seatBindingEnabled }: Readonly<{
     port: number;
     accountsFile?: string;
-    seatBindingEnabled?: SeatBindingEnabled;
+    bindingAllowed?: PasswordBindingAllowed;
+    seatBindingEnabled?: PasswordBindingAllowed;
   }>,
 ) {
+  const eligible = bindingAllowed ?? seatBindingEnabled;
   // Throws when the file is missing or empty, so the process exits instead of
   // accepting a default password. The stack start surfaces this as a failed start.
   // /password reloads the file. A later broken file refuses that attempt and does
@@ -103,26 +106,20 @@ export function createPasswordIdentityServer(
           // response tell an attacker which usernames exist.
           send(response, 401, '{"error":"invalid"}'); return;
         }
-        // A seat binding is not a static account. The file proves the password;
-        // the database proves the seat is still enabled. Any other binding keeps
-        // the previous file-only check, including the seeded synthetic names.
+        const builtIn = SYNTHETIC_IDENTITIES.some((identity) => identity.bindingId === account.bindingId);
         if (isSeatBindingId(account.bindingId)) {
           if (account.bindingId !== seatBindingIdFor(username)) {
             send(response, 401, '{"error":"invalid"}'); return;
           }
-          void (seatBindingEnabled ?? (async () => false))(account.bindingId).then((enabled) => {
-            if (enabled !== true) { send(response, 401, '{"error":"invalid"}'); return; }
-            failures.delete(username);
-            const code = randomBytes(32).toString('hex');
-            codes.set(code, { bindingId: account.bindingId, expiresAt: now + CODE_TTL_MS });
-            send(response, 200, JSON.stringify({ code }));
-          }).catch(() => { send(response, 401, '{"error":"invalid"}'); });
-          return;
         }
-        failures.delete(username);
-        const code = randomBytes(32).toString('hex');
-        codes.set(code, { bindingId: account.bindingId, expiresAt: now + CODE_TTL_MS });
-        send(response, 200, JSON.stringify({ code }));
+        const decide = builtIn ? Promise.resolve(true) : (eligible ?? (async () => false))(account.bindingId);
+        void decide.then((allowed) => {
+          if (allowed !== true) { send(response, 401, '{"error":"invalid"}'); return; }
+          failures.delete(username);
+          const code = randomBytes(32).toString('hex');
+          codes.set(code, { bindingId: account.bindingId, expiresAt: now + CODE_TTL_MS });
+          send(response, 200, JSON.stringify({ code }));
+        }).catch(() => { send(response, 401, '{"error":"invalid"}'); });
       });
       return;
     }
@@ -136,7 +133,12 @@ export function createPasswordIdentityServer(
         const row = codes.get(code);
         codes.delete(code);
         if (!row || row.expiresAt < Date.now()) { send(response, 401, '{"error":"invalid"}'); return; }
-        send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: row.bindingId }));
+        const builtIn = SYNTHETIC_IDENTITIES.some((identity) => identity.bindingId === row.bindingId);
+        const decide = builtIn ? Promise.resolve(true) : (eligible ?? (async () => false))(row.bindingId);
+        void decide.then((allowed) => {
+          if (allowed !== true) { send(response, 401, '{"error":"invalid"}'); return; }
+          send(response, 200, JSON.stringify({ provider: 'synthetic', binding_id: row.bindingId }));
+        }).catch(() => { send(response, 401, '{"error":"invalid"}'); });
       });
       return;
     }
@@ -156,7 +158,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     console.error('[password-identity] FAILED: a loopback port 1024..65535 is required');
     process.exitCode = 1;
   } else {
-    void createPasswordIdentityServer({ port, seatBindingEnabled: seatBindingEnabledFromStack }).listen().then(() => {
+    void createPasswordIdentityServer({ port, bindingAllowed: passwordBindingAllowedFromStack }).listen().then(() => {
       console.info(`[password-identity] listening at http://127.0.0.1:${String(port)}`);
     });
   }

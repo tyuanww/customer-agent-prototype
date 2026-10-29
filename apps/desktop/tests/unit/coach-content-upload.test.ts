@@ -127,7 +127,8 @@ describe('coach content upload parser', () => {
     expect(mixed.ok).toBe(true);
     if (!mixed.ok) return;
     expect(mixed.rows).toEqual([{ scene: '洁面用量确认', script: '先确认版本' }]);
-    expect(mixed.sourceName).toContain('已跳过空白或不完整 2 行');
+    expect(mixed.sourceName).toBe('skip-incomplete.csv');
+    expect(mixed.notices).toEqual([expect.stringContaining('已跳过空白或不完整 2 行')]);
     expect(parseCoachUploadCsv('﻿scene,script\r\n洁面,先确认版本\r\n', 'bom.csv')).toMatchObject({
       ok: true,
       rows: [{ scene: '洁面', script: '先确认版本' }],
@@ -229,7 +230,8 @@ describe('coach content upload parser', () => {
     expect(mixed.ok).toBe(true);
     if (!mixed.ok) return;
     expect(mixed.rows).toEqual([{ scene: '可替换', script: '订单{订单号}于{日期}发出' }]);
-    expect(mixed.sourceName).toContain('不能出现的符号 1 行');
+    expect(mixed.sourceName).toBe('braces.csv');
+    expect(mixed.notices).toEqual([expect.stringContaining('已跳过含 { } 的 1 行')]);
     const allBad = parseCoachUploadCsv('scene,script\n非法,含{其他}占位\n', 'all-braces.csv');
     expect(allBad).toMatchObject({ ok: false, code: 'empty' });
     if (allBad.ok) return;

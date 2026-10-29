@@ -5,6 +5,7 @@ import { bearerToken, type ProductAuthService, type MockCredentials, type Authen
 import { isFeishuOpenId } from './feishu-admit.js';
 import { establishFeishuLogin } from './feishu-login-link.js';
 import { bindSessionSubject } from './feishu-job-snapshot.js';
+import { takeOperatorDisplayName } from './operator-display-names.js';
 import type { ApiDatabaseBootstrapConfig, AuthMode } from './runtime-config.js';
 
 export class IdentityFailure extends Error {
@@ -53,8 +54,8 @@ export async function createProductAuthService(
   provider: SyntheticIdentityProvider,
   authMode: AuthMode,
   afterLogin?: (openId: string) => Promise<void>,
-  /** Runs after a non-Feishu binding is accepted. A seat has no Feishu identity, so this is the
-   *  only place its five-minute facts can be renewed from the post the operator assigned. */
+  /** Runs after a controlled password binding is accepted. Seat and master-account facts are
+   *  renewed here from the current database post; the password contributes no facts. */
   afterPasswordLogin?: (bindingId: string) => Promise<void>,
 ): Promise<ProductAuthService> {
   const pool = new Pool({
@@ -138,12 +139,27 @@ export async function createProductAuthService(
       // Commit state consumption before provider I/O. A crash leaves exchanging,
       // which expires; neither code nor state is silently retried.
       let binding: string | null = null;
+      let feishuOpenId: string | null = null;
       let providerFailure: IdentityFailure | undefined;
       if (code !== undefined) {
         try { binding = await provider.exchange(code); } catch (error) { providerFailure = identityFailure(error); }
       }
       if (binding !== null && isFeishuOpenId(binding)) {
-        binding = await establishFeishuLogin(query, loginId, binding);
+        const openId = binding;
+        feishuOpenId = openId;
+        binding = await establishFeishuLogin(query, loginId, openId);
+        const displayName = takeOperatorDisplayName(`usr_${openId}`.slice(0, 128));
+        if (displayName) {
+          try {
+            await query(
+              'SELECT backend_identity.set_operator_display_name($1,$2) AS status',
+              [binding, displayName],
+            );
+          } catch (error) {
+            const name = error instanceof Error ? error.name : 'unknown';
+            console.info(`[api] operator display name persist failed: ${name}`);
+          }
+        }
       } else {
         try {
           await query('SELECT backend_identity.complete_callback($1,$2)', [loginId, binding]);
@@ -160,13 +176,13 @@ export async function createProductAuthService(
         throw providerFailure;
       }
       if (binding === null) throw new IdentityFailure('LOGIN_INVALID');
-      if (afterLogin && isFeishuOpenId(binding)) {
-        try { await afterLogin(binding); }
+      if (afterLogin && feishuOpenId !== null) {
+        try { await afterLogin(feishuOpenId); }
         catch (error) {
           const name = error instanceof Error ? error.name : 'unknown';
           console.info(`[api] roster projection failed: ${name}`);
         }
-      } else if (afterPasswordLogin && !isFeishuOpenId(binding)) {
+      } else if (afterPasswordLogin && feishuOpenId === null) {
         // A failure here must not fail the login: the exchange already succeeded and the session
         // exists. The seat then has no live facts, which the next request reports as an ordinary
         // authorization refusal rather than a broken session.

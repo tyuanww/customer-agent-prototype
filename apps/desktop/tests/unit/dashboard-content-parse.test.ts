@@ -66,7 +66,7 @@ describe('dashboardContentParseUpload', () => {
     })).toMatchObject({
       ok: false,
       code: 'binary-workbook',
-      message: 'Excel 未能解析。未连接飞书或 Wiki。',
+      message: 'Excel 未能解析，请确认是 .xlsx 文件后重试。',
     });
   });
 

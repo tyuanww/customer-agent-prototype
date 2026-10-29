@@ -1,61 +1,52 @@
 # 备份与恢复演练
 
-生产目录库的每夜逻辑备份，以及把备份还原回空库的演练。脚本在 `scripts/ops/`，systemd 单元与它们同目录。
+本仓备份入口生成数据库和对象文件的完整备份集。旧版单文件 dump 不满足当前恢复合同。脚本的候选实现不代表杭州定时任务已更新；线上状态必须以实际部署记录和演练证据为准。
 
-## 组成
+## 当前备份合同
 
-| 文件 | 作用 |
+| 文件 | 职责 |
 | --- | --- |
-| `scripts/ops/customer-agent-backup.sh` | `pg_dump` 全量（schema + data）自定义格式，应用保留策略，可选异地副本 |
-| `scripts/ops/customer-agent-backup.service` | oneshot 运行上面的脚本 |
-| `scripts/ops/customer-agent-backup.timer` | 每日 03:20 触发，`Persistent=true` |
-| `scripts/ops/customer-agent-restore-drill.sh` | 把一份 dump 还原进临时库并核对账本 |
+| `scripts/ops/customer-agent-backup.sh` | 调用备份集实现，失败沿用既有告警入口 |
+| `scripts/ops/backup-set.mjs` | 数据库快照、对象清单、校验和、原子发布、副本、保留策略与隔离恢复 |
+| `scripts/ops/customer-agent-backup.service` | 从 `current` 对应版本运行入口，避免脚本与模块版本分离 |
+| `scripts/ops/customer-agent-backup.timer` | 每日 03:20，漏跑后补执行 |
+| `scripts/ops/customer-agent-restore-drill.sh` | 将备份集还原到独立临时 PG15 集群并执行完整迁移后验 |
 
-## 为什么是全量而不是 `--data-only`
+配置与运行命令见[验证备份集](how-to-verify-backup-set.md)。连接与对象目录从既有 `profile.json` 读取，不新增数据库配置真源。
 
-一份备份必须能单独还原进空库。`--data-only` 归档还需要 `--disable-triggers`（`query_events` 与 `content_releases` 之间有循环外键），那是每个还原者都要重新记一遍的坑。全量 dump 没有这个问题，代价是文件大一些。
+每个备份集包含 full custom dump、无角色密码的角色定义、对象归档、manifest 和其 SHA-256。数据库元数据与 `pg_dump` 使用同一导出快照，角色目录在 dump 前后另行核对稳定。manifest 记录迁移序列与哈希、角色、owner、ACL 指纹、对象引用、receipt、未引用文件、应用版本与 Git SHA、工具指纹和各阶段时间。
 
-## 退出码
+对象归档保留未引用文件，不把它们认定为垃圾。校验会拒绝缺失对象、摘要不符、无效 receipt、路径穿越和符号链接。SQL dump 保留 schema、owner 和 ACL；恢复不以新建 canonical schema 或 data-only 替代 full restore。
 
-| 码 | 含义 |
+角色密码、服务凭据及环境配置不进入备份集。灾难恢复需要另行取得受控配置与凭据。备份和恢复证据只输出元数据，不输出业务正文或密钥；备份本身含真实数据，应存于受控目录。
+
+## 发布、副本与保留策略
+
+备份先写 `.partial`，校验完成后原子改名。指定副本时，副本也必须校验成功，随后才允许清理历史。没有副本或副本失败时不修剪本地历史。只清理同数据库、已验证且超过保留份数的备份集；损坏、未知和旧版 `nightly/*.dump` 文件保留。
+
+保留份数只计算已验证且属于目标数据库的备份。较新的损坏目录不占名额，当前备份即使不在最新保留份数内也保留。
+
+同一数据库与备份根目录通过 PostgreSQL 会话级 advisory lock 串行执行。锁覆盖创建、校验、副本和保留清理，连接结束后释放。进程异常退出或主机重启不遗留文件锁。数据库不可连接时不创建暂存备份。
+
+| 退出码 | 含义 |
 | --- | --- |
-| 0 | dump 成功、保留策略已应用、异地副本成功 |
-| 3 | dump 成功、保留策略已应用、**没有配置异地副本** |
-| 1 | dump 或保留策略失败 |
+| 0 | 完整备份集与声明为异地的副本已校验 |
+| 3 | 完整备份集成功，但没有副本或副本只在同一主机 |
+| 1 | 备份、校验、副本或恢复失败 |
 
-`SuccessExitStatus=0 3`：3 表示「备份只在同一块盘上」，这是真实缺口，必须留在日志和退出码里；但如果单元每晚读作 `failed`，所有人都会开始忽略它。
+`CUSTOMER_AGENT_BACKUP_COPY_SCOPE=offsite` 是操作者对故障域的声明，工具不能仅由路径证明异地。WSL 的 `/mnt/c` 与源库在同一 Windows 主机，必须使用默认 `same-host`，退出 3。`SuccessExitStatus=0 3` 允许定时任务成功记录降级，但不能把同机副本描述为异地容灾。
 
-## 保留策略
+## 恢复验收边界
 
-保留最近 `CUSTOMER_AGENT_BACKUP_KEEP`（默认 14）份。规则：
+恢复在独立 PG15 临时目录和 Unix socket 中执行。先还原角色，再按源 owner 建空库，完整 `pg_restore`，提取并核验对象，比较账本、角色、owner、对象与 receipt，并运行对应迁移前缀的完整 verifier。它不会连接生产库执行恢复或改动生产服务。
 
-- 只在 dump 成功后修剪，失败的一晚不会把历史清空；
-- 永不删除最新的一份；
-- 文件名是 `<db>-<YYYYMMDDTHHMMSSZ>-<NNN>.dump`，固定宽度的序号让字典序等于时间序。同一秒内跑两次会得到 `-001` 和 `-002`，不会互相覆盖。
+PG15 会在重新解析 CHECK 时展开两处已知 AND 括号。verifier 只规范化这两条完整且等价的 manifest 行；不同边界、未验证状态、缺失约束及其他对象漂移仍失败。
 
-## 异地副本
+证据包含备份快照时刻、RPO、恢复耗时、verifier 结果和清理状态。RPO 从 `snapshotAt` 计算，恢复耗时只覆盖此脚本。通过不代表恢复后 API、身份服务、客户端或异地故障演练已通过，也不自动认证业务 RTO。应用恢复验收需另有实际结果。
 
-`CUSTOMER_AGENT_BACKUP_COPY_TO` 是副本目录。脚本在 `scripts/ops/customer-agent-backup.sh`。变量为空时，脚本写下面这一行，然后退出 3。
+## 历史记录说明
 
-```text
-offsite copy: NOT CONFIGURED (set CUSTOMER_AGENT_BACKUP_COPY_TO); this backup exists on one disk only
-```
-
-2026-10-25 选定的副本路径是 `/mnt/c/customer-agent-backups`。这是 Windows 的 C 盘，经 WSL 挂到这个路径。选定这个路径，是为了躲开 WSL 虚拟磁盘被换掉。整块系统盘损坏时，这份副本一起丢。
-
-2026-10-27 杭州单元把 `CUSTOMER_AGENT_BACKUP_COPY_TO` 设为 `/mnt/c/customer-agent-backups`。操作者接受副本和数据库在同一台 Windows 机器上。当天备份退出码是 0。恢复演练打印 `DRILL PASSED`。生产库没有被这次演练改写。`/mnt/c` 上的文件权限是 `rwxrwxrwx`。
-
-仓库里的 `scripts/ops/customer-agent-backup.service` 有 `ProtectSystem=strict`。没写进 `ReadWritePaths` 的路径，服务写不进去。杭州现在的 drop-in 是 `customer-agent-backup.service.d/offsite.conf`。
-
-```ini
-[Service]
-Environment=CUSTOMER_AGENT_BACKUP_ROOT=/srv/customer-agent/catalog-backups
-Environment=CUSTOMER_AGENT_BACKUP_COPY_TO=/mnt/c/customer-agent-backups
-ReadWritePaths=/srv/customer-agent/catalog-backups
-ReadWritePaths=/mnt/c/customer-agent-backups
-```
-
-服务用户是 `customer-agent`。脚本会对副本目录执行 `mkdir -p`。路径不可写时，副本失败。上面这段是 2026-10-27 写入杭州的 drop-in。
+以下记录对应 2026-10-24 至 2026-10-27 的旧版单文件备份和旧判定。保留当时输出用于追溯，不能据此认定新版备份集已部署或已完成真实恢复。
 
 ## 杭州机器上的实际安装（2026-10-24 已执行）
 
@@ -134,9 +125,7 @@ DRILL PASSED dump=customer_agent_formal-20261023T184219Z-001.dump
 
 要点是**备份自身没有变过**。dump 一直能写；不能还原的原因始终是数据违反了数据库自称成立的约束。
 
-## 相关
-
-## 演练脚本的判定
+## 历史演练脚本的判定（旧版）
 
 `customer-agent-restore-drill.sh` 创建 `customer_agent_restore_drill` 临时库，还原，比对，然后删库。比对四项：
 
@@ -149,7 +138,7 @@ DRILL PASSED dump=customer_agent_formal-20261023T184219Z-001.dump
 
 `/ready` 检查的做法是**比对演练前后**，而不是假定 200。这样在纯集群上（没有 API）也能跑，同时仍能抓出「演练把生产弄坏了」。生产上演练前应已是 200。
 
-## 已验证与未验证
+## 历史版本已验证与未验证
 
 已在 macOS 上用真实 PostgreSQL 15 集群跑通（一次性集群，64 迁移、121 表、1 条造出来的授权行）：
 

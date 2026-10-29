@@ -129,6 +129,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .overview-range-popup .ant-picker-panel-layout{flex-direction:column}
 .overview-range-popup .ant-picker-presets{width:auto;max-width:none}
 .overview-range-popup.ant-picker-dropdown .ant-picker-panel-container .ant-picker-presets ul{height:auto;flex:none;overflow:visible;display:flex;gap:8px;border:0}
+.overview-range-popup.ant-picker-dropdown .ant-picker-panel-container .ant-picker-presets ul li{margin:0}
 .wb9 .tabbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:var(--wb-hair) solid var(--line)}
 .wb9 .tabbar .tabs{margin-bottom:-1px}
 .wb9 .tabbar>.btn,.wb9 .tabbar>.right{margin-bottom:8px}
@@ -144,6 +145,8 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 tr.expand td{height:auto;padding:12px 12px 16px;background:var(--row)}
 .wb9 .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .wb9 .cell-sub{display:block;font-size:var(--wb-text-meta);line-height:18px;color:var(--mute)}
+.desk-item-images{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.desk-import-notices{margin:8px 0 0;padding-left:18px;color:var(--mute);font-size:var(--wb-text-meta)}
 .wb9 .state{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .wb9 .dot{width:6px;height:6px;border-radius:50%;background:var(--wb-text-3)}
 .wb9 .dot.ok{background:var(--ok)}
@@ -360,7 +363,7 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .dashboard-nav-item
 .desk-knowledge .acts { flex-wrap: nowrap; }
 .desk-knowledge .ant-table-thead > tr > th { height: auto; font-size:var(--wb-text-body); font-weight: 500; padding: 12px; }
 .desk-knowledge .ant-table-tbody > tr > td { height: auto; padding: 12px; }
-.desk-knowledge .desk-body { display: block; max-width: 100%; }
+.desk-knowledge .desk-body { display: -webkit-box; max-width: 100%; white-space: pre-line; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .desk-knowledge .ant-table-tbody > tr.ant-table-measure-row > td { height: 0; padding: 0; border: 0; font-size: 0; line-height: 0; }
 .desk-knowledge .ant-select-selection-search-input,
 .desk-knowledge .ant-select-selection-search-input:focus { height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; min-width: 0; }

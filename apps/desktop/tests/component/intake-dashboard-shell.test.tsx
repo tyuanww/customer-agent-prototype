@@ -432,3 +432,30 @@ it('opens 话术库 for page=announce and leaves that URL alone', () => {
     window.history.replaceState({}, '', '/');
   }
 });
+
+it('shows the signed-in account at the bottom of the sidebar and logs out through the dashboard bridge', async () => {
+  const user = userEvent.setup();
+  allowGrant();
+  let signedIn = true;
+  const changed: { notify: (() => void) | null } = { notify: null };
+  const base = window.dashboardContent!;
+  const logout = vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE' as const, message: '已退出本机，服务端退出未确认。' }));
+  window.dashboardContent = {
+    ...base,
+    session: async () => signedIn ? base.session() : { ok: true, enabled: true, signedIn: false, role: null, displayName: null, job: null },
+    logout,
+    onSessionChanged: (listener: () => void) => { changed.notify = listener; return () => { changed.notify = null; }; },
+  } as typeof window.dashboardContent;
+  render(<DashboardApp />);
+  const account = await screen.findByRole('button', { name: '账号信息' });
+  await waitFor(() => expect(account).toHaveTextContent('合成管理员'));
+  expect(account).toHaveTextContent('客服总监');
+  await user.click(account);
+  await user.click(await screen.findByRole('menuitem', { name: /退出登录/ }));
+  expect(logout).toHaveBeenCalledWith();
+  expect(await screen.findByRole('alert')).toHaveTextContent('已退出本机，服务端退出未确认。');
+  signedIn = false;
+  changed.notify?.();
+  expect(await screen.findByText('未登录')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '账号信息' })).not.toBeInTheDocument();
+});

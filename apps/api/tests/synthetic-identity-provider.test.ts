@@ -18,7 +18,7 @@ async function origin(status: number, body: string, headers: Record<string, stri
 const callback = 'http://127.0.0.1:43001/v1/auth/callback';
 
 describe('loopback synthetic identity provider', () => {
-  it('uses the configured callback and accepts only synthetic binding receipts', async () => {
+  it('uses the configured callback and accepts a synthetic provider receipt', async () => {
     const base = await origin(200, JSON.stringify({ binding_id: 'synthetic_agent', provider: 'synthetic' }));
     const provider = createSyntheticIdentityProvider(base, callback);
     const url = new URL(provider.authorizeUrl('opaque-state'));
@@ -30,7 +30,6 @@ describe('loopback synthetic identity provider', () => {
   });
   it.each([
     [200, '{', {}], [200, JSON.stringify({ binding_id: 'synthetic_agent', provider: 'feishu' }), {}],
-    [200, JSON.stringify({ binding_id: 'actual_binding', provider: 'synthetic' }), {}],
     [200, 'x'.repeat(4097), {}], [302, '', { location: 'http://127.0.0.1:1/redirect' }],
     [503, '', {}],
   ])('fails closed for status %s and invalid or oversized responses', async (status, body, headers) => {
@@ -38,6 +37,22 @@ describe('loopback synthetic identity provider', () => {
     try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
     finally { provider.close(); }
   });
+  it.each(['binding-manual-admin', 'a', 'a'.repeat(128)])('accepts a valid binding receipt: %s', async (bindingId) => {
+    const provider = createSyntheticIdentityProvider(await origin(200, JSON.stringify({
+      binding_id: bindingId, provider: 'synthetic',
+    })), callback);
+    try { await expect(provider.exchange('code')).resolves.toBe(bindingId); }
+    finally { provider.close(); }
+  });
+  it.each(['', '_admin', 'admin user', 'admin/user', 'a'.repeat(129), null, 123])(
+    'rejects a malformed binding receipt: %s', async (bindingId) => {
+      const provider = createSyntheticIdentityProvider(await origin(200, JSON.stringify({
+        binding_id: bindingId, provider: 'synthetic',
+      })), callback);
+      try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'DEPENDENCY_UNAVAILABLE' }); }
+      finally { provider.close(); }
+    },
+  );
   it('distinguishes rejected codes from transport failure', async () => {
     const provider = createSyntheticIdentityProvider(await origin(401, ''), callback);
     try { await expect(provider.exchange('code')).rejects.toMatchObject({ reason: 'LOGIN_INVALID' }); }

@@ -1,4 +1,5 @@
-import { Button } from 'antd';
+import { Avatar, Button, Dropdown } from 'antd';
+import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import {
   intakeDestinationItem,
   intakeSidebarItems,
@@ -121,6 +122,9 @@ function DashboardWorkspace() {
   const grantAllowed = canGrant(snapshot);
   const sopUpload = canUploadSop(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
+  const [sessionName, setSessionName] = useState<string | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
     () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
   );
@@ -206,6 +210,7 @@ function DashboardWorkspace() {
     const applySignedOut = () => {
       sessionConfirmed.current = false;
       setSessionJob(null);
+      setSessionName(null);
       setContentSignedIn(false);
       setContentRole(null);
       setSessionPhase('signed-out');
@@ -225,6 +230,7 @@ function DashboardWorkspace() {
         }
         sessionConfirmed.current = true;
         setSessionJob(result.job ?? null);
+        setSessionName(result.displayName);
         setContentSignedIn(true);
         setContentRole(result.role);
         setSessionPhase('ready');
@@ -748,6 +754,29 @@ function DashboardWorkspace() {
               </div>
             );
           })}
+        </div>
+        <div className="dashboard-account dashboard-no-drag">
+          {contentSignedIn ? <Dropdown
+            trigger={['click']}
+            menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', disabled: logoutBusy }], onClick: ({ key }) => {
+              if (key !== 'logout' || logoutBusy) return;
+              setLogoutBusy(true);
+              setLogoutError(null);
+              void (async () => {
+                try {
+                  const result = await window.dashboardContent?.logout?.();
+                  if (!result || !result.ok) setLogoutError(result?.message ?? '退出未完成，请重试。');
+                } catch { setLogoutError('退出未完成，请重试。'); }
+                finally { setLogoutBusy(false); }
+              })();
+            } }}
+          >
+            <Button className="dashboard-account-button" type="text" aria-label="账号信息" title={sessionName ?? '已登录'}>
+              <Avatar size={32} icon={<UserOutlined />} />
+              <span className="dashboard-account-copy"><strong>{sessionName ?? '已登录'}</strong><small>{sessionJob?.status === 'resolved' ? sessionJob.title : '账号'}</small></span>
+            </Button>
+          </Dropdown> : <div className="dashboard-account-signed-out"><Avatar size={32} icon={<UserOutlined />} /><span>未登录</span></div>}
+          {logoutError ? <p role="alert">{logoutError}</p> : null}
         </div>
       </aside>
 
