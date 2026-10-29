@@ -8,10 +8,11 @@ import { rosterPrincipalId } from '../src/project-roster-login.js';
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 
 describe.skipIf(!enabled)('manual identity bounded transition property', () => {
-  const harness = new Pg15Harness();
+  let harness: Pg15Harness;
   let client: Client;
 
   beforeAll(async () => {
+    harness = new Pg15Harness();
     harness.start();
     client = await harness.connect(harness.createDatabase('manual_identity_property').config);
     await applyDatabaseMigrations(client);
