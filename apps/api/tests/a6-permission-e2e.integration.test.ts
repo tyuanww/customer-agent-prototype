@@ -316,7 +316,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           ok: true,
           value: { sourceId: 'source-a', action: 'query' },
         });
-        expect(await readAuthorizationActions(client, feishu.user_id)).toEqual({
+        expect(await readAuthorizationActions(client, feishu)).toEqual({
           query: true, import: false, publish: false, rollback: false,
         });
       });
@@ -432,7 +432,7 @@ describe.skipIf(!enabled)('A6 permission reads', () => {
           ok: true,
           value: { sourceId: 'source-a', action: 'publish' },
         });
-        expect(await readAuthorizationActions(client, seatUserId)).toEqual({
+        expect(await readAuthorizationActions(client, seat)).toEqual({
           query: true, import: false, publish: false, rollback: false,
         });
       });

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { QueryResult, QueryResultRow } from 'pg';
 import { feishuUserId } from './feishu-admit.js';
 import { snapshotForOpenId } from './feishu-job-snapshot.js';
+import type { AuthenticatedUser } from './auth-service.js';
 import {
   JOB_ROSTER,
   matchJobRoster,
@@ -123,20 +124,19 @@ export const NO_AUTHORIZATION_ACTIONS: AuthorizationActions = {
  *  rollback to anyone else would offer a button that can only answer 403. `query` stays
  *  grant-based because the candidate path still serves granted seats. */
 const ACTION_SQL = `WITH stamp AS (SELECT clock_timestamp() AS at),
-person AS (SELECT principal_id, user_id FROM content_intake.principals WHERE user_id = $1 LIMIT 1),
-binding AS (SELECT (role = 'owner') AS is_owner FROM backend_identity.subject_bindings
-  WHERE user_id = (SELECT user_id FROM person))
+person AS (SELECT principal_id FROM content_intake.principals WHERE user_id = $1 LIMIT 1)
 SELECT
   COALESCE((SELECT EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'query', stamp.at))), false) AS query,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+  COALESCE((SELECT $2::boolean
     AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'import', stamp.at))), false) AS import,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+  COALESCE((SELECT $2::boolean
     AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'publish', stamp.at))), false) AS publish,
-  COALESCE((SELECT EXISTS (SELECT 1 FROM binding WHERE is_owner)
+  COALESCE((SELECT $2::boolean
     AND EXISTS (SELECT 1 FROM person, stamp, content_intake.authorization_sources(person.principal_id, 'rollback', stamp.at))), false) AS rollback`;
 
-export async function readAuthorizationActions(client: Queryable, userId: string): Promise<AuthorizationActions> {
-  const found = await client.query<AuthorizationActions>(ACTION_SQL, [userId]);
+/** Project the authenticated role; the protected operations reauthorize at execution. */
+export async function readAuthorizationActions(client: Queryable, user: Pick<AuthenticatedUser, 'user_id' | 'role'>): Promise<AuthorizationActions> {
+  const found = await client.query<AuthorizationActions>(ACTION_SQL, [user.user_id, user.role === 'owner']);
   const row = found.rows[0];
   if (!row) return NO_AUTHORIZATION_ACTIONS;
   return { query: row.query, import: row.import, publish: row.publish, rollback: row.rollback };

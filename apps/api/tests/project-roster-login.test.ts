@@ -1,7 +1,7 @@
 import type { QueryResult } from 'pg';
 import fastify from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createMockAuthService } from '../src/auth-service.js';
+import { createMockAuthService, type AuthenticatedUser } from '../src/auth-service.js';
 import { registerAuthRoutes } from '../src/auth-routes.js';
 import { bindSessionSubject, forgetJobSnapshot, rememberJobSnapshot, subjectHash } from '../src/feishu-job-snapshot.js';
 import { feishuUserId } from '../src/feishu-admit.js';
@@ -276,7 +276,7 @@ describe('roster login projection', () => {
 describe('GET /v1/auth/job', () => {
   async function appWithPermission(
     readPermission?: (userId: string) => Promise<{ title: string; state: 'pending' | 'ready' | 'expired' | 'revoked' | 'denied' } | null>,
-    readActions?: (userId: string) => Promise<{ query: boolean; import: boolean; publish: boolean; rollback: boolean }>,
+    readActions?: (user: AuthenticatedUser) => Promise<{ query: boolean; import: boolean; publish: boolean; rollback: boolean }>,
   ) {
     const auth = createMockAuthService(() => 'tok_' + 'a'.repeat(40));
     const app = fastify();
@@ -420,7 +420,7 @@ describe('GET /v1/auth/job', () => {
         message: null,
         actions: { query: true, import: false, publish: true, rollback: false },
       });
-      expect(readActions).toHaveBeenCalledWith('usr_ou_abcdef');
+      expect(readActions).toHaveBeenCalledWith({ user_id: 'usr_ou_abcdef', role: 'owner', auth_mode: 'mock' });
     } finally {
       await app.close();
     }

@@ -38,6 +38,8 @@
 
 查询资格读取 `authorization_sources`，单来源授权入口读取 `authorization_deadline`；两者共享数据库决策，不以桌面的 `JOB_ROSTER` 按钮投影代替服务端授权。返回的店集合来自当前发布内容中存在有效 lineage 的来源，店目录只是显示投影。有业务库时，`GET /v1/auth/job` 的 `permission_state` 来自 `content_intake.roster_permission_for_user`。函数使用一次 `clock_timestamp()`，再对当前店铺集的每一行调用 `authorization_deadline`。没有主体时函数返回空，接口再看进程快照。两边都没有职务时返回 404，正文是「职务未识别」。进程快照只提供本次登录采集到的职务原文，不能把内存里的 `ready` 当成放行。
 
+该接口的动作提示结合当前请求已认证的账号角色与 `authorization_sources`；业务连接不直接读取身份表的角色列。认证后的角色变化可能使在途提示短暂过时，实际写入仍按原有服务端事务重新检查授权。
+
 函数找到主体之后：事实未启用返回 `revoked`；事实窗口不包含当前时刻返回 `expired`；当前店铺集里至少一行截止时间非空返回 `ready`；其余返回 `pending`。`feishu-candidate` 的标题固定显示「已登记候选（岗位待核实）」，真实部门/职务只有在正式投影成功后才显示。事实里的正式 `job_id` 对不上 `JOB_ROSTER` 时为 `denied`。`ready`，以及没有业务库时的 `unknown`，`message` 为 `null`。这条路由不在冻结 OpenAPI 里。桌面主进程用 `@customer-agent/job-roster` 的 `parseRosterJobResponse` 收口，多出来的字段直接拒绝。
 
 桌面 `JOB_ROSTER` 决定按钮是否显示。客服坐席的查询按钮可以仍为可见，同时数据库状态是 `revoked`，发布按钮可见也不产生自动 `publish`。预加载权利表与 `JOB_ROSTER` 的五元组一致。

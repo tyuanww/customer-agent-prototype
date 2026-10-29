@@ -349,7 +349,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
     });
     registerProductAuthRoutes(app, auth);
-    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (userId) => readAuthorizationActions(admin!, userId));
+    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
     // The real search door, on a real app_runtime LOGIN: the search function is executable
     // only by that capability, so the lanes cannot borrow the intake pools. The keys are
     // throwaway fixture material and are never printed. The login inherits app_runtime

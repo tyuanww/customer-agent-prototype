@@ -177,9 +177,9 @@ export function createApiApp(options: ApiAppOptions): FastifyInstance {
     const client = await intakeDependencies.business.connect();
     try { return await readStoredRosterPermission(client, userId); }
     finally { client.release(); }
-  } : undefined, intakeDependencies ? async (userId) => {
+  } : undefined, intakeDependencies ? async (user) => {
     const client = await intakeDependencies.business.connect();
-    try { return await readAuthorizationActions(client, userId); }
+    try { return await readAuthorizationActions(client, user); }
     finally { client.release(); }
   } : undefined);
   registerNoticeRoutes(app, authService, noticeDependencies);
