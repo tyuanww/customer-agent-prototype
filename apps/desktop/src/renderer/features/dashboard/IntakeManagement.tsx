@@ -373,7 +373,8 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       return;
     }
     setBusy(true); setError(''); const gen = ++generation.current; pending.current = gen;
-    const uploading = command?.action.startsWith('upload-') ?? false; setUploadRequest(uploading);
+    const uploading = command?.action.startsWith('upload-') ?? false;
+    setUploadRequest(uploading);
     try {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
@@ -407,8 +408,12 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
     }
   };
+  const upload = view?.upload;
+  const uploadParsing = active && presentation === 'review' && !!upload?.file
+    && (upload.job?.state === 'reading' || upload.job?.state === 'parsing');
+  const uploadPolling = (busy && uploadRequest) || uploadParsing;
   useEffect(() => {
-    if (!busy || !uploadRequest) return;
+    if (!uploadPolling) return;
     let active = true, polling = false;
     const gen = generation.current;
     // current() now also settles a running parse job through one HTTP read per tick
@@ -425,7 +430,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     };
     void read(); const timer = window.setInterval(() => void read(), 250);
     return () => { active = false; window.clearInterval(timer); };
-  }, [busy, uploadRequest]);
+  }, [uploadPolling]);
   useEffect(() => {
     const api = window.dashboardIntake;
     if (!api) return undefined;
@@ -439,7 +444,6 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
   }, []);
-  const upload = view?.upload;
   const uploadPhase = upload?.phase;
   const hasSelected = !!view?.selected;
   useEffect(() => {

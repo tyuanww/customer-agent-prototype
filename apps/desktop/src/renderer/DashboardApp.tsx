@@ -11,7 +11,7 @@ import {
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
 import type { WorkbenchKind } from '../shared/workbench-mode';
-import { canGrant, canOpenPermissions, canUploadSop, type PageUseSnapshot } from '../shared/page-use';
+import { canGrant, canUploadSop, canViewPermissions, type PageUseSnapshot } from '../shared/page-use';
 import {
   useCallback,
   useMemo,
@@ -120,15 +120,35 @@ function usePageUse(): PageUseSnapshot {
 function DashboardWorkspace() {
   const snapshot = usePageUse();
   const [workbenchMode, setWorkbenchMode] = useState<WorkbenchKind | null>(null);
+  const [workbenchStatus, setWorkbenchStatus] = useState<'pending' | 'ready' | 'error'>(() => window.dashboardWorkbench ? 'pending' : 'ready');
+  const [workbenchAttempt, setWorkbenchAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
     const api = window.dashboardWorkbench;
-    if (api) void Promise.resolve().then(() => api.mode()).then(reply => {
-      if (alive) setWorkbenchMode(reply.ok ? reply.kind : null);
-    }).catch(() => { if (alive) setWorkbenchMode(null); });
+    if (!api) {
+      setWorkbenchMode(null);
+      setWorkbenchStatus('ready');
+      return () => { alive = false; };
+    }
+    setWorkbenchStatus('pending');
+    void Promise.resolve().then(() => api.mode()).then(reply => {
+      if (!alive) return;
+      if (reply.ok) {
+        setWorkbenchMode(reply.kind);
+        setWorkbenchStatus('ready');
+      } else {
+        setWorkbenchMode(null);
+        setWorkbenchStatus('error');
+      }
+    }).catch(() => {
+      if (alive) {
+        setWorkbenchMode(null);
+        setWorkbenchStatus('error');
+      }
+    });
     return () => { alive = false; };
-  }, []);
-  const permissionsOpen = canOpenPermissions(snapshot);
+  }, [workbenchAttempt]);
+  const permissionsOpen = canViewPermissions(snapshot);
   const grantAllowed = canGrant(snapshot);
   const sopUpload = canUploadSop(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
@@ -147,7 +167,7 @@ function DashboardWorkspace() {
   const sessionKey = !jobKnown || contentSignedIn !== true
     ? 'signed-out'
     : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
-  const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown);
+  const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown && contentSignedIn !== false);
   const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, permissionsOpen));
   const activeNav = active === 'content' ? 'wording' : active;
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
@@ -833,7 +853,7 @@ function DashboardWorkspace() {
         >
           {renderIntakeDestinations({
             active,
-            canOpenPermissions: permissionsOpen,
+            canViewPermissions: permissionsOpen,
             canGrant: grantAllowed,
             canUploadSop: sopUpload,
             seatLibraryOnly,
@@ -841,6 +861,9 @@ function DashboardWorkspace() {
             jobPending: sessionPhase === 'pending',
             sessionKey,
             workbenchMode,
+            workbenchStatus,
+            onRetryWorkbench: () => setWorkbenchAttempt(value => value + 1),
+            contentSignedIn,
             snapshot,
             onOpen: jump,
             onTodoCount: setTodoCount,

@@ -154,6 +154,7 @@ export function DeskKnowledge({
   const mounted = useRef(true);
   const readGeneration = useRef(0);
   const { resource, reload, replace } = useAsyncResource<DeskView>(async () => {
+    if (!active) return { status: 'idle' };
     const generation = ++readGeneration.current;
     const report = (nextMessage: string | null) => {
       if (mounted.current && generation === readGeneration.current) setMessage(nextMessage);
@@ -176,7 +177,7 @@ export function DeskKnowledge({
       report(null);
       return { status: 'error', message: READ_FAILED };
     }
-  }, [api ? 'present' : 'missing'], api ? { status: 'loading' } : { status: 'forbidden', message: UNAVAILABLE }, { retainReady: true });
+  }, [api ? 'present' : 'missing', active], active ? (api ? { status: 'loading' } : { status: 'forbidden', message: UNAVAILABLE }) : { status: 'idle' }, { retainReady: true });
   const view = resource.status === 'ready' ? resource.value : EMPTY;
 
   useEffect(() => () => { mounted.current = false; }, []);

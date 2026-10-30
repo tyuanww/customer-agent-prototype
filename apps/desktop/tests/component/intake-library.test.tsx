@@ -99,6 +99,12 @@ it('counts only the visible domain and search results in the footer',async()=>{
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
 });
+it('hides the SOP catalog tab when the formal workflow is unavailable', async () => {
+ setup();render(<IntakeLibrary active includeSop={false}/>);
+ await screen.findByText('合成原文 product');
+ expect(screen.queryByRole('tab',{name:'SOP'})).not.toBeInTheDocument();
+ expect(screen.getByRole('tab',{name:'产品'})).toBeInTheDocument();
+});
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
  await screen.findByText('合成原文 product');

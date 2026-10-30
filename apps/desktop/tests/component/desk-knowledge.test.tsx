@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true, writable: true,
@@ -11,6 +11,14 @@ import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowled
 import { DeskKnowledgeStore, type DeskReply } from '../../src/shared/desk-knowledge';
 
 afterEach(() => { cleanup(); delete window.dashboardDesk; delete window.dashboardContent; });
+
+it('does not read hidden local drafts before the draft page is opened', async () => {
+  const current = vi.fn(async () => ({ ok: true as const, view: new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined }).reply('operator', '合成经理').view! }));
+  window.dashboardDesk = { current, command: vi.fn() } as unknown as Window['dashboardDesk'];
+  render(<DeskKnowledge active={false} />);
+  await act(async () => {});
+  expect(current).not.toHaveBeenCalled();
+});
 
 it('uploads a sheet and shows it as what the seat receives', async () => {
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });

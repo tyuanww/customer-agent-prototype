@@ -173,6 +173,8 @@ describe('DashboardApp', () => {
     window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
     render(<DashboardApp />);
     await act(async () => {});
+    expect(screen.getByRole('alert')).toHaveTextContent('工作台暂不可用，请重试。');
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
@@ -234,11 +236,26 @@ describe('DashboardApp', () => {
     window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await screen.findByTestId('nav-sop');
-    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-permissions'));
+    expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('没有权限，请找人开通。');
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByText('停手')).not.toBeInTheDocument();
+  });
+
+  it('hides staff editing controls after the content session is signed out', async () => {
+    window.dashboardContent = {
+      session: async () => ({ ok: true as const, enabled: true, signedIn: false as const, role: null, displayName: null, job: null }),
+    } as unknown as Window['dashboardContent'];
+    window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
+    render(<DashboardApp />);
+    await screen.findByText('请先登录');
+    expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '本机草稿' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '上传团队资料' })).not.toBeInTheDocument();
   });
 
   it('opens grant navigation and sop upload only from an open server snapshot', async () => {

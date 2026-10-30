@@ -8,6 +8,7 @@ import { IntakeManagement } from './IntakeManagement';
 import { IntakeOverview } from './IntakeOverview';
 import { IntakePermissions } from './IntakePermissions';
 import { SopLibraryModule } from './SopLibraryModule';
+import { WorkbenchFailed, WorkbenchLoading, WorkbenchNoAccess } from './WorkbenchState';
 import {
   INTAKE_DESTINATION_ROWS,
   intakeRowVisible,
@@ -32,7 +33,7 @@ export {
 
 export type IntakeDestinationContext = {
   active: IntakeDestination;
-  canOpenPermissions: boolean;
+  canViewPermissions: boolean;
   canGrant: boolean;
   canUploadSop: boolean;
   seatLibraryOnly: boolean;
@@ -40,6 +41,9 @@ export type IntakeDestinationContext = {
   jobPending: boolean;
   sessionKey: string;
   workbenchMode: WorkbenchKind | null;
+  workbenchStatus: 'pending' | 'ready' | 'error';
+  onRetryWorkbench: () => void;
+  contentSignedIn: boolean | null;
   snapshot: PageUseSnapshot;
   onOpen: (target: 'content' | 'wording' | 'permissions' | 'materials') => void;
   onTodoCount: (count: number) => void;
@@ -63,21 +67,24 @@ const INTAKE_DESTINATION_MOUNTS: {
     <div hidden={ctx.active !== 'permissions'}>
       {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
         ? <IntakePermissions active={ctx.active === 'permissions'} canGrant={ctx.canGrant} gate={ctx.snapshot.permissions} />
-        : null}
+        : ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'closed'
+          ? <section className="dash-module" aria-label="成员与权限"><h1 className="desk-sr">成员与权限</h1>
+            <WorkbenchNoAccess need="查看成员与权限" detail={ctx.snapshot.permissions.recovery ?? '当前没有成员与权限。'} /></section>
+          : null}
     </div>
   ),
 };
 
 function ContentLibraryDestination({ ctx }: { ctx: IntakeDestinationContext }) {
   const active = ctx.active === 'wording' || ctx.active === 'content';
-  const canEdit = ctx.jobKnown && !ctx.seatLibraryOnly;
+  const canEdit = ctx.jobKnown && ctx.contentSignedIn !== false && !ctx.seatLibraryOnly;
   const drafts = canEdit && ctx.active === 'content';
   return <section hidden={!active} aria-label="内容库">
     <Tabs className="content-library-tabs" activeKey={drafts ? 'drafts' : 'published'}
       onChange={key => ctx.onOpen(key === 'drafts' ? 'content' : 'wording')}
       items={[{ key: 'published', label: '已发布' }, ...(canEdit ? [{ key: 'drafts', label: '本机草稿' }] : [])]}
       tabBarExtraContent={canEdit ? <Button onClick={() => ctx.onOpen('materials')}>上传团队资料</Button> : undefined} />
-    <IntakeLibrary active={active && !drafts} seatNotice={ctx.seatLibraryOnly} />
+    <IntakeLibrary active={active && !drafts} includeSop={ctx.workbenchMode === 'legacy'} seatNotice={ctx.seatLibraryOnly} />
     {canEdit && <div hidden={!drafts}>
       <p className="content-library-note">草稿仅保存在这台电脑。团队使用的内容请到资料审核上传并发布。</p>
       <DeskKnowledge active={active && drafts} draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} />
@@ -97,7 +104,7 @@ function MaterialsDestination({ active, presentation, onOpenReview }: { active: 
 }
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {
-  if (!intakeRowVisible(row, ctx.canOpenPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return false;
+  if (!intakeRowVisible(row, ctx.canViewPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return false;
   if (row.keepAlive) return true;
   return row.id === ctx.active;
 }
@@ -115,6 +122,12 @@ export function renderIntakeDestinations(ctx: IntakeDestinationContext): ReactNo
         <p>{ctx.jobPending ? JOB_PENDING : '请先登录。'}</p>
       </section>
     </>;
+  }
+  if (ctx.workbenchStatus === 'pending') {
+    return <section className="dash-module" aria-label="工作台"><WorkbenchLoading label="正在确认工作台" /></section>;
+  }
+  if (ctx.workbenchStatus === 'error') {
+    return <section className="dash-module" aria-label="工作台"><WorkbenchFailed message="工作台暂不可用，请重试。" onRetry={ctx.onRetryWorkbench} /></section>;
   }
   return pages;
 }

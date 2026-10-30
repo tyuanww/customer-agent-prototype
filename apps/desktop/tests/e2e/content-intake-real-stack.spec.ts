@@ -103,8 +103,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(sources).toBeEnabled();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
-    await expect(dashboard.getByRole('tab')).toHaveCount(4);
-    await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(0);
+    await expect(dashboard.getByRole('tablist', { name: '工作台功能' }).getByRole('tab')).toHaveCount(5);
+    await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(1);
     await expect(dashboard.getByTestId('nav-materials')).toHaveAttribute('aria-selected', 'true');
     async function appearance(mode: 'light' | 'dark') {
       await dashboard.getByTestId('dashboard-theme-trigger').click();

@@ -80,7 +80,7 @@ function hang(): Promise<typeof READ_DISCARDED> {
   return Promise.resolve(READ_DISCARDED);
 }
 
-export function IntakeLibrary({ active, seatNotice = false }: { active: boolean; seatNotice?: boolean }) {
+export function IntakeLibrary({ active, includeSop = true, seatNotice = false }: { active: boolean; includeSop?: boolean; seatNotice?: boolean }) {
   const shownRef = useRef<IntakeCatalogView | null>(null);
   const intentRef = useRef<CatalogIntent | null>(null);
   const generationRef = useRef(0);
@@ -94,6 +94,9 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   const [domain, setDomain] = useState<LibraryTab>('product');
   const [question, setQuestion] = useState('');
   const [filters, setFilters] = useState<{ productIds: string[]; scenarioIds: string[] } | null>(null);
+  useEffect(() => {
+    if (!includeSop && domain === 'sop') setDomain('product');
+  }, [domain, includeSop]);
   if (active && !startedRef.current) {
     startedRef.current = true;
     intentRef.current = { kind: 'command', command: { action: 'refresh' } };
@@ -230,11 +233,13 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   const shopLabel=(id:string) => names.has(id) ? `${names.get(id)}${counts.get(names.get(id)!)!>1 ? `（${id}）` : ''}` : id;
   const changeDomain=(id:LibraryTab) => setDomain(id);
   const needle=question.trim();
-  const visible=rows.filter(row => row.domain===domain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
+  const shownDomain = includeSop || domain !== 'sop' ? domain : 'product';
+  const visible=rows.filter(row => row.domain===shownDomain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
+  const tabs = includeSop ? libraryTabs : libraryTabs.filter(item => item.id !== 'sop');
   const filterCount = (context?.productIds.length ?? 0) + (context?.scenarioIds.length ?? 0);
   const domainKey=(event:KeyboardEvent<HTMLElement>,index:number) => {
-    const next=event.key==='ArrowRight' ? (index+1)%libraryTabs.length : event.key==='ArrowLeft' ? (index+libraryTabs.length-1)%libraryTabs.length : event.key==='Home' ? 0 : event.key==='End' ? libraryTabs.length-1 : null;
-    if(next===null)return;event.preventDefault();changeDomain(libraryTabs[next].id);document.getElementById(`intake-domain-${libraryTabs[next].id}`)?.focus();
+    const next=event.key==='ArrowRight' ? (index+1)%tabs.length : event.key==='ArrowLeft' ? (index+tabs.length-1)%tabs.length : event.key==='Home' ? 0 : event.key==='End' ? tabs.length-1 : null;
+    if(next===null)return;event.preventDefault();changeDomain(tabs[next].id);document.getElementById(`intake-domain-${tabs[next].id}`)?.focus();
   };
   const entryState=(row:IntakeCatalogRow):{label:string;dot:string} => {
     const now=Date.now(),from=Date.parse(row.effectiveFrom),to=row.effectiveTo?Date.parse(row.effectiveTo):NaN;
@@ -297,8 +302,8 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
       {!disabled && view?.signedIn && !context?.shopId && <p>请选择有权查看的店铺；没有可用店铺时请核对身份与范围。</p>}
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
       <div className="tabbar sub"><div className="tabs" role="tablist" aria-label="话术类型">
-        {libraryTabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
-          aria-selected={domain===item.id} aria-controls="intake-domain-panel" tabIndex={domain===item.id?0:-1}
+        {tabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
+          aria-selected={shownDomain===item.id} aria-controls="intake-domain-panel" tabIndex={shownDomain===item.id?0:-1}
           className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</LibraryButton>)}
       </div></div>
       <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>

@@ -182,6 +182,33 @@ it('does not expose revoked candidate rows while the next page is in flight', as
   } finally { release(); await next; f.main.dispose(); }
 });
 
+it('keeps a selected candidate out of a different list page after detail refresh', async () => {
+  const f = fixture();
+  const second = structuredClone(f.data.candidate);
+  second.key.candidateId = 'candidate-b';
+  second.key.digest = 'b'.repeat(64);
+  const original = f.request.getMockImplementation()!;
+  f.request.mockImplementation(async (...args) => {
+    const result = await original(...args);
+    if (args[1].startsWith('/v1/intake/candidates?')) {
+      const page = new URL(args[1], 'http://127.0.0.1').searchParams.has('cursor')
+        ? { items: [second], nextCursor: null }
+        : { items: [f.data.candidate], nextCursor: 'next-page' };
+      result.value = page;
+    }
+    return result;
+  });
+  try {
+    await f.select();
+    await f.main.command({ action: 'list', next: false });
+    await f.main.command({ action: 'list', next: true });
+    expect(f.main.view().candidates.map(row => row.candidate.key.candidateId)).toEqual(['candidate-b']);
+    expect(f.main.view().selected?.key.candidateId).toBe('candidate-a');
+    await f.main.command({ action: 'refresh-candidate' });
+    expect(f.main.view().candidates.map(row => row.candidate.key.candidateId)).toEqual(['candidate-b']);
+  } finally { f.main.dispose(); }
+});
+
 const confirm = { action: 'confirm-source', versionKind: 'opaque', versionValue: 'synthetic-export-v1', reason: '已人工核对合成来源' } as const;
 const publish = { action: 'publish', title: '合成 FAQ 更新', summary: '新增合成条目' } as const;
 async function ready(f: ReturnType<typeof fixture>) {

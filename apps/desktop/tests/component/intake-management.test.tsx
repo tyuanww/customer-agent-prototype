@@ -31,8 +31,9 @@ async function choose(user: ReturnType<typeof userEvent.setup>, name: string, op
 
 function destinationContext(overrides: Partial<IntakeDestinationContext> = {}): IntakeDestinationContext {
   return {
-    active: 'materials', canOpenPermissions: false, canGrant: false, canUploadSop: false,
+    active: 'materials', canViewPermissions: false, canGrant: false, canUploadSop: false,
     seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'owner:director', workbenchMode: 'faq-v2',
+    workbenchStatus: 'ready', onRetryWorkbench: () => undefined, contentSignedIn: true,
     snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
     onSupplyScript: () => undefined, scriptDraft: null, onDraftConsumed: () => undefined,
     ...overrides,

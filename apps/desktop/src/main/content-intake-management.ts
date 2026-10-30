@@ -134,7 +134,7 @@ export class ContentIntakeManagement {
    * button sends the same `upload-refresh` command, so this is the automatic path, not
    * the only one. A failed tick keeps the last known phase and the next tick retries. */
   async settleUpload(): Promise<void> {
-    if (this.disposed || !this.session.view().signedIn || !this.upload.needsSettle()) return;
+    if (this.disposed || this.active || !this.session.view().signedIn || !this.upload.needsSettle()) return;
     try { await this.upload.command({ action: 'upload-refresh' }, this.validAccess()); }
     catch { /* The next poll tick retries; the view keeps its last known phase. */ }
   }
@@ -197,7 +197,7 @@ export class ContentIntakeManagement {
           if (!this.selected) {
             this.clearSelection(); this.quality.select(candidate.key);
           }
-          this.observeCandidate(candidate);
+          this.observeCandidate(candidate, true);
         }
       } else if (c.action === 'recover' || c.action === 'retry') {
         if (this.workflowPending) {
@@ -332,11 +332,11 @@ export class ContentIntakeManagement {
   }
   /** A verified candidate read updates both detail and list, so closing the detail
    * cannot resurrect a completed batch as pending. List handles remain stable. */
-  private observeCandidate(next: C['IntakeCandidate']) {
+  private observeCandidate(next: C['IntakeCandidate'], addToList = false) {
     if (this.can('content-manage', next.sourceId)) {
       const row = this.rows.find(row => sameKey(row.candidate.key, next.key) && row.candidate.sourceId === next.sourceId);
       if (row) row.candidate = next;
-      else this.rows.unshift({ selection: randomUUID(), candidate: next });
+      else if (addToList) this.rows.unshift({ selection: randomUUID(), candidate: next });
     }
     if (next.approvalEvidenceVersion !== this.review?.evidenceVersion) this.review = null;
     if (!['awaiting-evidence','ready'].includes(next.state)) {
