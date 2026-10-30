@@ -73,3 +73,14 @@ it('legacy unknown rollback exposes receipt lookup without an unsafe retry actio
   expect(screen.getByRole('button', { name: '查询原回退回执' })).toBeEnabled();
   expect(screen.queryByRole('button', { name: '重试原回退操作' })).not.toBeInTheDocument();
 });
+
+it('dismisses a parked confirmation without executing the rollback', async () => {
+  const apply = vi.fn(), onDirty = vi.fn(), user = userEvent.setup();
+  const props = { view: view({ impact, canExecute: true }), busy: false, blocked: false, apply, onDirty };
+  const page = render(<IntakeRollback {...props} />);
+  await user.click(screen.getByRole('button', { name: '确认回退并发布' }));
+  expect(await screen.findByRole('dialog', { name: '回退整个发布目录到上一版' })).toBeVisible();
+  page.rerender(<IntakeRollback {...props} active={false} />);
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(apply).not.toHaveBeenCalled();
+});

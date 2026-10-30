@@ -135,12 +135,13 @@ describe('DashboardApp', () => {
     expect(screen.queryByText('无后端 · 不保存')).not.toBeInTheDocument();
     expect(screen.queryByText('演示环境')).not.toBeInTheDocument();
     expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
-    expect(screen.getByTestId('nav-overview')).toHaveAccessibleName('概览');
+    expect(screen.getByTestId('nav-overview')).toHaveAccessibleName('工作台');
     expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
-    expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
-    expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
+    expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('内容库');
+    expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料审核');
     await user.click(screen.getByTestId('nav-materials'));
-    expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '资料审核' })).toBeInTheDocument();
   });
 
   it.each(['product-remote', 'faq-v2'] as const)('keeps legacy statistics closed while mode is pending and after %s is confirmed', async (kind) => {
@@ -152,11 +153,13 @@ describe('DashboardApp', () => {
     window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
     window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
     render(<DashboardApp />);
-    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(questionRates).not.toHaveBeenCalled();
     await act(async () => { resolveMode({ ok: true, kind }); });
-    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(screen.queryByText('没有查询')).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(questionRates).not.toHaveBeenCalled();
@@ -170,7 +173,8 @@ describe('DashboardApp', () => {
     window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
     render(<DashboardApp />);
     await act(async () => {});
-    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(questionRates).not.toHaveBeenCalled();
   });
@@ -183,7 +187,8 @@ describe('DashboardApp', () => {
     window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
     render(<DashboardApp />);
     await act(async () => {});
-    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(questionRates).not.toHaveBeenCalled();
   });
@@ -204,9 +209,10 @@ describe('DashboardApp', () => {
 
   it('shows the allergy SOP tree as a read-only 话术运营 module', async () => {
     const user = userEvent.setup();
+    window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(await screen.findByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
     expect(screen.getByTestId('sop-delete')).toBeDisabled();
@@ -225,6 +231,7 @@ describe('DashboardApp', () => {
       }),
       onChanged: () => () => undefined,
     };
+    window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await screen.findByTestId('nav-sop');
     expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
@@ -256,6 +263,7 @@ describe('DashboardApp', () => {
       }),
       onChanged: () => () => undefined,
     };
+    window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await screen.findByTestId('nav-permissions');
     await user.click(screen.getByTestId('nav-sop'));
@@ -279,11 +287,11 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('nav-sop')).toHaveAttribute('aria-current', 'page');
 
     fireEvent.keyDown(screen.getByTestId('nav-sop'), { key: 'ArrowDown' });
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'content');
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'materials');
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    expect(screen.getByTestId('nav-content')).toHaveFocus();
+    expect(screen.getByTestId('nav-materials')).toHaveFocus();
 
-    fireEvent.keyDown(screen.getByTestId('nav-content'), { key: 'ArrowUp' });
+    fireEvent.keyDown(screen.getByTestId('nav-materials'), { key: 'ArrowUp' });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
   });
@@ -313,23 +321,25 @@ describe('DashboardApp', () => {
     };
     render(<DashboardApp />);
     const materials = await screen.findByTestId('nav-materials');
-    expect(materials).toHaveAccessibleName('资料');
+    expect(materials).toHaveAccessibleName('资料审核');
     expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
     await screen.findByTestId('nav-permissions');
     expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid')).filter((id) => id?.startsWith('nav-'))).toEqual([
-      'nav-overview', 'nav-wording', 'nav-sop', 'nav-content', 'nav-materials', 'nav-permissions',
+      'nav-overview', 'nav-wording', 'nav-sop', 'nav-materials', 'nav-permissions',
     ]);
-    expect(screen.getByTestId('nav-content')).toHaveAccessibleName('知识库');
+    expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('内容库');
     expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nav-announce')).not.toBeInTheDocument();
     expect(screen.queryByTestId('intake-shell-line')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-topbar-drag-surface').parentElement).not.toHaveTextContent('synthetic-local');
     await user.click(materials);
-    expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '知识库' })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-content'));
-    expect(await screen.findByRole('heading', { name: '知识库' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '资料' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '资料审核' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '本机草稿' })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
+    expect(await screen.findByRole('heading', { name: '本机草稿' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '资料审核' })).not.toBeInTheDocument();
   });
 
   it('hides the intake shell line unless both whitelist strings are present', async () => {
@@ -374,11 +384,11 @@ describe('DashboardApp', () => {
     expect(brand).not.toHaveTextContent('狐客服运营工作台');
 
     const overviewNav = screen.getByTestId('nav-overview');
-    expect(overviewNav).toHaveTextContent('概览');
+    expect(overviewNav).toHaveTextContent('工作台');
     expect(overviewNav).toHaveClass('is-active');
     expect(overviewNav).not.toHaveStyle({ borderLeft: '3px solid rgb(111, 76, 195)' });
     expect(within(overviewNav).queryByText('风险、责任与处理进度')).not.toBeInTheDocument();
-    expect(screen.getAllByText('概览').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('工作台').length).toBeGreaterThanOrEqual(1);
 
     const shell = screen.getByTestId('dashboard-shell');
     expect(['integrated', 'native']).toContain(shell.getAttribute('data-dashboard-chrome'));
@@ -471,7 +481,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('dashboard-brand-logo').querySelector('.dashboard-brand-fox-image')).toBeInstanceOf(
       HTMLImageElement,
     );
-    expect(screen.getByRole('tab', { name: '话术库' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('tab', { name: '内容库' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
 
     toggle.focus();
@@ -523,7 +533,7 @@ describe('DashboardApp', () => {
     act(() => vi.advanceTimersByTime(319));
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1));
-    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('概览');
+    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('工作台');
     expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveClass('is-visible');
 
     fireEvent.mouseLeave(overview);
@@ -532,7 +542,7 @@ describe('DashboardApp', () => {
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
 
     fireEvent.focus(overview);
-    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('概览');
+    expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveTextContent('工作台');
     expect(screen.getByTestId('dashboard-nav-tooltip')).toHaveClass('is-visible');
     fireEvent.keyDown(overview, { key: 'Escape' });
     expect(screen.queryByTestId('dashboard-nav-tooltip')).not.toBeInTheDocument();
@@ -772,13 +782,13 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('dashboard-nav-toggle')).not.toHaveAttribute('hidden');
   });
 
-  it('presents overview work as a decision table, a continuous KPI strip, and operational charts', () => {
+  it('removes unavailable statistics from the task workspace', () => {
     render(<DashboardApp />);
 
-    expect(screen.getByRole('heading', { name: '概览' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '待审核资料' })).toBeInTheDocument();
     expect(screen.queryByText('管理概览')).not.toBeInTheDocument();
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('查询次数');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('查询次数');
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('当前查询暂不能统计');
   });
 
   it('navigates from a manager decision into the wording detail', async () => {
@@ -790,8 +800,8 @@ describe('DashboardApp', () => {
 
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('没查到');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('没查到');
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('当前查询暂不能统计');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 
@@ -860,7 +870,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
 
     expect(screen.getByTestId('module-overview')).toBeInTheDocument();
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('待办');
+    expect(screen.getByTestId('module-overview')).not.toHaveTextContent('当前查询暂不能统计');
 
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');

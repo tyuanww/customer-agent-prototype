@@ -1,0 +1,72 @@
+.intake-permissions-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.intake-permissions-scope .ant-select {
+  width: 300px;
+  max-width: 100%;
+}
+
+.intake-permissions-members .ant-table-cell,
+.intake-permissions-detail .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+
+.intake-permissions-meta {
+  display: block;
+  color: var(--wb-text-2);
+  font-size: var(--wb-text-meta);
+  line-height: var(--wb-line-meta);
+}
+
+.intake-permissions-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.intake-permissions-status {
+  white-space: nowrap;
+  color: var(--wb-text-2);
+}
+
+.intake-permissions-status[data-status='有效'] { color: var(--wb-ok); }
+.intake-permissions-status[data-status='未生效'],
+.intake-permissions-status[data-status='时间待确认'] { color: var(--wb-warn); }
+
+.intake-permissions-detail .ant-drawer-body { padding: 20px; }
+.intake-permissions-detail .ant-drawer-content-wrapper { max-width: 100%; transition: none; }
+
+.intake-permissions-reason summary {
+  cursor: pointer;
+  color: var(--wb-text-2);
+  font-size: var(--wb-text-meta);
+}
+
+.intake-permissions-reason p { margin: 8px 0 0; white-space: pre-wrap; }
+
+.intake-permissions-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.intake-permissions-form label { display: grid; gap: 6px; }
+.intake-permissions-form .ant-select { width: 100%; }
+.intake-permissions-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.intake-permissions-form label > span:first-child { color: var(--wb-text-2); font-size: var(--wb-text-meta); }
+.intake-permissions-preview { display: grid; gap: 16px; margin: 20px 0 0; }
+.intake-permissions-preview dt { color: var(--wb-text-2); font-size: var(--wb-text-meta); }
+.intake-permissions-preview dd { margin: 4px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.intake-permissions-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+@media (max-width: 600px) {
+  .intake-permissions-form .two { grid-template-columns: 1fr; }
+}

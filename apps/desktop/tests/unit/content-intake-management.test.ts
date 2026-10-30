@@ -353,6 +353,7 @@ it.each(['recover','retry'] as const)('recovers cancellation via %s with the ori
     await expect(f.main.command({ action: 'discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
     const result = await f.main.command({ action: recovery });
     expect(result.pending).toBeNull();
+    expect(result).toMatchObject({ authorized: false, validUntil: null, candidates: [], selected: null });
     await f.main.command({ action: 'list', next: false });
     const current = f.main.view();
     expect(current).toMatchObject({ selected: { state: 'cancelled' }, material: null, quality: null, review: null, canCancel: false, canRevise: false, workflowResult: { action: 'cancel', state: 'cancelled', operationId: pending.operationId } });
@@ -501,5 +502,33 @@ it('rollback confirmation shares the Main single-operation fence and ignores log
     await expect(f.main.command({ action: 'rollback-discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
     f.logout(); resolve(true); await expect(pending).rejects.toMatchObject({ code: 'STALE' });
     expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().rollback.pending).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it.each(['published', 'cancelled'] as const)('retains the verified %s list state after closing its detail', async state => {
+  const f = fixture();
+  try {
+    const opened = await f.select();
+    const selection = opened.candidates[0].selection;
+    f.data.candidate.state = state;
+    if (state === 'published') f.data.candidate.publishedReleaseId = 'rel_completed';
+    const refreshed = await f.main.command({ action: 'refresh-candidate' });
+    expect(refreshed.candidates).toHaveLength(1);
+    expect(refreshed.candidates[0]).toMatchObject({ selection, candidate: { state } });
+    const closed = await f.main.command({ action: 'discard' });
+    expect(closed.selected).toBeNull();
+    expect(closed.candidates[0]).toMatchObject({ selection, candidate: { state } });
+  } finally { f.main.dispose(); }
+});
+
+it('refreshes the selected detail from a newer list observation without retaining editable material', async () => {
+  const f = fixture();
+  try {
+    await f.select();
+    await f.main.command({ action: 'material', next: false });
+    f.data.candidate.state = 'cancelled';
+    const listed = await f.main.command({ action: 'list', next: false });
+    expect(listed).toMatchObject({ selected: { state: 'cancelled' }, material: null, canReview: false, canCancel: false });
+    expect(listed.candidates[0].candidate.state).toBe('cancelled');
   } finally { f.main.dispose(); }
 });

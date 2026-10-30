@@ -1,0 +1,11 @@
+.content-library-tabs { margin-bottom: 20px; }
+.content-library-note, .content-library-status { color: var(--wb-text-2); font-size: var(--wb-text-meta); }
+.content-library-note { margin: 0 0 16px; }
+.content-library-status { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+.content-filter-group { margin-bottom: 24px; }
+.content-filter-group h3 { font-size: var(--wb-text-body); }
+.content-filter-group .cond-value { margin-left: 12px; color: var(--wb-text-2); font-weight: 400; }
+.content-filter-group fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; }
+.content-filter-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.content-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.content-empty { color: var(--wb-text-2); margin: 32px 0; }

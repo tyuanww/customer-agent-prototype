@@ -496,8 +496,7 @@ describe('dashboard layout contract', () => {
     expect(css).toContain("[data-nav-phase='collapsed'] .dashboard-brand-copy");
   });
 
-  it('binds the intake wording page to the published catalog', () => {
-    expect(app).toContain('<IntakeLibrary active={ctx.active === \'wording\'} seatNotice={ctx.seatLibraryOnly} />');
+  it('does not mount the legacy content modules in the intake dashboard', () => {
     expect(app).not.toContain('<WordingLibraryModule');
     expect(app).not.toContain('<AnnounceModule');
     expect(app).not.toContain('<ContentModule');
@@ -535,7 +534,7 @@ describe('dashboard layout contract', () => {
   });
 
   it('publishes from the materials page without a renderer-owned content client', () => {
-    expect(materials).toContain('发布当前候选');
+    expect(materials).toContain('window.dashboardIntake');
     expect(materials).not.toContain('publishDraft');
     expect(materials).not.toContain('customerAgent');
     expect(materials).not.toMatch(

@@ -97,12 +97,13 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.getByTestId('nav-materials').click();
+    await dashboard.getByRole('button', { name: '上传资料', exact: true }).click();
     const upload = dashboard.getByRole('region', { name: '上传 FAQ 资料', exact: true });
     const sources = upload.getByRole('combobox', { name: '上传来源', exact: true });
     await expect(sources).toBeEnabled();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
-    await expect(dashboard.getByRole('tab')).toHaveCount(5);
+    await expect(dashboard.getByRole('tab')).toHaveCount(4);
     await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(0);
     await expect(dashboard.getByTestId('nav-materials')).toHaveAttribute('aria-selected', 'true');
     async function appearance(mode: 'light' | 'dark') {
@@ -162,6 +163,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     }
     async function settleParse(expected: string) {
       await expect.poll(async () => {
+        if (expected === '校验通过，待审核资料已生成' && await dashboard.getByRole('region', { name: '批次详情', exact: true }).isVisible()) return true;
         if (await upload.getByRole('status').filter({ hasText: expected }).count()) return true;
         const refresh = upload.getByRole('button', { name: '刷新解析进度', exact: true });
         if (await refresh.count() && await refresh.isEnabled()) await refresh.click();
@@ -176,7 +178,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     // format's logical record/worksheet coordinates, even across quoted newlines.
     await expect(validation).toContainText(format === 'csv' ? '3 / 8' : '3 / 3');
     if (format === 'csv') await expect(validation).toContainText('CSV 行号按记录计算');
-    await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toHaveCount(0);
+    await expect(dashboard.getByRole('region', { name: '批次详情', exact: true })).toHaveCount(0);
     await upload.getByRole('button', { name: '保存完整错误报告', exact: true }).click();
     await expect.poll(() => existsSync(reportFile)).toBe(true);
     expect(await readIssueReport(readFileSync(reportFile))).toEqual([
@@ -187,19 +189,30 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await validation.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-upload-error-report.png') });
     await selectAndSubmit(path.basename(goodFile));
-    await settleParse('校验通过，候选已形成');
+    await settleParse('校验通过，待审核资料已生成');
     await expect(upload.getByRole('button', { name: '刷新解析进度', exact: true })).toHaveCount(0);
-    await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toBeVisible();
+    await expect(dashboard.getByRole('region', { name: '批次详情', exact: true })).toBeVisible();
+    await expect(upload).not.toBeVisible();
+    await dashboard.getByRole('button', { name: '返回批次列表', exact: true }).click();
+    await expect(dashboard.getByRole('region', { name: '资料批次列表', exact: true }).getByRole('button', { name: /^继续查看 / })).toBeVisible();
+    await dashboard.screenshot({ path: path.join(evidence, 'batch-list.png') });
+    await dashboard.getByTestId('nav-overview').click();
+    await expect(dashboard.getByTestId('module-overview').getByRole('table').getByRole('row')).toHaveCount(2);
+    await dashboard.screenshot({ path: path.join(evidence, 'workspace-pending.png') });
+    await dashboard.getByTestId('nav-materials').click();
+    await dashboard.getByRole('button', { name: /^继续查看 / }).click();
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
     const material = dashboard.getByRole('region', { name: '当前页材料与差异' });
-    await expect(material.getByRole('article')).toHaveCount(3);
+    await expect(material.getByRole('button', { name: /^查看原文 / })).toHaveCount(3);
+    await material.getByRole('button', { name: /^查看原文 / }).first().click();
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer, { exact: true })).toHaveCSS('white-space', 'pre-wrap');
-    await material.getByRole('article').first().scrollIntoViewIfNeeded();
+    await material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer, { exact: true }).scrollIntoViewIfNeeded();
     await expect(dashboard.getByText(/待确认来源版本/)).toBeVisible();
-    await expect(material.getByText('风险等级', { exact: true })).toBeVisible();
-    await expect(material.getByText('常规内容', { exact: true })).toBeVisible();
+    await material.getByText('查看完整检查材料', { exact: true }).click();
+    await expect(material.getByText('风险提示', { exact: true })).toBeVisible();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-uploaded-material.png') });
     async function confirmSourceAndCheck(version: number) {
+    await dashboard.getByRole('navigation', { name: '审核内容' }).getByRole('button', { name: '来源确认', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '来源版本', exact: true }).fill(`synthetic-export-${version}`);
     await dashboard.getByRole('textbox', { name: '来源确认说明', exact: true }).fill('已人工核对本轮合成导出及三条材料');
     await dashboard.getByTestId('nav-overview').click();
@@ -212,11 +225,12 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('button', { name: '确认来源版本', exact: true }).click();
     await expect(dashboard.getByText('本次操作结果：来源已确认', { exact: false })).toBeVisible();
     await expect(dashboard.getByRole('button', { name: '发起组织审批', exact: true })).toHaveCount(0);
-    await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toHaveCount(0);
-    await dashboard.getByRole('button', { name: '读取初检', exact: true }).click();
-    await dashboard.getByRole('button', { name: '冻结本次抽样', exact: true }).click();
+    await expect(dashboard.getByRole('button', { name: '发布整批资料', exact: true })).toHaveCount(0);
+    await dashboard.getByRole('navigation', { name: '审核内容' }).getByRole('button', { name: '人工质量检查', exact: true }).click();
+    await dashboard.getByRole('button', { name: '读取审核清单', exact: true }).click();
+    await dashboard.getByRole('button', { name: '开始本轮审核', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '操作回执：' })).toBeVisible();
-    await dashboard.getByRole('button', { name: '读取初检', exact: true }).click();
+    await dashboard.getByRole('button', { name: '读取审核清单', exact: true }).click();
     const quality = dashboard.getByRole('region', { name: '人工质量检查' });
     await expect(quality.getByRole('article')).toHaveCount(3);
     for (const faq of INTAKE_SYNTHETIC_FAQ) {
@@ -225,16 +239,16 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       await decision.click();
       const listId = await decision.getAttribute('aria-controls');
       expect(listId).toBeTruthy();
-      await dashboard.locator(`[id="${listId}"]`).getByRole('option', { name: '无缺陷', exact: true }).click();
-      await row.getByRole('button', { name: '保存本条判断', exact: true }).click();
+      await dashboard.locator(`[id="${listId}"]`).getByRole('option', { name: '通过', exact: true }).click();
+      await row.getByRole('button', { name: '暂存本条判断', exact: true }).click();
     }
-    await dashboard.getByRole('button', { name: '提交本轮人工检查', exact: true }).click();
+    await dashboard.getByRole('button', { name: '提交本轮审核', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '质量检查通过' }).first()).toBeVisible();
-    await dashboard.getByRole('button', { name: '刷新候选状态', exact: true }).click();
+    await dashboard.getByRole('button', { name: '刷新审核状态', exact: true }).click();
     }
     await confirmSourceAndCheck(1);
     const old = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
-    await dashboard.getByRole('button', { name: '修订当前候选', exact: true }).click();
+    await dashboard.getByRole('button', { name: '上传修订版', exact: true }).click();
     await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(upload.getByText(/正在准备修订/)).toContainText('原版本 1');
     await expect(sources).toBeDisabled();
@@ -244,16 +258,18 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     const unchanged = await (await host.requestAs('enabler', oldPath)).json();
     expect(unchanged).toMatchObject({ key: old.key, state: 'ready', publicationPolicy: 'direct-v1', sourceEvidenceVersion: 1, approvalEvidenceVersion: 0 });
     await selectAndSubmit(path.basename(revisionFile));
-    await settleParse('校验通过，候选已形成');
+    await settleParse('校验通过，待审核资料已生成');
     const revised = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     expect(revised).toMatchObject({ key: { candidateId: old.key.candidateId, version: 2 }, sourceEvidenceVersion: 0, approvalEvidenceVersion: 0 });
     expect(revised.key.digest).not.toBe(old.key.digest);
     expect(await (await host.requestAs('enabler', oldPath)).json()).toMatchObject({ state: 'invalidated' });
     await dashboard.getByRole('button', { name: '查看材料', exact: true }).click();
+    await material.getByRole('button', { name: /^查看原文 / }).first().click();
     await expect(material.getByText(INTAKE_SYNTHETIC_FAQ[0]!.answer + revisionSuffix, { exact: true })).toBeVisible();
     await material.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-revision-v2.png') });
     await confirmSourceAndCheck(2);
+    await dashboard.getByRole('navigation', { name: '审核内容' }).getByRole('button', { name: '发布资料', exact: true }).click();
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     const beforeCancel = (await host.status()).requests.filter(p => p.endsWith('/publish')).length;
@@ -266,12 +282,12 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('textbox', { name: '发布标题', exact: true }).fill('合成桌面实链发布');
     await dashboard.getByRole('textbox', { name: '发布摘要', exact: true }).fill('三条FAQ：真实API/PG、手动逐条人工质量判断、原生二次确认');
     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
-    await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
-    await expect(dashboard.getByRole('button', { name: '发布当前候选', exact: true })).toBeEnabled();
+    await dashboard.getByRole('button', { name: '发布整批资料', exact: true }).click();
+    await expect(dashboard.getByRole('button', { name: '发布整批资料', exact: true })).toBeEnabled();
     expect((await host.status()).requests.filter(p => p.endsWith('/publish'))).toHaveLength(beforeCancel);
     expect((await host.status()).publications).toBe(0);
     await expect(dashboard.getByRole('textbox', { name: '发布标题', exact: true })).toHaveValue('合成桌面实链发布');
-    await dashboard.getByRole('button', { name: '发布当前候选', exact: true }).click();
+    await dashboard.getByRole('button', { name: '发布整批资料', exact: true }).click();
     await expect(dashboard.getByRole('status').filter({ hasText: '本次操作结果：已发布' })).toBeVisible();
     const result = await host.status();
     expect(result.publications).toBe(1); expect(result.currentReleaseId).not.toBe('rel_native_base'); expect(result.diagnostics).toEqual([]);
@@ -286,22 +302,22 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     });
     expect(security).toEqual({ sandbox: true, nodeIntegration: false, contextIsolation: true });
     // Explicitly discard completed local UI state before closing the window.
-    await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
+    await dashboard.getByRole('button', { name: '放弃输入并关闭', exact: true }).click();
     await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
-    await expect(dashboard.getByRole('region', { name: '当前候选', exact: true })).toHaveCount(0);
+    await expect(dashboard.getByRole('region', { name: '批次详情', exact: true })).toHaveCount(0);
     // A separate unpublished candidate can be cancelled without withdrawing the live release.
     await selectAndSubmit(path.basename(goodFile));
-    await settleParse('校验通过，候选已形成');
+    await settleParse('校验通过，待审核资料已生成');
     const cancelled = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     expect(cancelled.key.candidateId).not.toBe(revised.key.candidateId);
-    await dashboard.getByRole('button', { name: '取消当前候选', exact: true }).click();
+    await dashboard.getByRole('button', { name: '取消这份资料', exact: true }).click();
     await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await expect(dashboard.getByText(/已取消：此版本不再接受修改或发布/)).toBeVisible();
     expect(await (await host.requestAs('enabler', `/v1/intake/candidates/${cancelled.key.candidateId}/versions/1`)).json()).toMatchObject({ state: 'cancelled' });
     expect((await host.status()).currentReleaseId).toBe(result.currentReleaseId);
     expect((await host.status()).publications).toBe(1);
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-cancelled.png') });
-    await dashboard.getByRole('button', { name: '关闭当前候选', exact: true }).click();
+    await dashboard.getByRole('button', { name: '放弃输入并关闭', exact: true }).click();
     await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
     host.selectIdentity('agent');

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Button, Tabs } from 'antd';
 import type { PageUseSnapshot } from '@shared/page-use';
 import type { WorkbenchKind } from '@shared/workbench-mode';
 import { DeskKnowledge } from './DeskKnowledge';
@@ -40,7 +41,7 @@ export type IntakeDestinationContext = {
   sessionKey: string;
   workbenchMode: WorkbenchKind | null;
   snapshot: PageUseSnapshot;
-  onOpen: (target: 'content' | 'wording' | 'permissions') => void;
+  onOpen: (target: 'content' | 'wording' | 'permissions' | 'materials') => void;
   onTodoCount: (count: number) => void;
   onSupplyScript: (question: string) => void;
   scriptDraft: string | null;
@@ -50,11 +51,14 @@ export type IntakeDestinationContext = {
 const INTAKE_DESTINATION_MOUNTS: {
   [Id in IntakeDestination]: (ctx: IntakeDestinationContext) => ReactNode;
 } = {
-  overview: (ctx) => <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
-  wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
-  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />,
-  content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
-  materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials'} />,
+  overview: (ctx) => ctx.workbenchMode === 'legacy' ? <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} /> : null,
+  wording: (ctx) => <ContentLibraryDestination ctx={ctx} />,
+  sop: (ctx) => ctx.workbenchMode === 'legacy'
+    ? <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />
+    : <section className="dash-module" data-testid="module-sop"><h1 className="desk-sr">SOP</h1><p className="content-empty">SOP 学习与执行尚未开放。</p></section>,
+  content: () => null,
+  materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials' || (ctx.active === 'overview' && ctx.workbenchMode !== 'legacy')}
+    presentation={ctx.active === 'overview' && ctx.workbenchMode !== 'legacy' ? 'overview' : 'review'} onOpenReview={() => ctx.onOpen('materials')} />,
   permissions: (ctx) => (
     <div hidden={ctx.active !== 'permissions'}>
       {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
@@ -64,7 +68,24 @@ const INTAKE_DESTINATION_MOUNTS: {
   ),
 };
 
-function MaterialsDestination({ active }: { active: boolean }) {
+function ContentLibraryDestination({ ctx }: { ctx: IntakeDestinationContext }) {
+  const active = ctx.active === 'wording' || ctx.active === 'content';
+  const canEdit = ctx.jobKnown && !ctx.seatLibraryOnly;
+  const drafts = canEdit && ctx.active === 'content';
+  return <section hidden={!active} aria-label="内容库">
+    <Tabs className="content-library-tabs" activeKey={drafts ? 'drafts' : 'published'}
+      onChange={key => ctx.onOpen(key === 'drafts' ? 'content' : 'wording')}
+      items={[{ key: 'published', label: '已发布' }, ...(canEdit ? [{ key: 'drafts', label: '本机草稿' }] : [])]}
+      tabBarExtraContent={canEdit ? <Button onClick={() => ctx.onOpen('materials')}>上传团队资料</Button> : undefined} />
+    <IntakeLibrary active={active && !drafts} seatNotice={ctx.seatLibraryOnly} />
+    {canEdit && <div hidden={!drafts}>
+      <p className="content-library-note">草稿仅保存在这台电脑。团队使用的内容请到资料审核上传并发布。</p>
+      <DeskKnowledge active={active && drafts} draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} />
+    </div>}
+  </section>;
+}
+
+function MaterialsDestination({ active, presentation, onOpenReview }: { active: boolean; presentation: 'overview' | 'review'; onOpenReview: () => void }) {
   const [visited, setVisited] = useState(active);
   const [generation, setGeneration] = useState(0);
   useEffect(() => { if (active) setVisited(true); }, [active]);
@@ -72,7 +93,7 @@ function MaterialsDestination({ active }: { active: boolean }) {
     if (!visited && !active) return undefined;
     return window.dashboardIntake?.onInvalidated(() => setGeneration(value => value + 1));
   }, [visited, active]);
-  return <div hidden={!active}>{(visited || active) && <IntakeManagement key={generation} />}</div>;
+  return <div hidden={!active}>{(visited || active) && <IntakeManagement key={generation} active={active} presentation={presentation} onOpenReview={onOpenReview} />}</div>;
 }
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {

@@ -28,8 +28,8 @@ const EMPTY: DeskView = {
   items: [], delivered: [], tacit: [], revision: 0, notice: null, persistence: 'ok',
 };
 
-const UNAVAILABLE = '知识库还不能在这里用。';
-const READ_FAILED = '知识库暂时读不出来。';
+const UNAVAILABLE = '本机草稿还不能在这里用。';
+const READ_FAILED = '本机草稿暂时读不出来。';
 
 const VALIDITY_CHOICES: { label: string; value: Validity }[] = [
   { label: '长期生效', value: 'always' },
@@ -103,9 +103,11 @@ function KnowledgeTable<RecordType extends object>(props: TableProps<RecordType>
 /** Operator view edits one persona. A seat only sees knowledge that is already
  * effective for that persona, including the shared shop set. */
 export function DeskKnowledge({
+  active = true,
   draftQuestion = null,
   onDraftConsumed,
 }: {
+  active?: boolean;
   draftQuestion?: string | null;
   onDraftConsumed?: () => void;
 } = {}) {
@@ -211,12 +213,12 @@ export function DeskKnowledge({
   }
 
   if (resource.status === 'forbidden') {
-    return <section className="desk-knowledge" aria-label="知识库"><div className="desk-column"><header className="desk-title"><h1>知识库</h1></header><p>{resource.message}</p></div></section>;
+    return <section className="desk-knowledge" aria-label="本机草稿"><div className="desk-column"><header className="desk-title"><h1>本机草稿</h1></header><p>{resource.message}</p></div></section>;
   }
   const operator = view.role === 'operator';
   const statusLine = message ?? (resource.status === 'error' ? resource.message : null);
   const emptyCopy = view.role === null
-    ? (view.signedIn ? '正在读取知识库。' : '请先登录。')
+    ? (view.signedIn ? '正在读取本机草稿。' : '请先登录。')
     : (operator ? '还没有知识。' : '还没有生效知识。');
   const columns: TableColumnsType<DeskItemView> = [
     { title: '话术名称', dataIndex: 'name', key: 'name', ellipsis: true },
@@ -242,9 +244,9 @@ export function DeskKnowledge({
       </div> : null,
     },
   ];
-  return <IntakeAntdTheme><section className="desk-knowledge wb9" aria-label="知识库">
+  return <IntakeAntdTheme><section className="desk-knowledge wb9" aria-label="本机草稿">
     <div className="desk-column">
-      <h1 className="desk-sr">知识库</h1>
+      <h1 className="desk-sr">本机草稿</h1>
       <div className="tabbar">
         <div className="tabs" role="tablist" aria-label="人设">
           {view.personas.map((persona, index) => <DeskButton
@@ -273,7 +275,7 @@ export function DeskKnowledge({
       </div>
       {statusLine ? <p role="status">{statusLine}</p> : null}
       {view.notice && view.notice !== statusLine ? <p role="status">{view.notice}</p> : null}
-      {resource.status === 'idle' || resource.status === 'loading' ? <WorkbenchLoading rows={5} label="正在读取知识库" /> : null}
+      {resource.status === 'idle' || resource.status === 'loading' ? <WorkbenchLoading rows={5} label="正在读取本机草稿" /> : null}
       {resource.status === 'ready' && !(view.role === null && statusLine) ? <KnowledgeTable<DeskItemView>
         aria-label="当前人设知识"
         pagination={false}
@@ -284,7 +286,7 @@ export function DeskKnowledge({
         locale={{ emptyText: <KnowledgeEmpty description={emptyCopy} /> }}
       /> : null}
     </div>
-    <Modal open={operator && writing} title="添加话术" width={520} footer={null} destroyOnHidden maskClosable transitionName="" maskTransitionName="" onCancel={closeWriting}>
+    <Modal open={active && operator && writing} title="添加话术" width={520} footer={null} destroyOnHidden maskClosable transitionName="" maskTransitionName="" onCancel={closeWriting}>
         {addMode === 'upload' ? <>
           {!csv ? <Upload.Dragger
             {...csvDragger}
@@ -338,7 +340,7 @@ export function DeskKnowledge({
         </>}
     </Modal>
     <Modal
-      open={writing && confirmImport && csv !== null}
+      open={active && writing && confirmImport && csv !== null}
       title="确认导入？"
       closable={false}
       maskClosable={false}
@@ -353,10 +355,10 @@ export function DeskKnowledge({
         })}>{`确认导入 ${csv.count} 条`}</DeskButton>,
       ] : null}
     >
-      <p>将导入 {csv?.count ?? 0} 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。</p>
+      <p>将导入 {csv?.count ?? 0} 条到本机草稿，状态为未生效，不会覆盖已有话术，也不会发布到查询。</p>
     </Modal>
     <Modal
-      open={pendingDelete !== null}
+      open={active && pendingDelete !== null}
       title="确认删除"
       okText="确认删除"
       cancelText="取消"

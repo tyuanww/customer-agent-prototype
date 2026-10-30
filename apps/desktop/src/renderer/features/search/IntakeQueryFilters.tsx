@@ -10,7 +10,7 @@ function Terms({ label, options, selected, disabled, onChange, onLayoutChange }:
   const [text, setText] = useState('');
   const matches = options.filter(option => option.label.includes(text.trim()) || option.id.includes(text.trim()));
   return <details className="intake-terms" onToggle={onLayoutChange}>
-    <summary>{label} · {selected.length ? `已选 ${selected.length}` : '通用'}</summary>
+    <summary>{label} · {selected.length ? `已选 ${selected.length}` : '全部'}</summary>
     <fieldset disabled={disabled}>
       <legend className="sr-only">{label}筛选</legend>
       <input aria-label={`查找${label}`} value={text} onChange={event => { setText(event.target.value); onLayoutChange(); }} placeholder={`查找${label}`} />
@@ -36,7 +36,7 @@ function shopOptionLabel(id: string, names: Map<string, string>, repeats: Map<st
 }
 
 function dimensionSummary(label: '商品' | '场景', selected: string[], options: IntakeQueryOption[]): string {
-  if (!selected.length) return `${label}通用`;
+  if (!selected.length) return `${label}全部`;
   if (selected.length === 1) {
     const id = selected[0] ?? '';
     return `${label} ${options.find(option => option.id === id)?.label ?? id}`;
@@ -90,7 +90,7 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutCh
         <Terms onLayoutChange={onLayoutChange} label="场景" options={state.scenarios} selected={state.scenarioIds} disabled={disabled || !state.shopId}
           onChange={scenarioIds => { void state.selectConditions({ productIds: state.productIds, scenarioIds }); }} />
       </div>
-      <p role="status">未选的只查通用话术。请点击查询。</p>
+      <p role="status">未选条件时查询全部授权话术。请点击查询。</p>
       {state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
     </div> : null}
   </div>;

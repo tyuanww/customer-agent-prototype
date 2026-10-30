@@ -149,6 +149,7 @@ function DashboardWorkspace() {
     : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
   const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown);
   const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, permissionsOpen));
+  const activeNav = active === 'content' ? 'wording' : active;
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [scriptDraft, setScriptDraft] = useState<string | null>(null);
@@ -192,10 +193,11 @@ function DashboardWorkspace() {
   };
   useLayoutEffect(() => {
     if (!jobKnown) return;
-    if (navItems.some((item) => item.id === active)) return;
+    if (active === 'content' && seatLibraryOnly) { setActive('wording'); return; }
+    if (navItems.some((item) => item.id === activeNav)) return;
     const next = navItems[0]?.id;
     if (next) setActive(next);
-  }, [jobKnown, navItems, active]);
+  }, [jobKnown, navItems, active, activeNav, seatLibraryOnly]);
   useLayoutEffect(() => {
     if (!permissionsOpen) return;
     if (readIntakePreviewPage(window.location, true) !== 'permissions') return;
@@ -584,7 +586,7 @@ function DashboardWorkspace() {
   }, []);
 
   const move = (delta: number) => {
-    const nextId = nextSidebarDestination(active, delta, navItems);
+    const nextId = nextSidebarDestination(activeNav, delta, navItems);
     selectNav(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
@@ -690,7 +692,7 @@ function DashboardWorkspace() {
           aria-orientation="vertical"
         >
           {navItems.map((item) => {
-            const selected = item.id === active;
+            const selected = item.id === activeNav;
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
             return (
@@ -825,7 +827,7 @@ function DashboardWorkspace() {
           ref={contentRef}
           className="dashboard-content"
           role="tabpanel"
-          aria-labelledby={navItems.some((item) => item.id === active) ? `dash-nav-${active}` : undefined}
+          aria-labelledby={navItems.some((item) => item.id === activeNav) ? `dash-nav-${activeNav}` : undefined}
           data-testid="dashboard-content"
           data-active-module={active}
         >

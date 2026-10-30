@@ -12,7 +12,7 @@ function Filters({ state: filterState }: { state: ReturnType<typeof useIntakeSho
 it('shows names with ID disambiguation and emits only the stable shop ID',()=>{
  const s=state();s.shopNames=[{id:'shop-a',label:'合成同名店'},{id:'shop-b',label:'合成同名店'}];s.shopNamesValidUntil=new Date(Date.now()+60000).toISOString();
  render(<Filters state={s}/>);
- expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('合成同名店（shop-a） · 商品通用 · 场景通用');
+ expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('合成同名店（shop-a） · 商品全部 · 场景全部');
  fireEvent.click(screen.getByRole('button',{name:'筛选'}));
  expect(screen.getByRole('option',{name:'合成同名店（shop-a）'})).toHaveValue('shop-a');
  fireEvent.change(screen.getByRole('combobox',{name:'当前店铺'}),{target:{value:'shop-b'}});expect(s.load).toHaveBeenCalledWith('shop-b');
@@ -22,7 +22,7 @@ it('shows names with ID disambiguation and emits only the stable shop ID',()=>{
 it.each(['missing','expired'])('keeps IDs and explicitly marks %s names unavailable',kind=>{
  const s=state();if(kind==='expired'){s.shopNames=[{id:'shop-a',label:'过期合成名'},{id:'shop-b',label:'过期合成名'}];s.shopNamesValidUntil=new Date(Date.now()-1000).toISOString();}
  render(<Filters state={s}/>);
- expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('shop-a · 商品通用 · 场景通用');
+ expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('shop-a · 商品全部 · 场景全部');
  expect(screen.queryByText(/过期合成名/)).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'筛选'}));
  expect(screen.getByRole('option',{name:'shop-a'})).toHaveValue('shop-a');expect(screen.getByText('当前显示店铺编号。')).toBeVisible();
@@ -36,10 +36,10 @@ it('keeps the shop, product, and scene line collapsed until 筛选 is opened',()
  render(<Filters state={s}/>);
  expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('合成店 · 商品 洁面乳 · 场景 2');
  expect(screen.queryByRole('combobox',{name:'当前店铺'})).toBeNull();
- expect(screen.queryByText('未选的只查通用话术。请点击查询。')).toBeNull();
+ expect(screen.queryByText('未选条件时查询全部授权话术。请点击查询。')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'筛选'}));
  expect(screen.getByRole('combobox',{name:'当前店铺'})).toBeVisible();
- expect(screen.getByText('未选的只查通用话术。请点击查询。')).toBeVisible();
+ expect(screen.getByText('未选条件时查询全部授权话术。请点击查询。')).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'收起'}));
  expect(screen.queryByRole('combobox',{name:'当前店铺'})).toBeNull();
 });
@@ -48,7 +48,7 @@ it('sends only the chosen product id when a condition is checked',()=>{
  s.products=[{id:'product-a',label:'洁面乳'}];
  render(<Filters state={s}/>);
  fireEvent.click(screen.getByRole('button',{name:'筛选'}));
- fireEvent.click(screen.getByText('商品 · 通用'));
+ fireEvent.click(screen.getByText('商品 · 全部'));
  fireEvent.click(screen.getByRole('checkbox',{name:'洁面乳'}));
  expect(s.selectConditions).toHaveBeenCalledWith({ productIds: ['product-a'], scenarioIds: [] });
  expect(s.load).not.toHaveBeenCalled();
