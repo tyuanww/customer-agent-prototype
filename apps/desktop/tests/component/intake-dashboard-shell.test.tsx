@@ -299,7 +299,7 @@ async function tabUntil(user: ReturnType<typeof userEvent.setup>, target: HTMLEl
   expectVisibleFocus(target);
 }
 
-it('opens the add layer and permission dialogs and keeps keyboard focus inside 980 by 680 in light and dark', async () => {
+it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard flows usable at 980 by 680 in %s mode', async (theme) => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
   window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
@@ -332,54 +332,52 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     shell.style.width = '980px';
     shell.style.height = '680px';
     const content = screen.getByTestId('dashboard-content');
-    for (const theme of ['light', 'dark'] as const) {
-      await user.click(screen.getByTestId('dashboard-theme-trigger'));
-      await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
-      expect(shell).toHaveAttribute('data-theme', theme);
-      if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
+    await user.click(screen.getByTestId('dashboard-theme-trigger'));
+    await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
+    expect(shell).toHaveAttribute('data-theme', theme);
+    if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
 
-      await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByTestId('nav-wording'));
     await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-      const add = await screen.findByRole('button', { name: '添加话术' });
-      await user.click(add);
-      const addDialog = screen.getByRole('dialog', { name: '添加话术' });
-      await tabUntil(user, within(addDialog).getByRole('button', { name: '关闭' }));
-      await user.click(within(addDialog).getByRole('button', { name: '没有文档？手动填写一条' }));
-      await tabUntil(user, within(addDialog).getByRole('textbox', { name: '问题' }));
-      await user.type(within(addDialog).getByRole('textbox', { name: '问题' }), '焦点不保存');
-      await user.click(within(addDialog).getByRole('button', { name: '关闭' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.queryByRole('cell', { name: '焦点不保存' })).not.toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
+    const add = await screen.findByRole('button', { name: '添加话术' });
+    await user.click(add);
+    const addDialog = screen.getByRole('dialog', { name: '添加话术' });
+    await tabUntil(user, within(addDialog).getByRole('button', { name: '关闭' }));
+    await user.click(within(addDialog).getByRole('button', { name: '没有文档？手动填写一条' }));
+    await tabUntil(user, within(addDialog).getByRole('textbox', { name: '问题' }));
+    await user.type(within(addDialog).getByRole('textbox', { name: '问题' }), '焦点不保存');
+    await user.click(within(addDialog).getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: '焦点不保存' })).not.toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
-      await user.click(screen.getByTestId('nav-permissions'));
-      const businessTab = screen.queryByRole('tab', { name: '成员权限' });
-      if (businessTab && businessTab.getAttribute('aria-selected') !== 'true') await user.click(businessTab);
-      await screen.findByRole('row', { name: /合成坐席/ });
-      expect(screen.queryByRole('button', { name: '停止等待' })).not.toBeInTheDocument();
-      expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: '新增授权' }));
-      const grant = screen.getByRole('dialog', { name: '新增授权' });
-      await tabUntil(user, within(grant).getByRole('button', { name: '关闭' }));
-      await tabUntil(user, within(grant).getByRole('combobox', { name: '成员' }));
-      await user.click(within(grant).getByRole('button', { name: '关闭' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-permissions'));
+    const businessTab = screen.queryByRole('tab', { name: '成员权限' });
+    if (businessTab && businessTab.getAttribute('aria-selected') !== 'true') await user.click(businessTab);
+    await screen.findByRole('row', { name: /合成坐席/ });
+    expect(screen.queryByRole('button', { name: '停止等待' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '新增授权' }));
+    const grant = screen.getByRole('dialog', { name: '新增授权' });
+    await tabUntil(user, within(grant).getByRole('button', { name: '关闭' }));
+    await tabUntil(user, within(grant).getByRole('combobox', { name: '成员' }));
+    await user.click(within(grant).getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('tab', { name: '账号管理' }));
-      await user.click(screen.getByRole('button', { name: '新建坐席' }));
-      const seat = screen.getByRole('dialog', { name: '新建坐席' });
-      await tabUntil(user, within(seat).getByRole('button', { name: '关闭' }));
-      await tabUntil(user, within(seat).getByLabelText('姓名'));
-      await user.click(within(seat).getByRole('button', { name: '取消' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
+    await user.click(screen.getByRole('tab', { name: '账号管理' }));
+    await user.click(screen.getByRole('button', { name: '新建坐席' }));
+    const seat = screen.getByRole('dialog', { name: '新建坐席' });
+    await tabUntil(user, within(seat).getByRole('button', { name: '关闭' }));
+    await tabUntil(user, within(seat).getByLabelText('姓名'));
+    await user.click(within(seat).getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
-      await user.click(screen.getByTestId('nav-wording'));
-      const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
-      await tabUntil(user, refresh);
-      expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
-    }
+    await user.click(screen.getByTestId('nav-wording'));
+    const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
+    await tabUntil(user, refresh);
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
     await user.click(screen.getByTestId('nav-permissions'));
     await user.click(screen.getByRole('tab', { name: '成员权限' }));
     await user.click(screen.getByRole('button', { name: '新增授权' }));
