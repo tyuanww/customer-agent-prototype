@@ -567,24 +567,29 @@ it('distinguishes overview loading, read failure and confirmed lack of access, w
   } finally { f.main.dispose(); }
 });
 
-it('preserves unsaved and staged quality judgments through list and overview without lifting dirty gates', async () => {
+async function openQualityDraft() {
   const f = setup(); f.data.candidate.sourceEvidenceVersion = 1;
   const respond = f.data.respond;
   f.data.respond = (path, body) => path.startsWith('/v1/intake/candidates?')
     ? { items: [f.data.candidate, { ...f.data.candidate, key: { ...f.data.candidate.key, candidateId: 'candidate-b' } }], nextCursor: null }
     : respond(path, body);
   const page = render(<IntakeManagement />);
+  await f.user.click(await screen.findByRole('button', { name: '审核 产品 / candidate-a' }));
+  await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+  await f.user.click(screen.getByRole('button', { name: '读取审核清单' }));
+  await f.user.click(screen.getByRole('button', { name: '开始本轮审核' }));
+  await f.user.click(screen.getByRole('button', { name: '读取审核清单' }));
+  await choose(f.user, '检查结论 合成洁面 1', '需修改');
+  await f.user.type(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' }), '需核对原文');
+  await f.user.click(screen.getByRole('button', { name: '返回批次列表' }));
+  expect(screen.getByRole('button', { name: '刷新批次' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '审核 产品 / candidate-b' })).toBeDisabled();
+  return { f, page };
+}
+
+it('preserves an unsaved quality judgment through list and overview without lifting dirty gates', async () => {
+  const { f, page } = await openQualityDraft();
   try {
-    await f.user.click(await screen.findByRole('button', { name: '审核 产品 / candidate-a' }));
-    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
-    await f.user.click(screen.getByRole('button', { name: '读取审核清单' }));
-    await f.user.click(screen.getByRole('button', { name: '开始本轮审核' }));
-    await f.user.click(screen.getByRole('button', { name: '读取审核清单' }));
-    await choose(f.user, '检查结论 合成洁面 1', '需修改');
-    await f.user.type(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' }), '需核对原文');
-    await f.user.click(screen.getByRole('button', { name: '返回批次列表' }));
-    expect(screen.getByRole('button', { name: '刷新批次' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '审核 产品 / candidate-b' })).toBeDisabled();
     await f.user.click(within(screen.getByRole('radiogroup', { name: '批次筛选' })).getByText('已发布'));
     const calls = f.command.mock.calls.length;
     page.rerender(<IntakeManagement presentation="overview" onOpenReview={() => undefined} />);
@@ -596,6 +601,13 @@ it('preserves unsaved and staged quality judgments through list and overview wit
     expect(f.command).toHaveBeenCalledTimes(calls);
     expect(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' })).toHaveValue('需核对原文');
     expect(screen.getByRole('button', { name: '提交本轮审核' })).toBeDisabled();
+  } finally { f.main.dispose(); }
+});
+
+it('preserves a staged quality judgment through review panes and list navigation', async () => {
+  const { f } = await openQualityDraft();
+  try {
+    await f.user.click(screen.getByRole('button', { name: '继续当前审核' }));
     await f.user.click(screen.getByRole('button', { name: '原始材料' }));
     expect(screen.getByRole('button', { name: '查看材料' })).toBeDisabled();
     await f.user.click(screen.getByRole('button', { name: '发布资料' }));
