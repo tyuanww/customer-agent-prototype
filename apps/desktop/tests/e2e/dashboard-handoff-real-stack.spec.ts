@@ -35,7 +35,7 @@ function syntheticWorkbook(): Buffer {
   ]);
 }
 
-test('dashboard handoff: date presets, collapsed filters, xlsx with picture, account logout across windows', async () => {
+test('dashboard handoff: task homepage, collapsed filters, xlsx with picture, account logout across windows', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit synthetic PG15/Electron gate');
   test.setTimeout(180_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -55,7 +55,9 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
     await app.evaluate(({ app }) => app.focus({ steal: true }));
-    await query.evaluate(() => window.customerAgent!.openSearch());
+    const fox = app.windows().find(w => w.url().includes('role=fox'))!;
+    await fox.getByTestId('fox-button').click();
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await query.getByRole('button', { name: '登录', exact: true }).click();
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
@@ -84,48 +86,24 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
       const mode = await window.dashboardWorkbench?.mode();
       return mode?.ok ? mode.kind : null;
     })).toBe('faq-v2');
-    await expect(dashboard.getByTestId('overview-usage-status')).toHaveText('当前查询暂不能统计');
-    await expect(dashboard.getByRole('region', { name: '没查到的问题' })).toContainText('当前查询暂不能统计');
-    await expect(dashboard.getByRole('region', { name: '待办' })).toContainText('当前待办暂不可用');
-    await expect(dashboard.getByRole('region', { name: '不准的话术' })).toContainText('当前待办暂不可用');
-    await expect(dashboard.getByTestId('overview-outcomes')).toContainText('当前处理效果暂不可用');
-    await expect(dashboard.getByRole('button', { name: '开始处理' })).toHaveCount(0);
-    await expect(dashboard.getByRole('button', { name: '已处理' })).toHaveCount(0);
-    await expect(dashboard.getByText('没有查询', { exact: true })).toHaveCount(0);
+    await expect(dashboard.getByTestId('module-overview')).toBeVisible();
+    await expect(dashboard.getByRole('textbox', { name: '时间范围' })).toHaveCount(0);
+    await expect(dashboard.getByText('当前查询暂不能统计')).toHaveCount(0);
     const overviewRequests = (await host.status()).requests;
-    expect(overviewRequests).not.toContain('/v1/events/usage');
-    expect(overviewRequests).not.toContain('/v1/metrics/question');
-    expect(overviewRequests).not.toContain('/v1/metrics/iteration-tasks');
-    expect(overviewRequests).not.toContain('/v1/metrics/inaccuracy-outcomes');
-    expect(overviewRequests.some(request => request.startsWith('/v1/events/iteration-tasks/'))).toBe(false);
-    await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
-    const presets = dashboard.locator('.overview-range-popup .ant-picker-presets li');
-    await expect(presets).toHaveCount(2);
-    const tops = await presets.evaluateAll(items => items.map(item => Math.round(item.getBoundingClientRect().top)));
-    expect(tops[0]).toBe(tops[1]);
-    await dashboard.screenshot({ path: path.join(evidence, 'date-presets.png') });
-    for (const [label, days] of [['近 7 天', 7], ['近 30 天', 30]] as const) {
-      await dashboard.locator('.overview-range-popup .ant-picker-presets li', { hasText: label }).click();
-      await expect.poll(async () => {
-        const values = await dashboard.getByRole('textbox', { name: '时间范围' }).evaluateAll(inputs => inputs.map(i => (i as HTMLInputElement).value));
-        return (Date.parse(values.at(-1)!) - Date.parse(values[0]!)) / 86_400_000 + 1;
-      }, { message: label }).toBe(days);
-      await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
-    }
-    await dashboard.keyboard.press('Escape');
-    const requestsAfterDateChanges = (await host.status()).requests;
-    expect(requestsAfterDateChanges).not.toContain('/v1/metrics/iteration-tasks');
-    expect(requestsAfterDateChanges).not.toContain('/v1/metrics/inaccuracy-outcomes');
-    expect(requestsAfterDateChanges.some(request => request.startsWith('/v1/events/iteration-tasks/'))).toBe(false);
-
-    await dashboard.getByTestId('nav-content').click();
+    for (const route of ['/v1/events/usage', '/v1/metrics/question', '/v1/metrics/iteration-tasks', '/v1/metrics/inaccuracy-outcomes']) expect(overviewRequests).not.toContain(route);
+    await dashboard.screenshot({ path: path.join(evidence, 'workspace.png') });
+    await dashboard.getByTestId('nav-sop').click();
+    await expect(dashboard.getByTestId('module-sop')).toContainText('SOP 学习与执行尚未开放。');
+    await expect(dashboard.getByTestId('sop-upload')).toHaveCount(0);
+    await dashboard.getByTestId('nav-wording').click();
+    await dashboard.getByRole('tab', { name: '本机草稿', exact: true }).click();
     await dashboard.getByRole('button', { name: '添加话术' }).click();
     await dashboard.locator('input[type=file]').setInputFiles(workbookPath);
     await expect(dashboard.getByText('包含 1 张图片，将随对应话术保存。')).toBeVisible();
     await expect(dashboard.getByRole('list', { name: '未导入的内容' })).toContainText('工作表背景图不属于任何话术，未导入。');
     await dashboard.screenshot({ path: path.join(evidence, 'xlsx-preview.png') });
     await dashboard.getByRole('button', { name: '导入 2 条' }).click();
-    await expect(dashboard.getByText('将导入 2 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeVisible();
+    await expect(dashboard.getByText('将导入 2 条到本机草稿，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeVisible();
     await dashboard.getByRole('button', { name: '确认导入 2 条' }).click();
     await expect(dashboard.getByText('已导入 2 条，状态是未生效。')).toBeVisible();
     await dashboard.getByRole('tab', { name: '售前客服' }).click();

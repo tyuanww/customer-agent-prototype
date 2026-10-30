@@ -43,11 +43,12 @@ it('shows entry dates and the read deadline in the same local time zone with an 
  expect(await screen.findByRole('row',{name:/合成标题 product/})).toHaveTextContent('生效 2026-01-15 10:00，失效 2026-01-15 11:00');
  expect(screen.getByRole('row',{name:/合成标题 product/})).not.toHaveTextContent('UTC');
  const status=screen.getByRole('status');
- expect(status).toHaveTextContent('当前可用 4 条，到 2026-01-15 还能查。');
+ expect(status).toHaveTextContent('当前显示 1 条');
  expect(status).not.toHaveTextContent('rel_');
  expect(status).not.toHaveTextContent('UTC');
  expect(status).not.toHaveTextContent('1 小时内到期');
- expect(screen.getByText('1 小时内到期')).toBeVisible();
+ expect(status).toHaveTextContent('读取有效至 2026-01-15 10:00');
+ expect(screen.queryByText('1 小时内到期')).not.toBeInTheDocument();
  expect(f.command).toHaveBeenCalledTimes(1);
 });
 it('shows missing and invalid entry times explicitly instead of inventing a date',async()=>{
@@ -63,16 +64,16 @@ it('does not turn an absent optional timestamp into the Unix epoch',()=>{
  expect(formatIntakeTime(undefined)).toBe('未提供时间');
  expect(formatIntakeTime('  ')).toBe('未提供时间');
 });
-it('counts the snapshot on the status line while a domain tab shows fewer rows',async()=>{
+it('counts only the visible domain and search results in the footer',async()=>{
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
  const product=await screen.findByRole('row',{name:/合成标题 product/});
  expect(screen.getByRole('region',{name:'可用话术目录'})).toBeVisible();
- expect(screen.getByRole('heading',{name:'话术库'})).toBeInTheDocument();
+ expect(screen.getByRole('heading',{name:'已发布话术'})).toBeInTheDocument();
  expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
  expect(screen.queryByText(/软件更新/)).not.toBeInTheDocument();
  expect(screen.queryByText(/发布记录/)).not.toBeInTheDocument();
  const status=screen.getByRole('status');
- expect(status).toHaveTextContent('当前可用 4 条');
+ expect(status).toHaveTextContent('当前显示 1 条');
  expect(status).not.toHaveTextContent('rel_');
  expect(screen.queryByText('合成原文 campaign')).not.toBeInTheDocument();
  expect(document.querySelector('select')).toBeNull();
@@ -82,7 +83,7 @@ it('counts the snapshot on the status line while a domain tab shows fewer rows',
  for(const [label,domain] of [['活动','campaign'],['售前','presale'],['售后','aftersale']]){
   await user.click(screen.getByRole('tab',{name:label}));expect(screen.getByText(`合成原文 ${domain}`)).toBeVisible();
   expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('当前可用 4 条');
+  expect(screen.getByRole('status')).toHaveTextContent('当前显示 1 条');
  }
  expect(f.command).toHaveBeenCalledTimes(1);
  fireEvent.keyDown(screen.getByRole('tab',{name:'售后'}),{key:'Home'});
@@ -92,21 +93,30 @@ it('counts the snapshot on the status line while a domain tab shows fewer rows',
  expect(screen.getByRole('button', { name: '刷新可用资料' })).toBeVisible();
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  await user.click(screen.getByRole('tab',{name:'SOP'}));
- // SOP is a real tab now, rendered by the same table as the other four.
- expect(screen.getByRole('tabpanel')).toHaveTextContent('当前条件下没有此类可用话术。');
+ expect(screen.getByRole('tabpanel')).toHaveTextContent('此分类还没有可用话术，资料审核发布后会出现在这里。');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('这一栏还没有 SOP 目录。');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('未接入');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
 });
+it('hides the SOP catalog tab when the formal workflow is unavailable', async () => {
+ setup();render(<IntakeLibrary active includeSop={false}/>);
+ await screen.findByText('合成原文 product');
+ expect(screen.queryByRole('tab',{name:'SOP'})).not.toBeInTheDocument();
+ expect(screen.getByRole('tab',{name:'产品'})).toBeInTheDocument();
+});
 it('clears content on condition changes and uses IDs rather than names for shop selection',async()=>{
  const f=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
  await screen.findByText('合成原文 product');
- await user.click(screen.getByText('商品'));
+ await user.click(screen.getByRole('button',{name:'高级筛选'}));
  await user.click(screen.getByRole('checkbox',{name:'合成商品'}));
- expect(f.command).toHaveBeenLastCalledWith({action:'select-conditions',productIds:['product-a'],scenarioIds:[]});
- expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
- await user.click(screen.getByRole('button',{name:'刷新可用资料'}));await screen.findByText('合成原文 product');
+ expect(f.command).toHaveBeenCalledTimes(1);
+ await user.click(screen.getByRole('button',{name:'应用筛选'}));
+ await waitFor(()=>expect(f.command).toHaveBeenCalledTimes(3));
+ expect(f.command).toHaveBeenNthCalledWith(2,{action:'select-conditions',productIds:['product-a'],scenarioIds:[]});
+ expect(f.command).toHaveBeenLastCalledWith({action:'refresh'});
+ expect(await screen.findByText('合成原文 product')).toBeVisible();
+ expect(screen.getByRole('region',{name:'可用话术目录'})).toHaveTextContent('商品：合成商品');
  await user.click(screen.getByRole('combobox',{name:'目录店铺'}));
  await user.click(await screen.findByRole('option',{name:'合成同名店（shop-b）'}));
  expect(f.command).toHaveBeenLastCalledWith({action:'select-shop',shopId:'shop-b'});
@@ -217,8 +227,9 @@ it('counts a fresh empty snapshot as zero available rows',async()=>{
  const f=setup(),view=data();view.rows=[];
  f.command.mockResolvedValueOnce({ok:true,view});
  render(<IntakeLibrary active/>);
- const status=await screen.findByRole('status');
- expect(status.textContent ?? '').toMatch(/^当前可用 0 条，到 \d{4}-\d{2}-\d{2} 还能查。$/);
+ await screen.findByText('当前显示 0 条');
+ const status=screen.getByRole('status');
+ expect(status).toHaveTextContent('当前显示 0 条');
  expect(status).not.toHaveTextContent('暂无有效发布');
 });
 it('stores a missing catalog API as the unavailable sentence with a retry',async()=>{
@@ -238,4 +249,28 @@ it('stores a signed-out catalog as the logged-out sentence without a retry',asyn
  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'重试'})).not.toBeInTheDocument();
  expect(screen.queryByRole('heading',{name:'系统同步'})).not.toBeInTheDocument();
+});
+
+it('keeps filter edits local until applied and counts the visible search', async () => {
+ const fixture=setup(), user=userEvent.setup();render(<IntakeLibrary active/>);
+ await screen.findByText('合成原文 product');
+ expect(screen.queryByText('商品')).not.toBeInTheDocument();
+ await user.type(screen.getByRole('textbox',{name:'问题搜索'}),'不匹配');
+ expect(screen.getByRole('status')).toHaveTextContent('当前显示 0 条');
+ await user.click(screen.getByRole('button',{name:'高级筛选'}));
+ await user.click(screen.getByRole('checkbox',{name:'合成商品'}));
+ await user.click(screen.getByRole('button',{name:'取消'}));
+ expect(fixture.command).toHaveBeenCalledTimes(1);
+ expect(screen.queryByLabelText('已用筛选')).not.toBeInTheDocument();
+});
+it('does not acquire a new snapshot after applying rejected filters',async()=>{
+ const fixture=setup(),user=userEvent.setup();render(<IntakeLibrary active/>);
+ await screen.findByText('合成原文 product');
+ await user.click(screen.getByRole('button',{name:'高级筛选'}));
+ await user.click(screen.getByRole('checkbox',{name:'合成商品'}));
+ fixture.command.mockResolvedValueOnce({ok:false,code:'UNAVAILABLE',message:'筛选范围已变化',view:null});
+ await user.click(screen.getByRole('button',{name:'应用筛选'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('筛选范围已变化');
+ expect(fixture.command).toHaveBeenCalledTimes(2);
+ expect(screen.queryByText('合成原文 product')).not.toBeInTheDocument();
 });

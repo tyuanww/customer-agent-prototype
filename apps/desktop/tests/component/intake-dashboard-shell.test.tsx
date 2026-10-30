@@ -120,18 +120,19 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   render(<DashboardApp />);
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
-  await waitFor(() => expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5));
-  expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
+  await waitFor(() => expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(4));
+  expect(screen.queryByRole('tab', { name: '成员与权限' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
-  await user.click(screen.getByTestId('nav-content'));
-  const tab = screen.getByTestId('nav-content');
+  await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
+  const tab = screen.getByTestId('nav-wording');
   expect(tab).toHaveAttribute('aria-selected', 'true');
-  for (const [key,module] of [['ArrowDown','materials'],['ArrowUp','content'],['Home','overview'],['End','materials']]) {
-    fireEvent.keyDown(screen.getByTestId('nav-content'), { key });
+  for (const [key,module] of [['ArrowDown','sop'],['ArrowUp','wording'],['Home','overview'],['End','materials']]) {
+    fireEvent.keyDown(screen.getByTestId('nav-wording'), { key });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', module);
   }
-  for (const id of ['overview','wording','sop','content']) await user.click(screen.getByTestId(`nav-${id}`));
+  for (const id of ['overview','wording','sop']) await user.click(screen.getByTestId(`nav-${id}`));
   await user.click(screen.getByTestId('dashboard-theme-trigger'));
   await user.click(screen.getByTestId('dashboard-theme-dark'));
   expect(shell).toHaveAttribute('data-theme', 'dark');
@@ -139,16 +140,16 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   fireEvent.focus(window);
   expect(legacySession).toHaveBeenCalled();
   expect(screen.queryByTestId('overview-kpi-source')).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '知识库' })).toBeInTheDocument();
+  expect(screen.getByTestId('module-sop')).toBeInTheDocument();
 });
 
 it('opens the six-page shell without waiting on the intake mode lookup', async () => {
   window.dashboardIntake = { mode: async () => ({ ok: false, code: 'UNAVAILABLE' }),
-    current: vi.fn(), command: vi.fn(), onInvalidated: vi.fn() } as unknown as typeof window.dashboardIntake;
+    current: vi.fn(), command: vi.fn(async () => ({ ok:false,code:'UNAVAILABLE',message:'无法读取资料',view:null })), onInvalidated: () => () => undefined } as unknown as typeof window.dashboardIntake;
   render(<DashboardApp />);
   expect(await screen.findByTestId('dashboard-shell')).toBeInTheDocument();
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  expect(window.dashboardIntake!.command).not.toHaveBeenCalled();
+  expect(window.dashboardIntake!.command).toHaveBeenCalledWith({ action:'list', next:false });
 });
 
 it('keeps an unsent knowledge name across workspace navigation', async () => {
@@ -158,7 +159,8 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   const user = userEvent.setup();
   installShippedDashboardCss();
   render(<DashboardApp />);
-  await user.click(await screen.findByTestId('nav-content'));
+  await user.click(await screen.findByTestId('nav-wording'));
+  await user.click(screen.getByRole('tab', { name: '本机草稿' }));
   const write = await screen.findByRole('button', { name: '添加话术' });
   const content = screen.getByTestId('dashboard-content');
   const knowledge = document.querySelector('.desk-knowledge');
@@ -182,7 +184,8 @@ it('keeps an unsent knowledge name across workspace navigation', async () => {
   expectSeatFontWeight(save, '600');
   await user.type(question, '退货时效');
   await user.click(screen.getByTestId('nav-overview'));
-  await user.click(screen.getByTestId('nav-content'));
+  await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
   expect(screen.getByRole('textbox', { name: '问题' })).toHaveValue('退货时效');
 });
 it('preserves an unsaved permission preview across outer navigation',async()=>{
@@ -191,11 +194,12 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
   showPermissionsNav();
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();allowGrant();render(<DashboardApp/>);
-    expect(await screen.findByRole('tab',{name:'权限'})).toHaveAttribute('data-nav-group','治理与架构');
-    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(6);
-    await user.click(screen.getByTestId('nav-content'));
-    fireEvent.keyDown(screen.getByTestId('nav-content'), { key: 'ArrowDown' });
-    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'materials');
+    expect(await screen.findByRole('tab',{name:'成员与权限'})).toHaveAttribute('data-nav-group','治理与架构');
+    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5);
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
+    fireEvent.keyDown(screen.getByTestId('nav-wording'), { key: 'ArrowDown' });
+    expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-permissions'));
     const permissionsPage = document.querySelector('.desk-permissions-page');
@@ -211,7 +215,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     await screen.findAllByRole('row',{name:/合成坐席/});
     await user.click(screen.getByRole('button',{name:'新增授权'}));
     const person = owner.view().people[0]!;
-    await user.click(screen.getByRole('combobox',{name:'人员'}));
+    await user.click(screen.getByRole('combobox',{name:'成员'}));
     await user.click(await screen.findByRole('option', { name: person.label }));
     await user.click(screen.getByLabelText('生效时间'));
     await user.type(screen.getByLabelText('生效时间'), '2026-10-08 18:00{Enter}');
@@ -248,7 +252,7 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     shell.style.width = '980px';
     shell.style.height = '680px';
     const content = screen.getByTestId('dashboard-content');
-    const pages = ['overview', 'wording', 'sop', 'content', 'permissions'] as const;
+    const pages = ['overview', 'wording', 'sop', 'materials', 'permissions'] as const;
     for (const theme of ['light', 'dark'] as const) {
       await user.click(screen.getByTestId('dashboard-theme-trigger'));
       await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
@@ -265,10 +269,11 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('没有权限，请找人开通。');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('SOP 学习与执行尚未开放。');
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-content'));
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
     const add = await screen.findByRole('button', { name: '添加话术' });
     for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
     expect(add).toHaveFocus();
@@ -294,7 +299,7 @@ async function tabUntil(user: ReturnType<typeof userEvent.setup>, target: HTMLEl
   expectVisibleFocus(target);
 }
 
-it('opens the add layer and permission dialogs and keeps keyboard focus inside 980 by 680 in light and dark', async () => {
+it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard flows usable at 980 by 680 in %s mode', async (theme) => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
   window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
@@ -327,58 +332,57 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     shell.style.width = '980px';
     shell.style.height = '680px';
     const content = screen.getByTestId('dashboard-content');
-    for (const theme of ['light', 'dark'] as const) {
-      await user.click(screen.getByTestId('dashboard-theme-trigger'));
-      await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
-      expect(shell).toHaveAttribute('data-theme', theme);
-      if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
+    await user.click(screen.getByTestId('dashboard-theme-trigger'));
+    await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
+    expect(shell).toHaveAttribute('data-theme', theme);
+    if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
 
-      await user.click(screen.getByTestId('nav-content'));
-      const add = await screen.findByRole('button', { name: '添加话术' });
-      await user.click(add);
-      const addDialog = screen.getByRole('dialog', { name: '添加话术' });
-      await tabUntil(user, within(addDialog).getByRole('button', { name: '关闭' }));
-      await user.click(within(addDialog).getByRole('button', { name: '没有文档？手动填写一条' }));
-      await tabUntil(user, within(addDialog).getByRole('textbox', { name: '问题' }));
-      await user.type(within(addDialog).getByRole('textbox', { name: '问题' }), '焦点不保存');
-      await user.click(within(addDialog).getByRole('button', { name: '关闭' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.queryByRole('cell', { name: '焦点不保存' })).not.toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
+    await user.click(screen.getByTestId('nav-wording'));
+    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
+    const add = await screen.findByRole('button', { name: '添加话术' });
+    await user.click(add);
+    const addDialog = screen.getByRole('dialog', { name: '添加话术' });
+    await tabUntil(user, within(addDialog).getByRole('button', { name: '关闭' }));
+    await user.click(within(addDialog).getByRole('button', { name: '没有文档？手动填写一条' }));
+    await tabUntil(user, within(addDialog).getByRole('textbox', { name: '问题' }));
+    await user.type(within(addDialog).getByRole('textbox', { name: '问题' }), '焦点不保存');
+    await user.click(within(addDialog).getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: '焦点不保存' })).not.toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
 
-      await user.click(screen.getByTestId('nav-permissions'));
-      const businessTab = screen.queryByRole('tab', { name: '业务授权' });
-      if (businessTab && businessTab.getAttribute('aria-selected') !== 'true') await user.click(businessTab);
-      await screen.findByRole('row', { name: /合成坐席/ });
-      expect(screen.queryByRole('button', { name: '停止等待' })).not.toBeInTheDocument();
-      expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: '新增授权' }));
-      const grant = screen.getByRole('dialog', { name: '新增业务权限' });
-      await tabUntil(user, within(grant).getByRole('button', { name: '关闭' }));
-      await tabUntil(user, within(grant).getByRole('combobox', { name: '人员' }));
-      await user.click(within(grant).getByRole('button', { name: '关闭' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('tab', { name: '外包坐席' }));
-      await user.click(screen.getByRole('button', { name: '新建坐席' }));
-      const seat = screen.getByRole('dialog', { name: '新建坐席' });
-      await tabUntil(user, within(seat).getByRole('button', { name: '关闭' }));
-      await tabUntil(user, within(seat).getByLabelText('姓名'));
-      await user.click(within(seat).getByRole('button', { name: '取消' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
-
-      await user.click(screen.getByTestId('nav-wording'));
-      const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
-      await tabUntil(user, refresh);
-      expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
-      expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
-    }
     await user.click(screen.getByTestId('nav-permissions'));
-    await user.click(screen.getByRole('tab', { name: '业务授权' }));
+    const businessTab = screen.queryByRole('tab', { name: '成员权限' });
+    if (businessTab && businessTab.getAttribute('aria-selected') !== 'true') await user.click(businessTab);
+    await screen.findByRole('row', { name: /合成坐席/ });
+    expect(screen.queryByRole('button', { name: '停止等待' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '新增授权' }));
+    const grant = screen.getByRole('dialog', { name: '新增授权' });
+    await tabUntil(user, within(grant).getByRole('button', { name: '关闭' }));
+    await tabUntil(user, within(grant).getByRole('combobox', { name: '成员' }));
+    await user.click(within(grant).getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: '账号管理' }));
+    await user.click(screen.getByRole('button', { name: '新建坐席' }));
+    const seat = screen.getByRole('dialog', { name: '新建坐席' });
+    await tabUntil(user, within(seat).getByRole('button', { name: '关闭' }));
+    await tabUntil(user, within(seat).getByLabelText('姓名'));
+    await user.click(within(seat).getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
+
+    await user.click(screen.getByTestId('nav-wording'));
+    const refresh = await screen.findByRole('button', { name: '刷新可用资料' });
+    await tabUntil(user, refresh);
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
+    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
+    await user.click(screen.getByTestId('nav-permissions'));
+    await user.click(screen.getByRole('tab', { name: '成员权限' }));
     await user.click(screen.getByRole('button', { name: '新增授权' }));
     const person = owner.view().people[0]!;
-    await user.click(screen.getByRole('combobox', { name: '人员' }));
+    await user.click(screen.getByRole('combobox', { name: '成员' }));
     await user.click(await screen.findByRole('option', { name: person.label }));
     await user.click(screen.getByLabelText('生效时间'));
     await user.type(screen.getByLabelText('生效时间'), '2026-10-08 10:00{Enter}');
@@ -391,6 +395,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     await user.click(screen.getByRole('button', { name: '确认保存权限' }));
     await screen.findByText(/本次操作已保存/);
     await user.click(screen.getByRole('button', { name: '刷新权限列表' }));
+    await user.click(await screen.findByRole('button', { name: '查看权限' }));
     const revoke = await screen.findByRole('button', { name: '撤销该权限' });
     expect(revoke).toHaveClass('ant-btn-dangerous');
     await tabUntil(user, revoke);
@@ -453,7 +458,7 @@ it('shows the signed-in account at the bottom of the sidebar and logs out throug
   await user.click(account);
   await user.click(await screen.findByRole('menuitem', { name: /退出登录/ }));
   expect(logout).toHaveBeenCalledWith();
-  expect(await screen.findByRole('alert')).toHaveTextContent('已退出本机，服务端退出未确认。');
+  expect(await screen.findByText('已退出本机，服务端退出未确认。')).toHaveAttribute('role','alert');
   signedIn = false;
   changed.notify?.();
   expect(await screen.findByText('未登录')).toBeInTheDocument();

@@ -33,13 +33,13 @@ describe('dashboard manifest', () => {
       'materials',
       'permissions',
     ]);
-    expect(DASHBOARD_NAV.find((item) => item.id === 'content')?.label).toBe('知识库');
-    expect(DASHBOARD_NAV.find((item) => item.id === 'materials')?.label).toBe('资料');
-    expect(DASHBOARD_NAV.find((item) => item.id === 'permissions')?.label).toBe('权限');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'content')?.label).toBe('内容库');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'materials')?.label).toBe('资料审核');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'permissions')?.label).toBe('成员与权限');
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
-      blurb: '当前产品会话 SOP 树',
+      blurb: '学习与执行操作流程',
       group: '话术运营',
     });
     expect(DASHBOARD_NAV.filter((item) => item.group === '话术运营').map((item) => item.id)).toEqual([

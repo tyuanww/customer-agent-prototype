@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true, writable: true,
@@ -11,6 +11,14 @@ import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowled
 import { DeskKnowledgeStore, type DeskReply } from '../../src/shared/desk-knowledge';
 
 afterEach(() => { cleanup(); delete window.dashboardDesk; delete window.dashboardContent; });
+
+it('does not read hidden local drafts before the draft page is opened', async () => {
+  const current = vi.fn(async () => ({ ok: true as const, view: new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined }).reply('operator', '合成经理').view! }));
+  window.dashboardDesk = { current, command: vi.fn() } as unknown as Window['dashboardDesk'];
+  render(<DeskKnowledge active={false} />);
+  await act(async () => {});
+  expect(current).not.toHaveBeenCalled();
+});
 
 it('uploads a sheet and shows it as what the seat receives', async () => {
   const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
@@ -38,7 +46,7 @@ it('uploads a sheet and shows it as what the seat receives', async () => {
   await user.upload(screen.getByLabelText('导入 CSV 或 Excel'), file);
   expect(await screen.findByText('退货多久')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '导入 1 条' }));
-  expect(screen.getByText('将导入 1 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
+  expect(screen.getByText('将导入 1 条到本机草稿，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '确认导入 1 条' }));
   expect(await screen.findByText('已导入 1 条，状态是未生效。')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '售后客服' }));
@@ -115,7 +123,7 @@ it('closes the import confirmation with the add layer and does not import', asyn
   const file = new File(['问题,标准话术,分类\n退货多久,七天内可退,售后\n'], '售后.csv', { type: 'text/csv' });
   await user.upload(screen.getByLabelText('导入 CSV 或 Excel'), file);
   await user.click(await screen.findByRole('button', { name: '导入 1 条' }));
-  expect(screen.getByText('将导入 1 条到本机知识库，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
+  expect(screen.getByText('将导入 1 条到本机草稿，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '关闭' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByText(/将导入 1 条话术/)).not.toBeInTheDocument();
@@ -124,12 +132,12 @@ it('closes the import confirmation with the add layer and does not import', asyn
 
 it('does not ask the seat to log in when the knowledge store is absent', async () => {
   render(<DeskKnowledge />);
-  expect(screen.getByRole('region', { name: '知识库' })).toHaveTextContent('知识库还不能在这里用。');
+  expect(screen.getByRole('region', { name: '本机草稿' })).toHaveTextContent('本机草稿还不能在这里用。');
   expect(screen.queryByText('未接入')).not.toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
   await act(async () => { await Promise.resolve(); });
-  expect(screen.getByRole('region', { name: '知识库' })).toHaveTextContent('知识库还不能在这里用。');
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '本机草稿' })).toHaveTextContent('本机草稿还不能在这里用。');
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
 });
 
 it('stores a scheduled window as an instant and keeps that instant out of the fields', async () => {
@@ -219,12 +227,12 @@ it('shows the reading skeleton until the knowledge read is ready', async () => {
     command: async (command) => desk.command(null, command, null),
   };
   render(<DeskKnowledge />);
-  expect(screen.getByRole('status', { name: '正在读取知识库' })).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: '正在读取本机草稿' })).toBeInTheDocument();
   expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
   expect(screen.queryByText('还没有知识。')).not.toBeInTheDocument();
   await act(async () => { resolveCurrent(desk.reply(null, null)); });
   expect(await screen.findByText('请先登录。')).toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
 });
 
 it('keeps the empty sentences for an operator and a seat', async () => {
@@ -260,7 +268,7 @@ it('keeps the persona list when a write fails', async () => {
   expect(screen.getByRole('tab', { name: '售前客服' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: '售后客服' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '添加话术' })).toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
 });
 
 it('shows a failed knowledge read without a persona list', async () => {
@@ -269,9 +277,9 @@ it('shows a failed knowledge read without a persona list', async () => {
     command: async () => { throw new Error('down'); },
   };
   render(<DeskKnowledge />);
-  expect(await screen.findByText('知识库暂时读不出来。')).toBeInTheDocument();
+  expect(await screen.findByText('本机草稿暂时读不出来。')).toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: '全店' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
 });
 
 it('stores an unauthorized knowledge read as forbidden', async () => {
@@ -283,7 +291,7 @@ it('stores an unauthorized knowledge read as forbidden', async () => {
   expect(await screen.findByText('请先在查询窗口登录。')).toBeInTheDocument();
   expect(screen.queryByRole('tab', { name: '全店' })).not.toBeInTheDocument();
   expect(screen.queryByRole('table', { name: '当前人设知识' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
 });
 
 it('keeps a refused knowledge read on the workbench as an error', async () => {
@@ -293,8 +301,8 @@ it('keeps a refused knowledge read on the workbench as an error', async () => {
   };
   render(<DeskKnowledge />);
   expect(await screen.findByText('请求未完成或权限已改变。')).toBeInTheDocument();
-  expect(screen.queryByText('知识库还不能在这里用。')).not.toBeInTheDocument();
-  expect(screen.getByRole('region', { name: '知识库' })).toHaveClass('wb9');
+  expect(screen.queryByText('本机草稿还不能在这里用。')).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '本机草稿' })).toHaveClass('wb9');
 });
 
 it('keeps the persona list on screen while the next knowledge read is in flight', async () => {
@@ -324,7 +332,7 @@ it('keeps the persona list on screen while the next knowledge read is in flight'
   expect(reads).toBe(2);
   expect(screen.getByRole('tab', { name: '全店' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '添加话术' })).toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '正在读取本机草稿' })).not.toBeInTheDocument();
   await act(async () => { release(); });
   expect(await screen.findByRole('button', { name: '添加话术' })).toBeInTheDocument();
 });

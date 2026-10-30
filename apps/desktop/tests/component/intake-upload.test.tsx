@@ -62,7 +62,7 @@ it('shows total issues separately from the bounded page and saves the complete r
   expect(screen.getByText(/共 125 个问题，当前显示 1 个/)).toBeInTheDocument();
   expect(screen.getByText(/最近读取的服务端状态：校验未通过/)).toBeInTheDocument();
   expect(screen.getByRole('cell', { name: '1 / 3' })).toBeInTheDocument();
-  expect(screen.getByText(/本批尚未形成候选/)).toBeInTheDocument();
+  expect(screen.getByText(/本批尚未生成待审核资料/)).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '保存完整错误报告' }));
   expect(apply).toHaveBeenCalledWith({ action: 'upload-save-report' });
   await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
@@ -77,7 +77,7 @@ it('shows CSV record coordinates and offers a pathless choice for either support
   expect(screen.getByRole('status')).toHaveTextContent('整批校验未通过');
   expect(screen.getByText(/CSV 行号按记录计算/)).toBeInTheDocument();
   expect(screen.getByRole('cell', { name: '3 / 8' })).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: '资料校验结果' })).toHaveTextContent('本批尚未形成候选');
+  expect(screen.getByRole('region', { name: '资料校验结果' })).toHaveTextContent('本批尚未生成待审核资料');
   await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
   expect(apply).toHaveBeenCalledWith({ action: 'upload-choose' });
 });
@@ -117,18 +117,20 @@ it('stops a pending upload through the management controller and ignores its lat
   await user.click(screen.getByRole('button', { name: '按原请求重试上传' }));
   await screen.findByText(/正在上传文件/);
   await act(async () => resolve({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
-  expect(screen.queryByText(/校验通过，候选已形成/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/校验通过，待审核资料已生成/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '刷新上传权限' })).toBeDisabled();
   await act(async () => finishRetry({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
-  expect(await screen.findByText(/校验通过，候选已形成/)).toBeInTheDocument();
+  expect(await screen.findByText(/校验通过，待审核资料已生成/)).toBeInTheDocument();
   expect(command.mock.calls.map(([c]) => c.action)).toEqual(['list', 'upload-submit', 'upload-stop', 'upload-retry']);
 });
 it('protects an already opened candidate from a new native file selection while allowing report reads', async () => {
+  const user = userEvent.setup();
   const view = { ...management(upload({ phase: 'validated', canSubmit: false, canSaveReport: true })), selected: intakeManagementData(1).candidate };
   const command = vi.fn(async () => ({ ok: true as const, view }));
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command,
     current: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
+  await user.click(await screen.findByRole('button', { name: '上传资料' }));
   expect(await screen.findByRole('button', { name: '选择 CSV / Excel 文件' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '保存完整错误报告' })).toBeEnabled();
   expect(screen.getByRole('button', { name: '查看材料' })).toBeEnabled();
@@ -146,6 +148,7 @@ it.each([
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command,
     current: async () => ({ ok: true, view: structuredClone(view) }), onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
+  await user.click(await screen.findByRole('button', { name: '上传资料' }));
   const refresh = await screen.findByRole('button', { name: '刷新解析进度' });
   if (field) {
     expect(refresh).toBeEnabled();
@@ -219,4 +222,28 @@ it('offers only local discard when revision details are hidden after import revo
   expect(screen.getByRole('button', { name: '选择 CSV / Excel 文件' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: '清除本地上传准备' }));
   expect(apply).toHaveBeenCalledWith({ action: 'upload-reset' });
+});
+
+it('retains upload declarations across collapse and overview, and dismisses the upload reset dialog', async () => {
+  const user = userEvent.setup(), view = management(upload());
+  const command = vi.fn<IntakeManagementApi['command']>(async () => ({ ok: true, view: structuredClone(view) }));
+  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command,
+    current: async () => ({ ok: true, view: structuredClone(view) }), onInvalidated: () => () => undefined };
+  const page = render(<IntakeManagement />);
+  await screen.findByRole('combobox', { name: '整理责任人' }); await declare(user);
+  await user.click(screen.getByRole('button', { name: '收起上传区' }));
+  expect(screen.queryByRole('combobox', { name: '整理责任人' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '上传资料' }));
+  expect(screen.getByRole('button', { name: '上传并校验' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: '重新选择来源' }));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  page.rerender(<IntakeManagement presentation="overview" onOpenReview={() => undefined} />);
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: '上传并校验' })).not.toBeInTheDocument();
+  page.rerender(<IntakeManagement />);
+  expect(screen.getByRole('checkbox', { name: '我已核对整理责任人及全部实际改稿人' })).toBeChecked();
+  expect(screen.getByRole('combobox', { name: '整理责任人' }).closest('.ant-select')).toHaveTextContent('合成整理人');
+  expect(screen.getByRole('checkbox', { name: '实际改稿人 合成历史编辑' })).toBeChecked();
+  expect(screen.getByRole('button', { name: '上传并校验' })).toBeEnabled();
+  expect(command.mock.calls.map(([c]) => c.action)).toEqual(['list']);
 });

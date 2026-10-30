@@ -57,7 +57,7 @@ it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限
   expect(screen.getByRole('region', { name: '权限配置' })).toBeVisible();
   cleanup();
   render(<IntakeManagement />);
-  expect(await screen.findByRole('heading', { name: '资料' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: '资料审核' })).toBeVisible();
   expect(screen.getByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText('当前没有可用的资料管理权限，请确认登录身份与店铺授权。')).toBeNull();
 });

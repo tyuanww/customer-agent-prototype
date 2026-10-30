@@ -1,19 +1,20 @@
 import type { components } from '@customer-agent/contracts';
-import { Button, Empty, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
+import { Button, Collapse, ConfigProvider, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementReply, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
 import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { READ_DISCARDED, useAsyncResource, type DashboardRead } from './use-async-resource';
-import { DISPLAY_SEPARATOR, joinDisplayParts } from '@shared/display-separator';
+import { DISPLAY_SEPARATOR } from '@shared/display-separator';
 import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
 import { formatSeatClock } from './intake-time';
+import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
 import './intake-management.css';
 
 function askConfirm(content: string, onOk: () => void, danger = false) {
-  Modal.confirm({
+  return Modal.confirm({
     title: '请确认',
     content,
     okText: '确认',
@@ -32,27 +33,25 @@ function ActionButton(props: ButtonProps) {
 }
 type CandidateRow = IntakeManagementView['candidates'][number];
 const domainWord: Record<string, string> = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' };
-function scopeWording(scopeLabel: string | undefined, sourceId: string, domain?: string) {
-  const label = scopeLabel?.trim() ?? '';
-  const word = domain ? domainWord[domain] : undefined;
-  const fallback = joinDisplayParts(word ? ['该店铺', word, '该来源'] : ['该店铺', '该来源']);
-  if (!label || label === '—' || label === sourceId || label.startsWith('source-')) return fallback;
-  const parts = label.split(DISPLAY_SEPARATOR);
-  const head = parts[0] ?? '';
-  if (parts.length >= 2 && !/[\u3400-\u9fff]/.test(head)) return joinDisplayParts(['该店铺', ...parts.slice(1)]);
-  return label;
+function candidateCategory(scopeLabel?: string, domain?: string) {
+  const label = scopeLabel?.split(DISPLAY_SEPARATOR).at(-1)?.trim();
+  return label && Object.values(domainWord).includes(label) ? label : (domain && domainWord[domain]) || '—';
 }
-function candidateTitle(scopeLabel: string | undefined, version: number, sourceId: string, domain?: string) {
-  return `${scopeWording(scopeLabel, sourceId, domain)} 第 ${version} 版`;
+function shortBatchId(candidateId: string) {
+  return candidateId.length <= 16 ? candidateId : `${candidateId.slice(0, 6)}…${candidateId.slice(-6)}`;
+}
+function candidateState(candidate: CandidateRow['candidate']) {
+  if (candidate.state === 'awaiting-evidence') return candidate.sourceEvidenceVersion ? '待审核' : '待确认来源';
+  return stateLabel(candidate.state);
 }
 function differenceTitle(entries: { businessEntryId: string; title: string }[], businessEntryId: string) {
   const title = entries.find(entry => entry.businessEntryId === businessEntryId)?.title.trim();
   return title || '未命名条目';
 }
-const states: Record<string, string> = { 'awaiting-evidence': '等待补证', ready: '候选就绪', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
-  confirmed: '来源已确认', creating: '审批创建结果待确认', pending: '等待组织审批', approved: '组织审批已通过', rejected: '组织审批未通过', revoked: '组织审批已撤回', unavailable: '审批服务暂不可用', unknown: '操作结果待确认', failed: '操作失败', not_frozen: '待冻结抽样', revision_required: '需要修订后重新检查', initial_required: '等待初检', expansion_required: '等待扩检', passed: '质量检查通过', blocked: '质量检查未通过' };
+const states: Record<string, string> = { 'awaiting-evidence': '待审核', ready: '待发布', publishing: '发布中', published: '已发布', cancelled: '已取消', invalidated: '已失效',
+  confirmed: '来源已确认', creating: '审批创建结果待确认', pending: '等待组织审批', approved: '组织审批已通过', rejected: '组织审批未通过', revoked: '组织审批已撤回', unavailable: '审批服务暂不可用', unknown: '操作结果待确认', failed: '操作失败', not_frozen: '待开始审核', revision_required: '需上传修订版重新审核', initial_required: '待完成审核', expansion_required: '待完成追加检查', passed: '质量检查通过', blocked: '质量检查未通过' };
 const readinessLabels: Record<string, string> = {
-  SOURCE_MISMATCH: '来源已变更，请核对当前材料', BASE_CHANGED: '已发布版本已变更，请重新核对候选',
+  SOURCE_MISMATCH: '来源已变更，请核对当前材料', BASE_CHANGED: '已发布版本已变更，请重新核对资料',
   SOURCE_CONFIRMATION_REQUIRED: '待确认来源版本', APPROVAL_REVOKED: '组织审批已撤回',
   APPROVAL_UNAVAILABLE: '审批结果需重新核验', AWAITING_APPROVAL: '待组织审批通过',
   PERMISSION_CHANGED: '当前资格已变更，请刷新并核对权限',
@@ -60,13 +59,15 @@ const readinessLabels: Record<string, string> = {
 };
 const riskLabels: Record<components['schemas']['IntakeRisk']['level'], string> = { routine: '常规内容', critical: '关键变更' };
 function readinessLabel(reason: string) {
-  return Object.hasOwn(readinessLabels, reason) ? readinessLabels[reason] : '还有待核验事项，请刷新候选状态';
+  return Object.hasOwn(readinessLabels, reason) ? readinessLabels[reason] : '还有待核验事项，请刷新审核状态';
 }
-function workflowPane(target: string | undefined, policy: string | undefined): 'source' | 'publish' | 'legacy' | 'none' {
+type ReviewPane = 'material' | 'source' | 'quality' | 'publish' | 'legacy';
+function workflowPane(target: string | undefined, policy: string | undefined): ReviewPane {
   if (target === 'source') return 'source';
   if (target === 'publish') return 'publish';
+  if (target === 'quality') return 'quality';
   if (target === 'candidate' && policy === 'approval-v1') return 'legacy';
-  return 'none';
+  return 'material';
 }
 function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonNullable<IntakeManagementView['material']>; disabled: boolean; apply: (command: IntakeManagementCommand) => void; pageIndex: number }) {
   return <section aria-label="当前页材料与差异">
@@ -75,15 +76,28 @@ function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonN
       <ActionButton disabled={disabled || pageIndex === 0} onClick={() => apply({ action: 'material', next: false, previous: true })}>上一页材料</ActionButton>
       <ActionButton disabled={disabled || !material.nextCursor} onClick={() => apply({ action: 'material', next: true })}>下一页材料</ActionButton>
     </div>
-    {/* The workbook code is the entry's identity, so the reviewer has to see it;
-        without it 266 SOP cards share six sheet-name titles. */}
-    {material.entries.map(entry => <article className="intake-card" key={entry.businessEntryId}>
-      <h3>{entry.title}</h3>
-      <p className="intake-entry-code"><code>{entry.businessEntryId}</code></p>
-      <p className="intake-answer">{entry.answerText}</p>
-      <EntryDetails entry={entry} />
-    </article>)}
-    <h3>当前页差异</h3>{material.differences.map(difference => <p key={difference.businessEntryId} className="intake-diff"><code>{difference.businessEntryId}</code><span>{differenceTitle(material.entries, difference.businessEntryId)}</span><span>{({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[difference.change]}</span><span className="mute">{difference.previousVersion ?? '无前版'} → {difference.nextVersion}</span></p>)}
+    <Table rowKey="businessEntryId" dataSource={material.entries} pagination={false} size="small"
+      columns={[
+        // Workbook titles may repeat; the business code identifies the original row.
+        { title: '条目编号', dataIndex: 'businessEntryId', render: id => <code>{id}</code> },
+        { title: '标题', dataIndex: 'title' },
+        { title: '版本', dataIndex: 'scriptVersion' },
+      ]}
+      expandable={{
+        columnTitle: '原文', columnWidth: 100,
+        expandIcon: ({ expanded, onExpand, record }) => <ActionButton type="text"
+          aria-label={`${expanded ? '收起' : '查看'}原文 ${record.businessEntryId}`} aria-expanded={expanded}
+          onClick={event => onExpand(record, event)}>{expanded ? '收起原文' : '查看原文'}</ActionButton>,
+        expandedRowRender: entry => <><h3>{entry.title}</h3><p className="intake-answer">{entry.answerText}</p><EntryDetails entry={entry} /></>,
+      }} />
+    <h3>当前页差异</h3>
+    <Table rowKey="businessEntryId" dataSource={material.differences} pagination={false} size="small" locale={{ emptyText: '当前页没有变更记录。' }}
+      columns={[
+        { title: '条目编号', dataIndex: 'businessEntryId', render: id => <code>{id}</code> },
+        { title: '标题', key: 'title', render: (_value, difference) => differenceTitle(material.entries, difference.businessEntryId) },
+        { title: '变更', dataIndex: 'change', render: (change: 'add' | 'modify' | 'disable' | 'reenable') => ({ add: '新增', modify: '修改', disable: '停用', reenable: '重新启用' })[change] },
+        { title: '版本', key: 'version', render: (_value, difference) => `${difference.previousVersion ?? '无前版'} → ${difference.nextVersion}` },
+      ]} />
   </section>;
 }
 /** An instance can be bound before the first observation exists. The frozen
@@ -117,23 +131,23 @@ function CheckRow({ sample, disabled, save, onDirty }: { sample: QualityPage['sa
   const dirty = choice !== (saved ? saved.defect ? 'defect' : 'pass' : '') || reason !== (saved?.reason ?? '');
   useEffect(() => { onDirty(sample.scriptId, dirty); return () => { onDirty(sample.scriptId, false); }; }, [dirty, onDirty, sample.scriptId]);
   return <article className="intake-card">
-    <h3>{sample.entry.title} {sample.mandatory && <small>必检</small>}</h3>
+    <h3>{sample.entry.title} <small>{sample.mandatory ? '必检条目' : '抽检条目'}</small></h3>
     <p className="intake-answer">{sample.entry.answerText}</p>
     <EntryDetails entry={sample.entry} />
-    {sample.check ? <p>已提交：{sample.check.defect ? '有缺陷' : '无缺陷'} {sample.check.reason}</p>
+    {sample.check ? <p>已提交：{sample.check.defect ? '需修改' : '通过'} {sample.check.reason}</p>
       : <fieldset disabled={disabled}>
-        <legend>人工判断{sample.draft ? '（已暂存）' : '（尚未填写）'}</legend>
+        <legend>本条判断{sample.draft ? '（已暂存，尚未提交）' : '（尚未填写）'}</legend>
         <label>检查结论<Select aria-label={`检查结论 ${sample.entry.title}`} value={choice || undefined} placeholder="请选择" disabled={disabled}
           virtual={false} style={{ width: 160 }} onChange={value => setChoice(value)}
-          options={[{ value: 'pass', label: '无缺陷' }, { value: 'defect', label: '有缺陷' }]} /></label>
+          options={[{ value: 'pass', label: '通过' }, { value: 'defect', label: '需修改' }]} /></label>
         <label>判断说明<Input.TextArea value={reason} onChange={e => setReason(e.target.value)} aria-label={`判断说明 ${sample.entry.title}`} autoSize={{ minRows: 2, maxRows: 6 }} /></label>
         <ActionButton disabled={!choice || (choice === 'defect' && !reason.trim()) || [...reason].length > 1000}
-          onClick={() => save({ action: 'check', scriptId: sample.scriptId, defect: choice === 'defect', reason })}>保存本条判断</ActionButton>
+          onClick={() => save({ action: 'check', scriptId: sample.scriptId, defect: choice === 'defect', reason })}>暂存本条判断</ActionButton>
       </fieldset>}
   </article>;
 }
 function CandidateWorkflow({ view, disabled, apply, onDirty, sectionId, open, children }: { view: IntakeManagementView; disabled: boolean;
-  sectionId: string; open: 'source' | 'publish' | 'legacy' | 'none'; children: ReactNode;
+  sectionId: string; open: ReviewPane; children: ReactNode;
   apply: (command: IntakeManagementCommand) => void; onDirty: (id: string, dirty: boolean) => void }) {
   const [versionKind, setVersionKind] = useState<'integer' | 'opaque'>('opaque');
   const [versionValue, setVersionValue] = useState(''), [reason, setReason] = useState('');
@@ -158,65 +172,64 @@ function CandidateWorkflow({ view, disabled, apply, onDirty, sectionId, open, ch
   }, [result?.operationId, result?.action, result?.state]);
   return <section aria-label="来源确认与发布">
     <div hidden={open !== 'source'}>
-    <h2 id={`${sectionId}-source`} tabIndex={-1}>2. 确认来源</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。请核对原资料版本与当前候选材料。</p>
-    {view.material && <MaterialPage material={view.material} disabled={disabled} apply={apply} pageIndex={view.materialPage} />}
+    <h2 id={`${sectionId}-source`} tabIndex={-1}>确认来源</h2><p>已记录 {candidate.sourceEvidenceVersion} 次来源确认。</p>
     {view.canConfirmSource ? <fieldset disabled={disabled || view.hasDraft || publishDirty || !mutable || !view.material}>
       <legend>确认本次导出对应的来源版本</legend>
       {!view.material && <p>请先查看材料，核对本次上传内容。</p>}
-      <label>来源版本类型<Select aria-label="来源版本类型" value={versionKind} virtual={false} style={{ width: 160 }}
-        onChange={value => { if (value === 'integer' || value === 'opaque') setVersionKind(value); }}
-        options={[{ value: 'opaque', label: '版本标识' }, { value: 'integer', label: '递增整数' }]} /></label>
       <label>来源版本<Input aria-label="来源版本" value={versionValue} onChange={e => setVersionValue(e.target.value)} /></label>
       <label>来源确认说明<Input.TextArea aria-label="来源确认说明" value={reason} autoSize={{ minRows: 2, maxRows: 6 }} onChange={e => setReason(e.target.value)} /></label>
-      <p>版本最多 128 字；说明最多 512 字。递增整数须为 0 或不带前导零的正整数。</p>
+      <Collapse ghost size="small" items={[{ key: 'format', label: '来源版本格式与填写限制', children: <>
+        <label>来源版本类型<Select aria-label="来源版本类型" value={versionKind} virtual={false} style={{ width: 160 }}
+          onChange={value => { if (value === 'integer' || value === 'opaque') setVersionKind(value); }}
+          options={[{ value: 'opaque', label: '版本标识' }, { value: 'integer', label: '递增整数' }]} /></label>
+        <p>版本最多 128 字；说明最多 512 字。递增整数须为 0 或不带前导零的正整数。</p>
+      </> }]} />
       <ActionButton type="primary" disabled={!sourceValid} onClick={() => apply({ action: 'confirm-source', versionKind, versionValue, reason })}>确认来源版本</ActionButton>
     </fieldset> : <p>当前没有此来源的确认权限。</p>}
     </div>
     {legacy && <section hidden={open !== 'legacy'} aria-label="历史审批记录"><h2>历史审批记录</h2>
-      <p>旧审批流程的候选，需先修订或重新导入才能直接发布。</p>
+      <p>旧审批流程的资料，需先修订或重新导入才能直接发布。</p>
       <ActionButton disabled={disabled || !candidate.approvalEvidenceVersion} onClick={() => apply({ action: 'read-review' })}>读取历史审批</ActionButton>
       {view.review && <div role="status"><p>{stateLabel(view.review.state, view.review)}{view.review.instanceCode ? `，审批编号 ${view.review.instanceCode}` : ''}</p>
         <p>历史核验：{view.review.checkedAt ? formatSeatClock(view.review.checkedAt) : '尚未核验'}，有效至：{view.review.validUntil ? formatSeatClock(view.review.validUntil) : '尚无有效核验'}</p></div>}
     </section>}
     {children}
     <div hidden={open !== 'publish'}>
-    <h2 id={`${sectionId}-publish`} tabIndex={-1}>4. 确认发布</h2><p>来源与质量检查满足要求后，由具备发布权限的人员确认发布。点击发布将弹窗再次确认。</p>
+    <h2 id={`${sectionId}-publish`} tabIndex={-1}>确认发布</h2><p>发布整批资料前，还需在弹窗中确认。</p>
     {view.canPublish ? <fieldset disabled={disabled || view.hasDraft || sourceDirty || !view.material || legacy || candidate.state !== 'ready'}>
       <legend>本次发布说明</legend>
       <label>发布标题<Input aria-label="发布标题" value={title} onChange={e => setTitle(e.target.value)} /></label>
       <label>发布摘要<Input.TextArea aria-label="发布摘要" value={summary} autoSize={{ minRows: 2, maxRows: 6 }} onChange={e => setSummary(e.target.value)} /></label>
       <p>标题最多 256 字；摘要最多 2048 字。</p>
       <ActionButton type="primary" disabled={!title.trim() || !summary.trim() || [...title].length > 256 || [...summary].length > 2048}
-        onClick={() => apply({ action: 'publish', title, summary })}>发布当前候选</ActionButton>
+        onClick={() => apply({ action: 'publish', title, summary })}>发布整批资料</ActionButton>
     </fieldset> : <p>当前没有此来源的发布权限。</p>}
     </div>
     {(candidate.state === 'published' || candidate.publishedReleaseId) && <div role="status"><p>已发布。</p>
       {candidate.publishedReleaseId ? <p>{candidate.publishedReleaseId}</p> : null}<p>坐席重新查询后可读取新版本。</p></div>}
     {result && <div role="status"><p>本次操作结果：{result.action === 'publish' && ['pending', 'unknown'].includes(result.state) ? '发布结果待确认' : stateLabel(result.state, view.review)}。</p>
-      {result.releaseId ? <p>{result.releaseId}</p> : null}<p>这是操作记录；当前候选状态可单独刷新。</p></div>}
+      {result.releaseId ? <p>{result.releaseId}</p> : null}<p>这是操作记录；当前审核状态可单独刷新。</p></div>}
   </section>;
 }
 /** Navigation advice only. Main/API continue to own every operation's eligibility. */
-function currentStep(view: IntakeManagementView, dirtyIds: Set<string>): { title: string; detail: string; target: string } {
-  if (view.pending) return { title: '确认上次操作结果', detail: '先取得原操作的结果，再继续处理当前资料。', target: 'recovery' };
+function currentStep(view: IntakeManagementView, dirtyIds: Set<string>): { title: string; target: string } {
+  if (view.pending) return { title: '确认上次操作结果', target: 'recovery' };
   const candidate = view.selected!;
-  if (!['awaiting-evidence', 'ready'].includes(candidate.state)) return { title: stateLabel(candidate.state), detail: '请查看当前候选状态与操作记录。', target: 'candidate' };
-  if (candidate.publicationPolicy === 'approval-v1') return { title: '先修订或重新导入旧候选', detail: '旧审批记录继续保留；直接发布需要新的候选及检查。', target: 'candidate' };
-  if (dirtyIds.has('workflow-source')) return { title: '完成来源确认', detail: '请提交当前填写的来源版本和确认说明，或清空这些输入。', target: 'source' };
-  if (dirtyIds.has('workflow-publish')) return { title: '完成发布说明', detail: '请核对当前标题和摘要。点击发布后，还需在弹窗中再次确认。', target: 'publish' };
-  if (dirtyIds.size || view.hasDraft) return { title: '完成本轮质量检查', detail: '先保存各条判断，再提交本轮检查。已暂存的判断还没有完成提交。', target: 'quality' };
-  if (!view.material) return { title: '1. 核对材料', detail: '先查看当前候选的内容和差异，再确认它对应的来源版本。', target: 'material' };
-  if (!candidate.sourceEvidenceVersion) return { title: '2. 确认来源', detail: view.canConfirmSource ? '填写本次导出的来源版本，并说明核对结果。' : '需要有此来源确认权限的人员完成核对。', target: 'source' };
-  if (candidate.state === 'ready') return { title: '4. 确认发布', detail: view.canPublish ? '填写发布标题和摘要；点击发布后，弹窗会要求再次确认。' : '当前候选就绪，需要有此来源发布权限的人员操作。', target: 'publish' };
-  if (view.receipt && !view.quality) return { title: '读取最新检查状态', detail: '已收到本次操作回执。请重新读取初检或扩检，核对当前结果。', target: 'quality' };
+  if (!['awaiting-evidence', 'ready'].includes(candidate.state)) return { title: stateLabel(candidate.state), target: 'candidate' };
+  if (candidate.publicationPolicy === 'approval-v1') return { title: '上传修订版或重新导入', target: 'candidate' };
+  if (dirtyIds.has('workflow-source')) return { title: '完成来源确认', target: 'source' };
+  if (dirtyIds.has('workflow-publish')) return { title: '完成发布说明', target: 'publish' };
+  if (dirtyIds.size || view.hasDraft) return { title: '完成本轮质量检查', target: 'quality' };
+  if (!view.material) return { title: '核对材料', target: 'material' };
+  if (!candidate.sourceEvidenceVersion) return { title: '确认来源', target: 'source' };
+  if (candidate.state === 'ready') return { title: '确认发布', target: 'publish' };
+  if (view.receipt && !view.quality) return { title: '读取最新检查状态', target: 'quality' };
   const state = view.quality?.status.state;
-  if (state === 'blocked' || state === 'revision_required') return { title: '修订后重新检查', detail: '本次质量检查未通过，请修订资料后重新上传和检查。', target: 'quality' };
+  if (state === 'blocked' || state === 'revision_required') return { title: '上传修订版后重新审核', target: 'quality' };
   if (state === 'passed' || candidate.readinessReasons.some(reason => !['SOURCE_CONFIRMATION_REQUIRED', 'QUALITY_NOT_PASSED'].includes(reason))) {
-    return { title: '核对候选状态', detail: '请刷新候选状态，并处理下方提示的待核验事项。', target: 'candidate' };
+    return { title: '核对审核状态', target: 'candidate' };
   }
-  return { title: '3. 完成质量检查', detail: !view.canReview ? '需要有此来源检查权限的人员完成本轮检查。'
-    : state === 'expansion_required' ? '读取扩检，逐条保存人工判断，再提交本轮检查。'
-      : '读取初检并确定抽样范围，逐条保存人工判断，再提交本轮检查。', target: 'quality' };
+  return { title: '完成质量检查', target: 'quality' };
 }
 type CandidateFilter = 'open' | 'published' | 'all';
 function isOpenCandidate(state: string) {
@@ -230,14 +243,15 @@ function candidateVisible(state: string, filter: CandidateFilter, selected: bool
 }
 function listNext(candidate: components['schemas']['IntakeCandidate']) {
   if (candidate.state === 'publishing') return states.publishing;
-  if (candidate.publicationPolicy === 'approval-v1' && isOpenCandidate(candidate.state)) return '先修订或重新导入旧候选';
+  if (candidate.publicationPolicy === 'approval-v1' && isOpenCandidate(candidate.state)) return '上传修订版或重新导入';
   if (!isOpenCandidate(candidate.state)) return states[candidate.state] ?? candidate.state;
   if (!candidate.sourceEvidenceVersion) return '核对材料';
   if (candidate.state === 'ready') return '确认发布';
   return '质量检查';
 }
 function sameCandidate(candidate: components['schemas']['IntakeCandidate'], selected: components['schemas']['IntakeCandidate'] | null) {
-  return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version && candidate.sourceId === selected.sourceId;
+  return !!selected && candidate.key.candidateId === selected.key.candidateId && candidate.key.version === selected.key.version
+    && candidate.key.digest === selected.key.digest && candidate.sourceId === selected.sourceId;
 }
 function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeManagementView> {
   if (reply.view) return { status: 'ready', value: reply.view };
@@ -247,8 +261,25 @@ function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeMan
 function shownView(view: IntakeManagementView | null): AsyncResource<IntakeManagementView> {
   return view ? { status: 'ready', value: view } : { status: 'idle' };
 }
-export function IntakeManagement() {
+/** The host keeps this instance across both destinations. A second overview
+ * reader would duplicate access invalidation and lose the in-progress forms. */
+export function IntakeManagement({ active = true, presentation = 'review', onOpenReview }: {
+  active?: boolean;
+  presentation?: 'overview' | 'review';
+  onOpenReview?: () => void;
+}) {
   const sectionId = useId();
+  const [detailOpen, setDetailOpen] = useState(true);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [reviewPane, setReviewPane] = useState<ReviewPane | null>(null);
+  const activeReview = useRef(active && presentation === 'review');
+  activeReview.current = active && presentation === 'review';
+  const confirmation = useRef<ReturnType<typeof Modal.confirm> | null>(null);
+  useEffect(() => () => { confirmation.current?.destroy(); confirmation.current = null; }, [active, presentation]);
+  const confirm = (content: string, onOk: () => void, danger = false) => {
+    confirmation.current?.destroy();
+    confirmation.current = askConfirm(content, onOk, danger);
+  };
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
   const [rereading, setRereading] = useState(false);
@@ -310,6 +341,8 @@ export function IntakeManagement() {
     const next = new Set(previous); if (dirty) next.add(id); else next.delete(id); return next;
   }), []);
   const apply = async (command?: IntakeManagementCommand) => {
+    // Parked forms retain input, but cannot dispatch an operation from overview.
+    if (!activeReview.current) return;
     if (command?.action === 'upload-stop') {
       if (stopPending.current) return;
       if (!window.dashboardIntake) {
@@ -340,12 +373,18 @@ export function IntakeManagement() {
       return;
     }
     setBusy(true); setError(''); const gen = ++generation.current; pending.current = gen;
-    const uploading = command?.action.startsWith('upload-') ?? false; setUploadRequest(uploading);
+    const uploading = command?.action.startsWith('upload-') ?? false;
+    setUploadRequest(uploading);
     try {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
       commit(resourceForReply(reply)); if (!reply.ok) setError(reply.message);
+      if (reply.ok && command) {
+        if (command.action === 'select' || command.action === 'upload-open') setDetailOpen(true);
+        if (['select', 'upload-open', 'confirm-source', 'freeze', 'submit', 'refresh-candidate', 'discard', 'revise'].includes(command.action)) setReviewPane(null);
+        if (command.action === 'revise') setUploadOpen(true);
+      }
     } catch {
       if (generation.current !== gen) return;
       if (uploading) {
@@ -369,8 +408,12 @@ export function IntakeManagement() {
       if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
     }
   };
+  const upload = view?.upload;
+  const uploadParsing = active && presentation === 'review' && !!upload?.file
+    && (upload.job?.state === 'reading' || upload.job?.state === 'parsing');
+  const uploadPolling = (busy && uploadRequest) || uploadParsing;
   useEffect(() => {
-    if (!busy || !uploadRequest) return;
+    if (!uploadPolling) return;
     let active = true, polling = false;
     const gen = generation.current;
     // current() now also settles a running parse job through one HTTP read per tick
@@ -387,7 +430,7 @@ export function IntakeManagement() {
     };
     void read(); const timer = window.setInterval(() => void read(), 250);
     return () => { active = false; window.clearInterval(timer); };
-  }, [busy, uploadRequest]);
+  }, [uploadPolling]);
   useEffect(() => {
     const api = window.dashboardIntake;
     if (!api) return undefined;
@@ -401,8 +444,13 @@ export function IntakeManagement() {
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
   }, []);
-  const upload = view?.upload;
-  const disabled = busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const uploadPhase = upload?.phase;
+  const hasSelected = !!view?.selected;
+  useEffect(() => {
+    if (hasSelected && uploadPhase === 'validated') setUploadOpen(false);
+    else if (uploadPhase && uploadPhase !== 'idle' && !hasSelected) setUploadOpen(true);
+  }, [uploadPhase, hasSelected]);
+  const disabled = !active || presentation !== 'review' || busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
@@ -411,56 +459,79 @@ export function IntakeManagement() {
   const editable = quality?.status.state === (quality?.phase === 'initial' ? 'initial_required' : 'expansion_required');
   const step = view?.authorized && view.selected && !view.rollback.pending && !view.rollback.impact && !dirtyIds.has('rollback-input')
     ? currentStep(view, dirtyIds) : null;
-  const visibleCandidates = (view?.candidates ?? []).filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
+  const pane = reviewPane ?? workflowPane(step?.target, view?.selected?.publicationPolicy);
+  const inDetail = !!view?.selected && detailOpen;
+  const candidates = view?.candidates ?? [];
+  const visibleCandidates = candidates.filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
   const rowDisabled = disabled || dirty || !!view?.hasDraft || uploadDraft;
-  const candidateColumns: TableColumnsType<CandidateRow> = [
-    { title: '名称', key: 'name', render: (_value, row) => <>
-      <ActionButton type="text" disabled={rowDisabled} onClick={() => void apply({ action: 'select', selection: row.selection })}>{candidateTitle(row.scopeLabel, row.candidate.key.version, row.candidate.sourceId)}</ActionButton>
-    </> },
-    { title: '范围', key: 'scope', render: (_value, row) => scopeWording(row.scopeLabel, row.candidate.sourceId) },
-    { title: '状态', key: 'state', render: (_value, row) => states[row.candidate.state] ?? row.candidate.state },
-    { title: '下一步', key: 'next', render: (_value, row) => {
-      const current = sameCandidate(row.candidate, view?.selected ?? null);
-      return current && step ? step.title : listNext(row.candidate);
-    } },
-    { title: '时间', key: 'time', render: (_value, row) => formatSeatClock(row.candidate.updatedAt) },
+  const batchColumns: TableColumnsType<CandidateRow> = [
+    { title: '资料批次', key: 'batch', render: (_value, row) => <div className="intake-batch-label">
+      <span title={row.candidate.key.candidateId}>{candidateCategory(row.scopeLabel)} / {shortBatchId(row.candidate.key.candidateId)}</span>
+      <small>修订 {row.candidate.key.version}</small>
+    </div> },
+    { title: '分类', key: 'category', render: (_value, row) => candidateCategory(row.scopeLabel) },
+    { title: '更新时间', key: 'time', render: (_value, row) => formatSeatClock(row.candidate.updatedAt) },
+    { title: '审核状态', key: 'state', render: (_value, row) => candidateState(row.candidate) },
   ];
-  return <IntakeAntdTheme><section className="intake-management" aria-label="FAQ 资料">
-    <h1 className="desk-sr">资料</h1>
+  const candidateColumns: TableColumnsType<CandidateRow> = [...batchColumns,
+    { title: '下一步', key: 'next', render: (_value, row) => listNext(row.candidate) },
+    { title: '操作', key: 'action', render: (_value, row) => {
+      const current = sameCandidate(row.candidate, view?.selected ?? null);
+      const label = current ? '继续查看' : isOpenCandidate(row.candidate.state) ? '审核' : '查看';
+      return <ActionButton type="text" disabled={!current && rowDisabled}
+        aria-label={`${label} ${candidateCategory(row.scopeLabel)} / ${shortBatchId(row.candidate.key.candidateId)}`}
+        onClick={() => current ? setDetailOpen(true) : void apply({ action: 'select', selection: row.selection })}>{label}</ActionButton>;
+    } },
+  ];
+  const selectedRow = view?.candidates.find(row => sameCandidate(row.candidate, view.selected));
+  return <IntakeAntdTheme><ConfigProvider getPopupContainer={trigger => trigger?.parentElement ?? document.body}><section className="intake-management" aria-label={presentation === 'overview' ? '工作台待审核资料' : '资料审核'}
+    data-testid={presentation === 'overview' ? 'module-overview' : undefined}>
+    {presentation === 'overview' && <section aria-label="待审核资料">
+      <div className="intake-candidate-head"><h1>待审核资料</h1><ActionButton disabled={!onOpenReview} onClick={onOpenReview}>查看全部资料</ActionButton></div>
+      {(error || readFailure) && <WorkbenchFailed message={error || readFailure} retryLabel="重新读取当前状态"
+        onRetry={busy || reading || rereading || stopping ? undefined : reread} />}
+      {reading || rereading || (!view && !error && !readFailure) ? <WorkbenchLoading label="读取待审核资料" />
+        : view?.signedIn && view.authorized
+        ? <><Table<CandidateRow> columns={batchColumns} dataSource={candidates.filter(row => isOpenCandidate(row.candidate.state))}
+          pagination={false} rowKey="selection" locale={{ emptyText: view.moreCandidates ? '当前页没有待审核资料，后续批次尚未读取。' : '有可处理的资料批次时，会显示在这里。' }} />
+          {view.moreCandidates && <p className="intake-muted">这里只显示当前已读取的批次。点击“查看全部资料”，可在批次列表继续翻页。</p>}</>
+        : view ? <p>{!view.signedIn ? '登录后可查看待审核资料。' : '取得资料查看权限后，会显示可处理的批次。'}</p> : null}
+    </section>}
+    <div hidden={presentation !== 'review'}>
+    <h1>资料审核</h1>
     <p className="intake-operator">{view?.displayName ?? (busy || reading || rereading ? '正在读取会话…' : '会话待确认')}</p>
     {(error || readFailure) && <div><p role="alert">{error || readFailure}</p><ActionButton disabled={busy || reading || rereading || stopping} onClick={reread}>重新读取当前状态</ActionButton></div>}
-    {step && <section className="intake-notice intake-current-step" aria-label="当前步骤">
-      <div><h2>{step.title}</h2><p>{step.detail}</p><small>核对材料 → 确认来源 → 质量检查 → 确认发布</small></div>
-      <ActionButton onClick={() => {
-        const target = document.getElementById(`${sectionId}-${step.target}`);
-        target?.focus(); target?.scrollIntoView({ block: 'start' });
-      }}>前往当前步骤</ActionButton>
+    {view?.signedIn && upload && <section aria-label="资料上传">
+      <ActionButton type={inDetail ? 'default' : 'primary'} aria-expanded={uploadOpen} aria-controls={`${sectionId}-upload`}
+        onClick={() => setUploadOpen(open => !open)}>{uploadOpen ? '收起上传区' : '上传资料'}</ActionButton>
+      <div id={`${sectionId}-upload`} hidden={!uploadOpen}>
+        <IntakeUpload view={upload} active={active && presentation === 'review' && uploadOpen} busy={presentation !== 'review' || busy || rereading} stopping={stopping}
+          blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />
+        {(!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || reading || rereading || stopping}
+          onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</ActionButton>}
+      </div>
     </section>}
-    {view?.signedIn && upload && <IntakeUpload view={upload} busy={busy || rereading} stopping={stopping}
-      blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />}
-    {view?.signedIn && upload && (!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || reading || rereading || stopping}
-      onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</ActionButton>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2 id={`${sectionId}-recovery`} tabIndex={-1}>操作结果待确认</h2>
-      {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定候选已经取消。</p>}
+      {view.pending.action === 'cancel' && <p>取消结果尚未确认。取得最终回执前，不能认定资料已经取消。</p>}
       <p>{view.pending.recovery === 'receipt' ? '请查询原操作回执。' : '请按原请求重试，继续确认本次操作结果。'}重试会沿用同一操作编号。</p><code>{view.pending.operationId}</code>
       <div className="intake-toolbar">{view.pending.recovery === 'receipt' && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'recover' })}>查询原操作回执</ActionButton>}
         {view.pending.retryAllowed !== false && <ActionButton disabled={busy || rereading} onClick={() => void apply({ action: 'retry' })}>重试原操作</ActionButton>}
         {view.pending.retryAllowed === false && <p>旧流程操作不能转成确认直发，请查询原回执或读取历史状态。</p>}</div></section>}
-    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || !!view.rollback.result) && <IntakeRollback view={view} busy={busy || rereading || stopping}
+    {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || !!view.rollback.result) && <IntakeRollback active={active && presentation === 'review'} view={view} busy={!active || presentation !== 'review' || busy || rereading || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
     {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
     {view?.signedIn && !view.authorized && !view.pending && <p>请确认登录与店铺授权。</p>}
-    {view?.authorized && <div className={view.selected ? 'intake-stage has-sheet' : 'intake-stage'}>
-      <section aria-label="候选列表">
+    {view?.authorized && <div className="intake-stage">
+      <section aria-label="资料批次列表" hidden={inDetail}>
         <div className="intake-candidate-head">
-          <h2>候选</h2>
+          <h2>资料批次</h2>
           <div className="intake-toolbar">
-            <ActionButton disabled={disabled || dirty || uploadDraft} onClick={() => void apply({ action: 'list', next: false })}>刷新候选</ActionButton>
-            <ActionButton disabled={disabled || dirty || uploadDraft || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页候选</ActionButton>
-            {view?.selected && <ActionButton disabled={disabled} onClick={() => askConfirm('放弃尚未提交的判断并关闭当前候选？', () => void apply({ action: 'discard' }))}>关闭当前候选</ActionButton>}
+            <ActionButton disabled={disabled || dirty || view.hasDraft || uploadDraft} onClick={() => void apply({ action: 'list', next: false })}>刷新批次</ActionButton>
+            <ActionButton disabled={disabled || dirty || view.hasDraft || uploadDraft || !view?.moreCandidates} onClick={() => void apply({ action: 'list', next: true })}>下一页批次</ActionButton>
+            {view.selected && <ActionButton onClick={() => setDetailOpen(true)}>继续当前审核</ActionButton>}
             <Segmented
-              aria-label="候选筛选"
+              aria-label="批次筛选"
               disabled={disabled}
               value={candidateFilter}
               onChange={(value) => {
@@ -476,41 +547,55 @@ export function IntakeManagement() {
         </div>
         <Table<CandidateRow> columns={candidateColumns} dataSource={visibleCandidates} pagination={false} rowKey="selection"
           locale={{ emptyText: view.candidates.length
-            ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这个筛选下没有候选。" />
-            : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这一页没有候选。选择来源并上传资料后，会出现在这里。" /> }} />
-        {dirty && <p role="status">当前有尚未提交的输入。请完成对应操作，或关闭当前候选并明确放弃。</p>}
+            ? '这个筛选下没有资料批次。'
+            : '上传资料并通过校验后，会显示在这里。' }} />
+        {(dirty || view.hasDraft) && <p role="status">当前审核有未提交的输入，请继续当前审核，或进入详情后放弃输入。</p>}
       </section>
-      {view.selected && <section className="intake-sheet" aria-label="当前候选"><h2 id={`${sectionId}-candidate`} tabIndex={-1}>{candidateTitle(view.candidates.find(row => sameCandidate(row.candidate, view.selected))?.scopeLabel, view.selected.key.version, view.selected.sourceId, view.material?.materialHeader.scope.domain)}</h2>
-        <p>{states[view.selected.state]}：{['awaiting-evidence','ready'].includes(view.selected.state)
+      {view.selected && <section className="intake-sheet" aria-label="批次详情" hidden={!inDetail}>
+        <div className="intake-toolbar"><ActionButton onClick={() => setDetailOpen(false)}>返回批次列表</ActionButton>
+          <ActionButton disabled={disabled} onClick={() => confirm('放弃尚未提交的输入并关闭当前审核？已提交的记录不会撤销。', () => void apply({ action: 'discard' }))}>放弃输入并关闭</ActionButton></div>
+        <h2 id={`${sectionId}-candidate`} tabIndex={-1}>{candidateCategory(selectedRow?.scopeLabel, view.material?.materialHeader.scope.domain)} / {shortBatchId(view.selected.key.candidateId)}</h2>
+        <p className="intake-muted">修订 {view.selected.key.version} / 更新于 {formatSeatClock(view.selected.updatedAt)}</p>
+        <p>{candidateState(view.selected)}：{['awaiting-evidence','ready'].includes(view.selected.state)
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
         {(view.canRevise || view.canCancel) && <div className="intake-toolbar">
-          {view.canRevise && <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('修订当前候选？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和质量检查；校验失败保留旧版。', () => void apply({ action: 'revise' }))}>修订当前候选</ActionButton>}
-          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => askConfirm('确认取消当前候选？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }), true)}>取消当前候选</ActionButton>}
+          {view.canRevise && <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => confirm('上传这份资料的修订版？请上传完整修订稿。校验成功后旧版失效，新版须重新确认来源和审核；校验失败保留旧版。', () => void apply({ action: 'revise' }))}>上传修订版</ActionButton>}
+          {view.canCancel && <ActionButton danger disabled={disabled || dirty || view.hasDraft} onClick={() => confirm('确认取消这份资料？取消成功后该版本不能再发布，已发布内容不受影响。这不是停止本机等待。', () => void apply({ action: 'cancel-candidate' }), true)}>取消这份资料</ActionButton>}
         </div>}
-        <ActionButton disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新候选状态</ActionButton>
-        <div hidden={step?.target !== 'material'}>
-        <h2 id={`${sectionId}-material`} tabIndex={-1}>1. 核对材料</h2>
-        <div className="intake-toolbar"><ActionButton type="primary" disabled={disabled} onClick={() => void apply({ action: 'material', next: false })}>查看材料</ActionButton></div>
+        <ActionButton disabled={disabled} onClick={() => void apply({ action: 'refresh-candidate' })}>刷新审核状态</ActionButton>
+        {step && <p className="intake-review-progress" aria-label="当前步骤">当前：{step.title}</p>}
+        <div className="intake-toolbar" role="navigation" aria-label="审核内容">
+          {(['material', 'source', 'quality', ...(view.selected.publicationPolicy === 'approval-v1' ? ['legacy'] as const : ['publish'] as const)] as const).map(target =>
+            <ActionButton key={target} aria-pressed={pane === target} onClick={() => setReviewPane(target)}>
+              {{ material: '原始材料', source: '来源确认', quality: '人工质量检查', publish: '发布资料', legacy: '历史审批' }[target]}
+            </ActionButton>)}
+        </div>
+        <div hidden={pane !== 'material' && pane !== 'source'}>
+        <h2 id={`${sectionId}-material`} tabIndex={-1}>核对材料</h2>
+        <div className="intake-toolbar"><ActionButton type={view.material ? 'default' : 'primary'} disabled={disabled || qualityDirty || view.hasDraft} onClick={() => void apply({ action: 'material', next: false })}>查看材料</ActionButton></div>
+        {view.material && <MaterialPage key={`${view.selected.key.digest}-${view.materialPage}`} material={view.material} disabled={disabled || qualityDirty || view.hasDraft} apply={c => void apply(c)} pageIndex={view.materialPage} />}
         </div>
         <CandidateWorkflow key={view.selected.key.digest} view={view} disabled={disabled || qualityDirty} apply={c => void apply(c)} onDirty={onDirty} sectionId={sectionId}
-          open={workflowPane(step?.target, view.selected.publicationPolicy)}>
-          <section aria-label="人工质量检查" hidden={step?.target !== 'quality'}><h2 id={`${sectionId}-quality`} tabIndex={-1}>3. 质量检查</h2>
-          {view.selected.publicationPolicy === 'approval-v1' ? <p>旧候选需先修订或重新导入，才能直接发布。</p> : null}
-          {view.canReview ? <div className="intake-toolbar"><ActionButton type={quality ? 'default' : 'primary'} disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取初检</ActionButton>
-            <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取扩检</ActionButton></div> : <p>当前没有此来源的检查权限。</p>}
+          open={pane}>
+          <section aria-label="人工质量检查" hidden={pane !== 'quality'}><h2 id={`${sectionId}-quality`} tabIndex={-1}>人工质量检查</h2>
+          <p>检查范围由本轮抽样确定。暂存判断后需提交本轮审核，整批发布另行确认。</p>
+          {view.selected.publicationPolicy === 'approval-v1' ? <p>旧版资料需先修订或重新导入，才能直接发布。</p> : null}
+          {view.canReview ? <div className="intake-toolbar"><ActionButton type={quality ? 'default' : 'primary'} disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'initial' })}>读取审核清单</ActionButton>
+            <ActionButton disabled={disabled || dirty || view.hasDraft} onClick={() => void apply({ action: 'quality', phase: 'expanded' })}>读取追加检查</ActionButton></div> : <p>当前没有此来源的检查权限。</p>}
         {quality && <><h3>{states[quality.status.state] ?? quality.status.state}</h3><p>本轮 {quality.total} 条，已填写 {quality.checked} 条</p>
-          {!quality.status.frozen && <><ActionButton type="primary" disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>冻结本次抽样</ActionButton></>}
+          {!quality.status.frozen && <><ActionButton type="primary" disabled={disabled || workflowDirty} onClick={() => void apply({ action: 'freeze' })}>开始本轮审核</ActionButton></>}
           <div className="intake-toolbar"><ActionButton disabled={disabled || dirty || quality.offset === 0} onClick={() => void apply({ action: 'quality-page', offset: Math.max(0, quality.offset - 20) })}>上一页检查</ActionButton>
             <ActionButton disabled={disabled || dirty || quality.offset + 20 >= quality.total} onClick={() => void apply({ action: 'quality-page', offset: quality.offset + 20 })}>下一页检查</ActionButton></div>
           {quality.samples.map(sample => <CheckRow key={`${view.selected!.key.digest}-${quality.phase}-${quality.offset}-${sample.scriptId}`} sample={sample}
             disabled={disabled || workflowDirty || !editable} onDirty={onDirty} save={c => void apply(c)} />)}
           <ActionButton type={quality.status.frozen ? 'primary' : 'default'} disabled={disabled || dirty || quality.checked !== quality.total || !editable}
-            onClick={() => void apply({ action: 'submit' })}>提交本轮人工检查</ActionButton>
+            onClick={() => void apply({ action: 'submit' })}>提交本轮审核</ActionButton>
         </>}
           </section>
         </CandidateWorkflow>
         {view.receipt && <p role="status">操作回执：{states[view.receipt.state] ?? view.receipt.state}。这是本次操作记录，请重新读取检查状态。</p>}
       </section>}
     </div>}
-  </section></IntakeAntdTheme>;
+    </div>
+  </section></ConfigProvider></IntakeAntdTheme>;
 }

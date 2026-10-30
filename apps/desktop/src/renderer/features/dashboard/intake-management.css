@@ -39,11 +39,6 @@
 .desk-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
 .desk-layout ul { margin: 8px 0; padding-left: 18px; }
 @media (max-width: 760px) { .desk-layout { grid-template-columns: minmax(0, 1fr); } }
-.intake-toolbar[aria-label='候选筛选'] button[aria-pressed=true] {
-  border-color: var(--dash-purple-line);
-  background: var(--dash-chrome-selected);
-  color: var(--dash-ink);
-}
 .intake-card { margin: 16px 0; padding: 16px 0; border-block: var(--wb-hair) solid var(--dash-line); }
 .intake-card h3 { margin-top: 0; }
 .intake-notice, .intake-management p[role=alert] { margin: 16px 0; padding: 12px 16px; border: var(--wb-hair) solid var(--dash-line-strong); border-radius: var(--dash-radius); background: var(--dash-surface-subtle); color: var(--dash-ink); }
@@ -105,11 +100,11 @@
 .intake-grant-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 .intake-grant-side { border-left: var(--wb-hair) solid var(--dash-line); padding-left: 16px; }
 .intake-stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-.intake-stage.has-sheet { grid-template-columns: minmax(280px, 1fr) minmax(320px, 440px); }
-.intake-sheet { border-left: var(--wb-hair) solid var(--dash-line); padding-left: 16px; }
-.intake-current-step { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.intake-current-step > div { flex: 1 1 320px; }
-.intake-current-step h2 { margin-bottom: 4px; }
+.intake-sheet { min-width: 0; }
+.intake-batch-label { display: grid; gap: 4px; }
+.intake-batch-label small, .intake-review-progress { color: var(--dash-muted); }
+.intake-management [hidden] { display: none !important; }
+.intake-management [aria-label='审核内容'] button[aria-pressed='true'] { background: var(--dash-chrome-hover); border-color: var(--dash-line-strong); font-weight: 600; }
 .intake-management h2[id] { scroll-margin-top: 16px; }
 
 .desk-knowledge {

@@ -48,8 +48,9 @@ test('director previews without saving, grants a named seat query access, then r
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-    await dashboard.getByRole('tab', { name: '权限', exact: true }).click();
+    await dashboard.getByRole('tab', { name: '成员与权限', exact: true }).click();
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
+    await expect(panel.getByRole('table', { name: '成员权限', exact: true })).toBeVisible();
     // Appearance is judged on the panel before the modal opens, because an antd mask owns the
     // pointer and would intercept the chrome menu.
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.setSize(980, 680));
@@ -63,9 +64,9 @@ test('director previews without saving, grants a named seat query access, then r
     // The grant form is an antd Modal portalled to body, so the dialog owns the fields while the
     // panel keeps the entry button, the grant list, and the status sentence.
     await panel.getByRole('button', { name: '新增授权', exact: true }).click();
-    const dialog = dashboard.getByRole('dialog', { name: '新增业务权限', exact: true });
+    const dialog = dashboard.getByRole('dialog', { name: '新增授权', exact: true });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('combobox', { name: '人员', exact: true }).click();
+    await dialog.getByRole('combobox', { name: '成员', exact: true }).click();
     await dashboard.getByRole('option', { name: '合成坐席', exact: true }).click();
     await expect(dialog.getByRole('combobox', { name: '岗位', exact: true })
       .locator('xpath=ancestor::*[contains(@class,"ant-select")][1]')).toContainText('客服');
@@ -104,18 +105,20 @@ test('director previews without saving, grants a named seat query access, then r
     await expect(panel.getByRole('status')).toContainText('已保存');
     const granted = await entitlement(); expect(granted.status).toBe(200);
     await panel.getByRole('button', { name: '刷新权限列表', exact: true }).click();
-    const grants = panel.getByRole('table', { name: '已有业务权限', exact: true });
+    await panel.getByRole('table', { name: '成员权限', exact: true }).getByRole('row').filter({ hasText: '合成坐席' }).getByRole('button', { name: '查看权限', exact: true }).click();
+    const detail = dashboard.getByRole('dialog', { name: '合成坐席的权限', exact: true });
+    const grants = detail.getByRole('table', { name: '权限明细', exact: true });
     const record = grants.getByRole('row').filter({ hasText: '合成桌面验收授予查询' });
     await expect(record).toHaveCount(1);
     await record.getByRole('button', { name: '撤销该权限', exact: true }).click();
-    await panel.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
-    await panel.getByRole('button', { name: '确认撤销', exact: true }).click();
+    await detail.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
+    await detail.getByRole('button', { name: '确认撤销', exact: true }).click();
     const revokeDialog = dashboard.getByRole('dialog', {
       name: '收回 合成坐席 在 该店铺 / 产品 / 该来源的查询复制',
       exact: true,
     });
     await expect(revokeDialog).toBeVisible();
-    await expect(revokeDialog).toContainText('收回之后不能撤销。以后要用，需要重新开通。');
+    await expect(revokeDialog).toContainText('仅撤销这条权限。撤销后如需使用，须重新授权。');
     await revokeDialog.getByRole('button', { name: '确认收回', exact: true }).click();
     await expect(panel.getByRole('status')).toContainText('已保存');
     expect((await entitlement()).ok).toBe(false);
