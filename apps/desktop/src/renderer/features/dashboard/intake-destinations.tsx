@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import type { PageUseSnapshot } from '@shared/page-use';
+import type { WorkbenchKind } from '@shared/workbench-mode';
 import { DeskKnowledge } from './DeskKnowledge';
 import { IntakeLibrary } from './IntakeLibrary';
 import { IntakeManagement } from './IntakeManagement';
@@ -37,6 +38,7 @@ export type IntakeDestinationContext = {
   jobKnown: boolean;
   jobPending: boolean;
   sessionKey: string;
+  workbenchMode: WorkbenchKind | null;
   snapshot: PageUseSnapshot;
   onOpen: (target: 'content' | 'wording' | 'permissions') => void;
   onTodoCount: (count: number) => void;
@@ -48,7 +50,7 @@ export type IntakeDestinationContext = {
 const INTAKE_DESTINATION_MOUNTS: {
   [Id in IntakeDestination]: (ctx: IntakeDestinationContext) => ReactNode;
 } = {
-  overview: (ctx) => <IntakeOverview key={ctx.sessionKey} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
+  overview: (ctx) => <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
   sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />,
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,

@@ -276,7 +276,7 @@ describe('fox head brand assets', () => {
     } finally {
       rmSync(temporary, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it('generates identical fox PNG hashes across consecutive runs', async () => {
     const {

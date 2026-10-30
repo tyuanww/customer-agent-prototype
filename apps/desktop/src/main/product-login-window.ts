@@ -89,6 +89,7 @@ export function createLoginWindow(
         });
         let closed = false;
         let handedOff = false;
+        const isActive = () => !closed && !signal.aborted && !window.isDestroyed();
         const finish = (error?: ProductHttpError) => {
           if (closed) return; closed = true; signal.removeEventListener('abort', cancel);
           ipcMain.removeHandler(IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU);
@@ -119,6 +120,7 @@ export function createLoginWindow(
           if (!allowedLoginUrl(url, provider, api)) return { ok: false, code: 'VALIDATION' } satisfies LoginWindowCommandResult;
           try {
             await openExternal(url);
+            if (!isActive()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
             handoff();
             return { ok: true } satisfies LoginWindowCommandResult;
           } catch {
@@ -129,19 +131,26 @@ export function createLoginWindow(
           if (event.sender !== window.webContents || window.isDestroyed()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
           const credentials = readCredentials(payload);
           if (!credentials) return { ok: false, code: 'INVALID' } satisfies LoginWindowCommandResult;
-          const code = await verifySyntheticPassword(provider, credentials.username, credentials.password, transport);
+          const code = await verifySyntheticPassword(provider, credentials.username, credentials.password, transport, signal);
+          if (!isActive()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
           if (code === 'invalid') return { ok: false, code: 'INVALID' } satisfies LoginWindowCommandResult;
           if (code === 'unavailable') return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           const callback = callbackUrl(url, api, code);
           if (!callback || !allowedLoginUrl(callback, provider, api)) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           try {
             const response = await transport(callback, {
-              method: 'GET', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
+              method: 'GET', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS)]),
             });
-            if (!response.ok) return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
+            if (!isActive()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
+            if (!response.ok) {
+              finish(new ProductHttpError('UNAVAILABLE'));
+              return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
+            }
             finish();
             return { ok: true } satisfies LoginWindowCommandResult;
           } catch {
+            if (!isActive()) return { ok: false, code: 'CANCELLED' } satisfies LoginWindowCommandResult;
+            finish(new ProductHttpError('UNAVAILABLE'));
             return { ok: false, code: 'UNAVAILABLE' } satisfies LoginWindowCommandResult;
           }
         });
@@ -201,10 +210,11 @@ async function verifySyntheticPassword(
   username: string,
   password: string,
   transport: typeof fetch,
+  signal: AbortSignal,
 ): Promise<string | 'invalid' | 'unavailable'> {
   try {
     const response = await transport(new URL('/password', origin), {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS),
+      method: 'POST', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(LOGIN_IDENTITY_TIMEOUT_MS)]),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });

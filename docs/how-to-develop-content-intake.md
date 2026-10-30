@@ -158,6 +158,8 @@ node scripts/probe-intake-family-sql.mjs --output .gstack/family-sql-check.json
 
 同一资格分页须沿用相同会话和选择；换店、重新登录或改变选择后重签。新资格只能签 current，可指定 releaseId 作 CAS。普通新发布时旧页保持自己的 release；若希望展示新版，重新取资格并完成全部页面后整体替换，不能把新旧页合并。实际空目录必须能替换旧目录。游标只定位，不授予权限；每页均重验，不能把回执/旧资格/hash 当权限。
 
+查询窗口复制前重新读取目标所在页并核对资格、条目和词项；断网或核对失败时不写剪贴板。资格到期时清空结果；组织事实不可用通过受限的 `facts-expired` 失效事件提示稍后重试。失效事件带查询关联标识，窗口只处理当前查询的通知；该标识不授予权限。服务端响应和本机剪贴板写入之间不能形成跨机器原子操作，已经复制的内容也无法撤回。
+
 资格失败按 reason 恢复：SCOPE_DENIED/PERMISSION_CHANGED 核对登录及范围；ORG_FACTS_UNAVAILABLE 刷新组织事实；APPROVAL_UNAVAILABLE/APPROVAL_REVOKED 表示历史 approval-v1 依据失效，停止使用并核对历史资料；LEASE_EXPIRED 重签；BASE_CHANGED 重新取 current；MODE_CONFLICT 处理尚未支持的目录模式。Main 的 `ContentIntakeUsage` 已拥有完整分页、当前店/选择、迟到回调、原文复制与失效通知；单资格自然到期和精确 FORBIDDEN/LEASE_EXPIRED 只影响该资格，其他有效句柄仍受自己的原截止约束，真正会话/权限/审批失效才清除全部句柄。失败不会复活或延长资格。根级合成 HTTP 探针现在通过实际 `ProductHttp` / `ProductSession` 消费该模块；凭据仅驻留隔离进程内存，测试替换本机员工显示名读取，不读取用户 profile。合成 profile 的 Main factory、白名单 IPC 和 renderer 已接线；生产 factory 与未覆盖设备项仍待验收；此前持久化和最终复审见[使用资格上下文验收](../evidence/qa/content-intake-p2-usage-context/README.md)。
 
 封闭路由适配器 `apps/api/src/content-intake/usage-http.ts` 只由隔离合成宿主注册六个正式路径：`GET /v1/intake/authorization`、`GET /v1/intake/sources`、`GET /v1/intake/sources/{sourceId}/vocabulary`、`GET /v1/intake/shop-directory`、`POST /v1/intake/entitlements` 与 `GET /v1/intake/snapshot`。复用当前产品认证，原样保留私有 actor 引用；不接受额外身份/选择字段，重复查询参数不覆盖，错误统一为 `IntakeError` 并返回 `no-store`。生产 app/server 工厂未注册它。
@@ -190,7 +192,9 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `ContentIntakeUsage` 重新取得完整资格快照。词项从冻结的 `GET /v1/intake/sources/{sourceId}/vocabulary` 完整分页读取，按授权店铺/品牌/域校验，最多 5000 词项、8 MiB；改名、撤权或分页内容变化要求重读。结果区的商品/场景支持多选与清除，空维度仅取通用条目。Main 校验菜单成员后把稳定 ID 交给原使用资格；换店清选择，换条件撤旧结果与复制、保留问题、等待手动查询。胶囊只留“筛选”入口。检索复用 retrieval-core，标题/启用问法权重 3，正文 1，固定 BM25 k1=1.2、b=0.75；按快照顺序稳定破同分。暂不接外部模型、反馈写回或 SOP。最多 5000 条、2 MiB 检索字段输入；超限整次返回 LIMIT，不交付截断结果。计算后让出事件循环，再复核原资格，不能把计算期间到期的正文投影出来。
 
-`cancel` 只停止查询及当前展示复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key，资格 owner 重新核验并写原文，不信 renderer 文本。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
+当前 Main 也在 `product-remote` 工作台装配同一个 Query；远程服务的可用性和上线验收仍需独立确认。
+
+`cancel` 停止查询及在途复制；独立店铺发现由后一次发现、会话改变或窗口销毁取消。复制只接受当前展示的 key：资格 owner 使用装配快照时保存的原始页游标，以原资格重新请求目标所在页（最多 100 条），由服务端复核授权、父链、发布依赖、该页词项和数据库时钟截止。Main 确认目标来源、业务编号、版本和完整条目与展示时一致，再核对会话、选择和展示句柄，才写原文；目标缺失或不一致时失败关闭。撤权和到期通知界面清除结果；网络不可用或 5 秒超时不写剪贴板、提示重试，已完成的离线快照仍只保留至原本地截止。超时同时检查本机墙钟和单调时钟的请求前后差值，任一超限或倒退均拒绝。取消、切换或迟到响应不能复制，也不能撤销新的上下文。服务端完成核验到本机写入之间仍有网络和调度间隔，不承诺与撤权提交原子同步。新 profile 不读取旧 hydrate/偏好/员工显示名文件，也不装配旧检索、announce 或管理适配器。原生菜单、托盘和 Dock 现在可进入 FAQ 专用资料审核页；没有 content-manage 权限时只显示无管理权限，不装配旧管理适配器。FAQ 正文展示和复制均保留原换行。
 
 上述两项原生测试使用冻结合同 wire double；真实 API/PG 与桌面整链入口见下方独立合成联调章节，此前封闭 PG → HTTP → Main 探针证据独立保留。新上传/校验管理入口已接通。商品/场景筛选已完成本组合成验证；店铺名称目录已接到查询选择器；名称异常保留编号，剩余平台人工验收仍待完成；已有设备结果按版本复用，不重新列为全未做。窗口与合成测试通过不代表真实飞书/数据、生产 factory/ACL/activation 放行。
 

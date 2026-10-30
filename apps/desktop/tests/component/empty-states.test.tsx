@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 it('splits an empty usage log from a failed usage read on 概览', async () => {
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findAllByText('坐席查询后会出现')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
   cleanup();
@@ -28,8 +28,8 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     previewExport: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageFailed }),
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageFailed }),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findAllByText('这段时间所有查询都有结果。')).not.toHaveLength(0);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(await screen.findAllByText('最近读取的记录中没有这段时间的查询。')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   cleanup();
   window.dashboardUsageLog = {
@@ -37,7 +37,7 @@ it('splits an empty usage log from a failed usage read on 概览', async () => {
     previewExport: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
     export: async () => ({ ok: false, code: 'UNAVAILABLE', message: WORKBENCH_EMPTY.usageUnmounted }),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findAllByText('坐席查询后会出现')).not.toHaveLength(0);
   expect(screen.queryByText(WORKBENCH_EMPTY.usageFailed)).toBeNull();
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();

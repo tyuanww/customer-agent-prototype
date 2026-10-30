@@ -10,6 +10,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -77,6 +78,61 @@ function backupSets(backupRoot) {
     .filter((entry) => entry.isDirectory() && !entry.name.endsWith('.partial'))
     .map((entry) => path.join(root, entry.name))
     .sort();
+}
+
+async function verifyBuildIdentityInBackup(root, baseEnvironment) {
+  const release = path.join(root, 'identity-release');
+  const desktopScripts = path.join(release, 'apps/desktop/scripts');
+  const backupScripts = path.join(release, 'scripts/ops');
+  mkdirSync(desktopScripts, { recursive: true });
+  mkdirSync(backupScripts, { recursive: true });
+  cpSync(path.join(repositoryRoot, 'apps/desktop/scripts/write-build-identity.mjs'),
+    path.join(desktopScripts, 'write-build-identity.mjs'));
+  cpSync(path.join(testDirectory, 'backup-set.mjs'), path.join(backupScripts, 'backup-set.mjs'));
+  writeFileSync(path.join(release, 'VERSION'), '1.2.3\n');
+  writeFileSync(path.join(release, '.gitignore'), '/apps/desktop/build/\n/node_modules\n');
+  writeFileSync(path.join(release, 'source.txt'), 'original\n');
+  symlinkSync(path.join(repositoryRoot, 'node_modules'), path.join(release, 'node_modules'), 'dir');
+  const gitOptions = {
+    cwd: release,
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull },
+    encoding: 'utf8',
+  };
+  execFileSync('git', ['init', '-q'], gitOptions);
+  execFileSync('git', ['add', '.'], gitOptions);
+  execFileSync('git', [
+    '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false',
+    'commit', '-qm', 'fixture',
+  ], gitOptions);
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], gitOptions).trim();
+  const environment = { ...baseEnvironment };
+  delete environment.CUSTOMER_AGENT_BACKUP_GIT_SHA;
+  delete environment.CUSTOMER_AGENT_BACKUP_PRODUCT_VERSION;
+  delete environment.CUSTOMER_AGENT_BACKUP_COPY_TO;
+  delete environment.CUSTOMER_AGENT_BACKUP_COPY_SCOPE;
+  const identity = path.join(desktopScripts, 'write-build-identity.mjs');
+  const backup = path.join(backupScripts, 'backup-set.mjs');
+
+  for (const state of ['clean', 'dirty']) {
+    if (state === 'dirty') writeFileSync(path.join(release, 'source.txt'), 'modified\n');
+    runCli(process.execPath, [identity], environment, [0]);
+    const stamp = JSON.parse(readFileSync(path.join(release, 'apps/desktop/build/build-identity.json'), 'utf8'));
+    assert.equal(stamp.gitSha, state === 'clean' ? head : 'dirty');
+    const stateBackupRoot = path.join(root, `identity-backups-${state}`);
+    runCli(process.execPath, [backup, 'backup'], {
+      ...environment,
+      CUSTOMER_AGENT_BACKUP_ROOT: stateBackupRoot,
+    }, [3]);
+    const sets = backupSets(stateBackupRoot);
+    assert.equal(sets.length, 1);
+    const verified = await verifyBackupSet(sets[0], { pgBin: pg15Bin() });
+    assert.deepEqual(verified.manifest.application, {
+      productVersion: '1.2.3',
+      productVersionSource: 'release-version-file',
+      gitSha: state === 'clean' ? head : null,
+      gitShaSource: state === 'clean' ? 'desktop-build-identity' : 'not-provided',
+    });
+  }
 }
 
 function artifactSummary(directory, file) {
@@ -293,6 +349,8 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
       CUSTOMER_AGENT_BACKUP_GIT_SHA: productionApplicationSha,
       CUSTOMER_AGENT_BACKUP_PRODUCT_VERSION: productionApplicationVersion,
     };
+
+    if (migrationCount === 75) await verifyBuildIdentityInBackup(root, baseEnvironment);
 
     const first = runCli(backupScript, [], baseEnvironment, [3]);
     assert.match(first.stdout, /retention skipped because no verified copy exists/u);

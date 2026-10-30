@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApiApp } from '../src/app.js';
+import { createApiApp, createSyntheticTestApiApp } from '../src/app.js';
 import type { IterationTaskRepository } from '../src/iteration-task-repository.js';
-import { parseApiRuntimeConfig } from '../src/runtime-config.js';
+import { parseApiRuntimeConfig, type ApiProfile } from '../src/runtime-config.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
 
@@ -90,12 +90,16 @@ function iterationRepository(): IterationTaskRepository {
   };
 }
 
-function appWith(repository?: IterationTaskRepository): FastifyInstance {
-  const app = createApiApp({
+function appWith(
+  repository?: IterationTaskRepository,
+  profile: ApiProfile = 'test',
+  assemble = createSyntheticTestApiApp,
+): FastifyInstance {
+  const app = assemble({
     config: parseApiRuntimeConfig({
-      CUSTOMER_AGENT_PROFILE: 'test',
+      CUSTOMER_AGENT_PROFILE: profile,
       AUTH_MODE: 'mock',
-      CUSTOMER_AGENT_API_PORT: '0',
+      CUSTOMER_AGENT_API_PORT: profile === 'test' ? '0' : '3100',
       CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-iteration-test',
     }),
     repository: serviceRepository(),
@@ -106,6 +110,26 @@ function appWith(repository?: IterationTaskRepository): FastifyInstance {
 }
 
 describe('iteration task HTTP routes', () => {
+  it.each(['production', 'formal-dev', 'test'] as const)('blocks unscoped list, start and close in ordinary %s', async (profile) => {
+    const repository = iterationRepository();
+    const app = appWith(repository, profile, createApiApp);
+    const requests = [
+      { method: 'GET', url: '/v1/metrics/iteration-tasks' },
+      { method: 'POST', url: '/v1/events/iteration-tasks/itask-01J4PF9TQX7G/start', payload: { expected_version: 1 } },
+      { method: 'POST', url: '/v1/events/iteration-tasks/itask-01J4PF9TQX7G/close',
+        payload: { expected_version: 2, status: 'resolved', resolution_note: 'synthetic' } },
+    ] as const;
+    for (const request of requests) {
+      const headers = { ...coachHeaders, 'idempotency-key': 'synthetic-key' };
+      const response = await app.inject({ ...request, headers });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+    }
+    expect(repository.list).not.toHaveBeenCalled();
+    expect(repository.start).not.toHaveBeenCalled();
+    expect(repository.close).not.toHaveBeenCalled();
+  });
+
   it('returns an empty list for coach and owner without inventing rows', async () => {
     const repository = iterationRepository();
     const app = appWith(repository);

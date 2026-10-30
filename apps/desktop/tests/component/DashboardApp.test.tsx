@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
+import type { WorkbenchModeReply } from '../../src/shared/workbench-mode';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
 
@@ -80,6 +81,9 @@ describe('DashboardApp', () => {
     delete window.dashboardWording;
     delete window.dashboardContent;
     delete window.dashboardIteration;
+    delete window.dashboardWorkbench;
+    delete window.dashboardUsageLog;
+    delete window.dashboardOps;
     Object.defineProperty(window, 'PointerEvent', {
       configurable: true,
       writable: true,
@@ -101,6 +105,9 @@ describe('DashboardApp', () => {
     delete window.dashboardIntake;
     delete window.dashboardPermissions;
     delete window.dashboardPageUse;
+    delete window.dashboardWorkbench;
+    delete window.dashboardUsageLog;
+    delete window.dashboardOps;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -134,6 +141,65 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
     await user.click(screen.getByTestId('nav-materials'));
     expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
+  });
+
+  it.each(['product-remote', 'faq-v2'] as const)('keeps legacy statistics closed while mode is pending and after %s is confirmed', async (kind) => {
+    let resolveMode: (value: WorkbenchModeReply) => void = () => undefined;
+    const pending = new Promise<WorkbenchModeReply>((resolve) => { resolveMode = resolve; });
+    const list = vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false }));
+    const questionRates = vi.fn();
+    window.dashboardWorkbench = { mode: vi.fn(() => pending) };
+    window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+    window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+    render(<DashboardApp />);
+    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(list).not.toHaveBeenCalled();
+    expect(questionRates).not.toHaveBeenCalled();
+    await act(async () => { resolveMode({ ok: true, kind }); });
+    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.queryByText('没有查询')).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(questionRates).not.toHaveBeenCalled();
+  });
+
+  it('leaves statistics closed when the mode request fails', async () => {
+    const list = vi.fn();
+    const questionRates = vi.fn();
+    window.dashboardWorkbench = { mode: vi.fn().mockRejectedValue(new Error('unavailable')) };
+    window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+    window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+    render(<DashboardApp />);
+    await act(async () => {});
+    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(list).not.toHaveBeenCalled();
+    expect(questionRates).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'denied'] as const)('leaves statistics closed when the mode is %s', async (kind) => {
+    const list = vi.fn();
+    const questionRates = vi.fn();
+    if (kind === 'denied') window.dashboardWorkbench = { mode: async () => ({ ok: false, code: 'FORBIDDEN' }) };
+    window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+    window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+    render(<DashboardApp />);
+    await act(async () => {});
+    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(list).not.toHaveBeenCalled();
+    expect(questionRates).not.toHaveBeenCalled();
+  });
+
+  it('reads legacy statistics only after the mode is confirmed', async () => {
+    let resolveMode: (value: WorkbenchModeReply) => void = () => undefined;
+    const pending = new Promise<WorkbenchModeReply>((resolve) => { resolveMode = resolve; });
+    const list = vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false }));
+    window.dashboardWorkbench = { mode: vi.fn(() => pending) };
+    window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+    render(<DashboardApp />);
+    expect(list).not.toHaveBeenCalled();
+    await act(async () => { resolveMode({ ok: true, kind: 'legacy' }); });
+    expect(await screen.findByText('最近读取的记录中没有这段时间的查询。')).toBeInTheDocument();
+    expect(list).toHaveBeenCalled();
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('查询次数0');
   });
 
   it('shows the allergy SOP tree as a read-only 话术运营 module', async () => {
@@ -725,7 +791,7 @@ describe('DashboardApp', () => {
   it('explains an operational KPI before navigating to its detail', async () => {
     render(<DashboardApp />);
     expect(screen.getByTestId('module-overview')).toHaveTextContent('没查到');
-    expect(screen.getByTestId('module-overview')).toHaveTextContent('坐席查询后会出现');
+    expect(screen.getByTestId('module-overview')).toHaveTextContent('当前查询暂不能统计');
     expect(screen.queryByRole('button', { name: '查看明细' })).not.toBeInTheDocument();
   });
 

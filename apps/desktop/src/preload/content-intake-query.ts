@@ -2,12 +2,12 @@ import { ipcRenderer } from 'electron';
 import { IPC_CHANNELS as C } from '../shared/ipc-channels';
 import { exactKeys } from '../shared/product-session';
 import { intakeQueryFailure, isIntakeFailure, isIntakeContextResult, isIntakeSearchResult,
-  isIntakeSelection, isIntakeShopRequest, isIntakeSearchRequest, isIntakeCopyRequest,
-  type IntakeQueryApi, type IntakeQueryResult } from '../shared/content-intake-query';
+  isIntakeSelection, isIntakeShopRequest, isIntakeSearchRequest, isIntakeCopyRequest, isIntakeQueryInvalidationEvent,
+  type IntakeQueryApi, type IntakeQueryInvalidationEvent, type IntakeQueryResult } from '../shared/content-intake-query';
 
-const listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
+const listeners = new Set<(event: IntakeQueryInvalidationEvent) => void>();
 ipcRenderer.on(C.INTAKE_QUERY_INVALIDATED, (_event, ...args: unknown[]) => {
-  if (args.length === 1 && (args[0] === 'expired' || args[0] === 'invalidated')) for (const listener of listeners) listener(args[0]);
+  if (args.length === 1 && isIntakeQueryInvalidationEvent(args[0])) for (const listener of listeners) listener(args[0]);
 });
 async function invoke<T>(channel: string, args: unknown[], valid: (value: unknown) => value is IntakeQueryResult<T>): Promise<IntakeQueryResult<T>> {
   try {

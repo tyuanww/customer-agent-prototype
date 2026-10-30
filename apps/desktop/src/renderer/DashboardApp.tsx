@@ -10,6 +10,7 @@ import {
 } from './features/dashboard/intake-destinations';
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
+import type { WorkbenchKind } from '../shared/workbench-mode';
 import { canGrant, canOpenPermissions, canUploadSop, type PageUseSnapshot } from '../shared/page-use';
 import {
   useCallback,
@@ -118,6 +119,15 @@ function usePageUse(): PageUseSnapshot {
 
 function DashboardWorkspace() {
   const snapshot = usePageUse();
+  const [workbenchMode, setWorkbenchMode] = useState<WorkbenchKind | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const api = window.dashboardWorkbench;
+    if (api) void Promise.resolve().then(() => api.mode()).then(reply => {
+      if (alive) setWorkbenchMode(reply.ok ? reply.kind : null);
+    }).catch(() => { if (alive) setWorkbenchMode(null); });
+    return () => { alive = false; };
+  }, []);
   const permissionsOpen = canOpenPermissions(snapshot);
   const grantAllowed = canGrant(snapshot);
   const sopUpload = canUploadSop(snapshot);
@@ -828,6 +838,7 @@ function DashboardWorkspace() {
             jobKnown,
             jobPending: sessionPhase === 'pending',
             sessionKey,
+            workbenchMode,
             snapshot,
             onOpen: jump,
             onTodoCount: setTodoCount,

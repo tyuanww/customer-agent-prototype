@@ -93,7 +93,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/desktop/src/main/content-intake-management.ts` / `content-intake-management-ipc.ts` | Dashboard 候选／材料选择、来源权限提示、限时投影与关闭提醒；Main 保管来源确认、发布、取消的精确原操作正文；direct-v1 发布冻结请求后调用默认取消的原生确认，迟到确认受会话／取消代际及当前权限约束；人工质量检查复用 ContentIntakeQuality；新审批命令拒绝，旧审批只读；未知直发查原回执或重试原请求，旧审批发布仅查原回执，成功后另读当前状态 | 仅 FAQ loopback 合成 profile；窄命令不接受 actor/key/操作 ID/URL；来源失权和会话变化清空材料；确认不等于权限或审批通过，旧未知请求不得改写 confirmed 后重发 |
 | `apps/desktop/src/main/content-intake-rollback.ts` | 独占上一版回退计划、影响摘要和精确未知操作恢复；执行前复用 Main 原生确认展示目标与范围；管理模块拥有会话、取消和有效期，renderer 只传版本选择与操作意图；旧审批历史可读但不续期 | 仅 FAQ 合成 profile；回退是新的确认发布，不直接还原 current；旧未知审批请求只查原回执；权限不足只展示有权范围和纠正上传入口 |
 | `apps/desktop/src/main/content-intake-permissions.ts` / `content-intake-permissions-ipc.ts` | 内容管理内的业务权限配置；复用完整授权/来源发现与已登记人员目录，持有限时选择句柄、只读预览、精确保存/撤销请求、未知结果恢复及窗口关闭提醒；人员自己的较早截止独立失效 | 仅 FAQ 合成 profile；renderer 不构造主体/范围/操作键；当前姓名不可用的历史授权按记录编号、范围和原原因核对，不猜名字；本片 UI 不新增 delegation/root allocation/接管操作 |
-| `apps/desktop/src/main/seat-account-ipc.ts` | `faq-v2` 的 `dashboard:seats-command`：把 list/create/reset/disable 意图交给合成栈运行脚本；人员进 `customer_agent_synthetic`，口令只写 salt/哈希 | 仅 `contentIntake === "faq-v2"`；renderer 不持主体 ID；43101 每次重读口令文件，读失败 503，仍不交换新建坐席；`preview=intake` 不走这条 IPC |
+| `apps/desktop/src/main/seat-account-ipc.ts` | `dashboard:seats-command` 把 list/create/reset/disable 意图交给产品 API；服务端拥有身份写入 | 远程及显式 FAQ 合成工作台可用；Main 校验主帧和管理资格，renderer 不持主体 ID；建账号不自动授予业务权限 |
 | `apps/desktop/src/shared/seat-account-intent.ts` | `isSeatAccountIntent`、`seatAccountReply`、`SeatAccountApi`、`SeatAccountRecord`（`displayName`、`username`、`post`、`enabled`） | 只校验四种意图的字段形状；登录名正则在合成栈 `seatUsername` |
 | `apps/api/src/content-intake/discovery.ts` managementContext | 在原内容事务和发布锁内投影当前来源版本、本人 principal、事实版本、发布基线及最早有效期；只允许当前来源 import，receive 重新验权并比较版本 | 只读输入提示，不是资格、租约或提交票据；仅隔离宿主注册，不从 userId 推断主体或把未知基线当空值 |
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
@@ -174,11 +174,13 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是概览、话术库、SOP、知识库、资料、权限。话术库只读当前发布目录。SOP 读/导入/更新当前会话树（删除仅管理员）。待办 live list/start/close。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce`。 |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是概览、话术库、SOP、知识库、资料、权限。话术库只读当前发布目录。preload 保留旧 SOP 与待办通道，但普通服务不提供这些旧操作，见下文。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce`。 |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
+
+API 的普通启动在认证与岗位检查后拒绝无店铺范围的旧查询统计、优化待办、不准反馈、旧 SOP 目录与维护，以及旧话术修改和下架。显式合成测试装配可在 `test` 配置下调用这些接口，调用方须提供隔离的合成依赖；配置名称本身不能保证数据隔离。新版资料发布、查询与复制继续使用既有资格和权限链。
 
 Dashboard 没有 overlay 的 `customerAgent`（search / login / copy / inaccuracy）。独立 `dashboard.cjs` 只暴露话术库只读、内容会话/解析/发布、话术优化待办 list/start/close，以及 `dashboardOps`（检索账 / SOP / 话术下架 / 软件目录 / 打开下载页）。这是有意收窄，不是「完全无 preload」。ops-loop HTTP 已由 Main `dashboard-ops-loop.ts` 消费冻结合同；不要把通用 IPC 或 Node 权限塞进当前窗口。
 

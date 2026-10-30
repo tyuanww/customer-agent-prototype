@@ -413,9 +413,18 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       const candidate = parseContractSchema('IntakeCandidate', await checkedJson(await requestAs('enabler', `/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`), 'candidate'));
       prepared = { candidate, object: uploaded };
     }
-    const facts = await admin.query('SELECT min(valid_until) AS expires FROM content_intake.principal_facts');
+    const identities = INTAKE_SYNTHETIC_IDENTITIES.map(([id]) => id);
+    const facts = await admin.query<{ expires: Date | null; count: number }>(`
+      SELECT min(f.valid_until) AS expires, count(*)::int AS count
+      FROM content_intake.principals p
+      JOIN content_intake.principal_facts f
+        ON f.principal_id = p.principal_id AND f.facts_version = p.current_facts_version
+      WHERE p.principal_id = ANY($1::text[])`, [identities]);
+    if (facts.rows[0]?.count !== identities.length || !facts.rows[0].expires) {
+      throw new Error('Synthetic host identities lack current facts');
+    }
     return {
-      apiOrigin, identityOrigin, root: pg.root, expiresAt: (facts.rows[0].expires as Date).toISOString(),
+      apiOrigin, identityOrigin, root: pg.root, expiresAt: facts.rows[0].expires.toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: DesktopSyntheticIdentity) {
         if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',

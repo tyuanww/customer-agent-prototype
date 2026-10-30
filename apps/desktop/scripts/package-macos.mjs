@@ -36,7 +36,7 @@ try {
     env: buildEnvironment,
     stdio: 'inherit',
   });
-  execFileSync(process.execPath, ['scripts/write-build-identity.mjs'], {
+  execFileSync(process.execPath, ['scripts/write-build-identity.mjs', mode], {
     cwd: desktopRoot,
     env: buildEnvironment,
     stdio: 'inherit',

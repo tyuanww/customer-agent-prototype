@@ -333,15 +333,17 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(query.getByTestId('toast')).toContainText('已复制');
     expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(firstAnswer);
     if (profile === 'purpose-runtime') {
-      const shown = await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }));
-      expect(shown.ok).toBe(true);
-      if (!shown.ok) throw new Error('Expected qualified rows before synthetic revocation');
-      const oldKey = shown.rows[0]!.key;
+      // Changing the question cancels the success-dismiss timer and displays a fresh result.
+      await query.getByTestId('question-input').fill('如何洁面');
+      await query.getByTestId('search-button').click();
+      await expect(query.getByTestId('answer-text-1')).toBeVisible();
+      await app.evaluate(({ clipboard }) => clipboard.writeText('合成撤权复制检查哨兵'));
       await host.revokeSyntheticQuery();
-      expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }))).toMatchObject({ ok: false });
+      // Use the displayed button directly, without a search or refresh after revocation.
+      await query.getByTestId('copy-button-1').click();
       await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
-      expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), oldKey)).toMatchObject({ ok: false });
-      expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(firstAnswer);
+      await expect(query.getByTestId('error-state')).toContainText('资料资格已失效，请重新查询。');
+      expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('合成撤权复制检查哨兵');
       const use = (await host.status()).purposeQueries;
       expect(use.business).toBeGreaterThan(10); expect(use.usage).toBeGreaterThan(10); expect(use.worker).toBeGreaterThan(10);
     }

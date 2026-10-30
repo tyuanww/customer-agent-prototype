@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
+import type { IntakeQueryInvalidation } from '../shared/content-intake-query';
 
 type C = components['schemas'];
 type Selection = Pick<C['IntakeEntitlementRequest'], 'shopId' | 'productIds' | 'scenarioIds'>;
@@ -9,7 +11,7 @@ export interface IntakeUsageSession {
   subscribe(listener: () => void): () => void;
   request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }): Promise<{value: unknown}>;
 }
-import { ProductHttpError } from './product-http';
+import { ProductHttpError } from './product-http.ts';
 
 /** The server distinguishes a closed facts window from a missing grant, and the two tell the
  * operator to do different things. Every path that turns a refusal into a local error has to
@@ -41,19 +43,21 @@ export class IntakeUsageError extends Error {
     super(`INTAKE_USAGE_${code}`);
   }
 }
-type CatalogEvent = 'invalidated' | 'updated' | 'expired';
+type CatalogEvent = IntakeQueryInvalidation | 'updated';
 type Row = C['IntakeSnapshot']['faq'][number] & { key: string };
 export interface IntakeCatalog {
   /** Main-only handle: read/copy always recheck this exact qualification. No token in the projection. */
   read(): { releaseId: string; contextGeneration: number; validUntil: string; faq: Row[]; scopes: C['IntakeEntitlement']['scopes']; vocabulary: C['IntakeVocabulary'][] } | null;
-  copy(key: string): { copied: true };
+  copy(key: string, options?: { signal?: AbortSignal; stillShown?: () => boolean }): Promise<{ copied: true }>;
   preview(objectId: string): Promise<{ mime: string; bytes: Buffer }>;
 }
 const MAX_PAGES = 500;
 const MAX_BYTES = 32 * 1024 * 1024;
+const PAGE_LIMIT = '100';
+const COPY_CHECK_TIMEOUT_MS = 5_000;
 
 /** Owns current shop/selection, cancellation, complete-page assembly and native copy.
- * Consumed by sealed runners and the explicit loopback FAQ Query profile.
+ * Consumed by sealed runners and the intake Query in configured workbench profiles.
  * Legacy announce/current remains a separate contract.
  * A normal new release does not revoke handles already shown in this context;
  * selection/session changes and definitive permission failures revoke them all.
@@ -84,10 +88,10 @@ export class ContentIntakeUsage {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
   }
   private emit(event: CatalogEvent) { for (const listener of this.listeners) listener(event); }
-  private invalidate() {
+  private invalidate(reason: 'invalidated' | 'facts-expired' = 'invalidated') {
     this.invalidation++; this.request?.abort(); this.request = null; this.catalog = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
-    this.emit('invalidated');
+    this.emit(reason);
   }
   /** A selection intent only. Identity, generation and release authority are Main/API owned. */
   select(raw: unknown): number {
@@ -145,12 +149,13 @@ export class ContentIntakeUsage {
       };
       const vocabulary = new Map<string,C['IntakeVocabulary']>();
       const faq: Row[] = [], keys = new Set<string>(), cursors = new Set<string>(), mediaIds = new Set<string>();
+      const byKey = new Map<string, { row: Row; cursor: string | null }>();
       const sourceIds = new Set(entitlement.scopes.map(s => s.sourceId));
       let cursor: string | null = null, bytes = 0;
       for (let page = 0; ; page++) {
         if (page >= MAX_PAGES || bytes >= MAX_BYTES) throw new IntakeUsageError('LIMIT');
         if (!live()) throw new IntakeUsageError('EXPIRED');
-        const query = new URLSearchParams({ entitlementId: entitlement.entitlementId, limit: '100', ...(cursor === null ? {} : { cursor }) });
+        const query = new URLSearchParams({ entitlementId: entitlement.entitlementId, limit: PAGE_LIMIT, ...(cursor === null ? {} : { cursor }) });
         const response = await this.session.request(epoch, `/v1/intake/snapshot?${query}`, {
           signal: controller.signal, maxResponseBytes: MAX_BYTES - bytes,
         });
@@ -175,7 +180,8 @@ export class ContentIntakeUsage {
           }
           const identity = JSON.stringify([row.sourceId, row.entry.businessEntryId]);
           if (!sourceIds.has(row.sourceId) || keys.has(identity)) throw new IntakeUsageError('FORBIDDEN');
-          keys.add(identity); faq.push({ ...row, key: randomUUID() });
+          const stored = { ...row, key: randomUUID() };
+          keys.add(identity); faq.push(stored); byKey.set(stored.key, { row: stored, cursor });
         }
         for (const item of snapshot.media) mediaIds.add(item.objectId);
         if (snapshot.nextCursor === null) break;
@@ -184,15 +190,85 @@ export class ContentIntakeUsage {
       }
       assertRequest();
       if (!live()) throw new IntakeUsageError('EXPIRED');
-      const byKey = new Map(faq.map(row => [row.key, row]));
+      const expire = () => {
+        expired = true;
+        if (this.catalog === catalog) {
+          this.catalog = null; if (this.timer) clearTimeout(this.timer); this.timer = null; this.emit('expired');
+        }
+      };
+      const assertCopyLive = () => {
+        if (live()) return;
+        if (active()) { expire(); throw new IntakeUsageError('EXPIRED'); }
+        throw new IntakeUsageError('STALE');
+      };
       const catalog: IntakeCatalog = {
         read: () => live() ? structuredClone({ releaseId: entitlement.releaseId, contextGeneration: generation, validUntil: entitlement.validUntil, faq, scopes: entitlement.scopes, vocabulary: [...vocabulary.values()] }) : null,
-        copy: key => {
-          if (!live()) throw new IntakeUsageError('STALE');
-          const row = byKey.get(key);
-          if (!row) throw new IntakeUsageError('VALIDATION');
-          try { this.writeClipboard(row.entry.answerText); } catch { throw new IntakeUsageError('CLIPBOARD_FAILED'); }
-          return { copied: true };
+        copy: async (key, options) => {
+          assertCopyLive();
+          const target = byKey.get(key);
+          if (!target) throw new IntakeUsageError('VALIDATION');
+          if (options?.signal?.aborted || options?.stillShown?.() === false) throw new IntakeUsageError('STALE');
+          const controller = new AbortController();
+          let timedOut = false;
+          const wallStarted = this.now(), monotonicStarted = this.monotonic();
+          const deadlinePassed = () => {
+            const wallElapsed = this.now() - wallStarted, monotonicElapsed = this.monotonic() - monotonicStarted;
+            return timedOut || !Number.isFinite(wallElapsed) || wallElapsed < 0 || wallElapsed >= COPY_CHECK_TIMEOUT_MS
+              || !Number.isFinite(monotonicElapsed) || monotonicElapsed < 0 || monotonicElapsed >= COPY_CHECK_TIMEOUT_MS;
+          };
+          const cancel = () => controller.abort();
+          options?.signal?.addEventListener('abort', cancel, { once: true });
+          const timer = setTimeout(() => { timedOut = true; controller.abort(); }, COPY_CHECK_TIMEOUT_MS);
+          timer.unref?.();
+          const interrupted = new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () => reject(new IntakeUsageError(timedOut ? 'UNAVAILABLE' : 'STALE')), { once: true });
+          });
+          try {
+            const query = new URLSearchParams({ entitlementId: entitlement.entitlementId, limit: PAGE_LIMIT,
+              ...(target.cursor === null ? {} : { cursor: target.cursor }) });
+            const response = await Promise.race([
+              this.session.request(epoch, `/v1/intake/snapshot?${query}`, { signal: controller.signal, maxResponseBytes: MAX_BYTES }),
+              interrupted,
+            ]);
+            assertCopyLive();
+            if (deadlinePassed()) throw new IntakeUsageError('UNAVAILABLE');
+            if (controller.signal.aborted || options?.stillShown?.() === false) throw new IntakeUsageError('STALE');
+            const snapshot = parseContractSchema('IntakeSnapshot', response.value);
+            if (snapshot.entitlementId !== entitlement.entitlementId || snapshot.releaseId !== entitlement.releaseId
+              || snapshot.contextGeneration !== generation || snapshot.sopNodes.length || snapshot.sopEdges.length || snapshot.media.length) {
+              throw new IntakeUsageError('FORBIDDEN');
+            }
+            const matching = snapshot.faq.filter(row => row.sourceId === target.row.sourceId
+              && row.entry.businessEntryId === target.row.entry.businessEntryId);
+            const terms = new Set(snapshot.vocabulary.map(term => JSON.stringify([term.id, term.displayVersion])));
+            if (matching.length !== 1 || !isDeepStrictEqual(matching[0]!.entry, target.row.entry)
+              || snapshot.vocabulary.some(term => !term.active) || terms.size !== snapshot.vocabulary.length
+              || [...target.row.entry.productRefs, ...target.row.entry.scenarioRefs]
+                .some(ref => !terms.has(JSON.stringify([ref.id, ref.displayVersion])))) throw new IntakeUsageError('FORBIDDEN');
+            // No asynchronous work between the final context check and the native write.
+            assertCopyLive();
+            if (controller.signal.aborted || options?.stillShown?.() === false) throw new IntakeUsageError('STALE');
+            if (deadlinePassed()) throw new IntakeUsageError('UNAVAILABLE');
+            try { this.writeClipboard(target.row.entry.answerText); } catch { throw new IntakeUsageError('CLIPBOARD_FAILED'); }
+            return { copied: true };
+          } catch (error) {
+            // A cancelled or superseded copy must not invalidate a newer context.
+            if (error instanceof IntakeUsageError && error.code === 'EXPIRED' && active()) throw error;
+            if (!active() || options?.signal?.aborted || options?.stillShown?.() === false) throw new IntakeUsageError('STALE');
+            assertCopyLive();
+            if (deadlinePassed()) throw new IntakeUsageError('UNAVAILABLE');
+            if (error instanceof IntakeUsageError && ['STALE', 'UNAVAILABLE', 'CLIPBOARD_FAILED'].includes(error.code)) throw error;
+            const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+            const reason = error && typeof error === 'object' && 'reason' in error ? error.reason : null;
+            if (code === 'FORBIDDEN' && reason === 'LEASE_EXPIRED') { expire(); throw new IntakeUsageError('EXPIRED'); }
+            if (code === 'UNAVAILABLE' || code === 'OVERLOADED' || code === 'RATE_LIMITED') throw new IntakeUsageError('UNAVAILABLE');
+            const denial = intakeFactsDenial(error);
+            this.invalidate(denial ? 'facts-expired' : 'invalidated');
+            if (denial) throw denial;
+            throw new IntakeUsageError(code === 'UNAUTHORIZED' ? 'UNAUTHORIZED' : 'FORBIDDEN');
+          } finally {
+            clearTimeout(timer); options?.signal?.removeEventListener('abort', cancel);
+          }
         },
         preview: async objectId => {
           if (!live()) throw new IntakeUsageError('STALE');
@@ -209,14 +285,9 @@ export class ContentIntakeUsage {
       };
       this.catalog = catalog;
       if (this.timer) clearTimeout(this.timer);
-      this.timer = setTimeout(() => {
-        expired = true;
-        if (this.catalog === catalog) {
-          // Expiry belongs to this qualification, not to another in-flight refresh
-          // or an older handle whose independent deadline is still valid.
-          this.catalog = null; this.timer = null; this.emit('expired');
-        }
-      }, Math.max(0, expires - this.now()));
+      // Expiry belongs to this qualification, not to another in-flight refresh
+      // or an older handle whose independent deadline is still valid.
+      this.timer = setTimeout(expire, Math.max(0, expires - this.now()));
       this.timer.unref?.();
       this.emit('updated'); return catalog;
     } catch (error) {
@@ -231,7 +302,7 @@ export class ContentIntakeUsage {
       if (code === 'UNAVAILABLE' || code === 'OVERLOADED' || code === 'RATE_LIMITED') throw new IntakeUsageError('UNAVAILABLE');
       // Keep the server's reason before the generic fallback flattens it.
       const denial = intakeFactsDenial(error);
-      if (denial) { this.invalidate(); throw denial; }
+      if (denial) { this.invalidate('facts-expired'); throw denial; }
       this.invalidate();
       if (error instanceof IntakeUsageError) throw error;
       throw new IntakeUsageError(code === 'UNAUTHORIZED' ? 'UNAUTHORIZED' : 'FORBIDDEN');

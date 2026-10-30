@@ -5,12 +5,16 @@ it('uses explicit product-remote mode without consulting an origin', () => {
   expect(workbenchKind({ mode: 'product-remote' })).toBe('product-remote');
 });
 
-it.each(['synthetic-local', 'product-remote', undefined] as const)(
+it.each(['synthetic-local', undefined] as const)(
   'keeps faq-v2 ahead of mode %s',
   (mode) => {
     expect(workbenchKind({ mode, contentIntake: 'faq-v2' })).toBe('faq-v2');
   },
 );
+
+it('classifies a remote profile as remote even with the historical FAQ marker', () => {
+  expect(workbenchKind({ mode: 'product-remote', contentIntake: 'faq-v2' })).toBe('product-remote');
+});
 
 it('does not upgrade an explicit synthetic-local profile because its origin is HTTPS', () => {
   const profile = { mode: 'synthetic-local', apiOrigin: 'https://api.example.com' } as const;

@@ -80,6 +80,24 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
 
     await dashboard.getByTestId('nav-overview').click();
+    await expect.poll(() => dashboard.evaluate(async () => {
+      const mode = await window.dashboardWorkbench?.mode();
+      return mode?.ok ? mode.kind : null;
+    })).toBe('faq-v2');
+    await expect(dashboard.getByTestId('overview-usage-status')).toHaveText('当前查询暂不能统计');
+    await expect(dashboard.getByRole('region', { name: '没查到的问题' })).toContainText('当前查询暂不能统计');
+    await expect(dashboard.getByRole('region', { name: '待办' })).toContainText('当前待办暂不可用');
+    await expect(dashboard.getByRole('region', { name: '不准的话术' })).toContainText('当前待办暂不可用');
+    await expect(dashboard.getByTestId('overview-outcomes')).toContainText('当前处理效果暂不可用');
+    await expect(dashboard.getByRole('button', { name: '开始处理' })).toHaveCount(0);
+    await expect(dashboard.getByRole('button', { name: '已处理' })).toHaveCount(0);
+    await expect(dashboard.getByText('没有查询', { exact: true })).toHaveCount(0);
+    const overviewRequests = (await host.status()).requests;
+    expect(overviewRequests).not.toContain('/v1/events/usage');
+    expect(overviewRequests).not.toContain('/v1/metrics/question');
+    expect(overviewRequests).not.toContain('/v1/metrics/iteration-tasks');
+    expect(overviewRequests).not.toContain('/v1/metrics/inaccuracy-outcomes');
+    expect(overviewRequests.some(request => request.startsWith('/v1/events/iteration-tasks/'))).toBe(false);
     await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
     const presets = dashboard.locator('.overview-range-popup .ant-picker-presets li');
     await expect(presets).toHaveCount(2);
@@ -95,6 +113,10 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
       await dashboard.getByRole('textbox', { name: '时间范围' }).first().click();
     }
     await dashboard.keyboard.press('Escape');
+    const requestsAfterDateChanges = (await host.status()).requests;
+    expect(requestsAfterDateChanges).not.toContain('/v1/metrics/iteration-tasks');
+    expect(requestsAfterDateChanges).not.toContain('/v1/metrics/inaccuracy-outcomes');
+    expect(requestsAfterDateChanges.some(request => request.startsWith('/v1/events/iteration-tasks/'))).toBe(false);
 
     await dashboard.getByTestId('nav-content').click();
     await dashboard.getByRole('button', { name: '添加话术' }).click();

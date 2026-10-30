@@ -1,30 +1,36 @@
+import { randomUUID } from 'node:crypto';
 import { buildBm25Index, characterUnigramBigramTerms, rankBm25 } from '@customer-agent/retrieval-core';
-import { emptyIntakeQueryContext, isIntakeSelection, type IntakeQuerySelection, type IntakeQueryContext, type IntakeQueryRow } from '../shared/content-intake-query';
+import { emptyIntakeQueryContext, isIntakeSelection, type IntakeQuerySelection, type IntakeQueryContext, type IntakeQueryRow, type IntakeQueryInvalidationEvent } from '../shared/content-intake-query';
 import { loadIntakeAccess, loadIntakeVocabulary } from './content-intake-access';
 import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUsageSession } from './content-intake-usage';
 
 /** One Query window's context. Discovery is a menu, never a qualification.
  * Every search obtains a fresh complete qualified snapshot. Only the displayed
- * Top 3 keys may copy, and the catalog rechecks its own immutable deadline. */
+ * Top 3 keys may copy, and the catalog rechecks server authority before writing. */
 export class ContentIntakeQuery {
   private readonly usage: ContentIntakeUsage;
   private readonly unsubscribe: () => void;
   private generation = 0;
   private discovery: AbortController | null = null;
+  private copyRequest: AbortController | null = null;
   private context: IntakeQueryContext = emptyIntakeQueryContext();
-  private shown: { catalog: IntakeCatalog; keys: Set<string> } | null = null;
+  private shown: { catalog: IntakeCatalog; keys: Set<string>; contextId: string } | null = null;
   private menuDeadline = 0;
   private namesDeadline = 0;
   private epoch: number;
   private disposed = false;
-  private listeners = new Set<(reason: 'invalidated' | 'expired') => void>();
+  private listeners = new Set<(event: IntakeQueryInvalidationEvent) => void>();
   constructor(private readonly session: IntakeUsageSession, writeClipboard: (text: string) => void) {
     this.epoch = session.view().sessionEpoch;
     this.usage = new ContentIntakeUsage(session, writeClipboard);
     this.usage.subscribe(event => {
       if (event === 'updated') return;
+      const affected = this.shown;
+      this.copyRequest?.abort(); this.copyRequest = null;
       this.shown = null;
-      for (const listener of this.listeners) listener(event);
+      // A refresh failure is returned to its caller; expiry of an older catalog
+      // must not be attributed to a replacement search that has not completed.
+      if (affected) for (const listener of this.listeners) listener({ reason: event, contextId: affected.contextId });
     });
     this.unsubscribe = session.subscribe(() => {
       const current = session.view();
@@ -33,9 +39,10 @@ export class ContentIntakeQuery {
       }
     });
   }
-  subscribe(listener: (reason: 'invalidated' | 'expired') => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  subscribe(listener: (event: IntakeQueryInvalidationEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   cancel() {
     this.generation++;
+    this.copyRequest?.abort(); this.copyRequest = null;
     this.usage.cancelRefresh(); this.shown = null;
   }
   async access(shopId?: string): Promise<IntakeQueryContext> {
@@ -78,7 +85,7 @@ export class ContentIntakeQuery {
       throw new IntakeUsageError('EXPIRED');
     }
   }
-  async search(queryText: string): Promise<IntakeQueryRow[]> {
+  async search(queryText: string, contextId: string = randomUUID()): Promise<IntakeQueryRow[]> {
     this.cancel();
     this.assertMenu();
     const generation = this.generation;
@@ -109,12 +116,18 @@ export class ContentIntakeQuery {
     await new Promise<void>(resolve => setImmediate(resolve));
     if (this.disposed || generation !== this.generation) throw new IntakeUsageError('STALE');
     if (!catalog.read()) throw new IntakeUsageError('EXPIRED');
-    this.shown = { catalog, keys: new Set(rows.map(row => row.key)) };
+    this.shown = { catalog, keys: new Set(rows.map(row => row.key)), contextId };
     return rows;
   }
-  copy(key: string) {
-    if (!this.shown?.keys.has(key)) throw new IntakeUsageError('STALE');
-    return this.shown.catalog.copy(key);
+  async copy(key: string) {
+    const shown = this.shown;
+    if (!shown?.keys.has(key)) throw new IntakeUsageError('STALE');
+    this.copyRequest?.abort();
+    const controller = new AbortController(); this.copyRequest = controller;
+    try {
+      return await shown.catalog.copy(key, { signal: controller.signal,
+        stillShown: () => this.shown === shown && shown.keys.has(key) && this.copyRequest === controller });
+    } finally { if (this.copyRequest === controller) this.copyRequest = null; }
   }
   dispose() { this.disposed = true; this.discovery?.abort(); this.discovery = null; this.cancel(); this.unsubscribe(); this.usage.dispose(); this.listeners.clear(); }
 }

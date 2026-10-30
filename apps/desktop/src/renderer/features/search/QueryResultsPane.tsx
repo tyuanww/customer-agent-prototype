@@ -26,6 +26,7 @@ type QueryResultsPaneProps = {
   onRetry: () => void;
   onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
+  reportError?: string;
   onReportInaccuracy?: (script: RankedScript) => void;
   onCopyContact?: () => void;
   onOpenHelp?: () => void;
@@ -51,6 +52,7 @@ export function QueryResultsPane({
   onRetry,
   onCopy,
   reportedScriptIds,
+  reportError,
   onReportInaccuracy,
   onCopyContact,
   onOpenHelp,
@@ -105,6 +107,7 @@ export function QueryResultsPane({
                       <span>{results.length} 条 · 按 1 / 2 / 3 复制</span>
                     )}
                   </div>
+                  {reportError ? <div className="validation-error" role="status">{reportError}</div> : null}
                   {sopEntryVisible ? (
                     <div className="sop-entry-banner" data-testid="sop-entry-banner">
                       <span>{SOP_ENTRY_HINT}</span>

@@ -108,7 +108,8 @@ function closeBody(
 export function registerIterationTaskRoutes(
   app: FastifyInstance,
   authService: AuthService,
-  dependencies?: IterationTaskRouteDependencies,
+  dependencies: IterationTaskRouteDependencies | undefined,
+  allowUnscopedLegacyOps: boolean,
 ): void {
   const windows = new Map<string, { start: number; count: number }>();
   function limit(operation: string, userId: string, maximum: number): boolean {
@@ -125,6 +126,7 @@ export function registerIterationTaskRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const query = request.query as {
       status?: unknown;
       signal_id?: unknown;
@@ -172,6 +174,7 @@ export function registerIterationTaskRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const taskId = (request.params as { task_id?: unknown }).task_id;
     if (!isTaskId(taskId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
@@ -199,6 +202,7 @@ export function registerIterationTaskRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const taskId = (request.params as { task_id?: unknown }).task_id;
     if (!isTaskId(taskId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));

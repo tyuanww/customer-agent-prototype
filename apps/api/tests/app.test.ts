@@ -13,7 +13,8 @@ import type { ClientConfig } from 'pg';
 import { CONTRACT_PROVENANCE } from '@customer-agent/contracts/provenance';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
-import { createApiApp } from '../src/app.js';
+import { createApiApp, createSyntheticTestApiApp } from '../src/app.js';
+import * as publicApi from '../src/index.js';
 import {
   ApiConfigError,
   parseApiDatabaseBootstrapConfig,
@@ -70,6 +71,7 @@ const PHASE1_POLICY_OFF = Object.freeze({
 
 afterEach(async () => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   await Promise.all(openApps.splice(0).map(async (app) => app.close()));
 });
 
@@ -141,6 +143,16 @@ function databaseEnvironment(overrides: Record<string, string> = {}) {
 }
 
 describe('Application API bootstrap', () => {
+  it.each(['production', 'formal-dev'] as const)('rejects the synthetic fixture for %s', (profile) => {
+    const config = { ...testConfig(), profile };
+    expect(() => createSyntheticTestApiApp({ config, repository: stubRepository() }))
+      .toThrow('Synthetic fixture requires the test profile');
+  });
+
+  it('does not export the synthetic fixture from the public API entry', () => {
+    expect(publicApi).not.toHaveProperty('createSyntheticTestApiApp');
+  });
+
   it('keeps liveness dependency-free and contract-valid', async () => {
     const repository = stubRepository();
     const app = createApiApp({
@@ -228,6 +240,28 @@ describe('Application API bootstrap', () => {
     // Neither the raw subject id nor the LOG_HASH_KEY material may appear.
     expect(line).not.toContain('coach_log_probe');
     expect(line).not.toContain(RESTRICTED);
+  });
+
+  it('logs route templates without query parameters or dynamic path values', async () => {
+    const lines: string[] = [];
+    const app = createApiApp({
+      config: testConfig(), repository: stubRepository(ALL_READY),
+      accessLog: { logHash: { version: 'hmac-log-v1', key: 'routine-diagnosis-material-000000000001' }, sink: line => lines.push(line) },
+    });
+    app.get('/synthetic/:id', async () => ({ ok: true }));
+    openApps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/synthetic/private-id?code=synthetic-code&state=synthetic-state' });
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(lines[0]!)).toMatchObject({ path: '/synthetic/:id' });
+    expect(lines[0]).not.toContain('private-id');
+    expect(lines[0]).not.toContain('synthetic-code');
+    expect(lines[0]).not.toContain('synthetic-state');
+
+    lines.length = 0;
+    await app.inject({ method: 'GET', url: '/unmatched-private?code=synthetic-code' });
+    expect(lines[0]).not.toContain('unmatched-private');
+    expect(lines[0]).not.toContain('synthetic-code');
   });
 
   it('fails readiness closed for every dependency and repository exceptions', async () => {
@@ -947,7 +981,8 @@ describe('Application API bootstrap', () => {
     expect(repository.close).toHaveBeenCalledOnce();
   });
 
-  it('starts on an ephemeral loopback port and closes cleanly without connecting health to DB', async () => {
+  it.each([undefined, '1'])('starts on loopback and keeps legacy routes closed with PG test marker %s', async (marker) => {
+    vi.stubEnv('CUSTOMER_AGENT_API_PG15_INTEGRATION', marker);
     const started = await startApi({
       environment: databaseEnvironment({
         CUSTOMER_AGENT_BUILD_VERSION: '0.2.0-w5-listen',
@@ -964,6 +999,11 @@ describe('Application API bootstrap', () => {
         service: 'cs-ai-api',
         version: '0.2.0-w5-listen',
       });
+      const legacy = await fetch(`${started.address}/v1/metrics/iteration-tasks`, {
+        headers: { 'x-mock-user': 'synthetic-coach', 'x-mock-role': 'coach' },
+      });
+      expect(legacy.status).toBe(503);
+      await expect(legacy.json()).resolves.toMatchObject({ error: { code: 'OVERLOADED' } });
     } finally {
       await started.close();
     }

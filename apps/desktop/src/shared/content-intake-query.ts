@@ -38,6 +38,15 @@ const messages = {
 } as const;
 export type IntakeQueryFailure = { ok: false; code: keyof typeof messages; message: string };
 export type IntakeQueryResult<T> = ({ ok: true } & T) | IntakeQueryFailure;
+export type IntakeQueryInvalidation = 'invalidated' | 'expired' | 'facts-expired';
+/** Correlation only; Main still owns the qualification and copy handle. */
+export type IntakeQueryInvalidationEvent = { reason: IntakeQueryInvalidation; contextId: string };
+const contextId = (value: unknown): value is string => typeof value === 'string'
+  && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+export function isIntakeQueryInvalidationEvent(value: unknown): value is IntakeQueryInvalidationEvent {
+  return exactKeys(value, ['reason', 'contextId']) && contextId(value.contextId)
+    && (value.reason === 'invalidated' || value.reason === 'expired' || value.reason === 'facts-expired');
+}
 export function intakeQueryFailure(code: keyof typeof messages): IntakeQueryFailure {
   return { ok: false, code, message: messages[code] };
 }
@@ -52,8 +61,8 @@ export function isIntakeText(value: unknown, max = 256): value is string {
 export function isIntakeShopRequest(value: unknown): value is { shopId: string } {
   return exactKeys(value, ['shopId']) && isIntakeText(value.shopId);
 }
-export function isIntakeSearchRequest(value: unknown): value is { queryText: string } {
-  return exactKeys(value, ['queryText']) && typeof value.queryText === 'string'
+export function isIntakeSearchRequest(value: unknown): value is { queryText: string; contextId: string } {
+  return exactKeys(value, ['queryText', 'contextId']) && contextId(value.contextId) && typeof value.queryText === 'string'
     && value.queryText.trim().length > 0 && [...value.queryText].length <= 500;
 }
 export function isIntakeCopyRequest(value: unknown): value is { key: string } {
@@ -87,8 +96,8 @@ export type IntakeQueryApi = {
   access(): Promise<IntakeQueryResult<IntakeQueryContext>>;
   selectShop(request: { shopId: string }): Promise<IntakeQueryResult<IntakeQueryContext>>;
   selectConditions(request: IntakeQuerySelection): Promise<IntakeQueryResult<IntakeQueryContext>>;
-  search(request: { queryText: string }): Promise<IntakeQueryResult<{ rows: IntakeQueryRow[] }>>;
+  search(request: { queryText: string; contextId: string }): Promise<IntakeQueryResult<{ rows: IntakeQueryRow[] }>>;
   copy(request: { key: string }): Promise<IntakeQueryResult<{ copied: true }>>;
   cancel(): Promise<IntakeQueryResult<{ cancelled: true }>>;
-  onInvalidated(listener: (reason: 'invalidated' | 'expired') => void): () => void;
+  onInvalidated(listener: (event: IntakeQueryInvalidationEvent) => void): () => void;
 };

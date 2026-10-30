@@ -95,6 +95,16 @@ export type ApiAppOptions = Readonly<{
 }>;
 
 export function createApiApp(options: ApiAppOptions): FastifyInstance {
+  return assembleApiApp(options, false);
+}
+
+/** Internal fixture entry: callers must supply isolated synthetic dependencies. Not exported by the public API. */
+export function createSyntheticTestApiApp(options: ApiAppOptions): FastifyInstance {
+  if (options.config.profile !== 'test') throw new Error('Synthetic fixture requires the test profile');
+  return assembleApiApp(options, true);
+}
+
+function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean): FastifyInstance {
   const { config, repository } = options;
   const diagnosticSink = options.diagnosticSink ?? reportApiRuntimeDiagnostic;
   const providedAuthService = options.authService;
@@ -154,7 +164,7 @@ export function createApiApp(options: ApiAppOptions): FastifyInstance {
         requestId: request.id,
         // Hashed, never the raw subject id. 'anonymous' when nothing authenticated.
         userId: currentRequestActorHash() ?? 'anonymous',
-        path: request.url,
+        path: request.routeOptions.url ?? '<unmatched>',
         method: request.method,
         statusCode: reply.statusCode,
         durationMs: started === undefined ? 0 : Math.max(0, Math.round(performance.now() - started)),
@@ -192,8 +202,10 @@ export function createApiApp(options: ApiAppOptions): FastifyInstance {
   registerContentReviewRoutes(app, authService, contentReviewDependencies);
   registerContentReleaseRoutes(app, authService, contentReleaseDependencies);
   registerAnnounceRoutes(app, authService, announceDependencies);
-  registerIterationTaskRoutes(app, authService, iterationTaskDependencies);
-  registerOpsLoopRoutes(app, authService, opsLoopDependencies);
+  // Legacy statistics, tasks, SOP nodes and script mutations lack an enforceable shop/app scope.
+  // Only the explicit synthetic fixture may exercise them; a profile alone cannot.
+  registerIterationTaskRoutes(app, authService, iterationTaskDependencies, allowUnscopedLegacyOps);
+  registerOpsLoopRoutes(app, authService, opsLoopDependencies, allowUnscopedLegacyOps);
   if (intakeDependencies && authService.kind === 'product') {
     const report = (_diagnosticId: string, error: unknown): void => {
       try { diagnosticSink(createApiRuntimeDiagnostic('API_REQUEST_FAILED', error)); } catch { /* observational */ }

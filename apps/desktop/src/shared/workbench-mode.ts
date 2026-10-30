@@ -9,8 +9,8 @@ export function workbenchKind(profile: {
   readonly contentIntake?: 'faq-v2';
 } | null | undefined): WorkbenchKind {
   if (!profile) return 'legacy';
-  if (profile.contentIntake === 'faq-v2') return 'faq-v2';
   if (profile.mode === 'product-remote') return 'product-remote';
+  if (profile.contentIntake === 'faq-v2') return 'faq-v2';
   return 'legacy';
 }
 
