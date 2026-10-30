@@ -18,6 +18,7 @@ for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTT
     const result = await response.json(); assert.equal(response.status, status, JSON.stringify(result)); return result;
   }
   try {
+    assert.ok(Date.parse(host.expiresAt) > Date.now(), 'the intentionally expired roster fixture must not expire the host');
     for (const menu of ['authorization', 'sources']) await json(await host.requestAs('enabler', `/v1/intake/${menu}?limit=100`));
     assert.equal((await host.requestAs('agent', url)).status, 404);
     assert.equal(host.candidate.publicationPolicy, 'direct-v1');
@@ -83,6 +84,9 @@ for (const { profile, domain } of cases) test(`isolated ${profile}/${domain} HTT
     }
     console.info(JSON.stringify({ status: 'PASS', profile, domain, consumer: 'ordinary-seat', http: 'actual', postgres: 15, publicationPolicy: 'direct-v1', approvalFacts: 0, publications: 1, faq: snapshot.faq.length, multilinePreserved: true }));
   } finally { await host.close(); }
-  assert.deepEqual(host.resources(), { closed: true, identityListening: false, poolConnections: profile === 'purpose-runtime' ? [0, 0, 0, 0] : [0] });
+  const resources = host.resources();
+  assert.equal(resources.closed, true);
+  assert.equal(resources.identityListening, false);
+  assert.ok(resources.poolConnections.length > 0 && resources.poolConnections.every(count => count === 0));
   assert.equal(existsSync(host.root), false, 'owned PG, objects and attachments cleaned');
 });

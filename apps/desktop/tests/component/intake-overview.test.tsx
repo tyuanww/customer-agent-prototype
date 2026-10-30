@@ -1,10 +1,10 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { IntakeOverview } from '../../src/renderer/features/dashboard/IntakeOverview';
 import { formatShortTime } from '../../src/renderer/features/dashboard/intake-time';
 import { v9Headline } from '../fixtures/v9-overview-model';
-import type { UsageSourceRow } from '../../src/shared/usage-log-csv';
+import { listUsageLog, type UsageSourceRow } from '../../src/shared/usage-log-csv';
 import type { DashboardIterationTask } from '../../src/shared/dashboard-iteration';
 import type { DashboardWordingEntry, DashboardWordingView } from '../../src/shared/dashboard-wording';
 import type { DeskItemView, DeskView } from '../../src/shared/desk-knowledge';
@@ -111,7 +111,7 @@ it('names a no-hit cluster in Chinese instead of the machine key', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   expect(await screen.findByText('抖音全店没有命中话术')).toBeInTheDocument();
   expect(screen.queryByText('no_hit:none:storewide:douyin')).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
     close: vi.fn(),
   };
   const onOpen = vi.fn();
-  render(<IntakeOverview onOpen={onOpen} />);
+  render(<IntakeOverview mode="legacy" onOpen={onOpen} />);
   await openTodo();
   expect(await screen.findByText('话术不准：script-a')).toBeInTheDocument();
   expect(tileText('不准次数')).toBe('不准次数3只含已开待办记下的样本，不是这段时间的全部。');
@@ -146,7 +146,7 @@ it('shows only 待处理 and 处理中', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   const table = await screen.findByRole('table', { name: '话术迭代' });
   expect(table).toHaveTextContent('待处理');
@@ -160,7 +160,7 @@ it('says 现在没有待办 when the loaded task list has nothing open', async (
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findByText('现在没有待办。')).toBeInTheDocument();
   expect(screen.getByText('当前没有达到开单阈值的不准稿。')).toBeInTheDocument();
   expect(tileText('不准次数')).toBe('不准次数0只含已开待办记下的样本，不是这段时间的全部。');
@@ -168,13 +168,13 @@ it('says 现在没有待办 when the loaded task list has nothing open', async (
   expect(tileText('查询次数')).toBe('查询次数');
   expect(tileText('被复制')).toBe('被复制只表示复制了');
   expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('坐席查询后会出现');
-  expect(screen.queryByText('这段时间所有查询都有结果。')).not.toBeInTheDocument();
+  expect(screen.queryByText('所选时段内已读取的查询都有结果。')).not.toBeInTheDocument();
   expect(screen.queryByText('命中率')).not.toBeInTheDocument();
   expect(screen.queryByText('较上期')).not.toBeInTheDocument();
 });
 
 it('names the next step when a block has no source', () => {
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(screen.getByRole('region', { name: '待办' })).toHaveTextContent('请先登录。');
   expect(screen.getByRole('region', { name: '不准的话术' })).toHaveTextContent('请先登录。');
   expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('坐席查询后会出现');
@@ -199,7 +199,7 @@ it('shows a separate 无命中 list and no percentage', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findByText('话术不准：script-a')).toBeInTheDocument();
   const misses = screen.getByRole('region', { name: '没查到的问题' });
   expect(misses).toHaveTextContent('坐席查询后会出现');
@@ -223,7 +223,7 @@ it('does not turn knowledge reminders into 不准 rows', async () => {
     })),
     command: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const iteration = await screen.findByRole('table', { name: '话术迭代' });
   expect(iteration).toHaveTextContent('话术不准：script-a');
   expect(iteration).not.toHaveTextContent('退货运费什么时候到');
@@ -251,7 +251,7 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
   const older = vi.fn(async () => wording('2026-10-12T00:00:00.000Z'));
   window.dashboardWording = { list: older };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(older);
@@ -262,7 +262,7 @@ it('refuses 内容缺口 已处理 until a newer published release and then clos
 
   const newer = vi.fn(async () => wording('2026-10-14T00:00:00.000Z'));
   window.dashboardWording = { list: newer };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(newer);
@@ -285,7 +285,7 @@ it('closes 内容缺口 when the announce lease shows that script published afte
   }));
   window.dashboardWording = { list: sameRelease };
   const user = userEvent.setup();
-  const { unmount } = render(<IntakeOverview onOpen={() => undefined} />);
+  const { unmount } = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(sameRelease);
@@ -299,7 +299,7 @@ it('closes 内容缺口 when the announce lease shows that script published afte
     effectiveFrom: '2026-10-14T00:00:00.000Z',
   }));
   window.dashboardWording = { list: newerLease };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(newerLease);
@@ -322,7 +322,7 @@ it('does not treat a local catalog without a refresh time as a newer release', a
   }));
   window.dashboardWording = { list: local };
   const user = userEvent.setup();
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   await settleWording(local);
@@ -348,7 +348,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
     command,
   };
   const user = userEvent.setup();
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await openTodo();
   await screen.findByText('处理中');
   expect(screen.getByRole('button', { name: '暂不处理' })).toBeDisabled();
@@ -363,7 +363,7 @@ it('defers another cause only with a reason and does not rewrite the script', as
 
 it('does not fill the counts with the v9 sample when preview=intake', () => {
   window.history.pushState({}, '', '/?preview=intake');
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('坐席查询后会出现');
   expect(screen.queryByText(v9Headline(7).use)).not.toBeInTheDocument();
   expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();
@@ -394,11 +394,12 @@ it('computes overview figures from the usage rows', async () => {
     previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
     export: vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE', message: '未接入' })),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await waitFor(() => expect(tileText('查询次数')).toBe('查询次数4'));
   expect(tileText('没查到')).toBe('没查到2');
   expect(tileText('被复制')).toBe('被复制1只表示复制了');
   expect(tileText('不准次数')).toBe('不准次数');
+  expect(screen.getByText(/当前登录者最近读到的记录，服务端最多 500 条/)).toBeInTheDocument();
   expect(screen.queryByText('运费谁承担')).not.toBeInTheDocument();
   expect(screen.queryByText(v9Headline(7).use)).not.toBeInTheDocument();
   expect(screen.queryByText('退货时效')).not.toBeInTheDocument();
@@ -436,7 +437,7 @@ it('shows a short local time for a live miss instead of the raw timestamp', asyn
     previewExport: vi.fn(),
     export: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const misses = screen.getByRole('region', { name: '没查到的问题' });
   const cell = await within(misses).findByRole('cell', { name: formatShortTime(askedAt) });
   expect(cell).not.toHaveTextContent(askedAt);
@@ -449,7 +450,7 @@ it('keeps 待处理 on one line and uses no native select inside a narrow overvi
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<div style={{ width: 360 }}><IntakeOverview onOpen={() => undefined} /></div>);
+  render(<div style={{ width: 360 }}><IntakeOverview mode="legacy" onOpen={() => undefined} /></div>);
   const root = screen.getByTestId('module-overview');
   expect(root.querySelector('select')).toBeNull();
   expect(root.querySelector('details')).toBeNull();
@@ -497,11 +498,11 @@ it('counts usage rows inside the dates the operator picks', async () => {
     previewExport: vi.fn(),
     export: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   await waitFor(() => expect(tileText('查询次数')).toBe('查询次数1'));
   expect(tileText('被复制')).toBe('被复制1只表示复制了');
   expect(tileText('没查到')).toBe('没查到0');
-  expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('这段时间所有查询都有结果。');
+  expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('所选时段内已读取的查询都有结果。');
   expect(screen.queryByText('二十天前的话术')).not.toBeInTheDocument();
   expect(screen.queryByText('今天的话术')).not.toBeInTheDocument();
   const user = userEvent.setup();
@@ -512,7 +513,7 @@ it('counts usage rows inside the dates the operator picks', async () => {
   expect(tileText('被复制')).toBe('被复制1只表示复制了');
   expect(tileText('没查到')).toBe('没查到1');
   expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('二十天前的话术');
-  expect(screen.queryByText('这段时间所有查询都有结果。')).not.toBeInTheDocument();
+  expect(screen.queryByText('所选时段内已读取的查询都有结果。')).not.toBeInTheDocument();
   expect(screen.queryByText('今天的话术')).not.toBeInTheDocument();
   await user.click(start!);
   await user.clear(start!);
@@ -533,7 +534,7 @@ it('asks a signed-out seat to log in and does not call the read a failure', asyn
     previewExport: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED', message: '请先登录' })),
     export: vi.fn(async () => ({ ok: false as const, code: 'UNAUTHORIZED', message: '请先登录' })),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const status = await screen.findByTestId('overview-usage-status');
   expect(status).toHaveTextContent('请先登录。');
   expect(status).not.toHaveTextContent('使用记录暂时读不出来');
@@ -552,14 +553,14 @@ it('says 坐席查询后会出现 when usage is not mounted', async () => {
     previewExport: vi.fn(),
     export: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const status = await screen.findByTestId('overview-usage-status');
   expect(status).toHaveTextContent('坐席查询后会出现');
   expect(status).not.toHaveTextContent('没读到');
   expect(status).not.toHaveTextContent('请先登录');
   expect(within(status).queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
   expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('坐席查询后会出现');
-  expect(screen.queryByText('这段时间所有查询都有结果。')).not.toBeInTheDocument();
+  expect(screen.queryByText('所选时段内已读取的查询都有结果。')).not.toBeInTheDocument();
   expect(screen.queryByText(WORKBENCH_EMPTY.usageUnmounted)).not.toBeInTheDocument();
   expect(tileText('查询次数')).toBe('查询次数');
 });
@@ -570,7 +571,7 @@ it('says 没读到 when a mounted usage read fails for another reason', async ()
     previewExport: vi.fn(),
     export: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const status = await screen.findByTestId('overview-usage-status');
   expect(status).toHaveTextContent('没读到。');
   expect(within(status).getByRole('button', { name: '重试' })).toBeInTheDocument();
@@ -579,7 +580,178 @@ it('says 没读到 when a mounted usage read fails for another reason', async ()
   expect(tileText('查询次数')).toBe('查询次数');
 });
 
-const SHOP_RATE_SCOPE = '命中率、无命中率和不准反馈率是全店这段时间的查询，不是当前登录者的使用记录。';
+const SHOP_RATE_SCOPE = '命中率、无命中率和不准反馈率依据当前数据库这段时间的记录计算，未按店铺筛选。';
+
+it.each([null, 'product-remote', 'faq-v2'] as const)(
+  'does not read or act on legacy tasks and outcomes in mode %s', async (mode) => {
+    const list = vi.fn(async () => ({ ok: true as const, items: [task('open')], nextCursor: null }));
+    const outcomes = vi.fn(async () => ({ ok: true as const, items: [{
+      scriptId: 'script-a', resolvedAt: '2026-10-13T00:00:00.000Z', ready: true,
+      beforeCount: 4, afterCount: 1, windowDays: 7,
+    }] }));
+    const start = vi.fn();
+    const close = vi.fn();
+    const onTodoCount = vi.fn();
+    window.dashboardIteration = { list, outcomes, start, close };
+    render(<IntakeOverview mode={mode} onOpen={() => undefined} onTodoCount={onTodoCount} />);
+    await act(async () => {});
+    expect(screen.getByRole('region', { name: '待办' })).toHaveTextContent('当前待办暂不可用');
+    expect(screen.getByRole('region', { name: '不准的话术' })).toHaveTextContent('当前待办暂不可用');
+    expect(screen.getByTestId('overview-outcomes')).toHaveTextContent('当前处理效果暂不可用');
+    expect(tileText('不准次数')).toBe('不准次数');
+    expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+    expect(screen.queryByText(/处理前 7 天 4 次/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '开始处理' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '已处理' })).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(outcomes).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+    expect(onTodoCount).toHaveBeenLastCalledWith(0);
+  },
+);
+
+it('immediately hides legacy tasks and outcomes on a mode change and clears the badge', async () => {
+  const list = vi.fn(async () => ({ ok: true as const, items: [task('open')], nextCursor: null }));
+  const outcomes = vi.fn(async () => ({ ok: true as const, items: [{
+    scriptId: 'script-a', resolvedAt: '2026-10-13T00:00:00.000Z', ready: true,
+    beforeCount: 4, afterCount: 1, windowDays: 7,
+  }] }));
+  const start = vi.fn();
+  const close = vi.fn();
+  const onTodoCount = vi.fn();
+  window.dashboardIteration = { list, outcomes, start, close };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  const oldButton = await screen.findByRole('button', { name: '开始处理' });
+  expect(await screen.findByText(/处理前 7 天 4 次/)).toBeInTheDocument();
+  expect(onTodoCount).toHaveBeenLastCalledWith(1);
+
+  view.rerender(<IntakeOverview mode="faq-v2" onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  expect(screen.queryByText(/处理前 7 天 4 次/)).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: '待办' })).toHaveTextContent('当前待办暂不可用');
+  expect(screen.getByTestId('overview-outcomes')).toHaveTextContent('当前处理效果暂不可用');
+  expect(tileText('不准次数')).toBe('不准次数');
+  expect(onTodoCount).toHaveBeenLastCalledWith(0);
+  fireEvent.click(oldButton);
+  expect(start).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  expect(list).toHaveBeenCalledTimes(1);
+  expect(outcomes).toHaveBeenCalledTimes(1);
+});
+
+it('discards late task and outcome reads and waits for fresh results after returning to legacy', async () => {
+  const taskPage = { ok: true as const, items: [task('open')], nextCursor: null };
+  const outcomePage = { ok: true as const, items: [{
+    scriptId: 'script-a', resolvedAt: '2026-10-13T00:00:00.000Z', ready: true,
+    beforeCount: 4, afterCount: 1, windowDays: 7,
+  }] };
+  let releaseTasks: (value: typeof taskPage) => void = () => undefined;
+  let releaseOutcomes: (value: typeof outcomePage) => void = () => undefined;
+  const pendingTasks = new Promise<typeof taskPage>((resolve) => { releaseTasks = resolve; });
+  const pendingOutcomes = new Promise<typeof outcomePage>((resolve) => { releaseOutcomes = resolve; });
+  const list = vi.fn().mockImplementationOnce(() => pendingTasks).mockImplementationOnce(() => new Promise(() => undefined));
+  const outcomes = vi.fn().mockImplementationOnce(() => pendingOutcomes).mockImplementationOnce(() => new Promise(() => undefined));
+  window.dashboardIteration = { list, outcomes, start: vi.fn(), close: vi.fn() };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  await waitFor(() => { expect(list).toHaveBeenCalledTimes(1); expect(outcomes).toHaveBeenCalledTimes(1); });
+  view.rerender(<IntakeOverview mode="product-remote" onOpen={() => undefined} />);
+  await act(async () => { releaseTasks(taskPage); releaseOutcomes(outcomePage); });
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  expect(screen.queryByText(/处理前 7 天 4 次/)).not.toBeInTheDocument();
+  view.rerender(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  expect(screen.queryByText(/处理前 7 天 4 次/)).not.toBeInTheDocument();
+  await waitFor(() => { expect(list).toHaveBeenCalledTimes(2); expect(outcomes).toHaveBeenCalledTimes(2); });
+});
+
+it.each([null, 'product-remote', 'faq-v2'] as const)(
+  'does not read legacy query statistics in mode %s', async (mode) => {
+    const list = vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false }));
+    const questionRates = vi.fn();
+    const tasks = vi.fn(async () => ({ ok: true as const, items: [task('open')], nextCursor: null }));
+    window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+    window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+    window.dashboardIteration = { list: tasks, start: vi.fn(), close: vi.fn() };
+    render(<IntakeOverview mode={mode} onOpen={() => undefined} />);
+
+    expect(screen.getByRole('region', { name: '待办' })).toHaveTextContent('当前待办暂不可用');
+    expect(tasks).not.toHaveBeenCalled();
+    expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+    expect(screen.getByRole('region', { name: '没查到的问题' })).toHaveTextContent('当前查询暂不能统计');
+    expect(tileText('查询次数')).toBe('查询次数');
+    expect(tileText('没查到')).toBe('没查到');
+    expect(tileText('被复制')).toBe('被复制只表示复制了');
+    expect(screen.queryByText('没有查询')).not.toBeInTheDocument();
+    expect(screen.queryByText('命中率')).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(questionRates).not.toHaveBeenCalled();
+  },
+);
+
+it('hides earlier statistics immediately when the mode changes and waits for a fresh legacy read', async () => {
+  const row: UsageSourceRow = {
+    id: 'q-mode', askedAt: insideRecentWeek(9), agent: '坐席', question: '合成问题',
+    scriptTitle: null, result: 'miss', snapshotStale: false,
+  };
+  const page = { ok: true as const, rows: [row], nextCursor: null, canExport: false };
+  const rates = { ok: true as const, queryCount: 1, hitCount: 1, noHitCount: 0, otherCount: 0,
+    inaccuracyCount: 0, hitRate: '1', noHitRate: '0', inaccuracyRate: '0' };
+  let releasePage: (value: typeof page) => void = () => undefined;
+  let releaseRates: (value: typeof rates) => void = () => undefined;
+  const nextPage = new Promise<typeof page>((resolve) => { releasePage = resolve; });
+  const nextRates = new Promise<typeof rates>((resolve) => { releaseRates = resolve; });
+  const list = vi.fn().mockResolvedValueOnce(page).mockImplementationOnce(() => nextPage);
+  const questionRates = vi.fn().mockResolvedValueOnce(rates).mockImplementationOnce(() => nextRates);
+  window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+  window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  await waitFor(() => expect(tileText('查询次数')).toBe('查询次数1'));
+  expect(await screen.findByText('100.0%')).toBeInTheDocument();
+
+  view.rerender(<IntakeOverview mode="faq-v2" onOpen={() => undefined} />);
+  expect(tileText('查询次数')).toBe('查询次数');
+  expect(screen.queryByText('100.0%')).not.toBeInTheDocument();
+  expect(screen.queryByText('合成问题')).not.toBeInTheDocument();
+  expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+
+  view.rerender(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(tileText('查询次数')).toBe('查询次数');
+  expect(screen.queryByText('100.0%')).not.toBeInTheDocument();
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+  await act(async () => { releasePage(page); releaseRates(rates); });
+  await waitFor(() => expect(tileText('查询次数')).toBe('查询次数1'));
+  expect(await screen.findByText('100.0%')).toBeInTheDocument();
+});
+
+it('does not fetch another legacy page when a pending read finishes after a mode change', async () => {
+  let release: (value: { ok: true; rows: []; nextCursor: string; canExport: false }) => void = () => undefined;
+  const pending = new Promise<{ ok: true; rows: []; nextCursor: string; canExport: false }>((resolve) => { release = resolve; });
+  const list = vi.fn(() => pending);
+  window.dashboardUsageLog = { list, previewExport: vi.fn(), export: vi.fn() };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+  view.rerender(<IntakeOverview mode="product-remote" onOpen={() => undefined} />);
+  await act(async () => { release({ ok: true, rows: [], nextCursor: 'next', canExport: false }); });
+  expect(list).toHaveBeenCalledTimes(1);
+  expect(tileText('查询次数')).toBe('查询次数');
+  expect(screen.queryByText('最近读取的记录中没有这段时间的查询。')).not.toBeInTheDocument();
+});
+
+it('hides unfinished legacy task input in intake mode and restores it after a fresh legacy read', async () => {
+  window.dashboardIteration = {
+    list: vi.fn(async () => ({ ok: true as const, items: [task('in_progress')], nextCursor: null })),
+    start: vi.fn(), close: vi.fn(),
+  };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  const input = await screen.findByRole('textbox', { name: '处理说明 话术不准：script-a' });
+  await userEvent.setup().type(input, '合成处理说明');
+  view.rerender(<IntakeOverview mode="faq-v2" onOpen={() => undefined} />);
+  expect(screen.queryByRole('textbox', { name: '处理说明 话术不准：script-a' })).not.toBeInTheDocument();
+  expect(screen.getByTestId('overview-usage-status')).toHaveTextContent('当前查询暂不能统计');
+  view.rerender(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(await screen.findByRole('textbox', { name: '处理说明 话术不准：script-a' })).toHaveValue('合成处理说明');
+});
 
 it('shows an empty shop window as 没有查询 and keeps the personal counts at 0', async () => {
   window.dashboardIteration = {
@@ -605,7 +777,7 @@ it('shows an empty shop window as 没有查询 and keeps the personal counts at 
       inaccuracyRate: null,
     })),
   } as unknown as Window['dashboardOps'];
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findAllByText('没有查询')).toHaveLength(3);
   expect(tileText('命中率')).toBe('命中率没有查询');
   expect(tileText('无命中率')).toBe('无命中率没有查询');
@@ -628,7 +800,7 @@ it('rounds 23 of 80 queries so the two rates sum to 100', async () => {
       inaccuracyRate: '1.0875',
     })),
   } as unknown as Window['dashboardOps'];
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findByText('28.7%')).toBeInTheDocument();
   expect(screen.getByText('71.3%')).toBeInTheDocument();
   expect(screen.getByText('108.8%')).toBeInTheDocument();
@@ -651,7 +823,7 @@ it('rounds an incomplete pair from the decimal text instead of the 100 percent s
       inaccuracyRate: '0.1',
     })),
   } as unknown as Window['dashboardOps'];
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(await screen.findByText('28.8%')).toBeInTheDocument();
   expect(screen.getByText('71.3%')).toBeInTheDocument();
   expect(screen.getByText('10.0%')).toBeInTheDocument();
@@ -661,7 +833,6 @@ it('rounds an incomplete pair from the decimal text instead of the 100 percent s
   expect(screen.queryByText('报告数除以查询数，可以超过 100%。')).not.toBeInTheDocument();
 });
 
-// Value: protects=in-flight shop rates show 正在读取全店比率 and a new window hides the previous percentages; fails_when=loading is omitted or ready tiles render for a mismatched window; why_new=both shop-rate tests resolve a single window before the assertion; seam=none; no_claim=mocked questionRates; the 近 30 天 preset stands in for a slow response
 it('shows a loading row and hides the previous rates when the window changes', async () => {
   const shown = {
     ok: true as const,
@@ -680,8 +851,8 @@ it('shows a loading row and hides the previous rates when the window changes', a
     .mockImplementationOnce(() => first)
     .mockImplementationOnce(() => new Promise(() => undefined));
   window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
-  render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findByRole('status', { name: '正在读取全店比率' })).toBeInTheDocument();
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(await screen.findByRole('status', { name: '正在读取查询比率' })).toBeInTheDocument();
   expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
   await act(async () => { releaseFirst(shown); });
   expect(await screen.findByText('28.7%')).toBeInTheDocument();
@@ -689,7 +860,7 @@ it('shows a loading row and hides the previous rates when the window changes', a
   await user.click(screen.getByPlaceholderText('开始日期'));
   await user.click(await screen.findByText('近 30 天'));
   expect(screen.queryByText('28.7%')).not.toBeInTheDocument();
-  expect(await screen.findByRole('status', { name: '正在读取全店比率' })).toBeInTheDocument();
+  expect(await screen.findByRole('status', { name: '正在读取查询比率' })).toBeInTheDocument();
   expect(questionRates).toHaveBeenCalledTimes(2);
   expect(questionRates.mock.calls[1]?.[0]).not.toBe(questionRates.mock.calls[0]?.[0]);
 });
@@ -712,7 +883,7 @@ it('keeps 366 inclusive days and clamps a longer shop window', async () => {
       inaccuracyRate: null,
     }));
     window.dashboardOps = { questionRates } as unknown as Window['dashboardOps'];
-    render(<IntakeOverview onOpen={() => undefined} />);
+    render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
     await screen.findAllByText('没有查询');
     const user = userEvent.setup({ delay: null });
     const startInput = screen.getByPlaceholderText('开始日期');
@@ -747,8 +918,8 @@ it('shows the digit 0 when the signed-in reads are empty', async () => {
     previewExport: vi.fn(async () => ({ ok: true as const, exportable: 0, redacted: 0, withoutConsent: 0 })),
     export: vi.fn(async () => ({ ok: true as const, written: 0 })),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
-  expect(await screen.findByText('这段时间所有查询都有结果。')).toBeInTheDocument();
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(await screen.findByText('最近读取的记录中没有这段时间的查询。')).toBeInTheDocument();
   expect(await screen.findByText('现在没有待办。')).toBeInTheDocument();
   expect(tileText('查询次数')).toBe('查询次数0');
   expect(tileText('没查到')).toBe('没查到0');
@@ -762,6 +933,31 @@ it('shows the digit 0 when the signed-in reads are empty', async () => {
   expect(document.querySelector('.donut-wrap')).toBeNull();
 });
 
+it('describes only the fetched records when a selected period predates the latest 500', async () => {
+  const rows: UsageSourceRow[] = Array.from({ length: 500 }, (_, index) => ({
+    id: `recent-${index}`, askedAt: new Date().toISOString(), agent: '坐席', question: null,
+    scriptTitle: null, result: 'viewed', snapshotStale: false, consented: false,
+  }));
+  window.dashboardUsageLog = {
+    list: vi.fn(async filter => listUsageLog(rows, filter)),
+    previewExport: vi.fn(), export: vi.fn(),
+  };
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  await waitFor(() => expect(tileText('查询次数')).toBe('查询次数500'));
+  const user = userEvent.setup({ delay: null });
+  const start = screen.getByPlaceholderText('开始日期');
+  const end = screen.getByPlaceholderText('结束日期');
+  await user.click(start);
+  await user.clear(start);
+  await user.type(start, '2020-01-01');
+  await user.click(end);
+  await user.clear(end);
+  await user.type(end, '2020-01-07{Enter}');
+  expect(await screen.findByText('最近读取的记录中没有这段时间的查询。')).toBeInTheDocument();
+  expect(screen.queryByText('这段时间没有查询记录。')).not.toBeInTheDocument();
+  expect(screen.getByText(/服务端最多 500 条/)).toBeInTheDocument();
+}, 15000);
+
 it('says 没读到 and runs the usage read again', async () => {
   let failed = true;
   const list = vi.fn(async () => failed
@@ -772,14 +968,14 @@ it('says 没读到 and runs the usage read again', async () => {
     previewExport: vi.fn(),
     export: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const status = await screen.findByTestId('overview-usage-status');
   expect(status).toHaveTextContent('没读到。');
   expect(tileText('查询次数')).toBe('查询次数');
   const before = list.mock.calls.length;
   failed = false;
   await userEvent.setup().click(within(status).getByRole('button', { name: '重试' }));
-  expect(await screen.findByText('这段时间所有查询都有结果。')).toBeInTheDocument();
+  expect(await screen.findByText('最近读取的记录中没有这段时间的查询。')).toBeInTheDocument();
   expect(list.mock.calls.length).toBeGreaterThan(before);
   expect(tileText('查询次数')).toBe('查询次数0');
   expect(tileText('没查到')).toBe('没查到0');
@@ -792,7 +988,7 @@ it('keeps an unauthorized task read on the logged-out sentence', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const todo = screen.getByRole('region', { name: '待办' });
   expect(await within(todo).findByText('请先登录。')).toBeInTheDocument();
   expect(todo).not.toHaveTextContent('没读到');
@@ -808,7 +1004,7 @@ it('says 没读到 when the task read fails for another reason', async () => {
     start: vi.fn(),
     close: vi.fn(),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const todo = screen.getByRole('region', { name: '待办' });
   expect(await within(todo).findByText('没读到。')).toBeInTheDocument();
   expect(within(todo).getByRole('button', { name: '重试' })).toBeInTheDocument();
@@ -818,7 +1014,7 @@ it('says 没读到 when the task read fails for another reason', async () => {
 });
 
 it('does not render the frozen sample catalog on the live overview', () => {
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   expect(screen.queryByText(/虚构合成结构样例/)).not.toBeInTheDocument();
   expect(screen.queryByText('DEMO · 合成数据')).not.toBeInTheDocument();
   expect(screen.queryByText(/澄芽氨基酸/)).not.toBeInTheDocument();
@@ -848,7 +1044,7 @@ it('shows the seven-day comparison only from a real outcome read', async () => {
       }],
     })),
   };
-  render(<IntakeOverview onOpen={() => undefined} />);
+  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
   const outcomes = screen.getByTestId('overview-outcomes');
   expect(await within(outcomes).findByText(/处理前 7 天 4 次，处理后 7 天 1 次。/)).toBeInTheDocument();
   expect(outcomes).not.toHaveTextContent('已处理的不准待办出现后');

@@ -84,6 +84,9 @@ export async function seedIntakeSyntheticHost(admin: Client, domain: 'product' |
     if (includeSopSource) {
       await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES ('source-sop','scope-a',1,'v2-preview')");
       await admin.query("INSERT INTO content_intake.source_mappings VALUES ('source-sop',1,'faq-p1.1','intake-p1.1','sop-not-imported',repeat('a',64))");
+      if (storeSetGrants) await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+        VALUES ('tenant-a','app-a',1,'scope-a','source-sop',clock_timestamp()+interval '2 hours')`);
       await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
         to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-sop','source_id','source-sop'))).*
         FROM content_intake.grants g WHERE source_id='source-a' AND kind='business'`);

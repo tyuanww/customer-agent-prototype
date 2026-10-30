@@ -7,7 +7,7 @@ import { ContentIntakeQuery } from './content-intake-query';
 import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
 import { writeSystemClipboard } from './system-clipboard';
 
-/** Session is supplied only for the explicit loopback synthetic FAQ profile.
+/** The caller supplies a session only when its configured workbench enables intake.
  * A capability belongs to one trusted Query main frame and dies with its window. */
 export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null,
   trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null,
@@ -28,8 +28,8 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
     if (!query) {
       query = new ContentIntakeQuery(session, writeSystemClipboard); windows.set(event.sender, query);
       const owned = query;
-      query.subscribe(reason => {
-        if (!event.sender.isDestroyed()) event.sender.send(C.INTAKE_QUERY_INVALIDATED, reason);
+      query.subscribe(invalidation => {
+        if (!event.sender.isDestroyed()) event.sender.send(C.INTAKE_QUERY_INVALIDATED, invalidation);
       });
       event.sender.once('destroyed', () => { windows.delete(event.sender); owned.dispose(); });
     }
@@ -37,8 +37,8 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
       if (channel === C.INTAKE_QUERY_ACCESS) return { ok: true, ...await query.access() };
       if (channel === C.INTAKE_QUERY_SELECT && isIntakeShopRequest(args[0])) return { ok: true, ...await query.access(args[0].shopId) };
       if (channel === C.INTAKE_QUERY_CONDITIONS && isIntakeSelection(args[0])) return { ok: true, ...query.selectConditions(args[0]) };
-      if (channel === C.INTAKE_QUERY_SEARCH && isIntakeSearchRequest(args[0])) return { ok: true, rows: await query.search(args[0].queryText) };
-      if (channel === C.INTAKE_QUERY_COPY && isIntakeCopyRequest(args[0])) return { ok: true, ...query.copy(args[0].key) };
+      if (channel === C.INTAKE_QUERY_SEARCH && isIntakeSearchRequest(args[0])) return { ok: true, rows: await query.search(args[0].queryText, args[0].contextId) };
+      if (channel === C.INTAKE_QUERY_COPY && isIntakeCopyRequest(args[0])) return { ok: true, ...await query.copy(args[0].key) };
       query.cancel(); return { ok: true, cancelled: true };
     } catch (error) { return intakeQueryFailure(error instanceof IntakeUsageError ? error.code : 'UNAVAILABLE'); }
   });

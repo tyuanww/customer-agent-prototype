@@ -332,11 +332,10 @@ it('preserves the explicit synthetic FAQ shell projection and remote compatibili
   expect(parsed).toMatchObject({ mode: 'synthetic-local', contentIntake: 'faq-v2' });
   expect(projectIntakeShellLine(parsed)).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   write(directory, { mode: 'product-remote', apiOrigin: 'https://synthetic-api.invalid', identityOrigin: 'https://synthetic-id.invalid', contentIntake: 'faq-v2' });
-  expect(readPackagedProductProfile(directory)).toMatchObject({
+  expect(readPackagedProductProfile(directory)).toEqual({
     mode: 'product-remote',
     apiOrigin: 'https://synthetic-api.invalid',
     identityOrigin: 'https://synthetic-id.invalid',
-    contentIntake: 'faq-v2',
   });
   expect(projectIntakeShellLine(readPackagedProductProfile(directory))).toBeNull();
   expect(projectIntakeShellLine({ contentIntake: 'faq-v2' })).toBeNull();
@@ -361,7 +360,7 @@ it.each([
   { input: STACK_PROFILE, mode: 'synthetic-local', kind: 'legacy' },
   { input: { ...STACK_PROFILE, contentIntake: 'faq-v2' }, mode: 'synthetic-local', kind: 'faq-v2' },
   { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com/', identityOrigin: 'https://id.example.com:443/' }, mode: 'product-remote', kind: 'product-remote' },
-  { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com', identityOrigin: 'https://id.example.com', contentIntake: 'faq-v2' }, mode: 'product-remote', kind: 'faq-v2' },
+  { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com', identityOrigin: 'https://id.example.com', contentIntake: 'faq-v2' }, mode: 'product-remote', kind: 'product-remote' },
   { input: { mode: 'synthetic-offline' }, mode: undefined, kind: 'legacy' },
 ])('retains $mode and the existing $kind navigation when resolving a packaged profile', ({ input, mode, kind }) => {
   const directory = userDataDirectory();

@@ -1,4 +1,4 @@
-import { PRODUCT_ERRORS, type ProductErrorCode } from '../shared/product-session';
+import { PRODUCT_ERRORS, type ProductErrorCode } from '../shared/product-session.ts';
 import { desktopFetch } from './desktop-fetch.ts';
 
 export class ProductHttpError extends Error {

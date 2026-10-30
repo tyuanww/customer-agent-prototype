@@ -38,8 +38,9 @@ export async function launchIntakeElectron(options: {
       const identity = await app.evaluate(({ app, screen }) => ({ packaged: app.isPackaged, version: app.getVersion(),
         executable: process.execPath, appPath: app.getAppPath(), userData: app.getPath('userData'),
         displays: screen.getAllDisplays().map(display => ({ bounds: display.bounds, workArea: display.workArea, scaleFactor: display.scaleFactor })) }));
-      expect(identity).toMatchObject({ packaged: true, executable: packagedExecutable,
+      expect(identity).toMatchObject({ packaged: true,
         version: JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8')).version });
+      expect(realpathSync(identity.executable)).toBe(realpathSync(packagedExecutable));
       expect(realpathSync(identity.userData)).toBe(realpathSync(userDataDirectory));
       mkdirSync(evidenceDirectory, { recursive: true });
       writeFileSync(path.join(evidenceDirectory, 'packaged-identity.json'), JSON.stringify(identity, null, 2));

@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState, type ComponentType } from 'react';
+import { createElement, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from 'react';
 import { Button, DatePicker, Input, Select, Space, Table, type TableProps } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -9,6 +9,7 @@ import {
   type DashboardIterationTask,
 } from '@shared/dashboard-iteration';
 import type { DashboardWordingResult } from '@shared/dashboard-wording';
+import type { WorkbenchKind } from '@shared/workbench-mode';
 import { aggregateInaccuracyTodoCounts, inaccuracyScriptIdFromTask, INACCURACY_TODO_COPY } from '@shared/inaccuracy-todo';
 import {
   INACCURACY_OUTCOME_COPY,
@@ -21,7 +22,6 @@ import {
   type CloseHintTask,
 } from '@shared/iteration-close-hint';
 import { asyncFailure, type AsyncResource } from '@shared/async-resource';
-import { useAsyncResource } from './use-async-resource';
 import { rankMissRows, type UsageSourceRow } from '@shared/usage-log-csv';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { formatShortTime } from './intake-time';
@@ -45,15 +45,22 @@ const CAUSE_OPTIONS = [
 ] as const;
 
 const LOGGED_OUT = '请先登录。';
+const IDLE_RESOURCE = { status: 'idle' } as const;
+const LOADING_RESOURCE = { status: 'loading' } as const;
+const FORBIDDEN_TASKS = { status: 'forbidden', message: LOGGED_OUT } as const;
 const USAGE_LATER = '坐席查询后会出现';
 const USAGE_FAILED = '没读到。';
 const TODO_EMPTY = '现在没有待办。';
 const READ_SENTENCES = { forbidden: LOGGED_OUT, error: USAGE_FAILED } as const;
 const INACCURACY_EMPTY = '当前没有达到开单阈值的不准稿。';
-const USAGE_SCOPE = '查询次数、没查到和被复制只含当前登录者最近读到的查询，不是全店。不准次数不随上面的日期变化。';
-const QUESTION_SCOPE = '命中率、无命中率和不准反馈率是全店这段时间的查询，不是当前登录者的使用记录。';
+const USAGE_SCOPE = '查询次数、没查到和被复制只含当前登录者最近读到的记录，服务端最多 500 条，再按日期筛选，可能不完整。不准次数不随上面的日期变化。';
+const QUESTION_SCOPE = '命中率、无命中率和不准反馈率依据当前数据库这段时间的记录计算，未按店铺筛选。';
+const STATISTICS_UNAVAILABLE = '当前查询暂不能统计';
+const TASKS_UNAVAILABLE = '当前待办暂不可用';
+const OUTCOMES_UNAVAILABLE = '当前处理效果暂不可用';
 const INACCURACY_SCOPE = '只含已开待办记下的样本，不是这段时间的全部。';
-const MISS_ALL_ANSWERED = '这段时间所有查询都有结果。';
+const MISS_ALL_ANSWERED = '所选时段内已读取的查询都有结果。';
+const MISS_NO_QUERIES = '最近读取的记录中没有这段时间的查询。';
 const COPY_ONLY = '只表示复制了';
 
 const nowrapCell = () => ({ style: { whiteSpace: 'nowrap' as const } });
@@ -297,7 +304,7 @@ function rowsInWindow(rows: readonly UsageSourceRow[], span: DayWindow): UsageSo
   });
 }
 
-async function readUsageAll(): Promise<AsyncResource<UsageLoad>> {
+async function readUsageAll(isActive: () => boolean): Promise<AsyncResource<UsageLoad>> {
   const api = window.dashboardUsageLog;
   if (!api) return { status: 'idle' };
   try {
@@ -307,8 +314,10 @@ async function readUsageAll(): Promise<AsyncResource<UsageLoad>> {
     let pages = 0;
     let truncated = false;
     do {
+      if (!isActive()) return { status: 'idle' };
       pages += 1;
       const reply = await api.list({ result: '', query: '', cursor });
+      if (!isActive()) return { status: 'idle' };
       if (!reply.ok) {
         if (reply.code === 'UNAVAILABLE' && reply.message === WORKBENCH_EMPTY.usageUnmounted) return { status: 'idle' };
         return asyncFailure<UsageLoad>(reply.code, READ_SENTENCES);
@@ -329,25 +338,81 @@ async function readUsageAll(): Promise<AsyncResource<UsageLoad>> {
   }
 }
 
+/** A mode change invalidates both in-flight reads and previously displayed data. */
+function useLegacyResource<T>(
+  mode: WorkbenchKind | null,
+  available: boolean,
+  dependencies: readonly number[],
+  read: (isActive: () => boolean) => Promise<AsyncResource<T>>,
+): {
+  resource: AsyncResource<T>;
+  reload: () => void;
+  replace: (update: (current: AsyncResource<T>) => AsyncResource<T>) => void;
+} {
+  const enabled = mode === 'legacy';
+  const [modeState, setModeState] = useState({ mode, generation: 0 });
+  if (modeState.mode !== mode) setModeState({ mode, generation: modeState.generation + 1 });
+  const [retry, setRetry] = useState(0);
+  const [snapshot, setSnapshot] = useState<{ generation: number; resource: AsyncResource<T> } | null>(null);
+  const readRef = useRef(read);
+  readRef.current = read;
+  const dependencyKey = dependencies.join(',');
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let active = true;
+    const generation = modeState.generation;
+    setSnapshot({ generation, resource: available ? LOADING_RESOURCE : IDLE_RESOURCE });
+    void readRef.current(() => active).then((resource) => {
+      if (active) setSnapshot({ generation, resource });
+    }).catch(() => {
+      if (active) setSnapshot({ generation, resource: { status: 'error', message: USAGE_FAILED } });
+    });
+    return () => { active = false; };
+  }, [enabled, modeState.generation, available, dependencyKey, retry]);
+
+  const resource: AsyncResource<T> = !enabled ? IDLE_RESOURCE
+    : snapshot?.generation === modeState.generation ? snapshot.resource
+      : available ? LOADING_RESOURCE : IDLE_RESOURCE;
+  return {
+    resource,
+    reload: () => setRetry((value) => value + 1),
+    replace: (update) => {
+      if (!enabled) return;
+      const generation = modeState.generation;
+      setSnapshot((current) => current?.generation === generation
+        ? { generation, resource: update(current.resource) }
+        : current);
+    },
+  };
+}
+
 type OutcomeValue = { items: readonly InaccuracyOutcome[]; truncated: boolean };
 
 export function IntakeOverview({
+  mode,
   onOpen,
   onTodoCount,
   onSupplyScript,
 }: {
+  mode: WorkbenchKind | null;
   onOpen: (target: 'content' | 'wording' | 'permissions') => void;
   onTodoCount?: (count: number) => void;
   onSupplyScript?: (question: string) => void;
 }) {
   const todoSection = useRef<HTMLElement>(null);
   const taskTruncated = useRef(false);
-  const { resource: taskRead, reload: retryTasks, replace: setTaskRead } = useAsyncResource<readonly DashboardIterationTask[]>(
-    async () => {
+  const tasksEnabled = mode === 'legacy';
+  const tasksMounted = window.dashboardIteration !== undefined;
+  const { resource: taskResource, reload: retryTasks, replace: setTaskRead } = useLegacyResource<readonly DashboardIterationTask[]>(
+    mode,
+    tasksMounted,
+    [],
+    async (isActive) => {
       const api = window.dashboardIteration;
       if (!api) return { status: 'forbidden', message: LOGGED_OUT };
       try {
         const result = await api.list();
+        if (!isActive()) return { status: 'idle' };
         if (!result.ok) return asyncFailure<readonly DashboardIterationTask[]>(result.code, READ_SENTENCES);
         taskTruncated.current = result.truncated === true;
         return { status: 'ready', value: result.items };
@@ -355,17 +420,18 @@ export function IntakeOverview({
         return { status: 'error', message: USAGE_FAILED };
       }
     },
-    [],
-    window.dashboardIteration ? { status: 'loading' } : { status: 'forbidden', message: LOGGED_OUT },
   );
+  const taskRead: AsyncResource<readonly DashboardIterationTask[]> = tasksEnabled && !tasksMounted
+    ? FORBIDDEN_TASKS : taskResource;
   const usageMounted = window.dashboardUsageLog !== undefined;
-  const { resource: usage, reload: retryUsage } = useAsyncResource<UsageLoad>(
-    () => readUsageAll(),
+  const { resource: usage, reload: retryUsage } = useLegacyResource<UsageLoad>(
+    mode,
+    usageMounted,
     [],
-    usageMounted ? { status: 'loading' } : { status: 'idle' },
+    readUsageAll,
   );
   const outcomesMounted = window.dashboardIteration?.outcomes !== undefined;
-  const { resource: outcomeRead, reload: retryOutcomes } = useAsyncResource<OutcomeValue>(async () => {
+  const { resource: outcomeRead, reload: retryOutcomes } = useLegacyResource<OutcomeValue>(mode, outcomesMounted, [], async () => {
     const api = window.dashboardIteration;
     if (!api?.outcomes) return { status: 'idle' };
     try {
@@ -375,7 +441,7 @@ export function IntakeOverview({
     } catch {
       return { status: 'error', message: USAGE_FAILED };
     }
-  }, [], outcomesMounted ? { status: 'loading' } : { status: 'idle' });
+  });
   const [message, setMessage] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CloseHintCatalog | null>(null);
@@ -384,7 +450,7 @@ export function IntakeOverview({
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const mutation = useRef(false);
   const [span, setSpan] = useState<DayWindow>(() => recentWindow(7));
-  const { resource: shopRates, reload: retryShopRates } = useAsyncResource(async () => {
+  const { resource: shopRates, reload: retryShopRates } = useLegacyResource(mode, window.dashboardOps?.questionRates !== undefined, [span.start, span.end], async () => {
     const read = window.dashboardOps?.questionRates;
     if (!read) return { status: 'idle' as const };
     try {
@@ -402,7 +468,7 @@ export function IntakeOverview({
     } catch {
       return { status: 'error' as const, message: USAGE_FAILED };
     }
-  }, [span.start, span.end], window.dashboardOps?.questionRates ? { status: 'loading' } : { status: 'idle' });
+  });
 
   useEffect(() => {
     const api = window.dashboardWording;
@@ -431,15 +497,19 @@ export function IntakeOverview({
     return () => { live = false; };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!tasksEnabled) {
+      onTodoCount?.(0);
+      return;
+    }
     if (taskRead.status !== 'ready') return;
     const count = taskRead.value.filter((task) => task.status === 'open' || task.status === 'in_progress').length;
     onTodoCount?.(count);
-  }, [taskRead, onTodoCount]);
+  }, [tasksEnabled, taskRead, onTodoCount]);
 
   function closeTask(task: DashboardIterationTask, status: 'resolved' | 'wont_fix') {
     const api = window.dashboardIteration;
-    if (!api || mutation.current) return;
+    if (!tasksEnabled || !api || mutation.current) return;
     const cause = causeById[task.taskId] ?? task.suspectedCause;
     const note = noteById[task.taskId] ?? '';
     const decision = decideIterationClose({
@@ -487,7 +557,7 @@ export function IntakeOverview({
 
   function startTask(task: DashboardIterationTask) {
     const api = window.dashboardIteration;
-    if (!api || mutation.current) return;
+    if (!tasksEnabled || !api || mutation.current) return;
     mutation.current = true;
     setBusyId(task.taskId);
     const finish = () => { mutation.current = false; setBusyId(null); };
@@ -572,28 +642,29 @@ export function IntakeOverview({
         }}
       />
     </div>
-    <div className="tiles" data-testid="shop-rates">
+    {mode === 'legacy' ? <div className="tiles" data-testid="shop-rates">
       {readyShop && readyShopText ? <>
         <RateTile label="命中率" value={readyShopText.hit} />
         <RateTile label="无命中率" value={readyShopText.noHit} />
         <RateTile label="不准反馈率" value={readyShopText.inaccuracy} detail={/^\d{3,}\./.test(readyShopText.inaccuracy) ? '报告数除以查询数，可以超过 100%。' : undefined} />
-      </> : shopRates.status === 'loading' ? <div className="shop-rates-loading"><WorkbenchLoading rows={1} label="正在读取全店比率" /></div> : null}
-    </div>
-    {readyShop ? <p className="t-sub">{QUESTION_SCOPE}{readyShop.otherCount > 0 ? '另有未归入命中或无命中的查询。' : ''}</p> : null}
-    {shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
-    {shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
+      </> : shopRates.status === 'loading' ? <div className="shop-rates-loading"><WorkbenchLoading rows={1} label="正在读取查询比率" /></div> : null}
+    </div> : null}
+    {mode === 'legacy' && readyShop ? <p className="t-sub">{QUESTION_SCOPE}{readyShop.otherCount > 0 ? '另有未归入命中或无命中的查询。' : ''}</p> : null}
+    {mode === 'legacy' && shopRates.status === 'forbidden' ? <p className="t-sub" data-testid="shop-rates-status">{shopRates.message}</p> : null}
+    {mode === 'legacy' && shopRates.status === 'error' ? <WorkbenchFailed message={shopRates.message} onRetry={retryShopRates} /> : null}
     <div className="tiles">
       <CountTile label="查询次数" value={usageCounts?.queries ?? null} />
       <CountTile label="没查到" value={usageCounts?.misses ?? null} />
       <CountTile label="被复制" value={usageCounts?.copied ?? null} detail={COPY_ONLY} />
       <CountTile label="不准次数" value={inaccuracyTotal} detail={inaccuracyTotal === null ? undefined : INACCURACY_SCOPE} />
     </div>
-    {usage.status === 'ready' ? <p className="t-sub">{USAGE_SCOPE}</p> : null}
-    {usageTruncated ? <p data-testid="usage-truncated">还有更多，这里只显示前 {usageRows?.length ?? 0} 条。</p> : null}
-    {usageNote(usage, retryUsage)}
+    {mode === 'legacy' && usage.status === 'ready' ? <p className="t-sub">{USAGE_SCOPE}</p> : null}
+    {mode === 'legacy' && usageTruncated ? <p data-testid="usage-truncated">还有更多，这里只显示前 {usageRows?.length ?? 0} 条。</p> : null}
+    {mode === 'legacy' ? usageNote(usage, retryUsage) : <p className="t-sub" data-testid="overview-usage-status">{STATISTICS_UNAVAILABLE}</p>}
     <section ref={todoSection} className="card" aria-label="待办" tabIndex={-1}>
       <div className="card-head"><h3>待办</h3></div>
-      {taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={3} label="正在读取待办" />
+      {!tasksEnabled ? <OverviewEmpty description={TASKS_UNAVAILABLE} />
+        : taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={3} label="正在读取待办" />
         : taskRead.status === 'forbidden' ? <OverviewEmpty description={taskRead.message} />
         : taskRead.status === 'error' ? <WorkbenchFailed message={taskRead.message} onRetry={retryTasks} />
         : openTasks.length === 0 ? <OverviewEmpty description={TODO_EMPTY} />
@@ -651,14 +722,15 @@ export function IntakeOverview({
             },
           ]}
         />}
-      {message ? <p role="status">{message}</p> : null}
+      {tasksEnabled && message ? <p role="status">{message}</p> : null}
       {taskTruncated.current && taskRead.status === 'ready'
         ? <p data-testid="todo-truncated">还有更多，这里只显示前 {taskRead.value.length} 条。</p>
         : null}
     </section>
     <section className="card" aria-label="不准的话术">
       <div className="card-head"><h3>不准的话术</h3></div>
-      {taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取不准的话术" />
+      {!tasksEnabled ? <OverviewEmpty description={TASKS_UNAVAILABLE} />
+        : taskRead.status === 'idle' || taskRead.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取不准的话术" />
         : taskRead.status === 'forbidden' ? <OverviewEmpty description={taskRead.message} />
         : taskRead.status === 'error' ? <WorkbenchFailed message={taskRead.message} onRetry={retryTasks} />
         : inaccuracyRows.length === 0 ? <OverviewEmpty description={INACCURACY_EMPTY} />
@@ -695,9 +767,10 @@ export function IntakeOverview({
     </section>
     <section className="card" aria-label="没查到的问题">
       <div className="card-head"><h3>没查到的问题</h3></div>
-      {usage.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取没查到的问题" />
+      {mode !== 'legacy' ? <OverviewEmpty description={STATISTICS_UNAVAILABLE} />
+        : usage.status === 'loading' ? <WorkbenchLoading rows={2} label="正在读取没查到的问题" />
         : usageStatus !== null ? <OverviewEmpty description={usageStatus} />
-        : missRows !== null && missRows.length === 0 ? <OverviewEmpty description={MISS_ALL_ANSWERED} />
+        : missRows !== null && missRows.length === 0 ? <OverviewEmpty description={usageRows?.length === 0 ? MISS_NO_QUERIES : MISS_ALL_ANSWERED} />
         : <A11yTable<MissTableRow>
           aria-label="没查到的问题"
           pagination={false}
@@ -722,7 +795,8 @@ export function IntakeOverview({
     </section>
     <section className="card" aria-label={INACCURACY_OUTCOME_COPY.heading} data-testid="overview-outcomes">
       <div className="card-head"><h3>{INACCURACY_OUTCOME_COPY.heading}</h3></div>
-      {outcomeRead.status === 'error'
+      {!tasksEnabled ? <OverviewEmpty description={OUTCOMES_UNAVAILABLE} />
+        : outcomeRead.status === 'error'
         ? <p>{outcomeRead.message} <Button type="link" onClick={retryOutcomes}>{INACCURACY_OUTCOME_COPY.retry}</Button></p>
         : outcomeRead.status === 'forbidden'
           ? <OverviewEmpty description={outcomeRead.message} />

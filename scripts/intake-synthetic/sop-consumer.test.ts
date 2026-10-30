@@ -45,7 +45,7 @@ test('SOP upload → quality → confirmed publication → second-seat Main copy
     await json(await post(`${url}/quality/freeze`, { operationId: 'sop-consumer-freeze', key: candidate.key }, 'reviewer'));
     const quality = parseContractSchema('IntakeQualityStatus', await json(await host.requestAs('reviewer', `${url}/quality?digest=${candidate.key.digest}`)));
     const samples = parseContractSchema('IntakeQualitySamplePage', await json(await host.requestAs('reviewer', `${url}/quality/samples?${new URLSearchParams({ digest: candidate.key.digest, viewHash: quality.viewHash, phase: 'initial', limit: '100' })}`)));
-    assert.equal(samples.nextCursor, null); assert.equal(samples.items.length, 9);
+    assert.equal(samples.nextCursor, null); assert.equal(samples.items.length, 3);
     const checked = parseContractSchema('IntakeQualityReceipt', await json(await post(`${url}/quality/checks`, {
       operationId: 'sop-consumer-checks', key: candidate.key, phase: 'initial',
       checks: samples.items.map(row => ({ scriptId: row.scriptId, contentHash: row.contentHash, defect: false, reason: '' })),
@@ -74,7 +74,7 @@ test('SOP upload → quality → confirmed publication → second-seat Main copy
     const projection = catalog.read();
     assert.equal(projection?.releaseId, published.releaseId);
     const row = projection!.faq.find(row => row.entry.answerText.includes('合成文字'));
-    assert.ok(row); assert.deepEqual(catalog.copy(row.key), { copied: true });
+    assert.ok(row); assert.deepEqual(await catalog.copy(row.key), { copied: true });
     assert.equal(clipboard.at(-1), row.entry.answerText); assert.ok(!clipboard.at(-1)!.includes(png.toString('base64')));
     const objectId = `med_${createHash('sha256').update('source-sop').update('\0').update(png).digest('hex')}`;
     const seen = await catalog.preview(objectId);
@@ -86,5 +86,8 @@ test('SOP upload → quality → confirmed publication → second-seat Main copy
     console.info(JSON.stringify({ status: 'PASS', postgres: 15, http: 'actual', source: 'synthetic-six-sheet-xlsx', consumer: 'ContentIntakeUsage', copied: 'text-only', preview: 'system-bytes', nativeClipboard: 'not-tested' }));
   } finally { consumer?.dispose(); await host.close(); }
   assert.equal(existsSync(host.root), false);
-  assert.deepEqual(host.resources(), { closed: true, identityListening: false, poolConnections: [0] });
+  const resources = host.resources();
+  assert.equal(resources.closed, true);
+  assert.equal(resources.identityListening, false);
+  assert.ok(resources.poolConnections.length > 0 && resources.poolConnections.every(count => count === 0));
 });

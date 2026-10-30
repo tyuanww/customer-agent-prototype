@@ -31,19 +31,19 @@ it.skipIf(!context?.family)('consumes qualified family choices through HTTP, Mai
       expect(snapshot.faq.map(row => row.entry.answerText).sort()).toEqual([...item.answers].sort());
       expect(snapshot.faq.every(row => !('internalNote' in row.entry))).toBe(true);
       await query.access(item.shopId);
-      if (oldKey) expect(() => query.copy(oldKey!)).toThrow('STALE');
+      if (oldKey) await expect(query.copy(oldKey)).rejects.toMatchObject({ code: 'STALE' });
       const results = await query.search('合成');
       expect(results.map(row => row.answerText).sort()).toEqual([...item.answers].sort());
       for (const result of results) {
         expect(result.releaseId).toBe(releaseId);
-        expect(query.copy(result.key)).toEqual({ copied: true });
+        expect(await query.copy(result.key)).toEqual({ copied: true });
         expect(copied.at(-1)).toBe(result.answerText);
       }
       if (results[0]) oldKey = results[0].key;
       oldCatalog = catalog;
     }
     expect((await session.logout()).ok).toBe(true);
-    expect(() => query.copy(oldKey!)).toThrow('STALE');
+    await expect(query.copy(oldKey!)).rejects.toMatchObject({ code: 'STALE' });
     console.log('INTAKE_FAMILY_HTTP_PASS');
   } finally { query.dispose(); usage.dispose(); await session.shutdown(); }
 }, 35_000);

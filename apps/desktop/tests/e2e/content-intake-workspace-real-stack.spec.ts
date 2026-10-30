@@ -88,7 +88,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       // Acquire after that lifecycle boundary to isolate directory refresh effects.
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
       expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'shop-a' }))).toMatchObject({ ok: true });
-      const queryRows = await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }));
+      const queryRows = await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面', contextId: crypto.randomUUID() }));
       expect(queryRows.ok).toBe(true);
       if (!queryRows.ok) throw new Error('Expected qualified Query rows');
       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: true, copied: true });
@@ -132,7 +132,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       await library.getByRole('button', { name: '刷新可用资料', exact: true }).click();
       for (const faq of INTAKE_SYNTHETIC_FAQ) await expect(library.getByText(faq.answer, { exact: true })).toHaveCount(0);
       await expect(library.getByText('请选择有权查看的店铺；没有可用店铺时请核对身份与范围。')).toBeVisible();
-      expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面' }))).toMatchObject({ ok: false });
+      expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.search({ queryText: '洁面', contextId: crypto.randomUUID() }))).toMatchObject({ ok: false });
       expect(await query.evaluate(key => window.customerAgent!.intakeQuery!.copy({ key }), queryRows.rows[0]!.key)).toMatchObject({ ok: false });
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.close());
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(false);
@@ -140,7 +140,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       const legacyRequests = status.requests.filter(p => /^\/v1\/(announce|content|iteration|metrics|software)(\/|\?|$)/.test(p));
       expect(legacyRequests, JSON.stringify(status.requests)).toEqual([]);
       expect(status.requests).toContain('/v1/sop/catalog');
-      expect(status.requests).toContain('/v1/events/usage');
+      expect(status.requests).not.toContain('/v1/events/usage');
       expect(status.approvalFacts).toBe(0); expect(status.directPublications).toBe(1); expect(errors).toEqual([]);
       console.info(JSON.stringify({ status: 'PASS', domain, flow: 'restricted-publication-to-unified-workspace', screenshots: evidence, legacyContentAdapters: false }));
     } finally {

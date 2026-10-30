@@ -1,5 +1,5 @@
 import { rosterMessageFor, type RosterPermissionState } from '@customer-agent/job-roster';
-import { resolveJobTitle, type BoardRights, type BoardRole, type JobDirectoryEntry } from './workbench-job';
+import { resolveJobTitle, type BoardRights, type BoardRole, type JobDirectoryEntry } from './workbench-job.ts';
 
 /** Public session projection. Credentials never cross preload. Epoch is owned by main. */
 export type ProductSessionView = {

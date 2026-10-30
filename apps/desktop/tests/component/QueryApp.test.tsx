@@ -1532,6 +1532,9 @@ describe('QueryApp', () => {
 
   it('does not call copyAdopt when recording a local inaccuracy report', async () => {
     const f = connectProduct();
+    window.customerAgent!.productSearch!.reportInaccuracy = vi.fn(async request => ({
+      ok: true as const, sessionEpoch: request.sessionEpoch, generation: request.generation, recorded: true,
+    }));
     await prepareProductQuery();
     await screen.findByTestId('copy-button-1');
 
@@ -1602,7 +1605,8 @@ describe('QueryApp', () => {
     fireEvent.click(screen.getByTestId('search-button'));
     await screen.findByTestId('report-inaccuracy-button-1');
     fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
-    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(await screen.findByText('话术反馈未记录，请联系话术师。')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
     expect(reportInaccuracy).not.toHaveBeenCalled();
   });
 
@@ -1641,26 +1645,54 @@ describe('QueryApp', () => {
       queryId: '11111111-1111-4111-8111-111111111111',
       scriptId: 'script-synthetic',
     })));
-    expect(screen.getByTestId('report-status-1')).toHaveTextContent(SCRIPT_INACCURACY_RECORDED_STATUS);
+    expect(await screen.findByText('话术反馈未记录，请联系话术师。')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
   });
 
-  it('does not mark a local inaccuracy report when the live post fails', async () => {
+  it.each(['failure', 'rejection'] as const)('explains when an inaccuracy report has a %s', async failure => {
     connectProduct();
     const reportInaccuracy = vi.fn(async (
       request: import('../../src/shared/product-search').ProductInaccuracyRequest,
-    ) => ({
-      ok: false as const,
-      sessionEpoch: request.sessionEpoch,
-      generation: request.generation,
-      code: 'RATE_LIMITED' as const,
-      message: '操作过于频繁，请稍后重试',
-    }));
+    ) => {
+      if (failure === 'rejection') throw new Error('synthetic unavailable');
+      return {
+        ok: false as const,
+        sessionEpoch: request.sessionEpoch,
+        generation: request.generation,
+        code: 'RATE_LIMITED' as const,
+        message: '操作过于频繁，请稍后重试',
+      };
+    });
     window.customerAgent!.productSearch!.reportInaccuracy = reportInaccuracy;
     await prepareProductQuery();
     fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
     await waitFor(() => expect(reportInaccuracy).toHaveBeenCalled());
+    expect(await screen.findByText('话术反馈结果未确认，请联系话术师。')).toBeInTheDocument();
     expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-inaccuracy-button-1')).not.toBeDisabled();
+  });
+
+  it('does not claim a product report was recorded when the reporting capability is missing', async () => {
+    connectProduct();
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    expect(await screen.findByText('话术反馈未记录，请联系话术师。')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
+  });
+
+  it('does not attach a late report failure to a newer query', async () => {
+    const f = connectProduct();
+    const pending = deferred<import('../../src/shared/product-search').ProductInaccuracyResult>();
+    window.customerAgent!.productSearch!.reportInaccuracy = vi.fn(() => pending.promise);
+    await prepareProductQuery();
+    fireEvent.click(screen.getByTestId('report-inaccuracy-button-1'));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '另一发货问题' } });
+    fireEvent.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(f.search).toHaveBeenCalledTimes(2));
+    await act(async () => pending.resolve({ ok: false, sessionEpoch: 10, generation: 1,
+      code: 'UNAVAILABLE', message: '服务暂不可用' }));
+    expect(screen.queryByText('话术反馈结果未确认，请联系话术师。')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-status-1')).not.toBeInTheDocument();
   });
 
   it('dismisses with Esc after copy without implying the reply was sent', async () => {
@@ -2563,7 +2595,7 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('question-input')).toHaveValue('合成客户问题');
     expect(screen.getByTestId('search-button')).toBeEnabled();
     await user.click(screen.getByTestId('search-button'));
-    await waitFor(() => expect(search).toHaveBeenCalledWith({ queryText: '合成客户问题' }));
+    await waitFor(() => expect(search).toHaveBeenCalledWith(expect.objectContaining({ queryText: '合成客户问题' })));
   });
 
   it('keeps FAQ notice visible, ignores stale results and lets a fresh query survive old expiry', async () => {
@@ -2573,7 +2605,7 @@ describe('QueryApp', () => {
       expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
     const menu = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<import('../../src/shared/content-intake-query').IntakeQueryContext>>();
     const search = vi.fn().mockResolvedValue({ ok: true, rows: [] });
-    let invalidate: (reason: 'expired' | 'invalidated') => void = () => {};
+    let invalidate: (event: import('../../src/shared/content-intake-query').IntakeQueryInvalidationEvent) => void = () => {};
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn().mockResolvedValue(session), logout: vi.fn(), onSessionChanged: () => () => {},
       currentNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, decision: null, decided_at: null,
@@ -2604,12 +2636,190 @@ describe('QueryApp', () => {
     expect(screen.queryByText('不应展示')).not.toBeInTheDocument();
     const fresh = deferred<unknown>(); search.mockReturnValueOnce(fresh.promise);
     await user.click(screen.getByTestId('search-button'));
-    act(() => invalidate('expired'));
+    act(() => invalidate({ reason: 'expired', contextId: search.mock.calls[0][0].contextId }));
     await act(async () => fresh.resolve({ ok: true, rows: [{ kind: 'intake', key: 'fresh', rank: 1, title: '新资格', answerText: '新的合成话术',
       applicabilityNote: '', riskNote: '', releaseId: 'r2', validUntil: '2099-01-01T00:00:00Z' }] }));
     await user.click(await screen.findByTestId('copy-button-1'));
     expect(window.customerAgent!.intakeQuery!.copy).toHaveBeenCalledWith({ key: 'fresh' });
     expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['facts-expired', 'pending'], ['facts-expired', 'shown'], ['invalidated', 'pending'],
+    ['invalidated', 'shown'], ['expired', 'pending'], ['expired', 'shown'],
+  ] as const)('keeps a replacement query when an older %s event is delivered after it is %s', async (reason, delivery) => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const oldCopy = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ copied: true }>>();
+    const newCopy = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ copied: true }>>();
+    const replacement = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ rows: import('../../src/shared/content-intake-query').IntakeQueryRow[] }>>();
+    let invalidate: (event: import('../../src/shared/content-intake-query').IntakeQueryInvalidationEvent) => void = () => {};
+    let deliverOldEvent = () => {};
+    const row = (key: string, answerText: string) => ({ kind: 'intake' as const, key, rank: 1 as const, title: key, answerText,
+      applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' });
+    const search = vi.fn().mockResolvedValueOnce({ ok: true, rows: [row('old', '旧合成正文')] }).mockReturnValueOnce(replacement.promise);
+    const copy = vi.fn().mockImplementationOnce(() => { const contextId = search.mock.calls[0][0].contextId;
+      deliverOldEvent = () => invalidate({ reason, contextId }); return oldCopy.promise; }).mockReturnValueOnce(newCopy.promise);
+    const cancel = vi.fn().mockResolvedValue({ ok: true, cancelled: true });
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn(), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, decision: 'accepted', decided_at: '2026-01-01T00:00:00Z',
+        notice: { version: 'v1', content: '合成告知', content_hash: 'a'.repeat(64), published_at: '2026-01-01T00:00:00Z' } }),
+      decideNotice: vi.fn(),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(), search,
+      copy, cancel,
+      onInvalidated: listener => { invalidate = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '旧问题' } });
+    await user.click(screen.getByTestId('search-button'));
+    await user.click(await screen.findByTestId('copy-button-1'));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '新问题' } });
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    const resolveReplacement = async () => act(async () => replacement.resolve({ ok: true, rows: [row('new', '新合成正文')] }));
+    if (delivery === 'shown') {
+      await resolveReplacement(); expect(await screen.findByText('新合成正文')).toBeVisible();
+      await user.click(screen.getByTestId('copy-button-1'));
+    }
+    const cancellations = cancel.mock.calls.length;
+    act(() => deliverOldEvent());
+    expect(cancel).toHaveBeenCalledTimes(cancellations);
+    if (delivery === 'pending') await resolveReplacement();
+    expect(await screen.findByText('新合成正文')).toBeVisible();
+    if (delivery === 'pending') await user.click(screen.getByTestId('copy-button-1'));
+    await act(async () => oldCopy.resolve({ ok: false, code: 'FACTS_EXPIRED', message: '资料资格过期了，请稍后重试。' }));
+    expect(screen.getByText('新合成正文')).toBeVisible();
+    await act(async () => newCopy.resolve({ ok: true, copied: true }));
+    expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
+  });
+
+  it('clears a result and explains expired organization facts while its copy response is pending', async () => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const copy = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ copied: true }>>();
+    let invalidate: (event: import('../../src/shared/content-intake-query').IntakeQueryInvalidationEvent) => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn().mockResolvedValue(session), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, decision: null, decided_at: null,
+        notice: { version: 'v1', content: '合成告知', content_hash: 'a'.repeat(64), published_at: '2026-01-01T00:00:00Z' } }),
+      decideNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, version: 'v1', decision: 'accepted', decided_at: '2026-01-01T00:00:00Z' }),
+    };
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [{ kind: 'intake', key: 'current', rank: 1, title: '合成标题', answerText: '合成正文',
+      applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(),
+      search,
+      copy: vi.fn().mockReturnValue(copy.promise), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }),
+      onInvalidated: listener => { invalidate = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问题' } });
+    await user.click(screen.getByTestId('search-button'));
+    await user.click(await screen.findByTestId('copy-button-1'));
+    act(() => invalidate({ reason: 'facts-expired', contextId: search.mock.calls[0][0].contextId }));
+    expect(await screen.findByText('资料资格过期了，请稍后重试。')).toBeVisible();
+    expect(screen.queryByText('合成正文')).not.toBeInTheDocument();
+    await act(async () => copy.resolve({ ok: false, code: 'FACTS_EXPIRED', message: '资料资格过期了，请稍后重试。' }));
+    expect(screen.getByText('资料资格过期了，请稍后重试。')).toBeVisible();
+    expect(screen.queryByText(COPY_SUCCESS_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it.each(['facts-expired', 'invalidated', 'expired'] as const)('rejects a late search reply after its own %s event arrives first', async reason => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const pending = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ rows: import('../../src/shared/content-intake-query').IntakeQueryRow[] }>>();
+    const search = vi.fn().mockReturnValue(pending.promise);
+    let invalidate: (event: import('../../src/shared/content-intake-query').IntakeQueryInvalidationEvent) => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn(), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn().mockResolvedValue({ ok: true, sessionEpoch: 1, decision: 'accepted', decided_at: '2026-01-01T00:00:00Z',
+        notice: { version: 'v1', content: '合成告知', content_hash: 'a'.repeat(64), published_at: '2026-01-01T00:00:00Z' } }),
+      decideNotice: vi.fn(),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(), search, copy: vi.fn(),
+      cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }),
+      onInvalidated: listener => { invalidate = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问题' } });
+    await user.click(screen.getByTestId('search-button'));
+    act(() => invalidate({ reason, contextId: search.mock.calls[0][0].contextId }));
+    await act(async () => pending.resolve({ ok: true, rows: [{ kind: 'intake', key: 'stale', rank: 1, title: '失效标题', answerText: '失效正文',
+      applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] }));
+    expect(screen.queryByText('失效正文')).not.toBeInTheDocument();
+    expect(screen.getByText(reason === 'facts-expired' ? '资料资格过期了，请稍后重试。' : '资料资格已失效，请重新查询。')).toBeVisible();
+  });
+
+  it.each(['shop switch', 'logout'] as const)('ignores an old copy event after %s, but clears a current invalidation', async action => {
+    const user = userEvent.setup();
+    const signedIn = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席', job: null };
+    const signedOut = { ...signedIn, signedIn: false, sessionEpoch: 2, userId: null, role: null, authMode: null, expiresAt: null, displayName: null };
+    const oldCopy = deferred<import('../../src/shared/content-intake-query').IntakeQueryResult<{ copied: true }>>();
+    let sessionChanged: (event: import('../../src/shared/product-session').ProductSessionResult) => void = () => {};
+    let invalidate: (event: import('../../src/shared/content-intake-query').IntakeQueryInvalidationEvent) => void = () => {};
+    const row = (key: string, answerText: string) => ({ kind: 'intake' as const, key, rank: 1 as const, title: key, answerText,
+      applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' });
+    const context = (shopId: string) => ({ ok: true as const, ...emptyIntakeQueryContext(), shops: ['shop-a', 'shop-b'], shopId });
+    const search = vi.fn().mockResolvedValueOnce({ ok: true, rows: [row('old', '旧店合成正文')] })
+      .mockResolvedValueOnce({ ok: true, rows: [row('new', '新上下文合成正文')] });
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(signedIn), login: vi.fn(), logout: vi.fn(),
+      onSessionChanged: listener => { sessionChanged = listener; return () => {}; },
+      currentNotice: vi.fn(), decideNotice: vi.fn(),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }), access: vi.fn().mockResolvedValue(context('shop-a')),
+      selectShop: vi.fn(async request => context(request.shopId)), selectConditions: vi.fn(), search,
+      copy: vi.fn().mockReturnValue(oldCopy.promise), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }),
+      onInvalidated: listener => { invalidate = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问题' } });
+    await user.click(screen.getByTestId('search-button'));
+    await user.click(await screen.findByTestId('copy-button-1'));
+    const oldId = search.mock.calls[0][0].contextId;
+    if (action === 'shop switch') {
+      await user.click(screen.getByRole('button', { name: '筛选' }));
+      await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-b');
+      await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-b'));
+    } else {
+      act(() => sessionChanged(signedOut));
+      expect(screen.queryByText('旧店合成正文')).not.toBeInTheDocument();
+      act(() => sessionChanged({ ...signedIn, sessionEpoch: 3 }));
+    }
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByText('新上下文合成正文')).toBeVisible();
+    const newId = search.mock.calls[1][0].contextId;
+    expect(newId).not.toBe(oldId);
+    act(() => invalidate({ reason: 'facts-expired', contextId: oldId }));
+    await act(async () => oldCopy.resolve({ ok: false, code: 'FACTS_EXPIRED', message: '资料资格过期了，请稍后重试。' }));
+    expect(screen.getByText('新上下文合成正文')).toBeVisible();
+    act(() => invalidate({ reason: 'invalidated', contextId: newId }));
+    expect(screen.queryByText('新上下文合成正文')).not.toBeInTheDocument();
+    expect(screen.getByText('资料资格已失效，请重新查询。')).toBeVisible();
   });
 
 });

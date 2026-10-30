@@ -106,7 +106,8 @@ function extractCsvFromMultipart(body: Buffer, contentType: string): string | nu
 export function registerOpsLoopRoutes(
   app: FastifyInstance,
   authService: AuthService,
-  dependencies?: OpsLoopRouteDependencies,
+  dependencies: OpsLoopRouteDependencies | undefined,
+  allowUnscopedLegacyOps: boolean,
 ): void {
   const windows = new Map<string, { start: number; count: number }>();
   const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -132,6 +133,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
     if (!limit('inaccuracy-outcomes', actor.user_id, 60)) return sendRateLimited(reply);
     const result = await dependencies.repository.listInaccuracyOutcomes(actor);
@@ -146,6 +148,7 @@ export function registerOpsLoopRoutes(
     if (actor.role !== 'agent' && actor.role !== 'coach' && actor.role !== 'owner') {
       return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     }
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
     if (key === null) return sendValidationError(reply);
     const contract = validateContractSchema('InaccuracyReportRequest', request.body);
@@ -179,6 +182,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
     if (!limit('sop-catalog', actor.user_id, 60)) return sendRateLimited(reply);
     const result = await dependencies.repository.readSopCatalog(actor);
@@ -195,6 +199,7 @@ export function registerOpsLoopRoutes(
       const actor = await authenticateRequestHeaders(authService, request.headers);
       if (actor === null) return sendUnauthorized(reply);
       if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+      if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
       const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
       if (key === null) return sendValidationError(reply);
       const contentType = request.headers['content-type'];
@@ -226,6 +231,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const nodeId = (request.params as { node_id?: unknown }).node_id;
     if (!isId(nodeId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
@@ -266,6 +272,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const nodeId = (request.params as { node_id?: unknown }).node_id;
     if (!isId(nodeId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
@@ -293,6 +300,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const scriptId = (request.params as { script_id?: unknown }).script_id;
     if (!isId(scriptId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
@@ -333,6 +341,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const scriptId = (request.params as { script_id?: unknown }).script_id;
     if (!isId(scriptId)) return sendValidationError(reply);
     const key = idempotencyKey(headerValue(request.headers['idempotency-key']));
@@ -365,6 +374,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const window = (request.query as { window?: unknown }).window;
     if (typeof window !== 'string' || !WINDOWS.has(window as RetrievalWindow)) {
       return sendValidationError(reply);
@@ -381,6 +391,7 @@ export function registerOpsLoopRoutes(
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
+    if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
     const query = request.query as { start?: unknown; end?: unknown };
     const start = typeof query.start === 'string' ? new Date(query.start) : null;
     const end = typeof query.end === 'string' ? new Date(query.end) : null;

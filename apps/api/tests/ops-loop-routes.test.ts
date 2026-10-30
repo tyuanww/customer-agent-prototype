@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApiApp } from '../src/app.js';
+import { createApiApp, createSyntheticTestApiApp } from '../src/app.js';
+import { createMockAuthService, type AuthenticatedUser, type AuthService } from '../src/auth-service.js';
 import type { OpsLoopRepository } from '../src/ops-loop-repository.js';
-import { parseApiRuntimeConfig } from '../src/runtime-config.js';
+import { parseApiRuntimeConfig, type ApiProfile } from '../src/runtime-config.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
 
@@ -167,15 +168,21 @@ function sopMultipart(csv: string, field = 'file'): Buffer {
   ]);
 }
 
-function appWith(ops?: OpsLoopRepository): FastifyInstance {
-  const app = createApiApp({
+function appWith(
+  ops?: OpsLoopRepository,
+  profile: ApiProfile = 'test',
+  authService?: AuthService,
+  assemble = createSyntheticTestApiApp,
+): FastifyInstance {
+  const app = assemble({
     config: parseApiRuntimeConfig({
-      CUSTOMER_AGENT_PROFILE: 'test',
+      CUSTOMER_AGENT_PROFILE: profile,
       AUTH_MODE: 'mock',
-      CUSTOMER_AGENT_API_PORT: '0',
+      CUSTOMER_AGENT_API_PORT: profile === 'test' ? '0' : '3100',
       CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-ops-loop-test',
     }),
     repository: serviceRepository(),
+    authService,
     opsLoopDependencies: ops === undefined ? undefined : { repository: ops, idempotencyHmac: keyRing },
   });
   openApps.push(app);
@@ -183,6 +190,103 @@ function appWith(ops?: OpsLoopRepository): FastifyInstance {
 }
 
 describe('ops-loop HTTP routes', () => {
+  it.each(['production', 'formal-dev', 'test'] as const)('denies unscoped feedback in ordinary %s after authentication and role checks', async (profile) => {
+    const ops = repository();
+    const auth = createMockAuthService();
+    const app = appWith(ops, profile, auth, createApiApp);
+    const request = {
+      method: 'POST',
+      url: '/v1/inaccuracy-reports',
+      headers: { 'idempotency-key': 'feedback-test' },
+      payload: { query_id: '11111111-1111-1111-1111-111111111111', script_id: 'script-1' },
+    } as const;
+    expect((await app.inject(request)).statusCode).toBe(401);
+    // Real authentication only admits the three supported roles; simulate an unexpected role
+    // to ensure the route still rejects it before applying the profile stopgap.
+    vi.spyOn(auth, 'authenticate').mockResolvedValueOnce({
+      user_id: 'synthetic-unexpected-role', role: 'unexpected', auth_mode: 'mock',
+    } as unknown as AuthenticatedUser);
+    expect((await app.inject(request)).statusCode).toBe(403);
+    for (const headers of [agentHeaders, coachHeaders, ownerHeaders]) {
+      const response = await app.inject({ ...request, headers: { ...request.headers, ...headers } });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ error: { code: 'OVERLOADED', message: '服务暂不可用' } });
+      expect(response.headers['cache-control']).toBe('no-store');
+    }
+    expect(ops.recordInaccuracy).not.toHaveBeenCalled();
+    expect((await app.inject({ method: 'GET', url: '/v1/events/usage', headers: agentHeaders })).statusCode).toBe(200);
+  });
+
+  it.each(['production', 'formal-dev', 'test'] as const)('blocks unscoped script changes in ordinary %s after role checks', async (profile) => {
+    const ops = repository();
+    const app = appWith(ops, profile, undefined, createApiApp);
+    const requests = [
+      { method: 'PATCH', url: '/v1/content/scripts/script-1',
+        payload: { expected_version: 1, title: 'synthetic', answer_text: 'synthetic', effective_from: '2026-01-01T00:00:00Z' } },
+      { method: 'DELETE', url: '/v1/content/scripts/script-1', payload: { expected_version: 1 } },
+    ] as const;
+    for (const request of requests) {
+      const headers = { 'idempotency-key': 'synthetic-script' };
+      expect((await app.inject({ ...request, headers })).statusCode).toBe(401);
+      for (const role of [agentHeaders, coachHeaders]) {
+        expect((await app.inject({ ...request, headers: { ...headers, ...role } })).statusCode).toBe(403);
+      }
+      const owner = await app.inject({ ...request, headers: { ...headers, ...ownerHeaders } });
+      expect(owner.statusCode).toBe(503);
+      expect(owner.headers['cache-control']).toBe('no-store');
+      expect(owner.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+    }
+    expect(ops.mutateScript).not.toHaveBeenCalled();
+  });
+
+  it.each(['production', 'formal-dev', 'test'] as const)('fails closed on unscoped metrics in ordinary %s', async (profile) => {
+    const ops = repository();
+    const app = appWith(ops, profile, undefined, createApiApp);
+    for (const url of [
+      '/v1/metrics/question?start=2026-03-01T00:00:00Z&end=2026-03-02T00:00:00Z',
+      '/v1/metrics/retrieval?window=last_7d',
+      '/v1/metrics/inaccuracy-outcomes',
+    ]) {
+      expect((await app.inject({ method: 'GET', url })).statusCode).toBe(401);
+      expect((await app.inject({ method: 'GET', url, headers: agentHeaders })).statusCode).toBe(403);
+      const response = await app.inject({ method: 'GET', url, headers: coachHeaders });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+    }
+    expect(ops.readQuestionRates).not.toHaveBeenCalled();
+    expect(ops.readRetrievalMetrics).not.toHaveBeenCalled();
+    expect(ops.listInaccuracyOutcomes).not.toHaveBeenCalled();
+    expect((await app.inject({ method: 'GET', url: '/v1/events/usage', headers: agentHeaders })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/v1/software/releases', headers: ownerHeaders })).statusCode).toBe(200);
+  });
+
+  it.each(['production', 'formal-dev', 'test'] as const)('fails closed on unscoped SOP reads and writes in ordinary %s', async (profile) => {
+    const ops = repository();
+    const app = appWith(ops, profile, undefined, createApiApp);
+    const requests = [
+      { method: 'GET', url: '/v1/sop/catalog', headers: {} },
+      { method: 'POST', url: '/v1/sop/import', headers: { 'content-type': sopContentType, 'idempotency-key': 'sop-import' },
+        payload: sopMultipart('node_id,parent_node_id,title,body,sort_key\nn1,,synthetic,body,0\n') },
+      { method: 'PATCH', url: '/v1/sop/nodes/n1', headers: { 'idempotency-key': 'sop-patch' },
+        payload: { expected_version: 1, title: 'synthetic' } },
+      { method: 'DELETE', url: '/v1/sop/nodes/n1', headers: { 'idempotency-key': 'sop-delete' },
+        payload: { expected_version: 1 } },
+    ] as const;
+    for (const request of requests) {
+      expect((await app.inject(request)).statusCode).toBe(401);
+      expect((await app.inject({ ...request, headers: { ...request.headers, ...agentHeaders } })).statusCode).toBe(403);
+      expect((await app.inject({ ...request, headers: { ...request.headers, ...coachHeaders } })).statusCode)
+        .toBe(request.method === 'DELETE' ? 403 : 503);
+      const owner = await app.inject({ ...request, headers: { ...request.headers, ...ownerHeaders } });
+      expect(owner.statusCode).toBe(503);
+      expect(owner.json()).toMatchObject({ error: { code: 'OVERLOADED' } });
+    }
+    expect(ops.readSopCatalog).not.toHaveBeenCalled();
+    expect(ops.importSopCatalog).not.toHaveBeenCalled();
+    expect(ops.patchSopNode).not.toHaveBeenCalled();
+    expect(ops.deleteSopNode).not.toHaveBeenCalled();
+  });
+
   it('returns inaccuracy outcomes to a coach and refuses an agent', async () => {
     const ops = repository();
     const app = appWith(ops);

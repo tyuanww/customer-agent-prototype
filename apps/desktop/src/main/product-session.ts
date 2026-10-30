@@ -45,6 +45,8 @@ export class ProductSession {
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(state: ProductSessionResult) => void>();
   private job: SessionJobView | null = null;
+  private jobObservation = 0;
+  private acceptedJobObservation = 0;
   private remoteJob = false;
   constructor(readonly http: ProductHttp, private readonly store: SessionStore, private readonly window: LoginWindow,
     private readonly displayNameFor: (userId: string) => string | null = readOperatorDisplayName,
@@ -64,19 +66,18 @@ export class ProductSession {
       job: this.token && this.user ? this.job : null };
   }
   enableRemoteJobObservation(): void { this.remoteJob = true; }
-  private async rememberJob(userId: string) {
+  private async observeJob(userId: string, token: StoredSession): Promise<SessionJobView> {
     let snapshot: JobSnapshot | null = null;
     try {
       snapshot = await this.jobSnapshotFor(userId);
     } catch { snapshot = null; }
-    if (snapshot === null && this.remoteJob && this.token) snapshot = await this.readRemoteJob();
-    this.job = observeSessionJob(snapshot);
+    if (snapshot === null && this.remoteJob) snapshot = await this.readRemoteJob(token);
+    return observeSessionJob(snapshot);
   }
-  private async readRemoteJob(): Promise<JobSnapshot | null> {
-    if (!this.token) return null;
+  private async readRemoteJob(token: StoredSession): Promise<JobSnapshot | null> {
     try {
       const { value } = await this.http.request('/v1/auth/job', {
-        token: this.token.access_token, timeoutMs: 8_000,
+        token: token.access_token, timeoutMs: 8_000,
       });
       const parsed = parseRosterJobResponse(value);
       if (!parsed) return null;
@@ -100,11 +101,17 @@ export class ProductSession {
   }
   private async install(token: StoredSession, user: NonNullable<ProductSession['user']>, epoch: number, signal: AbortSignal) {
     if (signal.aborted || epoch !== this.epoch) throw new ProductHttpError('STALE');
-    const remaining = Date.parse(token.expires_at) - Date.now();
     if (!sessionExpiryAccepted(token.expires_at)) throw new ProductHttpError('UNAUTHORIZED');
-    this.store.write(token); this.epoch++; this.token = token; this.user = user;
-    await this.rememberJob(user.userId);
-    this.expiry = setTimeout(() => this.invalidate(), remaining); this.expiry.unref?.();
+    this.store.write(token); this.epoch++; this.token = token; this.user = user; this.job = observeSessionJob(null);
+    const remaining = Date.parse(token.expires_at) - Date.now();
+    if (remaining <= 0) { this.invalidate(); throw new ProductHttpError('STALE'); }
+    const observation = ++this.jobObservation;
+    this.acceptedJobObservation = observation;
+    this.expiry = setTimeout(() => { if (this.token === token) this.invalidate(); }, remaining); this.expiry.unref?.();
+    const job = await this.observeJob(user.userId, token);
+    if (this.token === token && (signal.aborted || Date.parse(token.expires_at) <= Date.now())) this.invalidate();
+    if (signal.aborted || token !== this.token) throw new ProductHttpError('STALE');
+    if (observation === this.acceptedJobObservation) this.job = job;
     const state = this.view(); this.emit(state); return state;
   }
   private fail(error: unknown, epoch: number) {
@@ -124,20 +131,28 @@ export class ProductSession {
   async status(): Promise<ProductSessionResult> {
     if (!this.view().signedIn || !this.token) return this.view();
     const epoch = this.epoch; const token = this.token;
+    const observation = ++this.jobObservation;
     try {
       const user = await this.identify(token, AbortSignal.timeout(5_000));
-      if (epoch !== this.epoch || token !== this.token) return productFailure('STALE', epoch);
-      const changed = user.role !== this.user?.role || user.userId !== this.user?.userId;
-      const previousJob = JSON.stringify(this.job);
-      if (changed) this.epoch++;
+      if (token !== this.token) return productFailure('STALE', epoch);
+      if (observation < this.acceptedJobObservation) return this.view();
+      this.acceptedJobObservation = observation;
+      const changed = user.role !== this.user?.role || user.userId !== this.user?.userId || user.authMode !== this.user?.authMode;
       this.user = user;
-      await this.rememberJob(user.userId);
-      if (changed || JSON.stringify(this.job) !== previousJob) this.emit(this.view());
+      if (changed) { this.epoch++; this.job = observeSessionJob(null); this.emit(this.view()); }
+      const job = await this.observeJob(user.userId, token);
+      const current = this.view();
+      if (token !== this.token) return productFailure('STALE', epoch);
+      if (observation !== this.acceptedJobObservation) return current;
+      const previousJob = JSON.stringify(this.job);
+      this.job = job;
+      if (JSON.stringify(this.job) !== previousJob) this.emit(this.view());
       return this.view();
     } catch (error) {
-      if (epoch !== this.epoch) return productFailure('STALE', epoch);
+      if (token !== this.token) return productFailure('STALE', epoch);
+      if (observation < this.acceptedJobObservation) return this.view();
       if (error instanceof ProductHttpError && (error.code === 'UNAUTHORIZED' || error.code === 'GONE')) {
-        return this.fail(error, epoch);
+        return this.fail(error, this.epoch);
       }
       return this.view();
     }

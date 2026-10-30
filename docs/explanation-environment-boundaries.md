@@ -41,7 +41,7 @@ loopback 只限制网络范围，不能证明请求者是谁。生产 API 当前
 
 `synthetic-local` 只接受两个不同的 HTTP loopback origin。只有显式提供 `contentIntake: faq-v2`，Main 才给该合成模式装配 intake 查询、目录、资料、权限和账号管理。未提供标记时保留原有行为。
 
-`product-remote` 只接受两个不同的 HTTPS 公网主机名 origin。现有 Main 已为这个模式装配上述 intake 服务，不再把远程客户端描述成只走旧工作台。Main 与 shared 工作台导航共同消费校验后的 `mode`，不再从 HTTPS 字符串回猜模式。导航保留 `faq-v2` 优先级；没有该标记且缺少 `mode` 时保持 legacy。已有远程配置即使没有 `contentIntake` 也使用该接线；带 `faq-v2` 的历史远程配置仍被接受，但不会得到仅限 loopback 的合成环境标识。
+`product-remote` 只接受两个不同的 HTTPS 公网主机名 origin。Main 为此模式装配 intake 服务。已有远程配置即使没有 `contentIntake` 也使用该接线；带 `faq-v2` 的历史远程配置仍可读取，解析后忽略此旧标记并归类为远程模式。仅 loopback 的合成 profile 使用该标记。Profile 缺少 `mode` 时保持 legacy。
 
 开发态仍由配置模块校验两个 origin，并根据 API origin 归类 `mode`。它保留既有 HTTP loopback 与 HTTPS origin 支持范围。显式 `CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE=faq-v2` 仍要求两个 origin 都是 loopback。这个开发兼容入口不改变打包配置的限制。
 

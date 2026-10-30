@@ -173,8 +173,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
       return { ok: false, kind: 'invalid' };
     }
-    return { ok: true, profile: Object.freeze({ mode: REMOTE_MODE, apiOrigin, identityOrigin,
-      ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
+    return { ok: true, profile: Object.freeze({ mode: REMOTE_MODE, apiOrigin, identityOrigin }) };
   }
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
   const apiOrigin = loopbackOrigin(record.apiOrigin);

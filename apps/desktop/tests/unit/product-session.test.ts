@@ -75,6 +75,29 @@ describe('product session lifetime', () => {
     expect(f.session.view().signedIn).toBe(true);
     expect(f.store.write).toHaveBeenCalledTimes(1);
   });
+  it('starts a fresh authorization after a failed callback and lets the next login succeed', async () => {
+    let attempt = 0;
+    const f = fixture({ respond: (path) => {
+      if (path === '/v1/auth/login-requests') {
+        attempt += 1;
+        return Response.json({
+          login_id: `login_${String(attempt).repeat(43)}`,
+          authorize_url: `http://127.0.0.1:4101/authorize?state=attempt-${attempt}`,
+          expires_at: new Date(Date.now() + 300_000).toISOString(),
+        }, { status: 201 });
+      }
+      if (path.endsWith('/exchange')) return Response.json({ ...f.stored, token_type: 'Bearer' });
+      return Response.json(user);
+    }});
+    f.window.open.mockRejectedValueOnce(new ProductHttpError('UNAVAILABLE'));
+
+    await expect(f.session.login()).resolves.toMatchObject({ ok: false, code: 'UNAVAILABLE' });
+    expect(f.session.view().signedIn).toBe(false);
+    await expect(f.session.login()).resolves.toMatchObject({ ok: true, signedIn: true });
+    expect(f.requests.filter(request => request.path === '/v1/auth/login-requests')).toHaveLength(2);
+    expect(f.window.open.mock.calls.map(([url]) => new URL(url!).searchParams.get('state')))
+      .toEqual(['attempt-1', 'attempt-2']);
+  });
   it('cancels exchange when the login window aborts after opening the browser', async () => {
     const f = fixture();
     f.window.open.mockImplementation(async (_url, operation) => { operation?.abort(); });
@@ -118,6 +141,150 @@ describe('product session lifetime', () => {
     vi.useFakeTimers(); const f = fixture(); const event = vi.fn(); f.session.subscribe(event);
     await f.session.login(); await vi.advanceTimersByTimeAsync(900_000);
     expect(f.session.view().signedIn).toBe(false); expect(event).toHaveBeenLastCalledWith(expect.objectContaining({ signedIn: false }));
+  });
+  it('notifies expiry while the initial job lookup is still pending', async () => {
+    vi.useFakeTimers();
+    const f = fixture(); f.stored.expires_at = new Date(Date.now() + 2_000).toISOString();
+    f.session.enableRemoteJobObservation();
+    const event = vi.fn(); f.session.subscribe(event);
+    const original = f.session.http.request.bind(f.session.http);
+    let finishJob!: () => void;
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => path === '/v1/auth/job'
+      ? new Promise(resolve => { finishJob = () => resolve({ status: 200, value: null }); })
+      : original(path, options));
+    const pending = f.session.login();
+    await vi.waitFor(() => expect(finishJob).toBeTypeOf('function'));
+    expect(isProductSessionResult(f.session.view())).toBe(true);
+    const before = event.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(event.mock.calls.length).toBeGreaterThan(before);
+    expect(event).toHaveBeenLastCalledWith(expect.objectContaining({ signedIn: false }));
+    finishJob();
+    await expect(pending).resolves.toMatchObject({ ok: false, code: 'STALE' });
+  });
+  it('clears a session that expires while it is being saved', async () => {
+    vi.useFakeTimers();
+    const f = fixture(); f.stored.expires_at = new Date(Date.now() + 5_000).toISOString();
+    const event = vi.fn(); f.session.subscribe(event);
+    vi.spyOn(f.store, 'write').mockImplementation(() => { vi.setSystemTime(Date.now() + 7_000); });
+    await expect(f.session.login()).resolves.toMatchObject({ ok: false, code: 'STALE' });
+    expect(event).toHaveBeenLastCalledWith(expect.objectContaining({ signedIn: false }));
+    expect(f.store.clear).toHaveBeenCalledTimes(2);
+    expect(f.session.view().signedIn).toBe(false);
+  });
+  it('does not apply a delayed job lookup to a newer login', async () => {
+    const f = fixture(); f.session.enableRemoteJobObservation();
+    const original = f.session.http.request.bind(f.session.http);
+    let finishOldJob!: () => void, jobs = 0;
+    const job = (title: string) => ({ title, directory: one(title), permission_state: 'ready', message: null,
+      actions: { query: true, import: false, publish: false, rollback: false } });
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => {
+      if (path !== '/v1/auth/job') return original(path, options);
+      jobs += 1;
+      return jobs === 1 ? new Promise(resolve => { finishOldJob = () => resolve({ status: 200, value: job('客服总监') }); })
+        : Promise.resolve({ status: 200, value: job('客服坐席') });
+    });
+    const oldLogin = f.session.login();
+    await vi.waitFor(() => expect(finishOldJob).toBeTypeOf('function'));
+    await f.session.logout();
+    expect(await f.session.login()).toMatchObject({ ok: true, signedIn: true, job: { title: '客服坐席' } });
+    finishOldJob();
+    await expect(oldLogin).resolves.toMatchObject({ ok: false, code: 'STALE' });
+    expect(f.session.view()).toMatchObject({ signedIn: true, job: { title: '客服坐席' } });
+    await f.session.logout();
+  });
+  it('does not let an older status lookup overwrite a later status', async () => {
+    const f = fixture(); f.session.enableRemoteJobObservation();
+    const original = f.session.http.request.bind(f.session.http);
+    let finishOldJob!: () => void, jobs = 0;
+    const job = (title: string) => ({ title, directory: one(title), permission_state: 'ready', message: null,
+      actions: { query: true, import: false, publish: false, rollback: false } });
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => {
+      if (path !== '/v1/auth/job') return original(path, options);
+      jobs += 1;
+      return jobs === 2 ? new Promise(resolve => { finishOldJob = () => resolve({ status: 200, value: job('客服总监') }); })
+        : Promise.resolve({ status: 200, value: job('客服坐席') });
+    });
+    await f.session.login();
+    const oldStatus = f.session.status();
+    await vi.waitFor(() => expect(finishOldJob).toBeTypeOf('function'));
+    expect(await f.session.status()).toMatchObject({ ok: true, job: { title: '客服坐席' } });
+    finishOldJob();
+    await expect(oldStatus).resolves.toMatchObject({ ok: true, signedIn: true, job: { title: '客服坐席' } });
+    expect(f.session.view()).toMatchObject({ signedIn: true, job: { title: '客服坐席' } });
+    await f.session.logout();
+  });
+  it('notifies role changes before waiting for the updated job', async () => {
+    const f = fixture(); f.session.enableRemoteJobObservation();
+    const original = f.session.http.request.bind(f.session.http);
+    const events = vi.fn(); f.session.subscribe(events);
+    let identity = 0, jobs = 0, finishJob!: () => void;
+    const job = { title: '客服坐席', directory: one('客服坐席'), permission_state: 'ready', message: null,
+      actions: { query: true, import: false, publish: false, rollback: false } };
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => {
+      if (path === '/v1/auth/me') return Promise.resolve({ status: 200, value: { ...user, role: ++identity === 1 ? 'agent' : 'coach' } });
+      if (path === '/v1/auth/job') return ++jobs === 2
+        ? new Promise(resolve => { finishJob = () => resolve({ status: 200, value: job }); })
+        : Promise.resolve({ status: 200, value: job });
+      return original(path, options);
+    });
+    await f.session.login(); events.mockClear();
+    const first = f.session.status();
+    await vi.waitFor(() => expect(finishJob).toBeTypeOf('function'));
+    expect(events).toHaveBeenCalledWith(expect.objectContaining({ signedIn: true, role: 'coach',
+      job: expect.objectContaining({ status: 'unresolved', reason: 'missing', rights: expect.objectContaining({ search: false }) }) }));
+    expect(events.mock.calls.every(([state]) => isProductSessionResult(state))).toBe(true);
+    expect(await f.session.status()).toMatchObject({ ok: true, role: 'coach' });
+    finishJob();
+    await expect(first).resolves.toMatchObject({ ok: true, role: 'coach' });
+    await f.session.logout();
+  });
+  it('does not accept an older identity after a newer identity was observed', async () => {
+    const f = fixture(); f.session.enableRemoteJobObservation();
+    const original = f.session.http.request.bind(f.session.http);
+    let identities = 0, jobs = 0, finishIdentity!: () => void, finishJob!: () => void;
+    const job = { title: '客服坐席', directory: one('客服坐席'), permission_state: 'ready', message: null,
+      actions: { query: true, import: false, publish: false, rollback: false } };
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => {
+      if (path === '/v1/auth/me') return ++identities === 2
+        ? new Promise(resolve => { finishIdentity = () => resolve({ status: 200, value: { ...user, role: 'owner' } }); })
+        : Promise.resolve({ status: 200, value: user });
+      if (path === '/v1/auth/job') return ++jobs === 2
+        ? new Promise(resolve => { finishJob = () => resolve({ status: 200, value: job }); })
+        : Promise.resolve({ status: 200, value: job });
+      return original(path, options);
+    });
+    await f.session.login();
+    const old = f.session.status();
+    await vi.waitFor(() => expect(finishIdentity).toBeTypeOf('function'));
+    const recent = f.session.status();
+    await vi.waitFor(() => expect(finishJob).toBeTypeOf('function'));
+    finishIdentity();
+    await expect(old).resolves.toMatchObject({ ok: true, signedIn: true, role: 'agent' });
+    expect(f.session.view()).toMatchObject({ signedIn: true, role: 'agent' });
+    finishJob();
+    await expect(recent).resolves.toMatchObject({ ok: true, role: 'agent' });
+    await f.session.logout();
+  });
+  it('returns the current session when its role changes during login', async () => {
+    const f = fixture(); f.session.enableRemoteJobObservation();
+    const original = f.session.http.request.bind(f.session.http);
+    let identities = 0, jobs = 0, finishJob!: () => void;
+    const job = { title: '客服坐席', directory: one('客服坐席'), permission_state: 'ready', message: null,
+      actions: { query: true, import: false, publish: false, rollback: false } };
+    vi.spyOn(f.session.http, 'request').mockImplementation((path, options) => {
+      if (path === '/v1/auth/me') return Promise.resolve({ status: 200, value: { ...user, role: ++identities === 1 ? 'agent' : 'coach' } });
+      if (path === '/v1/auth/job') return ++jobs === 1
+        ? new Promise(resolve => { finishJob = () => resolve({ status: 200, value: job }); })
+        : Promise.resolve({ status: 200, value: job });
+      return original(path, options);
+    });
+    const login = f.session.login();
+    await vi.waitFor(() => expect(finishJob).toBeTypeOf('function'));
+    expect(await f.session.status()).toMatchObject({ ok: true, role: 'coach' });
+    finishJob();
+    await expect(login).resolves.toMatchObject({ ok: true, signedIn: true, role: 'coach' });
+    await f.session.logout();
   });
   it('clears memory immediately before a slow remote logout finishes', async () => {
     const f = fixture(); await f.session.login(); let done!: () => void;

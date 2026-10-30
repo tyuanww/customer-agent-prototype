@@ -210,6 +210,58 @@ describe('createLoginWindow', () => {
     await opened;
   });
 
+  it.each(['response', 'timeout'] as const)('ends the login attempt after a callback %s failure', async failure => {
+    const transport = vi.fn(async (input: URL | RequestInfo) => {
+      const target = String(input);
+      if (target.endsWith('/password')) return Response.json({ code: 'synthetic_agent' });
+      if (target.includes('/v1/auth/callback')) {
+        if (failure === 'timeout') throw new Error('synthetic timeout');
+        return new Response(null, { status: 503 });
+      }
+      return new Response(null, { status: 404 });
+    }) as unknown as typeof fetch;
+    const { opened, submit } = openWindow({ fetch: transport });
+    const rejection = expect(opened).rejects.toMatchObject({ code: 'UNAVAILABLE' });
+    expect(await submit({ username: 'synthetic_agent', password: 'synthetic-password' })).toEqual({ ok: false, code: 'UNAVAILABLE' });
+    await rejection;
+    expect(mocks.windowInstance.destroy).toHaveBeenCalledOnce();
+    expect(mocks.handlers.has('login-window:submit-account')).toBe(false);
+  });
+
+  it('does not send a callback when account verification completes after cancellation', async () => {
+    let resolvePassword: (response: Response) => void = () => undefined;
+    const password = new Promise<Response>(resolve => { resolvePassword = resolve; });
+    const transport = vi.fn(async () => password) as unknown as typeof fetch;
+    const { opened, submit, cancel } = openWindow({ fetch: transport });
+    const rejection = expect(opened).rejects.toMatchObject({ code: 'CANCELLED' });
+    const pending = submit({ username: 'synthetic_agent', password: 'synthetic-password' });
+    await cancel();
+    resolvePassword(Response.json({ code: 'synthetic_agent' }));
+    expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(transport).toHaveBeenCalledTimes(1);
+    await rejection;
+  });
+
+  it('aborts an in-flight callback and ignores its response after cancellation', async () => {
+    let resolveCallback: (response: Response) => void = () => undefined;
+    let callbackSignal: AbortSignal | null | undefined;
+    const callback = new Promise<Response>(resolve => { resolveCallback = resolve; });
+    const transport = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      if (String(input).endsWith('/password')) return Response.json({ code: 'synthetic_agent' });
+      callbackSignal = init?.signal;
+      return callback;
+    }) as unknown as typeof fetch;
+    const { opened, submit, cancel } = openWindow({ fetch: transport });
+    const rejection = expect(opened).rejects.toMatchObject({ code: 'CANCELLED' });
+    const pending = submit({ username: 'synthetic_agent', password: 'synthetic-password' });
+    await vi.waitFor(() => expect(callbackSignal).toBeDefined());
+    await cancel();
+    resolveCallback(new Response('ok', { status: 200 }));
+    expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(callbackSignal?.aborted).toBe(true);
+    await rejection;
+  });
+
   it('posts the account password to the HTTPS identity origin and callbacks the API origin', async () => {
     const identity = 'https://agent-id.jianghua.site';
     const api = 'https://agent-auth.jianghua.site';

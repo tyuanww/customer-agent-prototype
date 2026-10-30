@@ -68,6 +68,7 @@ import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
 import { compactQueryText } from '@shared/query-analyze';
 import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
 import type { LibraryDomain } from '@shared/library-delta';
+import { intakeQueryFailure } from '@shared/content-intake-query';
 import {
   adoptedPlaceholderValues,
   announceInvalidationEffect,
@@ -137,6 +138,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
+  const intakeContextIdRef = useRef<string | null>(null);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const [announceInvalid, setAnnounceInvalid] = useState(false);
@@ -150,6 +152,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [sopEntryError, setSopEntryError] = useState<string | null>(null);
   const [sopEntryResume, setSopEntryResume] = useState(false);
   const [reportedScriptIds, setReportedScriptIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [reportError, setReportError] = useState('');
   const lastProductQueryRef = useRef<{
     sessionEpoch: number;
     generation: number;
@@ -195,6 +198,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setPhase('SEARCH_INPUT');
     setResults([]);
     setReportedScriptIds(new Set());
+    setReportError('');
     setCopying(false);
     setSearching(false);
     setCopiedRank(null);
@@ -422,6 +426,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         openingRef.current = false;
         openingUserInteractionRef.current = false;
         searchGenerationRef.current += 1;
+        intakeContextIdRef.current = null;
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
@@ -535,6 +540,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         });
         cancelScheduledResultFocus();
         searchGenerationRef.current += 1;
+        intakeContextIdRef.current = null;
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
@@ -700,6 +706,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   useEffect(
     () => () => {
       searchGenerationRef.current += 1;
+      intakeContextIdRef.current = null;
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
@@ -734,6 +741,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const cancelPendingSearch = useCallback(() => {
     searchGenerationRef.current += 1;
+    intakeContextIdRef.current = null;
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
@@ -984,12 +992,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     productState?.sessionEpoch ?? 0, resetIntakeView);
   useEffect(() => {
     if (!intake) return;
-    return window.customerAgent?.intakeQuery?.onInvalidated(reason => {
-      cancelPendingCopy(); setResults([]);
-      // An old qualification expiring cannot cancel its in-flight replacement.
-      if (reason !== 'expired') cancelPendingSearch();
+    return window.customerAgent?.intakeQuery?.onInvalidated(({ reason, contextId }) => {
+      if (contextId !== intakeContextIdRef.current) return;
+      cancelPendingCopy(); setResults([]); cancelPendingSearch();
       if (!searchInFlightRef.current && phaseRef.current !== 'FOX_IDLE') {
-        setErrorMessage('资料资格已失效，请重新查询。'); reportPhase('ERROR');
+        setErrorMessage(reason === 'facts-expired' ? intakeQueryFailure('FACTS_EXPIRED').message : '资料资格已失效，请重新查询。'); reportPhase('ERROR');
       }
     });
   }, [intake, cancelPendingSearch, cancelPendingCopy, reportPhase]);
@@ -1016,8 +1023,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       const generation = ++searchGenerationRef.current;
+      const contextId = crypto.randomUUID(); intakeContextIdRef.current = contextId;
       searchInFlightRef.current = true; setSearching(true); reportPhase('RESULTS');
-      void api.search({ queryText: text }).then(result => {
+      void api.search({ queryText: text, contextId }).then(result => {
         if (generation !== searchGenerationRef.current) return;
         if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
         setResults(result.rows); reportPhase(result.rows.length ? 'RESULTS' : 'EMPTY', result.rows.length as ResultCount);
@@ -1050,6 +1058,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       setReportedScriptIds(new Set());
+      setReportError('');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
       searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
       const search = () => preferenceWriteRef.current.then(() => api.search({
@@ -1109,6 +1118,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setSearching(true);
     setResults([]);
     setReportedScriptIds(new Set());
+    setReportError('');
     const generation = ++searchGenerationRef.current;
 
     searchTimerRef.current = window.setTimeout(() => {
@@ -1810,6 +1820,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
             sopEntryResume={sopEntryResume}
             onOpenSop={openAllergySop}
             reportedScriptIds={reportedScriptIds}
+            reportError={reportError}
             onReportInaccuracy={(script) => {
               const last = lastProductQueryRef.current;
               const sessionKey = last?.queryId ?? `local:${searchGenerationRef.current}`;
@@ -1831,7 +1842,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
                   return next;
                 });
               };
-              if (report && last && PRODUCT_QUERY_UUID.test(last.queryId)) {
+              setReportError('');
+              if (last && (!report || !PRODUCT_QUERY_UUID.test(last.queryId))) {
+                setReportError('话术反馈未记录，请联系话术师。');
+                return;
+              }
+              if (report && last) {
                 void report({
                   sessionEpoch: last.sessionEpoch,
                   generation: last.generation,
@@ -1839,7 +1855,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
                   scriptId: script.scriptId,
                   rank: script.rank,
                 }).then((result) => {
-                  if (result.ok) markLocal();
+                  if (lastProductQueryRef.current !== last) return;
+                  if (result.ok && result.recorded) markLocal();
+                  else setReportError(result.ok ? '话术反馈未记录，请联系话术师。' : '话术反馈结果未确认，请联系话术师。');
+                }).catch(() => {
+                  if (lastProductQueryRef.current === last) setReportError('话术反馈结果未确认，请联系话术师。');
                 });
                 return;
               }
