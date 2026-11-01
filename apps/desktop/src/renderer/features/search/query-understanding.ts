@@ -61,6 +61,7 @@ export type SemanticMatch = Readonly<{
   entityScopeMatched: boolean;
   entityContextClean: boolean;
   topicContextMatched: boolean;
+  requiredTopicsMatched: boolean;
   kind: Exclude<MatchKind, 'exact' | 'similar'> | null;
   label: string;
   matchedAnchors: readonly string[];
@@ -148,13 +149,14 @@ export function matchSearchMetadata(
   let entityScopeMatched = false;
   let aliasMatched = false;
   let topicMatched = false;
+  let requiredTopicsMatched = true;
 
   for (const anchor of metadata.anchors) {
     if (includesTerm(query.compact, anchor.canonical)) {
       matchedAnchors.push(anchor.label);
       matchedTerms.push(anchor.canonical);
       entityMatched ||= anchor.kind === 'entity';
-      topicMatched ||= anchor.kind === 'topic';
+      topicMatched ||= anchor.kind !== 'entity';
       if (anchor.kind === 'entity') {
         entityScopeMatched ||= includesTerm(query.compact, entityScopeToken(anchor.canonical));
       }
@@ -166,10 +168,12 @@ export function matchSearchMetadata(
       matchedTerms.push(matchedAlias);
       aliasMatched = true;
       entityMatched ||= anchor.kind === 'entity';
-      topicMatched ||= anchor.kind === 'topic';
+      topicMatched ||= anchor.kind !== 'entity';
       if (anchor.kind === 'entity') {
         entityScopeMatched ||= includesTerm(query.compact, entityScopeToken(anchor.canonical));
       }
+    } else if (anchor.kind === 'required-topic') {
+      requiredTopicsMatched = false;
     }
   }
 
@@ -180,6 +184,7 @@ export function matchSearchMetadata(
       entityScopeMatched: false,
       entityContextClean: false,
       topicContextMatched: false,
+      requiredTopicsMatched,
       kind: null,
       label: '',
       matchedAnchors: Object.freeze([]),
@@ -207,6 +212,7 @@ export function matchSearchMetadata(
       entityContextClean: false,
       topicContextMatched:
         topicMatched && matchedIntents.length > 0 && categoryContexts.has(contextRemainder),
+      requiredTopicsMatched,
       kind: null,
       label: '',
       matchedAnchors: Object.freeze(matchedAnchors),
@@ -230,6 +236,7 @@ export function matchSearchMetadata(
     entityScopeMatched,
     entityContextClean,
     topicContextMatched: false,
+    requiredTopicsMatched,
     kind: aliasMatched ? 'alias' : 'semantic',
     label: aliasMatched
       ? `同义表达 · ${anchorLabel}`

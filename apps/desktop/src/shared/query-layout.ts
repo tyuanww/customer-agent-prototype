@@ -19,7 +19,7 @@ export const QUERY_RESIZE_STEP_LARGE = 24;
 export const QUERY_CONTENT_BLANK_TOLERANCE_PX = 12;
 export const QUERY_LAYOUT_FALLBACK_MS = 160;
 
-const QUERY_LAYOUT_KEYS = ['sessionId', 'sequence', 'phase', 'resultCount', 'desiredHeight'] as const;
+const QUERY_LAYOUT_KEYS = ['sessionId', 'viewEpoch', 'sequence', 'phase', 'resultCount', 'desiredHeight'] as const;
 const QUERY_LAYOUT_ACK_KEYS = [
   'ok',
   'sessionId',
@@ -53,6 +53,7 @@ export type QueryResizeKey = 'ArrowUp' | 'ArrowDown' | 'Home' | 'End';
 
 export type QueryLayoutRequest = {
   sessionId: number;
+  viewEpoch: number;
   sequence: number;
   phase: ReportablePhase;
   resultCount: ResultCount;
@@ -133,6 +134,7 @@ export function isQueryLayoutRequest(value: unknown): value is QueryLayoutReques
   const record = value as Partial<QueryLayoutRequest>;
   return (
     isQueryLayoutSessionId(record.sessionId) &&
+    isQueryLayoutSessionId(record.viewEpoch) &&
     isQueryLayoutSequence(record.sequence) &&
     (record.phase === 'SEARCH_INPUT' ||
       record.phase === 'RESULTS' ||

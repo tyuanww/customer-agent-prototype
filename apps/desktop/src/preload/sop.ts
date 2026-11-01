@@ -1,131 +1,53 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import {
-  isSopLayoutAck,
-  isSopLayoutRequest,
-  isSopProjection,
-  isSopWindowResult,
-  rejectedSopLayoutAck,
-  type SopCopyResult,
-  type SopProjection,
-  type SopWindowApi,
-} from '../shared/sop-window';
-
-// Keep these literals aligned with IPC_CHANNELS. Do not import ipc-channels.ts:
-// a second preload entry would split a shared chunk that sandboxed overlay
-// preloads cannot load, and Query stays parked (Windows smoke).
-const CLOSE = 'sop-window:close';
-const END_FLOW = 'sop-window:end-flow';
-const RESTART = 'sop-window:restart';
-const CHOOSE_EDGE = 'sop-window:choose-edge';
-const NEXT_STEP = 'sop-window:next-step';
-const MOVE_BY = 'sop-window:move-by';
-const REPORT_LAYOUT = 'sop-window:report-layout';
-const COPY_CURRENT = 'sop-window:copy-current';
-const PROJECTION = 'sop-window:projection';
-
-const projectionListeners = new Set<(projection: SopProjection) => void>();
-
-ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
-  if (!isSopProjection(payload)) {
-    return;
-  }
-  for (const listener of projectionListeners) {
-    listener(payload);
-  }
-});
-
-const unavailable = { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程通道不可用' };
-
-const api: SopWindowApi = {
-  async close() {
-    try {
-      await ipcRenderer.invoke(CLOSE);
-    } catch {
-      // Window is already closing.
-    }
+import { isQuerySopWindowIntent } from '../shared/query-sop-window';
+import { isSopDraftIdentity, isSopDraftStart, isSopDraftUpdate, isSopDraftDiscard, isSopDraftResult, isSopFloatingSnapshot, isSopExecutionCommand, isSopExecutionCopy, isSopExecutionRename, isSopReadyRequest,
+  isSopCopyResult, isSopWindowResult, SOP_UNAVAILABLE, type SopFloatingApi } from '../shared/sop-window';
+const api: SopFloatingApi = {
+  async current() {
+    try { const value: unknown = await ipcRenderer.invoke('sop-floating:current'); return isSopFloatingSnapshot(value) ? value : SOP_UNAVAILABLE; }
+    catch { return SOP_UNAVAILABLE; }
   },
-  async endFlow() {
-    try {
-      await ipcRenderer.invoke(END_FLOW);
-    } catch {
-      // Window is already closing.
-    }
+  async ready(request) { return isSopReadyRequest(request) && await ipcRenderer.invoke('sop-floating:ready', request) === true; },
+  async windowIntent(request) { return isQuerySopWindowIntent(request) && await ipcRenderer.invoke('sop-floating:window', request) === true; },
+  async command(request) {
+    if (!isSopExecutionCommand(request)) return { ok: false, code: 'INVALID', message: '流程操作无效' };
+    const value: unknown = await ipcRenderer.invoke('sop-floating:command', request);
+    return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '流程操作失败' };
   },
-  async restart() {
-    try {
-      await ipcRenderer.invoke(RESTART);
-    } catch {
-      // Renderer only needs the next projection.
-    }
+  async copyCurrent(request) {
+    if (!isSopExecutionCopy(request)) return { ok: false, message: '复制请求无效' };
+    const value: unknown = await ipcRenderer.invoke('sop-floating:copy', request);
+    return isSopCopyResult(value) ? value : { ok: false, message: '复制失败，请重试' };
   },
-  async chooseEdge(edgeId) {
-    if (typeof edgeId !== 'string') {
-      return { ok: false, code: 'INVALID', message: '当前步骤不能继续' };
-    }
+  async renameCurrent(request) {
+    if (!isSopExecutionRename(request)) return { ok: false, code: 'INVALID', message: '名称无效' };
     try {
-      const value: unknown = await ipcRenderer.invoke(CHOOSE_EDGE, edgeId);
-      return isSopWindowResult(value) ? value : unavailable;
-    } catch {
-      return unavailable;
-    }
+      const value: unknown = await ipcRenderer.invoke('sop-floating:rename-current', request);
+      return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '名称修改失败' };
+    } catch { return { ok: false, code: 'UNAVAILABLE', message: '名称修改失败' }; }
   },
-  async nextStep() {
-    try {
-      const value: unknown = await ipcRenderer.invoke(NEXT_STEP);
-      return isSopWindowResult(value) ? value : unavailable;
-    } catch {
-      return unavailable;
-    }
+  async draftCurrent(request) {
+    if (!isSopDraftIdentity(request)) return { ok: false };
+    try { const value: unknown = await ipcRenderer.invoke('sop-floating:draft-current', request); return isSopDraftResult(value) ? value : { ok: false }; }
+    catch { return { ok: false }; }
   },
-  async moveBy(dx, dy, finished = false) {
-    if (
-      typeof dx !== 'number'
-      || typeof dy !== 'number'
-      || typeof finished !== 'boolean'
-    ) {
-      return;
-    }
-    try {
-      await ipcRenderer.invoke(MOVE_BY, dx, dy, finished);
-    } catch {
-      // Drag can race with hide.
-    }
+  async draftStart(request) {
+    if (!isSopDraftStart(request)) return { ok: false };
+    try { const value: unknown = await ipcRenderer.invoke('sop-floating:draft-start', request); return isSopDraftResult(value) ? value : { ok: false }; }
+    catch { return { ok: false }; }
   },
-  async reportLayout(request) {
-    if (!isSopLayoutRequest(request)) {
-      return rejectedSopLayoutAck(0, 0);
-    }
-    try {
-      const value: unknown = await ipcRenderer.invoke(REPORT_LAYOUT, request);
-      return isSopLayoutAck(value) ? value : rejectedSopLayoutAck(request.sessionId, request.sequence);
-    } catch {
-      return rejectedSopLayoutAck(request.sessionId, request.sequence);
-    }
+  async draftUpdate(request) {
+    if (!isSopDraftUpdate(request)) return false;
+    try { return await ipcRenderer.invoke('sop-floating:draft-update', request) === true; } catch { return false; }
   },
-  async copyCurrent() {
-    try {
-      const value: unknown = await ipcRenderer.invoke(COPY_CURRENT);
-      if (!value || typeof value !== 'object') {
-        return { ok: false, message: '复制失败，请重试' };
-      }
-      const record = value as SopCopyResult;
-      if (record.ok === true) {
-        return { ok: true };
-      }
-      return {
-        ok: false,
-        message: typeof record.message === 'string' ? record.message : '复制失败，请重试',
-      };
-    } catch {
-      return { ok: false, message: '复制失败，请重试' };
-    }
+  async draftDiscard(request) {
+    if (!isSopDraftDiscard(request)) return false;
+    try { return await ipcRenderer.invoke('sop-floating:draft-discard', request) === true; } catch { return false; }
   },
-  onProjection(cb) {
-    projectionListeners.add(cb);
-    return () => {
-      projectionListeners.delete(cb);
-    };
+  onProjection(callback) {
+    const listener = (_event: unknown, value: unknown) => callback(isSopFloatingSnapshot(value) ? value : SOP_UNAVAILABLE);
+    ipcRenderer.on('sop-floating:projection', listener);
+    return () => { ipcRenderer.removeListener('sop-floating:projection', listener); };
   },
 };
-
-contextBridge.exposeInMainWorld('sopWindow', api);
+contextBridge.exposeInMainWorld('sopFloating', api);

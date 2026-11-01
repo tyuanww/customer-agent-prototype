@@ -55,6 +55,27 @@ describe('query understanding', () => {
     expect(match.score).toBeGreaterThan(38);
   });
 
+  it('treats optional topics as supporting evidence rather than a requirement', () => {
+    const match = matchSearchMetadata(understandQuery('星河氨基酸洁面怎么用'), topicMetadata);
+    expect(match.requiredTopicsMatched).toBe(true);
+  });
+
+  it('requires every required topic while accepting canonical terms and aliases', () => {
+    const restricted: SearchMetadata = {
+      intents: ['safety', 'aftersales'],
+      anchors: [
+        ...metadata.anchors,
+        { kind: 'required-topic', label: '孕期咨询', canonical: '孕期', aliases: ['怀孕'] },
+        { kind: 'required-topic', label: '不适反馈', canonical: '过敏', aliases: ['红肿'] },
+      ],
+    };
+    expect(matchSearchMetadata(understandQuery('星河洁面孕期过敏'), restricted).requiredTopicsMatched).toBe(true);
+    expect(matchSearchMetadata(understandQuery('星河洁面怀孕红肿'), restricted).requiredTopicsMatched).toBe(true);
+    expect(matchSearchMetadata(understandQuery('星河洁面孕期能用吗'), restricted).requiredTopicsMatched).toBe(false);
+    expect(matchSearchMetadata(understandQuery('星河洁面过敏怎么办'), restricted).requiredTopicsMatched).toBe(false);
+    expect(matchSearchMetadata(understandQuery('完全无关的问题'), restricted).requiredTopicsMatched).toBe(false);
+  });
+
   it('does not mutate or replace the query when detecting multiple intents', () => {
     const parsed = understandQuery('星河洁面敏感肌怎么用');
     expect(parsed.normalized).toBe('星河洁面敏感肌怎么用');

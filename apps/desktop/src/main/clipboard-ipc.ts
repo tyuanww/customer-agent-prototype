@@ -13,6 +13,7 @@ export function registerClipboardIpc(
   getRole: (contents: WebContents) => OverlayRole | null,
   getDevServerUrl: () => string | undefined,
   productConnected: () => boolean = () => false,
+  onCopied: () => number | undefined = () => undefined,
 ): void {
   const guard = (event: IpcMainInvokeEvent): boolean => {
     return isTrustedSender(event, getTrusted(), getDevServerUrl());
@@ -35,9 +36,15 @@ export function registerClipboardIpc(
 
       try {
         clipboard.writeText(resolved.payload);
-        return { ok: true };
       } catch {
         return { ok: false, message: '复制失败，请重试' };
+      }
+      try {
+        const copyGeneration = onCopied();
+        return copyGeneration === undefined ? { ok: true } : { ok: true, copyGeneration };
+      } catch {
+        // The clipboard write cannot be rolled back if notifying another window fails.
+        return { ok: true, feedbackSyncFailed: true };
       }
     },
   );

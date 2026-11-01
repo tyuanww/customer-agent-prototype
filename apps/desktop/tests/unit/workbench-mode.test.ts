@@ -28,9 +28,9 @@ it('does not infer a missing mode from HTTPS', () => {
   expect(workbenchKind(profile)).toBe('legacy');
 });
 
-it('keeps synthetic-local and absent profiles on the legacy navigation', () => {
+it('keeps explicit synthetic-local profiles on legacy navigation and absent profiles offline', () => {
   expect(workbenchKind({ mode: 'synthetic-local' })).toBe('legacy');
   expect(workbenchKind({})).toBe('legacy');
-  expect(workbenchKind(null)).toBe('legacy');
-  expect(workbenchKind(undefined)).toBe('legacy');
+  expect(workbenchKind(null)).toBe('synthetic-offline');
+  expect(workbenchKind(undefined)).toBe('synthetic-offline');
 });

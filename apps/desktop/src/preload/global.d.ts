@@ -1,3 +1,4 @@
+import type { SopFloatingApi } from '../shared/sop-window';
 import type { IntakeCatalogApi } from '../shared/content-intake-catalog';
 import type { IntakePermissionApi } from '../shared/content-intake-permissions';
 import type { PageUseApi } from '../shared/page-use';
@@ -13,10 +14,10 @@ import type { WorkbenchModeReply } from '../shared/workbench-mode';
 import type { SopWorkbookOpenReply } from '../shared/sop-workbook-preview';
 import type { DashboardWordingApi } from '../shared/dashboard-wording';
 import type { LoginWindowApi } from '../shared/login-window';
-import type { SopWindowApi } from '../shared/sop-window';
 
 declare global {
   interface Window {
+    sopFloating?: SopFloatingApi;
     dashboardIntakeCatalog?: IntakeCatalogApi;
     dashboardPageUse?: PageUseApi;
     dashboardPermissions?: IntakePermissionApi;
@@ -29,10 +30,9 @@ declare global {
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;
     dashboardUsageLog?: DashboardUsageLogApi;
-    dashboardWorkbench?: { mode(): Promise<WorkbenchModeReply> };
+    dashboardWorkbench?: { mode(): Promise<WorkbenchModeReply>; sopImages?(): Promise<unknown> };
     dashboardSopWorkbook?: { open(): Promise<SopWorkbookOpenReply> };
     loginWindow?: LoginWindowApi;
-    sopWindow?: SopWindowApi;
   }
 }
 

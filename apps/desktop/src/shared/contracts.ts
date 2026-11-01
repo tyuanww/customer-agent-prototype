@@ -19,7 +19,19 @@ import type { QuerySopWindowApi } from './sop-window';
 
 export type CopyTextResult =
   | { ok: true }
+  | { ok: true; copyGeneration: number }
+  | { ok: true; feedbackSyncFailed: true }
   | { ok: false; message: string };
+export function isCopyTextResult(value: unknown): value is CopyTextResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !('ok' in value)) return false;
+  const fields = Object.keys(value);
+  if (value.ok === false) return fields.length === 2 && 'message' in value && typeof value.message === 'string' && value.message.length > 0;
+  if (value.ok !== true) return false;
+  if (fields.length === 1) return true;
+  if (fields.length !== 2) return false;
+  return ('copyGeneration' in value && typeof value.copyGeneration === 'number' && Number.isSafeInteger(value.copyGeneration) && value.copyGeneration > 0)
+    || ('feedbackSyncFailed' in value && value.feedbackSyncFailed === true);
+}
 export type { OpenDashboardResult } from './dashboard-access';
 export {
   OPEN_DASHBOARD_FAILURE_MESSAGE,

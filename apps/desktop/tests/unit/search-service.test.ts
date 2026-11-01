@@ -4,6 +4,7 @@ import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
 import {
   MAX_RESULTS,
   searchScripts,
+  scoreScript,
 } from '../../src/renderer/features/search/search-service';
 import type { ScriptFixture } from '../../src/renderer/features/search/types';
 
@@ -82,6 +83,49 @@ describe('searchScripts', () => {
     expect(outcome.results.every((item) => item.matchKind === 'alias')).toBe(true);
     expect(outcome.results[0]?.matchLabel).toContain('同义表达');
     expect(outcome.results[0]?.matchLabel).not.toMatch(/\d/);
+  });
+
+  it.each([
+    ['用了露芷面膜过敏了怎么办', ['syn-after-002']],
+    ['露芷面膜过敏', ['syn-after-002']],
+    ['露芷面膜孕期能用吗', ['syn-pre-001']],
+    ['露芷面膜怀孕能敷吗', ['syn-pre-001']],
+    ['露芷面膜能用吗', []],
+  ])('requires the specialist wording context for %s', (query, expectedIds) => {
+    const outcome = searchScripts(query, SYNTHETIC_SCRIPTS, DEMO_NOW);
+    const ids = outcome.status === 'hit' ? outcome.results.map(item => item.scriptId) : [];
+    expect(ids).toEqual(expectedIds);
+  });
+
+  it('retains both specialist candidates when both contexts are explicit', () => {
+    const outcome = searchScripts('露芷面膜孕期过敏怎么办', SYNTHETIC_SCRIPTS, DEMO_NOW);
+    expect(outcome.status).toBe('hit');
+    if (outcome.status !== 'hit') throw new Error('Expected both synthetic specialist candidates');
+    expect(outcome.results.map(item => item.scriptId).sort()).toEqual(['syn-after-002', 'syn-pre-001']);
+  });
+
+  it('does not allow lexical similarity to bypass the pregnancy requirement', () => {
+    const pregnancy = SYNTHETIC_SCRIPTS.find(item => item.scriptId === 'syn-pre-001');
+    if (!pregnancy) throw new Error('Missing synthetic pregnancy wording');
+    expect(scoreScript('露芷面膜过敏', pregnancy)).toBe(0);
+  });
+
+  it('does not bypass an explicit topic requirement even for an exact question variant', () => {
+    const restricted = fixture({
+      scriptId: 'required-context',
+      questionVariants: ['星河洁面怎么用', '星河洁面孕期怎么用'],
+      answerText: 'RESTRICTED_SYNTHETIC_ANSWER',
+      search: {
+        intents: ['usage', 'safety'],
+        anchors: [
+          { kind: 'entity', label: '星河洁面', canonical: '星河洁面', aliases: [] },
+          { kind: 'required-topic', label: '孕期咨询', canonical: '孕期', aliases: ['怀孕'] },
+        ],
+      },
+    });
+    expect(searchScripts('星河洁面怎么用', [restricted], DEMO_NOW)).toEqual({ status: 'no-hit' });
+    expect(scoreScript('星河洁面怎么用', restricted)).toBe(0);
+    expect(scoreScript('星河洁面孕期怎么用', restricted)).toBe(100);
   });
 
   it('does not let a generic intent phrase manufacture a result without an entity anchor', () => {

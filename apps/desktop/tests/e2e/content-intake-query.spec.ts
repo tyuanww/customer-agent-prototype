@@ -46,12 +46,14 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
   apiOrigin = await listen(api); identityOrigin = await listen(identity);
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-query-native-'));
   let app: ElectronApplication | undefined;
+  let originalClipboard: string | undefined;
   try {
     const root = fileURLToPath(new URL('../..', import.meta.url));
     app = await electron.launch({ cwd: root, args: [`--user-data-dir=${directory}`, 'out/main/index.js', '--demo-e2e'], env: {
       ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: apiOrigin,
       CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: identityOrigin, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
     } });
+    originalClipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
@@ -71,6 +73,9 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('answer-text-1')).toHaveText(`shop-a ${wire.entries[0].answerText}`);
     await expect(query.getByTestId('answer-text-1')).toHaveCSS('white-space', 'pre-wrap');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-results');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-view-transition', 'stable');
+    await expect(query.getByText('无法读取流程进度')).toHaveCount(0);
     await expect(query.getByTestId('deep-thinking-toggle')).toHaveCount(0);
     await expect(query.getByTestId('report-inaccuracy-button-1')).toHaveCount(0);
     await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
@@ -122,6 +127,12 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('no-hit')).toBeVisible();
+    const queryBounds = () => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .find(w => w.webContents.getURL().includes('role=query'))!.getBounds());
+    const beforeResize = await queryBounds();
+    await query.getByRole('separator', { name: '调整查询窗高度' }).press('ArrowUp');
+    await expect.poll(async () => (await queryBounds()).height).not.toBe(beforeResize.height);
+    expect((await queryBounds()).width).toBe(beforeResize.width);
     const fox = app.windows().find(w => w.url().includes('role=fox'))!;
     expect(await fox.evaluate(() => window.customerAgent!.intakeQuery!.access())).toMatchObject({ code: 'FORBIDDEN' });
     expect(await query.evaluate(() => window.customerAgent!.intakeQuery!.selectShop({ shopId: 'other-shop' }))).toMatchObject({ code: 'NO_GRANT' });
@@ -129,10 +140,15 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await dashboard.getByRole('tab', { name: '知识库', exact: true }).click();
     await expect(dashboard.getByRole('heading', { name: '知识库' })).toBeVisible();
-    await expect(dashboard.getByText('当前账号只能使用已生效的知识。')).toBeVisible();
+    await expect(dashboard.getByRole('table', { name: '当前人设知识' })).toContainText('还没有生效知识。');
+    await expect(dashboard.getByRole('button', { name: '添加话术' })).toHaveCount(0);
     await expect(dashboard.getByRole('button', { name: '保存' })).toHaveCount(0);
     await expect(dashboard.getByRole('button', { name: '冻结本次抽样' })).toHaveCount(0);
+    expect(await dashboard.evaluate(() => window.dashboardDesk!.command({
+      action: 'upload', personaId: 'shop', name: '合成权限核验', category: 'product', fileName: 'synthetic.txt', text: '合成权限核验', validity: 'always',
+    }))).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     const nativeMenu = await app.evaluate(({ app: nativeApp, Menu, BrowserWindow }) => {
       nativeApp.emit('activate');
       return { labels: Menu.getApplicationMenu()?.getMenuItemById('customer-agent-menu')?.submenu?.items.map(i => i.label),
@@ -143,13 +159,20 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(await query.evaluate(() => ({ node: typeof window.require, process: typeof window.process }))).toEqual({ node: 'undefined', process: 'undefined' });
     expect(requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);
     await query.evaluate(() => window.customerAgent!.product!.logout());
-    await expect(shop).toBeDisabled();
+    await expect(query.getByRole('button', { name: '登录', exact: true })).toBeVisible();
+    await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
+    await expect(shop).toHaveCount(0);
+    await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
   } finally {
-    try { if (app) await closeOwnedElectron(app); }
-    finally {
-      api.closeAllConnections(); identity.closeAllConnections();
-      await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]);
-      rmSync(directory, { recursive: true, force: true });
+    try {
+      if (app && originalClipboard !== undefined) await app.evaluate(({ clipboard }, value) => clipboard.writeText(value), originalClipboard);
+    } finally {
+      try { if (app) await closeOwnedElectron(app); }
+      finally {
+        api.closeAllConnections(); identity.closeAllConnections();
+        try { await Promise.all([new Promise<void>(r => api.close(() => r())), new Promise<void>(r => identity.close(() => r()))]); }
+        finally { rmSync(directory, { recursive: true, force: true }); }
+      }
     }
   }
 });

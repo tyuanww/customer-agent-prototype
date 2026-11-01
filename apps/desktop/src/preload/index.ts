@@ -1,3 +1,6 @@
+import { isQuerySopNavigation, isQuerySopWindowIntent } from '../shared/query-sop-window';
+import { SOP_UNAVAILABLE, isQuerySopRevision, isSopExecutionCommand, isSopExecutionCopy, isSopExecutionRename, isSopRenameRequest, isSopReadyRequest, isQuerySopSnapshot, isSopCopyResult, isSopWindowResult,
+  isSopDraftIdentity, isSopDraftStart, isSopDraftUpdate, isSopDraftDiscard, isSopDraftResult, isSopShowQueryRequest, isSopShowQueryReady } from '../shared/sop-window';
 import { isQueryIdentity, isProductSearchRequest, isProductCopyRequest, isProductInaccuracyRequest, isProductQueryResult, queryFailure, type ProductSearchResult, type ProductCopyResult, type ProductCancelResult, type QueryIdentity, type ProductInaccuracyResult } from '../shared/product-search';
 import { announceFailure, isProductAnnounceRequest, isProductAnnounceResult, isProductAnnounceInvalidation, isProductAnnounceContentUpdate, isProductAnnounceUnread, type ProductAnnounceInvalidation, type ProductAnnounceContentUpdate } from '../shared/product-announce';
 import { LIBRARY_DOMAINS, isLibraryDomain, type LibraryDomain } from '../shared/library-delta';
@@ -18,6 +21,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { intakeQuery } from './content-intake-query';
 import {
   IPC_CHANNELS,
+  isCopyTextResult,
   isOpenDashboardResult,
   openDashboardUnavailable,
   type CopyTextResult,
@@ -108,41 +112,6 @@ async function readRetrievalPreference() {
   } catch {
     return DEFAULT_RETRIEVAL_PREFERENCE;
   }
-}
-const SOP_OPEN_ERROR_CODES = [
-  'INVALID',
-  'UNAVAILABLE',
-  'FAILED',
-  'SOP_LOAD_FAILED',
-  'SOP_LAYOUT_TIMEOUT',
-  'SOP_FIXTURE_MISSING',
-] as const;
-
-function parseSopWindowOpenResult(value: unknown):
-  | { ok: true }
-  | { ok: false; code: (typeof SOP_OPEN_ERROR_CODES)[number]; message: string }
-  | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  if (record.ok === true) {
-    return exactKeys(record, ['ok']) ? { ok: true } : null;
-  }
-  if (
-    record.ok === false
-    && exactKeys(record, ['ok', 'code', 'message'])
-    && typeof record.code === 'string'
-    && (SOP_OPEN_ERROR_CODES as readonly string[]).includes(record.code)
-    && typeof record.message === 'string'
-  ) {
-    return {
-      ok: false,
-      code: record.code as (typeof SOP_OPEN_ERROR_CODES)[number],
-      message: record.message,
-    };
-  }
-  return null;
 }
 const api: CustomerAgentApi = {
   intakeQuery,
@@ -241,11 +210,14 @@ const api: CustomerAgentApi = {
       } catch { return catalogFailure('UNAVAILABLE'); }
     },
   },
-  copyText(text: string): Promise<CopyTextResult> {
+  async copyText(text: string): Promise<CopyTextResult> {
     if (typeof text !== 'string') {
-      return Promise.resolve({ ok: false, message: '复制内容无效' });
+      return { ok: false, message: '复制内容无效' };
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.COPY_TEXT, text);
+    try {
+      const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.COPY_TEXT, text);
+      return isCopyTextResult(value) ? value : { ok: false, message: '复制失败，请重试' };
+    } catch { return { ok: false, message: '复制失败，请重试' }; }
   },
   getWindowContext(): Promise<WindowContext> {
     return ipcRenderer.invoke(IPC_CHANNELS.GET_WINDOW_CONTEXT);
@@ -328,16 +300,95 @@ const api: CustomerAgentApi = {
     };
   },
   sopWindow: {
+    async ready(request) { return isSopReadyRequest(request) && await ipcRenderer.invoke('query-sop:ready', request) === true; },
+    async rename(request) {
+      if (!isSopRenameRequest(request)) return { ok: false, code: 'INVALID', message: '名称无效' };
+      const value: unknown = await ipcRenderer.invoke('query-sop:rename', request);
+      return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '名称修改失败' };
+    },
+    async renameCurrent(request) {
+      if (!isSopExecutionRename(request)) return { ok: false, code: 'INVALID', message: '名称无效' };
+      try {
+        const value: unknown = await ipcRenderer.invoke('query-sop:rename-current', request);
+        return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '名称修改失败' };
+      } catch { return { ok: false, code: 'UNAVAILABLE', message: '名称修改失败' }; }
+    },
+    async draftCurrent(request) {
+      if (!isSopDraftIdentity(request)) return { ok: false };
+      try { const value: unknown = await ipcRenderer.invoke('query-sop:draft-current', request); return isSopDraftResult(value) ? value : { ok: false }; }
+      catch { return { ok: false }; }
+    },
+    async draftStart(request) {
+      if (!isSopDraftStart(request)) return { ok: false };
+      try { const value: unknown = await ipcRenderer.invoke('query-sop:draft-start', request); return isSopDraftResult(value) ? value : { ok: false }; }
+      catch { return { ok: false }; }
+    },
+    async draftUpdate(request) {
+      if (!isSopDraftUpdate(request)) return false;
+      try { return await ipcRenderer.invoke('query-sop:draft-update', request) === true; } catch { return false; }
+    },
+    async draftDiscard(request) {
+      if (!isSopDraftDiscard(request)) return false;
+      try { return await ipcRenderer.invoke('query-sop:draft-discard', request) === true; } catch { return false; }
+    },
+    onShowQueryRequest(callback) {
+      const listener = (_event: unknown, value: unknown) => { if (isSopShowQueryRequest(value)) callback(value); };
+      ipcRenderer.on('sop-window:show-query-request', listener);
+      return () => { ipcRenderer.removeListener('sop-window:show-query-request', listener); };
+    },
+    async showQueryReady(request) {
+      if (!isSopShowQueryReady(request)) return false;
+      try { return await ipcRenderer.invoke('query-sop:show-query-ready', request) === true; } catch { return false; }
+    },
+    async endTask(request) {
+      if (!isQuerySopRevision(request)) return { ok: false, code: 'INVALID', message: '待办无效' };
+      const value: unknown = await ipcRenderer.invoke('query-sop:end-task', request);
+      return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '结束待办失败' };
+    },
+    async windowIntent(request) {
+      if (!isQuerySopWindowIntent(request)) return false;
+      return (await ipcRenderer.invoke(IPC_CHANNELS.QUERY_SOP_WINDOW, request)) === true;
+    },
+    async current() {
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.QUERY_SOP_CURRENT);
+        return isQuerySopSnapshot(value) ? value : SOP_UNAVAILABLE;
+      } catch { return SOP_UNAVAILABLE; }
+    },
+    async navigate(request) {
+      if (!isQuerySopNavigation(request)) return { ok: false, code: 'INVALID', message: '视图操作无效' };
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.QUERY_SOP_NAVIGATE, request);
+        return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '视图切换失败，请重试' };
+      } catch { return { ok: false, code: 'UNAVAILABLE', message: '视图切换失败，请重试' }; }
+    },
+    async command(request) {
+      if (!isSopExecutionCommand(request)) return { ok: false, code: 'INVALID', message: '流程操作无效' };
+      const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.QUERY_SOP_COMMAND, request);
+      return isSopWindowResult(value) ? value : { ok: false, code: 'UNAVAILABLE', message: '流程操作失败' };
+    },
+    async copyCurrent(expected) {
+      if (!isSopExecutionCopy(expected)) return { ok: false, message: '复制请求无效' };
+      try {
+        const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.QUERY_SOP_COPY, expected);
+        return isSopCopyResult(value) ? value : { ok: false, message: '复制失败，请重试' };
+      } catch { return { ok: false, message: '复制失败，请重试' }; }
+    },
+    onProjection(callback) {
+      const listener = (_event: unknown, value: unknown) => { callback(isQuerySopSnapshot(value) ? value : SOP_UNAVAILABLE); };
+      ipcRenderer.on(IPC_CHANNELS.SOP_WINDOW_PROJECTION, listener);
+      return () => { ipcRenderer.removeListener(IPC_CHANNELS.SOP_WINDOW_PROJECTION, listener); };
+    },
     async open(sceneId) {
       if (typeof sceneId !== 'string' || sceneId.length === 0 || sceneId.length > 64) {
         return { ok: false as const, code: 'INVALID' as const, message: '流程参数无效' };
       }
       try {
         const value: unknown = await ipcRenderer.invoke(IPC_CHANNELS.SOP_WINDOW_OPEN, sceneId);
-        const parsed = parseSopWindowOpenResult(value);
-        return parsed ?? { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+        const parsed = isSopWindowResult(value) ? value : null;
+        return parsed ?? { ok: false as const, code: 'UNAVAILABLE' as const, message: '流程没打开' };
       } catch {
-        return { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程没打开' };
+        return { ok: false as const, code: 'UNAVAILABLE' as const, message: '流程没打开' };
       }
     },
     async entryAvailable() {

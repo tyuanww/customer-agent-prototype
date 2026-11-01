@@ -388,17 +388,27 @@ function useLegacyResource<T>(
 
 type OutcomeValue = { items: readonly InaccuracyOutcome[]; truncated: boolean };
 
-export function IntakeOverview({
-  mode,
-  onOpen,
-  onTodoCount,
-  onSupplyScript,
-}: {
+type IntakeOverviewProps = {
   mode: WorkbenchKind | null;
   onOpen: (target: 'content' | 'wording' | 'permissions') => void;
   onTodoCount?: (count: number) => void;
   onSupplyScript?: (question: string) => void;
-}) {
+};
+
+export function IntakeOverview(props: IntakeOverviewProps) {
+  const offline = props.mode === 'synthetic-offline';
+  const { onTodoCount } = props;
+  useLayoutEffect(() => {
+    if (offline) onTodoCount?.(0);
+  }, [offline, onTodoCount]);
+  if (offline) return <section className="dash-module intake-management intake-overview intake-overview-offline wb9" data-testid="module-overview">
+    <h1 className="desk-sr">概览</h1>
+    <OverviewEmpty description="当前为离线预览，查询和待办需在业务环境登录后查看" />
+  </section>;
+  return <BusinessOverview {...props} />;
+}
+
+function BusinessOverview({ mode, onOpen, onTodoCount, onSupplyScript }: IntakeOverviewProps) {
   const todoSection = useRef<HTMLElement>(null);
   const taskTruncated = useRef(false);
   const tasksEnabled = mode === 'legacy';
@@ -471,6 +481,7 @@ export function IntakeOverview({
   });
 
   useEffect(() => {
+    if (mode === null) return undefined;
     const api = window.dashboardWording;
     if (!api) return undefined;
     let live = true;
@@ -481,9 +492,10 @@ export function IntakeOverview({
       if (live) setCatalog(null);
     });
     return () => { live = false; };
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
+    if (mode === null) return undefined;
     const api = window.dashboardDesk;
     if (!api) return undefined;
     let live = true;
@@ -495,7 +507,7 @@ export function IntakeOverview({
       if (live) setDeskRole(null);
     });
     return () => { live = false; };
-  }, []);
+  }, [mode]);
 
   useLayoutEffect(() => {
     if (!tasksEnabled) {

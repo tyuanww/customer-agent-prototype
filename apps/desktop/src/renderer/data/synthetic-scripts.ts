@@ -239,7 +239,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
           aliases: ['露芷面膜', '修护面膜'],
         },
         {
-          kind: 'topic',
+          kind: 'required-topic',
           label: '孕期咨询',
           canonical: '孕期',
           aliases: ['孕妇', '怀孕'],
@@ -336,7 +336,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
           aliases: ['露芷修护面膜', '敷面膜'],
         },
         {
-          kind: 'topic',
+          kind: 'required-topic',
           label: '过敏反馈',
           canonical: '过敏',
           aliases: ['红肿', '刺痛'],

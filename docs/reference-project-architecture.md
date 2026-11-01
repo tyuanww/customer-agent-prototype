@@ -27,7 +27,7 @@
 │   ├─ QueryApp     查询胶囊、BM25/embedding/hydrate Top 3、复制   │
 │   ├─ DashboardApp 五项工作台（概览 / 话术库 / SOP / 内容 / 同步） │
 │   ├─ LoginApp     飞书 / 账号 chooser（独立原生窗，非 overlay）   │
-│   └─ SopApp       过敏售后流程切片 1（独立 SOP 窗，非 overlay）   │
+│   └─ QuerySopPanel / FloatingSopApp（同窗与独立 SOP 浮窗）      │
 └────────────────────────────────────────────────────────────────┘
                 │
 ┌───────────────▼───────────────────────────────────────────────┐
@@ -64,7 +64,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | 目录 | 只负责什么 | 不应该放什么 |
 | --- | --- | --- |
 | `apps/desktop/src/main/` | BrowserWindow 生命周期、原生能力、IPC handler、关闭与失败安全；D1 会话、D2 搜索复制、D3 `product-announce.ts` 拥有租约/ACK/快照分页/`content-updated`、D4 无命中求助入口、D5 经 API 消费发布链；仓外 BM25 / hydrate / MiniMax 规划与重排；Query `product:inaccuracy-report`；Dashboard 话术库只读 `dashboard:wording-list`、内容 `dashboard:content-*`、话术优化待办 `dashboard:iteration-*`、ops-loop `dashboard:ops-*`、origin-keyed `product-last-seen` | React 视图、业务 fixture、通用 HTTP 客户端 |
-| `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `sop.ts` 是独立入口，通道字符串必须内联 | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
+| `apps/desktop/src/preload/` | overlay `index.ts` 把 `CustomerAgentApi` 白名单暴露给 Fox/Query；`login.ts` / `dashboard.ts` / `sop.ts` 是独立入口，通道字符串必须内联；独立 SOP 浮窗使用受限的 `sop.ts` | `ipcRenderer` 通用转发、Node 文件系统、token、独立 preload 去 import `ipc-channels.ts` |
 | `apps/desktop/src/renderer/` | 狐狸、查询胶囊、Dashboard、登录 chooser、SOP 投影和其 CSS | Electron 主进程对象、数据库连接、真实客户数据 |
 | `apps/desktop/src/shared/` | 跨边界协议、类型、校验器、几何、状态纯函数，以及把产品字段权重、分词和弃权策略接到 `@customer-agent/retrieval-core` 的检索适配器 | 依赖 DOM、Electron、React 的实现，或把产品策略硬编码进通用检索包 |
 | `apps/desktop/` | 当前唯一 Electron workspace package；拥有源码、测试、配置、桌面资产、打包输入和产品版本 | Application API、DB、真实数据，或第二套 Electron 入口 |
@@ -168,7 +168,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 ## 3. 窗口和安全边界
 
-`OverlayRole` 只有 `fox | query`。`RendererRole` 是 `fox | query | dashboard | login | sop`（`apps/desktop/src/shared/overlay-events.ts`，由 `window-role.ts` 从 `?role=` 读取）。
+`OverlayRole` 只有 `fox | query`。`RendererRole` 是 `fox | query | dashboard | login | sop-floating`（`apps/desktop/src/shared/overlay-events.ts`，由 `window-role.ts` 从 `?role=` 读取）。
 
 | RendererRole | Renderer | preload | 主要能力 |
 | --- | --- | --- | --- |
@@ -176,7 +176,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
 | `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是概览、话术库、SOP、知识库、资料、权限。话术库只读当前发布目录。preload 保留旧 SOP 与待办通道，但普通服务不提供这些旧操作，见下文。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce`。 |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
-| `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
+| `sop-floating` | `FloatingSopApp` | 独立 `sop.cjs` | 指定任务的投影、步骤及受限窗口意图；不进 `trustedContents()` |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
@@ -280,7 +280,9 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 | CodeGraph 索引 | `.codegraph/` | 本地工具状态，不进业务提交 |
 | 用户参考 ZIP | `clawd-on-desk-0.15.0.zip` | 只读、忽略、不得复制资源进仓 |
 
-`pnpm workspace:check` 对所有保留输入实行三个独立 allocated-byte 预算：源码/测试/文档/资产/迁移/生成源码与配置 19.25 MiB、冻结合同 `contracts/upstream/` 16 MiB、冻结证据 `evidence/` 10.5 MiB，总量 45 MiB；任一分组或总量超限均失败。依赖、各已知包构建输出和精确派生图标单独统计，不误算成源码增长，也不借此排除未知文件或冻结历史。分组共享 inode 计数以避免重复统计硬链接，实际字节构成与批准依据见[预算收尾证据](../evidence/qa/intake-size-closeout/README.md#批准后的正式预算检查)。它还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器是精确 allowlist，遇到未知路径或符号链接会停止。
+`scripts/workspace-hygiene.mjs` 拥有工作区计量、源码预算和清理白名单。`pnpm workspace:check` 按逻辑字节分别检查保留源码、冻结合同和冻结证据，`workspace:size` 按磁盘分配量盘点；当前阈值与计量规则见[空间占用与清理](how-to-verify-desktop.md#5-空间占用与清理)。已知包的依赖和构建输出、本地 `.audit` 与 `.gstack` 报告单列，未知文件、设计输入和冻结历史仍计入预算。分类不授予删除权限，清理器仍只接受原有精确白名单。
+
+工作区检查还验证根 workspace 门面不声明版本，并要求 `.gstack/package-json-path` 唯一指向 `apps/desktop/package.json`，避免发布版本与安装包版本分叉。清理器遇到未知路径或符号链接会停止。
 
 ## 7. 当前架构评价
 
@@ -377,3 +379,20 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 ### 精确修复后继的版本接收（2026-10-12）
 
 治理 `export_customer_agent_repair_successor.mjs` 拥有批准记录、六件不可变冻结字节及 v6 八件导出包；累计 schema 只作参考，实际安装消费 upgrade。产品 `customer-agent-contract-set.mjs` 验证同一 Git 来源的批准/全部成员、39段前序及独立 `repair-contract-set.lock.json`，原主锁不变。合同生成器选择已验证 repair 快照；数据库生成器先重建并逐件比较原39段，再追加0040。runner 在0040事务内做前后物理校验及回执记账，COMMIT_UNKNOWN保留待恢复语义。治理来源提交379b793已正式导出，产品已接收独立repair锁与0040，生成合同的内容、ID、来源SHA及摘要统一取同一后继快照。接收状态VERIFIED_NOT_ACTIVATED；正式 HTTP/Main 和持久图片生产装配仍未开放。
+
+
+### 多待办与多浮窗 SOP（2026-10-29 基线，2026-11-01 用户确认）
+
+无产品 profile 的合成模式：`main/sop-window-controller.ts` 唯一管理最多8条独立内存流程、昵称、修订、历史和剪贴板。`main/sop-presentation-owner.ts` 按任务拥有唯一执行宿主和 hostEpoch、双向迁移的只读预览与就绪、多浮窗生命周期、左侧书签位置与展开位置、共享手动尺寸及 SOP 过渡；`sop-floating-window.ts` 是独立原生浮窗的创建与销毁边界。`overlay-controller.ts` 保留 Fox/Query 原生生命周期、普通 query-home/query-results 展示与布局代次，通过窄原生槽位接 SOP，不保存任务身份或第二份 SOP 尺寸。`shared/query-sop-window.ts` 拥有严格窗口意图和纯几何钳制。业务 revision 与执行 hostEpoch、布局代次分别校验，不因复制或核实变化取消合法缩放。
+
+Query 的 `sopWindow` 拥有任务入口、恢复、昵称与后台结束；步骤执行/复制必须绑定 taskId、revision、stepIndex 和 hostEpoch。步骤页 `renameCurrent` 也绑定当前 taskId、revision 和 hostEpoch，不赋予浮窗修改后台待办的能力。独立 `sop-floating` renderer 使用 `preload/sop.ts`，只获当前任务投影、就绪回执、步骤/复制与窄窗口意图；浮窗快照附带曾向该窗口入队或经 current 返回且仍有效的任务 ID，供清理草稿，不包含后台任务名称或正文。它不获普通查询、登录、后台任务管理或任意剪贴板正文。两个 IPC 宿主分别检查真实 sender、role 与主 frame，浮窗不进入 Overlay 的 `trustedContents()`。preload 通道内联，构建后必须自包含，不依赖 sandbox 不支持的相对共享 chunk。新浮窗复用现有步骤组件，不恢复已退役 `SopApp` 的业务实现。
+
+`shared/synthetic-sops.ts` 继续是合成手册与执行共用的唯一内容定义，`SopManual` 只读浏览；真实表与正式 graph 尚未接入。`workbench-mode` 的 `synthetic-offline` 只在没有产品 profile 时返回；Dashboard 仅在该结果下展示合成手册，远程、FAQ 和握手失败均不回退。`QueryAntdTheme` 从 Query CSS token 映射 antd，保留胶囊视觉。
+
+UI 不保存第二份节点图。`use-query-sop.ts` 接受验证后的 Main 快照并拒绝迟到读取；`QuerySopTasks` 显示紧凑按钮、昵称、受控改名与结束，编辑/确认区使用同一测高通路。`QuerySopPanel` 及 `FloatingSopApp` 复用步骤、局部展开、确认和复制来源反馈。只读 preview 没有执行许可，目标就绪后才移动执行宿主，失败保留原任务；旧宿主回包按 epoch 清除。普通 Query 与独立浮窗可同时存在，Query 的查询或收起不撤销浮窗进度。步骤页未保存的昵称草稿由 Main 按任务保存在本次进程内，renderer 保留编辑视图；迁移或返回前等待有序草稿交接，失败保留源视图。查询列表改名草稿仍由 Query 单独持有。浮窗唤起普通查询时，若 Query 正在执行另一任务，Main 必须先取得当前任务、hostEpoch 和请求号绑定的草稿就绪回执。Query 系统关闭暂存原宿主与草稿身份，隐藏期间只接受该身份的迟到草稿写入，不接受步骤或复制；重新显示恢复执行。浮窗系统关闭只隐藏，待办可重新打开；显式结束才删除相应任务。进程退出不声明草稿恢复，亦不声明跨启动或跨设备恢复。各宿主投影发送相互隔离；失败时尝试原生隐藏，必要时销毁窗口并提示重启。成功操作和重新聚焦后重读，未对齐的旧步骤不可继续执行。
+
+同窗返回进入 query-home，隐藏 Top3 并按查询和待办自然高度收缩，保留检索数据；只有主动查询进入 query-results。恢复指定 taskId 回到其步骤并使用全局共享的 SOP 手动尺寸，不新建任务或自动解除等待。复制先校验和预算后继，再同步写剪贴板，成功后一次提交内存状态；普通步核实齐全才推进，判断、未核实和终点留在原步，失败不推进。反馈绑定复制来源与执行宿主；Main 的单调复制代次使其他窗口的新复制清除过期反馈。改名不清除合法反馈，历史改判或换宿主不把旧成功贴到新步骤。普通搜索复制不推进 SOP。真实表格、FAQ 快照、客户身份与正式发布仍按各自合同接续，本切片不读取或导入真实业务内容。
+
+上述快照同时承载普通 Query 展示，不以 SOP 业务可用作为读取前提。产品 profile（含 faq-v2）禁用合成 SOP 时，快照仅提供空任务的健康查询展示，查询、筛选及纵向缩放继续使用 Overlay 的同一展示状态；业务入口、恢复、步骤和复制仍拒绝，不安装旧业务 adapter 或回退合成内容。只有读取或校验真正失败才呈现流程读取错误。 `shared/sop-entry.ts` 拥有合成查询入口和稳定话术编号到流程的显式关联；`QueryResultsPane` 在现有能力门禁下展示公共入口，并按本次匹配范围派生卡片关联。`ScriptCard` 只渲染已筛选入口，不按排名或正文猜流程；产品接口话术及 FAQ 不消费合成关联。
+
+合成图片作为独立 PNG 资源内联，跟随步骤、知识和话术进入已有执行投影。手册从 Main 的 `dashboard:sop-manual-images` 读取同源图片归属，不改变执行会话；该无参数入口仅允许无产品 profile 的可信 Dashboard 主帧。合成投影的图片格式、数量、尺寸和总量限制只用于当前内存样例；正式 P4b 消费不能复用该快照装载方式，须按既有资格逐张受控读取并在撤权时清除，尚未由本切片接线。

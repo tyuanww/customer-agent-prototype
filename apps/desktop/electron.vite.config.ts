@@ -34,7 +34,23 @@ export default defineConfig({
     // product-session pulls the roster through workbench-job. Bundle it.
     // A bare require fails in the unsigned package, and the query window
     // then never receives the open command.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster'] }), {
+      enforce: 'pre',
+      name: 'self-contained-sop-preload',
+      generateBundle(_options, bundle) {
+        for (const output of Object.values(bundle)) {
+          if (output.type === 'chunk' && output.isEntry && /require\(["']\./.test(output.code)) {
+            this.error(`Sandbox preload ${output.fileName} must not require a relative chunk`);
+          }
+        }
+      },
+      async resolveId(source, importer) {
+        if (!importer || !source.startsWith('.') || !(importer.endsWith('/preload/sop.ts') || importer.endsWith('?sop-preload'))) return null;
+        const resolved = await this.resolve(source, importer.replace(/\?sop-preload$/, ''), { skipSelf: true });
+        return resolved && !resolved.external ? `${resolved.id}?sop-preload` : null;
+      },
+
+    }],
     resolve: {
       conditions: ['source'],
     },
@@ -48,8 +64,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
-          login: resolve(__dirname, 'src/preload/login.ts'),
           sop: resolve(__dirname, 'src/preload/sop.ts'),
+          login: resolve(__dirname, 'src/preload/login.ts'),
           dashboard: resolve(__dirname, 'src/preload/dashboard.ts'),
         },
         output: {

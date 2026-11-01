@@ -24,7 +24,7 @@ describe('window role routing', () => {
     expect(isRendererRole('query')).toBe(true);
     expect(isRendererRole('dashboard')).toBe(true);
     expect(isRendererRole('login')).toBe(true);
-    expect(isRendererRole('sop')).toBe(true);
+    expect(isRendererRole('sop')).toBe(false);
     expect(isRendererRole('admin')).toBe(false);
     expect(readRoleFromLocation('?role=fox')).toBe('fox');
     expect(readRoleFromLocation('?role=dashboard')).toBe('dashboard');
@@ -36,10 +36,10 @@ describe('window role routing', () => {
     expect(appSource).toContain("import('./LoginApp')");
   });
 
-  it('does not eagerly load the SOP window into the overlay renderer', () => {
-    expect(appSource).not.toContain('import { SopApp }');
-    expect(appSource).toContain("import('./SopApp')");
-    expect(appSource).toContain("resolved === 'sop'");
+  it('has no retired standalone SOP route', () => {
+    expect(appSource).not.toContain("from './SopApp'");
+    expect(isRendererRole('sop-floating')).toBe(true);
+    expect(appSource).not.toContain("resolved === 'sop'");
   });
 
   it('keeps Query free of the SOP tree fixture', () => {

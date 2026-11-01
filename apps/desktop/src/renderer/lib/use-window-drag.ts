@@ -10,6 +10,7 @@ export type WindowDragEnd = {
 };
 
 export type WindowDragGestureOptions = {
+  canStart?: (event: PointerEvent<HTMLElement> | MouseEvent<HTMLElement>) => boolean;
   onPressStart?: () => void;
   onGestureSample?: (sample: FoxDragSample) => void;
   onGestureEnd?: (end: WindowDragEnd) => void;
@@ -141,6 +142,7 @@ export function useWindowDrag(
 
   return {
     onPointerDown(event) {
+      if (gestureRef.current.canStart && !gestureRef.current.canStart(event)) return;
       if (typeof event.button === 'number' && event.button > 0) {
         return;
       }
@@ -226,6 +228,7 @@ export function useWindowDrag(
       }
     },
     onClick(event) {
+      if (gestureRef.current.canStart && !gestureRef.current.canStart(event)) return;
       if (event.ctrlKey && event.detail > 0) {
         event.preventDefault();
         return;
@@ -242,4 +245,22 @@ export function useWindowDrag(
       emitClick();
     },
   };
+}
+
+/** Root blank space may drag; text selection, scrolling and controls keep their pointer stream. */
+export function canStartBackgroundDrag(event: PointerEvent<HTMLElement> | MouseEvent<HTMLElement>): boolean {
+  if (!(event.target instanceof Element)) return false;
+  if (event.target.closest('button, input, textarea, select, a, label, [role="button"], [role="menu"], [role="dialog"], [contenteditable]:not([contenteditable="false"]), [role="checkbox"], [role="radio"], [role="switch"], [role="slider"], [role="tab"], .sop-resize-edge, .query-resize-grip, p, li, h1, h2, h3, h4, h5, h6, .ant-typography, .script-body, .query-sop-script-body')) return false;
+  if (window.getSelection()?.isCollapsed === false
+    || Array.from(event.target.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())) return false;
+  const root = event.currentTarget.getBoundingClientRect();
+  if (event.clientX < root.left + 6 || event.clientX > root.right - 6 || event.clientY < root.top + 6 || event.clientY > root.bottom - 6) return false;
+  let element: Element | null = event.target;
+  while (element && element !== event.currentTarget) {
+    if (element instanceof HTMLElement && element.scrollHeight > element.clientHeight && element.offsetWidth > element.clientWidth) {
+      if (event.clientX >= element.getBoundingClientRect().right - (element.offsetWidth - element.clientWidth)) return false;
+    }
+    element = element.parentElement;
+  }
+  return true;
 }

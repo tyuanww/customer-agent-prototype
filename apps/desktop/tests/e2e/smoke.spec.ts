@@ -18,7 +18,7 @@ import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
 const mainEntry = path.join(desktopRoot, 'out/main/index.js');
-const screenshotDir = path.join(repositoryRoot, '.gstack/qa-reports/screenshots');
+const screenshotDir = process.env.CUSTOMER_AGENT_TEST_OUTPUT ?? path.join(repositoryRoot, '.gstack/qa-reports/screenshots');
 const CLEANSER_QUERY = '澄芽氨基酸洁面怎么用';
 const VERBATIM_TAIL = '合成原文保留尾部空格与换行  \n\n';
 let launchSequence = 0;
@@ -1818,6 +1818,15 @@ test('rejects a second query resize begin and settles the session on COPIED', as
     await waitForHarness(app);
     await fox.getByTestId('fox-button').click();
     await waitForInteractiveQuery(app, query);
+    const navigation = await query.evaluate(async () => {
+      const api = window.customerAgent?.sopWindow;
+      const snapshot = await api?.current?.();
+      if (!api?.navigate || snapshot?.kind !== 'ready') throw new Error('Query workspace missing');
+      return api.navigate({ type: 'results', viewEpoch: snapshot.viewEpoch });
+    });
+    expect(navigation.ok).toBe(true);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-results');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-view-transition', 'stable');
 
     type LayoutDebug = {
       handoffId: number;

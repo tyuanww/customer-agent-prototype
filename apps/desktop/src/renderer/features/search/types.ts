@@ -12,7 +12,8 @@ export type SearchIntent =
   | 'return_policy';
 
 export type SearchAnchor = Readonly<{
-  kind: 'entity' | 'topic';
+  /** Every required-topic must match its canonical term or an alias, including for exact questions. */
+  kind: 'entity' | 'topic' | 'required-topic';
   label: string;
   canonical: string;
   aliases: readonly string[];

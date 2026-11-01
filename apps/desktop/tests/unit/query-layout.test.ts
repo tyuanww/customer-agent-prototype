@@ -88,6 +88,7 @@ describe('query content-hugging layout', () => {
 
   it('fails closed on malicious layout payloads and stale sequences', () => {
     expect(isQueryLayoutRequest({
+      viewEpoch: 1,
       sessionId: 2,
       sequence: 1,
       phase: 'RESULTS',
@@ -95,6 +96,7 @@ describe('query content-hugging layout', () => {
       desiredHeight: 312,
     })).toBe(true);
     expect(isQueryLayoutRequest({
+      viewEpoch: 1,
       sessionId: 2,
       sequence: 1,
       phase: 'RESULTS',
@@ -102,6 +104,7 @@ describe('query content-hugging layout', () => {
       desiredHeight: 312,
     })).toBe(false);
     expect(isQueryLayoutRequest({
+      viewEpoch: 1,
       sessionId: 2,
       sequence: 1,
       phase: 'RESULTS',
@@ -109,6 +112,7 @@ describe('query content-hugging layout', () => {
       desiredHeight: Number.POSITIVE_INFINITY,
     })).toBe(false);
     expect(isQueryLayoutRequest({
+      viewEpoch: 1,
       sessionId: 2,
       sequence: 1,
       phase: 'FOX_IDLE',
@@ -320,6 +324,7 @@ describe('main query layout policy', () => {
     expect(controller).toContain('this.settleQueryResizeSession(true)');
     expect(controller).toContain('if (this.queryResizeSession && !this.queryResizeSession.finished)');
     expect(isQueryLayoutRequest({
+      viewEpoch: 1,
       sessionId: 2,
       sequence: 1,
       phase: 'RESULTS',

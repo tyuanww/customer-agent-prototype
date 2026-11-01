@@ -236,6 +236,10 @@ html[data-role='dashboard'] .dashboard-shell .wb9 .ov-empty {
   text-align: center;
 }
 
+html[data-role='dashboard'] .dashboard-shell :is(.intake-overview-offline, .intake-offline-page) .ov-empty {
+  color: var(--wb-text-2);
+}
+
 html[data-role='dashboard'] .dashboard-shell :is(.wb9, .intake-management) :is(h2, h3, .card-head h3) {
   color: var(--wb-text);
   font-size: var(--wb-text-body);

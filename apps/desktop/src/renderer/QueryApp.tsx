@@ -1,8 +1,14 @@
+import { QuerySopWindowControls } from './features/sop/QuerySopWindowControls';
+import { QueryAntdTheme } from './components/QueryAntdTheme';
+import { QuerySopTasks } from './features/sop/QuerySopTasks';
+import { useQuerySop } from './features/sop/use-query-sop';
+import { QuerySopPanel, type SopTransferRegistration } from './features/sop/QuerySopPanel';
+import { SopRenameDrafts } from './features/sop/sop-rename-drafts';
 import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
 import { PERMISSION_DENIAL_MESSAGE, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
   EMPTY_QUERY_MESSAGE,
@@ -63,10 +69,8 @@ import {
 } from './features/search/query-view';
 import { isImeComposing, shouldSubmitOnEnter } from './lib/ime';
 import { isInteractiveTarget } from './lib/is-interactive-target';
-import { useWindowDrag } from './lib/use-window-drag';
-import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
-import { compactQueryText } from '@shared/query-analyze';
-import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
+import { canStartBackgroundDrag, useWindowDrag } from './lib/use-window-drag';
+import { findSopEntries } from '@shared/sop-entry';
 import type { LibraryDomain } from '@shared/library-delta';
 import { intakeQueryFailure } from '@shared/content-intake-query';
 import {
@@ -82,6 +86,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
   const [query, setQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
   const [results, setResults] = useState<QueryResult[]>([]);
   const [invalidMessage, setInvalidMessage] = useState('');
   const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
@@ -137,6 +142,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
   const copyGenerationRef = useRef(0);
+  const displayedCopyGeneration = useRef<number | null>(null);
   const searchGenerationRef = useRef(0);
   const intakeContextIdRef = useRef<string | null>(null);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
@@ -147,10 +153,60 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const announceGenerationRef = useRef(0);
   const announceReleaseRef = useRef<string | null>(null);
   const [helpStatus, setHelpStatus] = useState<HelpStatus>('待核实');
+  const { snapshot: sopState, snapshotRef: sopStateRef, busy: sopBusy, error: sopError,
+    navigate: navigateSop, open: startSop, restore: restoreSop, close: closeSop,
+    rename: renameSop, recover: recoverSop, cancelPending: cancelSopPending, afterStepOperation: refreshSopAfterOperation } = useQuerySop();
+  const sopTransferGuard = useRef<SopTransferRegistration | null>(null);
+  const registerSopTransferGuard = useCallback((guard: SopTransferRegistration | null) => { sopTransferGuard.current = guard; }, []);
+  useEffect(() => {
+    const api = window.customerAgent?.sopWindow;
+    if (!api?.onShowQueryRequest || !api.showQueryReady) return undefined;
+    const ready = api.showQueryReady;
+    return api.onShowQueryRequest(request => {
+      void (async () => {
+        const guard = sopTransferGuard.current;
+        let accepted = false;
+        try {
+          const current = sopStateRef.current;
+          if (guard && guard.taskId === request.taskId && guard.hostEpoch === request.hostEpoch
+            && current?.kind === 'ready' && current.view.kind === 'sop' && current.view.taskId === request.taskId
+            && current.access.kind === 'executable' && current.access.hostEpoch === request.hostEpoch) {
+            accepted = await guard.prepareTransfer();
+          }
+        } catch { accepted = false; }
+        try { await ready({ ...request, accepted }); }
+        catch { /* Main times out and leaves the current task in place. */ }
+        finally { if (accepted) guard?.finishTransfer(); }
+      })();
+    });
+  }, [sopStateRef]);
+  const readSopCopyGeneration = useCallback(() => sopStateRef.current?.kind === 'ready' ? sopStateRef.current.copyGeneration : 0, [sopStateRef]);
+  const sopSnapshot = sopState?.kind === 'ready' ? sopState : null;
+  const sopProjection = sopSnapshot?.projection ?? null;
+  const sopView = sopSnapshot?.view.kind === 'sop';
+  const showTop3 = sopSnapshot === null || sopSnapshot.view.kind === 'query-results';
+  const sopTasks = sopSnapshot?.tasks ?? [];
+  const [sopStepDrafts] = useState(() => new SopRenameDrafts());
+  const [sopListDrafts] = useState(() => new SopRenameDrafts());
+  const reconciledSopSequence = useRef(0);
+  useEffect(() => {
+    if (!sopSnapshot || sopSnapshot.sequence <= reconciledSopSequence.current) return;
+    reconciledSopSequence.current = sopSnapshot.sequence;
+    const taskIds = new Set(sopSnapshot.tasks.map(task => task.taskId));
+    sopStepDrafts.retain(taskIds);
+    sopListDrafts.retain(taskIds);
+  }, [sopSnapshot, sopStepDrafts, sopListDrafts]);
+  const sopProjectionInvalid = sopState?.kind === 'unavailable';
+  const sopRecoveryBusy = sopBusy;
+  const sopEntryBusy = sopBusy;
   const [sopEntryVisible, setSopEntryVisible] = useState(false);
-  const [sopEntryBusy, setSopEntryBusy] = useState(false);
-  const [sopEntryError, setSopEntryError] = useState<string | null>(null);
-  const [sopEntryResume, setSopEntryResume] = useState(false);
+  const [localSopError, setSopEntryError] = useState<string | null>(null);
+  const sopEntryError = sopError ?? localSopError;
+  const sopEntryResume = false;
+  const cancelSopOpen = cancelSopPending;
+  const cancelSopRecovery = cancelSopPending;
+  const sopActiveRef = useRef(false);
+  sopActiveRef.current = sopTasks.length > 0;
   const [reportedScriptIds, setReportedScriptIds] = useState<ReadonlySet<string>>(() => new Set());
   const [reportError, setReportError] = useState('');
   const lastProductQueryRef = useRef<{
@@ -196,6 +252,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const finishCollapseContent = useCallback(() => {
     setPhase('SEARCH_INPUT');
+    setSubmittedQuery(null);
     setResults([]);
     setReportedScriptIds(new Set());
     setReportError('');
@@ -296,6 +353,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     reportHandoffMilestone(activeHandoffIdRef.current, 'open-finished');
   }, [focusQueryInput, reportHandoffMilestone]);
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const settle = () => { if (media.matches && sopStateRef.current?.kind === 'ready' && sopStateRef.current.transition?.stage === 'animating') navigateSop({ type: 'view-finished' }); };
+    media.addEventListener('change', settle);
+    settle();
+    return () => media.removeEventListener('change', settle);
+  }, [navigateSop, sopStateRef]);
+
   const reportPhase = useCallback((next: OverlayPhase, resultCount: ResultCount = 0) => {
     setPhase(next);
     resultCountRef.current = resultCount;
@@ -309,21 +374,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
   }, []);
 
-  const requestQueryLayout = useCallback((phase: OverlayPhase, resultCount: ResultCount) => {
-    if (
-      !isQueryContentLayoutPhase(phase)
-      || opening
-      || closing
-      || !resizeFinishedRef.current
-    ) {
-      return;
-    }
-    const api = window.customerAgent;
-    const report = api?.reportQueryLayout;
-    if (!report) {
-      setLayoutReady(true);
-      return;
-    }
+  const measureQueryHeight = useCallback(() => {
     const shell = shellRef.current;
     const pane = resultPaneRef.current;
     const content = resultContentRef.current;
@@ -331,9 +382,17 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const statusBanner = statusBannerRef.current;
     const contentBanner = contentUpdatedBannerRef.current;
     const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
+    const tasks = shell?.querySelector<HTMLElement>('.query-sop-tasks');
+    const taskList = tasks?.querySelector<HTMLElement>('.query-sop-task-list');
+    const taskListLimit = taskList ? Number.parseFloat(getComputedStyle(taskList).getPropertyValue('--query-sop-task-list-limit')) : NaN;
+    // Measure the list before the current viewport clips it, while preserving its configured scroll limit.
+    const hiddenTaskHeight = taskList
+      ? Math.max(0, Math.min(taskList.scrollHeight, Number.isFinite(taskListLimit) ? taskListLimit : taskList.scrollHeight) - taskList.clientHeight)
+      : 0;
     const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
     const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
-    const lastContentBottom = maxContentBottom([
+    const currentContentBottom = maxContentBottom([
+      tasks,
       lastCard,
       lastCopy,
       shortcutBanner,
@@ -342,6 +401,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       content?.lastElementChild ?? null,
       pane?.querySelector('[data-query-context]') ?? null,
     ]);
+    const lastContentBottom = currentContentBottom > 0 ? currentContentBottom + hiddenTaskHeight : 0;
     const panePad = pane
       ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
       : 0;
@@ -351,8 +411,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const intrinsic = composeQueryDesiredHeight({
       capsuleHeight: capsule?.offsetHeight ?? QUERY_INPUT_HEIGHT,
       bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0) + (contentBanner?.offsetHeight ?? 0),
-      contentScrollHeight: content?.scrollHeight ?? 0,
-      chromeExtra: paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX,
+      contentScrollHeight: (showTop3 ? content?.scrollHeight ?? 0 : 0) + (tasks?.offsetHeight ?? 0) + hiddenTaskHeight,
+      chromeExtra: pane ? paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX : 0,
     });
     const hugged = shell
       ? measureQueryHugHeight({
@@ -366,9 +426,29 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           lastContentBottom: lastContentBottom > 0 ? lastContentBottom : undefined,
         })
       : intrinsic;
-    const measuredFromDom = lastContentBottom > 0 ? hugged : intrinsic;
+    return lastContentBottom > 0 ? hugged : intrinsic;
+  }, [showTop3]);
+
+  const requestQueryLayout = useCallback((phase: OverlayPhase, resultCount: ResultCount) => {
+    if (
+      (phase === 'FOX_IDLE' || sopView || (sopSnapshot === null && !isQueryContentLayoutPhase(phase)))
+      || sopSnapshot?.transition
+      || opening
+      || closing
+      || !resizeFinishedRef.current
+    ) {
+      return;
+    }
+    const api = window.customerAgent;
+    const report = api?.reportQueryLayout;
+    if (!report) {
+      setLayoutReady(true);
+      return;
+    }
+    const measuredFromDom = measureQueryHeight();
     const request: QueryLayoutRequest = {
       sessionId: activeHandoffIdRef.current,
+      viewEpoch: sopSnapshot?.viewEpoch ?? 1,
       sequence: ++layoutSequenceRef.current,
       phase,
       resultCount,
@@ -392,7 +472,30 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setQueryHeight(ack.height);
       setLayoutReady(true);
     }).catch(() => undefined);
-  }, [closing, opening]);
+  }, [closing, opening, measureQueryHeight, sopView, sopSnapshot]);
+
+  const requestTaskLayout = useCallback(() => {
+    requestQueryLayout(phaseRef.current, resultCountRef.current);
+  }, [requestQueryLayout]);
+
+  useLayoutEffect(() => {
+    if (!sopSnapshot || opening || closing || parked) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (sopSnapshot.transition?.stage === 'preparing') {
+        navigateSop({ type: 'view-ready', desiredHeight: sopView ? sopSnapshot.transition.to.height : Math.max(88, measureQueryHeight()), reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+      } else if (!sopView && !sopSnapshot.transition) {
+        requestQueryLayout(phaseRef.current, resultCountRef.current);
+      }
+    });
+    return () => { window.cancelAnimationFrame(frame); };
+  }, [sopSnapshot, sopView, opening, closing, parked, measureQueryHeight, requestQueryLayout, navigateSop, sopTasks.length, sopEntryError]);
+
+  useEffect(() => {
+    if (sopSnapshot?.view.kind === 'query-home' && !sopSnapshot.transition && !opening && !closing && !parked) {
+      inputRef.current?.focus();
+    }
+  }, [sopSnapshot?.view.kind, sopSnapshot?.viewEpoch, sopSnapshot?.transition, opening, closing, parked]);
+
 
   useEffect(() => {
     const api = window.customerAgent;
@@ -417,6 +520,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
     return api.onOverlayCommand((command) => {
       if (command.type === 'prepare-search') {
+        cancelSopOpen();
+        cancelSopRecovery();
         cancelScheduledOpening();
         cancelScheduledInputFocus();
         cancelScheduledCollapseContent(true);
@@ -454,6 +559,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setClosing(false);
           setPhase('SEARCH_INPUT');
           setQuery('');
+          setSubmittedQuery(null);
           setResults([]);
           setInvalidMessage('');
           setErrorMessage('');
@@ -506,6 +612,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         return;
       }
       if (command.type === 'collapse') {
+        const animate = command.animate && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         cancelScheduledOpening();
         cancelScheduledInputFocus();
         cancelScheduledCollapseContent(false);
@@ -535,8 +642,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setOpening(false);
           // Animated closes keep the shared fox visible until the shell reaches
           // its handoff frame; no-motion closes park immediately.
-          setParked(!command.animate);
-          setClosing(command.animate);
+          setParked(!animate);
+          setClosing(animate);
         });
         cancelScheduledResultFocus();
         searchGenerationRef.current += 1;
@@ -558,10 +665,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         pendingCopyRef.current = null;
         composingRef.current = false;
         setQuery('');
+        cancelSopOpen();
+        cancelSopRecovery();
+        setSubmittedQuery(null);
         setCopying(false);
         setSearching(false);
         setInvalidMessage('');
-        if (command.animate) {
+        if (animate) {
           collapseCleanupTimerRef.current = window.setTimeout(() => {
             collapseCleanupTimerRef.current = null;
             finishCollapseContent();
@@ -607,6 +717,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     });
   }, [
     intake,
+    cancelSopOpen,
+    cancelSopRecovery,
     cancelScheduledCollapseContent,
     cancelScheduledInputFocus,
     cancelScheduledOpening,
@@ -755,6 +867,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const cancelPendingCopy = useCallback(() => {
     copyGenerationRef.current += 1;
+    displayedCopyGeneration.current = null;
     copyInFlightRef.current = false;
     pendingCopyRef.current = null;
     if (dismissTimerRef.current !== null) {
@@ -765,11 +878,20 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setCopiedRank(null);
   }, []);
 
+  useEffect(() => {
+    if (!sopSnapshot || displayedCopyGeneration.current === null || sopSnapshot.copyGeneration <= displayedCopyGeneration.current) return;
+    cancelPendingCopy();
+    setErrorMessage('');
+    if (phaseRef.current === 'COPIED') reportPhase('RESULTS', results.length as ResultCount);
+  }, [sopSnapshot, cancelPendingCopy, reportPhase, results.length]);
+
   const changeQuery = useCallback(
     (nextQuery: string) => {
       cancelScheduledResultFocus();
       cancelPendingSearch();
       cancelPendingCopy();
+      cancelSopOpen();
+
       if (phase === 'EMPTY') {
         recordNoHitExit();
       } else {
@@ -784,7 +906,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         reportPhase(intake ? 'RESULTS' : 'SEARCH_INPUT');
       }
     },
-    [intake, cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, phase, recordNoHitExit, reportPhase],
+    [intake, cancelPendingCopy, cancelPendingSearch, cancelScheduledResultFocus, cancelSopOpen, phase, recordNoHitExit, reportPhase],
   );
 
   const refreshAnnounce = useCallback(async (sessionEpoch: number) => {
@@ -986,8 +1108,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const resetIntakeView = useCallback(() => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
-    if (phaseRef.current !== 'FOX_IDLE') reportPhase('RESULTS');
-  }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
+    if (phaseRef.current !== 'FOX_IDLE') { navigateSop({ type: 'results' }); reportPhase('RESULTS'); }
+  }, [cancelPendingSearch, cancelPendingCopy, navigateSop, reportPhase]);
   const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
     productState?.sessionEpoch ?? 0, resetIntakeView);
   useEffect(() => {
@@ -1003,6 +1125,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const runSearch = useCallback(() => {
     if (intake) {
+      navigateSop({ type: 'results' });
       if (!(productState?.ok && productState.signedIn)) return;
       const api = window.customerAgent?.intakeQuery;
       if (!api) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); return; }
@@ -1021,6 +1144,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (blocked) {
         setErrorMessage(blocked); reportPhase('ERROR'); return;
       }
+      setSubmittedQuery(text);
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       const generation = ++searchGenerationRef.current;
       const contextId = crypto.randomUUID(); intakeContextIdRef.current = contextId;
@@ -1037,6 +1161,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return;
     }
     if (window.customerAgent?.product && !(productState?.ok && !productState.enabled)) {
+      navigateSop({ type: 'results' });
       if (!(productState?.ok && productState.signedIn)) {
         return;
       }
@@ -1051,6 +1176,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (!api || !queryText || [...queryText].length > 500) {
         setResults([]); setErrorMessage('请输入最多 500 字的客户问题。'); reportPhase('ERROR'); return;
       }
+      setSubmittedQuery(queryText);
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
         sessionNoticeRef.current = null;
@@ -1094,7 +1220,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const liveQuery = inputRef.current?.value ?? query;
     const trimmed = liveQuery.trim();
     if (!trimmed) {
+      navigateSop({ type: 'home' });
       setResults([]);
+      setSubmittedQuery(null);
       setCopiedRank(null);
       setInvalidMessage(EMPTY_QUERY_MESSAGE);
       reportPhase(reduceOverlay(phase, { type: 'QUERY_BLANK' }));
@@ -1102,15 +1230,19 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
 
     if (liveQuery.length > MAX_QUERY_CHARS) {
+      navigateSop({ type: 'home' });
       setResults([]);
+      setSubmittedQuery(null);
       setCopiedRank(null);
       setInvalidMessage(QUERY_TOO_LONG_MESSAGE);
       reportPhase(reduceOverlay(phase, { type: 'QUERY_BLANK' }));
       return;
     }
 
+    navigateSop({ type: 'results' });
     setInvalidMessage('');
     setErrorMessage('');
+    setSubmittedQuery(trimmed);
     cancelPendingCopy();
     cancelScheduledResultFocus();
     reportPhase('SEARCH_INPUT');
@@ -1156,7 +1288,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
+  }, [navigateSop, cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
 
   const copyScript = useCallback(
     async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
@@ -1197,13 +1329,22 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           return;
         }
         if (result.ok) {
+          const committedGeneration = 'copyGeneration' in result && typeof result.copyGeneration === 'number' ? result.copyGeneration : null;
+          const currentSop = sopStateRef.current;
+          if (committedGeneration !== null && currentSop?.kind === 'ready' && committedGeneration < currentSop.copyGeneration) return;
+          displayedCopyGeneration.current = committedGeneration;
           setCopiedRank(script.rank);
           setErrorMessage(copySuccessErrorMessage(result));
           reportPhase('COPIED', resultCount);
           dismissTimerRef.current = window.setTimeout(() => {
             dismissTimerRef.current = null;
             if (copyGeneration === copyGenerationRef.current) {
-              void window.customerAgent?.dismiss(true);
+              if (sopActiveRef.current) {
+                setCopiedRank(null);
+                reportPhase('RESULTS', resultCount);
+              } else {
+                void window.customerAgent?.dismiss(true);
+              }
             }
           }, COPY_FEEDBACK_MS);
           return;
@@ -1223,7 +1364,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     },
-    [phase, reportPhase, results.length, placeholderValues, productState],
+    [phase, reportPhase, results.length, placeholderValues, productState, sopStateRef],
   );
 
   const openDashboardWindow = useCallback(() => {
@@ -1269,82 +1410,28 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     openDashboardWindow();
   }, [openDashboardWindow, productState, sessionAction]);
 
+  const sopEntries = useMemo(
+    () => (submittedQuery ? findSopEntries(submittedQuery) : []),
+    [submittedQuery],
+  );
+
   useEffect(() => {
     let cancelled = false;
-    const allergyHit = !intake && (phase === 'RESULTS' || phase === 'COPIED')
-      && results.length > 0
-      && isAllergySopEntry(compactQueryText(query));
-    if (!allergyHit) {
-      setSopEntryVisible(false);
-      setSopEntryResume(false);
-      setSopEntryError(null);
-      return undefined;
-    }
-    const api = window.customerAgent?.sopWindow;
-    if (!api?.entryAvailable) {
-      setSopEntryVisible(false);
-      setSopEntryResume(false);
-      return undefined;
-    }
-    void api.entryAvailable().then((ok) => {
-      if (!cancelled) {
-        setSopEntryVisible(ok === true);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setSopEntryVisible(false);
-      }
-    });
-    void api.resumeAvailable?.().then((ok) => {
-      if (!cancelled) {
-        setSopEntryResume(ok === true);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setSopEntryResume(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [intake, phase, query, results.length]);
+    const available = !intake && (phase === 'RESULTS' || phase === 'COPIED' || phase === 'EMPTY') && sopEntries.length > 0;
+    if (!available) { setSopEntryVisible(false); return; }
+    const read = window.customerAgent?.sopWindow?.entryAvailable;
+    if (!read) { setSopEntryVisible(false); return; }
+    void read().then(ok => { if (!cancelled) setSopEntryVisible(ok); })
+      .catch(() => { if (!cancelled) setSopEntryVisible(false); });
+    return () => { cancelled = true; };
+  }, [intake, phase, sopEntries]);
 
-  useEffect(() => {
-    const onFocus = () => {
-      const resume = intake ? undefined : window.customerAgent?.sopWindow?.resumeAvailable;
-      if (!resume) {
-        return;
-      }
-      void resume().then((ok) => {
-        setSopEntryResume(ok === true);
-      }).catch(() => {
-        setSopEntryResume(false);
-      });
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [intake]);
-
-  const openAllergySop = useCallback(() => {
-    const api = window.customerAgent?.sopWindow;
-    if (!api || sopEntryBusy) {
-      setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
-      return;
-    }
-    setSopEntryBusy(true);
+  const openSop = useCallback((requestedSceneId?: string) => {
+    const sceneId = requestedSceneId ?? (sopEntries.length === 1 ? sopEntries[0]?.sceneId : undefined);
+    if (!sceneId) { setSopEntryError('请选择要执行的流程'); return; }
     setSopEntryError(null);
-    void api.open(ALLERGY_SOP_SCENE_ID).then((result) => {
-      if (!result.ok) {
-        setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
-        return;
-      }
-      setSopEntryResume(true);
-    }).catch(() => {
-      setSopEntryError(SOP_OPEN_FAILURE_MESSAGE);
-    }).finally(() => {
-      setSopEntryBusy(false);
-    });
-  }, [sopEntryBusy]);
+    startSop(sceneId);
+  }, [startSop, sopEntries]);
 
   const retry = useCallback(() => {
     if (dashboardOpenFailedRef.current) {
@@ -1359,8 +1446,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   }, [copyScript, errorMessage, openDashboard, runSearch]);
 
   const dismiss = useCallback(() => {
-    void window.customerAgent?.dismiss(true);
-  }, []);
+    cancelSopOpen();
+    cancelSopRecovery();
+    return window.customerAgent?.dismiss(true) ?? Promise.resolve();
+  }, [cancelSopOpen, cancelSopRecovery]);
 
   const runHelp = useCallback(async (action: HelpAction, openedStatus: HelpStatus, failedMessage: string) => {
     const last = lastProductQueryRef.current;
@@ -1401,9 +1490,19 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     dismiss,
   );
 
+  const backgroundDrag = useWindowDrag((dx, dy, finished) => {
+    void window.customerAgent?.moveFoxBy(dx, dy, finished);
+  }, () => {}, { canStart: canStartBackgroundDrag });
+
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (parked || closing || !queryInteractiveRef.current) {
+        return;
+      }
+      if (sopView) return;
+      if (event.key === 'F7' && showTop3 && sopEntryVisible && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && !isImeComposing(event)) {
+        event.preventDefault();
+        openSop();
         return;
       }
       if (event.key === 'Escape') {
@@ -1412,6 +1511,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         return;
       }
       if (
+        !showTop3 ||
         phase !== 'RESULTS' ||
         searchInFlightRef.current ||
         searching ||
@@ -1439,13 +1539,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     };
     window.addEventListener('keydown', onWindowKeyDown);
     return () => window.removeEventListener('keydown', onWindowKeyDown);
-  }, [closing, copyScript, copying, dismiss, parked, phase, results, searching]);
+  }, [closing, copyScript, copying, dismiss, parked, phase, results, searching, sopView, showTop3, sopEntryVisible, sopProjection, openSop]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (parked || closing || !queryInteractiveRef.current) {
       event.preventDefault();
       return;
     }
+    if (sopView) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       dismiss();
@@ -1459,7 +1560,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   };
 
   const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
-  const expanded = showQueryResizeGrip || phase === 'COPIED';
+  const expanded = showQueryResizeGrip || phase === 'COPIED' || sopProjectionInvalid;
   const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
   const showScopeFields = Boolean(
     window.customerAgent?.productSearch
@@ -1667,6 +1768,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const foxVisualState = queryFoxVisualState(searching, phase);
 
   return (
+    <QueryAntdTheme>
     <div
       className={queryShellClassName({
         expanded,
@@ -1675,13 +1777,22 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         closing,
         layoutReady,
       })}
-      style={queryHandoffCssVars({
-        geometry: handoffGeometry,
-        foxTransform: handoffFoxTransform,
-        anchor,
-      })}
+      style={{ ...queryHandoffCssVars({ geometry: handoffGeometry, foxTransform: handoffFoxTransform, anchor }),
+        ...(sopSnapshot?.transition ? {
+          '--query-view-width': `${sopSnapshot.transition.to.width}px`,
+          '--query-view-height': `${sopSnapshot.transition.to.height}px`,
+          '--query-view-from-width': `${sopSnapshot.transition.from.width}px`,
+          '--query-view-from-height': `${sopSnapshot.transition.from.height}px`,
+        } : {}),
+      }}
       ref={shellRef}
       data-testid="query-shell"
+      data-sop-view={sopView ? 'true' : 'false'}
+      data-sop-active={sopView ? 'true' : 'false'}
+      data-workspace-view={sopSnapshot?.view.kind}
+      data-view-transition={sopSnapshot?.transition?.stage ?? 'stable'}
+      data-view-epoch={sopSnapshot?.viewEpoch}
+      {...backgroundDrag}
       data-phase={phase}
       data-window-role="query"
       data-anchor={anchor}
@@ -1711,6 +1822,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           if (event.target !== event.currentTarget) {
             return;
           }
+          if (event.animationName === 'query-view-change') navigateSop({ type: 'view-finished' });
           if (event.animationName === 'query-shell-unfold') {
             finishOpening();
           }
@@ -1725,9 +1837,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       >
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
+          hidden={sopView && !parked && !opening && !closing}
           intake={intake}
           scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry" disabled={!signedInSession}
-            onClick={() => { setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', Math.min(3, results.length) as ResultCount); }}>筛选</button> : null}
+            onClick={() => { navigateSop({ type: 'results' }); setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', Math.min(3, results.length) as ResultCount); }}>筛选</button> : null}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}
@@ -1751,7 +1864,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           searching={searching}
           scopePending={intake && intakeShops.busy}
           signedIn={Boolean(productState?.ok && productState.signedIn)}
-          inputIdle={parked || closing}
+          inputIdle={parked || closing || sopView}
           onCancelScheduledResultFocus={cancelScheduledResultFocus}
           onCancelScheduledInputFocus={cancelScheduledInputFocus}
           onChangeQuery={changeQuery}
@@ -1779,19 +1892,31 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           onSearch={runSearch}
         />
 
-        {shortcutFailed ? (
+        {shortcutFailed && !sopView ? (
           <p ref={shortcutBannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
             {shortcutHint || '请点击狐狸头打开。'}
           </p>
         ) : null}
-        <QueryAnnounceBanner
+        {!sopView ? <QueryAnnounceBanner
           invalid={announceInvalid}
           domains={contentUpdatedDomains}
           contentUpdatedBannerRef={contentUpdatedBannerRef}
           onDismiss={dismissContentUpdated}
-        />
+        /> : null}
 
-        {expanded ? (
+        {!sopView ? <QuerySopTasks tasks={sopTasks} busy={sopEntryBusy} error={sopEntryError}
+          drafts={sopListDrafts} unavailable={sopProjectionInvalid} onRestore={restoreSop} onClose={closeSop} onRename={renameSop} onRecover={recoverSop} onLayoutChange={requestTaskLayout} /> : null}
+        {sopProjection && sopSnapshot && window.customerAgent?.sopWindow ? <QuerySopWindowControls
+          api={window.customerAgent.sopWindow} taskId={sopProjection.taskId} hostEpoch={sopSnapshot.access.kind === 'executable' ? sopSnapshot.access.hostEpoch : null} mode={sopSnapshot.mode}>
+          {pinControl => <QuerySopPanel key={sopProjection.taskId} projection={sopProjection} task={sopTasks.find(item => item.taskId === sopProjection.taskId)} hostEpoch={sopSnapshot.access.kind === 'executable' ? sopSnapshot.access.hostEpoch : null} api={window.customerAgent!.sopWindow!} drafts={sopStepDrafts} copyGeneration={sopSnapshot.copyGeneration} readCopyGeneration={readSopCopyGeneration} onOperationSuccess={refreshSopAfterOperation}
+            windowControls={pinControl} onTransferGuard={registerSopTransferGuard} onCollapse={async () => {
+              if (sopSnapshot.access.kind !== 'executable' || !await window.customerAgent?.sopWindow?.windowIntent?.({
+                type: 'hide', taskId: sopProjection.taskId, hostEpoch: sopSnapshot.access.hostEpoch,
+              })) throw new Error('SOP collapse failed');
+            }}
+            onSearch={() => navigateSop({ type: 'home' })} />}
+        </QuerySopWindowControls> : null}
+        {expanded && !sopView && showTop3 ? (
           <QueryResultsPane
             contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
               onToggle={() => { setFiltersOpen(current => !current); setLayoutReady(false); }}
@@ -1816,9 +1941,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
             helpStatus={helpStatus}
             sopEntryVisible={sopEntryVisible}
             sopEntryBusy={sopEntryBusy}
-            sopEntryError={sopEntryError}
-            sopEntryResume={sopEntryResume}
-            onOpenSop={openAllergySop}
+            sopEntryError={null}
+            sopProjectionInvalid={false}
+            sopRecoveryBusy={sopRecoveryBusy}
+            onRecoverSop={recoverSop}
+            sopEntryResume={sopEntryResume && sopProjection !== null}
+            sopEntries={sopEntries}
+            onOpenSop={openSop}
             reportedScriptIds={reportedScriptIds}
             reportError={reportError}
             onReportInaccuracy={(script) => {
@@ -1874,7 +2003,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
             onLeaveNoHit={!intake && window.customerAgent?.productHelp ? leaveNoHit : undefined}
           />
         ) : null}
-        {showQueryResizeGrip ? (
+        {showQueryResizeGrip && !sopView && showTop3 ? (
           <QueryResizeGrip
             gripRef={resizeGripRef}
             activePointerIdRef={resizePointerRef}
@@ -1888,5 +2017,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         ) : null}
       </div>
     </div>
+    </QueryAntdTheme>
   );
 }

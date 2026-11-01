@@ -544,6 +544,7 @@ contextBridge.exposeInMainWorld('dashboardIntake', {
 
 contextBridge.exposeInMainWorld('dashboardWorkbench', {
   mode: () => ipcRenderer.invoke('dashboard:workbench-mode'),
+  sopImages: () => ipcRenderer.invoke('dashboard:sop-manual-images'),
 });
 
 contextBridge.exposeInMainWorld('dashboardDesk', {

@@ -1,5 +1,7 @@
 import { Avatar, Button, Dropdown } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { SopManual } from './features/sop/SopManual';
+import { SYNTHETIC_SOP_TREES } from '@shared/synthetic-sops';
 import {
   intakeDestinationItem,
   intakeSidebarItems,
@@ -128,6 +130,7 @@ function DashboardWorkspace() {
     }).catch(() => { if (alive) setWorkbenchMode(null); });
     return () => { alive = false; };
   }, []);
+  const syntheticManual = workbenchMode === 'synthetic-offline';
   const permissionsOpen = canOpenPermissions(snapshot);
   const grantAllowed = canGrant(snapshot);
   const sopUpload = canUploadSop(snapshot);
@@ -138,7 +141,7 @@ function DashboardWorkspace() {
   const [sessionPhase, setSessionPhase] = useState<'pending' | 'signed-out' | 'ready'>(
     () => (window.dashboardContent === undefined ? 'ready' : 'pending'),
   );
-  const jobKnown = sessionPhase === 'ready';
+  const jobKnown = syntheticManual || sessionPhase === 'ready';
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
   const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
   const sessionEpoch = useRef(0);
@@ -829,7 +832,7 @@ function DashboardWorkspace() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
-          {renderIntakeDestinations({
+          {syntheticManual && active === 'sop' ? <SopManual trees={SYNTHETIC_SOP_TREES} /> : renderIntakeDestinations({
             active,
             canOpenPermissions: permissionsOpen,
             canGrant: grantAllowed,

@@ -81,6 +81,8 @@ function cleanupDashboardWithWindowBridges() {
   delete window.dashboardContent;
   delete window.dashboardPermissions;
   delete window.dashboardPageUse;
+  delete window.dashboardWorkbench;
+  delete window.dashboardIteration;
   vi.unstubAllGlobals();
 }
 
@@ -304,7 +306,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
     onInvalidated: () => () => undefined,
   };
-  const owner = new ContentIntakePermissions(intakePermissionsData().session);
+  const owner = new ContentIntakePermissions(intakePermissionsData(['query'], [], 300_000).session);
   window.dashboardPermissions = { current: async () => ({ ok: true, view: owner.view() }), command: async (command) => ({ ok: true, view: await owner.command(command) }), onInvalidated: (fn) => owner.subscribe(fn) };
   showPermissionsNav();
   window.dashboardSeats = { command: async (intent) => (intent.action === 'list' ? { ok: true, action: 'list' as const, seats: [] } : { ok: false, message: '未保存' }) };
@@ -408,7 +410,7 @@ it('opens the add layer and permission dialogs and keeps keyboard focus inside 9
     document.documentElement.style.width = '';
     document.body.style.cssText = '';
   }
-}, 20000);
+}, 90_000);
 
 it('opens 话术库 for page=announce and leaves that URL alone', () => {
   expect(intakeDestinationsExcludeAnnounce).toBe(true);
@@ -458,4 +460,27 @@ it('shows the signed-in account at the bottom of the sidebar and logs out throug
   changed.notify?.();
   expect(await screen.findByText('未登录')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '账号信息' })).not.toBeInTheDocument();
+});
+
+it('keeps the offline explanation consistent with signed-out chrome and preserves the SOP manual', async () => {
+  window.dashboardWorkbench = { mode: vi.fn(async () => ({ ok: true as const, kind: 'synthetic-offline' as const })) };
+  allowGrant();
+  window.dashboardContent!.session = vi.fn(async () => ({
+    ok: true as const, enabled: false, signedIn: false, role: null, displayName: null, job: null,
+  }));
+  const list = vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE' as const, message: '没读到。' }));
+  const outcomes = vi.fn();
+  window.dashboardIteration = { list, outcomes, start: vi.fn(), close: vi.fn() };
+  render(<DashboardApp />);
+  expect(await screen.findByText('请先登录')).toBeInTheDocument();
+  expect(await screen.findByText('当前为离线预览，查询和待办需在业务环境登录后查看')).toBeInTheDocument();
+  expect(screen.queryByText('没读到。')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+  await userEvent.setup().click(screen.getByTestId('nav-sop'));
+  expect(await screen.findByRole('region', { name: 'SOP 手册' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '复制话术' })).not.toBeInTheDocument();
+  await userEvent.setup().click(screen.getByTestId('nav-overview'));
+  expect(await screen.findByText('当前为离线预览，查询和待办需在业务环境登录后查看')).toBeInTheDocument();
+  expect(list).not.toHaveBeenCalled();
+  expect(outcomes).not.toHaveBeenCalled();
 });

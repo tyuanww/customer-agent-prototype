@@ -1,3 +1,4 @@
+import type { QuerySopNavigation, QuerySopPresentation } from '../shared/query-sop-window';
 import {
   BrowserWindow,
   globalShortcut,
@@ -120,8 +121,27 @@ export type OverlayControllerOptions = {
   rendererDevServerUrl?: string;
   onDispose?: () => void;
   onDashboardShown?: () => void;
+  onQueryViewChanged?: () => void;
+  onQueryDismiss?: () => void;
+  onQueryShown?: () => void;
+  onQueryDestroyed?: () => void;
   runningPoint?: RunningPoint;
 };
+
+type OrdinaryQueryView = Readonly<{ kind: 'query-home' | 'query-results' }>;
+export type OrdinaryQueryPresentation = Omit<QuerySopPresentation, 'view'> & { view: OrdinaryQueryView };
+
+/** A native Query surface only. Execution assignment and preferred sizes belong to its caller. */
+export type QuerySopSlot = Readonly<{
+  getBounds(): Rect | null;
+  getWorkArea(): Rect;
+  prepare(): boolean;
+  applyBounds(bounds: Rect): boolean;
+  show(): boolean;
+  hide(): boolean;
+  failClosed(): boolean;
+  restore(): boolean;
+}>;
 
 export class OverlayController {
   phase: OverlayPhase = 'FOX_IDLE';
@@ -182,6 +202,10 @@ export class OverlayController {
   private readonly preloadPath: string;
   private readonly onDispose?: () => void;
   private readonly onDashboardShown?: () => void;
+  private readonly onQueryViewChanged?: () => void;
+  private readonly onQueryDismiss?: () => void;
+  private readonly onQueryShown?: () => void;
+  private readonly onQueryDestroyed?: () => void;
   readonly dashboardEnabled: boolean;
   readonly rendererDevServerUrl: string | undefined;
   private readonly runningLine: string;
@@ -196,6 +220,10 @@ export class OverlayController {
     this.rendererDevServerUrl = options.rendererDevServerUrl;
     this.onDispose = options.onDispose;
     this.onDashboardShown = options.onDashboardShown;
+    this.onQueryViewChanged = options.onQueryViewChanged;
+    this.onQueryDismiss = options.onQueryDismiss;
+    this.onQueryShown = options.onQueryShown;
+    this.onQueryDestroyed = options.onQueryDestroyed;
   }
 
   isDisposed(): boolean {
@@ -351,7 +379,10 @@ export class OverlayController {
     }
     this.restorePreviousAppOnIdle = restorePreviousApp === true;
     this.finishOrClearQueryDrag();
+    this.finishQueryViewTransition();
+    const wasOpen = isOpenPhase(this.phase);
     this.applyEvent({ type: 'DISMISS' });
+    if (wasOpen) this.onQueryDismiss?.();
   }
 
   toggle(): void {
@@ -504,12 +535,195 @@ export class OverlayController {
     return this.trustedContents().some((contents) => contents.id === this.dashboard?.webContents.id);
   }
 
+  private queryView: OrdinaryQueryView = { kind: 'query-home' };
+  private viewEpoch = 1;
+  private viewTransition: QuerySopPresentation['transition'] = null;
+  private viewTimer: ReturnType<typeof setTimeout> | null = null;
+  private homeHeight = QUERY_INPUT_HEIGHT;
+  private sopSlotActive = false;
+  private readonly nativeSopSlot: QuerySopSlot = {
+    getBounds: () => this.queryWindowBounds(),
+    getWorkArea: () => this.querySlotWorkArea(),
+    prepare: () => this.prepareQuerySlot(),
+    applyBounds: (bounds) => this.applyQuerySlotBounds(bounds),
+    show: () => this.showQuerySlot(),
+    hide: () => {
+      if (!this.live(this.query)) return false;
+      this.dismiss(true);
+      this.onQueryViewChanged?.();
+      return true;
+    },
+    failClosed: () => {
+      const query = this.query;
+      if (!query || query.isDestroyed()) return true;
+      try { this.dismiss(true); } catch { /* Native hiding still runs if the ordinary transition fails. */ }
+      try { query.hide(); if (!query.isVisible()) return true; }
+      catch { /* Destroy the window if its native hide fails. */ }
+      try {
+        query.destroy();
+        if (!query.isDestroyed()) return false;
+        try { this.onQueryDestroyed?.(); }
+        catch { console.warn('[sop-presentation] Query failure notice could not be shown'); }
+        return true;
+      }
+      catch { return false; }
+    },
+    restore: () => this.restoreQuerySlot(),
+  };
+
+  queryPresentation(): OrdinaryQueryPresentation {
+    return { view: this.queryView, viewEpoch: this.viewEpoch, transition: this.viewTransition };
+  }
+
+  querySopSlot(): QuerySopSlot {
+    return this.nativeSopSlot;
+  }
+
+  private querySlotWorkArea(): Rect {
+    const bounds = this.queryWindowBounds();
+    if (!bounds) return this.currentWorkArea();
+    return screen.getDisplayNearestPoint({
+      x: Math.round(bounds.x + bounds.width / 2),
+      y: Math.round(bounds.y + bounds.height / 2),
+    }).workArea;
+  }
+
+  private prepareQuerySlot(): boolean {
+    if (!this.live(this.query)) return false;
+    this.finishQueryViewTransition(false);
+    this.settleQueryResizeSession(true);
+    this.clearQueryLayoutFallback();
+    this.clearPendingQueryBlur();
+    this.sopSlotActive = true;
+    this.viewEpoch += 1;
+    this.onQueryViewChanged?.();
+    return true;
+  }
+
+  private applyQuerySlotBounds(bounds: Rect): boolean {
+    const query = this.query;
+    if (!this.sopSlotActive || !this.live(query)
+      || ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite)
+      || bounds.width <= 0 || bounds.height <= 0) return false;
+    query.setBounds(clampRectToWorkArea({
+      x: Math.round(bounds.x), y: Math.round(bounds.y),
+      width: Math.max(1, Math.round(bounds.width)), height: Math.max(1, Math.round(bounds.height)),
+    }, this.querySlotWorkArea()));
+    // SOP geometry belongs to its slot; the ordinary query keeps its fox anchor.
+    return true;
+  }
+
+  private showQuerySlot(): boolean {
+    const query = this.query;
+    if (!this.sopSlotActive || !this.live(query)) return false;
+    if (!isOpenPhase(this.phase)) { this.openSearch(); return true; }
+    this.clearPendingQueryBlur();
+    const preparedBounds = query.getBounds();
+    this.setQueryFocusable(true);
+    query.show();
+    query.setBounds(preparedBounds);
+    this.phase = this.phase === 'FOX_IDLE' ? 'SEARCH_INPUT' : this.phase;
+    if (this.live(this.fox)) this.fox.hide();
+    this.focusQueryWindow();
+    if (this.isWindowVisible(query)) this.onQueryShown?.();
+    this.onQueryViewChanged?.();
+    return true;
+  }
+
+  private restoreQuerySlot(): boolean {
+    const query = this.query;
+    if (!this.live(query)) return false;
+    if (!this.sopSlotActive) return true;
+    const area = this.querySlotWorkArea();
+    const from = query.getBounds(), to = this.currentQuerySize(area);
+    this.sopSlotActive = false;
+    if (this.chromeHandoffMode === 'closing') {
+      // The close handshake already sampled this frame. Releasing the slot must not move that source.
+    } else if (isOpenPhase(this.phase)) {
+      this.viewTransition = { stage: 'preparing', from: { width: from.width, height: from.height }, to };
+      this.viewTimer = this.scheduler.schedule(() => this.finishQueryViewTransition(), HANDOFF_PREPARE_TIMEOUT_MS + QUERY_OPEN_DURATION_MS + HANDOFF_FALLBACK_BUFFER_MS);
+    } else query.setBounds(clampRectToWorkArea({ ...query.getBounds(), ...to }, area));
+    this.viewEpoch += 1;
+    this.onQueryViewChanged?.();
+    return true;
+  }
+
+  navigateQuery(request: QuerySopNavigation): boolean {
+    if (request.viewEpoch !== this.viewEpoch || this.isInactive() || this.sopSlotActive) return false;
+    if (request.type === 'home' || request.type === 'results') {
+      this.changeQueryView({ kind: request.type === 'home' ? 'query-home' : 'query-results' });
+      return true;
+    }
+    if (request.type === 'view-finished') {
+      if (this.viewTransition?.stage !== 'animating') return false;
+      this.finishQueryViewTransition();
+      return true;
+    }
+    if (request.type !== 'view-ready' || this.viewTransition?.stage !== 'preparing') return false;
+    const query = this.query;
+    if (!this.live(query)) return false;
+    const area = this.currentWorkArea();
+    const to = {
+      width: Math.min(QUERY_WIDTH, area.width),
+      height: this.queryView.kind === 'query-home'
+        ? Math.max(QUERY_INPUT_HEIGHT, Math.min(request.desiredHeight, availableOverlayHeight(area)))
+        : clampQueryDesiredHeight(request.desiredHeight, availableOverlayHeight(area)),
+    };
+    if (this.queryView.kind === 'query-home') this.homeHeight = to.height;
+    else if (this.queryView.kind === 'query-results') this.lastQueryContentHeight = to.height;
+    const from = this.viewTransition.from;
+    this.scheduler.clear(this.viewTimer);
+    if (request.reducedMotion || this.prefersReducedMotion()) {
+      this.viewTransition = { stage: 'animating', from, to };
+      this.finishQueryViewTransition();
+      return true;
+    }
+    this.viewTransition = { stage: 'animating', from, to };
+    const current = query.getBounds();
+    query.setBounds(clampRectToWorkArea({ ...current, width: Math.max(from.width, to.width), height: Math.max(from.height, to.height) }, area));
+    this.onQueryViewChanged?.();
+    this.viewTimer = this.scheduler.schedule(() => this.finishQueryViewTransition(), QUERY_OPEN_DURATION_MS + HANDOFF_FALLBACK_BUFFER_MS);
+    return true;
+  }
+
+  private changeQueryView(view: OrdinaryQueryView, notify = true): void {
+    if (this.queryView.kind === view.kind) return;
+    const priorFrom = this.viewTransition?.from;
+    this.finishQueryViewTransition(false);
+    this.queryView = view;
+    this.viewEpoch += 1;
+    this.queryResizeSession = null;
+    this.manualQueryHeight = null;
+    this.clearPendingQueryBlur();
+    this.clearQueryLayoutFallback();
+    const query = this.query;
+    if (this.live(query) && isOpenPhase(this.phase) && this.chromeHandoffMode === null) {
+      const from = priorFrom ?? query.getBounds(), to = this.currentQuerySize(this.currentWorkArea());
+      this.viewTransition = { stage: 'preparing', from: { width: from.width, height: from.height }, to };
+      this.viewTimer = this.scheduler.schedule(() => this.finishQueryViewTransition(), HANDOFF_PREPARE_TIMEOUT_MS + QUERY_OPEN_DURATION_MS + HANDOFF_FALLBACK_BUFFER_MS);
+    }
+    if (notify) this.onQueryViewChanged?.();
+  }
+
+  private finishQueryViewTransition(notify = true): void {
+    this.scheduler.clear(this.viewTimer); this.viewTimer = null;
+    const transition = this.viewTransition;
+    if (!transition) return;
+    this.viewTransition = null;
+    const query = this.query;
+    if (this.live(query) && isOpenPhase(this.phase)) {
+      query.setBounds(clampRectToWorkArea({ ...query.getBounds(), ...transition.to }, this.currentWorkArea()));
+    }
+    if (notify) this.onQueryViewChanged?.();
+  }
+
   reportUiPhase(phase: ReportablePhase, resultCount: ResultCount): void {
     if (this.isInactive() || !isOpenPhase(this.phase)) {
       return;
     }
     this.phase = phase;
     this.resultCount = resultCount;
+    if (this.sopSlotActive || this.queryView.kind !== 'query-results' || this.viewTransition) return;
     if (phase === 'SEARCH_INPUT') {
       this.clearQueryHeightOverride();
       this.syncWindows({ activate: false });
@@ -533,35 +747,39 @@ export class OverlayController {
     if (
       shouldIgnoreQueryLayout(this.chromeHandoffMode, this.phase) ||
       !isOpenPhase(this.phase) ||
-      !isQueryContentLayoutPhase(this.phase) ||
+      (this.sopSlotActive || this.viewTransition !== null) ||
+      request.viewEpoch !== this.viewEpoch ||
       request.sessionId !== this.activeChromeHandoffId ||
       !acceptQueryLayoutSequence(this.lastQueryLayoutSequence, request.sequence)
     ) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
     if (request.phase !== this.phase || request.resultCount !== this.resultCount) {
-      this.applyFallbackQueryHeight();
+      if (this.queryView.kind === 'query-results') this.applyFallbackQueryHeight();
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
 
     const workArea = this.currentWorkArea();
-    const natural = clampQueryDesiredHeight(
-      request.desiredHeight,
-      this.availableQueryHeight(workArea),
-    );
+    const natural = this.queryView.kind === 'query-home'
+      ? Math.max(QUERY_INPUT_HEIGHT, Math.min(request.desiredHeight, this.availableQueryHeight(workArea)))
+      : clampQueryDesiredHeight(request.desiredHeight, this.availableQueryHeight(workArea));
+    if (this.queryView.kind === 'query-home') this.homeHeight = natural;
     this.lastQueryLayoutSequence = request.sequence;
     this.lastQueryContentHeight = natural;
     this.clearQueryLayoutFallback();
     const resizing = this.queryResizeSession !== null && !this.queryResizeSession.finished;
     const applied = this.manualQueryHeight ?? this.currentQueryHeight();
     if (!resizing && this.manualQueryHeight === null) {
-      this.applyQueryHeight(natural, this.queryResizeEdgeForCurrent(workArea), true);
+      if (this.queryView.kind === 'query-home' && this.live(this.query)) {
+        this.query.setBounds(clampRectToWorkArea({ ...this.query.getBounds(), width: Math.min(QUERY_WIDTH, workArea.width), height: natural }, workArea));
+      } else this.applyQueryHeight(natural, this.queryResizeEdgeForCurrent(workArea), true);
       return this.acceptedLayoutAck(request.sessionId, request.sequence);
     }
     return this.acceptedLayoutAck(request.sessionId, request.sequence, applied);
   }
 
   resizeQueryHeight(request: QueryResizeRequest): QueryLayoutAck {
+    if (this.sopSlotActive || this.queryView.kind !== 'query-results' || this.viewTransition) return this.rejectedLayoutAck(request.sessionId, request.sequence);
     if (this.isInactive()) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
@@ -733,6 +951,7 @@ export class OverlayController {
         return null;
       }
     }
+    if (target === this.query) this.finishQueryViewTransition();
     const nativeBounds = target.getBounds();
     const sessionWorkArea = this.testHarness
       ? screen.getDisplayNearestPoint({
@@ -792,7 +1011,7 @@ export class OverlayController {
     if (target === this.fox) {
       this.clearQueryDragGesture();
       this.foxOrigin = { x: next.x, y: next.y };
-    } else if (this.phase !== 'FOX_IDLE' && this.chromeHandoffMode !== 'closing' && this.chromeHandoffMode !== 'preparing-open') {
+    } else if (!this.sopSlotActive && this.phase !== 'FOX_IDLE' && this.chromeHandoffMode !== 'closing' && this.chromeHandoffMode !== 'preparing-open') {
       if (this.queryDragAnchor === null) {
         this.queryDragAnchor = this.currentQueryAnchor();
       }
@@ -947,10 +1166,13 @@ export class OverlayController {
         return;
       }
     }
+    if (this.phase === 'FOX_IDLE' && next === 'SEARCH_INPUT' && !this.sopSlotActive) {
+      this.changeQueryView({ kind: 'query-home' });
+    }
     this.phase = next;
     if (next === 'FOX_IDLE' || next === 'SEARCH_INPUT') {
       this.resultCount = 0;
-      this.clearQueryHeightOverride();
+      if (!this.sopSlotActive) this.clearQueryHeightOverride();
     }
     this.syncWindows({ activate: next === 'SEARCH_INPUT' && event.type !== 'DISMISS' });
   }
@@ -1009,7 +1231,7 @@ export class OverlayController {
     }
 
     const workArea = this.currentWorkArea();
-    const size = this.currentQuerySize(workArea);
+    const size = this.sopSlotActive ? query.getBounds() : this.currentQuerySize(workArea);
     const fullFoxRect: Rect = {
       x: this.foxOrigin.x,
       y: this.foxOrigin.y,
@@ -1083,6 +1305,7 @@ export class OverlayController {
     // WindowServer can process a later fox.hide() as an app deactivation and
     // revoke focus that was just assigned to Query.
     this.focusQueryWindow();
+    if (this.isWindowVisible(query)) this.onQueryShown?.();
     this.scheduleQueryFocusRetry();
     const animate = rendererArmed && !this.prefersReducedMotion();
     this.chromeHandoffMode = 'opening';
@@ -1348,6 +1571,7 @@ export class OverlayController {
     }
 
     this.finishOrClearQueryDrag();
+    this.finishQueryViewTransition();
 
     const point = {
       x: Math.round(this.foxOrigin.x + FOX_SIZE / 2),
@@ -1382,7 +1606,7 @@ export class OverlayController {
       return;
     }
 
-    const size = this.currentQuerySize(workArea);
+    const size = this.sopSlotActive ? query.getBounds() : this.currentQuerySize(workArea);
     const anchor = this.sessionQueryAnchor(queryAnchorForFox(clampedFox, workArea));
     query.setBounds(
       placeQueryAnchoredToFox(
@@ -1397,8 +1621,9 @@ export class OverlayController {
   }
 
   private currentQuerySize(workArea: Rect) {
+    if (this.queryView.kind === 'query-home') return { width: Math.min(QUERY_WIDTH, workArea.width), height: Math.min(this.homeHeight, availableOverlayHeight(workArea)) };
     return effectiveQuerySize({
-      phase: this.phase,
+      phase: this.phase === 'FOX_IDLE' ? 'RESULTS' : this.phase,
       resultCount: this.resultCount,
       workArea,
       measuredHeight: this.lastQueryContentHeight,
@@ -1549,7 +1774,7 @@ export class OverlayController {
   }
 
   private applyFallbackQueryHeight(): void {
-    if (this.manualQueryHeight !== null || this.queryResizeSession) {
+    if (this.sopSlotActive || this.manualQueryHeight !== null || this.queryResizeSession) {
       return;
     }
     const workArea = this.currentWorkArea();
@@ -1667,6 +1892,8 @@ export class OverlayController {
   }
 
   private handleQueryBlur(): void {
+    this.finishQueryViewTransition();
+    if (this.sopSlotActive) { this.clearPendingQueryBlur(); return; }
     if (this.isInactive() || this.phase === 'FOX_IDLE' || !this.isWindowVisible(this.query)) {
       this.clearPendingQueryBlur();
       return;
@@ -1683,7 +1910,7 @@ export class OverlayController {
   private schedulePendingBlurRecheck(): void {
     this.scheduler.clear(this.blurRecheckTimer);
     this.blurRecheckTimer = null;
-    if (this.isInactive() || !this.pendingQueryBlur) {
+    if (this.sopSlotActive || this.isInactive() || !this.pendingQueryBlur) {
       return;
     }
     const remaining = this.ignoreBlurUntil - Date.now();

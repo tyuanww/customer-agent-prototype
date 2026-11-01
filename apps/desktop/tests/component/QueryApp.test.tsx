@@ -17,6 +17,10 @@ import {
 } from '../../src/renderer/features/search/query-view';
 import { productCatalogEntries } from '../../src/shared/product-catalog';
 import { observeSessionJob } from '../../src/shared/product-session';
+import { projectSop, startSopProgress } from '../../src/shared/sop-model';
+import { ALLERGY_SOP_TREE, MISSING_ITEM_SOP_TREE } from '../../src/shared/synthetic-sops';
+import { SOP_UNAVAILABLE, type QuerySopSnapshot, type SopProjection, type SopTaskSummary, type SopWindowResult, type SopDraft, type SopShowQueryRequest } from '../../src/shared/sop-window';
+import type { QuerySopNavigation, QuerySopView } from '../../src/shared/query-sop-window';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
@@ -73,8 +77,107 @@ async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByTestId('copy-button-1');
 }
 
+function sopSnapshot(projections: readonly SopProjection[], view: QuerySopView, sequence: number, viewEpoch = sequence): Extract<QuerySopSnapshot, { kind: 'ready' }> {
+  const tasks: SopTaskSummary[] = projections.map((projection, index) => ({
+    taskId: projection.taskId, displayName: null, ordinal: Number(/^task-(\d+)$/.exec(projection.taskId)?.[1]) || index + 1, revision: projection.revision, sceneId: projection.sceneId,
+    sceneTitle: projection.sceneTitle, taskTitle: projection.taskTitle, stepIndex: projection.stepIndex, waiting: projection.waiting,
+  }));
+  const shared = { sequence, copyGeneration: 0, viewEpoch, tasks, transition: null };
+  if (view.kind === 'sop') {
+    const projection = projections.find(item => item.taskId === view.taskId);
+    if (!projection) throw new Error('SOP test view must have a matching task');
+    return { kind: 'ready', ...shared, mode: 'query', access: { kind: 'executable', hostEpoch: viewEpoch }, view, projection };
+  }
+  return { kind: 'ready', ...shared, mode: 'query', access: { kind: 'none' }, view, projection: null };
+}
+
+function connectSop() {
+  const api = window.customerAgent?.sopWindow;
+  if (!api) throw new Error('Missing SOP API');
+  let state: QuerySopSnapshot = sopSnapshot([], { kind: 'query-home' }, 1);
+  let projections: SopProjection[] = [];
+  let ordinal = 0;
+  let sequence = 1;
+  let nextDraftId = 0;
+  const drafts = new Map<string, SopDraft>();
+  let listener: ((value: QuerySopSnapshot) => void) | undefined;
+  const publish = (value: QuerySopSnapshot) => {
+    state = value;
+    if (value.kind === 'ready') {
+      sequence = Math.max(sequence, value.sequence);
+      if (value.projection) {
+        const projected = value.projection;
+        projections = projections.some(item => item.taskId === projected.taskId)
+          ? projections.map(item => item.taskId === projected.taskId ? projected : item)
+          : [...projections, projected];
+      }
+      projections = projections.filter(item => value.tasks.some(task => task.taskId === item.taskId));
+      for (const taskId of drafts.keys()) if (!value.tasks.some(task => task.taskId === taskId)) drafts.delete(taskId);
+    }
+    listener?.(value);
+  };
+  const current = vi.fn(async () => state);
+  const navigate = vi.fn(async (request: QuerySopNavigation): Promise<SopWindowResult> => {
+    if (state.kind !== 'ready' || state.viewEpoch !== request.viewEpoch) return { ok: false, code: 'INVALID', message: '视图已变化，请重试' };
+    if (request.type === 'home' || request.type === 'results') {
+      publish(sopSnapshot(projections, { kind: request.type === 'home' ? 'query-home' : 'query-results' }, ++sequence));
+    } else if (request.type === 'restore') {
+      const task = projections.find(item => item.taskId === request.taskId && item.revision === request.revision);
+      if (!task) return { ok: false, code: 'INVALID', message: '待办已变化，请重新选择' };
+      publish(sopSnapshot(projections, { kind: 'sop', taskId: task.taskId }, ++sequence));
+    }
+    return { ok: true };
+  });
+  api.current = current;
+  api.draftCurrent = async ({ taskId }) => ({ ok: true, draft: drafts.get(taskId) ?? null });
+  api.draftStart = async ({ taskId, revision }) => {
+    const task = state.kind === 'ready' ? state.tasks.find(item => item.taskId === taskId) : undefined;
+    if (!task || task.revision !== revision) return { ok: false };
+    const draft = drafts.get(taskId) ?? { draftId: ++nextDraftId, revision, initialName: task.displayName,
+      value: task.displayName ?? `${task.sceneTitle} #${task.ordinal}`, sequence: 0 };
+    drafts.set(taskId, draft);
+    return { ok: true, draft };
+  };
+  api.draftUpdate = async ({ taskId, draftId, sequence: draftSequence, value }) => {
+    const draft = drafts.get(taskId);
+    if (!draft || draft.draftId !== draftId || draftSequence <= draft.sequence) return false;
+    drafts.set(taskId, { ...draft, sequence: draftSequence, value });
+    return true;
+  };
+  api.draftDiscard = async ({ taskId, draftId }) => {
+    if (drafts.get(taskId)?.draftId !== draftId) return false;
+    drafts.delete(taskId);
+    return true;
+  };
+  api.navigate = navigate;
+  api.onProjection = callback => { listener = callback; return () => { listener = undefined; }; };
+  api.windowIntent = vi.fn(async () => true);
+  api.command = vi.fn(async (request): Promise<SopWindowResult> => {
+    if (request.type !== 'end' || state.kind !== 'ready') return { ok: false, code: 'INVALID', message: '流程操作无效' };
+    const task = projections.find(item => item.taskId === request.taskId && item.revision === request.revision && item.stepIndex === request.stepIndex);
+    if (!task) return { ok: false, code: 'INVALID', message: '步骤已变化，请按当前步骤操作' };
+    projections = projections.filter(item => item.taskId !== request.taskId);
+    const view = state.view.kind === 'sop' && state.view.taskId === request.taskId ? { kind: 'query-home' as const } : state.view;
+    publish(sopSnapshot(projections, view, ++sequence));
+    return { ok: true };
+  });
+  api.endTask = request => api.command!({ ...request, type: 'end', hostEpoch: 1 });
+  sopOpen.mockImplementation(async (sceneId: string): Promise<SopWindowResult> => {
+    const tree = sceneId === MISSING_ITEM_SOP_TREE.sceneId ? MISSING_ITEM_SOP_TREE : ALLERGY_SOP_TREE;
+    const projection = projectSop({ tree, progress: startSopProgress(tree), role: 'agent', taskId: `task-${++ordinal}`, revision: 1 });
+    projections = [...projections, projection];
+    publish(sopSnapshot(projections, { kind: 'sop', taskId: projection.taskId }, ++sequence));
+    return { ok: true };
+  });
+  return { api, current, navigate, publish, snapshot: () => state, readState: (value: QuerySopSnapshot) => { state = value; } };
+}
+
 describe('QueryApp', () => {
   beforeEach(() => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false, media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: () => true,
+    } satisfies MediaQueryList));
     copyText.mockReset();
     getWindowContext.mockReset();
     openSearch.mockReset();
@@ -754,6 +857,7 @@ describe('QueryApp', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     commandListeners.clear();
     delete window.customerAgent;
     vi.useRealTimers();
@@ -1002,6 +1106,27 @@ describe('QueryApp', () => {
     expect(shell).toHaveAttribute('data-close-duration-ms', '200');
   });
 
+  it('finishes reduced-motion collapse without waiting for an animation event', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)', media: query, onchange: null,
+      addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: () => true,
+    } satisfies MediaQueryList));
+    try {
+      render(<QueryApp />);
+      activateQuery();
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'collapse', handoffId: 12, anchor: 'right', dockEdge: 'right', animate: true, handoffCenterX: 600, handoffCenterY: 44 });
+        }
+      });
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(12, 'close-finished');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows an explicit empty-query hint and does not invent results', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
@@ -1213,23 +1338,31 @@ describe('QueryApp', () => {
     expect(copyText).not.toHaveBeenCalled();
   });
 
-  it('shows the allergy SOP banner between the heading and cards for the gold query', async () => {
+  it('shows query and associated-card SOP entries bound to the submitted query', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
     activateQueryIfParked();
     await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-1')).toBeVisible();
-    const heading = screen.getByText('候选话术');
-    const banner = await screen.findByTestId('sop-entry-banner');
-    const firstCard = screen.getByTestId('script-card-1');
-    expect(heading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(banner.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(banner).toHaveTextContent('过敏可走售后流程 · 建议先要凭证');
-    expect(screen.getByTestId('open-allergy-sop')).toHaveTextContent('打开过敏售后流程');
-    await user.click(screen.getByTestId('open-allergy-sop'));
+    expect(screen.getByRole('group', { name: '本次查询相关流程' })).toBeVisible();
+    expect(screen.queryByTestId('capsule-sop-entry')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/sop-card-entry-/)).toHaveLength(1);
+    const entry = screen.getByTestId('sop-card-open-1-allergy-aftersale-demo');
+    expect(entry).toBeVisible();
+    const copy = screen.getByTestId('copy-button-1');
+    expect(copy.compareDocumentPosition(entry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    for (const modifier of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
+      fireEvent.keyDown(window, { key: 'F7', [modifier]: true });
+    }
+    expect(sopOpen).not.toHaveBeenCalled();
+    await user.click(entry);
     expect(sopOpen).toHaveBeenCalledWith('allergy-aftersale-demo');
-    expect(await screen.findByTestId('open-allergy-sop')).toHaveTextContent('继续过敏售后流程');
+    expect(screen.queryByTestId('sop-card-entry-2')).not.toBeInTheDocument();
+    await user.clear(screen.getByTestId('question-input'));
+    await user.type(screen.getByTestId('question-input'), '尚未提交的其他问题');
+    expect(screen.queryByRole('button', { name: /^进入过敏流程$/ })).not.toBeInTheDocument();
   });
 
   it('does not show the SOP button for usage-plus-allergy or empty results', async () => {
@@ -1239,13 +1372,496 @@ describe('QueryApp', () => {
     await user.type(screen.getByTestId('question-input'), '怎么用过敏');
     await user.click(screen.getByTestId('search-button'));
     await waitFor(() => {
-      expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^进入/ })).not.toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '今天中午虚构星球食堂有没有排骨汤' } });
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('no-hit');
-    expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^进入/ })).not.toBeInTheDocument();
+  });
+
+  it('shows an error after an invalid SOP update and preserves ordinary search and recovery', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    await user.click(await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo'));
+    const panel = await screen.findByRole('region', { name: 'SOP 流程' });
+    await user.click(within(panel).getByRole('button', { name: '索取凭证' }));
+    const sourceText = ALLERGY_SOP_TREE.nodes[0]?.scripts[0]?.answerText;
+    if (!sourceText) throw new Error('Missing synthetic wording');
+    expect(screen.getByText(sourceText)).toBeVisible();
+    const active = host.snapshot();
+    act(() => host.publish(SOP_UNAVAILABLE));
+    expect(screen.queryByRole('region', { name: 'SOP 流程' })).toBeNull();
+    expect(screen.queryByText(sourceText)).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'SOP 待办' })).getByRole('alert')).toHaveTextContent('无法读取流程进度');
+    expect(screen.getByTestId('question-input')).toHaveValue('过敏了怎么办');
+    expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    host.current.mockRejectedValueOnce(new Error('IPC unavailable'));
+    await user.click(screen.getByRole('button', { name: /重新读取$/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /重新读取$/ })).not.toHaveClass('ant-btn-loading'));
+    expect(within(screen.getByRole('region', { name: 'SOP 待办' })).getByRole('alert')).toHaveTextContent('无法读取流程进度');
+    host.current.mockResolvedValueOnce(SOP_UNAVAILABLE);
+    await user.click(screen.getByRole('button', { name: /重新读取$/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /重新读取$/ })).not.toHaveClass('ant-btn-loading'));
+    host.current.mockImplementationOnce(async () => { host.readState(active); return active; });
+    await user.click(screen.getByRole('button', { name: /重新读取$/ }));
+    expect(await screen.findByRole('region', { name: 'SOP 流程' })).toBeVisible();
+    expect(screen.queryByText('无法读取流程进度')).toBeNull();
+    await user.click(screen.getByRole('button', { name: '返回搜索' }));
+    expect(await screen.findByRole('region', { name: 'SOP 待办' })).toBeVisible();
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('copy-button-1')).toBeEnabled();
+    await user.click(screen.getByTestId('copy-button-1'));
+    await waitFor(() => expect(copyText).toHaveBeenCalled());
+    expect(dismiss).not.toHaveBeenCalled();
+    act(() => host.publish(SOP_UNAVAILABLE));
+    await user.clear(screen.getByTestId('question-input'));
+    await user.type(screen.getByTestId('question-input'), '少件了，没收到全部');
+    expect(within(screen.getByRole('region', { name: 'SOP 待办' })).getByRole('alert')).toHaveTextContent('无法读取流程进度');
+    await user.click(screen.getByTestId('search-button'));
+    sopOpen.mockResolvedValueOnce({ ok: false, code: 'INVALID', message: '最多保留 8 条待办，请先结束一条' });
+    await user.click(await screen.findByRole('button', { name: /^进入少件处理$/ }));
+    expect(await screen.findAllByText('最多保留 8 条待办，请先结束一条')).not.toHaveLength(0);
+
+    const pending = deferred<QuerySopSnapshot>();
+    host.current.mockReturnValueOnce(pending.promise);
+    await user.click(screen.getByRole('button', { name: /重新读取$/ }));
+    expect(screen.getByRole('button', { name: /重新读取$/ })).toHaveClass('ant-btn-loading');
+    act(() => host.publish(sopSnapshot([], { kind: 'query-home' }, 20)));
+    await act(async () => { pending.resolve(active); await pending.promise; });
+    expect(screen.queryByRole('region', { name: 'SOP 流程' })).toBeNull();
+    expect(screen.queryByText('无法读取流程进度')).toBeNull();
+
+    const afterEdit = deferred<QuerySopSnapshot>();
+    host.current.mockReturnValueOnce(afterEdit.promise);
+    act(() => host.publish(SOP_UNAVAILABLE));
+    await user.click(screen.getByRole('button', { name: /重新读取$/ }));
+    await user.type(screen.getByTestId('question-input'), 'x');
+    await act(async () => { afterEdit.resolve(active); await afterEdit.promise; });
+    expect(screen.queryByRole('region', { name: 'SOP 流程' })).toBeNull();
+    expect(screen.getByRole('button', { name: /重新读取$/ })).not.toHaveClass('ant-btn-loading');
+  });
+
+  it.each(['invalid', 'closed', 'updated', 'different'] as const)('does not restore an old SOP read after a newer %s event', async outcome => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const projection = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-a', revision: 1 });
+    const pending = deferred<QuerySopSnapshot>();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    const entry = await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo');
+    await waitFor(() => expect(screen.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-results'));
+    host.current.mockReturnValueOnce(pending.promise);
+    sopOpen.mockImplementation(async (): Promise<SopWindowResult> => {
+      host.publish(sopSnapshot([projection], { kind: 'sop', taskId: projection.taskId }, 10));
+      return { ok: true };
+    });
+    await user.click(entry);
+    expect(await screen.findByRole('region', { name: 'SOP 流程' })).toBeVisible();
+    const updated = { ...projection, revision: 2, sceneTitle: '更新后的合成流程' };
+    const different = { ...projection, taskId: 'task-b', sceneId: 'other-synthetic', sceneTitle: '其他合成流程' };
+    act(() => host.publish(outcome === 'invalid' ? SOP_UNAVAILABLE : outcome === 'closed'
+      ? sopSnapshot([], { kind: 'query-home' }, 11) : outcome === 'different'
+        ? sopSnapshot([different], { kind: 'query-home' }, 11)
+        : sopSnapshot([updated], { kind: 'sop', taskId: updated.taskId }, 11)));
+    await act(async () => { pending.resolve(sopSnapshot([projection], { kind: 'sop', taskId: projection.taskId }, 10)); await pending.promise; });
+    if (outcome === 'updated') expect(screen.getByRole('region', { name: 'SOP 流程' })).toHaveTextContent('更新后的合成流程');
+    else expect(screen.queryByRole('region', { name: 'SOP 流程' })).toBeNull();
+    if (outcome === 'invalid') expect(within(screen.getByRole('region', { name: 'SOP 待办' })).getByRole('alert')).toHaveTextContent('无法读取流程进度');
+    if (outcome === 'closed') expect(screen.queryByText('无法读取流程进度')).toBeNull();
+    if (outcome === 'different') expect(screen.getByRole('button', { name: /^其他合成流程 #1 .*步骤 1/ })).toBeVisible();
+  });
+
+  it.each(['opening', 'reading', 'collapse'] as const)('cancels the old SOP open intent on %s', async stage => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const projection = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-a', revision: 1 });
+    const opening = deferred<SopWindowResult>();
+    const reading = deferred<QuerySopSnapshot>();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    const entry = await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo');
+    await waitFor(() => expect(screen.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-results'));
+    host.current.mockClear();
+    host.current.mockReturnValueOnce(reading.promise);
+    sopOpen.mockImplementation(() => stage === 'opening' ? opening.promise : Promise.resolve({ ok: true }));
+    await user.click(entry);
+    if (stage !== 'opening') await waitFor(() => expect(host.current).toHaveBeenCalledOnce());
+    if (stage === 'collapse') fireEvent.keyDown(window, { key: 'Escape' });
+    else await user.type(screen.getByTestId('question-input'), 'x');
+    await act(async () => {
+      if (stage === 'opening') { opening.resolve({ ok: true }); await opening.promise; }
+      else { reading.resolve(sopSnapshot([projection], { kind: 'sop', taskId: projection.taskId }, 10)); await reading.promise; }
+    });
+    expect(screen.queryByRole('region', { name: 'SOP 流程' })).toBeNull();
+    if (stage === 'collapse') expect(dismiss).toHaveBeenCalledWith(true);
+    else expect(screen.getByTestId('question-input')).toHaveValue('过敏了怎么办x');
+    if (stage === 'opening') expect(host.current).not.toHaveBeenCalled();
+  });
+
+  it('serializes duplicate SOP opens from the entry and shortcut in the same event turn', async () => {
+    const user = userEvent.setup();
+    connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    const entry = await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo');
+    const opening = deferred<SopWindowResult>();
+    sopOpen.mockImplementation(() => opening.promise);
+    act(() => {
+      fireEvent.click(entry);
+      fireEvent.click(screen.getByTestId('sop-query-open-allergy-aftersale-demo'));
+      fireEvent.keyDown(window, { key: 'F7' });
+    });
+    expect(sopOpen).toHaveBeenCalledOnce();
+    await act(async () => { opening.resolve({ ok: false, code: 'FAILED', message: '流程没打开，请重试' }); await opening.promise; });
+    expect(screen.getByTestId('sop-card-open-1-allergy-aftersale-demo')).toBeEnabled();
+  });
+
+  it('keeps an empty workspace at the original query capsule height', async () => {
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function measuredHeight(this: HTMLElement) {
+        return this.classList.contains('query-capsule') ? 88 : 0;
+      });
+    try {
+      connectSop();
+      render(<QueryApp />);
+      activateQueryIfParked();
+      await waitFor(() => expect(reportQueryLayout).toHaveBeenLastCalledWith(expect.objectContaining({
+        phase: 'SEARCH_INPUT', resultCount: 0, desiredHeight: 88,
+      })));
+    } finally { height.mockRestore(); }
+  });
+
+  it('returns to the compact home without losing the input, and restores independent same-named tasks', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '过敏了怎么办');
+    await user.click(screen.getByTestId('search-button'));
+    await user.click(await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo'));
+    await user.click(await screen.findByRole('button', { name: '返回搜索' }));
+    await waitFor(() => expect(screen.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-home'));
+    expect(screen.getByTestId('question-input')).toHaveValue('过敏了怎么办');
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('question-input')).toHaveFocus());
+    await user.click(screen.getByTestId('query-shell'));
+    expect(document.activeElement).toBe(document.body);
+    await user.keyboard('123');
+    expect(copyText).not.toHaveBeenCalled();
+    expect(screen.getByTestId('question-input')).toHaveValue('过敏了怎么办');
+    await user.keyboard('{F7}');
+    expect(sopOpen).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-home');
+    const first = screen.getByRole('button', { name: /^过敏流程 #1 .*步骤 1/ });
+    await user.click(first);
+    expect(host.navigate).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'restore', taskId: 'task-1', revision: 1 }));
+    await user.click(await screen.findByRole('button', { name: '返回搜索' }));
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('result-list')).toBeVisible();
+    await user.click(await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo'));
+    await user.click(await screen.findByRole('button', { name: '返回搜索' }));
+    expect(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^过敏流程 #2 .*步骤 1/ })).toBeVisible();
+    await user.click(screen.getByTestId('search-button'));
+    expect(await screen.findByTestId('result-list')).toBeVisible();
+    expect(screen.getByRole('button', { name: '结束 过敏流程 #1' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: '结束 过敏流程 #1' }));
+    const confirmation = screen.getByRole('dialog', { name: '结束流程？' });
+    await user.click(within(confirmation).getByRole('button', { name: '结束流程' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^过敏流程 #1 .*步骤 1/ })).not.toBeInTheDocument());
+    expect(screen.getByTestId('result-list')).toBeVisible();
+    expect(screen.getByTestId('question-input')).toHaveValue('过敏了怎么办');
+    await user.click(screen.getByRole('button', { name: /^过敏流程 #2 .*步骤 1/ }));
+    expect(host.navigate).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'restore', taskId: 'task-2', revision: 1 }));
+    expect(await screen.findByRole('region', { name: 'SOP 流程' })).toBeVisible();
+  });
+
+  it('restores a list nickname draft after opening a different SOP and returning', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    const second = projectSop({ tree: MISSING_ITEM_SOP_TREE, progress: startSopProgress(MISSING_ITEM_SOP_TREE), role: 'agent', taskId: 'task-2', revision: 1 });
+    act(() => host.publish(sopSnapshot([first, second], { kind: 'sop', taskId: first.taskId }, 2)));
+    act(() => host.publish(sopSnapshot([first, second], { kind: 'sop', taskId: second.taskId }, 3)));
+    act(() => host.publish(sopSnapshot([first, second], { kind: 'query-home' }, 4)));
+    await user.click(await screen.findByRole('button', { name: '改名' }));
+    await user.click(screen.getByRole('button', { name: /^修改 过敏流程 #1 的昵称/ }));
+    await user.type(screen.getByRole('textbox', { name: '待办昵称' }), '合成列表草稿');
+    await user.click(screen.getByRole('button', { name: /^少件处理 #2 .*步骤 1/ }));
+    await user.click(await screen.findByRole('button', { name: '返回搜索' }));
+    expect(await screen.findByRole('textbox', { name: '待办昵称' })).toHaveValue('合成列表草稿');
+  });
+
+  it('restores independent step and list drafts when returning between SOP and search', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    host.api.renameCurrent = vi.fn(async (): Promise<SopWindowResult> => ({ ok: true }));
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    const edit = await screen.findByRole('button', { name: '编辑流程名称' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await user.click(edit);
+    await user.clear(screen.getByRole('textbox', { name: '流程名称' }));
+    await user.type(screen.getByRole('textbox', { name: '流程名称' }), '步骤草稿');
+    await user.click(screen.getByRole('button', { name: '返回搜索' }));
+    await user.click(await screen.findByRole('button', { name: '改名' }));
+    await user.click(screen.getByRole('button', { name: /^修改 过敏流程 #1 的昵称/ }));
+    await user.type(screen.getByRole('textbox', { name: '待办昵称' }), '列表草稿');
+    await user.click(screen.getByRole('button', { name: /^过敏流程 #1 .*步骤 1/ }));
+    expect(await screen.findByRole('textbox', { name: '流程名称' })).toHaveValue('步骤草稿');
+    expect(screen.getByRole('button', { name: '独立悬浮' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: '返回搜索' }));
+    expect(await screen.findByRole('textbox', { name: '待办昵称' })).toHaveValue('列表草稿');
+    expect(host.api.renameCurrent).not.toHaveBeenCalled();
+  });
+
+  it('prepares the current draft before acknowledging a request to show ordinary Query', async () => {
+    const host = connectSop();
+    let request: (value: SopShowQueryRequest) => void = () => undefined;
+    host.api.onShowQueryRequest = callback => { request = callback; return () => undefined; };
+    host.api.showQueryReady = vi.fn(async () => true);
+    host.api.renameCurrent = vi.fn(async (): Promise<SopWindowResult> => ({ ok: true }));
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    const edit = await screen.findByRole('button', { name: '编辑流程名称' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await user.click(edit);
+    await user.clear(screen.getByRole('textbox', { name: '流程名称' }));
+    await user.type(screen.getByRole('textbox', { name: '流程名称' }), '合成草稿');
+    act(() => request({ requestId: 4, taskId: 'task-1', hostEpoch: 2 }));
+    await waitFor(() => expect(host.api.showQueryReady).toHaveBeenCalledWith({ requestId: 4, taskId: 'task-1', hostEpoch: 2, accepted: true }));
+    expect(screen.getByRole('textbox', { name: '流程名称' })).toHaveValue('合成草稿');
+    act(() => request({ requestId: 5, taskId: 'task-2', hostEpoch: 2 }));
+    await waitFor(() => expect(host.api.showQueryReady).toHaveBeenCalledWith({ requestId: 5, taskId: 'task-2', hostEpoch: 2, accepted: false }));
+  });
+
+  it('does not call a successful navigation a failure when its follow-up read fails', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    host.current.mockImplementation(async () => {
+      const current = host.snapshot();
+      if (current.kind === 'ready' && current.view.kind === 'query-home') throw new Error('read failed');
+      return current;
+    });
+    await user.click(await screen.findByRole('button', { name: '返回搜索' }));
+    expect(await screen.findByText('无法读取流程进度')).toBeVisible();
+    expect(screen.queryByText('流程操作失败，请重试')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'SOP 流程' })).not.toBeInTheDocument();
+  });
+
+  it('refreshes the query snapshot on focus after a missed update', async () => {
+    const host = connectSop();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    host.readState(sopSnapshot([first], { kind: 'query-home' }, 2));
+    fireEvent.focus(window);
+    expect(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ })).toBeVisible();
+  });
+
+  it('keeps the initial task read when typing without an SOP operation in flight', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const reading = deferred<QuerySopSnapshot>();
+    host.current.mockReturnValueOnce(reading.promise);
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '客户问题');
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    await act(async () => { reading.resolve(sopSnapshot([first], { kind: 'query-home' }, 2)); await reading.promise; });
+    expect(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ })).toBeVisible();
+  });
+
+  it.each(['input', 'search', 'collapse'] as const)('settles a successful nickname save while Query handles %s', async action => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const saving = deferred<SopWindowResult>();
+    host.api.rename = vi.fn(() => saving.promise);
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    act(() => host.publish(sopSnapshot([first], { kind: 'query-home' }, 3)));
+    fireEvent.keyDown(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ }), { key: 'F2' });
+    fireEvent.change(screen.getByRole('textbox', { name: '待办昵称' }), { target: { value: '合成客户' } });
+    await user.click(screen.getByRole('button', { name: '保存昵称' }));
+    expect(host.api.rename).toHaveBeenCalledOnce();
+    if (action === 'collapse') fireEvent.keyDown(window, { key: 'Escape' });
+    else {
+      fireEvent.change(screen.getByTestId('question-input'), { target: { value: '过敏了怎么办' } });
+      if (action === 'search') {
+        await user.click(screen.getByTestId('search-button'));
+        await waitFor(() => expect(host.navigate).toHaveBeenCalledWith(expect.objectContaining({ type: 'results' })));
+        const entry = await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo');
+        expect(entry).toBeDisabled();
+        fireEvent.click(entry);
+        expect(sopOpen).not.toHaveBeenCalled();
+      }
+    }
+    const restore = screen.getByRole('button', { name: /^过敏流程 #1 .*步骤 1/ });
+    expect(restore).toBeDisabled();
+    fireEvent.click(restore);
+    expect(host.navigate).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'restore' }));
+    const updated = sopSnapshot([{ ...first, revision: 2 }], { kind: 'query-home' }, 100);
+    act(() => host.publish({ ...updated, tasks: updated.tasks.map(task => ({ ...task, displayName: '合成客户' })) }));
+    await act(async () => { saving.resolve({ ok: true }); await saving.promise; });
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: '待办昵称' })).not.toBeInTheDocument());
+    expect(screen.queryByText('昵称保存失败，请重试')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^合成客户 .*步骤 1/ })).toBeVisible();
+  });
+
+  it('shows an actual save failure and retains the draft after typing a query', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const saving = deferred<SopWindowResult>();
+    host.api.rename = vi.fn(() => saving.promise);
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    act(() => host.publish(sopSnapshot([first], { kind: 'query-home' }, 3)));
+    fireEvent.keyDown(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ }), { key: 'F2' });
+    fireEvent.change(screen.getByRole('textbox', { name: '待办昵称' }), { target: { value: '合成草稿' } });
+    await user.click(screen.getByRole('button', { name: '保存昵称' }));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '其他查询' } });
+    await act(async () => { saving.resolve({ ok: false, code: 'FAILED', message: '名称保存失败' }); await saving.promise; });
+    expect(await screen.findByText('昵称保存失败，请重试')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: '待办昵称' })).toHaveValue('合成草稿');
+  });
+
+  it('keeps the accepted save reconciliation when a concurrent query navigation is cancelled', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const saving = deferred<SopWindowResult>();
+    const reconciliation = deferred<QuerySopSnapshot>();
+    const navigation = deferred<SopWindowResult>();
+    host.api.rename = vi.fn(() => saving.promise);
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    act(() => host.publish(sopSnapshot([first], { kind: 'query-home' }, 3)));
+    fireEvent.keyDown(await screen.findByRole('button', { name: /^过敏流程 #1 .*步骤 1/ }), { key: 'F2' });
+    fireEvent.change(screen.getByRole('textbox', { name: '待办昵称' }), { target: { value: '合成客户' } });
+    await user.click(screen.getByRole('button', { name: '保存昵称' }));
+    const reads = host.current.mock.calls.length;
+    host.current.mockReturnValueOnce(reconciliation.promise);
+    await act(async () => { saving.resolve({ ok: true }); await saving.promise; });
+    await waitFor(() => expect(host.current.mock.calls.length).toBeGreaterThan(reads));
+    host.navigate.mockImplementationOnce(() => navigation.promise);
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '过敏了怎么办' } });
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(host.navigate).toHaveBeenCalledWith(expect.objectContaining({ type: 'results' })));
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '新的查询' } });
+    const updated = sopSnapshot([{ ...first, revision: 2 }], { kind: 'query-home' }, 100);
+    const committed = { ...updated, tasks: updated.tasks.map(task => ({ ...task, displayName: '合成客户' })) };
+    host.readState(committed);
+    await act(async () => { reconciliation.resolve(committed); await reconciliation.promise; });
+    expect(await screen.findByRole('button', { name: /^合成客户 .*步骤 1/ })).toBeVisible();
+    expect(screen.queryByText('昵称保存失败，请重试')).not.toBeInTheDocument();
+    await act(async () => { navigation.resolve({ ok: true }); await navigation.promise; });
+  });
+
+  it.each(['input', 'search', 'collapse'] as const)('reconciles a successful task end while Query handles %s and the update was missed', async action => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    const ending = deferred<SopWindowResult>();
+    host.api.endTask = vi.fn(() => ending.promise);
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    act(() => host.publish(sopSnapshot([first], { kind: 'query-home' }, 3)));
+    await user.click(await screen.findByRole('button', { name: '结束 过敏流程 #1' }));
+    await user.click(within(screen.getByRole('dialog', { name: '结束流程？' })).getByRole('button', { name: '结束流程' }));
+    await waitFor(() => expect(host.api.endTask).toHaveBeenCalledOnce());
+    if (action === 'collapse') fireEvent.keyDown(window, { key: 'Escape' });
+    else {
+      fireEvent.change(screen.getByTestId('question-input'), { target: { value: '过敏了怎么办' } });
+      if (action === 'search') {
+        await user.click(screen.getByTestId('search-button'));
+        await waitFor(() => expect(host.navigate).toHaveBeenCalledWith(expect.objectContaining({ type: 'results' })));
+        const entry = await screen.findByTestId('sop-card-open-1-allergy-aftersale-demo');
+        expect(entry).toBeDisabled();
+        fireEvent.click(entry);
+        expect(sopOpen).not.toHaveBeenCalled();
+      }
+    }
+    const restore = screen.getByRole('button', { name: /^过敏流程 #1 .*步骤 1/ });
+    expect(restore).toBeDisabled();
+    fireEvent.click(restore);
+    expect(host.navigate).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'restore' }));
+    host.readState(sopSnapshot([], { kind: 'query-home' }, 100));
+    const reads = host.current.mock.calls.length;
+    await act(async () => { ending.resolve({ ok: true }); await ending.promise; });
+    await waitFor(() => expect(screen.queryByRole('button', { name: '结束 过敏流程 #1' })).not.toBeInTheDocument());
+    expect(host.current.mock.calls.length).toBeGreaterThan(reads);
+  });
+
+  it('clears both drafts after Main removes the task', async () => {
+    const user = userEvent.setup();
+    const host = connectSop();
+    host.api.renameCurrent = vi.fn(async (): Promise<SopWindowResult> => ({ ok: true }));
+    render(<QueryApp />);
+    activateQueryIfParked();
+    const first = projectSop({ tree: ALLERGY_SOP_TREE, progress: startSopProgress(ALLERGY_SOP_TREE), role: 'agent', taskId: 'task-1', revision: 1 });
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 2)));
+    const edit = await screen.findByRole('button', { name: '编辑流程名称' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await user.click(edit);
+    await user.type(screen.getByRole('textbox', { name: '流程名称' }), '步骤草稿');
+    await user.click(screen.getByRole('button', { name: '返回搜索' }));
+    await user.click(await screen.findByRole('button', { name: '改名' }));
+    await user.click(screen.getByRole('button', { name: /^修改 过敏流程 #1 的昵称/ }));
+    await user.type(screen.getByRole('textbox', { name: '待办昵称' }), '列表草稿');
+    await user.click(screen.getByRole('button', { name: '结束 过敏流程 #1' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('结束流程？')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '结束流程' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^过敏流程 #1 .*步骤 1/ })).not.toBeInTheDocument());
+
+    act(() => host.publish(sopSnapshot([first], { kind: 'sop', taskId: first.taskId }, 100)));
+    expect(await screen.findByRole('button', { name: '编辑流程名称' })).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: '流程名称' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '返回搜索' }));
+    expect(screen.queryByRole('textbox', { name: '待办昵称' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a matched SOP entry visible when ordinary search has no hit', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    activateQueryIfParked();
+    await user.type(screen.getByTestId('question-input'), '少件了，没收到全部');
+    await user.click(screen.getByTestId('search-button'));
+
+    expect(await screen.findByTestId('no-hit')).toBeVisible();
+    const entry = await screen.findByRole('button', { name: /^进入少件处理$/ });
+    expect(entry).toBeVisible();
+    await user.click(entry);
+    expect(sopOpen).toHaveBeenCalledWith('missing-item-demo');
   });
 
   it('keeps 少发/长痘 on aftersale Top 3 without a SOP button', async () => {
@@ -1255,7 +1871,7 @@ describe('QueryApp', () => {
     await user.type(screen.getByTestId('question-input'), '月白防晒长痘了');
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-1')).toBeVisible();
-    expect(screen.queryByTestId('open-allergy-sop')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^进入/ })).not.toBeInTheDocument();
   });
 
   it('renders the original synthetic aftersales wording for a natural category question', async () => {
@@ -1426,6 +2042,54 @@ describe('QueryApp', () => {
     await waitFor(() => expect(dismiss).toHaveBeenCalledWith(true), { timeout: 1_500 });
   });
 
+  it('clears ordinary copy feedback when a newer SOP copy reaches Main', async () => {
+    const host = connectSop();
+    copyText.mockResolvedValueOnce({ ok: true, copyGeneration: 1 });
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    expect(await screen.findByTestId('toast')).toHaveTextContent('已复制');
+    const state = host.snapshot();
+    if (state.kind !== 'ready') throw new Error('SOP snapshot missing');
+    act(() => host.publish({ ...state, sequence: state.sequence + 1, copyGeneration: 2 }));
+    await waitFor(() => expect(screen.queryByTestId('toast')).not.toBeInTheDocument());
+    expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('ignores a late ordinary copy response when a newer SOP copy already succeeded', async () => {
+    const host = connectSop();
+    const pending = deferred<{ ok: true; copyGeneration: number }>();
+    copyText.mockReturnValueOnce(pending.promise);
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    const state = host.snapshot();
+    if (state.kind !== 'ready') throw new Error('SOP snapshot missing');
+    act(() => host.publish({ ...state, sequence: state.sequence + 1, copyGeneration: 2 }));
+    await act(async () => { pending.resolve({ ok: true, copyGeneration: 1 }); await pending.promise; });
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('keeps ordinary copy feedback when its commit is newer than the last SOP copy', async () => {
+    const host = connectSop();
+    const pending = deferred<{ ok: true; copyGeneration: number }>();
+    copyText.mockReturnValueOnce(pending.promise);
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    await searchCleanser(user);
+    await user.click(screen.getByTestId('copy-button-1'));
+    const state = host.snapshot();
+    if (state.kind !== 'ready') throw new Error('SOP snapshot missing');
+    act(() => host.publish({ ...state, sequence: state.sequence + 1, copyGeneration: 2 }));
+    await act(async () => { pending.resolve({ ok: true, copyGeneration: 3 }); await pending.promise; });
+    expect(await screen.findByTestId('toast')).toHaveTextContent('已复制');
+  });
+
   it('locks every copy entry point during COPIED feedback', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
@@ -1458,11 +2122,14 @@ describe('QueryApp', () => {
 
     render(<QueryApp />);
     await searchCleanser(user);
-    await user.click(screen.getByTestId('copy-button-1'));
+    const copyButton = screen.getByTestId('copy-button-1');
+    const focus = vi.spyOn(copyButton, 'focus');
+    screen.getByTestId('question-input').focus();
+    fireEvent.click(copyButton);
 
-    await waitFor(() => {
-      expect(copyText).toHaveBeenCalledWith(cleanser?.answerText);
-    });
+    expect(focus).toHaveBeenCalledOnce();
+    expect(copyButton).toHaveFocus();
+    await waitFor(() => expect(copyText).toHaveBeenCalledWith(cleanser?.answerText));
     expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
     expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
@@ -2549,6 +3216,8 @@ describe('QueryApp', () => {
   });
   it.each(['success', 'rejected', 'thrown'] as const)('settles FAQ filter waits after %s and permits an explicit recovered query', async outcome => {
     const user = userEvent.setup();
+    const workspace = connectSop();
+    sopEntryAvailable.mockResolvedValue(false);
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
       userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
       expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
@@ -2596,6 +3265,9 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('search-button')).toBeEnabled();
     await user.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(search).toHaveBeenCalledWith(expect.objectContaining({ queryText: '合成客户问题' })));
+    await waitFor(() => expect(workspace.navigate).toHaveBeenCalledWith(expect.objectContaining({ type: 'results' })));
+    expect(screen.queryByText('无法读取流程进度')).not.toBeInTheDocument();
+    expect(sopOpen).not.toHaveBeenCalled();
   });
 
   it('keeps FAQ notice visible, ignores stale results and lets a fresh query survive old expiry', async () => {

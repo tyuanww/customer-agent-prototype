@@ -1655,6 +1655,24 @@
   color: var(--muted);
 }
 
+.sop-no-hit-entry {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-basis: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--fox) 24%, var(--hairline));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--fox-soft) 58%, transparent);
+}
+
+.sop-no-hit-entry .ant-typography {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 @keyframes no-hit-arrive {
   from {
     opacity: 0;
@@ -1685,24 +1703,6 @@
 .result-heading span {
   color: var(--muted);
   font-size: 11px;
-}
-
-.sop-entry-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  background: var(--glass-inner);
-  color: var(--ink);
-  font-size: 12px;
-}
-
-.sop-entry-banner .retry-btn {
-  margin-top: 0;
-  min-height: 32px;
 }
 
 .status-banner {
@@ -1841,11 +1841,11 @@
 }
 
 .scene-label {
+  min-width: 0;
   color: var(--ink);
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .card-top-tags {
@@ -1854,11 +1854,40 @@
   gap: 6px;
 }
 
+.sop-query-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sop-card-entry {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sop-card-entry-action.ant-btn {
+  box-sizing: border-box;
+  min-height: 36px;
+  height: auto;
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
 .answer-text {
   min-width: 0;
   margin: 0;
   font-size: 14px;
   line-height: 20px;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
@@ -1870,12 +1899,21 @@
   margin-bottom: 5px;
 }
 
+.card-answer-row-stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .card-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: start;
   justify-content: flex-end;
+}
+
+.card-answer-row-stacked > .card-actions {
+  min-width: 0;
+  justify-content: flex-start;
 }
 
 .script-card .retry-btn {
@@ -1949,25 +1987,28 @@
 .copy-btn {
   min-height: 36px;
   padding: 0 12px;
+  font-weight: 600;
+}
+
+.copy-btn:not(.ant-btn) {
   border: 1px solid color-mix(in srgb, var(--fox) 36%, var(--hairline));
   border-radius: 10px;
   background: var(--query-accent-control);
   color: var(--ink);
-  font-weight: 600;
   transition: background-color var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 
-.copy-btn:hover:not(:disabled) {
+.copy-btn:not(.ant-btn):hover:not(:disabled) {
   background: var(--query-accent-control-hover);
 }
 
-.copy-btn.is-copied {
+.copy-btn:not(.ant-btn).is-copied {
   border-color: rgba(72, 201, 169, 0.45);
   background: var(--query-success-control);
   color: var(--query-success-ink);
 }
 
-.copy-btn:disabled {
+.copy-btn:not(.ant-btn):disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1983,6 +2024,8 @@ html[data-role='fox'] #root {
     transition: none;
   }
 
+  .script-card,
+  .result-heading .copied-feedback,
   .query-shell.is-opening .glass-shell,
   .query-shell.is-closing .glass-shell,
   .query-shell.is-opening .glass-surface,
@@ -2181,7 +2224,7 @@ html[data-role='fox'] #root {
     --query-glass-inner: var(--glass-inner-solid);
   }
 
-  html[data-role='query'] {
+  html:is([data-role='query'], [data-role='sop-floating']) {
     --query-glass: var(--query-glass-solid);
     --query-glass-inner: var(--glass-inner-solid);
     --glass-inner: var(--glass-inner-solid);
@@ -2246,8 +2289,8 @@ html[data-role='fox'] #root {
   .deep-thinking-entry[aria-checked='true'],
   .search-btn,
   .search-btn:hover,
-  .copy-btn,
-  .copy-btn:hover:not(:disabled) {
+  .copy-btn:not(.ant-btn),
+  .copy-btn:not(.ant-btn):hover:not(:disabled) {
     background: var(--fox-soft-solid);
   }
 
@@ -2255,7 +2298,7 @@ html[data-role='fox'] #root {
     background: color-mix(in srgb, var(--fox) 72%, var(--fox-soft-solid));
   }
 
-  .copy-btn.is-copied,
+  .copy-btn:not(.ant-btn).is-copied,
   .result-heading .copied-feedback {
     background: var(--query-success-solid);
   }

@@ -26,7 +26,9 @@ it('puts the catalog upload on the six-page SOP slot and keeps the seat window o
   ].join('\n'));
   expect(destinations).not.toContain('IntakeSopSource');
   expect(app).not.toContain('IntakeSopSource');
-  expect(windowController).toContain('return this.tree ?? ALLERGY_SOP_TREE');
+  expect(windowController).toContain('findSyntheticSopTree(sceneId)');
+  expect(windowController).not.toContain('ALLERGY_SOP_TREE');
+  expect(windowController).not.toContain('createOverlayChromeWindow');
   expect(ops).toContain("'/v1/sop/import'");
   expect(ops).not.toContain('sopUploadRefusal');
 });

@@ -361,7 +361,7 @@ it.each([
   { input: { ...STACK_PROFILE, contentIntake: 'faq-v2' }, mode: 'synthetic-local', kind: 'faq-v2' },
   { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com/', identityOrigin: 'https://id.example.com:443/' }, mode: 'product-remote', kind: 'product-remote' },
   { input: { mode: 'product-remote', apiOrigin: 'https://api.example.com', identityOrigin: 'https://id.example.com', contentIntake: 'faq-v2' }, mode: 'product-remote', kind: 'product-remote' },
-  { input: { mode: 'synthetic-offline' }, mode: undefined, kind: 'legacy' },
+  { input: { mode: 'synthetic-offline' }, mode: undefined, kind: 'synthetic-offline' },
 ])('retains $mode and the existing $kind navigation when resolving a packaged profile', ({ input, mode, kind }) => {
   const directory = userDataDirectory();
   write(directory, input);

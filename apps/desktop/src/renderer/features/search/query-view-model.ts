@@ -89,6 +89,9 @@ export function adoptedPlaceholderValues(
 
 /** Copy succeeded. An unrecorded event is still a copy, not a send. */
 export function copySuccessErrorMessage(result: object): string {
+  if ('feedbackSyncFailed' in result && result.feedbackSyncFailed === true) {
+    return '已复制，但其他窗口的复制提示未能同步';
+  }
   if ('eventStatus' in result && result.eventStatus === 'unrecorded') {
     return COPY_UNRECORDED_MESSAGE;
   }

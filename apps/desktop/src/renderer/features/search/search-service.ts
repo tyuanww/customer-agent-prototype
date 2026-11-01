@@ -100,7 +100,7 @@ function isValidScriptFixture(value: unknown): value is ScriptFixture {
   for (const anchor of anchors) {
     if (
       !isRecord(anchor) ||
-      (anchor.kind !== 'entity' && anchor.kind !== 'topic') ||
+      (anchor.kind !== 'entity' && anchor.kind !== 'topic' && anchor.kind !== 'required-topic') ||
       !isNonEmptyString(anchor.label) ||
       !isNonEmptyString(anchor.canonical) ||
       !Array.isArray(anchor.aliases) ||
@@ -296,6 +296,10 @@ function scoreAgainstVariant(features: QueryFeatures, variant: string): number {
 }
 
 function scoreScriptWithFeatures(features: QueryFeatures, script: ScriptFixture): ScriptScore {
+  const semantic = matchSearchMetadata(features.understanding, script.search);
+  if (!semantic.requiredTopicsMatched) {
+    return { score: 0, lexicalScore: 0, exact: false, matchKind: 'similar', matchLabel: '相似问法' };
+  }
   let best = 0;
   for (const variant of script.questionVariants) {
     const next = scoreAgainstVariant(features, variant);
@@ -316,7 +320,6 @@ function scoreScriptWithFeatures(features: QueryFeatures, script: ScriptFixture)
     };
   }
 
-  const semantic = matchSearchMetadata(features.understanding, script.search);
   if (!semantic.entityMatched) {
     if (
       semantic.topicContextMatched &&

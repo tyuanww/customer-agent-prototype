@@ -665,6 +665,73 @@ it('discards late task and outcome reads and waits for fresh results after retur
   await waitFor(() => { expect(list).toHaveBeenCalledTimes(2); expect(outcomes).toHaveBeenCalledTimes(2); });
 });
 
+it('shows the offline explanation without reading business resources or offering retry', async () => {
+  const list = vi.fn(async () => ({ ok: false as const, code: 'UNAVAILABLE' as const, message: '没读到。' }));
+  const outcomes = vi.fn();
+  const wordingList = vi.fn(async () => wording(null));
+  const deskCurrent = vi.fn(async () => ({ ok: true as const, view: deskView([]) }));
+  const usageList = vi.fn();
+  const questionRates = vi.fn();
+  const onTodoCount = vi.fn();
+  window.dashboardIteration = { list, outcomes, start: vi.fn(), close: vi.fn() };
+  window.dashboardWording = { list: wordingList };
+  window.dashboardDesk = { current: deskCurrent, command: vi.fn() };
+  window.dashboardUsageLog = { list: usageList, previewExport: vi.fn(), export: vi.fn() };
+  window.dashboardOps = {
+    questionRates,
+    retrieval: vi.fn(),
+    sopCatalog: vi.fn(),
+    sopImport: vi.fn(),
+    sopPatch: vi.fn(),
+    sopDelete: vi.fn(),
+    scriptDelete: vi.fn(),
+    softwareCatalog: vi.fn(),
+    softwareOpenDownload: vi.fn(),
+  };
+  const view = render(<IntakeOverview mode={null} onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  await act(async () => undefined);
+  for (const read of [list, outcomes, wordingList, deskCurrent, usageList, questionRates]) expect(read).not.toHaveBeenCalled();
+  view.rerender(<IntakeOverview mode="synthetic-offline" onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  await act(async () => undefined);
+  expect(screen.getByTestId('module-overview')).toHaveTextContent('当前为离线预览，查询和待办需在业务环境登录后查看');
+  expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+  expect(screen.queryByText('没读到。')).not.toBeInTheDocument();
+  expect(screen.queryByText('查询次数')).not.toBeInTheDocument();
+  expect(onTodoCount).toHaveBeenLastCalledWith(0);
+  for (const read of [list, outcomes, wordingList, deskCurrent, usageList, questionRates]) expect(read).not.toHaveBeenCalled();
+});
+
+it('clears loaded business data and the badge when entering offline preview', async () => {
+  const list = vi.fn(async () => ({ ok: true as const, items: [task('open')], nextCursor: null }));
+  const onTodoCount = vi.fn();
+  window.dashboardIteration = { list, start: vi.fn(), close: vi.fn() };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  await screen.findByText('话术不准：script-a');
+  expect(onTodoCount).toHaveBeenLastCalledWith(1);
+  view.rerender(<IntakeOverview mode="synthetic-offline" onOpen={() => undefined} onTodoCount={onTodoCount} />);
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '开始处理' })).not.toBeInTheDocument();
+  expect(onTodoCount).toHaveBeenLastCalledWith(0);
+  expect(list).toHaveBeenCalledTimes(1);
+});
+
+it('discards late business reads across offline preview and reads afresh on return', async () => {
+  const page = { ok: true as const, items: [task('open')], nextCursor: null };
+  let release: (value: typeof page) => void = () => undefined;
+  const pending = new Promise<typeof page>(resolve => { release = resolve; });
+  const list = vi.fn().mockImplementationOnce(() => pending).mockResolvedValueOnce({ ...page, items: [task('open', 'fresh-task')] });
+  window.dashboardIteration = { list, start: vi.fn(), close: vi.fn() };
+  const view = render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+  view.rerender(<IntakeOverview mode="synthetic-offline" onOpen={() => undefined} />);
+  await act(async () => { release(page); });
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  view.rerender(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
+  expect(screen.queryByText('话术不准：script-a')).not.toBeInTheDocument();
+  await screen.findByText('话术不准：script-a');
+  expect(list).toHaveBeenCalledTimes(2);
+});
+
 it.each([null, 'product-remote', 'faq-v2'] as const)(
   'does not read legacy query statistics in mode %s', async (mode) => {
     const list = vi.fn(async () => ({ ok: true as const, rows: [], nextCursor: null, canExport: false }));
@@ -957,6 +1024,7 @@ it('describes only the fetched records when a selected period predates the lates
   expect(screen.queryByText('这段时间没有查询记录。')).not.toBeInTheDocument();
   expect(screen.getByText(/服务端最多 500 条/)).toBeInTheDocument();
 }, 15000);
+
 
 it('says 没读到 and runs the usage read again', async () => {
   let failed = true;

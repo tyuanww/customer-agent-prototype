@@ -306,6 +306,7 @@ describe('overlay query layout IPC handlers', () => {
     const fixture = createControllerFixture();
     registerOverlayIpc(() => fixture.controller);
     const request: QueryLayoutRequest = {
+      viewEpoch: 1,
       sessionId: 11,
       sequence: 3,
       phase: 'RESULTS',
@@ -357,6 +358,7 @@ describe('overlay query layout IPC handlers', () => {
     const fixture = createControllerFixture();
     registerOverlayIpc(() => fixture.controller);
     const request: QueryLayoutRequest = {
+      viewEpoch: 1,
       sessionId: 21,
       sequence: 8,
       phase: 'RESULTS',

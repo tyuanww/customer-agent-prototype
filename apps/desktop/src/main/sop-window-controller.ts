@@ -1,478 +1,207 @@
-import { BrowserWindow, clipboard, type WebContents } from 'electron';
-import { join } from 'node:path';
+import { clipboard } from 'electron';
 import { resolveClipboardWrite } from '../shared/clipboard-write';
-import { IPC_CHANNELS } from '../shared/ipc-channels';
-import { sanitizeDragDelta, type Rect } from '../shared/overlay-geometry';
-import { ALLERGY_SOP_SCENE_ID } from '../shared/sop-entry';
-import {
-  SOP_COPY_FEEDBACK_MS,
-  SOP_LAYOUT_TIMEOUT_MS,
-  SOP_OPEN_HEIGHT,
-  SOP_WIDTH,
-  applySopDrag,
-  applySopHeight,
-  placeSopNearQuery,
-  sopLayoutNeedsProjection,
-  sopOpeningSize,
-} from '../shared/sop-geometry';
-import {
-  advanceSopNext,
-  chooseSopEdge,
-  currentSopNode,
-  projectSop,
-  startSopProgress,
-  validateSopTree,
-  type SopProgress,
-  type SopPublishSet,
-  type SopTree,
-  type SopViewerRole,
-} from '../shared/sop-model';
-import { ALLERGY_SOP_TREE } from '../shared/synthetic-sops';
-import {
-  SOP_OPEN_FAILURE_MESSAGE,
-  rejectedSopLayoutAck,
-  sopWindowFailure,
-  type SopCopyResult,
-  type SopLayoutAck,
-  type SopLayoutRequest,
-  type SopProjection,
-  type SopShellState,
-  type SopWindowErrorCode,
-  type SopWindowResult,
-} from '../shared/sop-window';
+import { advanceSopNext, chooseSopEdge, currentSopNode, projectSop, sopScriptCopyable, startSopProgress,
+  type SopProgress, type SopPublishSet, type SopTree, type SopViewerRole } from '../shared/sop-model';
+import { findSyntheticSopTree } from '../shared/synthetic-sops';
+import { MAX_SOP_TASKS, SOP_COPY_FEEDBACK_MS, sopWindowFailure, type QuerySopCommand, type QuerySopCopyRequest,
+  type SopRenameRequest, type SopTaskSummary, type SopCopyResult, type SopProjection, type SopWindowResult } from '../shared/sop-window';
 import { GuardedScheduler } from './guarded-scheduler';
-import { createOverlayChromeWindow } from './overlay-chrome-window';
-import { loadRenderer } from './overlay-renderer-loader';
-import { lockRendererWindow } from './window-security';
 
 export type SopWindowControllerOptions = {
-  preloadPath?: string;
-  rendererDevServerUrl?: () => string | undefined;
-  queryBounds: () => Rect | null;
-  workArea: () => Rect;
+  enabled: () => boolean;
+  presentation: {
+    selectedTask: () => string | null;
+    canExecuteTask?: (taskId: string) => boolean;
+    showTask: (taskId: string) => Promise<boolean>;
+    removeTask: (taskId: string) => void;
+    changed: () => void;
+  };
   sessionRole: () => SopViewerRole;
   publishedScriptIds?: () => SopPublishSet;
   writeClipboard?: (text: string) => void;
 };
+type Session = {
+  taskId: string;
+  ordinal: number;
+  revision: number;
+  displayName: string | null;
+  tree: SopTree;
+  history: SopProgress[];
+  choices: Map<number, string>;
+  confirmations: Map<number, readonly string[]>;
+  checked: Set<string>;
+  selectedScriptId: string | null;
+  waiting: 'customer' | 'internal' | null;
+  copied: boolean;
+  copyTimer: ReturnType<typeof setTimeout> | null;
+};
 
+/** Owns the only task map and copy transaction. Presentation never owns business progress. */
 export class SopWindowController {
-  private window: BrowserWindow | null = null;
-  private tree: SopTree | null = null;
-  private progress: SopProgress | null = null;
-  private shellState: SopShellState = 'opening';
-  private failCode: SopWindowErrorCode | null = null;
-  private failMessage: string | null = null;
-  private copied = false;
-  private opening: Promise<SopWindowResult> | null = null;
-  private sessionId = 0;
-  private lastLayoutSequence = 0;
+  private readonly sessions = new Map<string, Session>();
+  private ordinal = 0;
+  private copySequence = 0;
   private disposed = false;
   private readonly scheduler = new GuardedScheduler();
-  private layoutTimer: ReturnType<typeof setTimeout> | null = null;
-  private copyTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly preloadPath: string;
-  private readonly rendererDevServerUrl?: () => string | undefined;
-  private readonly queryBounds: () => Rect | null;
-  private readonly workArea: () => Rect;
-  private readonly sessionRole: () => SopViewerRole;
-  private readonly publishedScriptIds: () => SopPublishSet;
-  private readonly writeClipboard: (text: string) => void;
-
-  constructor(options: SopWindowControllerOptions) {
-    this.preloadPath = options.preloadPath ?? join(__dirname, '../preload/sop.cjs');
-    this.rendererDevServerUrl = options.rendererDevServerUrl;
-    this.queryBounds = options.queryBounds;
-    this.workArea = options.workArea;
-    this.sessionRole = options.sessionRole;
-    this.publishedScriptIds = options.publishedScriptIds ?? (() => 'fixture');
-    this.writeClipboard = options.writeClipboard ?? ((text) => clipboard.writeText(text));
-  }
-
-  isSopContents(contents: WebContents): boolean {
-    return Boolean(
-      this.window
-      && !this.window.isDestroyed()
-      && this.window.webContents.id === contents.id,
-    );
-  }
-
-  sopContents(): WebContents | null {
-    if (!this.window || this.window.isDestroyed()) {
-      return null;
-    }
-    return this.window.webContents;
-  }
-
-  entryAvailable(): boolean {
-    try {
-      const tree = this.loadTree();
-      validateSopTree(tree);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  resumeAvailable(): boolean {
-    return this.liveWindow() !== null && this.progress !== null;
-  }
-
+  constructor(private readonly options: SopWindowControllerOptions) {}
+  entryAvailable(): boolean { return !this.disposed && this.options.enabled(); }
+  resumeAvailable(): boolean { return this.entryAvailable() && this.sessions.size > 0; }
+  copyGeneration(): number { return this.copySequence; }
+  private progress(session: Session): SopProgress { return session.history[session.history.length - 1]; }
   async open(sceneId: string): Promise<SopWindowResult> {
-    if (this.disposed) {
-      return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);
-    }
-    if (sceneId !== ALLERGY_SOP_SCENE_ID) {
-      return sopWindowFailure('INVALID', '当前切片不能切换流程');
-    }
-    if (this.opening) {
-      return this.opening;
-    }
-    if (this.liveWindow() && this.progress?.sceneId === sceneId) {
-      if (this.shellState === 'failed' && this.failCode === 'SOP_LOAD_FAILED') {
-        this.opening = this.createOrReload(sceneId);
-        try {
-          return await this.opening;
-        } finally {
-          this.opening = null;
-        }
-      }
-      this.revealExisting();
-      return { ok: true };
-    }
-    if (this.liveWindow() && this.progress && this.progress.sceneId !== sceneId) {
-      return sopWindowFailure('INVALID', '当前切片不能切换流程');
-    }
-    this.opening = this.createOrReload(sceneId);
-    try {
-      return await this.opening;
-    } finally {
-      this.opening = null;
-    }
+    if (!this.entryAvailable()) return sopWindowFailure('UNAVAILABLE', '当前环境没有可用流程');
+    const tree = findSyntheticSopTree(sceneId);
+    if (!tree) return sopWindowFailure('INVALID', '没有找到该流程');
+    if (this.sessions.size >= MAX_SOP_TASKS) return sopWindowFailure('INVALID', `最多保留 ${MAX_SOP_TASKS} 条待办，请先结束一条`);
+    const ordinal = ++this.ordinal;
+    const session: Session = { taskId: `sop-${ordinal}`, ordinal, revision: 1, displayName: null, tree, history: [startSopProgress(tree)],
+      choices: new Map(), confirmations: new Map(), checked: new Set(), selectedScriptId: null, waiting: null, copied: false, copyTimer: null };
+    this.resetStep(session);
+    this.sessions.set(session.taskId, session);
+    this.publish();
+    return await this.options.presentation.showTask(session.taskId) ? { ok: true } : sopWindowFailure('FAILED', '流程窗口未打开，请从待办重试');
   }
-
-  close(): void {
-    this.hideRememberingProgress();
+  async restore(taskId: string, revision: number): Promise<SopWindowResult> {
+    const task = this.sessions.get(taskId);
+    if (!this.entryAvailable() || !task || task.revision !== revision) return sopWindowFailure('INVALID', '待办已变化，请重新选择');
+    return await this.options.presentation.showTask(taskId) ? { ok: true } : sopWindowFailure('FAILED', '流程窗口未打开，请从待办重试');
   }
-
-  hideRememberingProgress(): void {
-    const win = this.liveWindow();
-    if (!win) {
-      return;
-    }
-    win.hide();
-    win.webContents.setBackgroundThrottling(false);
-  }
-
   endFlow(): void {
-    this.clearLayoutTimer();
-    this.scheduler.clear(this.copyTimer);
-    this.copyTimer = null;
-    this.copied = false;
-    this.progress = null;
-    this.tree = null;
-    this.shellState = 'opening';
-    this.failCode = null;
-    this.failMessage = null;
-    const win = this.window;
-    this.window = null;
-    if (win && !win.isDestroyed()) {
-      win.destroy();
-    }
+    this.clearTasks();
+    this.publish();
   }
-
-  async restart(): Promise<SopWindowResult> {
-    if (this.disposed) {
-      return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);
-    }
-    this.resetProgress();
-    if (this.shellState === 'failed' && this.failCode === 'SOP_LOAD_FAILED') {
-      return this.open(ALLERGY_SOP_SCENE_ID);
-    }
-    this.shellState = 'ready';
-    this.failCode = null;
-    this.failMessage = null;
-    this.copied = false;
-    this.pushProjection();
+  private clearTasks(): void {
+    const tasks = [...this.sessions.values()];
+    this.sessions.clear();
+    for (const task of tasks) { this.clearCopy(task); this.options.presentation.removeTask(task.taskId); }
+  }
+  current(): SopProjection | null { return this.projection(this.options.presentation.selectedTask()); }
+  projection(taskId: string | null): SopProjection | null {
+    if (!taskId || !this.entryAvailable()) return null;
+    const task = this.sessions.get(taskId);
+    return task ? this.project(task) : null;
+  }
+  summaries(): readonly SopTaskSummary[] {
+    if (!this.entryAvailable()) this.clearTasks();
+    return [...this.sessions.values()].map(task => ({ taskId: task.taskId, ordinal: task.ordinal, displayName: task.displayName,
+      revision: task.revision, sceneId: task.tree.sceneId, sceneTitle: task.tree.sceneTitle,
+      taskTitle: currentSopNode(task.tree, this.progress(task))?.title ?? task.tree.sceneTitle,
+      stepIndex: this.progress(task).stepIndex, waiting: task.waiting }));
+  }
+  rename(request: SopRenameRequest): SopWindowResult {
+    const task = this.sessions.get(request.taskId);
+    if (!this.entryAvailable() || !task || task.revision !== request.revision) return sopWindowFailure('INVALID', '待办已变化，请重新选择');
+    if (task.displayName !== request.displayName) { task.displayName = request.displayName; task.revision += 1; this.publish(); }
     return { ok: true };
   }
-
-  chooseEdge(edgeId: string): SopWindowResult {
-    if (!this.tree || !this.progress || this.shellState !== 'ready') {
-      return sopWindowFailure('INVALID', '当前步骤不能继续');
-    }
-    const next = chooseSopEdge(this.tree, this.progress, edgeId);
-    if (!next) {
-      return sopWindowFailure('INVALID', '当前步骤不能继续');
-    }
-    this.progress = next;
-    this.copied = false;
-    this.pushProjection();
-    return { ok: true };
+  private project(task: Session): SopProjection {
+    return projectSop({ tree: task.tree, progress: this.progress(task), role: this.options.sessionRole(),
+      published: this.options.publishedScriptIds?.() ?? 'fixture', copied: task.copied, taskId: task.taskId, revision: task.revision,
+      checked: task.checked, selectedScriptId: task.selectedScriptId, history: task.history,
+      choices: task.choices, confirmations: task.confirmations, waiting: task.waiting });
   }
 
-  nextStep(): SopWindowResult {
-    if (!this.tree || !this.progress || this.shellState !== 'ready') {
-      return sopWindowFailure('INVALID', '当前步骤不能继续');
+  command(request: QuerySopCommand): SopWindowResult {
+    const session = this.sessions.get(request.taskId);
+    if (!this.entryAvailable() || !session || request.revision !== session.revision || request.stepIndex !== this.progress(session).stepIndex) {
+      return sopWindowFailure('INVALID', '步骤已变化，请按当前步骤操作');
     }
-    const next = advanceSopNext(this.tree, this.progress);
-    if (!next) {
-      return sopWindowFailure('INVALID', '当前步骤不能继续');
+    // Ending a background task must not disturb the displayed task or search results.
+    if (request.type === 'end') {
+      this.clearCopy(session); this.sessions.delete(session.taskId); this.options.presentation.removeTask(session.taskId); this.publish(); return { ok: true };
     }
-    this.progress = next;
-    this.copied = false;
-    this.pushProjection();
-    return { ok: true };
-  }
-
-  moveBy(dx: unknown, dy: unknown, finished?: unknown): void {
-    const win = this.liveWindow();
-    if (!win) {
-      return;
-    }
-    const delta = sanitizeDragDelta(dx, dy);
-    if (!delta) {
-      return;
-    }
-    if (finished !== undefined && typeof finished !== 'boolean') {
-      return;
-    }
-    win.setBounds(applySopDrag(win.getBounds(), delta.dx, delta.dy, this.workArea()));
-  }
-
-  reportLayout(request: SopLayoutRequest): SopLayoutAck {
-    const win = this.liveWindow();
-    if (!win || request.sessionId !== this.sessionId || request.sequence <= this.lastLayoutSequence) {
-      return rejectedSopLayoutAck(request.sessionId, request.sequence, SOP_OPEN_HEIGHT);
-    }
-    this.lastLayoutSequence = request.sequence;
-    this.clearLayoutTimer();
-    const current = win.getBounds();
-    const next = applySopHeight(current, request.desiredHeight, this.workArea());
-    const shouldProject = sopLayoutNeedsProjection(this.shellState, current, next);
-    if (sopLayoutNeedsProjection('ready', current, next)) {
-      win.setBounds(next);
-    }
-    this.shellState = 'ready';
-    this.failCode = null;
-    this.failMessage = null;
-    if (shouldProject) {
-      this.pushProjection();
-    }
-    return {
-      ok: true,
-      sessionId: request.sessionId,
-      sequence: request.sequence,
-      height: next.height,
-    };
-  }
-
-  copyCurrent(): SopCopyResult {
-    if (!this.tree || !this.progress || this.shellState !== 'ready') {
-      return { ok: false, message: '没有可复制的话术内容' };
-    }
-    const node = currentSopNode(this.tree, this.progress);
-    if (node?.kind !== 'copyable') {
-      return { ok: false, message: '没有可复制的话术内容' };
-    }
-    const resolved = resolveClipboardWrite(node.answerText);
-    if (!resolved.ok) {
-      return resolved;
-    }
-    try {
-      this.writeClipboard(resolved.payload);
-      this.copied = true;
-      this.scheduler.clear(this.copyTimer);
-      this.copyTimer = this.scheduler.schedule(() => {
-        this.copyTimer = null;
-        this.copied = false;
-        this.pushProjection();
-      }, SOP_COPY_FEEDBACK_MS);
-      this.pushProjection();
-      return { ok: true };
-    } catch {
-      return { ok: false, message: '复制失败，请重试' };
-    }
-  }
-
-  destroy(): void {
-    if (this.disposed) {
-      return;
-    }
-    this.disposed = true;
-    this.clearLayoutTimer();
-    this.scheduler.clear(this.copyTimer);
-    this.copyTimer = null;
-    this.scheduler.dispose();
-    const win = this.window;
-    this.window = null;
-    this.progress = null;
-    this.tree = null;
-    if (win && !win.isDestroyed()) {
-      win.destroy();
-    }
-  }
-
-  private async createOrReload(sceneId: string): Promise<SopWindowResult> {
-    let tree: SopTree;
-    try {
-      tree = this.loadTree();
-      validateSopTree(tree);
-    } catch {
-      return sopWindowFailure('SOP_FIXTURE_MISSING', '过敏流程样例不可用');
-    }
-    if (sceneId !== tree.sceneId) {
-      return sopWindowFailure('INVALID', '当前切片不能切换流程');
-    }
-    this.tree = tree;
-    this.progress = this.progress?.sceneId === sceneId ? this.progress : startSopProgress(tree);
-    this.copied = false;
-    const retryLoad = this.failCode === 'SOP_LOAD_FAILED';
-    this.shellState = 'opening';
-    this.failCode = null;
-    this.failMessage = null;
-    this.sessionId += 1;
-    this.lastLayoutSequence = 0;
-
-    const existing = this.liveWindow();
-    if (existing) {
-      this.placeWindow(existing, sopOpeningSize());
-      if (retryLoad) {
-        try {
-          const loaded = await loadRenderer(
-            existing,
-            'sop',
-            this.rendererDevServerUrl?.(),
-            () => this.disposed,
-          );
-          if (loaded !== 'loaded' || this.disposed || existing.isDestroyed()) {
-            return this.failLoad(existing);
-          }
-        } catch {
-          return this.failLoad(existing);
+    const executable = this.options.presentation.canExecuteTask?.(request.taskId) ?? this.current()?.taskId === request.taskId;
+    if (!executable) return sopWindowFailure('INVALID', '请先打开该待办');
+    const progress = this.progress(session), node = currentSopNode(session.tree, progress);
+    if (!node) return sopWindowFailure('INVALID', '当前步骤不可用');
+    const failed = (message: string): SopWindowResult => sopWindowFailure('INVALID', message);
+    switch (request.type) {
+      case 'restart': session.history = [startSopProgress(session.tree)]; session.choices.clear(); session.confirmations.clear(); this.resetStep(session); break;
+      case 'rewind': {
+        if (request.targetStepIndex >= progress.stepIndex) return failed('请选择此前已执行的步骤');
+        const index = session.history.findIndex(item => item.stepIndex === request.targetStepIndex);
+        if (index < 0) return failed('历史步骤不存在');
+        session.history = session.history.slice(0, index + 1);
+        for (const step of session.choices.keys()) if (step >= request.targetStepIndex) session.choices.delete(step);
+        for (const step of session.confirmations.keys()) if (step >= request.targetStepIndex) session.confirmations.delete(step);
+        this.resetStep(session); break;
+      }
+      case 'wait': if (node.kind === 'terminal') return failed('当前流程已到终点'); session.waiting = request.reason; break;
+      case 'resume': if (!session.waiting) return failed('当前流程没有等待事项'); session.waiting = null; break;
+      case 'check':
+        if (session.waiting) return failed('请先继续流程');
+        if (!node.requirements.some(item => item.id === request.requirementId)) return failed('该核实项不属于当前步骤');
+        if (request.checked) session.checked.add(request.requirementId); else session.checked.delete(request.requirementId);
+        break;
+      case 'select-script':
+        if (session.waiting) return failed('请先继续流程');
+        if (!node.scripts.some(item => item.id === request.scriptId)) return failed('该话术不属于当前步骤');
+        session.selectedScriptId = request.scriptId; break;
+      case 'choose': case 'next': {
+        if (session.waiting) return failed('请先继续流程');
+        if (!node.requirements.every(item => session.checked.has(item.id))) return failed('请先完成当前步骤的必要核实');
+        const next = request.type === 'choose' ? chooseSopEdge(session.tree, progress, request.edgeId) : advanceSopNext(session.tree, progress);
+        if (!next) return failed('请先选择当前步骤的实际情况');
+        if (request.type === 'choose' && node.kind === 'decision') {
+          const edge = node.edges.find(item => item.id === request.edgeId);
+          if (edge) session.choices.set(progress.stepIndex, edge.label);
         }
+        this.advance(session, next); break;
       }
-      this.pushProjection();
-      this.armLayoutTimeout();
-      this.revealExisting();
-      return { ok: true };
+      default: { const exhaustive: never = request; return exhaustive; }
     }
-
-    const win = createOverlayChromeWindow(this.preloadPath, {
-      width: SOP_WIDTH,
-      height: SOP_OPEN_HEIGHT,
-      title: '过敏售后流程 · Demo',
-      backgroundThrottling: false,
-    });
-    lockRendererWindow(win);
-    this.window = win;
-    win.on('closed', () => {
-      if (this.window === win) {
-        this.window = null;
-      }
-    });
-    this.placeWindow(win, sopOpeningSize());
-    try {
-      const loaded = await loadRenderer(
-        win,
-        'sop',
-        this.rendererDevServerUrl?.(),
-        () => this.disposed,
-      );
-      if (loaded !== 'loaded' || this.disposed || win.isDestroyed()) {
-        return this.failLoad(win);
-      }
-    } catch {
-      return this.failLoad(win);
+    session.revision += 1; this.clearCopy(session); this.publish(); return { ok: true };
+  }
+  copyCurrent(request: QuerySopCopyRequest): SopCopyResult {
+    const session = this.sessions.get(request.taskId);
+    const executable = this.options.presentation.canExecuteTask?.(request.taskId) ?? this.current()?.taskId === request.taskId;
+    if (!this.entryAvailable() || !executable || !session || request.revision !== session.revision || request.stepIndex !== this.progress(session).stepIndex) {
+      return { ok: false, message: '步骤已变化，请按当前步骤复制' };
     }
-    this.pushProjection();
-    this.armLayoutTimeout();
-    // First open must not steal Query IME. Re-open uses revealExisting().
-    win.showInactive();
-    return { ok: true };
-  }
-
-  private revealExisting(): void {
-    const win = this.liveWindow();
-    if (!win) {
-      return;
+    if (session.waiting) return { ok: false, message: '请先继续流程' };
+    const progress = this.progress(session), node = currentSopNode(session.tree, progress);
+    const script = node?.scripts.find(item => item.id === request.scriptId);
+    if (!node || !script) return { ok: false, message: '该话术当前不可复制' };
+    if (!sopScriptCopyable(script, this.options.publishedScriptIds?.() ?? 'fixture')) {
+      this.clearCopy(session); session.revision += 1; this.publish();
+      return { ok: false, message: '该话术当前不可复制' };
     }
-    this.placeWindow(win, { width: SOP_WIDTH, height: win.getBounds().height });
-    if (!win.isVisible()) {
-      win.show();
-    }
-    win.moveTop();
-    win.focus();
+    const resolved = resolveClipboardWrite(script.answerText);
+    if (!resolved.ok) return resolved;
+    const next = node.kind === 'action' && node.requirements.every(item => session.checked.has(item.id))
+      ? advanceSopNext(session.tree, progress) : null;
+    try { (this.options.writeClipboard ?? clipboard.writeText)(resolved.payload); }
+    catch { return { ok: false, message: '复制失败，请重试' }; }
+    const copyGeneration = ++this.copySequence;
+    for (const task of this.sessions.values()) this.clearCopy(task);
+    if (next) this.advance(session, next);
+    else { session.selectedScriptId = script.id; session.copied = true; }
+    session.revision += 1;
+    if (!next) session.copyTimer = this.scheduler.schedule(() => {
+      session.copyTimer = null; session.copied = false; this.publish();
+    }, SOP_COPY_FEEDBACK_MS);
+    this.publish();
+    const source = { taskId: session.taskId, revision: request.revision, stepIndex: progress.stepIndex };
+    return next ? { ok: true, outcome: 'copied-advanced', source, sourceTitle: node.title, copyGeneration }
+      : { ok: true, outcome: 'copied-stayed', source, sourceTitle: node.title, reason: node.kind === 'action' ? 'requirements' : node.kind, copyGeneration };
   }
-
-  private placeWindow(win: BrowserWindow, size: { width: number; height: number }): void {
-    win.setBounds(placeSopNearQuery(this.queryBounds(), this.workArea(), size));
+  private advance(session: Session, next: SopProgress): void {
+    const progress = this.progress(session), node = currentSopNode(session.tree, progress);
+    session.confirmations.set(progress.stepIndex, node?.requirements.filter(item => session.checked.has(item.id)).map(item => item.label) ?? []);
+    session.history.push(next); this.resetStep(session);
   }
-
-  private armLayoutTimeout(): void {
-    this.clearLayoutTimer();
-    const sessionId = this.sessionId;
-    this.layoutTimer = this.scheduler.schedule(() => {
-      this.layoutTimer = null;
-      if (this.disposed || sessionId !== this.sessionId || this.shellState === 'ready') {
-        return;
-      }
-      this.shellState = 'failed';
-      this.failCode = 'SOP_LAYOUT_TIMEOUT';
-      this.failMessage = '过敏流程窗口未能贴合内容';
-      this.pushProjection();
-    }, SOP_LAYOUT_TIMEOUT_MS);
+  destroy(): void { this.disposed = true; this.sessions.clear(); this.scheduler.dispose(); }
+  private resetStep(session: Session): void {
+    const scripts = currentSopNode(session.tree, this.progress(session))?.scripts ?? [];
+    session.checked.clear(); session.waiting = null;
+    session.selectedScriptId = scripts.length === 1 ? scripts[0]?.id ?? null : null;
   }
-
-  private clearLayoutTimer(): void {
-    this.scheduler.clear(this.layoutTimer);
-    this.layoutTimer = null;
+  private clearCopy(session: Session): void { this.scheduler.clear(session.copyTimer); session.copyTimer = null; session.copied = false; }
+  reportExternalCopy(): number {
+    this.copySequence += 1;
+    for (const task of this.sessions.values()) this.clearCopy(task);
+    this.publish();
+    return this.copySequence;
   }
-
-  private resetProgress(): void {
-    if (this.tree) {
-      this.progress = startSopProgress(this.tree);
-    }
-    this.copied = false;
-  }
-
-  private failLoad(win: BrowserWindow): SopWindowResult {
-    this.shellState = 'failed';
-    this.failCode = 'SOP_LOAD_FAILED';
-    this.failMessage = SOP_OPEN_FAILURE_MESSAGE;
-    if (!win.isDestroyed()) {
-      this.placeWindow(win, sopOpeningSize());
-      win.showInactive();
-    }
-    return sopWindowFailure('SOP_LOAD_FAILED', SOP_OPEN_FAILURE_MESSAGE);
-  }
-
-  private liveWindow(): BrowserWindow | null {
-    if (!this.window || this.window.isDestroyed() || this.disposed) {
-      return null;
-    }
-    return this.window;
-  }
-
-  private loadTree(): SopTree {
-    return this.tree ?? ALLERGY_SOP_TREE;
-  }
-
-  private pushProjection(): void {
-    const win = this.liveWindow();
-    if (!win || !this.tree || !this.progress || win.webContents.isDestroyed()) {
-      return;
-    }
-    const projection: SopProjection = projectSop({
-      tree: this.tree,
-      progress: this.progress,
-      role: this.sessionRole(),
-      published: this.publishedScriptIds(),
-      shellState: this.shellState,
-      copied: this.copied,
-      failCode: this.failCode,
-      failMessage: this.failMessage,
-      sessionId: Math.max(1, this.sessionId),
-    });
-    win.webContents.send(IPC_CHANNELS.SOP_WINDOW_PROJECTION, projection);
-  }
+  publish(): void { this.options.presentation.changed(); }
 }

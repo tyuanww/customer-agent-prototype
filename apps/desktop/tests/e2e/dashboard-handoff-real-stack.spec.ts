@@ -55,7 +55,10 @@ test('dashboard handoff: date presets, collapsed filters, xlsx with picture, acc
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
     await app.evaluate(({ app }) => app.focus({ steal: true }));
-    await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect.poll(() => app!.windows().some(w => w.url().includes('role=fox'))).toBe(true);
+    const fox = app.windows().find(w => w.url().includes('role=fox'))!;
+    await fox.getByTestId('fox-button').click();
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await query.getByRole('button', { name: '登录', exact: true }).click();
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);

@@ -10,6 +10,7 @@ import {
 } from './query-view';
 
 type QueryCapsuleProps = {
+  hidden?: boolean;
   productControl?: React.ReactNode;
   scopeControl?: React.ReactNode;
   intake?: boolean;
@@ -37,6 +38,7 @@ type QueryCapsuleProps = {
 };
 
 export function QueryCapsule({
+  hidden = false,
   productControl,
   scopeControl,
   intake = false,
@@ -63,7 +65,7 @@ export function QueryCapsule({
   onSearch,
 }: QueryCapsuleProps) {
   return (
-        <div className="query-capsule">
+        <div className="query-capsule" hidden={hidden}>
           <button
             type="button"
             className="capsule-fox"

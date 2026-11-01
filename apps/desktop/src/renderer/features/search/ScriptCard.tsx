@@ -1,3 +1,5 @@
+import { Button } from 'antd';
+import type { SopEntry } from '@shared/sop-entry';
 import { useState } from 'react';
 import {
   SCRIPT_INACCURACY_ACTION_LABEL,
@@ -14,6 +16,9 @@ type ScriptCardProps = {
   allowInaccuracyReport?: boolean;
   reported?: boolean;
   onReport?: (script: RankedScript) => void;
+  sopEntryBusy?: boolean;
+  sopEntries?: readonly SopEntry[];
+  onOpenSop?: (sceneId?: string) => void;
 };
 
 const RISK_COPY: Record<RiskLevel, { label: string; className: string }> = {
@@ -30,6 +35,9 @@ export function ScriptCard({
   allowInaccuracyReport = true,
   reported,
   onReport,
+  sopEntryBusy = false,
+  sopEntries = [],
+  onOpenSop,
 }: ScriptCardProps) {
   const validNow = Date.parse(script.effectiveFrom) <= Date.now() && (!script.effectiveTo || Date.now() < Date.parse(script.effectiveTo));
   const validity = script.productCopy ? { kind: validNow ? 'active' : 'expired', text: validNow ? '当前有效' : '已失效，请重新查询' } : getValidityInfo(script.effectiveFrom, script.effectiveTo);
@@ -58,24 +66,44 @@ export function ScriptCard({
           </span>
         </div>
       </div>
-      <div className="card-answer-row">
+      <div className="card-answer-row card-answer-row-stacked">
         <p className="answer-text" data-testid={`answer-text-${script.rank}`}>
           {script.answerText}
         </p>
         <div className="card-actions">
-          <button
-            type="button"
+          <Button
+            type="primary"
+            htmlType="button"
             className={copied ? 'copy-btn is-copied' : 'copy-btn'}
             data-testid={`copy-button-${script.rank}`}
             disabled={copying || (!!script.productCopy && !validNow)}
             aria-keyshortcuts={String(script.rank)}
-            onClick={(event) => onCopy(script, event.currentTarget)}
+            onClick={(event) => onCopy(script, event.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null)}
           >
             {copied ? '已复制' : '复制话术'}
-          </button>
+          </Button>
+          {sopEntries.length > 0 && onOpenSop ? (
+            <div className="sop-card-entry" data-testid={`sop-card-entry-${script.rank}`} aria-live="polite">
+              {sopEntries.map(entry => (
+                <Button
+                  key={entry.sceneId}
+                  type="default"
+                  className="sop-card-entry-action"
+                  data-testid={`sop-card-open-${script.rank}-${entry.sceneId}`}
+                  aria-label={`进入${entry.title}`}
+                  disabled={sopEntryBusy}
+                  loading={sopEntryBusy}
+                  onClick={() => onOpenSop?.(entry.sceneId)}
+                >
+                  进入{entry.title}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           {allowInaccuracyReport ? (
-            <button
-              type="button"
+            <Button
+              type="default"
+              htmlType="button"
               className="retry-btn"
               data-testid={`report-inaccuracy-button-${script.rank}`}
               disabled={isReported}
@@ -90,7 +118,7 @@ export function ScriptCard({
               }}
             >
               {SCRIPT_INACCURACY_ACTION_LABEL}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

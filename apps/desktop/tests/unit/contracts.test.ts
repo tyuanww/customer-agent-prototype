@@ -9,10 +9,6 @@ const loginPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/login.ts'),
   'utf8',
 );
-const sopPreload = readFileSync(
-  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/sop.ts'),
-  'utf8',
-);
 const dashboardPreload = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/preload/dashboard.ts'),
   'utf8',
@@ -94,17 +90,14 @@ describe('IPC whitelist', () => {
       IPC_CHANNELS.LOGIN_WINDOW_CHOOSE_FEISHU,
       IPC_CHANNELS.LOGIN_WINDOW_SUBMIT_ACCOUNT,
       IPC_CHANNELS.LOGIN_WINDOW_CANCEL,
+      IPC_CHANNELS.QUERY_SOP_WINDOW,
+      IPC_CHANNELS.QUERY_SOP_COMMAND,
+      IPC_CHANNELS.QUERY_SOP_NAVIGATE,
+      IPC_CHANNELS.QUERY_SOP_CURRENT,
+      IPC_CHANNELS.QUERY_SOP_COPY,
       IPC_CHANNELS.SOP_WINDOW_OPEN,
       IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE,
       IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE,
-      IPC_CHANNELS.SOP_WINDOW_CLOSE,
-      IPC_CHANNELS.SOP_WINDOW_END_FLOW,
-      IPC_CHANNELS.SOP_WINDOW_RESTART,
-      IPC_CHANNELS.SOP_WINDOW_CHOOSE_EDGE,
-      IPC_CHANNELS.SOP_WINDOW_NEXT_STEP,
-      IPC_CHANNELS.SOP_WINDOW_MOVE_BY,
-      IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT,
-      IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT,
       IPC_CHANNELS.SOP_WINDOW_PROJECTION,
     ]);
     expect(new Set(IPC_CHANNEL_WHITELIST).size).toBe(IPC_CHANNEL_WHITELIST.length);
@@ -121,14 +114,9 @@ describe('IPC whitelist', () => {
     expect(overlayPreload).toContain(`IPC_CHANNELS.PRODUCT_INACCURACY_REPORT`);
   });
 
-  it('parses SOP open results in the overlay preload without importing sop-window', () => {
-    expect(overlayPreload).not.toContain("from '../shared/sop-window'");
-    expect(overlayPreload).toContain('parseSopWindowOpenResult');
-    expect(overlayPreload).toContain("exactKeys(record, ['ok'])");
-    expect(overlayPreload).toContain("exactKeys(record, ['ok', 'code', 'message'])");
-    expect(overlayPreload).toContain('SOP_LOAD_FAILED');
-    expect(overlayPreload).toContain('SOP_LAYOUT_TIMEOUT');
-    expect(overlayPreload).toContain('SOP_FIXTURE_MISSING');
+  it('validates SOP open results and projections using the shared schema', () => {
+    expect(overlayPreload).toContain('isQuerySopSnapshot(value)');
+    expect(overlayPreload).toContain('isSopWindowResult(value)');
   });
 
   it('keeps the dashboard wording preload free of shared overlay modules', () => {
@@ -162,17 +150,12 @@ describe('IPC whitelist', () => {
     expect(dashboardPreload).toContain('ipcRenderer.on(PRODUCT_SESSION_CHANGED');
   });
 
-  it('keeps the SOP preload free of shared overlay modules', () => {
-    expect(sopPreload).not.toContain("from '../shared/ipc-channels'");
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_CLOSE}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_END_FLOW}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_RESTART}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_CHOOSE_EDGE}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_NEXT_STEP}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_MOVE_BY}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT}'`);
-    expect(sopPreload).toContain(`'${IPC_CHANNELS.SOP_WINDOW_PROJECTION}'`);
+  it('builds the narrow floating SOP preload with an enforced self-contained bundle', () => {
+    const config = readApiSource('../../electron.vite.config.ts');
+    expect(config).toContain("src/preload/sop.ts");
+    expect(config).toContain("Sandbox preload");
+    expect(overlayPreload).toContain('IPC_CHANNELS.QUERY_SOP_COMMAND');
+    expect(overlayPreload).toContain('IPC_CHANNELS.QUERY_SOP_COPY');
   });
 
   it('uses 已复制 as the only success copy label', () => {

@@ -34,7 +34,7 @@ import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
 import { join } from 'node:path';
-import { app, Menu, screen, session, shell } from 'electron';
+import { app, dialog, Menu, session, shell } from 'electron';
 import {
   applyChromiumLoopbackProxyBypass,
   applySessionLoopbackProxyBypass,
@@ -44,9 +44,10 @@ import { OverlayController } from './overlay-controller';
 import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
 import { registerOverlayIpc } from './overlay-ipc';
+import { SopPresentationOwner } from './sop-presentation-owner';
+import { createSopFloatingWindow } from './sop-floating-window';
 import { SopWindowController } from './sop-window-controller';
 import { registerSopWindowIpc } from './sop-window-ipc';
-import { sopWorkAreaForQuery } from '../shared/sop-geometry';
 import { applySessionSecurity } from './window-security';
 import { installDesktopShell, type DesktopShell } from './desktop-shell';
 import { applyApplicationIdentity } from './app-identity';
@@ -100,6 +101,7 @@ if (!gotLock) {
 } else {
   const shuttingDown = createShutdownFence();
   let controller: OverlayController | null = null;
+  let sopPresentation: SopPresentationOwner | null = null;
   let sopController: SopWindowController | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
@@ -207,13 +209,14 @@ if (!gotLock) {
       ? process.env.DEMO_E2E_ACCELERATOR
       : undefined;
     sopController = new SopWindowController({
-      rendererDevServerUrl: () => controller?.rendererDevServerUrl,
-      queryBounds: () => controller?.queryWindowBounds() ?? null,
-      workArea: () => sopWorkAreaForQuery(
-        controller?.queryWindowBounds() ?? null,
-        screen.getPrimaryDisplay().workArea,
-        (query) => screen.getDisplayMatching(query).workArea,
-      ),
+      enabled: () => !productProfile,
+      presentation: {
+        selectedTask: () => sopPresentation?.selectedTask() ?? null,
+        canExecuteTask: taskId => sopPresentation?.isTaskExecutable(taskId) === true,
+        showTask: async taskId => sopPresentation?.showTask(taskId) ?? false,
+        removeTask: taskId => sopPresentation?.removeTask(taskId),
+        changed: () => sopPresentation?.publish(),
+      },
       sessionRole: () => {
         const view = productSession?.view();
         return view?.ok && view.signedIn ? view.role : null;
@@ -225,20 +228,36 @@ if (!gotLock) {
       rendererDevServerUrl,
       runningPoint: runningPointFromResolvedSession(productProfile, app.isPackaged),
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
-      onDispose: () => sopController?.destroy(),
-      onDashboardShown: () => sopController?.hideRememberingProgress(),
+      onDispose: () => { sopPresentation?.destroy(); sopController?.destroy(); },
+      onQueryDismiss: () => sopPresentation?.queryDismissed(),
+      onQueryShown: () => sopPresentation?.queryShown(),
+      onQueryDestroyed: () => {
+        void dialog.showMessageBox({ type: 'warning', title: '查询窗口暂不可用', message: '查询窗口已关闭',
+          detail: '请先处理尚在打开的流程，再重新打开应用。未保存的名称可能需要重新输入。', buttons: ['知道了'], noLink: true })
+          .catch(() => console.warn('[sop-presentation] Query failure notice could not be shown'));
+      },
+      onQueryViewChanged: () => sopPresentation?.publish(),
     });
     controller = next;
+    sopPresentation = new SopPresentationOwner({ domain: sopController, query: next.querySopSlot(),
+      queryContents: () => next.trustedContents().find(contents => next.overlayRoleOf(contents) === 'query') ?? null,
+      queryPresentation: () => next.queryPresentation(),
+      showOrdinaryQuery: () => { next.openSearch(); return true; },
+      queryHome: () => { next.navigateQuery({ type: 'home', viewEpoch: next.queryPresentation().viewEpoch }); },
+      createFloating: onLost => createSopFloatingWindow({ devServerUrl: rendererDevServerUrl, onLost }),
+    });
     registerClipboardIpc(
       () => controller?.trustedContents() ?? [],
       (contents) => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl,
       () => productSession !== null,
+      () => sopController?.reportExternalCopy(),
     );
     registerOverlayIpc(() => controller);
     registerSopWindowIpc({
       getOverlay: () => controller,
       getSop: () => sopController,
+      getPresentation: () => sopPresentation,
     });
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {

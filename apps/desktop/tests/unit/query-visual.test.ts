@@ -100,9 +100,9 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('color-mix(in srgb, var(--muted) 32%, var(--glass-inner-solid))');
     expect(css).toContain(".deep-thinking-entry[aria-checked='true'] .smart-toggle-thumb {\n  transform: translateX(16px)");
     expect(css).toContain(".deep-thinking-entry[aria-checked='true'] .smart-toggle-thumb {\n  transform: translateX(16px);\n  border-color: color-mix(in srgb, var(--fox) 28%, #fff);\n  background: #fff;");
-    expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?border: 1px solid var\(--hairline\)/);
-    expect(css).toMatch(/\.sop-entry-banner\s*\{[\s\S]*?background: var\(--glass-inner\)/);
-    expect(css).not.toMatch(/\.sop-entry-banner\s*\{[^}]*--fox-soft/);
+    expect(css).not.toContain('.sop-entry-banner');
+    expect(css).not.toContain('.capsule-sop-entry');
+    expect(css).toMatch(/\.sop-card-entry-action\.ant-btn\s*\{[\s\S]*?min-height: 36px/);
   });
 
   it('keeps inaccuracy report as a hairline retry control, not the lavender copy CTA', () => {
@@ -113,7 +113,7 @@ describe('query capsule visual contract', () => {
     expect(queryApp).toContain('SCRIPT_INACCURACY_RECORDED_STATUS');
     expect(css).toMatch(/\.retry-btn\s*\{[\s\S]*?background: transparent/);
     expect(css).toContain('.script-card .retry-btn');
-    expect(css).toMatch(/\.copy-btn\s*\{[\s\S]*?background: var\(--query-accent-control\)/);
+    expect(css).toMatch(/\.copy-btn:not\(\.ant-btn\)\s*\{[\s\S]*?background: var\(--query-accent-control\)/);
   });
 
   it('provides glass fallbacks without changing the reduced-motion handoff snap', () => {
@@ -129,12 +129,12 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('.dashboard-entry:hover,');
     expect(css).toContain(".deep-thinking-entry[aria-checked='true'],");
     expect(css).toContain('.search-btn:hover,');
-    expect(css).toContain('.copy-btn:hover:not(:disabled)');
+    expect(css).toContain('.copy-btn:not(.ant-btn):hover:not(:disabled)');
     expect(css).toContain('.query-shell.is-opening .glass-shell {');
     expect(css).toContain('clip-path: inset(0 round var(--radius-shell))');
     expect(css).toContain('.query-shell.is-closing .glass-shell {');
     expect(css).toContain('var(--query-handoff-clip-left)');
-    expect(css).toContain("html[data-role='query'] {");
+    expect(css).toContain("html:is([data-role='query'], [data-role='sop-floating']) {");
     expect(css).toContain('--query-control: var(--glass-solid)');
     expect(css).toContain('--fox-soft: var(--fox-soft-solid)');
     expect(css).toContain('--query-match-exact-surface: var(--query-match-exact-solid)');

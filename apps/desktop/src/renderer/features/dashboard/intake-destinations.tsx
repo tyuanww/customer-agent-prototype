@@ -84,7 +84,16 @@ function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): 
 const JOB_PENDING = '正在确认你的职务……';
 
 export function renderIntakeDestinations(ctx: IntakeDestinationContext): ReactNode {
-  const pages = INTAKE_DESTINATION_ROWS.filter((row) => shouldMount(row, ctx)).map((row) => (
+  if (ctx.workbenchMode === 'synthetic-offline') {
+    const row = INTAKE_DESTINATION_ROWS.find(item => item.id === ctx.active);
+    if (!row || !intakeRowVisible(row, ctx.canOpenPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return null;
+    if (ctx.active === 'overview' || ctx.active === 'sop') return INTAKE_DESTINATION_MOUNTS[ctx.active](ctx);
+    return <section className="dash-module intake-management intake-offline-page wb9" data-testid={`module-${ctx.active}`} aria-label={row.label}>
+      <h1 className="desk-sr">{row.label}</h1>
+      <p className="ov-empty">当前为离线预览，{row.label}需在业务环境登录后查看</p>
+    </section>;
+  }
+  const pages = (ctx.workbenchMode === null && !ctx.jobKnown ? [] : INTAKE_DESTINATION_ROWS.filter((row) => shouldMount(row, ctx))).map((row) => (
     <Fragment key={row.id}>{INTAKE_DESTINATION_MOUNTS[row.id](ctx)}</Fragment>
   ));
   if (!ctx.jobKnown) {

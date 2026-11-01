@@ -302,13 +302,21 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 ## SOP
 
-过敏售后流程切片 1 是**合成**独立 SOP 窗，不是 Query 的第三种 overlay 角色，也不是产品远端发货查询的必经步。`OverlayRole` 仍只有 `fox | query`；`RendererRole` 增加 `sop`。问句须含「过敏」且判成售后（例如 `过敏了怎么办`）才出现入口；查发货不会出 SOP。
+本地合成 SOP 默认在 Query 内展示，也可在多个独立 `sop-floating` renderer 窗口执行；每条任务同时只有一个执行宿主。仅无产品 profile 的合成环境提供过敏与少件流程；真实资料和 FAQ 合成 profile 不回退到合成 SOP。合成验证不证明正式 graph、真实业务内容或授权已接入。
 
 | 你想证明 | 命令 |
 | --- | --- |
-| SOP 树 / 几何 / 合同 / 入口 / 三屏渲染 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/sop-model.test.ts tests/unit/sop-geometry.test.ts tests/unit/contracts.test.ts tests/unit/window-role.test.ts tests/unit/sop-window-ipc.test.ts tests/component/SopApp.test.tsx tests/component/QueryApp.test.tsx tests/unit/search-service.test.ts` |
+| 合成投影、会话、IPC、Query 和不可用话术 | `pnpm --filter @customer-agent/desktop exec vitest run tests/unit/sop-model.test.ts tests/unit/query-sop-session.test.ts tests/unit/sop-window-ipc.test.ts tests/unit/sop-projection-preload.test.ts tests/unit/sop-unavailable-projection.test.ts tests/component/query-sop-panel.test.tsx tests/component/query-sop-unavailable.test.tsx tests/component/QueryApp.test.tsx` |
 
-黄金路径（人工）：`pnpm dev` → 狐狸头 → `过敏了怎么办` → 结果标题和卡片之间的 banner +「打开过敏售后流程」→ 凭证话术屏。SOP 窗 600×240 起壳，ACK 后 hug，高度上限 620。Esc / × 收起后，同一 Query 结果应改成「继续过敏售后流程」。选严重程度时有「先判断不适程度，再选路径。」；凭证步才有「本步只给话术，不建单、不指令仓配」。复制卡没有排名「1」。Windows feasibility 允许过敏 hug 比旧 Query 更高，不把 620 当成失败。不要跑 `pnpm test:float` 来证明 SOP。SOP 卡片没有「话术不准」。
+合成 Electron 路径使用独立输出目录，不覆盖已有截图或测试结果：
+
+```sh
+SOP_QA_OUTPUT="$(mktemp -d "${TMPDIR:-/tmp}/customer-agent-sop-qa.XXXXXX")"
+pnpm --filter @customer-agent/desktop exec electron-vite build --outDir "$SOP_QA_OUTPUT/out"
+CUSTOMER_AGENT_SOP_E2E_ENTRY="$SOP_QA_OUTPUT/out/main/index.js" pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/query-sop-multi-window.spec.ts tests/e2e/query-sop-rename-drafts.spec.ts tests/e2e/query-sop-inline-rename.spec.ts tests/e2e/query-sop-resize-revision.spec.ts --workers=1 --output "$SOP_QA_OUTPUT/results"
+```
+
+人工路径：打开狐狸查询，搜索「用了露芷面膜过敏了怎么办」。首张普通话术卡保留「复制话术」和次要的「进入过敏流程」；坐席自行选择。进入后在 Query 内核实凭证，按实际情况选择分支；判断步骤不提供关键词推荐。返回搜索保留流程，结束和重新开始需要确认。复制只表示写入剪贴板，不代表发送或流程完成。异常投影测试使用合成注入：旧内容清除，提示旁的「重新进入」重读 Main 当前会话，失败时可以重试。窗口尺寸、图片失败、真实系统焦点、安装包及真人坐席的证据按各自专项执行，不用该合成路径代替。
 
 ## 话术不准（Query 切片 1）
 
@@ -316,7 +324,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 | 你想证明 | 命令 |
 | --- | --- |
-| 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/component/SopApp.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts tests/unit/product-search.test.ts tests/unit/product-search-ipc.test.ts` |
+| 话术不准入口与复制路径隔离 | `pnpm --filter @customer-agent/desktop exec vitest run tests/component/QueryApp.test.tsx tests/component/QueryResultsPane.test.tsx tests/unit/query-view.test.ts tests/unit/query-visual.test.ts tests/unit/product-search.test.ts tests/unit/product-search-ipc.test.ts` |
 
 ## 内容管理草稿（Dashboard 切片 1）
 

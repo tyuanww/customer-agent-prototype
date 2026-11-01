@@ -1,7 +1,8 @@
 import type { Ref, ReactNode } from 'react';
+import { Alert, Button, Typography } from 'antd';
+import { relatedSyntheticSopEntries, type SopEntry } from '@shared/sop-entry';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import type { OverlayPhase } from '@shared/overlay-machine';
-import { SOP_ENTRY_BUTTON, SOP_ENTRY_HINT, SOP_RESUME_BUTTON } from '@shared/sop-window';
 import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
 import { isIntakeRow, type QueryResult, type RankedScript } from './types';
@@ -21,8 +22,12 @@ type QueryResultsPaneProps = {
   sopEntryVisible?: boolean;
   sopEntryBusy?: boolean;
   sopEntryError?: string | null;
+  sopProjectionInvalid?: boolean;
+  sopRecoveryBusy?: boolean;
+  onRecoverSop?: () => void;
   sopEntryResume?: boolean;
-  onOpenSop?: () => void;
+  sopEntries?: readonly SopEntry[];
+  onOpenSop?: (sceneId?: string) => void;
   onRetry: () => void;
   onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
@@ -47,8 +52,12 @@ export function QueryResultsPane({
   sopEntryVisible = false,
   sopEntryBusy = false,
   sopEntryError = null,
+  sopProjectionInvalid = false,
+  sopRecoveryBusy = false,
+  onRecoverSop,
   sopEntryResume = false,
   onOpenSop,
+  sopEntries = [],
   onRetry,
   onCopy,
   reportedScriptIds,
@@ -58,6 +67,11 @@ export function QueryResultsPane({
   onOpenHelp,
   onLeaveNoHit,
 }: QueryResultsPaneProps) {
+  const availableSopEntries = sopEntryVisible && !sopEntryResume && onOpenSop
+    && results.every(script => !isIntakeRow(script) && !script.productCopy)
+    && (phase === 'RESULTS' || phase === 'COPIED' || phase === 'EMPTY') ? sopEntries : [];
+  const showSopNoHitEntry = phase === 'EMPTY' && availableSopEntries.length > 0;
+
   return (
           <section
             ref={resultPaneRef}
@@ -66,6 +80,8 @@ export function QueryResultsPane({
             aria-label="候选话术"
             tabIndex={-1}
           >
+            {sopProjectionInvalid ? <Alert type="error" title="流程读取失败，请重新进入" showIcon role="alert"
+              action={<Button aria-label="重新进入" loading={sopRecoveryBusy} disabled={sopRecoveryBusy} onClick={onRecoverSop}>重新进入</Button>} /> : null}
             {contextControls ? <div data-query-context>{contextControls}</div> : null}
             {phase === 'EMPTY' ? (
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
@@ -73,8 +89,28 @@ export function QueryResultsPane({
                 <strong>没找到可用话术</strong>
                 <span>请先让客户稍等，再联系话术师或运营，必要时升级客服经理。这不是转交回执。</span>
                 {errorMessage ? <span>{errorMessage}</span> : null}
-                {onCopyContact || onOpenHelp ? (
+                {showSopNoHitEntry || onCopyContact || onOpenHelp || onLeaveNoHit ? (
                   <div className="no-hit-help" data-testid="no-hit-help">
+                    {showSopNoHitEntry ? (
+                      <div className="sop-no-hit-entry" data-testid="sop-no-hit-entry">
+                        <Typography.Text>已匹配到可执行流程</Typography.Text>
+                        {availableSopEntries.map(entry => (
+                          <Button
+                            key={entry.sceneId}
+                            type="default"
+                            className="sop-card-entry-action"
+                            data-testid={`sop-no-hit-open-${entry.sceneId}`}
+                            aria-label={`进入${entry.title}`}
+                            disabled={sopEntryBusy}
+                            loading={sopEntryBusy}
+                            onClick={() => onOpenSop?.(entry.sceneId)}
+                          >
+                            进入{entry.title}
+                          </Button>
+                        ))}
+                        {sopEntryError ? <Typography.Text type="danger" role="alert" data-testid="sop-open-error">{sopEntryError}</Typography.Text> : null}
+                      </div>
+                    ) : null}
                     {onCopyContact ? <button type="button" className="retry-btn" data-testid="copy-contact-button" onClick={onCopyContact}>复制联系方式</button> : null}
                     {onOpenHelp ? <button type="button" className="retry-btn" data-testid="open-help-button" onClick={onOpenHelp}>打开求助入口</button> : null}
                     {onLeaveNoHit ? <button type="button" className="retry-btn" data-testid="no-hit-exit-button" onClick={onLeaveNoHit}>离开</button> : null}
@@ -107,25 +143,15 @@ export function QueryResultsPane({
                       <span>{results.length} 条 · 按 1 / 2 / 3 复制</span>
                     )}
                   </div>
+                  {availableSopEntries.length > 0 ? <div className="sop-query-entry" data-testid="sop-query-entry" role="group" aria-label="本次查询相关流程">
+                    <Typography.Text type="secondary">相关流程</Typography.Text>
+                    {availableSopEntries.map(entry => <Button key={entry.sceneId} type="default" className="sop-card-entry-action"
+                      data-testid={`sop-query-open-${entry.sceneId}`} disabled={sopEntryBusy} loading={sopEntryBusy}
+                      onClick={() => onOpenSop?.(entry.sceneId)}>进入{entry.title}</Button>)}
+                    {sopEntryError ? <Typography.Text type="danger" role="alert" data-testid="sop-open-error">{sopEntryError}</Typography.Text> : null}
+                  </div> : null}
                   {reportError ? <div className="validation-error" role="status">{reportError}</div> : null}
-                  {sopEntryVisible ? (
-                    <div className="sop-entry-banner" data-testid="sop-entry-banner">
-                      <span>{SOP_ENTRY_HINT}</span>
-                      <button
-                        type="button"
-                        className="retry-btn"
-                        data-testid="open-allergy-sop"
-                        disabled={sopEntryBusy}
-                        onClick={onOpenSop}
-                      >
-                        {sopEntryResume ? SOP_RESUME_BUTTON : SOP_ENTRY_BUTTON}
-                      </button>
-                      {sopEntryError ? (
-                        <span className="validation-error" data-testid="sop-open-error">{sopEntryError}</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {results.map((script) => isIntakeRow(script) ? (
+                    {results.map((script) => isIntakeRow(script) ? (
                     <IntakeFaqCard key={script.key} row={script} copying={copying || phase === 'COPIED'}
                       copied={copiedRank === script.rank} onCopy={onCopy} />
                   ) : (
@@ -136,6 +162,9 @@ export function QueryResultsPane({
                       copied={copiedRank === script.rank}
                       reported={reportedScriptIds?.has(script.scriptId)}
                       onReport={onReportInaccuracy}
+                      sopEntryBusy={sopEntryBusy}
+                      sopEntries={relatedSyntheticSopEntries({ scriptId: script.scriptId, entries: availableSopEntries })}
+                      onOpenSop={onOpenSop}
                       onCopy={(item, trigger) => {
                         onCopy(item, trigger);
                       }}

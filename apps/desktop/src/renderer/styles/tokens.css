@@ -16,6 +16,7 @@
   --query-control-pressed: rgba(246, 242, 255, 0.82);
   --query-accent-control: rgba(242, 236, 255, 0.92);
   --query-accent-control-hover: rgba(234, 226, 255, 0.96);
+  --query-primary: #6543aa;
   --query-success-surface: rgba(239, 252, 248, 0.94);
   --query-success-control: rgba(72, 201, 169, 0.14);
   --query-success-ink: #1d765f;
@@ -80,7 +81,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-html[data-role='query'] {
+html:is([data-role='query'], [data-role='sop-floating']) {
   --glass-inner: var(--query-glass-inner);
 }
 
@@ -120,7 +121,7 @@ button {
 }
 
 @media (prefers-color-scheme: dark) {
-  html[data-role='query'] {
+  html:is([data-role='query'], [data-role='sop-floating']) {
     color-scheme: dark;
     --query-glass: rgba(31, 30, 36, 0.76);
     --query-glass-inner: rgba(255, 255, 255, 0.11);
@@ -171,7 +172,7 @@ button {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }

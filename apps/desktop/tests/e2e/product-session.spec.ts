@@ -121,6 +121,42 @@ async function launchQuery(origins: { apiOrigin: string; identityOrigin: string 
 }
 
 /** Native IPC/login-window test. HTTP is a synthetic wire double; PG integration belongs to D5. */
+test('ordinary product Query keeps presentation and resizing without an SOP capability', async () => {
+  const wire = listenProductWire();
+  const origin = await wire.listen();
+  let app: ElectronApplication | undefined;
+  let directory: string | undefined;
+  try {
+    const launched = await launchQuery(origin);
+    app = launched.app;
+    directory = launched.directory;
+    const { query } = launched;
+    await expect(query.getByText('无法读取流程进度')).toHaveCount(0);
+    expect(await query.evaluate(() => window.customerAgent!.sopWindow!.entryAvailable())).toBe(false);
+    await query.getByRole('button', { name: '登录', exact: true }).click();
+    await expect.poll(() => app!.windows().some(page => page.url().includes('role=login'))).toBe(true);
+    await app.windows().find(page => page.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
+    await expect(query.getByRole('button', { name: /· 退出$/ })).toBeVisible();
+    await query.getByTestId('question-input').fill('合成查询');
+    await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-workspace-view', 'query-results');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-view-transition', 'stable');
+    const grip = query.getByRole('separator', { name: '调整查询窗高度' });
+    await expect(grip).toBeVisible();
+    const queryBounds = () => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .find(win => win.webContents.getURL().includes('role=query'))!.getBounds());
+    const before = await queryBounds();
+    await grip.press('ArrowDown');
+    await expect.poll(async () => (await queryBounds()).height).not.toBe(before.height);
+    expect((await queryBounds()).width).toBe(before.width);
+    await expect(query.getByText('无法读取流程进度')).toHaveCount(0);
+  } finally {
+    if (app) await closeOwnedElectron(app);
+    await wire.close();
+    if (directory) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('product session native Feishu login, logout and renderer isolation', async () => {
   const wire = listenProductWire();
   const origin = await wire.listen();
