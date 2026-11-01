@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { IntakePermissionCommand, IntakePermissionView } from '../shared/content-intake-permissions';
 import { GRANTABLE_ACTIONS, type OpenGrant } from '../shared/page-use';
+import { REVIEW_GRANT_ACTIONS } from '../shared/intake-post-actions';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
 import { loadIntakeAccess } from './content-intake-access';
@@ -167,7 +168,8 @@ export class ContentIntakePermissions {
         this.clear();const access=await loadIntakeAccess(this.session,controller.signal);check();this.access=access;
         this.deadline=performance.now()+Math.max(0,Date.parse(access.validUntil)-Date.now());this.armExpiry();
         this.sources=access.sources.flatMap(source=>{const c=access.capabilities.find(c=>c.scope.sourceId===source.scope.sourceId)!;
-          const actions=c.mayAllocate.filter(a=>(GRANTABLE_ACTIONS as readonly string[]).includes(a));return actions.length?[{source,actions,selection:randomUUID()}]:[];});
+          const canReview=REVIEW_GRANT_ACTIONS.every(action=>c.actions.includes(action));
+          const actions=c.mayAllocate.filter(a=>(GRANTABLE_ACTIONS as readonly string[]).includes(a) && (a!=='review' || canReview));return actions.length?[{source,actions,selection:randomUUID()}]:[];});
         if(this.sources.length===1){this.selected=this.sources[0]!;await readSelected();}
       }else{
         if(!this.fresh())return reject();

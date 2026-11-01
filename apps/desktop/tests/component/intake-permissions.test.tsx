@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render,screen,fireEvent,waitFor,within } from '@testing-library/react';
+import { act,render,screen,fireEvent,waitFor,within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach,expect,it,vi } from 'vitest';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
-import type { IntakePermissionCommand } from '../../src/shared/content-intake-permissions';
+import type { IntakePermissionCommand, IntakePermissionView } from '../../src/shared/content-intake-permissions';
 import { actionsForIntakePost } from '../../src/shared/intake-post-actions';
 import type { SeatAccountIntent, SeatAccountRecord } from '../../src/shared/seat-account-intent';
 import { IntakePermissions } from '../../src/renderer/features/dashboard/IntakePermissions';
@@ -37,7 +37,7 @@ it('selects a post, previews that post through the existing command, then saves 
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>{commands.push(c);return {ok:true,view:await main.command(c)};},onInvalidated:fn=>main.subscribe(fn)};
  try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   const people=screen.getByRole('table',{name:'人员'});
-  for(const header of ['姓名','登录名','岗位','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
+  for(const header of ['姓名','登录名','授权方案','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
   expect(within(within(people).getByRole('row',{name:/合成坐席/})).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['合成坐席','—','—','未授权']);
   expect(people).not.toHaveTextContent('registered-agent');
   const grants=screen.getByRole('table',{name:'已有业务权限'});
@@ -46,15 +46,15 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(document.querySelector('select')).toBeNull();
   await user.click(screen.getByRole('button',{name:'新增授权'}));
   expect(screen.getByRole('button',{name:'新增授权'})).toHaveClass('ant-btn-primary');
-  expect(screen.getByRole('combobox',{name:/^岗位$/}).closest('.ant-select')).toHaveTextContent('客服');
+  expect(screen.getByRole('combobox',{name:'授权方案'}).closest('.ant-select')).toHaveTextContent('客服');
   expect(document.querySelector('select')).toBeNull();
   const page=readFileSync(PAGE,'utf8');
-  expect(page).toContain('actionsForIntakePost');
+  expect(page).toContain('actionsForIntakeGrantChoice');
   expect(page).not.toContain('content-manage');
   expect(page).not.toContain('source-confirm');
   expect(page).not.toContain('password-accounts');
   await pick(user,'人员','合成坐席');
-  await pick(user,/^岗位$/,'客服主管');
+  await pick(user,'授权方案','客服主管');
   await user.click(screen.getByLabelText('生效时间'));
   await user.type(screen.getByLabelText('生效时间'), '2026-10-08 10:00{Enter}');
   await user.click(screen.getByLabelText('失效时间'));
@@ -64,7 +64,7 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').map(request=>(request.body as {items:{action:string}[]}).items.map(item=>item.action))).toEqual([[...supervisor.actions]]);
   expect(f.requests.some(request=>request.path.includes('password') || request.path.includes('account'))).toBe(false);
   await user.click(screen.getByRole('button',{name:'返回修改'}));
-  await pick(user,/^岗位$/,'客服');
+  await pick(user,'授权方案','客服');
   await user.click(screen.getByRole('button',{name:'预览权限'}));
   await screen.findByText('预览，尚未保存');expect(f.grants).toHaveLength(0);
   const displayedPeriod='2026-10-08 10:00 至 2026-10-09 10:00';
@@ -123,7 +123,7 @@ it('does not offer a post the current scope cannot grant',async()=>{
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
  try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await userEvent.click(screen.getByRole('button',{name:'新增授权'}));
-  const post=screen.getByRole('combobox',{name:/^岗位$/});
+  const post=screen.getByRole('combobox',{name:'授权方案'});
   expect(post.closest('.ant-select')).toHaveTextContent('客服');
   await userEvent.click(post);
   expect((await screen.findAllByRole('option')).map(option=>option.textContent)).toEqual(['客服']);
@@ -141,6 +141,67 @@ it('does not offer a post the current scope cannot grant',async()=>{
   expect(document.querySelector('select')).toBeNull();
  }finally{main.dispose();}
 });
+it('previews and saves only the two review actions for a qualified source', async () => {
+ vi.stubEnv('TZ','Asia/Shanghai');
+ const f=intakePermissionsData(['query','content-manage','review'], ['content-manage','review']);
+ const main=new ContentIntakePermissions(f.session),user=userEvent.setup();
+ window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
+ try {
+  render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+  await user.click(screen.getByRole('button',{name:'新增授权'}));
+  await pick(user,'人员','合成坐席');
+  await pick(user,'授权方案','资料审核');
+  expect(screen.getByText(/人员岗位需符合审核权限要求/)).toHaveTextContent('不包含查询或发布');
+  await user.click(screen.getByLabelText('生效时间'));
+  await user.type(screen.getByLabelText('生效时间'),'2026-10-08 10:00{Enter}');
+  await user.click(screen.getByLabelText('失效时间'));
+  await user.type(screen.getByLabelText('失效时间'),'2026-10-09 10:00{Enter}');
+  await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成质量检查');
+  await user.click(screen.getByRole('button',{name:'预览权限'}));
+  const preview=await screen.findByRole('region',{name:'权限预览'});
+  expect(preview).toHaveTextContent('查看与管理资料、人工质量检查');
+  expect(preview).not.toHaveTextContent('发布资料');
+  expect(f.grants).toHaveLength(0);
+  await user.click(screen.getByRole('button',{name:'确认保存权限'}));
+  await screen.findByText(/本次操作已保存/);
+  expect(f.grants.map(grant=>grant.action)).toEqual(['content-manage','review']);
+  expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').at(-1)).toMatchObject({body:{items:[{action:'content-manage'},{action:'review'}]}});
+ } finally {main.dispose();}
+}, 30_000);
+
+it('does not offer review when the issuer lacks either current business action', async () => {
+ const f=intakePermissionsData(['query','content-manage','review'], ['content-manage']);
+ const main=new ContentIntakePermissions(f.session);
+ window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
+ try {
+  render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+  await userEvent.click(screen.getByRole('button',{name:'新增授权'}));
+  await userEvent.click(screen.getByRole('combobox',{name:'授权方案'}));
+  expect((await screen.findAllByRole('option')).map(option=>option.textContent)).toEqual(['客服']);
+ } finally {main.dispose();}
+});
+it('keeps a role rejection visible when the permission view refreshes in the background', async () => {
+ vi.stubEnv('TZ','Asia/Shanghai');
+ const f=intakePermissionsData(['content-manage','review'], ['content-manage','review']);
+ const main=new ContentIntakePermissions(f.session),user=userEvent.setup();
+ let invalidate=()=>{};
+ const current=vi.fn(async()=>({ok:true as const,view:main.view()}));
+ window.dashboardPermissions={current,command:async c=>c.action==='preview'
+  ? {ok:false,message:'所选人员不能执行这些动作，请调整权限。',view:main.view()}
+  : {ok:true,view:await main.command(c)},onInvalidated:fn=>{invalidate=fn;return()=>{};}};
+ try {
+  render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+  await user.click(screen.getByRole('button',{name:'新增授权'}));
+  await pick(user,'人员','合成坐席');await pick(user,'授权方案','资料审核');
+  await user.click(screen.getByLabelText('生效时间'));await user.type(screen.getByLabelText('生效时间'),'2026-10-08 10:00{Enter}');
+  await user.click(screen.getByLabelText('失效时间'));await user.type(screen.getByLabelText('失效时间'),'2026-10-09 10:00{Enter}');
+  await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成质量检查');
+  await user.click(screen.getByRole('button',{name:'预览权限'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('所选人员不能执行这些动作');
+  invalidate();await waitFor(()=>expect(current).toHaveBeenCalled());
+  expect(screen.getByRole('alert')).toHaveTextContent('所选人员不能执行这些动作');
+ } finally {main.dispose();}
+}, 30_000);
 it('creates an outsourced seat from an intent and does not keep the password on the page',async()=>{
  const main=new ContentIntakePermissions(intakePermissionsData().session),user=userEvent.setup();
  const intents:SeatAccountIntent[]=[];
@@ -212,7 +273,7 @@ it('shows people headers before a scope is chosen and closing the dialogs does n
  const user=userEvent.setup();
  render(<IntakePermissions canGrant active/>);
  const people=await screen.findByRole('table',{name:'人员'});
- for(const header of ['姓名','登录名','岗位','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
+ for(const header of ['姓名','登录名','授权方案','状态']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
  expect(people).toHaveTextContent('请选择配置范围');
  expect(screen.getByRole('button',{name:'新增授权'})).toBeDisabled();
  expect(screen.queryByRole('button',{name:'停止等待'})).not.toBeInTheDocument();
@@ -298,6 +359,46 @@ function permissionView(patch: Record<string, unknown> = {}) {
     ...patch,
   };
 }
+
+it('shows combined current choices, unknown actions, future grants and invalid windows in the people table', async () => {
+ const base = { reference:'synthetic-grant',scope:'合成范围',reason:'合成测试',revoked:false,canRevoke:true };
+ const time = { startsAt:'2020-01-01T00:00:00Z',expiresAt:'2099-01-01T00:00:00Z' };
+ const row = (person:string, action:IntakePermissionView['grants'][number]['action'], extra:Partial<IntakePermissionView['grants'][number]> = {}) =>
+  ({ ...base,...time,selection:`${person}-${action}`,person,personSelection:person,action,...extra });
+ const view: IntakePermissionView = { ...permissionView(),
+  people:['组合','其他','未来','异常','部分'].map(person=>({selection:person,label:person})),
+  grants:[row('组合','query'),row('组合','content-manage'),row('组合','review'),
+   row('其他','query'),row('其他','rollback'),
+   row('未来','query',{startsAt:'2098-01-01T00:00:00Z'}),
+   row('异常','query',{startsAt:'2026-02-30T00:00:00Z'}),
+   row('部分','query'),row('部分','review',{startsAt:'2098-01-01T00:00:00Z'})],
+ };
+ window.dashboardPermissions={current:async()=>({ok:true,view}),command:async()=>({ok:true,view}),onInvalidated:()=>()=>undefined};
+ render(<IntakePermissions canGrant active/>);
+ const table=await screen.findByRole('table',{name:'人员'});
+ expect(screen.getByText('状态按授权记录的时间显示，实际使用由服务器核验。')).toBeInTheDocument();
+ expect(within(table).getByRole('row',{name:/组合/})).toHaveTextContent('客服 / 资料审核已授权');
+ expect(within(table).getByRole('row',{name:/其他/})).toHaveTextContent('客服 / 其他权限已授权');
+ expect(within(table).getByRole('row',{name:/未来/})).toHaveTextContent('客服未生效');
+ expect(within(table).getByRole('row',{name:/异常/})).toHaveTextContent('时间异常');
+ expect(within(table).getByRole('row',{name:/异常/})).not.toHaveTextContent('已授权');
+ expect(within(table).getByRole('row',{name:/部分/})).toHaveTextContent('客服部分生效');
+});
+
+it('updates a future grant at its start and expiry without treating the timer as authorization', () => {
+ vi.useFakeTimers({toFake:['Date','setTimeout','clearTimeout']});
+ vi.setSystemTime(new Date('2026-10-30T00:00:00Z'));
+ const view: IntakePermissionView = { ...permissionView(), people:[{selection:'p',label:'合成坐席'}],
+  grants:[{selection:'g',reference:'g',person:'合成坐席',personSelection:'p',action:'query',scope:'合成范围',
+   startsAt:'2026-10-30T00:00:01Z',expiresAt:'2026-10-30T00:00:02Z',reason:'合成',revoked:false,canRevoke:true}] };
+ const rendered=render(<IntakePermissions active={false} gate={{state:'open',body:view}}/>);
+ try {
+  const row=()=>within(screen.getByRole('table',{name:'人员'})).getByRole('row',{name:/合成坐席/});
+  expect(row()).toHaveTextContent('未生效');
+  act(()=>vi.advanceTimersByTime(1_000));expect(row()).toHaveTextContent('已授权');
+  act(()=>vi.advanceTimersByTime(1_000));expect(row()).toHaveTextContent('已过期');
+ } finally {rendered.unmount();vi.useRealTimers();}
+});
 
 it('shows a loading skeleton before the permission read resolves', async () => {
   let release: (value: { ok: true; view: ReturnType<typeof permissionView> }) => void = () => undefined;

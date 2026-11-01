@@ -163,9 +163,10 @@ it('cancels pending reads, discards late results and invalidates prior-session s
   f.logout();expect(main.view().people).toEqual([]);expect(main.view().available).toBe(false);await expect(main.command({action:'refresh'})).rejects.toThrow();
  }finally{main.dispose();}
 });
-it('rejects actor/grant IDs and arbitrary actions at renderer boundary',()=>{
+it('accepts quality-review actions but rejects actor/grant IDs and arbitrary actions at renderer boundary',()=>{
  expect(isIntakePermissionCommand({action:'save',actor:'director'})).toBe(false);expect(isIntakePermissionCommand({action:'revoke',grantId:'g',reason:'r'})).toBe(false);
- expect(isIntakePermissionCommand({action:'preview',person:'h',actions:['review'],startsAt:'x',expiresAt:'y',reason:'r'})).toBe(false);
+ expect(isIntakePermissionCommand({action:'preview',person:'h',actions:['content-manage','review'],startsAt:'x',expiresAt:'y',reason:'r'})).toBe(true);
+ expect(isIntakePermissionCommand({action:'preview',person:'h',actions:['unknown'],startsAt:'x',expiresAt:'y',reason:'r'})).toBe(false);
 });
 
 it.each(['stopped retry', 'new session'] as const)('late rejected writes cannot erase recovery for the %s', async transition => {

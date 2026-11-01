@@ -34,9 +34,11 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 | 客服 | `query` |
 | 客服主管 | `content-manage`、`import`、`source-confirm`、`publish` |
 
-不包含 `rollback`、`candidate-cancel`、`review`。页面不能新增、改名或删除岗位。未知岗位返回 `unknown-post`。新建坐席不会因为选了岗位就拿到这些动作，对照见[坐席岗位和角色上限](reports/2026-10-27-seat-post-role-ceiling.md)。
+这两组不包含 `rollback`、`candidate-cancel`、`review`。页面不能新增、改名或删除岗位。未知岗位返回 `unknown-post`。新建坐席不会因为选了岗位就拿到这些动作，对照见[坐席岗位和角色上限](reports/2026-10-27-seat-post-role-ceiling.md)。
 
-纯函数在 `apps/desktop/src/shared/intake-post-actions.ts`：`INTAKE_POSTS`、`DEFAULT_INTAKE_POST`、`actionsForIntakePost`、`intakePostForActions`、`intakePostsCoveredBy`、`intakePostStatusForGrants`。
+权限页的「授权方案」还提供「资料审核」，组合为 `content-manage` 和 `review`，不包含查询或发布。它是业务授权方案，不是新建坐席岗位。授予前仍须预览并经服务端检查人员的角色上限及授权人的分配资格；普通客服角色不能获得 `review`，客服主管角色可在符合条件时获授。需要同时查询时须另授 `query`。实际业务审核由本人完成，不由授权代替。
+
+纯函数在 `apps/desktop/src/shared/intake-post-actions.ts`：`INTAKE_POSTS`、`DEFAULT_INTAKE_POST`、`actionsForIntakePost`、`INTAKE_GRANT_CHOICES`、`actionsForIntakeGrantChoice`、`intakeGrantChoicesCoveredBy`、`intakeGrantStatusForGrants`。
 
 ## 坐席命令
 

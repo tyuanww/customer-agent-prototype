@@ -4,7 +4,7 @@ import './workbench-v9.css';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionReply, type IntakePermissionView } from '@shared/content-intake-permissions';
 import type { PermissionsUse } from '@shared/page-use';
 import { type AsyncResource } from '@shared/async-resource';
-import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import { actionsForIntakeGrantChoice, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakeGrantStatusForGrants, intakeGrantChoicesCoveredBy, intakeGrantWindow, isIntakeGrantChoice, isIntakePost, type IntakeGrantChoice, type IntakePost } from '@shared/intake-post-actions';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 import { formatSeatClock, timeoutUntil } from './intake-time';
@@ -33,7 +33,7 @@ type GrantRow = IntakePermissionView['grants'][number];
 const peopleColumns: TableColumnsType<PeopleRow> = [
   { title: '姓名', dataIndex: 'label', key: 'label' },
   { title: '登录名', key: 'login', render: () => '—' },
-  { title: '岗位', dataIndex: 'post', key: 'post' },
+  { title: '授权方案', dataIndex: 'post', key: 'post' },
   { title: '状态', dataIndex: 'status', key: 'status', render: (status: PeopleRow['status']) => <span className="state"><i className={`dot${status === '已授权' ? ' ok' : ''}`} />{status}</span> },
 ];
 
@@ -184,12 +184,13 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   gate?: Extract<PermissionsUse, { state: 'open' }> | null;
 }) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
+  const [person,setPerson]=useState(''),[choice,setChoice]=useState<IntakeGrantChoice>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
   const [job,setJob]=useState<'grants'|'seats'>('grants');
   const [grantOpen,setGrantOpen]=useState(false),[seatCreateOpen,setSeatCreateOpen]=useState(false);
   const [eligibilityEnded,setEligibilityEnded]=useState(false);
+  const [grantClockTick,setGrantClockTick]=useState(0);
   const mounted=useRef(true),generation=useRef(0),pending=useRef(false);
   const allowReadRef=useRef(active);
   const [allowRead,setAllowRead]=useState(active);
@@ -223,7 +224,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     const gen = ++generation.current;
     pending.current = true;
     setBusy(true);
-    setError('');
+    if (command) setError('');
     const replaceResource = (next: AsyncResource<IntakePermissionView>) => {
       resourceRef.current = next;
       replace(next);
@@ -235,7 +236,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
       if (gen !== generation.current) return false;
       const settled = resourceFromReply(reply);
       replaceResource(settled.resource);
-      setError(settled.resource.status === 'ready' ? settled.problem : '');
+      if (command || !reply.ok) setError(settled.resource.status === 'ready' ? settled.problem : '');
       return reply.ok;
     } catch (caught) {
       if (gen === generation.current) {
@@ -257,7 +258,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     const api=window.dashboardPermissions;if(!api)return;
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
   },[apply]);
-  useEffect(()=>{setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');},[view?.source]);
+  useEffect(()=>{setPerson('');setChoice(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');},[view?.source]);
   useEffect(()=>{
     if(!view?.validUntil)return undefined;
     const until=Date.parse(view.validUntil);
@@ -265,6 +266,14 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     setEligibilityEnded(false);
     return timeoutUntil(()=>{setEligibilityEnded(true);void apply();},until);
   },[view?.validUntil, apply]);
+  useEffect(()=>{
+    const now=Date.now();
+    const deadlines=(view?.grants??[]).filter(grant=>!grant.revoked).flatMap(grant=>{
+      const window=intakeGrantWindow(grant);
+      return window ? [window.start,window.end].filter(value=>value>now) : [];
+    });
+    return deadlines.length ? timeoutUntil(()=>setGrantClockTick(tick=>tick+1),Math.min(...deadlines)) : undefined;
+  },[view?.grants,grantClockTick]);
   useEffect(()=>()=>{mounted.current=false;generation.current++;},[]);
   const disabled=busy || !!view?.busy || !!view?.pending;
   const readAgain=()=>{
@@ -272,17 +281,15 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     if(resource.status==='forbidden'){reload();return;}
     void apply({action:'refresh'});
   };
-  const offered=intakePostsCoveredBy(view?.actions??[]);
-  const chosen=offered.includes(post)?post:undefined;
-  const previewPost=()=>{
-    if(!chosen){setError('当前范围没有可授予的岗位。');return;}
-    const mapped=actionsForIntakePost(chosen);
-    if(!mapped.ok){setError('未知岗位。');return;}
-    void apply({action:'preview',person,actions:[...mapped.actions],startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason});
+  const offered=intakeGrantChoicesCoveredBy(view?.actions??[]);
+  const chosen=offered.includes(choice)?choice:undefined;
+  const previewGrant=()=>{
+    if(!chosen){setError('当前范围没有可授予的方案。');return;}
+    void apply({action:'preview',person,actions:[...actionsForIntakeGrantChoice(chosen)],startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason});
   };
-  const choosePost=(value:string)=>{
-    if(!isIntakePost(value)){setError('未知岗位。');return;}
-    setPost(value);
+  const chooseGrant=(value:string)=>{
+    if(!isIntakeGrantChoice(value)){setError('未知授权方案。');return;}
+    setChoice(value);
   };
   const closeGrant=()=>{
     if(!view?.preview){setGrantOpen(false);return;}
@@ -304,13 +311,15 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
       maskTransitionName:'',
     });
   };
-  const peopleRows=view?.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return {key:p.selection,label:p.label,post:grant.post ?? '—',status:grant.status};}) : [];
+  const now=Date.now();
+  const peopleRows=view?.source && view.people.length ? view.people.map(p=>{const grant=intakeGrantStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection),now);
+    const choices=[...grant.choices,...(grant.hasOther?['其他权限']:[])];return {key:p.selection,label:p.label,post:choices.join(' / ') || '—',status:grant.status};}) : [];
   const grantColumns: TableColumnsType<GrantRow> = [
     { title: '人员', key: 'person', render: (_value, grant) => <>{grant.person}<span className="cell-sub">{labels[grant.action]}</span><span className="cell-sub">原授权原因：{grant.reason}</span></> },
     { title: '范围名称', dataIndex: 'scope', key: 'scope' },
     { title: '有效期', key: 'period', render: (_value, grant) => {
-      const ended = !grant.revoked && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) <= Date.now();
-      return <>{`${formatSeatClock(grant.startsAt)} 至 ${formatSeatClock(grant.expiresAt)}`}{grant.revoked ? <span className="state">已撤销</span> : ended ? <span className="state">已过期</span> : null}</>;
+      const status=intakeGrantStatusForGrants([grant],now).status;
+      return <>{`${formatSeatClock(grant.startsAt)} 至 ${formatSeatClock(grant.expiresAt)}`}{status!=='已授权' ? <span className="state">{status}</span> : null}</>;
     } },
     { title: '操作', key: 'ops', width: 140, render: (_value, grant) => <DeskButton type="text" danger disabled={disabled || !grant.canRevoke || !!view?.preview} onClick={() => { setRevoke(grant.selection); setRevokeReason(''); }}>撤销该权限</DeskButton> },
   ];
@@ -353,6 +362,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
           <DeskButton style={{marginLeft:8}} aria-label="刷新权限列表" disabled={disabled || !!view.preview} onClick={readAgain}>刷新</DeskButton></div>
         <A11yTable<PeopleRow> className="sub" aria-label="人员" pagination={false} rowKey="key" tableLayout="fixed" dataSource={peopleRows} columns={peopleColumns}
           locale={{ emptyText: <PermissionsEmpty description={view.source ? '当前没有可选择的人员。' : '请选择配置范围。'} /> }} />
+        <p className="hint">状态按授权记录的时间显示，实际使用由服务器核验。</p>
         <div className="sec"><div className="sec-head"><h2>当前可管理的业务权限</h2></div>
           <section aria-label="已有业务权限">
           <A11yTable<GrantRow> aria-label="已有业务权限" pagination={false} rowKey="selection" tableLayout="fixed" dataSource={view.grants} columns={grantColumns}
@@ -370,8 +380,9 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
             <fieldset className="fields" disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}>
               <div className="two"><label>人员<Select<string> aria-label="人员" value={person || undefined} placeholder="请选择已确认人员" disabled={disabled} virtual={false} style={{ width: '100%' }}
                 options={view.people.map(item => ({ value: item.selection, label: item.label }))} onChange={setPerson} /></label>
-              <label>岗位<Select<string> aria-label="岗位" value={chosen} disabled={disabled || offered.length === 0} virtual={false} style={{ width: '100%' }}
-                placeholder={offered.length === 0 ? '当前范围没有可授予的岗位' : '请选择岗位'} options={offered.map(name => ({ value: name, label: name }))} onChange={choosePost} /></label></div>
+              <label>授权方案<Select<string> aria-label="授权方案" value={chosen} disabled={disabled || offered.length === 0} virtual={false} style={{ width: '100%' }}
+                placeholder={offered.length === 0 ? '当前范围没有可授予的方案' : '请选择授权方案'} options={offered.map(name => ({ value: name, label: name }))} onChange={chooseGrant} /></label></div>
+              {chosen === '资料审核' && <span className="hint">允许查看资料和进行人工质量检查，不包含查询或发布；人员岗位需符合审核权限要求。</span>}
               <div className="two"><label>生效时间<SeatDateTime label="生效时间" placeholder="选择生效时间" value={starts} onChange={setStarts} disabled={disabled} /></label>
               <label>失效时间<SeatDateTime label="失效时间" placeholder="选择失效时间" value={expires} onChange={setExpires} disabled={disabled} /></label></div>
               <span className="hint">时间按本机时区填写，范围和期限仍由服务器核对。</span>
@@ -379,7 +390,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
             </fieldset>
             <footer><DeskButton onClick={closeGrant}>取消</DeskButton>
               <DeskButton type="primary" disabled={disabled || !person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
-                onClick={previewPost}>预览权限</DeskButton></footer>
+                onClick={previewGrant}>预览权限</DeskButton></footer>
           </> : view?.preview ? <section aria-label="权限预览">
             <p>{view.preview.person}<span className="mute">{view.preview.scope}</span></p>
             <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatSeatClock(view.preview.startsAt)} 至 {formatSeatClock(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>

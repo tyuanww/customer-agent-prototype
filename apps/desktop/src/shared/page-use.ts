@@ -2,7 +2,7 @@ import type { IntakePermissionView } from './content-intake-permissions';
 import type { DashboardSopNode } from './dashboard-ops-loop';
 
 export const GRANTABLE_ACTIONS = [
-  'query', 'content-manage', 'import', 'source-confirm',
+  'query', 'content-manage', 'import', 'source-confirm', 'review',
   'publish', 'candidate-cancel', 'rollback',
 ] as const;
 
@@ -13,7 +13,7 @@ const grantable: ReadonlySet<string> = new Set(GRANTABLE_ACTIONS);
 export function authorizationAllowsGrant(
   capabilities: readonly { readonly mayAllocate: readonly string[] }[],
 ): boolean {
-  return capabilities.some((row) => row.mayAllocate.some((action) => grantable.has(action)));
+  return capabilities.some((row) => row.mayAllocate.some((action) => action !== 'review' && grantable.has(action)));
 }
 
 export const openGrantBrand: unique symbol = Symbol('page-use.open-grant');

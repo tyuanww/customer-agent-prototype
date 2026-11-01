@@ -67,7 +67,7 @@ test('director previews without saving, grants a named seat query access, then r
     await expect(dialog).toBeVisible();
     await dialog.getByRole('combobox', { name: '人员', exact: true }).click();
     await dashboard.getByRole('option', { name: '合成坐席', exact: true }).click();
-    await expect(dialog.getByRole('combobox', { name: '岗位', exact: true })
+    await expect(dialog.getByRole('combobox', { name: '授权方案', exact: true })
       .locator('xpath=ancestor::*[contains(@class,"ant-select")][1]')).toContainText('客服');
     await dialog.screenshot({ path: path.join(evidence, 'permissions-grant-dialog.png') });
     const localTime = (offset: number) => {

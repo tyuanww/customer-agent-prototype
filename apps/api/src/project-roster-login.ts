@@ -96,6 +96,25 @@ JOIN content_intake.principal_facts facts
  AND facts.facts_version = person.current_facts_version
 WHERE person.user_id = $1 AND person.identity_scope IN ($2,$3)`;
 
+const SEAT_JOB_SQL = `WITH stamp AS (SELECT clock_timestamp() AS at)
+SELECT seat.out_post,
+  CASE WHEN NOT (seat.out_enabled AND facts.enabled) THEN 'revoked'
+    WHEN NOT (facts.checked_at <= stamp.at AND stamp.at < facts.valid_until
+      AND facts.valid_until <= facts.checked_at + interval '24 hours') THEN 'expired'
+    WHEN EXISTS (SELECT 1 FROM content_intake.authorization_sources(person.principal_id, 'query', stamp.at)) THEN 'ready'
+    ELSE 'pending' END AS state
+FROM content_intake.principals person
+JOIN content_intake.principal_facts facts
+  ON facts.principal_id=person.principal_id AND facts.facts_version=person.current_facts_version
+JOIN LATERAL backend_identity.list_seats(person.tenant_id,person.app_id) seat
+  ON person.principal_id='seat_' || seat.out_username
+  AND person.user_id=left('usr_seat_' || encode(sha256(convert_to(seat.out_username, 'UTF8')), 'hex'), 40)
+  AND ((seat.out_post='客服' AND facts.job_id='job-seat')
+    OR (seat.out_post='客服主管' AND facts.job_id='job-seat-supervisor'))
+CROSS JOIN stamp
+WHERE person.user_id=$1 AND person.identity_scope='confirmed-synthetic'
+  AND person.person_key=person.principal_id`;
+
 function databasePermissionState(value: unknown): DatabasePermissionState | null {
   if (value === 'pending' || value === 'ready' || value === 'expired' || value === 'revoked') return value;
   return null;
@@ -178,7 +197,16 @@ export async function readStoredRosterPermission(
   userId: string,
 ): Promise<StoredRosterPermission | null> {
   const state = await rosterPermissionForUser(client, userId);
-  if (!state) return null;
+  if (!state) {
+    const seats = await client.query<{ out_post: string; state: string }>(SEAT_JOB_SQL, [userId]);
+    if (seats.rows.length !== 1) return null;
+    const seat = seats.rows[0]!;
+    const seatState = databasePermissionState(seat.state);
+    if (!seatState) return null;
+    if (seat.out_post === '客服主管') return { title: '客服主管', state: seatState };
+    if (seat.out_post === '客服') return { title: '客服坐席', state: seatState };
+    return null;
+  }
   const facts = await client.query<{ job_id: string; identity_scope: string }>(
     JOB_ID_SQL,
     [userId, ROSTER_IDENTITY_SCOPE, CANDIDATE_IDENTITY_SCOPE],
