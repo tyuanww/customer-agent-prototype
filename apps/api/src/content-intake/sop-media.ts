@@ -15,7 +15,7 @@ export function decodeSopMediaReservation(value: unknown): SopMediaReservation {
   const row = value as SopMediaReservation;
   if (!row || !/^obj_[0-9a-f]{64}$/.test(row.objectId) || !/^med_[0-9a-f]{64}$/.test(row.mediaObjectId)
     || !/^[0-9a-f]{64}$/.test(row.sha256) || !Number.isSafeInteger(row.bytes) || row.bytes < 1 || row.bytes > 5 * 1024 * 1024
-    || !['image/png', 'image/jpeg', 'image/gif'].includes(row.mime)
+    || !['image/png', 'image/jpeg'].includes(row.mime)
     || !['reserved', 'persisted', 'adopted', 'releasing', 'released'].includes(row.state)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
   return row;
 }

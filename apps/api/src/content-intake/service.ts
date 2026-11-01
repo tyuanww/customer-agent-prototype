@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
 import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, previewFromBytes, stagePreviews } from './linked-preview.js';
-import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
+import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, type tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, ContentAttachmentStore, PersistedContentObject } from '../content-object-store.js';
@@ -50,7 +50,9 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   report: (diagnosticId: string, error: unknown) => void = () => undefined, _legacyApproval?: ApprovalAdapter,
   options: { requireProductSession?: boolean; principalLabels?: IntakePrincipalLabels; terminalPool?: IntakePool } = {}) {
   const run = createIntakeTransactions(pool, report, options);
-  const runner = createParseRunner();
+  // Node 24 runs the TypeScript source in isolated tests; the built service uses its compiled sibling.
+  const decoderExtension = new URL(import.meta.url).pathname.endsWith('.ts') ? '.ts' : '.js';
+  const runner = createParseRunner({ sopDecoderUrl: new URL(`./sop-media-check${decoderExtension}`, import.meta.url) });
   const reportCapacityError = (error: unknown) => {
     try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ }
   };
@@ -182,36 +184,48 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     }
     const previewKey = prepared.value.job.object_id;
     let previewStage: ReturnType<typeof stagePreviews> | undefined;
-    let parsed: ParseResult;
-    let sopPreviews: Awaited<ReturnType<typeof tryParseSopAsFaq>> extends infer Value ? Value extends { previews: infer Previews } ? Previews : never : never = [];
+    let parsed: ParseResult = failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version);
+    let sopPreviews: NonNullable<Awaited<ReturnType<typeof tryParseSopAsFaq>>>['previews'] = [];
     let sopRows: NonNullable<Awaited<ReturnType<typeof tryParseSopAsFaq>>>['rowBindings'] = [];
     let sopVersion: unknown;
     let sopWorkbook = false;
+    let bytes: Buffer | undefined;
     try {
-      const bytes = await store.readPayload(prepared.value.job.object_id);
-      if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) throw new Error('OBJECT_CHANGED');
-      const sourceId = prepared.value.source.scope.sourceId;
-      const sopSource = sourceUsesSopWorkbook(prepared.value.source);
-      const sop = sopSource ? await tryParseSopAsFaq(bytes, prepared.value.source.scope) : null;
-      if (sop) {
-        // A non-null result means the six sheets were found, so these rows carry a
-        // workbook row map. When a sheet is missing, tryParseSopAsFaq returns null and
-        // the registered SOP context makes the FAQ parser refuse the workbook.
-        parsed = sop.parsed;
-        sopPreviews = sop.previews;
-        sopRows = sop.rowBindings;
-        sopVersion = sop.contentVersion;
-        sopWorkbook = true;
-        previewStage = stagePreviews(prepared.value.job.object_id, sop.previews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
-          productRefIds: item.productRefIds, scenarioRefIds: item.scenarioRefIds, familySourceId: item.familySourceId,
-        })));
-      } else {
-        parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
+      bytes = await store.readPayload(prepared.value.job.object_id);
+      if (bytes.length !== Number(prepared.value.object.bytes) || digest(bytes) !== prepared.value.object.sha256) {
+        bytes = undefined;
+        throw new Error('OBJECT_CHANGED');
       }
     } catch {
-      parsed = { ...failedParse('OBJECT_UNAVAILABLE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version),
-        issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
-      sopWorkbook = false;
+      bytes = undefined;
+      parsed = { ...parsed, issues: [{ code: 'OBJECT_UNAVAILABLE', sheet: '', row: 0, column: '', fix: '对象不可读取或指纹变化，请重新上传' }] };
+    }
+    if (bytes) {
+      try {
+        const sourceId = prepared.value.source.scope.sourceId;
+        const sop = sourceUsesSopWorkbook(prepared.value.source)
+          ? await runner.parseSop(bytes, prepared.value.source.scope, signal ? { signal } : {})
+          : { kind: 'not-sop' as const };
+        if (sop.kind === 'failure') {
+          parsed = sop.result;
+        } else if (sop.kind === 'parsed') {
+          parsed = sop.value.parsed;
+          sopPreviews = sop.value.previews;
+          sopRows = sop.value.rowBindings;
+          sopVersion = sop.value.contentVersion;
+          sopWorkbook = true;
+          if (parsed.ok) previewStage = stagePreviews(prepared.value.job.object_id, sopPreviews.map(item => previewFromBytes(item.bytes, item.mime, sourceId, item.rowId, {
+            productRefIds: item.productRefIds, scenarioRefIds: item.scenarioRefIds, familySourceId: item.familySourceId,
+          })));
+        } else {
+          parsed = (await runner.parse(bytes, sourceInputFormat(prepared.value.source).context, signal ? { signal } : {})).result;
+        }
+      } catch (error) {
+        previewStage?.rollback();
+        try { report(`intake_${randomUUID()}`, error); } catch { /* Observational. */ }
+        parsed = failedParse('PROCESS_FAILURE', prepared.value.source.ruleVersion === CSV_POLICY_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version);
+        sopWorkbook = false;
+      }
     }
     // Images are published by the same SQL capability as the candidate rows, so
     // every byte must already be a completed private reservation before freeze.

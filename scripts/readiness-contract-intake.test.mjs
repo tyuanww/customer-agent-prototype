@@ -49,7 +49,9 @@ async function fixture(t) {
 test('compact intake reconstructs exact contracts, preserves forty migrations and replays after generation',async t=>{
   const f=await fixture(t);const original=readFileSync(path.join(f.product,upstream,'repair-contract-set.lock.json'));
   assert.equal(f.run().status,'CREATED');assert.equal(f.run().status,'REUSED');
-  const built=await generateDatabaseMigrations({projectRoot:f.product});assert.equal(built.migrations.length,72);
+  const built=await generateDatabaseMigrations({projectRoot:f.product});
+  const current=JSON.parse(readFileSync(path.join(root,'packages/database/migrations/manifest.generated.json')));
+  assert.deepEqual(built.migrations.map(({position,id})=>({position,id})),current.migrations.map(({position,id})=>({position,id})));
   assert.equal(built.migrations[40].id,'0041_intake_readiness_v1_29');
   assert.equal(built.migrations[48].id,'0049_roster_lifecycle');
   assert.equal(built.migrations[70].id,'0071_analytics_runtime_execute');assert.equal(built.migrations[71].id,'0072_seat_post_grants');

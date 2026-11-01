@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { digest } from '../src/content-intake/material.js';
 import { discardPreviews, mediaObjectId, previewFromBytes, stagePreviews } from '../src/content-intake/linked-preview.js';
-import { createReleasePreviewReader } from '../src/content-intake/sop-preview.js';
+import { createReleasePreviewReader, createSopPreviewReader } from '../src/content-intake/sop-preview.js';
 import type { IntakePreviewItem } from '../src/content-intake/usage.js';
 import type { IntakeTransaction } from '../src/content-intake/transaction.js';
 
@@ -50,5 +50,14 @@ describe('release preview reader', () => {
     const items = await reader.list(client, { principalId: 'p', entitlementHash: 'h', sessionTokenHash: 's',
       releaseId: 'rel_1', sourceIds: new Set(['source-sop']) });
     await expect(reader.read(items[0]!)).rejects.toMatchObject({ reason: 'FILE_INVALID' });
+  });
+
+  it('rejects inherited GIF descriptors at the published SOP boundary', async () => {
+    const client = { query: async () => ({ rows: [{ value: { items: [{ objectId: released,
+      payloadObjectId: `obj_${'c'.repeat(64)}`, sha256: digest(png), bytes: png.length, mime: 'image/gif',
+      sourceId: 'source-sop', rowId: 'sop:过敏流程SOP:2', businessEntryId: 'sop1', productRefIds: [], scenarioRefIds: [],
+      familySourceId: '', operation: 'upsert', effectiveFrom: null, effectiveTo: null }] } }] }) } as unknown as IntakeTransaction;
+    await expect(createSopPreviewReader({}).list(client, { principalId: 'p', entitlementHash: 'h', sessionTokenHash: 's',
+      releaseId: 'rel_1', sourceIds: new Set(['source-sop']) })).rejects.toMatchObject({ reason: 'FILE_INVALID' });
   });
 });

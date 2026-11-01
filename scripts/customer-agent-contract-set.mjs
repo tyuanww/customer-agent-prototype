@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { deflateSync } from 'node:zlib';
 import {
   constants,
   copyFileSync,
@@ -19,6 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
+import { TASK_GRAPH_SCHEMA, TASK_GRAPH_LOCK, TASK_GRAPH_CANDIDATE, TASK_GRAPH_CANDIDATE_ID, TASK_GRAPH_SOURCE, TASK_GRAPH_HISTORY_CANDIDATE, TASK_GRAPH_APPROVAL, TASK_GRAPH_HISTORY, TASK_GRAPH_MEMBERS, TASK_GRAPH_PRODUCER_HASHES, TASK_GRAPH_VERSIONS, assertProducerFingerprints, reviewedTaskGraphAnchor, verifyTaskGraphPredecessor, verifyTaskGraphReferences } from './sop-task-graph-contract.mjs';
 import { renderReadinessMigration, renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -39,6 +41,9 @@ const UPSTREAM_ROOT = 'contracts/upstream/customer-agent';
 const LOCK_FILE = 'contract-set.lock.json';
 const MANIFEST_FILE = 'contract-set.json';
 const INTAKE_STATUS = 'VERIFIED_NOT_ACTIVATED';
+const TASK_GRAPH_RECONSTRUCTION_ERROR = 'Task graph trusted source reconstruction proof is required; v9 intake and consumption are disabled';
+const TASK_GRAPH_REVIEW_ONLY_ERROR = 'Task graph review-only candidate cannot enter the product contract directory; formal freeze, export and business mapping are required';
+const TASK_GRAPH_PROOF_LOCK_SCHEMA = 'customer-agent-sop-reconstruction-proof-lock/v2';
 const OPENAPI_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml';
 const DATABASE_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql';
 const OWNER_SOURCE_ROOT = 'business-docs/01-客服Agent项目/30-开发-进行中';
@@ -164,6 +169,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  const isTaskGraphProfile = rawManifest?.schema === TASK_GRAPH_SCHEMA;
   const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
   const repairProfile = rawManifest?.schema === REPAIR_CONTRACT_SET_SCHEMA;
   const sopProfile = rawManifest?.schema === SOP_CONTRACT_SET_SCHEMA;
@@ -184,10 +190,11 @@ function validateManifest(rawManifest) {
       ...(runtimeProfile ? ['runtime'] : []),
       ...(repairProfile ? ['repair'] : []),
       ...(readinessProfile ? ['readiness'] : []),
+      ...(isTaskGraphProfile ? ['sopTaskGraph'] : []),
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile && !readinessProfile) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile && !readinessProfile && !isTaskGraphProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -220,6 +227,10 @@ function validateManifest(rawManifest) {
   }
   // Version and both paths form one reviewed pair; mixed generations fail closed.
   const readinessPair = openapi.version === '1.24.0' && database.version === 'schema.v1.29';
+  const taskGraphPair = openapi.version === TASK_GRAPH_VERSIONS.openapi && database.version === TASK_GRAPH_VERSIONS.database;
+  if (isTaskGraphProfile && (openapi.version === '1.26.0' || database.version === 'schema.v1.31')) {
+    throw new Error('Obsolete task graph v2 is not accepted');
+  }
   const repairPair = openapi.version === '1.24.0' && database.version === 'schema.v1.28';
   const sopPair = openapi.version === '1.23.0' && database.version === 'schema.v1.26';
   const legacyCheckPair = openapi.version === '1.22.0' && database.version === 'schema.v1.25';
@@ -235,10 +246,22 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (readinessPair !== readinessProfile || repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!readinessPair && !repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (taskGraphPair !== isTaskGraphProfile || readinessPair !== readinessProfile || repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!taskGraphPair && !readinessPair && !repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
-  if (readinessPair) {
+  if (taskGraphPair) {
+    if (rawManifest.architecture_version !== '1.16' || rawManifest.implementation_version !== '1.22') throw new Error('Task graph architecture or implementation version mismatch');
+    openapiPath = `${TASK_GRAPH_SOURCE}/openapi.v1.yaml`;
+    databasePath = `${TASK_GRAPH_SOURCE}/${database.file}`;
+    assertExactKeys(rawManifest.sopTaskGraph, Object.keys(TASK_GRAPH_MEMBERS), 'task graph artifacts');
+    for (const [key, [file, version]] of Object.entries(TASK_GRAPH_MEMBERS)) {
+      const descriptor = validateDescriptor(rawManifest.sopTaskGraph[key], `sopTaskGraph.${key}`);
+      if (descriptor.version !== version || descriptor.file !== file || descriptor.source_path !== `${TASK_GRAPH_SOURCE}/${file}`) throw new Error(`Task graph descriptor mismatch: ${key}`);
+    }
+    for (const descriptor of [openapi, database, ...Object.values(rawManifest.sopTaskGraph)]) {
+      if (descriptor.bytes > 32 * 1024 * 1024) throw new Error('Task graph member exceeds 32 MiB');
+    }
+  } else if (readinessPair) {
     openapiPath = `${READINESS_SOURCE}/openapi.v1.yaml`;
     databasePath = `${READINESS_SOURCE}/schema-v1.29.sql`;
     assertExactKeys(rawManifest.readiness, Object.keys(READINESS_MEMBERS), 'readiness artifacts');
@@ -313,7 +336,8 @@ function contractDescriptors(manifest) {
   return [['OpenAPI', manifest.openapi], ['Database', manifest.database],
     ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor]),
     ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor]),
-    ...Object.entries(manifest.readiness ?? {}).map(([key, descriptor]) => [`readiness.${key}`, descriptor])];
+    ...Object.entries(manifest.readiness ?? {}).map(([key, descriptor]) => [`readiness.${key}`, descriptor]),
+    ...Object.entries(manifest.sopTaskGraph ?? {}).map(([key, descriptor]) => [`sopTaskGraph.${key}`, descriptor])];
 }
 
 /** Verify the installation plan's references as well as the outer file hashes.
@@ -442,6 +466,7 @@ function assertMember(directory, descriptor, label) {
   }
 }
 
+/** Verifies bundle bytes and internal references, not source authority or reconstruction. */
 export function verifyContractSetDirectory(directory) {
   const resolvedDirectory = path.resolve(directory);
   assertDirectory(resolvedDirectory, 'Contract-set directory');
@@ -460,15 +485,49 @@ export function verifyContractSetDirectory(directory) {
   verifyRuntimeReferences(resolvedDirectory, manifest);
   if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
+  if (manifest.sopTaskGraph) verifyTaskGraphReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
 }
 
-function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
+function taskGraphGitExecutable() {
+  const candidates = process.platform === 'win32'
+    ? ['C:\\Program Files\\Git\\cmd\\git.exe', 'C:\\Program Files\\Git\\bin\\git.exe']
+    : ['/usr/bin/git'];
+  const found = candidates.find(candidate => existsSync(candidate));
+  if (!found) throw new Error('Task graph reconstruction requires a system Git executable');
+  return found;
+}
+
+function taskGraphEnvironment(gitExecutable) {
+  return {
+    PATH: process.platform === 'win32' ? `${path.dirname(gitExecutable)};C:\\Windows\\System32` : '/usr/bin:/bin',
+    ...(process.platform === 'win32' ? { SystemRoot: 'C:\\Windows' } : {}),
+    LANG: 'C',
+    GIT_NO_REPLACE_OBJECTS: '1',
+    GIT_NO_LAZY_FETCH: '1',
+    GIT_ALLOW_PROTOCOL: '',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: os.devNull,
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'core.hooksPath',
+    GIT_CONFIG_VALUE_0: os.devNull,
+  };
+}
+
+function runGit(repositoryRoot, arguments_, encoding = 'buffer', exactObjects = false) {
+  if (exactObjects && arguments_[0] === 'show' && arguments_.length !== 2) throw new Error('Exact Git blob read requires one object');
+  const gitArguments = exactObjects && arguments_[0] === 'show'
+    ? ['cat-file', 'blob', arguments_[1]]
+    : arguments_;
+  const executable = exactObjects ? taskGraphGitExecutable() : 'git';
+  const env = exactObjects ? taskGraphEnvironment(executable) : undefined;
   try {
-    return execFileSync('git', ['-C', repositoryRoot, ...arguments_], {
+    return execFileSync(executable, ['-C', repositoryRoot, ...gitArguments], {
       encoding: encoding === 'utf8' ? 'utf8' : null,
-      maxBuffer: 8 * 1024 * 1024,
+      maxBuffer: 33 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...(env ? { env } : {}),
     });
   } catch {
     throw new Error(`Source Git verification failed at ${arguments_[0] ?? 'unknown operation'}`);
@@ -480,6 +539,13 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === TASK_GRAPH_SCHEMA) {
+    assertSourceGitFile(repositoryRoot, manifest.source_git_sha, TASK_GRAPH_APPROVAL);
+    const original = runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${TASK_GRAPH_APPROVAL}`], 'buffer', true);
+    const frozen = runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${manifest.sopTaskGraph.approval.source_path}`], 'buffer', true);
+    if (!original.equals(frozen)) throw new Error('Task graph original approval does not match the frozen approval');
+    return;
+  }
   if (manifest.schema === READINESS_SCHEMA) return; // Full references and approval are verified against this exact Git SHA.
   const readinessHistory = String(runGit(repositoryRoot, ['log', '--full-history', '-1', '--format=%H', manifest.source_git_sha, '--', READINESS_APPROVAL], 'utf8')).trim();
   if (readinessHistory) throw new Error('Approved readiness successor cannot be downgraded');
@@ -568,23 +634,27 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
   }
   const resolvedRepositoryRoot = realpathSync(path.resolve(sourceRepositoryRoot));
   assertDirectory(resolvedRepositoryRoot, 'Source repository root');
+  const exactObjects = manifest.schema === TASK_GRAPH_SCHEMA;
   const gitTopLevel = String(
-    runGit(resolvedRepositoryRoot, ['rev-parse', '--show-toplevel'], 'utf8'),
+    runGit(resolvedRepositoryRoot, ['rev-parse', '--show-toplevel'], 'utf8', exactObjects),
   ).trim();
   if (realpathSync(gitTopLevel) !== resolvedRepositoryRoot) {
     throw new Error('Source repository root must be the Git top-level directory');
   }
   // A shallow boundary can hide a versioned approval that was later deleted.
   // Negative history assertions are only valid against a complete source graph.
-  if (String(runGit(resolvedRepositoryRoot, ['rev-parse', '--is-shallow-repository'], 'utf8')).trim() !== 'false') {
+  if (String(runGit(resolvedRepositoryRoot, ['rev-parse', '--is-shallow-repository'], 'utf8', exactObjects)).trim() !== 'false') {
     throw new Error('Source repository must have complete Git history; shallow clones are not accepted');
   }
-  runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${manifest.source_git_sha}^{commit}`]);
+  runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${manifest.source_git_sha}^{commit}`], 'buffer', exactObjects);
 
   for (const [label, descriptor] of contractDescriptors(manifest)) {
+    if (manifest.schema === TASK_GRAPH_SCHEMA) assertSourceGitFile(resolvedRepositoryRoot, manifest.source_git_sha, descriptor.source_path);
     const committedBytes = runGit(
       resolvedRepositoryRoot,
       ['show', `${manifest.source_git_sha}:${descriptor.source_path}`],
+      'buffer',
+      exactObjects,
     );
     if (
       committedBytes.length !== descriptor.bytes
@@ -593,8 +663,310 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
       throw new Error(`${label} contract does not match the declared source Git commit`);
     }
   }
-  verifySourceApproval(resolvedRepositoryRoot, manifest);
+  if (manifest.schema === TASK_GRAPH_SCHEMA) {
+    const members = String(runGit(resolvedRepositoryRoot, ['ls-tree', '--name-only', `${manifest.source_git_sha}:${TASK_GRAPH_SOURCE}`], 'utf8', true)).trim().split('\n').sort();
+    const expected = [manifest.openapi.file, manifest.database.file, ...Object.values(TASK_GRAPH_MEMBERS).map(([file]) => file)].sort();
+    if (!isDeepStrictEqual(members, expected)) throw new Error('Task graph source members mismatch');
+    const predecessor = JSON.parse(String(runGit(resolvedRepositoryRoot, ['show', `${manifest.source_git_sha}:${manifest.sopTaskGraph.predecessor.source_path}`], 'utf8', true)));
+    runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${predecessor.sourceGitSha}^{commit}`], 'buffer', true);
+    try {
+      runGit(resolvedRepositoryRoot, ['merge-base', '--is-ancestor', predecessor.sourceGitSha, manifest.source_git_sha], 'buffer', true);
+    } catch {
+      throw new Error('Task graph predecessor is not an ancestor of the source commit, or ancestry could not be verified');
+    }
+    for (const reference of Object.values(predecessor.artifacts)) {
+      assertSourceGitFile(resolvedRepositoryRoot, predecessor.sourceGitSha, reference.path);
+      if (sha256Bytes(runGit(resolvedRepositoryRoot, ['show', `${predecessor.sourceGitSha}:${reference.path}`], 'buffer', true)) !== reference.sha256) throw new Error('Task graph source predecessor hash mismatch');
+    }
+    for (const [file, descriptor] of [
+      ['openapi.candidate.yaml', manifest.openapi],
+      ['schema.candidate.sql', manifest.database],
+      ['storage.candidate.sql', manifest.sopTaskGraph.storage],
+      ['installation.candidate.json', manifest.sopTaskGraph.installation],
+      ['manifest.candidate.json', manifest.sopTaskGraph.provenance],
+      ['shapes.source.json', manifest.sopTaskGraph.shapes],
+      ['rules.source.json', manifest.sopTaskGraph.rules],
+      ['storage.source.sql', manifest.sopTaskGraph.storage],
+    ]) {
+      const sourcePath = `${TASK_GRAPH_CANDIDATE}/${file}`;
+      assertSourceGitFile(resolvedRepositoryRoot, manifest.source_git_sha, sourcePath);
+      const bytes = runGit(resolvedRepositoryRoot, ['show', `${manifest.source_git_sha}:${sourcePath}`], 'buffer', true);
+      if (bytes.length !== descriptor.bytes || sha256Bytes(bytes) !== descriptor.sha256) {
+        throw new Error(`Task graph committed candidate differs from frozen member: ${file}`);
+      }
+    }
+    verifySourceApproval(resolvedRepositoryRoot, manifest);
+    const provenance = JSON.parse(String(runGit(resolvedRepositoryRoot, ['show', `${manifest.source_git_sha}:${manifest.sopTaskGraph.provenance.source_path}`], 'utf8', true)));
+    const historicalSha = provenance.historicalCandidateGitSha;
+    if (historicalSha !== TASK_GRAPH_HISTORY) throw new Error('Task graph historical source does not match the designated historical candidate');
+    verifyTaskGraphHistoricalInputs(resolvedRepositoryRoot, manifest, historicalSha);
+    verifyTaskGraphProducerBlobs(resolvedRepositoryRoot, manifest.source_git_sha, TASK_GRAPH_PRODUCER_HASHES);
+  }
+  if (manifest.schema !== TASK_GRAPH_SCHEMA) verifySourceApproval(resolvedRepositoryRoot, manifest);
   return resolvedRepositoryRoot;
+}
+
+function assertSourceGitFile(repositoryRoot, revision, relativePath) {
+  const entry = String(runGit(repositoryRoot, ['ls-tree', revision, '--', relativePath], 'utf8', true)).trim();
+  if (!/^(100644|100755) blob [0-9a-f]{40}\t/.test(entry)) throw new Error(`Source Git file is not a regular blob: ${relativePath}`);
+}
+
+/** Compares committed blobs; the caller must separately authenticate the fingerprints. */
+export function verifyTaskGraphProducerBlobs(repositoryRoot, revision, fingerprints) {
+  requireString(revision, GIT_SHA_PATTERN, 'Task graph source SHA');
+  assertExactKeys(fingerprints, Object.keys(TASK_GRAPH_PRODUCER_HASHES), 'Task graph producer fingerprints');
+  const producers = Object.fromEntries(Object.keys(fingerprints).map(name => {
+    requireString(fingerprints[name], HASH_PATTERN, `Task graph producer fingerprint ${name}`);
+    const sourcePath = `business-docs/08-工具/${name}`;
+    assertSourceGitFile(repositoryRoot, revision, sourcePath);
+    return [name, runGit(repositoryRoot, ['show', `${revision}:${sourcePath}`], 'buffer', true)];
+  }));
+  assertProducerFingerprints(producers, fingerprints);
+  return producers;
+}
+
+/** Checks inheritance only; the caller must separately authenticate the history and producer. */
+export function verifyTaskGraphHistoricalInputs(repositoryRoot, manifest, historicalSha) {
+  requireString(historicalSha, GIT_SHA_PATTERN, 'Task graph historical source SHA');
+  requireString(manifest?.source_git_sha, GIT_SHA_PATTERN, 'Task graph source SHA');
+  runGit(repositoryRoot, ['cat-file', '-e', `${historicalSha}^{commit}`], 'buffer', true);
+  try {
+    runGit(repositoryRoot, ['merge-base', '--is-ancestor', historicalSha, manifest.source_git_sha], 'buffer', true);
+  } catch {
+    throw new Error('Task graph historical source is not an ancestor of the source commit, or ancestry could not be verified');
+  }
+  for (const [sourcePath, descriptor] of [
+    [`${TASK_GRAPH_HISTORY_CANDIDATE}/predecessor.source.json`, manifest.sopTaskGraph.predecessor],
+    [TASK_GRAPH_APPROVAL, manifest.sopTaskGraph.approval],
+  ]) {
+    assertSourceGitFile(repositoryRoot, historicalSha, sourcePath);
+    const bytes = runGit(repositoryRoot, ['show', `${historicalSha}:${sourcePath}`], 'buffer', true);
+    if (bytes.length !== descriptor.bytes || sha256Bytes(bytes) !== descriptor.sha256) {
+      throw new Error(`Task graph inherited historical member mismatch: ${sourcePath}`);
+    }
+  }
+  for (const name of ['build_customer_agent_sop_graph_candidate.mjs', 'build_customer_agent_sop_task_graph_candidate.mjs']) {
+    const sourcePath = `business-docs/08-工具/${name}`;
+    assertSourceGitFile(repositoryRoot, historicalSha, sourcePath);
+    assertSourceGitFile(repositoryRoot, manifest.source_git_sha, sourcePath);
+    const historical = runGit(repositoryRoot, ['show', `${historicalSha}:${sourcePath}`], 'buffer', true);
+    const current = runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${sourcePath}`], 'buffer', true);
+    if (!historical.equals(current)) throw new Error(`Task graph inherited builder differs from history: ${name}`);
+  }
+}
+
+function readExactGitObject(repositoryRoot, type, objectId) {
+  requireString(objectId, GIT_SHA_PATTERN, 'Git object SHA');
+  const data = runGit(repositoryRoot, ['cat-file', type, objectId], 'buffer', true);
+  const object = Buffer.concat([Buffer.from(`${type} ${data.length}\0`), data]);
+  if (createHash('sha1').update(object).digest('hex') !== objectId) throw new Error('Git object bytes do not match their identity');
+  return { data, object };
+}
+
+function commitParents(data) {
+  const header = data.toString('utf8').split('\n\n', 1)[0];
+  const parents = [];
+  for (const line of header.split('\n')) {
+    if (!line.startsWith('parent ')) continue;
+    const parent = line.slice(7);
+    requireString(parent, GIT_SHA_PATTERN, 'Git parent SHA');
+    parents.push(parent);
+  }
+  return parents;
+}
+
+function assertRawGitAncestor(repositoryRoot, ancestor, descendant) {
+  const pending = [descendant];
+  const seen = new Set();
+  while (pending.length) {
+    const current = pending.pop();
+    if (current === ancestor) return;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    if (seen.size > 10000) throw new Error('Task graph source ancestry exceeds the verification limit');
+    pending.push(...commitParents(readExactGitObject(repositoryRoot, 'commit', current).data));
+  }
+  throw new Error('Task graph source does not have the required raw Git ancestry');
+}
+
+function seedGitPath(repositoryRoot, destination, revision, relativePath, cache) {
+  const put = (type, objectId) => {
+    const key = `${type}:${objectId}`;
+    if (cache.has(key)) return cache.get(key);
+    const { data, object } = readExactGitObject(repositoryRoot, type, objectId);
+    const file = path.join(destination, '.git', 'objects', objectId.slice(0, 2), objectId.slice(2));
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, deflateSync(object), { flag: 'wx', mode: 0o600 });
+    cache.set(key, data);
+    return data;
+  };
+  const commit = put('commit', revision).toString('utf8');
+  const tree = commit.match(/^tree ([0-9a-f]{40})\n/);
+  if (!tree) throw new Error('Task graph Git commit has no valid tree');
+  let treeId = tree[1];
+  const segments = relativePath.split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) throw new Error('Invalid fixed Git path');
+  for (const [index, segment] of segments.entries()) {
+    const data = put('tree', treeId);
+    let position = 0;
+    let entry;
+    while (position < data.length) {
+      const space = data.indexOf(0x20, position);
+      const end = data.indexOf(0, space + 1);
+      if (space < position || end < 0 || end + 21 > data.length) throw new Error('Malformed Git tree');
+      const name = data.subarray(space + 1, end);
+      const mode = data.toString('ascii', position, space);
+      const objectId = data.subarray(end + 1, end + 21).toString('hex');
+      position = end + 21;
+      if (name.equals(Buffer.from(segment))) { entry = { mode, objectId }; break; }
+    }
+    if (!entry) throw new Error(`Task graph historical Git path is missing: ${relativePath}`);
+    if (index === segments.length - 1) {
+      if (!['100644', '100755'].includes(entry.mode)) throw new Error(`Task graph historical Git path is not a regular blob: ${relativePath}`);
+      return put('blob', entry.objectId);
+    }
+    if (!['40000', '040000'].includes(entry.mode)) throw new Error(`Task graph historical Git path is not a tree: ${relativePath}`);
+    treeId = entry.objectId;
+  }
+  throw new Error('Task graph Git path is empty');
+}
+
+function committedTaskGraphBlob(repositoryRoot, revision, relativePath) {
+  assertSourceGitFile(repositoryRoot, revision, relativePath);
+  return runGit(repositoryRoot, ['show', `${revision}:${relativePath}`], 'buffer', true);
+}
+
+/**
+ * Development-only reconstruction assumes SHA-1 Git objects, trusted system Git/Node,
+ * and an audited producer import closure. The temporary Git repository is not an OS sandbox.
+ * The result is review material, never an intake authorization.
+ */
+export function reconstructTaskGraphCandidate({ sourceDirectory, sourceRepositoryRoot } = {}) {
+  if (!sourceDirectory) throw new Error('Task graph reconstruction requires a contract-set directory');
+  const source = verifyContractSetDirectory(sourceDirectory);
+  if (source.manifest.schema !== TASK_GRAPH_SCHEMA) throw new Error('Task graph reconstruction requires v9');
+  const repositoryRoot = verifySourceRepository(sourceRepositoryRoot, source.manifest);
+  const { manifest } = source;
+  const manifestBytes = readFileSync(path.join(source.directory, MANIFEST_FILE));
+  if (!isDeepStrictEqual(JSON.parse(manifestBytes), manifest)) throw new Error('Task graph manifest changed during reconstruction');
+  const producers = verifyTaskGraphProducerBlobs(repositoryRoot, manifest.source_git_sha, TASK_GRAPH_PRODUCER_HASHES);
+  const candidateNames = ['openapi.candidate.yaml', 'schema.candidate.sql', 'storage.candidate.sql', 'installation.candidate.json',
+    'manifest.candidate.json', 'shapes.source.json', 'rules.source.json', 'storage.source.sql'];
+  const candidate = Object.fromEntries(candidateNames.map(name => [name,
+    committedTaskGraphBlob(repositoryRoot, manifest.source_git_sha, `${TASK_GRAPH_CANDIDATE}/${name}`)]));
+  const predecessor = JSON.parse(committedTaskGraphBlob(repositoryRoot, TASK_GRAPH_HISTORY, `${TASK_GRAPH_HISTORY_CANDIDATE}/predecessor.source.json`));
+  requireString(predecessor.sourceGitSha, GIT_SHA_PATTERN, 'Task graph predecessor SHA');
+  assertRawGitAncestor(repositoryRoot, TASK_GRAPH_HISTORY, manifest.source_git_sha);
+  assertRawGitAncestor(repositoryRoot, predecessor.sourceGitSha, TASK_GRAPH_HISTORY);
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-sop-rebuild-'));
+  try {
+    mkdirSync(path.join(temporary, '.git', 'objects'), { recursive: true });
+    mkdirSync(path.join(temporary, '.git', 'refs', 'heads'), { recursive: true });
+    writeFileSync(path.join(temporary, '.git', 'HEAD'), 'ref: refs/heads/rebuild\n', { mode: 0o600 });
+    writeFileSync(path.join(temporary, '.git', 'config'), '[core]\n\trepositoryformatversion = 0\n\tbare = false\n', { mode: 0o600 });
+    const cache = new Map();
+    const historyPaths = [`${TASK_GRAPH_HISTORY_CANDIDATE}/predecessor.source.json`, TASK_GRAPH_APPROVAL,
+      'business-docs/08-工具/build_customer_agent_sop_graph_candidate.mjs',
+      'business-docs/08-工具/build_customer_agent_sop_task_graph_candidate.mjs'];
+    const baselinePaths = [`${READINESS_SOURCE}/openapi.v1.yaml`, `${READINESS_SOURCE}/schema-v1.29.sql`];
+    const input = {};
+    for (const [revision, paths] of [[TASK_GRAPH_HISTORY, historyPaths], [predecessor.sourceGitSha, baselinePaths]]) {
+      for (const relativePath of paths) {
+        const bytes = seedGitPath(repositoryRoot, temporary, revision, relativePath, cache);
+        input[`${revision}:${relativePath}`] = { sha256: sha256Bytes(bytes), bytes: bytes.length };
+      }
+    }
+    for (const [name, bytes] of Object.entries(producers)) {
+      const target = path.join(temporary, 'business-docs/08-工具', name);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, bytes, { flag: 'wx', mode: 0o600 });
+    }
+    for (const [name, bytes] of Object.entries(candidate)) {
+      const relativePath = `${TASK_GRAPH_CANDIDATE}/${name}`;
+      const target = path.join(temporary, relativePath);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, bytes, { flag: 'wx', mode: 0o600 });
+      if (name.endsWith('.source.json') || name === 'storage.source.sql') {
+        input[`${manifest.source_git_sha}:${relativePath}`] = { sha256: sha256Bytes(bytes), bytes: bytes.length };
+      }
+    }
+    const stagedProducers = Object.fromEntries(Object.keys(producers).map(name => {
+      const file = path.join(temporary, 'business-docs/08-工具', name);
+      assertPathInsideRoot(temporary, file);
+      assertRegularFile(file, 'Staged task graph producer');
+      return [name, readFileSync(file)];
+    }));
+    assertProducerFingerprints(stagedProducers, TASK_GRAPH_PRODUCER_HASHES);
+    for (const [name, bytes] of Object.entries(candidate)) {
+      const file = path.join(temporary, TASK_GRAPH_CANDIDATE, name);
+      assertPathInsideRoot(temporary, file);
+      assertRegularFile(file, 'Staged task graph candidate');
+      if (!readFileSync(file).equals(bytes)) throw new Error(`Task graph candidate changed before reconstruction: ${name}`);
+    }
+    const entry = path.join(temporary, 'business-docs/08-工具/build_customer_agent_sop_resume_candidate.mjs');
+    try {
+      execFileSync(process.execPath, [entry, '--check'], {
+        cwd: temporary, env: taskGraphEnvironment(taskGraphGitExecutable()), timeout: 30000,
+        maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch {
+      throw new Error('Task graph producer reconstruction check failed');
+    }
+    for (const [name, bytes] of Object.entries(producers)) {
+      if (!readFileSync(path.join(temporary, 'business-docs/08-工具', name)).equals(bytes)) throw new Error(`Task graph producer changed during reconstruction: ${name}`);
+    }
+    for (const [name, bytes] of Object.entries(candidate)) {
+      if (!readFileSync(path.join(temporary, TASK_GRAPH_CANDIDATE, name)).equals(bytes)) throw new Error(`Task graph candidate changed during reconstruction: ${name}`);
+    }
+    const checkedAgain = verifyContractSetDirectory(source.directory);
+    if (!isDeepStrictEqual(checkedAgain.manifest, manifest)
+      || sha256(path.join(source.directory, MANIFEST_FILE)) !== sha256Bytes(manifestBytes)) {
+      throw new Error('Task graph bundle changed during reconstruction');
+    }
+    const proof = {
+      schema: 'customer-agent-sop-reconstruction-candidate/v1',
+      source_git_sha: manifest.source_git_sha,
+      historical_git_sha: TASK_GRAPH_HISTORY,
+      predecessor_git_sha: predecessor.sourceGitSha,
+      producers: Object.fromEntries(Object.entries(producers).map(([name, bytes]) => [name, { sha256: sha256Bytes(bytes), bytes: bytes.length }])),
+      runtime: { node: process.versions.node, git: String(runGit(repositoryRoot, ['--version'], 'utf8', true)).trim() },
+      inputs: Object.fromEntries(Object.entries(input).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)),
+      candidate_files: Object.fromEntries(Object.entries(candidate).map(([name, bytes]) => [name, { sha256: sha256Bytes(bytes), bytes: bytes.length }])),
+      manifest_sha256: sha256Bytes(manifestBytes),
+      outputs: Object.fromEntries(contractDescriptors(manifest).map(([label, descriptor]) => [label, { ...descriptor }])),
+      runtime_activated: false,
+    };
+    return Object.freeze({ status: 'RECONSTRUCTED_NOT_AUTHORIZED', proof: Object.freeze(proof), proof_sha256: sha256Bytes(Buffer.from(JSON.stringify(proof))) });
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+/** A reviewed product-code anchor authenticates the proof; the proof never authorizes itself. */
+export function verifyTaskGraphReviewAnchor(result) {
+  assertExactKeys(result, ['status', 'proof', 'proof_sha256'], 'Task graph reconstruction result');
+  if (result.status !== 'RECONSTRUCTED_NOT_AUTHORIZED') throw new Error('Task graph reconstruction result is invalid');
+  assertExactKeys(result.proof, ['schema', 'source_git_sha', 'historical_git_sha', 'predecessor_git_sha', 'producers', 'runtime',
+    'inputs', 'candidate_files', 'manifest_sha256', 'outputs', 'runtime_activated'], 'Task graph reconstruction proof');
+  const proof = result.proof;
+  if (proof.schema !== 'customer-agent-sop-reconstruction-candidate/v1' || proof.runtime_activated !== false) {
+    throw new Error('Task graph reconstruction proof identity is invalid');
+  }
+  requireString(proof.source_git_sha, GIT_SHA_PATTERN, 'Task graph proof source SHA');
+  requireString(proof.historical_git_sha, GIT_SHA_PATTERN, 'Task graph proof historical SHA');
+  requireString(proof.predecessor_git_sha, GIT_SHA_PATTERN, 'Task graph proof predecessor SHA');
+  requireString(proof.manifest_sha256, HASH_PATTERN, 'Task graph proof manifest SHA-256');
+  requireString(result.proof_sha256, HASH_PATTERN, 'Task graph proof SHA-256');
+  const anchor = reviewedTaskGraphAnchor(proof.source_git_sha);
+  if (!anchor) throw new Error('Task graph source has no reviewed product-code anchor');
+  assertExactKeys(anchor, ['manifest_sha256', 'proof_sha256'], 'Task graph product-code anchor');
+  requireString(anchor.manifest_sha256, HASH_PATTERN, 'Task graph anchor manifest SHA-256');
+  requireString(anchor.proof_sha256, HASH_PATTERN, 'Task graph anchor proof SHA-256');
+  if (proof.manifest_sha256 !== anchor.manifest_sha256) throw new Error('Task graph proof manifest does not match the product-code anchor');
+  if (result.proof_sha256 !== sha256Bytes(Buffer.from(JSON.stringify(proof))) || result.proof_sha256 !== anchor.proof_sha256) {
+    throw new Error('Task graph proof does not match the product-code anchor');
+  }
+  return Object.freeze({ source_git_sha: proof.source_git_sha, manifest_sha256: proof.manifest_sha256, proof_sha256: result.proof_sha256 });
 }
 
 function assertProjectRoot(projectRoot) {
@@ -822,6 +1194,112 @@ function verifyReadinessIngested(projectRoot, repair) {
   return Object.freeze({...repairMetadata({...lock,path:directory,lock_path:lockPath}),lock:Object.freeze(lock),manifest:Object.freeze(verified.manifest),...sources});
 }
 
+function assertNoUnprovedTaskGraph(projectRoot) {
+  const lockPath = path.join(projectRoot, UPSTREAM_ROOT, TASK_GRAPH_LOCK);
+  try {
+    lstatSync(lockPath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
+  try {
+    if (!lstatSync(lockPath).isFile() || lstatSync(lockPath).isSymbolicLink()) throw new Error('proof lock is not a regular file');
+    const proof = readJson(lockPath, 'Task graph reconstruction proof lock');
+    assertExactKeys(proof, [
+      'schema', 'contract_set_id', 'source_repository', 'source_git_sha', 'manifest_sha256',
+      'openapi_sha256', 'database_sha256', 'intake_status', 'ddev_authorized',
+      'candidate_id', 'candidate_manifest_sha256', 'profile', 'runtime_activated', 'proof_sha256',
+    ], 'Task graph reconstruction proof lock');
+    if (proof.schema !== TASK_GRAPH_PROOF_LOCK_SCHEMA || proof.runtime_activated !== false) throw new Error('proof lock identity is invalid');
+    requireString(proof.contract_set_id, CONTRACT_SET_ID_PATTERN, 'Task graph proof lock contract_set_id');
+    if (proof.source_repository !== SOURCE_REPOSITORY || proof.intake_status !== INTAKE_STATUS || proof.ddev_authorized !== false) {
+      throw new Error('proof lock authority is invalid');
+    }
+    requireString(proof.source_git_sha, GIT_SHA_PATTERN, 'Task graph proof lock source_git_sha');
+    requireString(proof.manifest_sha256, HASH_PATTERN, 'Task graph proof lock manifest_sha256');
+    requireString(proof.openapi_sha256, HASH_PATTERN, 'Task graph proof lock openapi_sha256');
+    requireString(proof.database_sha256, HASH_PATTERN, 'Task graph proof lock database_sha256');
+    if (proof.candidate_id !== TASK_GRAPH_CANDIDATE_ID || proof.profile !== TASK_GRAPH_VERSIONS.profile) {
+      throw new Error('proof lock candidate identity is invalid');
+    }
+    requireString(proof.candidate_manifest_sha256, HASH_PATTERN, 'Task graph proof lock candidate_manifest_sha256');
+    requireString(proof.proof_sha256, HASH_PATTERN, 'Task graph proof lock proof_sha256');
+    const anchor = reviewedTaskGraphAnchor(proof.source_git_sha);
+    if (!anchor || anchor.manifest_sha256 !== proof.manifest_sha256 || anchor.proof_sha256 !== proof.proof_sha256) {
+      throw new Error('proof lock is not bound to a reviewed product-code anchor');
+    }
+    return proof;
+  } catch {
+    throw new Error(TASK_GRAPH_RECONSTRUCTION_ERROR);
+  }
+}
+
+function taskGraphProofLock(result) {
+  const manifest = result.verifiedContractSet.manifest;
+  return {
+    schema: TASK_GRAPH_PROOF_LOCK_SCHEMA,
+    contract_set_id: manifest.contract_set_id,
+    source_repository: manifest.source_repository,
+    source_git_sha: result.proof.source_git_sha,
+    manifest_sha256: result.proof.manifest_sha256,
+    openapi_sha256: manifest.openapi.sha256,
+    database_sha256: manifest.database.sha256,
+    intake_status: INTAKE_STATUS,
+    ddev_authorized: false,
+    candidate_id: TASK_GRAPH_CANDIDATE_ID,
+    candidate_manifest_sha256: result.proof.candidate_files?.['manifest.candidate.json']?.sha256 ?? '',
+    profile: TASK_GRAPH_VERSIONS.profile,
+    proof_sha256: result.proof_sha256,
+    runtime_activated: false,
+  };
+}
+
+export function verifyIngestedTaskGraph({ projectRoot, expectedContractSetId } = {}) {
+  const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
+  const proof = assertNoUnprovedTaskGraph(resolvedRoot);
+  if (expectedContractSetId && proof.contract_set_id !== expectedContractSetId) {
+    throw new Error(`Expected task graph contract ${expectedContractSetId}, found ${proof.contract_set_id}`);
+  }
+  const directory = path.join(resolvedRoot, UPSTREAM_ROOT, proof.contract_set_id);
+  assertPathInsideRoot(resolvedRoot, directory);
+  const verified = verifyContractSetDirectory(directory);
+  if (verified.manifest.schema !== TASK_GRAPH_SCHEMA) throw new Error('Task graph proof lock requires v9 bundle');
+  assertTaskGraphProofMatchesContract(resolvedRoot, verified);
+  if (proof.openapi_sha256 !== verified.manifest.openapi.sha256 || proof.database_sha256 !== verified.manifest.database.sha256) {
+    throw new Error(TASK_GRAPH_RECONSTRUCTION_ERROR);
+  }
+  return Object.freeze({
+    status: 'VERIFIED_PENDING',
+    contract_set_id: proof.contract_set_id,
+    source_git_sha: proof.source_git_sha,
+    path: directory,
+    lock_path: path.join(resolvedRoot, UPSTREAM_ROOT, TASK_GRAPH_LOCK),
+    intake_status: proof.intake_status,
+    ddev_authorized: false,
+    runtime_activated: false,
+  });
+}
+
+function assertTaskGraphProofMatchesContract(projectRoot, verifiedContractSet) {
+  if (verifiedContractSet.manifest.schema !== TASK_GRAPH_SCHEMA) return;
+  const proof = assertNoUnprovedTaskGraph(projectRoot);
+  const manifestPath = path.join(verifiedContractSet.directory, MANIFEST_FILE);
+  if (!proof || proof.source_git_sha !== verifiedContractSet.manifest.source_git_sha
+    || proof.manifest_sha256 !== sha256(manifestPath)
+    || proof.candidate_manifest_sha256 !== sha256(path.join(verifiedContractSet.directory, verifiedContractSet.manifest.sopTaskGraph.provenance.file))) {
+    throw new Error(TASK_GRAPH_RECONSTRUCTION_ERROR);
+  }
+}
+
+function assertTaskGraphExportedCandidate(directory, manifest) {
+  const provenance = JSON.parse(readFileSync(path.join(directory, manifest.sopTaskGraph.provenance.file), 'utf8'));
+  if (provenance.formalVersionAssigned !== true || provenance.businessMappingApproved !== true
+    || provenance.freezeCompleted !== true || provenance.exportCompleted !== true
+    || provenance.sourceGitSha !== manifest.source_git_sha) {
+    throw new Error(TASK_GRAPH_REVIEW_ONLY_ERROR);
+  }
+}
+
 function consumptionLock(verifiedContractSet) {
   const { directory, manifest } = verifiedContractSet;
   return {
@@ -911,6 +1389,7 @@ export function verifyIngestedContractSet({ projectRoot, expectedContractSetId }
   const destination = path.join(upstreamRoot, lock.contract_set_id);
   assertPathInsideRoot(resolvedRoot, destination);
   const verified = verifyContractSetDirectory(destination);
+  assertTaskGraphProofMatchesContract(resolvedRoot, verified);
   assertLockMatchesContractSet(lock, verified);
   return Object.freeze({
     status: 'VERIFIED',
@@ -993,12 +1472,19 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   }
   const source = verifyContractSetDirectory(sourceDirectory);
   verifySourceRepository(sourceRepositoryRoot, source.manifest);
+  const reconstruction = source.manifest.schema === TASK_GRAPH_SCHEMA
+    ? reconstructTaskGraphCandidate({ sourceDirectory, sourceRepositoryRoot })
+    : null;
+  if (reconstruction) verifyTaskGraphReviewAnchor(reconstruction);
+  if (source.manifest.schema === TASK_GRAPH_SCHEMA) assertTaskGraphExportedCandidate(source.directory, source.manifest);
   const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
+  assertNoUnprovedTaskGraph(resolvedRoot);
   const upstreamRoot = path.join(resolvedRoot, UPSTREAM_ROOT);
   const destination = path.join(upstreamRoot, source.manifest.contract_set_id);
   const isReadiness = source.manifest.schema === READINESS_SCHEMA;
   const isRepair = source.manifest.schema === REPAIR_CONTRACT_SET_SCHEMA;
-  const lockPath = path.join(upstreamRoot, isReadiness ? READINESS_LOCK : isRepair ? REPAIR_LOCK : LOCK_FILE);
+  const isTaskGraph = source.manifest.schema === TASK_GRAPH_SCHEMA;
+  const lockPath = path.join(upstreamRoot, isTaskGraph ? TASK_GRAPH_LOCK : isReadiness ? READINESS_LOCK : isRepair ? REPAIR_LOCK : LOCK_FILE);
   assertPathInsideRoot(resolvedRoot, upstreamRoot);
   assertPathInsideRoot(resolvedRoot, destination);
   assertPathInsideRoot(resolvedRoot, lockPath);
@@ -1007,15 +1493,19 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const releaseIntakeLock = acquireIntakeLock(resolvedRoot, upstreamRoot);
 
   try {
+    assertNoUnprovedTaskGraph(resolvedRoot);
     const readinessLockPath = path.join(upstreamRoot, READINESS_LOCK);
     if (existsSync(readinessLockPath)) {
       const existing = verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot));
-      if (!isReadiness || existing.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse readiness lock downgrade or replacement');
+      if (isReadiness && existing.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse readiness lock downgrade or replacement');
+      if (!isReadiness && !isTaskGraph) throw new Error('Refuse readiness lock downgrade or replacement');
+      if (isTaskGraph) verifyTaskGraphPredecessor(source.manifest, verifyTaskGraphReferences(source.directory, source.manifest), existing);
     }
     const repairLockPath = path.join(upstreamRoot, REPAIR_LOCK);
     if (existsSync(repairLockPath)) {
       const existingRepair = verifyRepairIngested(resolvedRoot);
-      if (!isReadiness && (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id)) throw new Error('Refuse repair lock downgrade or replacement');
+      if (!isReadiness && !isRepair && !isTaskGraph) throw new Error('Refuse repair lock downgrade or replacement');
+      if (isRepair && existingRepair.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse repair lock downgrade or replacement');
     }
     if (isReadiness) verifyReadinessPredecessor(resolvedRoot, source.directory, source.manifest, verifyRepairIngested(resolvedRoot));
     if (isRepair) verifyRepairPredecessor(resolvedRoot, source.directory);
@@ -1028,11 +1518,14 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       if (!manifestsMatch(existing.manifest, source.manifest)) {
         throw new Error('Existing contract-set manifest differs from the verified source');
       }
-      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
+      if (isTaskGraph) {
+        writeJsonAtomically(lockPath, taskGraphProofLock({ ...reconstruction, verifiedContractSet: existing }));
+      } else if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
         writeJsonAtomically(lockPath, consumptionLock(existing));
       }
       if (isReadiness) return Object.freeze({ ...repairMetadata(verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot))), status: 'REUSED', generateMigrations: true, generateContracts: true });
       if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'REUSED', generateMigrations: true, generateContracts: true });
+      if (isTaskGraph) return Object.freeze({ ...verifyIngestedTaskGraph({ projectRoot: resolvedRoot, expectedContractSetId: source.manifest.contract_set_id }), status: 'REUSED', generateMigrations: false, generateContracts: false });
       if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
         const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
         return Object.freeze({
@@ -1065,9 +1558,12 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
       if (!manifestsMatch(staged.manifest, source.manifest)) {
         throw new Error('Staged contract-set manifest differs from the verified source');
       }
-      const nextLock = consumptionLock(staged);
+      const nextLock = source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && !isTaskGraph
+        ? consumptionLock(staged)
+        : null;
       renameSync(stagingDirectory, destination);
-      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA) writeJsonAtomically(lockPath, nextLock);
+      if (isTaskGraph) writeJsonAtomically(lockPath, taskGraphProofLock({ ...reconstruction, verifiedContractSet: staged }));
+      else if (nextLock) writeJsonAtomically(lockPath, nextLock);
     } catch (error) {
       if (existsSync(stagingDirectory)) {
         rmSync(stagingDirectory, { recursive: true, force: true });
@@ -1077,6 +1573,7 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
 
     if (isReadiness) return Object.freeze({ ...repairMetadata(verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot))), status: 'CREATED', generateMigrations: true, generateContracts: true });
     if (isRepair) return Object.freeze({ ...repairMetadata(verifyRepairIngested(resolvedRoot)), status: 'CREATED', generateMigrations: true, generateContracts: true });
+    if (isTaskGraph) return Object.freeze({ ...verifyIngestedTaskGraph({ projectRoot: resolvedRoot, expectedContractSetId: source.manifest.contract_set_id }), status: 'CREATED', generateMigrations: false, generateContracts: false });
     if (source.manifest.schema === SOP_CONTRACT_SET_SCHEMA) {
       const kept = verifyIngestedContractSet({ projectRoot: resolvedRoot });
       const successor = verifyContractSetDirectory(destination);
@@ -1120,7 +1617,7 @@ function defaultProjectRoot() {
 
 export function parseCliArguments(argv) {
   const command = argv[0] ?? 'verify';
-  if (command !== 'ingest' && command !== 'verify') {
+  if (command !== 'ingest' && command !== 'verify' && command !== 'reconstruct') {
     throw new Error(`Unknown contract-set command: ${command}`);
   }
   const options = {};
@@ -1134,13 +1631,17 @@ export function parseCliArguments(argv) {
     }
     options[match[1]] = match[2];
   }
+  if (command === 'reconstruct' && (options.id || options['project-root'])) {
+    throw new Error('Task graph reconstruction accepts only source and source-repository-root');
+  }
   return { command, options };
 }
 
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
-  const result = command === 'ingest'
-    ? ingestContractSetAndGenerate({
+  const result = command === 'reconstruct'
+    ? reconstructTaskGraphCandidate({ sourceDirectory: options.source, sourceRepositoryRoot: options['source-repository-root'] })
+    : command === 'ingest' ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],
         sourceDirectory: options.source,
         sourceRepositoryRoot: options['source-repository-root'],

@@ -1,0 +1,57 @@
+{
+  "schema": "menokin-six-sheet-candidate-registry-v1",
+  "status": "CANDIDATE",
+  "publishable": false,
+  "runtimeEnabled": false,
+  "sourceSha256": "c3416b2c779f97b52c3e4b17a38ea1670d13616e180a8d818d1b6b99df9829c4",
+  "entries": [
+    {
+      "sheet": "过敏流程SOP",
+      "kind": "sop-family",
+      "candidateId": "menokin.sop.allergy",
+      "entryTerms": ["过敏", "疑似过敏"],
+      "enabled": false,
+      "reason": "business-confirmation-required"
+    },
+    {
+      "sheet": "长痘痘SOP",
+      "kind": "sop-family",
+      "candidateId": "menokin.sop.acne",
+      "entryTerms": ["长痘", "痘痘"],
+      "enabled": false,
+      "reason": "business-confirmation-required"
+    },
+    {
+      "sheet": "少错破SOP",
+      "kind": "sop-family",
+      "candidateId": "menokin.sop.shaocuopo",
+      "entryTerms": ["少错破"],
+      "enabled": false,
+      "reason": "business-name-and-entry-confirmation-required"
+    },
+    {
+      "sheet": "品质售后SOP",
+      "kind": "sop-family",
+      "candidateId": "menokin.sop.quality-after-sales",
+      "entryTerms": ["品质问题", "质量问题", "售后"],
+      "enabled": false,
+      "reason": "business-confirmation-required"
+    },
+    {
+      "sheet": "税收相关规则",
+      "kind": "rule-set",
+      "candidateId": "menokin.rule.tax",
+      "entryTerms": [],
+      "enabled": false,
+      "reason": "rule-set-is-not-a-sop-entry"
+    },
+    {
+      "sheet": "品牌对接资源汇总",
+      "kind": "resource-set",
+      "candidateId": "menokin.resource.brand-integration",
+      "entryTerms": [],
+      "enabled": false,
+      "reason": "resource-set-needs-owner-and-scope-mapping"
+    }
+  ]
+}

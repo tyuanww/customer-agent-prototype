@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mediaObjectId, previewApplies, previewFromBytes } from '../src/content-intake/linked-preview.js';
 import { sourceUsesSopWorkbook } from '../src/content-intake/sop-source.js';
 
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 
 describe('SOP preview identity and applicability', () => {
   it('gives each source its own object id for the same bytes', () => {
@@ -17,11 +17,11 @@ describe('SOP preview identity and applicability', () => {
     expect(shop.objectId).not.toBe(`med_${content}`);
   });
 
-  it('selects the registered SOP tuple and leaves ordinary product sources on the FAQ parser', () => {
+  it('keeps the registered SOP source off the FAQ parser and allows only the synthetic profile', () => {
     const registered = { scope: { domain: 'sop' }, templateVersion: 'sop-v1', ruleVersion: 'sop-not-imported', mappingVersion: 'not-imported' };
     const product = { scope: { domain: 'product' }, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1' };
     const fixture = { ...product, mappingVersion: 'sop-not-imported' };
-    expect(sourceUsesSopWorkbook(registered)).toBe(true);
+    expect(sourceUsesSopWorkbook(registered)).toBe(false);
     expect(sourceUsesSopWorkbook(product)).toBe(false);
     expect(sourceUsesSopWorkbook(fixture)).toBe(true);
   });

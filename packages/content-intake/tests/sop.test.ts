@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { createSyntheticSopWorkbook, parseSopWorkbook, repairEmptySharedStringMarkers, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
 
-const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=';
+const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
 const context: SopParseContext = {
   sourceId: 'synthetic-sop-source', brandId: 'synthetic-brand', scope: 'shop-a', scopeKind: 'shop',
   selectedSheets: SOP_SHEET_NAMES,
@@ -116,4 +116,80 @@ it('builds bounded synthetic media windows with stable row identities across sma
   expect(b.rowBindings).toEqual(a.rowBindings.slice(0, b.rowBindings.length));
   expect(a.previews[0]?.row).toBe(403); expect(b.previews.at(-1)?.row).toBe(402);
   await expect(createSyntheticSopWorkbook({ tailRows: 502 })).rejects.toThrow('SYNTHETIC_TAIL_ROWS');
+});
+
+const GIF_SAMPLE = Buffer.from('R0lGODlhAQABAIAAAAAAABMhMSH/C05FVFNDQVBFMi4wAwEAAAAh+QQAAQAAACwAAAAAAQABAAACAkQBADs=', 'base64');
+const JPEG_SAMPLE = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAT/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCABRwt/9k=', 'base64');
+
+async function sourceWithImage(extension: 'gif' | 'png' | 'jpeg', bytes: Buffer, background = false): Promise<Buffer> {
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(new Uint8Array((await createSyntheticSopWorkbook()).bytes).buffer);
+  const id = book.addImage({ buffer: new Uint8Array(bytes).buffer, extension });
+  const sheet = book.getWorksheet(SOP_SHEET_NAMES[0]);
+  if (!sheet) throw new Error('SYNTHETIC_SHEET_MISSING');
+  if (background) sheet.addBackgroundImage(id); else sheet.addImage(id, 'D2:E3');
+  return Buffer.from(await book.xlsx.writeBuffer());
+}
+
+it.each([
+  ['GIF89a', 'gif', GIF_SAMPLE],
+  ['GIF87a', 'gif', Buffer.concat([Buffer.from('GIF87a'), GIF_SAMPLE.subarray(6)])],
+  ['GIF declared as PNG', 'png', GIF_SAMPLE],
+  ['GIF declared as JPEG', 'jpeg', GIF_SAMPLE],
+  ['unreadable GIF', 'gif', Buffer.from('not an image')],
+] as const)('rejects %s at its anchored row without returning partial content', async (_name, extension, bytes) => {
+  const workbook = await sourceWithImage(extension, bytes);
+  const result = await parseSopWorkbook(workbook, context);
+  expect(result).toMatchObject({ ok: false, rows: [], attachments: [] });
+  expect(result.issues).toContainEqual(expect.objectContaining({ code: 'MEDIA_FORMAT_UNSUPPORTED', sheet: SOP_SHEET_NAMES[0], row: 2, column: 'D', fix: expect.stringContaining('GIF') }));
+  expect(await tryParseSopAsFaq(workbook, { sourceId: context.sourceId, brandId: context.brandId, shopId: context.scope }))
+    .toMatchObject({ parsed: { ok: false, rows: [] }, rowBindings: [], previews: [] });
+});
+
+it('preserves anchored JPEG and PNG bytes in the same legacy workbook', async () => {
+  const result = await parseSopWorkbook(await sourceWithImage('jpeg', JPEG_SAMPLE), context);
+  expect(result.ok).toBe(true);
+  expect(result.attachments.map(item => item.mime)).toEqual(['image/png', 'image/jpeg']);
+  expect(result.attachments[1]?.base64).toBe(JPEG_SAMPLE.toString('base64'));
+});
+
+it.each([
+  ['gif', GIF_SAMPLE, 'MEDIA_FORMAT_UNSUPPORTED'],
+  ['png', Buffer.from(ONE_PIXEL_PNG, 'base64'), 'UNANCHORED_IMAGE'],
+] as const)('rejects a %s sheet background instead of ignoring it', async (extension, bytes, code) => {
+  const result = await parseSopWorkbook(await sourceWithImage(extension, bytes, true), context);
+  expect(result).toMatchObject({ ok: false, rows: [], attachments: [] });
+  expect(result.issues).toContainEqual(expect.objectContaining({ code, sheet: SOP_SHEET_NAMES[0], row: 1, fix: expect.stringContaining('背景') }));
+});
+
+it.each([
+  ['gif', GIF_SAMPLE, 'MEDIA_FORMAT_UNSUPPORTED'],
+  ['png', Buffer.from(ONE_PIXEL_PNG, 'base64'), 'UNANCHORED_IMAGE'],
+] as const)('reports an unreferenced %s resource rather than discarding it', async (extension, bytes, code) => {
+  const zip = await JSZip.loadAsync((await createSyntheticSopWorkbook()).bytes);
+  zip.file(`xl/media/unreferenced.${extension}`, bytes);
+  if (extension === 'gif') {
+    const file = zip.file('[Content_Types].xml');
+    if (!file) throw new Error('SYNTHETIC_CONTENT_TYPES_MISSING');
+    zip.file('[Content_Types].xml', (await file.async('string')).replace('</Types>', '<Default Extension="gif" ContentType="image/gif"/></Types>'));
+  }
+  const result = await parseSopWorkbook(await zip.generateAsync({ type: 'nodebuffer' }), context);
+  expect(result).toMatchObject({ ok: false, rows: [], attachments: [] });
+  expect(result.issues).toContainEqual(expect.objectContaining({ code, fix: expect.stringContaining('未关联图片资源') }));
+});
+
+
+it.each(['jpg', 'JPG'])("accepts JPEG workbook media named with .%s", async extension => {
+  const zip = await JSZip.loadAsync(await sourceWithImage('jpeg', JPEG_SAMPLE));
+  for (const [name, file] of Object.entries(zip.files)) {
+    if (name.endsWith('.jpeg')) {
+      zip.file(name.replace(/\.jpeg$/u, `.${extension}`), await file.async('nodebuffer'));
+      zip.remove(name);
+    } else if (name.endsWith('.xml') || name.endsWith('.rels')) {
+      zip.file(name, (await file.async('string')).replace(/\.jpeg/gu, `.${extension}`).replace(/Extension="jpeg"/gu, `Extension="${extension}"`));
+    }
+  }
+  const result = await parseSopWorkbook(await zip.generateAsync({ type: 'nodebuffer' }), context);
+  expect(result.ok, JSON.stringify(result.issues)).toBe(true);
+  expect(result.attachments.at(-1)).toMatchObject({ extension: 'jpeg', mime: 'image/jpeg', base64: JPEG_SAMPLE.toString('base64') });
 });

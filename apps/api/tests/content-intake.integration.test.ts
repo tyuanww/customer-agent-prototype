@@ -9,6 +9,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import Fastify from 'fastify';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { Pool, type Client, type PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
@@ -28,6 +29,8 @@ import { createProductAuthService, authenticatedProductSession } from '../src/pr
 import type { ApiDatabaseBootstrapConfig } from '../src/runtime-config.js';
 import { createApprovalAdapter, type ApprovalTransport } from '../src/content-intake/approval-adapter.js';
 import { syntheticApproval } from './support/intake-approval.js';
+import { sopImageFixtures as sopImages } from './support/sop-image-fixtures.js';
+import { sopImageRegressions as sopRegressions } from './support/sop-image-regressions.js';
 import { canonical, digest } from '../src/content-intake/material.js';
 import { seedSyntheticG1aRelease } from './support/synthetic-g1a.js';
 import { createIntakePurposePool, type IntakePurposePool } from '../src/content-intake/runtime-pool.js';
@@ -708,6 +711,105 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       throw error;
     }
   }
+  type SyntheticMedia = Readonly<{ bytes: Buffer; extension: 'png' | 'jpeg' | 'jpg' | 'gif' }>;
+  async function sopMediaWorkbook(media: readonly SyntheticMedia[]): Promise<Buffer> {
+    const requireIntake = createRequire(new URL('../../../packages/content-intake/package.json', import.meta.url));
+    const ExcelJS = requireIntake('exceljs'), workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load((await createSyntheticSopWorkbook()).bytes);
+    const first = media[0];
+    if (!first) throw new Error('SYNTHETIC_MEDIA_REQUIRED');
+    const initial = workbook.getImage(0);
+    initial.buffer = first.bytes; initial.extension = first.extension; delete initial.base64;
+    const sheet = workbook.getWorksheet('过敏流程SOP');
+    if (!sheet) throw new Error('SYNTHETIC_SHEET_MISSING');
+    for (const item of media.slice(1)) {
+      const id = workbook.addImage({ buffer: item.bytes, extension: item.extension });
+      sheet.addImage(id, { tl: { col: 1, row: 1 }, ext: { width: 8, height: 8 } });
+    }
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  it.each([
+    ['PNG', { bytes: sopImages.validPng, extension: 'png' }, 'image/png'],
+    ['RGBA PNG', { bytes: sopRegressions.pngRgba, extension: 'png' }, 'image/png'],
+    ['JPEG', { bytes: sopImages.validJpeg, extension: 'jpeg' }, 'image/jpeg'],
+    ['JPG', { bytes: sopImages.validJpeg, extension: 'jpg' }, 'image/jpeg'],
+    ['arithmetic JPEG', { bytes: sopRegressions.jpegArithmetic, extension: 'jpeg' }, 'image/jpeg'],
+    ['lossless JPEG', { bytes: sopRegressions.jpegLossless, extension: 'jpeg' }, 'image/jpeg'],
+  ] as const)('SOP media pixels: accepts complete %s through the actual upload and freeze path', async (_name, media, mime) => {
+    await publicationBase(); await registerSopSource();
+    const host = await managementHost();
+    try {
+      const upload = await host.upload(await sopMediaWorkbook([media]), 'sop-pixels-upload', 'source-sop');
+      expect(upload.status).toBe(201);
+      const object = parseContractSchema('IntakeObject', await upload.json());
+      const base = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-pixels-receive', null, base, 'source-sop');
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('validated');
+      const objects = await admin.query<{ sha256: string; mime: string }>("SELECT sha256,mime FROM content_intake.sop_media_objects WHERE source_id='source-sop'");
+      expect(objects.rows).toEqual([{ sha256: createHash('sha256').update(media.bytes).digest('hex'), mime }]);
+      const payload = await admin.query<{ payload_object_id: string }>("SELECT payload_object_id FROM content_intake.sop_media_objects WHERE source_id='source-sop'");
+      expect(await store.readAttachment({ objectId: payload.rows[0]!.payload_object_id, sha256: objects.rows[0]!.sha256,
+        sizeBytes: media.bytes.length, mime })).toEqual(media.bytes);
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it.each([
+    ['PNG pixel stream', { bytes: sopImages.corruptPng, extension: 'png' }, 'MEDIA_DECODE_FAILED'],
+    ['JPEG scan', { bytes: sopImages.corruptJpeg, extension: 'jpeg' }, 'MEDIA_DECODE_FAILED'],
+    ['animated GIF', { bytes: sopImages.validGif, extension: 'gif' }, 'MEDIA_FORMAT_UNSUPPORTED'],
+    ['PNG without IEND', { bytes: sopImages.validPng.subarray(0, -12), extension: 'png' }, 'MEDIA_DECODE_FAILED'],
+    ['PNG IEND CRC', { bytes: Buffer.concat([sopImages.validPng.subarray(0, -1), Buffer.from([sopImages.validPng.at(-1)! ^ 1])]), extension: 'png' }, 'MEDIA_DECODE_FAILED'],
+    ['JPEG scan byte removed', { bytes: sopRegressions.jpegCorruptScan, extension: 'jpeg' }, 'MEDIA_DECODE_FAILED'],
+    ['GIF shortened frame LZW', { bytes: sopRegressions.gifShortSecondFrame, extension: 'gif' }, 'MEDIA_FORMAT_UNSUPPORTED'],
+    ['CMYK JPEG needing conversion', { bytes: sopImages.cmykJpeg, extension: 'jpeg' }, 'MEDIA_FORMAT_UNSUPPORTED'],
+    ['12-bit JPEG needing conversion', { bytes: sopRegressions.jpeg12Bit, extension: 'jpeg' }, 'MEDIA_FORMAT_UNSUPPORTED'],
+    ['APNG', { bytes: sopImages.validApng, extension: 'png' }, 'MEDIA_APNG_UNSUPPORTED'],
+    ['damaged APNG', { bytes: sopImages.corruptApng, extension: 'png' }, 'MEDIA_APNG_UNSUPPORTED'],
+  ] as const)('SOP media pixels: rejects %s without a media object or candidate', async (_name, media, code) => {
+    await publicationBase(); await registerSopSource();
+    const host = await managementHost();
+    try {
+      const upload = await host.upload(await sopMediaWorkbook([media]), 'sop-bad-pixels-upload', 'source-sop');
+      expect(upload.status).toBe(201);
+      const object = parseContractSchema('IntakeObject', await upload.json());
+      const base = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-bad-pixels-receive', null, base, 'source-sop');
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state, JSON.stringify(job.issues)).toBe('failed');
+      expect(job.issues.map(issue => issue.code)).toEqual([code]);
+      if (media.extension === 'gif') {
+        expect(job.issues[0]?.message).toMatch(/GIF.*PNG.*JPEG/u);
+        expect(job.issues[0]?.location).toEqual({ sheet: '过敏流程SOP', row: 2, column: 2 });
+      }
+      expect(job.candidateId).toBeNull();
+      const mediaCount = await admin.query<{ count: number }>("SELECT count(*)::int AS count FROM content_intake.sop_media_objects WHERE source_id='source-sop'");
+      const candidateCount = await admin.query<{ count: number }>("SELECT count(*)::int AS count FROM content_intake.candidate_versions WHERE source_id='source-sop'");
+      expect(mediaCount.rows[0]?.count).toBe(0); expect(candidateCount.rows[0]?.count).toBe(0);
+    } finally { await host.app.close(); }
+  }, 30_000);
+
+  it('SOP media pixels: validates a whole batch before persisting its first valid image', async () => {
+    await publicationBase(); await registerSopSource();
+    const host = await managementHost();
+    try {
+      const workbook = await sopMediaWorkbook([{ bytes: sopImages.validPng, extension: 'png' }, { bytes: sopRegressions.gifShortSecondFrame, extension: 'gif' }]);
+      const upload = await host.upload(workbook, 'sop-mixed-pixels-upload', 'source-sop');
+      expect(upload.status).toBe(201);
+      const object = parseContractSchema('IntakeObject', await upload.json());
+      const base = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0]?.current_release_id ?? null;
+      const received = await host.receive(object.objectId, 'sop-mixed-pixels-receive', null, base, 'source-sop');
+      expect(received.statusCode, received.body).toBe(202);
+      const job = await host.settled(received.json<C['IntakeParseJob']>().jobId);
+      expect(job.state).toBe('failed'); expect(job.issues[0]?.code).toBe('MEDIA_FORMAT_UNSUPPORTED');
+      expect(job.issues[0]?.message).toMatch(/GIF.*PNG.*JPEG/u);
+      expect((await admin.query("SELECT count(*)::int AS count FROM content_intake.sop_media_objects WHERE source_id='source-sop'")).rows[0].count).toBe(0);
+    } finally { await host.app.close(); }
+  }, 30_000);
+
   it.each(['plain', 'successor-pending', 'same-version-empty', 'newer-version', 'cancelled', 'uncommitted', 'late-replay-cancel', 'late-freeze-cancel'] as const)('recovers SOP preview projection after a confirmed freeze COMMIT loses its acknowledgement: %s', async variant => {
     await registerSopSource();
     const workbook = await createSyntheticSopWorkbook();

@@ -23,7 +23,7 @@ describe('build boundary', () => {
     expect(build.exclude).toContain('experiments/**/*.ts');
     expect(tsconfig.exclude).toContain('experiments/**/.generated/**');
     expect(generatedTsconfig.include).toEqual(['.generated/search-decision.ts']);
-    expect(pkg.files).toEqual(['dist', 'README.md']);
+    expect(pkg.files).toEqual(['dist', 'README.md', 'THIRD_PARTY_NOTICES.md', 'third-party-licenses']);
     expect(pkg.scripts.typecheck).toContain('check-generated-types.mjs');
   });
 });

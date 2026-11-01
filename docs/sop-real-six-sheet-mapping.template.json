@@ -1,0 +1,117 @@
+{
+  "version": "menokin-six-sheet-mapping-v1",
+  "mappingState": "candidate",
+  "mappingStatus": "needs-business-confirmation",
+  "publishable": false,
+  "sourcePath": "/Users/hutou/Downloads/【SOP】Menokin_SOP.xlsx",
+  "sourceSha256": "c3416b2c779f97b52c3e4b17a38ea1670d13616e180a8d818d1b6b99df9829c4",
+  "entryCodeHeaderPresent": false,
+  "sheets": [
+    {
+      "sheet": "过敏流程SOP",
+      "rowCount": 73,
+      "columnCount": 15,
+      "imageCount": 1,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [
+        {
+          "value": "同一过敏流程内由专业坐席完成判断，按判断结果进入不同步骤分支；不拆成多个流程。具体分支目标待逐项绑定到稳定任务。",
+          "evidence": "workbook:过敏流程SOP#sheet; review:docs/reviews/2026-10-31-sop-business-decisions.md#决定-1-过敏流程由坐席直接判断"
+        }
+      ],
+      "unableToDeterminePaths": [
+        {
+          "value": "由专业坐席在流程内完成判断；信息不足时执行流程内的补充确认步骤，再进入对应判断分支；不设置转人工路径。",
+          "evidence": "workbook:过敏流程SOP#sheet; review:docs/reviews/2026-10-31-sop-business-decisions.md#决定-1-过敏流程由坐席直接判断"
+        }
+      ],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    },
+    {
+      "sheet": "长痘痘SOP",
+      "rowCount": 38,
+      "columnCount": 8,
+      "imageCount": 0,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [],
+      "unableToDeterminePaths": [],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    },
+    {
+      "sheet": "少错破SOP",
+      "rowCount": 48,
+      "columnCount": 5,
+      "imageCount": 0,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [],
+      "unableToDeterminePaths": [],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    },
+    {
+      "sheet": "品质售后SOP",
+      "rowCount": 36,
+      "columnCount": 7,
+      "imageCount": 13,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [],
+      "unableToDeterminePaths": [],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    },
+    {
+      "sheet": "税收相关规则",
+      "rowCount": 28,
+      "columnCount": 5,
+      "imageCount": 0,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [],
+      "unableToDeterminePaths": [],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    },
+    {
+      "sheet": "品牌对接资源汇总",
+      "rowCount": 64,
+      "columnCount": 9,
+      "imageCount": 43,
+      "stableBusinessIds": [],
+      "entryTerms": [],
+      "branchTargets": [],
+      "unableToDeterminePaths": [],
+      "knowledgeOwnership": [],
+      "resourceOwnership": [],
+      "imageOwnership": [],
+      "applicability": [],
+      "visibility": [],
+      "effectiveInterval": null
+    }
+  ]
+}

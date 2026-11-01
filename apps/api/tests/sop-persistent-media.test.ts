@@ -9,7 +9,7 @@ import { mediaObjectId } from '../src/content-intake/linked-preview.js';
 import { digest } from '../src/content-intake/material.js';
 import type { createIntakeTransactions, IntakeTransaction, Principal } from '../src/content-intake/transaction.js';
 import type { AuthenticatedUser } from '../src/auth-service.js';
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const actor = { user_id: 'synthetic-user' } as AuthenticatedUser;

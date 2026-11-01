@@ -21,8 +21,13 @@ export { SOP_TEMPLATE_VERSION } from './policy.js';
 export const SOP_RULE_VERSION = 'sop-not-imported';
 export const SOP_MAPPING_VERSION = 'not-imported';
 export const SOP_STRUCTURE_SHA256 = '55db62261cb6eee8bb0327ffb4bf8eac1f30a667e6821f640431d4be47c3a925';
-const IMAGE_EXTENSIONS = ['jpeg', 'png', 'gif'] as const;
-type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
+type ImageExtension = 'jpeg' | 'png';
+
+export const SOP_GIF_UNSUPPORTED_FIX = 'SOP 首版不支持 GIF 图片，请替换为 PNG 或 JPEG 后重新导入';
+export function isSopGif(extension: string | undefined, bytes: Buffer | undefined): boolean {
+  const header = bytes?.toString('latin1', 0, 6);
+  return extension?.toLowerCase() === 'gif' || header === 'GIF87a' || header === 'GIF89a';
+}
 
 /** The workbook column that carries a row's stable identity. The header row is
  * row 1 on every sheet; a sheet without this column is refused rather than
@@ -45,7 +50,7 @@ export type SopAttachment = Readonly<{
   row: number;
   column: number;
   extension: ImageExtension;
-  mime: `image/${'jpeg' | 'png' | 'gif'}`;
+  mime: `image/${ImageExtension}`;
   bytes: number;
   sha256: string;
   base64: string;
@@ -161,7 +166,8 @@ function imageBuffer(image: ExcelJS.Image): Buffer | undefined {
   return undefined;
 }
 
-const SYNTHETIC_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=', 'base64');
+const SYNTHETIC_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
+const SYNTHETIC_ALT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 /** A blank workbook the business fills in. Row 1 is the header and every data row
  * must carry its own code, because the code — not the row number — is the entry's
@@ -232,7 +238,7 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
     if (index === 0 && options.declaredVersion !== undefined) { sheet.getCell('D1').value = '版本'; sheet.getCell('D2').value = options.declaredVersion; }
   }
   const imageId = book.addImage(options.replaceFirstImage
-    ? { buffer: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') as unknown as ExcelJS.Buffer, extension: 'gif' }
+    ? { buffer: SYNTHETIC_ALT_PNG as unknown as ExcelJS.Buffer, extension: 'png' }
     : { buffer: SYNTHETIC_PNG as unknown as ExcelJS.Buffer, extension: 'png' });
   for (let row = imageStart; row < imageStart + imageCount; row++) {
     book.getWorksheet(SOP_SHEET_NAMES.at(-1)!)!.addImage(imageId, { tl: { col: 1, row: row + 1 }, ext: { width: 8, height: 8 } });
@@ -242,7 +248,7 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
     book.getWorksheet(SOP_SHEET_NAMES[2])!.addImage(imageId, { tl: { col: 1, row: 1 }, ext: { width: 8, height: 8 } });
   }
   if (options.imageOnLastTextRow || options.imageOnFinalRow) {
-    const secondImage = book.addImage({ buffer: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') as unknown as ExcelJS.Buffer, extension: 'gif' });
+    const secondImage = book.addImage({ buffer: SYNTHETIC_ALT_PNG as unknown as ExcelJS.Buffer, extension: 'png' });
     book.getWorksheet(SOP_SHEET_NAMES[options.imageOnFinalRow ? 5 : 2])!.addImage(secondImage, { tl: { col: 1, row: options.imageOnFinalRow ? 0 : 1 }, ext: { width: 8, height: 8 } });
   }
   return { bytes: Buffer.from(await book.xlsx.writeBuffer()), png: SYNTHETIC_PNG };
@@ -251,7 +257,7 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
 const refIds = (value: string): string[] => value ? value.split(',').map(part => part.trim()).filter(Boolean) : [];
 
 /** Map a six-sheet SOP workbook onto the existing FAQ row shape and keep image bytes. */
-export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ contentVersion: { kind: 'declared' | 'sha256'; value: string }; parsed: import('./policy.js').ParseResult; rowBindings: readonly { rowId: string; businessEntryId: string; title: string; answerText: string }[]; previews: readonly { bytes: Buffer; mime: `image/${'jpeg' | 'png' | 'gif'}`; rowId: string; sheet: string; row: number; column: number; ordinal: number; productRefIds: readonly string[]; scenarioRefIds: readonly string[]; familySourceId: string }[] } | null> {
+export async function tryParseSopAsFaq(bytes: Buffer, scope: Readonly<{ sourceId: string; brandId: string; shopId: string | null }>): Promise<{ contentVersion: { kind: 'declared' | 'sha256'; value: string }; parsed: import('./policy.js').ParseResult; rowBindings: readonly { rowId: string; businessEntryId: string; title: string; answerText: string }[]; previews: readonly { bytes: Buffer; mime: `image/${ImageExtension}`; rowId: string; sheet: string; row: number; column: number; ordinal: number; productRefIds: readonly string[]; scenarioRefIds: readonly string[]; familySourceId: string }[] } | null> {
   const sop = await parseSopWorkbook(bytes, {
     sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? scope.brandId,
     scopeKind: scope.shopId === null ? 'brand' : 'shop', selectedSheets: SOP_SHEET_NAMES,
@@ -316,11 +322,31 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
 
     const rows: SopRow[] = [];
     const attachments: SopAttachment[] = [];
+    const referencedMedia = new Set<number>();
     let normalizedTextChars = 0;
     const versionValues = new Set<string>();
     const seenCodes = new Set<string>();
     for (const name of selected) {
       const sheet = book.getWorksheet(name)!;
+      const backgroundId = sheet.getBackgroundImageId();
+      if (backgroundId !== undefined) {
+        referencedMedia.add(Number(backgroundId));
+        const background = book.getImage(Number(backgroundId));
+        const backgroundBytes = background ? imageBuffer(background) : undefined;
+        issue(isSopGif(background?.extension, backgroundBytes) ? 'MEDIA_FORMAT_UNSUPPORTED' : 'UNANCHORED_IMAGE', name, 1, 'A',
+          isSopGif(background?.extension, backgroundBytes) ? `工作表背景：${SOP_GIF_UNSUPPORTED_FIX}` : '背景图片无法关联内容行，请放入对应行后重新导入');
+      }
+      const pictures = sheet.getImages().map((entry, index) => {
+        const id = Number(entry.imageId);
+        referencedMedia.add(id);
+        const row = Math.floor(entry.range.tl.row) + 1;
+        const column = Math.floor(entry.range.tl.col) + 1;
+        const image = book.getImage(id);
+        const buffer = image ? imageBuffer(image) : undefined;
+        const gif = isSopGif(image?.extension, buffer);
+        if (gif) issue('MEDIA_FORMAT_UNSUPPORTED', name, row, columnName(column), SOP_GIF_UNSUPPORTED_FIX);
+        return { index, row, column, image, buffer, gif };
+      });
       let codeColumn = 0;
       for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
         if (cellText(sheet.getCell(1, column).value) === SOP_ENTRY_CODE_HEADER) { codeColumn = column; break; }
@@ -384,14 +410,12 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
       }
 
       const rowAttachments = new Map<number, string[]>();
-      for (const [index, entry] of sheet.getImages().entries()) {
-        const row = Math.floor(entry.range.tl.row) + 1;
-        const column = Math.floor(entry.range.tl.col) + 1;
-        const image = book.getImage(Number(entry.imageId));
-        const buffer = imageBuffer(image);
-        const extension = image.extension;
-        if (!buffer || !IMAGE_EXTENSIONS.includes(extension)) {
-          issue('MEDIA_UNAVAILABLE', name, row, columnName(column), '图片必须是受支持的内嵌 PNG/JPEG/GIF，且能被完整读取');
+      for (const { index, row, column, image, buffer, gif } of pictures) {
+        if (gif) continue;
+        const declaredExtension = image?.extension.toLowerCase();
+        const extension = declaredExtension === 'jpg' ? 'jpeg' : declaredExtension;
+        if (!buffer || (extension !== 'jpeg' && extension !== 'png')) {
+          issue('MEDIA_UNAVAILABLE', name, row, columnName(column), '图片必须是受支持的内嵌 PNG 或 JPEG，且能被完整读取');
           continue;
         }
         const id = `sop:${name}:${row}:${index + 1}`;
@@ -415,6 +439,16 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
         if (!byRow.has(row)) issue('IMAGE_WITHOUT_TEXT', name, row, 'A', '图片所在行必须补齐文字答案后再导入');
         else if (attachmentIds.length > 0 && !byRow.get(row)!.values.join('\n').trim()) issue('IMAGE_WITHOUT_TEXT', name, row, 'A', '图片所在行必须补齐文字答案后再导入');
       }
+    }
+    for (const [index, media] of book.model.media.entries()) {
+      if (referencedMedia.has(index)) continue;
+      const gif = isSopGif(media.extension, media.buffer ? Buffer.from(media.buffer) : undefined);
+      issue(gif ? 'MEDIA_FORMAT_UNSUPPORTED' : 'UNANCHORED_IMAGE', '', 0, '', gif
+        ? `未关联图片资源：${SOP_GIF_UNSUPPORTED_FIX}`
+        : '未关联图片资源，请关联内容行或从工作簿移除后重试');
+    }
+    if (archive.mediaCount > book.model.media.length) {
+      issue('MEDIA_UNAVAILABLE', '', 0, '', '工作簿含无法识别的图片资源，请检查后重新导出');
     }
     if (versionValues.size > 1) issue('VERSION_CONFLICT', selected[0]!, 1, 'A', '所有工作表的版本字段必须一致');
     const version = versionValues.values().next().value ?? rawSha256;

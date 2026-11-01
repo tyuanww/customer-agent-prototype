@@ -1,7 +1,6 @@
-/** A workbook is parsed as SOP only when the source is the SOP registration.
- * The consumed response schema still omits domain sop, so the synthetic fixture
- * opts in with mapping version sop-not-imported while its domain stays product.
- * The registered Menokin source matches the first three checks. */
+/** The legacy row parser is available only to the explicit synthetic fixture.
+ * A real `domain=sop` source must wait for the graph contract and must never
+ * enter the FAQ-shaped parser as an accidental downgrade. */
 export function sourceUsesSopWorkbook(source: {
   scope: { domain: string };
   templateVersion: string;
@@ -9,8 +8,5 @@ export function sourceUsesSopWorkbook(source: {
   mappingVersion: string;
 }): boolean {
   const domain: string = source.scope.domain;
-  return domain === 'sop'
-    || source.templateVersion === 'sop-v1'
-    || source.ruleVersion === 'sop-not-imported'
-    || source.mappingVersion === 'sop-not-imported';
+  return domain !== 'sop' && source.mappingVersion === 'sop-not-imported';
 }

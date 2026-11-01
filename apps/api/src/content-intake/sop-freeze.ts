@@ -34,7 +34,7 @@ const media = (value: unknown): MediaItem => {
     || typeof item.payloadObjectId !== 'string' || !/^obj_[0-9a-f]{64}$/.test(item.payloadObjectId)
     || typeof item.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(item.sha256)
     || !Number.isSafeInteger(item.bytes) || Number(item.bytes) < 1 || Number(item.bytes) > 5 * 1024 * 1024
-    || !['image/png', 'image/jpeg', 'image/gif'].includes(String(item.mime))
+    || !['image/png', 'image/jpeg'].includes(String(item.mime))
     || typeof item.sheetName !== 'string' || !Number.isInteger(item.rowNumber) || Number(item.rowNumber) < 1
     || !Number.isInteger(item.columnNumber) || Number(item.columnNumber) < 1 || Number(item.columnNumber) > 32
     || !Number.isInteger(item.ordinal) || Number(item.ordinal) < 1 || Number(item.ordinal) > 100) {

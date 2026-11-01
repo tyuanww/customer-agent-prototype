@@ -13,7 +13,7 @@ function descriptor(item: Record<string, unknown>): ReservedAttachment {
   if (typeof item.payloadObjectId !== 'string' || !/^obj_[0-9a-f]{64}$/.test(item.payloadObjectId)
     || typeof item.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(item.sha256)
     || !Number.isSafeInteger(item.bytes) || Number(item.bytes) < 1 || Number(item.bytes) > 5 * 1024 * 1024
-    || !['image/png', 'image/jpeg', 'image/gif'].includes(String(item.mime))) return invalid();
+    || !['image/png', 'image/jpeg'].includes(String(item.mime))) return invalid();
   return { objectId: item.payloadObjectId, sha256: item.sha256, sizeBytes: Number(item.bytes),
     mime: item.mime as ReservedAttachment['mime'] };
 }

@@ -94,11 +94,18 @@ export async function registeredPrincipalPage(client: Queryable, who: Principal,
   const { rows } = await client.query<PrincipalRow & { display_name: string | null; has_new_identity_activity: boolean }>(`WITH registered AS MATERIALIZED (
       SELECT * FROM content_intake.principals WHERE tenant_id=$1 AND app_id=$2 AND principal_id COLLATE "C">$3 COLLATE "C"
       ORDER BY principal_id COLLATE "C" LIMIT $4), projected AS (
-      ${principalProjection('registered')})
-    SELECT projected.*, account.display_name,
+      ${principalProjection('registered')}), seat_names AS MATERIALIZED (
+      SELECT person.principal_id, seat.out_display_name
+      FROM backend_identity.list_seats($1,$2) seat
+      JOIN registered person ON person.identity_scope='confirmed-synthetic'
+        AND person.person_key=person.principal_id
+        AND person.principal_id='seat_' || seat.out_username
+        AND person.user_id=left('usr_seat_' || encode(sha256(convert_to(seat.out_username, 'UTF8')), 'hex'), 40))
+    SELECT projected.*, COALESCE(seat_names.out_display_name, account.display_name) AS display_name,
       CASE WHEN projected.identity_scope='confirmed-hangzhou'
         THEN content_intake.principal_has_new_identity_activity(projected.principal_id) ELSE false END AS has_new_identity_activity FROM projected
     LEFT JOIN public.app_users account ON account.user_id=projected.user_id
+    LEFT JOIN seat_names ON seat_names.principal_id=projected.principal_id
     ORDER BY projected.principal_id COLLATE "C"`, [who.tenantId, who.appId, after, limit + 1]);
   return rows.map(row => ({ ...projectedPrincipal(row), displayName: row.display_name, hasNewIdentityActivity: row.has_new_identity_activity }));
 }

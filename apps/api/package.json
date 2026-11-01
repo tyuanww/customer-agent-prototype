@@ -5,7 +5,9 @@
   "description": "\u5ba2\u670d Agent \u6b63\u5f0f Application API \u7684 fail-closed \u542f\u52a8\u9aa8\u67b6",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "third-party-licenses"
   ],
   "exports": {
     ".": {
@@ -39,11 +41,13 @@
     "test:intake:organization": "pnpm --filter @customer-agent/contracts build:runtime && pnpm --filter @customer-agent/database build:runtime && pnpm --filter @customer-agent/content-intake build && CUSTOMER_AGENT_API_PG15_INTEGRATION=1 vitest run tests/intake-organization.integration.test.ts tests/intake-organization-observer.test.ts experiments/intake-organization/transport.test.ts experiments/intake-organization/transport-consumer.integration.test.ts experiments/intake-organization/session-owner.test.ts experiments/intake-organization/registered-refresh.integration.test.ts"
   },
   "dependencies": {
+    "@cornerstonejs/codec-libjpeg-turbo-8bit": "1.2.8",
     "@customer-agent/content-intake": "workspace:*",
     "@customer-agent/contracts": "workspace:*",
     "@customer-agent/job-roster": "workspace:*",
     "fastify": "5.12.1",
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@customer-agent/database": "workspace:*",
