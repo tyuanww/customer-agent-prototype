@@ -1,21 +1,14 @@
-/** Explicit, read-only mapping claims for the real Menokin six-sheet workbook.
+/** Explicit, read-only mapping claims for the frozen Menokin single-sheet source.
  *
  * The workbook has no stable entry-code header. This contract therefore treats
  * every business identity, branch target, scope and ownership as an explicit
  * human claim. Physical row order and sheet names are evidence only.
  */
-export const REAL_SOP_MAPPING_VERSION = 'menokin-six-sheet-mapping-v1' as const;
-export const REAL_SOP_SOURCE_SHA256 = 'c3416b2c779f97b52c3e4b17a38ea1670d13616e180a8d818d1b6b99df9829c4' as const;
-export const REAL_SOP_SHEETS = [
-  '过敏流程SOP', '长痘痘SOP', '少错破SOP', '品质售后SOP', '税收相关规则', '品牌对接资源汇总',
-] as const;
+export const REAL_SOP_MAPPING_VERSION = 'menokin-single-sheet-mapping-v1' as const;
+export const REAL_SOP_SOURCE_SHA256 = 'de81a688ff44aac00fe646b30806d750f9ebb6483dbf44fc939ed0a510ff2278' as const;
+export const REAL_SOP_SHEETS = ['特殊流程 SOP'] as const;
 export const REAL_SOP_STRUCTURE = Object.freeze({
-  '过敏流程SOP': { rowCount: 73, columnCount: 15, imageCount: 1 },
-  '长痘痘SOP': { rowCount: 38, columnCount: 8, imageCount: 0 },
-  '少错破SOP': { rowCount: 48, columnCount: 5, imageCount: 0 },
-  '品质售后SOP': { rowCount: 36, columnCount: 7, imageCount: 13 },
-  '税收相关规则': { rowCount: 28, columnCount: 5, imageCount: 0 },
-  '品牌对接资源汇总': { rowCount: 64, columnCount: 9, imageCount: 43 },
+  '特殊流程 SOP': { rowCount: 152, columnCount: 18, imageCount: 0 },
 } satisfies Record<typeof REAL_SOP_SHEETS[number], Readonly<{ rowCount: number; columnCount: number; imageCount: number }>>);
 
 export type MappingValue = Readonly<{ value: string; evidence: string }>;
@@ -36,6 +29,7 @@ export type RealSheetMapping = Readonly<{
   effectiveInterval: Readonly<{ from: string; to: string | null; evidence: string }> | null;
 }>;
 
+/** Kept as a source-compatible type name for callers migrating from the legacy contract. */
 export type RealSixSheetMapping = Readonly<{
   version: typeof REAL_SOP_MAPPING_VERSION;
   mappingState: 'candidate';
@@ -80,10 +74,10 @@ export function checkRealSixSheetMapping(input: RealSixSheetMapping): RealMappin
   if (!sha256.test(input.sourceSha256)) issue('', 'sourceSha256', 'source hash must be lowercase SHA-256');
   else if (input.sourceSha256 !== REAL_SOP_SOURCE_SHA256) issue('', 'sourceSha256', 'source hash does not match the read-only Menokin evidence');
   if (input.entryCodeHeaderPresent !== false) issue('', 'entryCodeHeaderPresent', 'real workbook has no entry-code header');
-  if (input.sheets.length !== REAL_SOP_SHEETS.length) issue('', 'sheets', 'all six registered sheets are required');
+  if (input.sheets.length !== REAL_SOP_SHEETS.length) issue('', 'sheets', 'the frozen single-sheet source is required');
   const seen = new Set<string>();
   for (const sheet of input.sheets) {
-    if (!REAL_SOP_SHEETS.includes(sheet.sheet)) issue(sheet.sheet, 'sheet', 'sheet is not in the registered six-sheet set');
+    if (!REAL_SOP_SHEETS.includes(sheet.sheet)) issue(sheet.sheet, 'sheet', 'sheet is not in the frozen single-sheet source');
     if (seen.has(sheet.sheet)) issue(sheet.sheet, 'sheet', 'duplicate sheet mapping');
     seen.add(sheet.sheet);
     const expected = REAL_SOP_STRUCTURE[sheet.sheet];
