@@ -57,7 +57,9 @@ xlsx 图片：只认锚在单元格上的 PNG / JPEG，归到图片左上角所�
 
 页面按全店、售前客服和售后客服切换人设。运营用表格查看话术名称、内容、状态、更新时间和操作；图片可以预览。点「添加话术」打开 520px 弹窗，支持逐条填写或文件导入。导入和删除均需确认。坐席只看已投递条目。
 
-权限页仍是侧栏「权限」，不进入 `DASHBOARD_MODULE_IDS`。它和知识库共用灰底和蓝色主按钮。刷新、预览、确认保存、撤销和坐席账号命令没有改。
+已登录时，工作台知识库标题旁显示 Ant Design「仅本机」标签。写操作成功后显示「已保存到本机，未发布给坐席。」；切换人设不显示写入成功。导入数量、跳过记录仍由原 notice 显示。磁盘写入失败继续显示「知识已更新，但没能写入本机。」，不以成功文案覆盖。这里的“未发布”指未进入服务器的坐席查询和跨电脑分发，不改变本机人设读取规则。
+
+权限页仍是侧栏「权限」，不进入 `DASHBOARD_MODULE_IDS`。它和知识库共用 `IntakeAntdTheme` 及工作台语义 token，主色遵循 `DESIGN.md` 的 violet 规则。刷新、预览、确认保存、撤销和坐席账号命令没有改。
 
 实现在 `apps/desktop/src/shared/desk-knowledge.ts`、`apps/desktop/src/main/desk-knowledge-ipc.ts` 和 `apps/desktop/src/renderer/features/dashboard/DeskKnowledge.tsx`。
 

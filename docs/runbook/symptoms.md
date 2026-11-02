@@ -153,7 +153,10 @@ journalctl -u customer-agent-backup.service --no-pager
 
 **确认。** 下一次刷新失败仍写出 `diagnostic=LEASE_REFRESH_FAILED`。变量未设置时没有新的连接。
 
-## SOP 页面写出没有权限，请找人开通
+## 历史旧 SOP 目录页面写出没有权限，请找人开通
+
+本节只解释 legacy `/v1/sop/catalog` 目录。当前 Dashboard 旧 SOP 通道已固定 fail-closed，正式单表 graph 尚未接入；不要用本节作为当前生产能力证据。
+
 
 `apps/desktop/src/renderer/features/dashboard/SopLibraryModule.tsx` 在 SOP 状态是 `closed` 时写出 **没有权限，请找人开通。** 上传、修改、删除和自定义步骤都不可用。
 
@@ -167,7 +170,10 @@ journalctl -u customer-agent-backup.service --no-pager
 
 **确认。** SOP 空状态不再出现 **没有权限，请找人开通。** 目录里有步骤时，步骤列表出现，上传可用。目录是空的且状态是 `open` 时，页面写出 **还没有 SOP 步骤。上传 CSV 后会出现在这里。**
 
-## SOP 页面写出服务暂不可用，请重试
+## 历史旧 SOP 目录页面写出服务暂不可用，请重试
+
+本节只解释 legacy `/v1/sop/catalog` 目录。当前 Dashboard 旧 SOP 通道已固定 fail-closed，正式单表 graph 尚未接入；不要通过重试旧路径绕过合同门禁。
+
 
 `apps/desktop/src/shared/dashboard-ops-loop.ts` 里的 `unavailable` 是 **服务暂不可用，请重试**。`apps/desktop/src/renderer/features/dashboard/SopLibraryModule.tsx` 在 SOP 状态是 `unavailable` 时展示这句。上传不可用。
 

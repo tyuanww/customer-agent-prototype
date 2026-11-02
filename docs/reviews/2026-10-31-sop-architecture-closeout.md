@@ -34,7 +34,7 @@
 3. 在隔离 PostgreSQL 中把候选、审核、发布和 graph projection 串成一条事务。验证旧版本流程续用、新版本不静默替换、撤权、过期和未知提交恢复。
 4. 按 [API 只读 snapshot 消费边界](./2026-10-31-sop-api-snapshot-consumption-contract.md) 让 API 返回版本绑定的图快照和媒体引用。Main 在读取和每个命令前重新核验资格、版本和截止时间。
 5. 将 Query 的 `open / next / choose / back / copy / renew / close` 接到 Main 的正式 adapter。验证 renderer 永远只发意图，剪贴板只由 Main 写入。
-6. 通过第二坐席真实验收、安装包验证、412 条内容业务审核和正式发布批准后，才可报告上线。
+6. 通过正式 SOP 接线、第二坐席和目标设备验收、签名/公证及正式发布批准后，才可报告上线。
 
 ## 本轮验证
 

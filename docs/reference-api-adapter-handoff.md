@@ -42,7 +42,7 @@ Dashboard renderer（无 customerAgent）
        └─ 无产品会话的数字写「未接入」，不读 Float 输入，不写盘
 ```
 
-话术库不走上面这条 `DASHBOARD_MANIFEST` 链：独立 `dashboard.cjs` 暴露 `dashboardWording.list()`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才读磁盘 hydrate。话术优化待办在有产品会话时走 `dashboardIteration` → Main → 冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`（仅 coach / owner；空列表合法）；无会话时 fail-closed，不回落 DEMO 5 条。Query「话术不准」Live UUID 经 Main `POST /v1/inaccuracy-reports`；待办页仍不展示按稿聚合次数。内容管理的 zip xlsx 由 `dashboardContent.parseUpload` 在 Main 解析第一张表，预览转成 CSV 后再走既有 `POST /v1/content/import`；renderer 不直连导入端口，也不把二进制工作簿交给 API。Publish 在 Main 里 `publishDraft` 一次动作：`POST /v1/content/import` 后 `GET /v1/content/import/{id}` 每 1.5s，429 退避，staged 后 `POST /v1/content/publish`。组织审核在飞书文档，产品内不 park `/v1/admin/content/reviews*`。有产品会话时 `dashboardOps` 另接检索账、SOP 树、话术下架 `pending_review` 与软件目录；renderer 仍无 token。
+话术库不走上面这条 `DASHBOARD_MANIFEST` 链：独立 `dashboard.cjs` 暴露 `dashboardWording.list()`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才读磁盘 hydrate。话术优化待办在有产品会话时走 `dashboardIteration` → Main → 冻结 `GET /v1/metrics/iteration-tasks` 与 `POST .../start|close`（仅 coach / owner；空列表合法）；无会话时 fail-closed，不回落 DEMO 5 条。Query「话术不准」Live UUID 经 Main `POST /v1/inaccuracy-reports`；待办页仍不展示按稿聚合次数。内容管理的 zip xlsx 由 `dashboardContent.parseUpload` 在 Main 解析第一张表，预览转成 CSV 后再走既有 `POST /v1/content/import`；renderer 不直连导入端口，也不把二进制工作簿交给 API。Publish 在 Main 里 `publishDraft` 一次动作：`POST /v1/content/import` 后 `GET /v1/content/import/{id}` 每 1.5s，429 退避，staged 后 `POST /v1/content/publish`。组织审核在飞书文档，产品内不 park `/v1/admin/content/reviews*`。有产品会话时 `dashboardOps` 另接检索账、旧 SOP 通道保持 fail-closed、话术下架 `pending_review` 与软件目录；renderer 仍无 token。正式单表 graph 接入后再重新定义 SOP 能力。
 
 正式一期拓扑是另一条链：
 
@@ -69,7 +69,7 @@ Windows Electron 壳
 | 空态 | escalate | events | 文案“转人工话术师”，**无按钮、无事件** | `open_feishu` / `copy_contact` 是辅助动作，不是 terminal |
 | 收起 / 切后台 | `dismissed` / `timeout` | events | 无上报 | 明确放弃才 `dismissed`；idle 达 `CLIENT_ACTION_TIMEOUT_MS` 才 `timeout` |
 | Dashboard 九模块（VOC / 工单 / 内容 / 公告等） | metrics / workorders / content / announce | 对应端口 | VOC / 工单仍静态合成；内容发布、待办、检索账、SOP、软件目录已接线 | 只读 GET；coach/owner RBAC；agent 无管理权；Publish 仍仅 owner；禁止 latest.yml |
-| Dashboard SOP 只读过敏树 | SOP 运营目录 | `/v1/sop/*` | 有产品会话时 `dashboardOps` 读/导入/更新当前会话树；删除仅 owner；Query 过敏窗仍是独立只读投影 | 过敏停手文案尚未校验；坐席 overlay 不可写 |
+| Dashboard SOP 只读过敏树 | SOP 运营目录 | `/v1/sop/*` | 旧通道已关闭并 fail-closed；正式单表 graph、权限和媒体合同获批后再接；Query 过敏窗仍是独立只读投影 | 过敏停手文案、正式 graph 和坐席权限仍待审核 |
 | 架构图九端口 | 目标拓扑 | 九端口 | API 已实现 development/test 的 auth/policy/search/events 子集；桌面和真实运行均未接入 | 状态标签不是生产可用性声明 |
 
 正式检索 **唯一 SQL 边界** 是 `search_recommendable_scripts(...)`。Adapter 若在客户端自拼 WHERE、直扫 `scripts`、或把 Demo fixture 当 SoR，即违反 INV-EFF / INV-ACL。

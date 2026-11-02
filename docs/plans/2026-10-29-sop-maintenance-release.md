@@ -4,11 +4,66 @@
 
 状态：IMPLEMENTING · 用户已授权按 P0–P6 实施及并行独立工作。P0 已完成；P1/P2 已有合成实现及安装包验证；P4a 六表到任务图的纯转换已集成，P5b 合成 Excel 批量整理闭环已集成；P3 正式合同交接及 P4b 正式发布消费仍未完成。实现授权不替代真实业务审核或正式发布批准。
 
-### 2026-11-01 当前接续入口
+### 2026-11-02 Goal 重新收敛
+
+原 goal 的范围同时包含本地收尾准备和生产激活。本地收尾、代码验证和 Git 交接已经完成；生产只读连接、正式来源接收、发布批准和目标设备验收仍是外部门禁。这些事实不能由本地测试或 AI 输出代替。已完成的独立工作不重做。
+
+当前继续执行的工作目标收敛为：**完成 A–F 的可审计 readiness 包，并把每个外部门禁绑定到明确证据和恢复动作；外部证据恢复后再按依赖顺序激活 B–F。** 该目标包含生产对账准备、Dashboard 本地与生产差异清单、152 行逐条审核台账、AI 交叉验证分诊、合同/graph/Main/Query review-only 接口和本机包验收；不把 `publishable` 或 `runtimeEnabled` 改为 true。
+
+退出条件：统一收尾报告、状态 JSON、审核队列、证据计划、风险扫描、AI 政策、验证汇总和 Git 交接可复核；每个未完成项有阻塞证据、责任角色和下一动作；本地工程检查通过。激活阶段另以生产只读观察、正式审核记录、来源冻结、graph 发布回执、第二坐席/目标设备验收和发布批准为硬条件。
+
+目标盘查和重写提示词见仓外 `sop-production-alignment/goal-review-2026-11-02.md`。
+
+### 当前恢复点：长痘痘候选故事映射
+
+当前来源是 `【SOP】Menokin_SOP(1).xlsx`。A 阶段当前成果和全表缺口统一见[完整审阅入口](../reviews/2026-10-31-sop-allergy-mapping-review.md#全表范围与当前覆盖)。152 行已经完成结构、AI delegated review 和用户业务处置记录，151 行批准，1 行移出候选，`pendingRows=0`。这只关闭本地候选审核门禁，`publishable=false`，正式合同、graph、runtime 和生产验收仍未完成。
+
+主管通过口头、飞书、微信等方式沟通同意，由坐席记录；不要求主管使用本软件审批，也不接入聊天平台。第 50 行已明确为坐席引导客户在订单端申请，不是软件自动退款。第 51 行特殊资格全部满足后按决定 19 直接沿用该入口；决定 20 明确退款实际完成且已告知客户才结束，决定 21 补齐拒绝或失败后的原订单跟进。既有 v2 候选和[检查工具](../reference-sop-story-review.md)保留；实际 UI、正式合同和运行时接线均未完成。
+
+[过敏审阅卡](../reviews/2026-10-31-sop-allergy-mapping-review.md#本轮候选产物与当前恢复点)拥有当前来源与结果。决定 24 已补齐医药批准后的办理与收尾，过敏故事未决出口为 0。当前仅形成候选关系，未证明所有文本适用或真实资格有效；下一项审阅第 56–79 行长痘痘范围，其他家族及正式字段继续按 A 阶段完成。
+
+决定 25 已确认长痘痘第 77–79 行医药申请须诊断类材料与购药凭证齐全才提交。决定 26 已确认 A2、A3 重叠时由坐席选用一条或多条适用说明，不固定顺序。决定 27 已确认回访后客户已回复且无后续诉求，由坐席核实已说明且无剩余事项后结束；未回复或仍有事项保留待办。决定 28 已确认订单退款实际完成且已告知后结束，异常结果保留原订单待办。决定 29 已确认不符合退货条件的说明在客户接受且无剩余事项后结束。决定 30 已确认医药事项按主管批准范围办理，完成、告知且无剩余事项后结束。独立[候选审阅卡](../reviews/2026-11-01-sop-acne-mapping-review.md)的长痘痘候选出口已闭合，但正式映射仍未完成。A/B 按产品分组，E1/E2 不限严重；重复编号及第 69–79 行回退不机械排序。下一阶段转入正式字段、业务审核和合同接收，过敏专属规则不自动继承。
+
+v1继续用于历史结构审阅，v2新增选择状态且报告明示是否启用；不能把v1的结构通过当成多选验证。旧六表 runtime 路径继续标记为 legacy；当前单表 mapping contract 已修复并通过验证，生产 graph 和 runtime 仍未启用。
+
+2026-11-01 顺序推进记录：先按表格顺序重试生产只读连接，`hangzhou-windows` 的 SSH 仍返回 `Connection refused`，没有观察到或修改远端。随后推进 A 阶段准备。过敏和长痘痘候选故事出口均已闭合，但其余 74 行仍只有结构盘查。新增仓外 `sop-production-alignment/mapping-progress-2026-11-01.json` 固化当前来源哈希、候选家族状态和正式字段声明；在 A 阶段正式映射获业务确认前，不进入 B 正式合同接收。已新增 [单表正式映射工作包说明](../how-to-build-single-sheet-formal-mapping.md) 和 `scripts/build-sop-formal-mapping-workpack.mjs`；生成的工作包仍固定为 `publishable=false`，并通过来源哈希、字段缺口和隐私边界检查。已记录第一条候选声明“判断为过敏相关，进入过敏相关处置”，候选目标节点为 `allergy.resolution`，候选来源行段为 41–55；该行段仍标记为 `formalBusinessIdApproved=false`，不作为正式编号或发布依据。过敏候选的 10 个正式字段现均有业务确认，均保持 `formalFrozen=false`；下一项是审阅其余 74 行及其他家族的业务边界和内容证据。
+
+### 2026-11-01 来源更正记录：拆解后的单表
+
+用户已更正本次来源为 `【SOP】Menokin_SOP(1).xlsx`，单工作表「特殊流程 SOP」，153 行、18 列。列冲突来自此前读取旧文件，现已解除。新的来源身份、列职责和聚合问题见[业务来源更正](../reviews/2026-10-31-sop-business-decisions.md#当前来源更正使用用户拆解后的单表)；后续参考用途和特殊申请优先级已明确，当前状态以上方恢复点为准。旧六表映射模板和候选合同保留历史来源绑定，不把换文件视为已完成映射或正式合同接收。
+
+### 2026-11-01 真实映射接续：原表顺序规则
+
+以下为来源更正前的历史。用户最初说明过敏表从第 21 行开始，D/G/I 表示顺序与具体步骤，见[旧来源决定 3](../reviews/2026-10-31-sop-business-decisions.md#决定-3过敏表按显式编号解释顺序)。当时发现坐标与所读文件不一致，因此曾等待版本对齐；该问题已由当前 `(1)` 拆解表更正解决，不再作为待答问题。正式映射和运行时仍未启用。
+
+### 2026-11-01 Dashboard 与生产对齐接续
+
+本节保留 Dashboard 与生产对齐时的执行记录；当前映射入口以页首为准，不把历史部署记录当作本次线上观测。维护源为 `codex/sop-integrated` 工作区。当前 SOP 收尾提交为 `572db66c` 和 `8c323376`，已推送到 `origin/codex/sop-integrated`；未执行合并、部署或生产写入。
+
+用户已批准先对齐 Dashboard 与生产能力，再准备本机验证包，并按 A–F 完成正式 SOP。已确认的本轮界面调整是业务 SOP 页保留导航并显示「SOP 流程发布后会显示在这里」，移除这一路无效旧 CSV 操作与重试；离线合成手册保留。知识库标注「仅本机」，保存反馈明确不等于发布给坐席。上述调整已实施；验证范围如下，不代表正式 SOP 已发布。
+
+| 单元 | 当前核实结果 | 下一验收条件 |
+| --- | --- | --- |
+| 生产版本对账 | SSH 只读连接返回 Connection refused，未观察到当前服务器状态；没有更改远端 | 连接恢复后核对 release SHA、profile、合同、迁移和发布版本，不用历史记录补填 |
+| Dashboard 入口 | 开发、预览、打包共用 DashboardApp、DashboardWorkspace 和 AntD 主题，预览夹具仅显式 loopback 开启 | 同一业务组件在合成和 product-remote 配置下消费受控数据，无另建生产看板 |
+| 概览、话术库、资料、权限 | 业务装配已有相应窄能力，离线使用空态；上一轮合成 Electron 已验证授权与撤权 | 生产配置的有数据、空数据、无权限、过期、失败和恢复仍须逐页验收 |
+| SOP | 离线手册与业务旧 CSV 目录语义不同；正式 API 关闭旧目录接口 | 本轮先停止旧请求和无效操作；正式 graph 获批后接同一业务入口，不恢复旧无范围接口 |
+| 知识库 | 本机 desk-knowledge.json 不进入 Query 或其他电脑 | 用户明确看到本机保存范围；正式分发仍经过资料审核发布链 |
+| A 映射（本次 Dashboard 对齐时的历史记录） | 当时按旧六表统计缺口；该数量不用于当前拆解表 | 当前范围、候选覆盖与缺口以上方完整审阅入口为准 |
+| B–E 正式接收与消费 | 候选工具和合成桌面已具备；正式 graph、版本快照、continuation 与动作接线未完成 | A 后依次完成正式合同批准及来源绑定、数据库发布快照、Main 权限续用、Query 动作 |
+| F 安装与发布 | 可制作本机未签名验证包，不能视作正式 SOP 生产包 | 验证实际包身份和运行；正式 SOP 接线、第二坐席、目标设备、签名/公证和发布放行另行记录 |
+
+本轮仓外证据目录为 `/Users/hutou/.codex/warehouse-remediation/2026-11-01/sop-production-alignment/`。`production-probe.txt` 记录连接失败，`source-binding-check.json` 记录原表只读摘要，`mapping-readiness.json` 记录字段校验；未提取原表正文或图片。字段缺口数量不是步骤数量，也不是业务差错数量。
+
+本轮实现验收：Main 明确输出 `not-published` 并停止旧目录读取；旧 SOP IPC 保留可信 sender / 主帧检查并返回不可用。开发 Electron 两项集成验收通过；`pnpm package:mac:local` 生成 0.3.39 universal 未签名 DMG / ZIP 并通过包校验。随后从只读挂载的实际 DMG 运行六项 Electron 验收，全部通过：业务 Dashboard / 本机知识保存 / 权限预览保存撤销、离线空态、左侧书签、异常投影恢复、缩放中断和紧凑侧栏。包内身份确认 `app.isPackaged=true`，没有回退开发入口。安装包基于本轮未提交源码，build identity 如实为 `dirty`；源码差异和产物 SHA-256 已在上述仓外证据目录绑定，不当作 clean HEAD 正式发布。
+
+静态红方从消费者和业务使用方复核，没有 P0–P2 阻断发现；完整测试中的两处旧 CSV 上传断言已同步为新空态边界。lint、typecheck、build、架构、文档与工作区检查通过；真实 Electron 合成栈为 7 passed、1 skipped。代码提交 `572db66c`、`8c323376` 已推送。真实生产配置逐页验证、第二坐席、签名公证和发布批准仍未完成。
+
+### 2026-11-01 当前接续入口（映射历史）
 
 上一轮已完成不可用合成话术保护、异常投影恢复、打开竞态修复，以及用户确认的普通话术正文在上、按钮在下布局。仓外证据见 `/Users/hutou/.codex/warehouse-remediation/2026-11-01/sop-projection-qa/card-layout-mUdeUf/qa-report.md`。该证据只覆盖合成 QA，不代表正式 graph 或真人第二坐席已验收。
 
-当前恢复点是 A 阶段的真实六表映射。[过敏流程审阅卡](../reviews/2026-10-31-sop-allergy-mapping-review.md#下一项业务输入)拥有唯一待答业务问题，填写说明和一页决策表引用它，不再重复询问已确认的坐席判断边界。候选登记、映射 JSON 和运行时代码保持原状态。
+当前恢复点是 A 阶段的 de81 单表映射。[过敏流程审阅卡](../reviews/2026-10-31-sop-allergy-mapping-review.md#下一项业务输入)拥有当前来源和审核入口，不再重复询问已确认的坐席判断边界。第 2–20 行已确认只作判断参考，不是前置任务；第 27 行共同核实后按产品适用性进入第 28 或第 29 行；第 36 行先行后按原因选择第 37–40 行说明；第 35 行未回复只保留等待或补充确认；少错破 G 标签按场景独立分支，沿用第 80–115 行；品质售后第 116–124 行按问题类型选择路径；税收规则和品牌对接资源均限于 Menokin 当前业务，客服业务负责人维护，客服坐席、主管可读；长痘痘、少错破、品质售后三家族共享同一范围和可见对象；长痘痘身份为 `menokin.sop.acne`，使用第 56–79 行及 37 条候选故事；少错破身份为 `menokin.sop.shaocuopo`；品质售后身份为 `menokin.sop.quality-after-sales`；税收规则和品牌资源分别为 `menokin.rule.tax`、`menokin.resource.brand-integration`，均无直接 SOP 入口；五个非过敏家族立即生效、无预设失效时间，由业务负责人发布新版本替换。四个 SOP 家族逐条内容和专业审核完成前不进入 graph preparation；税收规则需先政策审核，品牌资源需先资源引用和图片核验，再分别正式接收。后续候选统一绑定《【SOP】Menokin_SOP(1).xlsx》“特殊流程 SOP”及 SHA-256 `de81a688ff44aac00fe646b30806d750f9ebb6483dbf44fc939ed0a510ff2278`。四个 SOP 由 Menokin 客服业务负责人组织逐条审核，医学内容由专业审核人复核；税收规则由具备税务或政策职责的审核人复核，品牌资源由客服业务负责人核对引用和图片。仓外已生成 `sop-production-alignment/review-evidence-plan.json`、`sop-production-alignment/item-review-ledger.json`、`sop-production-alignment/structure-preflight.json`、`sop-production-alignment/row-structure-profile.json`、`sop-production-alignment/review-record-template.json`、`sop-production-alignment/review-progress.json`、`sop-production-alignment/parallel-audit-report.json`、`sop-production-alignment/sop-closeout-status.json`、`sop-production-alignment/content-risk-scan.json`、`sop-production-alignment/review-batches.json`、`sop-production-alignment/review-queue.json`、`sop-production-alignment/verification-summary.json`、`sop-production-alignment/completion-audit.json`、`sop-production-alignment/handoff-readiness.json`、`sop-production-alignment/review-packet.md`、`sop-production-alignment/ai-cross-validation-summary.json`、`sop-production-alignment/ai-cross-validation-policy.json` 和 `sop-production-alignment/sop-closeout-report-2026-11-02.md` 和 `sop-production-alignment/evidence-manifest-2026-11-02.json`、`sop-production-alignment/allergy-current-source-structure.json`、`sop-production-alignment/allergy-current-source-risk-review.json` 和 `sop-production-alignment/source-artifact-reconciliation.json`、`sop-production-alignment/current-source-coherence-check.json`、`sop-production-alignment/formal-workpack-consistency-check.json`、`sop-production-alignment/candidate-decision-evidence-check.json`、`sop-production-alignment/production-readonly-probe-2026-11-02.json` 和 `sop-production-alignment/package-content-evidence-2026-11-02.json`：前者保存六个来源单元的证据要求，中者按 152 个数据行建立待审核台账并标注 152 行结构预检通过，row profile 只保存每行的列占用和结构信号，模板定义逐条审核填写格式，progress 汇总各家族和证据门禁状态，parallel audit 合并三个只读审阅切片的阻塞项，closeout status 统一记录 A 到 F 的状态，content risk scan 只输出行号、风险类别和统一范围信号，review batches 将 152 行分成政策资源、医疗履约和普通内容三个审核批次，review queue 按批次顺序合并行号、角色、风险类别和必检项，verification summary 记录 lint、typecheck、test、build、workspace、docs 和 diff 检查，同时单独保留业务门禁状态，completion audit 按 A 到 F 要求逐项判定证据、缺口和状态，handoff readiness 将 B、C、D、E、F 的准备状态绑定到现有合同、代码、测试和安装包证据，review packet 给审核人提供批次、字段和硬门禁说明，ai cross validation 覆盖 152 行并保留所有 pending、拒绝建议和人工签核要求；这些文件都不保存原表正文、客户数据或图片字节。候选登记、映射 JSON 和运行时代码保持原状态。
 
 本轮先核对仓外结构索引，再修正填写说明中的默认转人工、确认时机和候选冻结表述。文档维护与业务答复独立推进，根代理单独写文档，红方只读复核。验证范围为文档检查、候选登记检查、差异和原修改保留核对。完整映射确认前，后续正式合同、数据库、Main 和 Query 接入继续等待。
 
