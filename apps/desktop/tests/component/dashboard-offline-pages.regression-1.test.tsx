@@ -8,7 +8,7 @@ const failure = { ok: false as const, code: 'UNAVAILABLE' as const, message: 'èµ
 
 function context(overrides: Partial<IntakeDestinationContext> = {}): IntakeDestinationContext {
   return {
-    active: 'overview', canOpenPermissions: false, canGrant: false, canUploadSop: false,
+    active: 'overview', canOpenPermissions: false, canGrant: false,
     seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'signed-out', workbenchMode: 'synthetic-offline',
     snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
     onSupplyScript: () => undefined, scriptDraft: null, onDraftConsumed: () => undefined,

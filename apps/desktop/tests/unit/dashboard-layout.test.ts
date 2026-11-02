@@ -512,8 +512,8 @@ describe('dashboard layout contract', () => {
     expect(library).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|customerAgent/);
   });
 
-  it('wires SOP as a read-only allergy tree module with a nav icon and no persist surface', () => {
-    expect(app).toContain('<SopLibraryModule sop={ctx.snapshot.phase === \'ready\' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />');
+  it('wires the unpublished SOP slot with a nav icon and no persist surface', () => {
+    expect(app).toContain('<SopLibraryModule sop={ctx.snapshot.phase === \'ready\' ? ctx.snapshot.sop : undefined} />');
     expect(app).not.toContain('sopUploadRefusal');
     expect(app).toContain("sop: ['M7 3h10v18H7z', 'M10 7h4', 'M10 11h4', 'M10 15h3']");
     expect(sopLibrary).not.toContain('allergySopTree()');

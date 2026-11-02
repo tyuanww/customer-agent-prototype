@@ -113,15 +113,8 @@ it('fail-closes unsigned dashboard senders and extra IPC args', async () => {
   expect(await catalog(event(dashboard), { extra: true })).toMatchObject({ ok: false, code: 'VALIDATION' });
   expect(session.request).not.toHaveBeenCalled();
 
-  vi.mocked(session.request).mockResolvedValueOnce({
-    status: 200,
-    value: { product_session_id: 'default', items: [] },
-  });
-  const view = await catalog(event(dashboard));
-  expect(view).toEqual({
-    ok: true, productSessionId: 'default', items: [],
-  });
-  expect(JSON.stringify(view)).not.toContain('usr_synthetic');
+  expect(await catalog(event(dashboard))).toMatchObject({ ok: false, code: 'UNAVAILABLE' });
+  expect(session.request).not.toHaveBeenCalled();
 
   registerDashboardOpsLoopIpc(session as ProductSession, () => null, () => 'http://127.0.0.1:5173/');
   expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG)!(event(dashboard)))
@@ -338,24 +331,19 @@ it('invokes remaining ops IPC channels and keeps a present software current with
   const session = sessionThatMayUpload('owner');
   registerDashboardOpsLoopIpc(session as ProductSession, () => dashboard, () => 'http://127.0.0.1:5173/');
   vi.mocked(session.request)
-    .mockResolvedValueOnce({
-      status: 202,
-      value: { ok: true, product_session_id: 'default', node_count: 1 },
-    })
-    .mockResolvedValueOnce({ status: 200, value: { ...sopNode, lifecycle: 'deleted', version: 3 } })
     .mockResolvedValueOnce({ status: 200, value: { items: [release] } })
     .mockResolvedValueOnce({ status: 200, value: release });
 
-  const imported = await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT)!(
-    event(dashboard),
-    'node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n',
-  );
-  expect(imported).toEqual({ ok: true, productSessionId: 'default', nodeCount: 1 });
-
-  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE)!(
-    event(dashboard),
-    { nodeId: 'n1', expectedVersion: 1 },
-  )).toMatchObject({ nodeId: 'n1', lifecycle: 'deleted', version: 3 });
+  for (const [channel, args] of [
+    [IPC_CHANNELS.DASHBOARD_OPS_SOP_CATALOG, []],
+    [IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT, ['node_id,parent_node_id,title,body,sort_key\nn1,,停手,先停手,0\n']],
+    [IPC_CHANNELS.DASHBOARD_OPS_SOP_PATCH, [{ nodeId: 'n1', expectedVersion: 1, body: '修改' }]],
+    [IPC_CHANNELS.DASHBOARD_OPS_SOP_DELETE, [{ nodeId: 'n1', expectedVersion: 1 }]],
+  ] as const) {
+    expect(await handlers.get(channel)!(event(dashboard), ...args)).toMatchObject({ ok: false, code: 'UNAVAILABLE' });
+    expect(await handlers.get(channel)!(event(dashboard, { parent: {} }), ...args)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  }
+  expect(session.request).not.toHaveBeenCalled();
 
   const catalog = await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOFTWARE)!(event(dashboard));
   expect(catalog).toMatchObject({
@@ -364,7 +352,7 @@ it('invokes remaining ops IPC channels and keeps a present software current with
   });
   expect(JSON.stringify(catalog)).not.toContain('latest.yml');
 
-  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT)!(event(dashboard), 12))
+  expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SOP_IMPORT)!(event(dashboard), 12, 'extra'))
     .toMatchObject({ ok: false, code: 'VALIDATION' });
   expect(await handlers.get(IPC_CHANNELS.DASHBOARD_OPS_SCRIPT_DELETE)!(event(dashboard)))
     .toMatchObject({ ok: false, code: 'VALIDATION' });

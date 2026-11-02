@@ -4,8 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it, vi } from 'vitest';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
-import { PageUseReader, sopUseFromCatalog } from '../../src/main/page-use';
-import { ProductHttpError } from '../../src/main/product-http';
+import { PageUseReader } from '../../src/main/page-use';
 import type { ProductSession } from '../../src/main/product-session';
 import { canGrant, canOpenPermissions, grantUse, isPageUseSnapshot, type PageUseSnapshot, type PermissionsUse, type SopUse } from '../../src/shared/page-use';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
@@ -106,23 +105,13 @@ it('opens the permissions page when mayAllocate contains a grantable action', ()
   expect(canOpenPermissions(ready(empty.state === 'open' ? { state: 'open', body: null } : empty, { state: 'pending' }))).toBe(false);
 });
 
-it('cannot read nodes from a FORBIDDEN catalog outcome', () => {
-  const closed = sopUseFromCatalog({ kind: 'forbidden' });
-  expect(closed).toEqual({ state: 'closed' });
-  expect(Object.hasOwn(closed, 'nodes')).toBe(false);
-
-  const opened = sopUseFromCatalog({
-    kind: 'ok',
-    value: {
-      product_session_id: 'default',
-      items: [{
-        node_id: 'n1', parent_node_id: null, title: '停手', body: '先停手',
-        sort_key: 0, version: 1, lifecycle: 'active',
-      }],
-    },
-  });
-  expect(opened).toMatchObject({ state: 'open', nodes: [{ nodeId: 'n1', title: '停手' }] });
-  expect(sopUseFromCatalog({ kind: 'ok', value: { items: 'nope' } })).toEqual({ state: 'unavailable' });
+it('accepts the unpublished capability only without content in both boundaries', () => {
+  const value = ready({ state: 'closed', recovery: null }, { state: 'not-published' });
+  expect(isPageUseSnapshot(value)).toBe(true);
+  expect(preloadPageUseSnapshot()(value)).toBe(true);
+  const leaked = { ...value, sop: { state: 'not-published', nodes: [] } };
+  expect(isPageUseSnapshot(leaked)).toBe(false);
+  expect(preloadPageUseSnapshot()(leaked)).toBe(false);
 });
 
 it('keeps page-use channel literals identical in main and the dashboard preload', () => {
@@ -140,6 +129,7 @@ it('does not write the previous person lists after the session epoch changes', a
   let epoch = 1;
   const signedIn = true;
   let authorizationCount = 0;
+  const requestedPaths: string[] = [];
   let releaseHold: () => void = () => undefined;
   let hold = Promise.resolve();
   const listeners = new Set<() => void>();
@@ -151,7 +141,8 @@ it('does not write the previous person lists after the session epoch changes', a
       return () => { listeners.delete(fn); };
     },
     request: async (requestEpoch: number, requestPath: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }) => {
-      if (requestPath.startsWith('/v1/sop/catalog')) throw new ProductHttpError('FORBIDDEN');
+      requestedPaths.push(requestPath);
+      if (requestPath.startsWith('/v1/sop/')) throw new Error('Legacy SOP requests must not run');
       if (requestPath.startsWith('/v1/intake/authorization')) {
         authorizationCount += 1;
         if (authorizationCount >= 5) await hold;
@@ -171,8 +162,9 @@ it('does not write the previous person lists after the session epoch changes', a
     expect(reader.current()).toMatchObject({
       phase: 'ready',
       permissions: { state: 'open', body: null },
-      sop: { state: 'closed' },
+      sop: { state: 'not-published' },
     });
+    expect(requestedPaths.some(path => path.startsWith('/v1/sop/'))).toBe(false);
     expect(Object.hasOwn(reader.current().phase === 'ready' ? reader.current() : {}, 'sop')).toBe(true);
     const warmed = reader.current();
     if (warmed.phase === 'ready') expect(Object.hasOwn(warmed.sop, 'nodes')).toBe(false);

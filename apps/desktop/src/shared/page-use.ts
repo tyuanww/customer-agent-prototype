@@ -27,6 +27,7 @@ export type PermissionsUse =
   | { readonly state: 'open'; readonly body: IntakePermissionView | null };
 
 export type SopUse =
+  | { readonly state: 'not-published' }
   | { readonly state: 'pending' }
   | { readonly state: 'unavailable' }
   | { readonly state: 'closed' }
@@ -52,10 +53,6 @@ export function canOpenPermissions(snapshot: PageUseSnapshot): boolean {
 
 export function canGrant(snapshot: PageUseSnapshot): boolean {
   return canOpenPermissions(snapshot);
-}
-
-export function canUploadSop(snapshot: PageUseSnapshot): boolean {
-  return snapshot.phase === 'ready' && snapshot.sop.state === 'open';
 }
 
 export function grantUse(
@@ -96,7 +93,7 @@ function isPermissionsUse(value: unknown): value is PermissionsUse {
 
 function isSopUse(value: unknown): value is SopUse {
   if (!isRecord(value) || typeof value.state !== 'string') return false;
-  if (value.state === 'pending' || value.state === 'unavailable' || value.state === 'closed') {
+  if (value.state === 'pending' || value.state === 'unavailable' || value.state === 'closed' || value.state === 'not-published') {
     return onlyKeys(value, ['state']);
   }
   return value.state === 'open' && onlyKeys(value, ['state', 'nodes']) && Array.isArray(value.nodes);

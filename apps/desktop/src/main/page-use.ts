@@ -1,6 +1,5 @@
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { parseContractSchema } from '@customer-agent/contracts';
-import type { DashboardSopNode } from '../shared/dashboard-ops-loop';
 import {
   grantUse,
   openGrantBrand,
@@ -8,7 +7,6 @@ import {
   type OpenGrant,
   type PageUseSnapshot,
   type PermissionsUse,
-  type SopUse,
 } from '../shared/page-use';
 import type { SeatAccountRecord } from '../shared/seat-account-intent';
 import type { ContentIntakePermissions } from './content-intake-permissions';
@@ -19,44 +17,11 @@ import { isTrustedMainFrameSender } from './sender-guard';
 export const PAGE_USE_CURRENT_CHANNEL = 'dashboard:page-use-current';
 export const PAGE_USE_CHANGED_CHANNEL = 'dashboard:page-use-changed';
 
-export type CatalogOutcome =
-  | { readonly kind: 'ok'; readonly value: unknown }
-  | { readonly kind: 'forbidden' }
-  | { readonly kind: 'unauthorized' }
-  | { readonly kind: 'unavailable' };
-
 export type SeatList = { readonly seats: readonly SeatAccountRecord[] };
-
-export function sopUseFromCatalog(outcome: CatalogOutcome): Exclude<SopUse, { state: 'pending' }> {
-  if (outcome.kind === 'forbidden' || outcome.kind === 'unauthorized') return { state: 'closed' };
-  if (outcome.kind !== 'ok') return { state: 'unavailable' };
-  try {
-    const parsed = parseContractSchema('SopCatalogResponse', outcome.value);
-    const nodes: DashboardSopNode[] = parsed.items.map((item) => ({
-      nodeId: item.node_id,
-      parentNodeId: item.parent_node_id,
-      title: item.title,
-      body: item.body,
-      sortKey: item.sort_key,
-      version: item.version,
-      lifecycle: item.lifecycle,
-    }));
-    return { state: 'open', nodes };
-  } catch {
-    return { state: 'unavailable' };
-  }
-}
 
 type AuthorizationRead =
   | { readonly ok: true; readonly capabilities: readonly { readonly mayAllocate: readonly string[] }[] }
   | { readonly ok: false; readonly failure: 'unauthorized' | 'forbidden' | 'unavailable' | 'stale' };
-
-function catalogOutcomeFromError(error: unknown): CatalogOutcome {
-  if (!(error instanceof ProductHttpError)) return { kind: 'unavailable' };
-  if (error.code === 'FORBIDDEN') return { kind: 'forbidden' };
-  if (error.code === 'UNAUTHORIZED') return { kind: 'unauthorized' };
-  return { kind: 'unavailable' };
-}
 
 function isOpenGrant(value: OpenGrant | PermissionsUse): value is OpenGrant {
   return value.state === 'open' && openGrantBrand in value;
@@ -81,7 +46,6 @@ export class PageUseReader {
   private listsReady = false;
   private suppress = 0;
   private permissionGeneration = 0;
-  private sopGeneration = 0;
   private readonly listeners = new Set<(snapshot: PageUseSnapshot) => void>();
   private readonly stopSession: () => void;
   private readonly stopPermissions: () => void;
@@ -155,41 +119,6 @@ export class PageUseReader {
     }
   }
 
-  async openSop(epoch: number): Promise<SopUse> {
-    const id = ++this.sopGeneration;
-    if (!this.sameEpoch(epoch)) return this.dropSop();
-    let outcome: CatalogOutcome;
-    try {
-      const result = await this.session.request(epoch, '/v1/sop/catalog', { maxResponseBytes: 1_048_576 });
-      outcome = { kind: 'ok', value: result.value };
-    } catch (error) {
-      outcome = catalogOutcomeFromError(error);
-    }
-    if (id !== this.sopGeneration || !this.sameEpoch(epoch)) return this.dropSop();
-    if (outcome.kind === 'unauthorized') {
-      this.becomeSignedOut();
-      return { state: 'closed' };
-    }
-    const next = sopUseFromCatalog(outcome);
-    this.commitSop(epoch, next);
-    return next;
-  }
-
-  async afterSopWrite(epoch: number, result: { ok: true } | { ok: false; code: string }): Promise<void> {
-    if (!this.sameEpoch(epoch)) return;
-    if (result.ok) {
-      await this.openSop(epoch);
-      return;
-    }
-    if (result.code === 'FORBIDDEN') {
-      this.commitSop(epoch, { state: 'closed' });
-      return;
-    }
-    if (result.code === 'UNAVAILABLE' || result.code === 'OVERLOADED' || result.code === 'RATE_LIMITED') {
-      this.commitSop(epoch, { state: 'unavailable' });
-    }
-  }
-
   async listSeats(epoch: number): Promise<SeatList | { readonly state: 'closed' }> {
     if (!this.permissionsAreOpen(epoch)) return { state: 'closed' };
     const result = await this.session.request(epoch, '/v1/intake/seats', { method: 'GET', maxResponseBytes: 262_144 });
@@ -220,11 +149,10 @@ export class PageUseReader {
       phase: 'ready',
       epoch: view.sessionEpoch,
       permissions: { state: 'pending' },
-      sop: { state: 'pending' },
+      sop: { state: 'not-published' },
     };
     this.emit();
     void this.warmPermissions(view.sessionEpoch);
-    void this.openSop(view.sessionEpoch);
   }
 
   private onPermissions(): void {
@@ -260,16 +188,7 @@ export class PageUseReader {
     if (!this.sameEpoch(epoch)) return;
     const sop = this.snapshot.phase === 'ready' && this.snapshot.epoch === epoch
       ? this.snapshot.sop
-      : { state: 'pending' as const };
-    this.snapshot = { phase: 'ready', epoch, permissions, sop };
-    this.emit();
-  }
-
-  private commitSop(epoch: number, sop: SopUse): void {
-    if (!this.sameEpoch(epoch)) return;
-    const permissions = this.snapshot.phase === 'ready' && this.snapshot.epoch === epoch
-      ? this.snapshot.permissions
-      : { state: 'pending' as const };
+      : { state: 'not-published' as const };
     this.snapshot = { phase: 'ready', epoch, permissions, sop };
     this.emit();
   }
@@ -281,16 +200,6 @@ export class PageUseReader {
     }
     const snap = this.snapshot;
     if (snap.phase === 'ready' && snap.epoch === this.session.view().sessionEpoch) return snap.permissions;
-    return { state: 'pending' };
-  }
-
-  private dropSop(): SopUse {
-    if (!this.session.view().signedIn) {
-      if (this.snapshot.phase !== 'signed-out') this.becomeSignedOut();
-      return { state: 'pending' };
-    }
-    const snap = this.snapshot;
-    if (snap.phase === 'ready' && snap.epoch === this.session.view().sessionEpoch) return snap.sop;
     return { state: 'pending' };
   }
 

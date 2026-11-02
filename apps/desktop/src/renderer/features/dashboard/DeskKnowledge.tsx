@@ -199,7 +199,9 @@ export function DeskKnowledge({
     try {
       const reply = await api.command(command);
       if (reply.view) replace({ status: 'ready', value: reply.view });
-      setMessage(reply.ok ? (command.action === 'import-csv' ? reply.view.notice : null) : reply.message);
+      setMessage(reply.ok
+        ? command.action === 'select-persona' ? null : '已保存到本机，未发布给坐席。'
+        : reply.message);
       if (reply.ok && command.action === 'upload') { setName(''); setText(''); }
       if (reply.ok && command.action === 'import-csv') { setWriting(false); setCsv(null); setConfirmImport(false); }
       if (!reply.ok) setConfirmImport(false);

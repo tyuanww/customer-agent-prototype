@@ -375,8 +375,6 @@ if (!gotLock) {
       productSession,
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
-      undefined,
-      pageUseReader,
     );
     await next.start();
     if (shuttingDown.isShuttingDown() || next.isDisposed()) {

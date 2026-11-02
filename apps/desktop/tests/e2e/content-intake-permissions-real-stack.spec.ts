@@ -48,8 +48,30 @@ test('director previews without saving, grants a named seat query access, then r
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
+    await dashboard.getByRole('tab', { name: 'SOP', exact: true }).click();
+    const sop = dashboard.getByRole('region', { name: 'SOP', exact: true });
+    await expect(sop).toContainText('SOP 流程发布后会显示在这里');
+    await expect(sop.getByRole('button')).toHaveCount(0);
+    await expect(sop.locator('input[type="file"]')).toHaveCount(0);
+    await dashboard.screenshot({ path: path.join(evidence, 'sop-business-empty.png') });
+    await dashboard.getByRole('tab', { name: '知识库', exact: true }).click();
+    await expect(dashboard.getByText('仅本机', { exact: true })).toBeVisible();
+    const knowledge = dashboard.getByRole('region', { name: '知识库', exact: true });
+    await expect(knowledge.getByRole('button', { name: '添加话术', exact: true })).toBeEnabled();
+    await knowledge.getByRole('button', { name: '添加话术', exact: true }).click();
+    const localEntry = dashboard.getByRole('dialog', { name: '添加话术', exact: true });
+    await localEntry.getByRole('button', { name: '没有文档？手动填写一条', exact: true }).click();
+    await localEntry.getByRole('textbox', { name: '问题', exact: true }).fill('本机验收问题');
+    await localEntry.getByRole('textbox', { name: '答案', exact: true }).fill('仅用于本机合成验收，不发布给坐席。');
+    await localEntry.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(localEntry.getByRole('textbox', { name: '问题', exact: true })).toHaveValue('');
+    await localEntry.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(knowledge.getByRole('status')).toContainText('已保存到本机，未发布给坐席。');
+    await expect(knowledge.getByRole('table', { name: '当前人设知识', exact: true })).toContainText('本机验收问题');
+    await dashboard.screenshot({ path: path.join(evidence, 'knowledge-local-only.png') });
     await dashboard.getByRole('tab', { name: '权限', exact: true }).click();
     const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
+    await expect(panel.getByRole('button', { name: '新增授权', exact: true })).toBeEnabled();
     // Appearance is judged on the panel before the modal opens, because an antd mask owns the
     // pointer and would intercept the chrome menu.
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('role=dashboard'))!.setSize(980, 680));

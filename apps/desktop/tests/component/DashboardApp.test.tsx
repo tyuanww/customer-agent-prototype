@@ -208,8 +208,8 @@ describe('DashboardApp', () => {
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('module-sop')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
-    expect(screen.getByTestId('sop-upload')).toBeDisabled();
-    expect(screen.getByTestId('sop-delete')).toBeDisabled();
+    expect(screen.queryByTestId('sop-upload')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sop-delete')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
@@ -229,12 +229,12 @@ describe('DashboardApp', () => {
     await screen.findByTestId('nav-sop');
     expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('sop-upload')).toBeDisabled();
+    expect(screen.queryByTestId('sop-upload')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
     expect(screen.queryByText('停手')).not.toBeInTheDocument();
   });
 
-  it('opens grant navigation and sop upload only from an open server snapshot', async () => {
+  it('opens grant navigation but never reopens the legacy SOP editor', async () => {
     const user = userEvent.setup();
     window.dashboardPageUse = {
       current: async () => ({
@@ -259,8 +259,9 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await screen.findByTestId('nav-permissions');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(await screen.findByText('停手')).toBeInTheDocument();
-    expect(screen.getByTestId('sop-upload')).toBeEnabled();
+    expect(screen.queryByText('停手')).not.toBeInTheDocument();
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('SOP 暂时不可用。');
+    expect(screen.queryByTestId('sop-upload')).not.toBeInTheDocument();
   });
 
   it('keyboard-walks 话术运营 from wording through SOP into content', async () => {

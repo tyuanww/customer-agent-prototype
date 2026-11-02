@@ -139,7 +139,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       const status = await host.status();
       const legacyRequests = status.requests.filter(p => /^\/v1\/(announce|content|iteration|metrics|software)(\/|\?|$)/.test(p));
       expect(legacyRequests, JSON.stringify(status.requests)).toEqual([]);
-      expect(status.requests).toContain('/v1/sop/catalog');
+      expect(status.requests).not.toContain('/v1/sop/catalog');
       expect(status.requests).not.toContain('/v1/events/usage');
       expect(status.approvalFacts).toBe(0); expect(status.directPublications).toBe(1); expect(errors).toEqual([]);
       console.info(JSON.stringify({ status: 'PASS', domain, flow: 'restricted-publication-to-unified-workspace', screenshots: evidence, legacyContentAdapters: false }));

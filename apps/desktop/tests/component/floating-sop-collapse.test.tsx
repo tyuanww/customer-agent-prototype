@@ -27,7 +27,8 @@ it('collapses to an independently expandable task bar without ending or advancin
   };
   window.sopFloating = api;
   render(<FloatingSopApp />);
-  fireEvent.click(await screen.findByRole('button', { name: '收起' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '编辑流程名称' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '收起' }));
   await waitFor(() => expect(api.windowIntent).toHaveBeenCalledWith({ type: 'hide', taskId: 'sop-1', hostEpoch: 9 }));
   act(() => publish({ ...initial, sequence: 2, collapsed: true }));
   const bookmark = await screen.findByRole('button', { name: '展开流程' });

@@ -572,7 +572,7 @@ function permissionsPayload(permissions: Record<string, unknown>): boolean {
 }
 
 function sopPayload(sop: Record<string, unknown>): boolean {
-  if (sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed') return onlyKeys(sop, ['state']);
+  if (sop.state === 'pending' || sop.state === 'unavailable' || sop.state === 'closed' || sop.state === 'not-published') return onlyKeys(sop, ['state']);
   return sop.state === 'open' && onlyKeys(sop, ['state', 'nodes']) && Array.isArray(sop.nodes);
 }
 

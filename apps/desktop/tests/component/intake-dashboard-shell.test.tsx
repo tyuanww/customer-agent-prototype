@@ -92,7 +92,7 @@ function showPermissionsNav() {
       phase: 'ready' as const,
       epoch: 1,
       permissions: { state: 'open' as const, body: null },
-      sop: { state: 'closed' as const },
+      sop: { state: 'not-published' as const },
     }),
     onChanged: () => () => undefined,
   };
@@ -267,11 +267,13 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('没有权限，请找人开通。');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('SOP 流程发布后会显示在这里');
+    expect(screen.queryByTestId('sop-upload')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
     await user.click(screen.getByTestId('nav-content'));
     const add = await screen.findByRole('button', { name: '添加话术' });
+    expect(screen.getByText('仅本机')).toBeInTheDocument();
     for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
     expect(add).toHaveFocus();
     const focused = getComputedStyle(add);

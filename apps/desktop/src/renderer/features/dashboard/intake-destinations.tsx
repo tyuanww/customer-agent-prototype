@@ -33,7 +33,6 @@ export type IntakeDestinationContext = {
   active: IntakeDestination;
   canOpenPermissions: boolean;
   canGrant: boolean;
-  canUploadSop: boolean;
   seatLibraryOnly: boolean;
   jobKnown: boolean;
   jobPending: boolean;
@@ -52,7 +51,7 @@ const INTAKE_DESTINATION_MOUNTS: {
 } = {
   overview: (ctx) => <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} />,
   wording: (ctx) => <IntakeLibrary active={ctx.active === 'wording'} seatNotice={ctx.seatLibraryOnly} />,
-  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />,
+  sop: (ctx) => <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} />,
   content: (ctx) => <div hidden={ctx.active !== 'content'}><DeskKnowledge draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} /></div>,
   materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials'} />,
   permissions: (ctx) => (

@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown } from 'antd';
+import { Avatar, Button, Dropdown, Tag } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { SopManual } from './features/sop/SopManual';
 import { SYNTHETIC_SOP_TREES } from '@shared/synthetic-sops';
@@ -13,7 +13,7 @@ import {
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
 import type { WorkbenchKind } from '../shared/workbench-mode';
-import { canGrant, canOpenPermissions, canUploadSop, type PageUseSnapshot } from '../shared/page-use';
+import { canGrant, canOpenPermissions, type PageUseSnapshot } from '../shared/page-use';
 import {
   useCallback,
   useMemo,
@@ -133,7 +133,6 @@ function DashboardWorkspace() {
   const syntheticManual = workbenchMode === 'synthetic-offline';
   const permissionsOpen = canOpenPermissions(snapshot);
   const grantAllowed = canGrant(snapshot);
-  const sopUpload = canUploadSop(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [sessionName, setSessionName] = useState<string | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -816,6 +815,7 @@ function DashboardWorkspace() {
             <p className="intake-crumb">
               {backStack.length > 0 ? <Button htmlType="button" autoInsertSpace={false} className="intake-back dashboard-no-drag" aria-label="返回" onClick={goBack}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg></Button> : null}
               <strong>{sessionPhase === 'pending' ? '正在确认' : sessionPhase === 'signed-out' ? '请先登录' : activeItem.label}</strong>
+              {active === 'content' && sessionPhase === 'ready' ? <Tag>仅本机</Tag> : null}
             </p>
             {sessionJob?.notice ? <p role="status" data-testid="permission-notice">{sessionJob.notice}</p> : null}
           </div>
@@ -836,7 +836,6 @@ function DashboardWorkspace() {
             active,
             canOpenPermissions: permissionsOpen,
             canGrant: grantAllowed,
-            canUploadSop: sopUpload,
             seatLibraryOnly,
             jobKnown,
             jobPending: sessionPhase === 'pending',

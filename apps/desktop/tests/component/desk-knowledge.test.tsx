@@ -32,6 +32,7 @@ it('uploads a sheet and shows it as what the seat receives', async () => {
   await user.click(screen.getByRole('button', { name: '保存' }));
   expect(await screen.findByRole('cell', { name: '退货时效' })).toBeInTheDocument();
   expect(screen.getByText('生效中')).toBeInTheDocument();
+  expect(screen.getByText('已保存到本机，未发布给坐席。')).toBeInTheDocument();
   expect(screen.queryByText(/坐席会收到/)).not.toBeInTheDocument();
   const file = new File(['问题,标准话术,分类\n退货多久,七天内可退,售后\n'], '售后.csv', { type: 'text/csv' });
   await user.click(screen.getByRole('button', { name: '改为上传文档' }));
@@ -327,4 +328,24 @@ it('keeps the persona list on screen while the next knowledge read is in flight'
   expect(screen.queryByRole('status', { name: '正在读取知识库' })).not.toBeInTheDocument();
   await act(async () => { release(); });
   expect(await screen.findByRole('button', { name: '添加话术' })).toBeInTheDocument();
+});
+
+it('does not report local persistence when the disk write failed', async () => {
+  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null,
+    save: () => { throw new Error('disk full'); } });
+  window.dashboardDesk = {
+    current: async () => desk.reply('operator', '合成经理'),
+    command: async command => desk.command('operator', command, '合成经理'),
+  };
+  const user = userEvent.setup();
+  render(<DeskKnowledge />);
+  await user.click(await screen.findByRole('button', { name: '添加话术' }));
+  await user.click(screen.getByRole('button', { name: '没有文档？手动填写一条' }));
+  await user.type(screen.getByRole('textbox', { name: '问题' }), '保留问题');
+  await user.type(screen.getByRole('textbox', { name: '答案' }), '保留答案');
+  await user.click(screen.getByRole('button', { name: '保存' }));
+  expect(await screen.findByText('知识已更新，但没能写入本机。')).toBeInTheDocument();
+  expect(screen.queryByText('已保存到本机，未发布给坐席。')).not.toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: '问题' })).toHaveValue('保留问题');
+  expect(screen.getByRole('textbox', { name: '答案' })).toHaveValue('保留答案');
 });
