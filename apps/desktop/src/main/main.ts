@@ -5,7 +5,6 @@ import { PageUseReader, registerPageUseIpc } from './page-use';
 import { canOpenPermissions } from '../shared/page-use';
 import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
-import { registerDeskKnowledgeIpc } from './desk-knowledge-ipc';
 import { registerWorkbenchModeIpc } from './workbench-mode-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
 import { registerProductSearchIpc } from './product-search-ipc';
@@ -106,7 +105,6 @@ if (!gotLock) {
   let productSession: ProductSession | null = null;
   let productAnnounce: ProductAnnounce | null = null;
   let intakeManagement: ReturnType<typeof registerContentIntakeManagementIpc> | null = null;
-  let deskKnowledge: ReturnType<typeof registerDeskKnowledgeIpc> | null = null;
   let intakePermissions: ReturnType<typeof registerContentIntakePermissionsIpc> | null = null;
   let pageUseReader: PageUseReader | null = null;
   let disposePageUse: (() => void) | null = null;
@@ -145,7 +143,6 @@ if (!gotLock) {
 
   const beginShutdown = (): void => {
     intakeManagement?.dispose(); intakeManagement = null;
-    deskKnowledge?.dispose(); deskKnowledge = null;
     disposePageUse?.(); disposePageUse = null;
     pageUseReader?.dispose(); pageUseReader = null;
     intakePermissions?.dispose(); intakePermissions = null;
@@ -289,8 +286,6 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
-    deskKnowledge = registerDeskKnowledgeIpc(workbenchSession,
-      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, userDataDirectory);
     disposeIntakeQuery = registerContentIntakeQueryIpc(workbenchSession,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl);

@@ -2,7 +2,6 @@ import type { IntakeCatalogApi, IntakeCatalogCommand } from '../shared/content-i
 import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/content-intake-permissions';
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
-import type { DeskCommand, DeskKnowledgeApi } from '../shared/desk-knowledge';
 import { contextBridge, ipcRenderer } from 'electron';
 
 // Keep these literals aligned with IPC_CHANNELS. Do not import shared modules:
@@ -545,11 +544,6 @@ contextBridge.exposeInMainWorld('dashboardIntake', {
 contextBridge.exposeInMainWorld('dashboardWorkbench', {
   mode: () => ipcRenderer.invoke('dashboard:workbench-mode'),
 });
-
-contextBridge.exposeInMainWorld('dashboardDesk', {
-  current: () => ipcRenderer.invoke('dashboard:desk-current'),
-  command: (command: DeskCommand) => ipcRenderer.invoke('dashboard:desk-command', command),
-} satisfies DeskKnowledgeApi);
 
 type DashboardPageSnapshot =
   | { phase: 'signed-out' }

@@ -1,8 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { Button, Tabs } from 'antd';
 import type { PageUseSnapshot } from '@shared/page-use';
 import type { WorkbenchKind } from '@shared/workbench-mode';
-import { DeskKnowledge } from './DeskKnowledge';
 import { IntakeLibrary } from './IntakeLibrary';
 import { IntakeManagement } from './IntakeManagement';
 import { IntakeOverview } from './IntakeOverview';
@@ -43,52 +41,37 @@ export type IntakeDestinationContext = {
   workbenchMode: WorkbenchKind | null;
   workbenchStatus: 'pending' | 'ready' | 'error';
   onRetryWorkbench: () => void;
-  contentSignedIn: boolean | null;
   snapshot: PageUseSnapshot;
-  onOpen: (target: 'content' | 'wording' | 'permissions' | 'materials') => void;
+  onOpen: (target: 'wording' | 'materials' | 'settings') => void;
   onTodoCount: (count: number) => void;
-  onSupplyScript: (question: string) => void;
-  scriptDraft: string | null;
-  onDraftConsumed: () => void;
 };
 
 const INTAKE_DESTINATION_MOUNTS: {
   [Id in IntakeDestination]: (ctx: IntakeDestinationContext) => ReactNode;
 } = {
-  overview: (ctx) => ctx.workbenchMode === 'legacy' ? <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} onSupplyScript={ctx.onSupplyScript} /> : null,
+  overview: (ctx) => ctx.workbenchMode === 'legacy' ? <IntakeOverview key={ctx.sessionKey} mode={ctx.workbenchMode} onOpen={ctx.onOpen} onTodoCount={ctx.onTodoCount} /> : null,
   wording: (ctx) => <ContentLibraryDestination ctx={ctx} />,
   sop: (ctx) => ctx.workbenchMode === 'legacy'
     ? <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />
     : <section className="dash-module" data-testid="module-sop"><h1 className="desk-sr">SOP</h1><p className="content-empty">SOP 学习与执行尚未开放。</p></section>,
-  content: () => null,
   materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials' || (ctx.active === 'overview' && ctx.workbenchMode !== 'legacy')}
     presentation={ctx.active === 'overview' && ctx.workbenchMode !== 'legacy' ? 'overview' : 'review'} onOpenReview={() => ctx.onOpen('materials')} />,
-  permissions: (ctx) => (
-    <div hidden={ctx.active !== 'permissions'}>
+  settings: (ctx) => (
+    <div hidden={ctx.active !== 'settings'}>
       {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
-        ? <IntakePermissions active={ctx.active === 'permissions'} canGrant={ctx.canGrant} gate={ctx.snapshot.permissions} />
+        ? <IntakePermissions active={ctx.active === 'settings'} canGrant={ctx.canGrant} gate={ctx.snapshot.permissions} />
         : ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'closed'
-          ? <section className="dash-module" aria-label="成员与权限"><h1 className="desk-sr">成员与权限</h1>
-            <WorkbenchNoAccess need="查看成员与权限" detail={ctx.snapshot.permissions.recovery ?? '当前没有成员与权限。'} /></section>
+          ? <section className="dash-module" aria-label="设置"><h1 className="desk-sr">设置</h1>
+            <WorkbenchNoAccess need="查看设置" detail={ctx.snapshot.permissions.recovery ?? '当前没有可查看的设置。'} /></section>
           : null}
     </div>
   ),
 };
 
 function ContentLibraryDestination({ ctx }: { ctx: IntakeDestinationContext }) {
-  const active = ctx.active === 'wording' || ctx.active === 'content';
-  const canEdit = ctx.jobKnown && ctx.contentSignedIn !== false && !ctx.seatLibraryOnly;
-  const drafts = canEdit && ctx.active === 'content';
+  const active = ctx.active === 'wording';
   return <section hidden={!active} aria-label="内容库">
-    <Tabs className="content-library-tabs" activeKey={drafts ? 'drafts' : 'published'}
-      onChange={key => ctx.onOpen(key === 'drafts' ? 'content' : 'wording')}
-      items={[{ key: 'published', label: '已发布' }, ...(canEdit ? [{ key: 'drafts', label: '本机草稿' }] : [])]}
-      tabBarExtraContent={canEdit ? <Button onClick={() => ctx.onOpen('materials')}>上传团队资料</Button> : undefined} />
-    <IntakeLibrary active={active && !drafts} includeSop={ctx.workbenchMode === 'legacy'} seatNotice={ctx.seatLibraryOnly} />
-    {canEdit && <div hidden={!drafts}>
-      <p className="content-library-note">草稿仅保存在这台电脑。团队使用的内容请到资料审核上传并发布。</p>
-      <DeskKnowledge active={active && drafts} draftQuestion={ctx.scriptDraft} onDraftConsumed={ctx.onDraftConsumed} />
-    </div>}
+    <IntakeLibrary active={active} includeSop={ctx.workbenchMode === 'legacy'} seatNotice={ctx.seatLibraryOnly} />
   </section>;
 }
 

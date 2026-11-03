@@ -5,7 +5,6 @@ import type { DashboardIterationTask } from '@shared/dashboard-iteration';
 import type { DashboardUsageLogApi, UsageLogRow } from '@shared/dashboard-usage-log';
 import { usageExportPreviewCounts } from '@shared/usage-log-csv';
 import type { DashboardWordingEntry, DashboardWordingView } from '@shared/dashboard-wording';
-import { DESK_PERSONAS, type DeskItemView, type DeskView } from '@shared/desk-knowledge';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 
 const REVIEW_HOSTS = new Set(['127.0.0.1', 'localhost']);
@@ -68,26 +67,6 @@ function permissionView(): IntakePermissionView {
       reason: '预览夹具', expiresAt: '2026-10-09T02:00:00.000Z', revoked: false, canRevoke: true,
     }],
     preview: null, pending: false, resultUnknown: false, notice: null,
-  };
-}
-
-function deskItem(id: string, name: string, body: string, statusLabel: string, validity: DeskItemView['validity']): DeskItemView {
-  return {
-    id, personaId: 'shop', name, category: 'product', customCategory: null, fileName: '问答.txt', body,
-    parseState: 'ok', validity, validFrom: '2026-10-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z',
-    updatedAt: '2026-10-13T02:00:00.000Z', statusLabel, delivered: statusLabel === '生效中',
-  };
-}
-
-function deskView(): DeskView {
-  const items = [
-    deskItem('k-live', '运费谁承担', '七天无理由，运费由买家承担。', '生效中', 'always'),
-    deskItem('k-due', '退货运费什么时候到', '到点后才发给坐席。', '待生效', 'scheduled'),
-    deskItem('k-old', '旧包装说明', '这句已经过了有效期。', '已失效', 'scheduled'),
-  ];
-  return {
-    signedIn: true, role: 'operator', displayName: '运营', personas: DESK_PERSONAS, selectedPersonaId: 'shop',
-    items, delivered: items.filter((item) => item.delivered), tacit: [], revision: 1, notice: null, persistence: 'ok',
   };
 }
 
@@ -197,11 +176,6 @@ export function installIntakeReviewBridge(location: Location = window.location):
     current: async () => ({ ok: true, view: permissions }),
     command: async () => ({ ok: true, view: permissions }),
     onInvalidated: () => () => undefined,
-  });
-  const desk = deskView();
-  exposePreview('dashboardDesk', {
-    current: async () => ({ ok: true, view: desk }),
-    command: async () => ({ ok: true, view: desk }),
   });
   exposePreview('dashboardIteration', {
     list: async () => ({ ok: true, items: [iterationTask('task-open', 'open'), iterationTask('task-progress', 'in_progress')], nextCursor: null }),

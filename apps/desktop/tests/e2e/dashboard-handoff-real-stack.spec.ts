@@ -1,41 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deflateRawSync } from 'node:zlib';
 import { expect, test, type ElectronApplication } from '@playwright/test';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-function zipLocal(name: string, payload: Buffer): Buffer {
-  const nameBytes = Buffer.from(name, 'utf8'); const body = deflateRawSync(payload); const header = Buffer.alloc(30);
-  header.writeUInt32LE(0x04034b50, 0); header.writeUInt16LE(8, 8); header.writeUInt32LE(body.length, 18);
-  header.writeUInt32LE(payload.length, 22); header.writeUInt16LE(nameBytes.length, 26);
-  return Buffer.concat([header, nameBytes, body]);
-}
-const rels = (items: [string, string][]) => Buffer.from(`<Relationships>${items.map(([id, target]) => `<Relationship Id="${id}" Type="t" Target="${target}"/>`).join('')}</Relationships>`);
-function syntheticWorkbook(): Buffer {
-  const strings = ['快捷短语', '产品话术', '合成问题一', '第一行\n第二行', '合成问题二', '这一行带图'];
-  const shared = Buffer.from(`<sst>${strings.map(s => `<si><t xml:space="preserve">${s}</t></si>`).join('')}</sst>`);
-  const sheet = Buffer.from('<worksheet xmlns:r="r"><sheetData>'
-    + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
-    + '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row>'
-    + '<row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="s"><v>5</v></c></row>'
-    + '</sheetData><drawing r:id="rId1"/><picture r:id="rId2"/></worksheet>');
-  const drawing = Buffer.from('<xdr:wsDr xmlns:xdr="x" xmlns:a="a" xmlns:r="r"><xdr:twoCellAnchor><xdr:from><xdr:col>2</xdr:col><xdr:row>2</xdr:row></xdr:from>'
-    + '<xdr:pic><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic></xdr:twoCellAnchor></xdr:wsDr>');
-  return Buffer.concat([
-    zipLocal('xl/sharedStrings.xml', shared), zipLocal('xl/worksheets/sheet1.xml', sheet),
-    zipLocal('xl/workbook.xml', Buffer.from('<workbook xmlns:r="r"><sheets><sheet name="s" r:id="rId1"/></sheets></workbook>')),
-    zipLocal('xl/_rels/workbook.xml.rels', rels([['rId1', 'worksheets/sheet1.xml']])),
-    zipLocal('xl/worksheets/_rels/sheet1.xml.rels', rels([['rId1', '../drawings/drawing1.xml'], ['rId2', '../media/bg.png']])),
-    zipLocal('xl/drawings/drawing1.xml', drawing), zipLocal('xl/drawings/_rels/drawing1.xml.rels', rels([['rId1', '../media/image1.png']])),
-    zipLocal('xl/media/image1.png', PNG), zipLocal('xl/media/bg.png', PNG),
-  ]);
-}
-
-test('dashboard handoff: task homepage, collapsed filters, xlsx with picture, account logout across windows', async () => {
+test('dashboard handoff: collapsed filters and account logout across windows', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit synthetic PG15/Electron gate');
   test.setTimeout(180_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -46,8 +17,6 @@ test('dashboard handoff: task homepage, collapsed filters, xlsx with picture, ac
   mkdirSync(evidence, { recursive: true });
   const userData = path.join(directory, 'user');
   mkdirSync(userData);
-  const workbookPath = path.join(directory, '【售前】合成话术.xlsx');
-  writeFileSync(workbookPath, syntheticWorkbook());
   let app: ElectronApplication | undefined;
   try {
     app = await launchIntakeElectron({ desktopRoot, userDataDirectory: userData, apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
@@ -96,20 +65,7 @@ test('dashboard handoff: task homepage, collapsed filters, xlsx with picture, ac
     await expect(dashboard.getByTestId('module-sop')).toContainText('SOP 学习与执行尚未开放。');
     await expect(dashboard.getByTestId('sop-upload')).toHaveCount(0);
     await dashboard.getByTestId('nav-wording').click();
-    await dashboard.getByRole('tab', { name: '本机草稿', exact: true }).click();
-    await dashboard.getByRole('button', { name: '添加话术' }).click();
-    await dashboard.locator('input[type=file]').setInputFiles(workbookPath);
-    await expect(dashboard.getByText('包含 1 张图片，将随对应话术保存。')).toBeVisible();
-    await expect(dashboard.getByRole('list', { name: '未导入的内容' })).toContainText('工作表背景图不属于任何话术，未导入。');
-    await dashboard.screenshot({ path: path.join(evidence, 'xlsx-preview.png') });
-    await dashboard.getByRole('button', { name: '导入 2 条' }).click();
-    await expect(dashboard.getByText('将导入 2 条到本机草稿，状态为未生效，不会覆盖已有话术，也不会发布到查询。')).toBeVisible();
-    await dashboard.getByRole('button', { name: '确认导入 2 条' }).click();
-    await expect(dashboard.getByText('已导入 2 条，状态是未生效。')).toBeVisible();
-    await dashboard.getByRole('tab', { name: '售前客服' }).click();
-    await expect(dashboard.getByRole('img', { name: '合成问题二的图片 1' })).toBeVisible();
-    await expect(dashboard.getByRole('img', { name: /合成问题一的图片/ })).toHaveCount(0);
-    await dashboard.screenshot({ path: path.join(evidence, 'xlsx-imported.png') });
+    await expect(dashboard.getByRole('tab', { name: '本机草稿', exact: true })).toHaveCount(0);
 
     const before = (await host.status()).requests.filter(p => p === '/v1/auth/logout').length;
     const account = dashboard.getByRole('button', { name: '账号信息' });

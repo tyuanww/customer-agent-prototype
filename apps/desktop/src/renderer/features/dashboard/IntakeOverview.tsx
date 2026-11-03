@@ -392,12 +392,10 @@ export function IntakeOverview({
   mode,
   onOpen,
   onTodoCount,
-  onSupplyScript,
 }: {
   mode: WorkbenchKind | null;
-  onOpen: (target: 'content' | 'wording' | 'permissions') => void;
+  onOpen: (target: 'wording' | 'materials' | 'settings') => void;
   onTodoCount?: (count: number) => void;
-  onSupplyScript?: (question: string) => void;
 }) {
   const todoSection = useRef<HTMLElement>(null);
   const taskTruncated = useRef(false);
@@ -445,7 +443,6 @@ export function IntakeOverview({
   const [message, setMessage] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CloseHintCatalog | null>(null);
-  const [deskRole, setDeskRole] = useState<'operator' | 'seat' | null>(null);
   const [causeById, setCauseById] = useState<Record<string, DashboardIterationCause>>({});
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const mutation = useRef(false);
@@ -479,20 +476,6 @@ export function IntakeOverview({
       setCatalog(catalogFromWording(result));
     }).catch(() => {
       if (live) setCatalog(null);
-    });
-    return () => { live = false; };
-  }, []);
-
-  useEffect(() => {
-    const api = window.dashboardDesk;
-    if (!api) return undefined;
-    let live = true;
-    void api.current().then((result) => {
-      if (!live) return;
-      if (!result.ok) return;
-      setDeskRole(result.view.role === 'seat' ? 'seat' : 'operator');
-    }).catch(() => {
-      if (live) setDeskRole(null);
     });
     return () => { live = false; };
   }, []);
@@ -593,12 +576,10 @@ export function IntakeOverview({
   const todoRows: TodoTableRow[] = openTasks.map((task) => ({ key: task.taskId, task }));
   const usageStatus = usageStatusText(usage);
 
-  function supplyScript(question: string) {
+  function supplyScript() {
     return <Button
       type="text"
-      disabled={deskRole !== 'operator'}
-      title={deskRole === 'seat' ? '坐席不能添加话术' : '仅运营可补充。'}
-      onClick={() => { if (onSupplyScript) onSupplyScript(question); else onOpen('content'); }}
+      onClick={() => onOpen('materials')}
     >补充话术</Button>;
   }
 
@@ -707,7 +688,7 @@ export function IntakeOverview({
                 if (task.status === 'open') {
                   return <Space size={8}>
                     <Button type="primary" disabled={busy} onClick={() => startTask(task)}>开始处理</Button>
-                    <Button type="text" onClick={() => onOpen('content')}>去知识库</Button>
+                    <Button type="text" onClick={() => onOpen('materials')}>去资料审核</Button>
                   </Space>;
                 }
                 return <Space wrap size={8} align="center">
@@ -789,7 +770,7 @@ export function IntakeOverview({
               render: (count: number) => <div className="cnt warn"><b>{count}</b></div>,
             },
             { title: '最近一次', dataIndex: 'latest', render: (latest: string) => <span className="mute">{latest}</span> },
-            { title: '', key: 'supply', render: (_value, row) => supplyScript(row.question) },
+            { title: '', key: 'supply', render: () => supplyScript() },
           ]}
         />}
     </section>

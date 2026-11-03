@@ -17,25 +17,24 @@ const sourcePath = path.resolve(
 
 describe('dashboard manifest', () => {
   it('is deeply frozen compile-time data with the live workbench pages', () => {
-    expect(DASHBOARD_MODULE_IDS).toHaveLength(6);
+    expect(DASHBOARD_MODULE_IDS).toHaveLength(5);
     expect(DASHBOARD_NAV.map((item) => item.id)).toEqual([...DASHBOARD_MODULE_IDS]);
     expect(Object.isFrozen(DASHBOARD_MANIFEST)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.ledger.rows)).toBe(true);
     expect(Object.isFrozen(DASHBOARD_MANIFEST.wording.entries)).toBe(true);
   });
 
-  it('places SOP in 话术运营 between wording and content', () => {
+  it('keeps the five-page workbench with permissions and accounts inside settings', () => {
     expect(DASHBOARD_MODULE_IDS).toEqual([
       'overview',
       'wording',
       'sop',
-      'content',
       'materials',
-      'permissions',
+      'settings',
     ]);
-    expect(DASHBOARD_NAV.find((item) => item.id === 'content')?.label).toBe('内容库');
     expect(DASHBOARD_NAV.find((item) => item.id === 'materials')?.label).toBe('资料审核');
-    expect(DASHBOARD_NAV.find((item) => item.id === 'permissions')?.label).toBe('成员与权限');
+    expect(DASHBOARD_NAV.find((item) => item.id === 'settings')?.label).toBe('设置');
+    expect(DASHBOARD_NAV.map((item) => String(item.id))).not.toContain('content');
     expect(DASHBOARD_NAV.find((item) => item.id === 'sop')).toEqual({
       id: 'sop',
       label: 'SOP',
@@ -46,7 +45,7 @@ describe('dashboard manifest', () => {
       'wording',
       'sop',
     ]);
-    expect(nextDashboardNavId('sop', 1)).toBe('content');
+    expect(nextDashboardNavId('sop', 1)).toBe('materials');
     expect(nextDashboardNavId('sop', -1)).toBe('wording');
   });
 
@@ -138,8 +137,8 @@ describe('dashboard manifest', () => {
     expect(DASHBOARD_MODULE_IDS).not.toContain('iteration');
     expect(nextDashboardNavId('overview', 1)).toBe('wording');
     expect(DASHBOARD_MODULE_IDS).not.toContain('announce');
-    expect(nextDashboardNavId('permissions', 1)).toBe('overview');
-    expect(nextDashboardNavId('overview', -1)).toBe('permissions');
+    expect(nextDashboardNavId('settings', 1)).toBe('overview');
+    expect(nextDashboardNavId('overview', -1)).toBe('settings');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不联网');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不发送');
     expect(DASHBOARD_MANIFEST.announce.simulation.disclaimer).toContain('不保存');

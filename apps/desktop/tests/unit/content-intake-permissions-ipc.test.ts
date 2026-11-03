@@ -16,8 +16,8 @@ it('rejects other windows, child frames and forged fields before accessing a ses
  try{const command=handlers.get('dashboard:permissions-command')!,current=handlers.get('dashboard:permissions-current')!;
   expect(await command(event({...dashboard,id:9} as WebContents),{action:'refresh'})).toMatchObject({ok:false,view:null});
   expect(await command(event(dashboard,{parent:frame}),{action:'refresh'})).toMatchObject({ok:false,view:null});
-  expect(await command(event(dashboard),{action:'save',actor:'forged'})).toMatchObject({ok:false,message:'权限配置输入无效。'});
-  expect(await current(event(dashboard),{})).toMatchObject({ok:false,message:'权限配置输入无效。'});
+  expect(await command(event(dashboard),{action:'save',actor:'forged'})).toMatchObject({ok:false,message:'设置输入无效。'});
+  expect(await current(event(dashboard),{})).toMatchObject({ok:false,message:'设置输入无效。'});
   expect(await command(event(dashboard),{action:'refresh'})).toMatchObject({ok:false,message:'资料还不能在这里改。请把表交给客服经理。'});
  }finally{owned.dispose();}expect(handlers.size).toBe(0);
 });

@@ -2,7 +2,6 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { dashboardContentParseUpload } from '../../src/main/dashboard-content';
-import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -137,35 +136,6 @@ describe('xlsx images follow their wording row', () => {
     });
   });
 
-  it('saves pictures with their wording and reads them back after a restart', () => {
-    const parsed = parse(workbook({ rows, anchors: [anchor(1, 'rId1'), anchor(3, 'rId2')], media: { 'a.png': PNG, 'b.jpeg': JPEG } }));
-    if (!parsed.ok) throw new Error('fixture must parse');
-    let disk: string | null = null;
-    const clock = { now: () => '2026-10-29T00:00:00.000Z', load: () => disk, save: (raw: string) => { disk = raw; } };
-    const store = new DeskKnowledgeStore(clock);
-    const reply = store.command('operator', {
-      action: 'import-csv', personaId: 'shop', fileName: '【售前】合成话术.xlsx', csvText: parsed.csvText, category: 'product', images: parsed.images,
-    }, '合成运营');
-    expect(reply.ok).toBe(true);
-    const reopenedStore = new DeskKnowledgeStore(clock);
-    const reopened = reopenedStore.command('operator', { action: 'select-persona', personaId: 'presale' }, '合成运营');
-    if (!reopened.ok) throw new Error('reload must succeed');
-    expect(reopened.view.persistence).toBe('ok');
-    const items = reopened.view.items;
-    const byName = new Map(items.map((item) => [item.name, item]));
-    expect(byName.get('合成问题一')?.body).toBe('第一行\n第二行');
-    expect(byName.get('合成问题一')?.images).toEqual([`data:image/png;base64,${PNG.toString('base64')}`]);
-    expect(byName.get('合成问题二')?.images).toBeUndefined();
-    expect(byName.get('合成问题三')?.images).toEqual([`data:image/jpeg;base64,${JPEG.toString('base64')}`]);
-  });
-
-  it('rejects renderer-supplied images that are not PNG/JPEG data or point past the rows', () => {
-    const store = new DeskKnowledgeStore({ now: () => 'x', load: () => null, save: () => undefined });
-    const base = { action: 'import-csv', personaId: 'shop', fileName: 'a.csv', csvText: 'scene,script\n合成问题,答案\n', category: 'product' } as const;
-    expect(store.command('operator', { ...base, images: [{ index: 0, dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }] }, null)).toMatchObject({ ok: false, code: 'VALIDATION' });
-    expect(store.command('operator', { ...base, images: [{ index: 1, dataUrl: `data:image/png;base64,${PNG.toString('base64')}` }] }, null))
-      .toMatchObject({ ok: false, message: '图片所在话术无法导入，请检查该行后重试。' });
-  });
 });
 
 describe('self-closing empty cells', () => {

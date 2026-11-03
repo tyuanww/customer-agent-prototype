@@ -110,7 +110,7 @@ async function expectDashboardWithoutHorizontalOverflow(
       ['shell', document.querySelector('[data-testid="dashboard-shell"]')],
       ['main', document.querySelector('.dashboard-main')],
       ['content', document.querySelector('.dashboard-content')],
-      ['module', document.querySelector('[data-testid="module-overview"]')],
+      ['module', document.querySelector('[data-testid="module-signed-out"]')],
     ] as const;
     return {
       documentOverflow: document.documentElement.scrollWidth - viewportWidth,
@@ -148,12 +148,9 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
 
     const dashboard = await waitForRole(app, 'dashboard');
     await expect(dashboard.getByTestId('dashboard-shell')).toBeVisible();
-    await expect(dashboard.getByTestId('module-overview')).toBeVisible();
+    await expect(dashboard.getByTestId('module-signed-out')).toContainText('请先登录');
     await expect(dashboard.getByTestId('dashboard-env-badges')).toHaveCount(0);
     await expect(dashboard.getByTestId('dashboard-disclaimer')).toHaveCount(0);
-    await expect(dashboard.getByTestId('dashboard-boundary-disclaimer')).toContainText(
-      '请先登录',
-    );
     for (const [width, height] of [[980, 680], [1180, 760], [1440, 820]] as const) {
       await expectDashboardWithoutHorizontalOverflow(app, dashboard, width, height);
     }
@@ -200,10 +197,10 @@ test('opens one isolated Dashboard from trusted desktop entries', async () => {
       transparent: false,
       hasPreload: true,
       closable: true,
-      title: '客服运营工作台',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
       integratedChrome: process.platform === 'darwin',
     });
+    expect(snapshot.window?.title).toMatch(/^客服运营工作台/);
     expect(snapshot.window?.width ?? 0).toBeGreaterThanOrEqual(snapshot.window?.minWidth ?? 1);
     expect(snapshot.window?.height ?? 0).toBeGreaterThanOrEqual(snapshot.window?.minHeight ?? 1);
 

@@ -2,6 +2,18 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.41] - 2026-11-03
+
+### Changed
+
+- 工作台保留五个入口：工作台、内容库、SOP、资料审核、设置。权限与账号收进「设置」页签，不再单独占用侧栏入口。
+- 内容库只读取服务端发布目录。原本机草稿、知识库页面和 `dashboardDesk` preload / Main IPC 已删除；已有 `desk-knowledge.json` 留在本机但不再由应用读写。
+- 工作台里的「补充话术」改为进入资料审核；账号维护文案统一为「账号」，避免同时使用坐席和账号两套名称。
+
+### Release
+
+- 仓库版本是 `0.3.41`。本轮只构建未签名 Windows 和 macOS 包；按既定授权跳过签名、公证、Linux 构建和 Linux 发布。
+
 ## [0.3.40] - 2026-11-03
 
 ### Changed

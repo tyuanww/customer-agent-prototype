@@ -1,6 +1,6 @@
 import type { SessionJobView } from './product-session';
 
-/** Display only. The server still checks. `null` while `signedIn` is null means the session has not answered. `null` when the job holds the ability means show the control. Upload SOP asks 客服主管 until the server sends `askRole`. Knowledge gating stays in `desk-knowledge-ipc.ts`. */
+/** Display only. The server still checks. `null` while `signedIn` is null means the session has not answered. `null` when the job holds the ability means show the control. Upload SOP asks 客服主管 until the server sends `askRole`. */
 export type WorkbenchAbility = 'grant' | 'upload-sop';
 
 export type AccessAsk = '客服主管' | '管理员';

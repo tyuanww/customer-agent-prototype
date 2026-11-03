@@ -57,7 +57,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
                                       └─ scrubbed aggregate report + mandatory cleanup
 ```
 
-桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。Live UUID 查询的「话术不准」走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。当前工作台是概览、话术库、SOP、知识库、资料、权限。没有产品会话或没有冻结合同的数字写一句何时会有数据，不写「未接入」，也不读 VOC / 工单合成 manifest 冒充生产。一期五项（管理概览、话术库、SOP、内容管理、系统同步）是旧工作台。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才回退磁盘 hydrate / 本机检索索引。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。ops-loop 走 `dashboardOps`：检索账、SOP 树、话术下架 `pending_review`、软件目录。管理员发布在 Main 里 `publishDraft`：内部 `POST /v1/content/import` 等到 staged，再 `POST /v1/content/publish`；不 park `/v1/admin/content/reviews*`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
+桌面主链：狐狸浮窗打开查询 → 每次产品检索先 `refreshAnnounce` → main 在仓外索引上 BM25 + 可选 MiniMax → hydrate 当前发布原文 Top 3 → 人工选择 → 白名单 IPC 写入剪贴板。有 hydrate 时不把问句交给 leftover `/v1/search`。Live UUID 查询的「话术不准」走 `product:inaccuracy-report` → `POST /v1/inaccuracy-reports`。细节见 [桌面语义检索](reference-desktop-retrieval.md)。当前工作台是工作台、内容库、SOP、资料审核、设置；设置内含权限和账号。没有产品会话或没有冻结合同的数字写一句何时会有数据，不写「未接入」，也不读 VOC / 工单合成 manifest 冒充生产。一期五项（管理概览、话术库、SOP、内容管理、系统同步）是旧工作台。话术库走独立 `dashboard.ts` preload 的 `dashboard:wording-list`，优先 announce 内存 snapshot（`matchesLease`），没有 snapshot 才回退磁盘 hydrate / 本机检索索引。待办走 `dashboard:iteration-*` → 冻结 iteration-tasks。ops-loop 走 `dashboardOps`：检索账、SOP 树、话术下架 `pending_review`、软件目录。管理员发布在 Main 里 `publishDraft`：内部 `POST /v1/content/import` 等到 staged，再 `POST /v1/content/publish`；不 park `/v1/admin/content/reviews*`。renderer 仍不直连 API。并行 API 只放行 synthetic；真实业务内容仍未接通。正式飞书身份可在本机 `feishu.env` 下接通，不等于生产部署。
 
 ## 2. 目录归属
 
@@ -175,7 +175,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
 | `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
-| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是概览、话术库、SOP、知识库、资料、权限。话术库只读当前发布目录。preload 保留旧 SOP 与待办通道，但普通服务不提供这些旧操作，见下文。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce`。 |
+| `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是工作台、内容库、SOP、资料审核、设置。内容库只读当前发布目录。preload 保留旧 SOP 与待办通道，但普通服务不提供这些旧操作，见下文。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce` 或 `dashboardDesk`。 |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
 | `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
 
@@ -287,7 +287,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。2026-10-14 在 `4a22c6b` 上运行 `pnpm check:architecture`，438 个源码/配置文件、0 个依赖方向违规。更早的记录仍有效：`main@4739c39` 的 CI run `37024571842` 是 303 个文件、0 违规；统一工作台当时是 389 个文件、0 违规。`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏六页是概览、话术库、SOP、知识库、资料、权限。`content` 的文案是「知识库」，挂载 `DeskKnowledge`，本机文件是 `userData/desk-knowledge.json`。`IntakeManagement` 挂在「资料」。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这六页一致，不含「系统同步」。上文 ASCII 仍画一期五项，那是旧工作台。知识库主按钮用紫色。字段见[前端设计结论](plans/2026-10-24-frontend-design-decisions.md)、[人设知识库](reference-desk-knowledge.md) 和[资料页与权限页](reference-intake-pages.md)。
+当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏五页是工作台、内容库、SOP、资料审核、设置。`IntakeManagement` 同时支撑工作台摘要和资料审核；`IntakePermissions` 挂在「设置」，页内提供权限和账号。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这五页一致。知识库组件、本机草稿路由和对应 Main/preload 通道已删除；既有磁盘文件保留但运行时不读写。字段见[资料页与设置页](reference-intake-pages.md)。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
 

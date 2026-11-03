@@ -2,6 +2,8 @@
 
 本文对应任务卡 D5（`docs/plans/2026-10-24-saas-refactor-task-cards.md` 第 6 节）。只描述现状、目标展示和与 C3 口径的对应关系。不写数据库迁移，也不改 Dashboard 代码。
 
+本文保留为当时的设计记录。后续工作台已移除本机知识库入口；当前「补充话术」进入资料审核。现行页面合同以 [DESIGN.md](../../DESIGN.md) 和[资料页与设置页](../reference-intake-pages.md)为准。
+
 依赖 C3 的分析层口径见 `docs/plans/2026-10-25-analytics-schema.md`。实现阶段另开卡。旧 profile 页面已经不在概览这条路径上。本说明不删除 `dashboard:wording-list`，也不删除 Query 与 Fox 的产品公告。
 
 ## 目标
@@ -43,7 +45,7 @@ FAQ 合成 profile 下，导航 id `overview` 挂载 `IntakeOverview`（`apps/de
 
 ### 没查到的问题
 
-对窗口内使用记录调用 `rankMissRows`（`usage-log-csv.ts`）。按问题文案聚合未命中次数，`question === null` 时显示「已脱敏」。运营可点「补充话术」，坐席角色禁用（`dashboardDesk.current` 判 `seat`）。
+对窗口内使用记录调用 `rankMissRows`（`usage-log-csv.ts`）。按问题文案聚合未命中次数，`question === null` 时显示「已脱敏」。计划当时拟让运营点「补充话术」进入本机知识库，并以 `dashboardDesk.current` 区分坐席；该入口已在后续版本撤除。
 
 ### 改过之后有没有变好
 

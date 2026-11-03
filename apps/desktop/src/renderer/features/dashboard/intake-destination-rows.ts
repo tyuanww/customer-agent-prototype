@@ -11,7 +11,7 @@ export const INTAKE_DESTINATION_ROWS = [
   {
     id: 'wording',
     label: '内容库',
-    blurb: '已发布话术与本机草稿',
+    blurb: '当前可用话术目录',
     group: '话术运营',
     audience: 'everyone',
     needsPermissionBridge: false,
@@ -27,15 +27,6 @@ export const INTAKE_DESTINATION_ROWS = [
     keepAlive: false,
   },
   {
-    id: 'content',
-    label: '内容库',
-    blurb: '本机草稿',
-    group: '治理与架构',
-    audience: 'staff',
-    needsPermissionBridge: false,
-    keepAlive: true,
-  },
-  {
     id: 'materials',
     label: '资料审核',
     blurb: '上传、确认来源、发布',
@@ -45,9 +36,9 @@ export const INTAKE_DESTINATION_ROWS = [
     keepAlive: true,
   },
   {
-    id: 'permissions',
-    label: '成员与权限',
-    blurb: '授权',
+    id: 'settings',
+    label: '设置',
+    blurb: '权限与账号',
     group: '治理与架构',
     audience: 'staff',
     needsPermissionBridge: false,
@@ -109,8 +100,9 @@ export function readIntakePreviewPage(
   const params = new URLSearchParams(location.search);
   if (!local || params.get('preview') !== 'intake') return 'overview';
   const page = params.get('page');
-  if (page === 'permissions' && !canViewPermissions) return 'overview';
+  if ((page === 'settings' || page === 'permissions') && !canViewPermissions) return 'overview';
   if (page === 'announce') return 'wording';
+  if (page === 'permissions') return 'settings';
   if (page !== null && isIntakeDestination(page)) return page;
   return 'overview';
 }
@@ -121,7 +113,7 @@ export function intakeRowVisible(
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): boolean {
-  if (row.id === 'permissions') return canViewPermissions;
+  if (row.id === 'settings') return canViewPermissions;
   if (row.audience === 'staff' && (!jobKnown || seatLibraryOnly)) return false;
   if (row.needsPermissionBridge && !canViewPermissions) return false;
   return true;
@@ -132,5 +124,5 @@ export function intakeSidebarItems(
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): readonly IntakeSidebarItem[] {
-  return INTAKE_DESTINATION_ROWS.filter((row) => row.id !== 'content' && intakeRowVisible(row, canViewPermissions, seatLibraryOnly, jobKnown));
+  return INTAKE_DESTINATION_ROWS.filter((row) => intakeRowVisible(row, canViewPermissions, seatLibraryOnly, jobKnown));
 }

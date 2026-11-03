@@ -6,7 +6,6 @@ import { IntakePermissions } from '../../src/renderer/features/dashboard/IntakeP
 import { IntakeManagement } from '../../src/renderer/features/dashboard/IntakeManagement';
 import { IntakeLibrary } from '../../src/renderer/features/dashboard/IntakeLibrary';
 import { SopLibraryModule } from '../../src/renderer/features/dashboard/SopLibraryModule';
-import { DeskKnowledge } from '../../src/renderer/features/dashboard/DeskKnowledge';
 import { WORKBENCH_EMPTY } from '../../src/shared/workbench-empty';
 
 afterEach(() => {
@@ -15,7 +14,6 @@ afterEach(() => {
   delete window.dashboardPermissions;
   delete window.dashboardIntake;
   delete window.dashboardWording;
-  delete window.dashboardDesk;
 });
 
 it('splits an empty usage log from a failed usage read on 概览', async () => {
@@ -50,11 +48,11 @@ it('names a missing usage source on the usage log and an empty log separately', 
   expect(screen.queryByText(WORKBENCH_EMPTY.usageEmpty)).toBeNull();
 });
 
-it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限 and 资料 without accusing the operator', async () => {
+it('shows 资料还不能在这里改。请把表交给客服经理。 on 设置 and 资料 without accusing the operator', async () => {
   render(<IntakePermissions active />);
   expect(await screen.findByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText(/没有可用的资料管理权限|权限配置尚未接入/)).toBeNull();
-  expect(screen.getByRole('region', { name: '权限配置' })).toBeVisible();
+  expect(screen.getByRole('region', { name: '设置' })).toBeVisible();
   cleanup();
   render(<IntakeManagement />);
   expect(await screen.findByRole('heading', { name: '资料审核' })).toBeVisible();
@@ -62,32 +60,10 @@ it('shows 资料还不能在这里改。请把表交给客服经理。 on 权限
   expect(screen.queryByText('当前没有可用的资料管理权限，请确认登录身份与店铺授权。')).toBeNull();
 });
 
-it('keeps the locked empty sentences on 话术库, SOP and 知识库', async () => {
+it('keeps the locked empty sentences on 话术库 and SOP', async () => {
   render(<IntakeLibrary active />);
   expect(await screen.findByText('可用资料暂不可读取，请重试。')).toBeVisible();
   cleanup();
   render(<SopLibraryModule />);
   expect(await screen.findAllByText('请先登录后再管理 SOP。')).not.toHaveLength(0);
-  cleanup();
-  window.dashboardDesk = {
-    current: async () => ({
-      ok: true,
-      view: {
-        signedIn: false,
-        role: null,
-        displayName: null,
-        personas: [],
-        selectedPersonaId: 'shop',
-        items: [],
-        delivered: [],
-        tacit: [],
-        revision: 0,
-        notice: null,
-        persistence: 'ok',
-      },
-    }),
-    command: async () => ({ ok: false, code: 'UNAUTHORIZED', message: WORKBENCH_EMPTY.signedOut, view: null }),
-  };
-  render(<DeskKnowledge />);
-  expect((await screen.findByText(/请先登录/)).textContent ?? '').toContain(WORKBENCH_EMPTY.signedOut);
 });

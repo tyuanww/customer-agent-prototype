@@ -134,8 +134,8 @@ it('does not offer a post the current scope cannot grant',async()=>{
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByRole('button',{name:'停止等待'})).not.toBeInTheDocument();
   expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab',{name:'账号管理'}));
-  fireEvent.click(screen.getByRole('button',{name:'新建坐席'}));
+  fireEvent.click(screen.getByRole('tab',{name:'账号'}));
+  fireEvent.click(screen.getByRole('button',{name:'新建账号'}));
   const seatPost=screen.getByRole('combobox',{name:'坐席岗位'});
   expect(seatPost.closest('.ant-select')).toHaveTextContent('客服');
   await userEvent.click(seatPost);
@@ -157,9 +157,9 @@ it('creates an outsourced seat from an intent and does not keep the password on 
  const login=readFileSync(resolve(dirname(fileURLToPath(import.meta.url)),'../../src/renderer/LoginApp.tsx'),'utf8');
  const page=readFileSync(PAGE,'utf8');
  try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
-  await user.click(screen.getByRole('tab',{name:'账号管理'}));
-  await user.click(screen.getByRole('button',{name:'新建坐席'}));
-  const form=screen.getByRole('dialog',{name:'新建坐席'});
+  await user.click(screen.getByRole('tab',{name:'账号'}));
+  await user.click(screen.getByRole('button',{name:'新建账号'}));
+  const form=screen.getByRole('dialog',{name:'新建账号'});
   expect(within(form).getByLabelText('姓名')).toBeInTheDocument();
   expect(within(form).getByLabelText('登录名')).toBeInTheDocument();
   expect(within(form).getByLabelText('密码')).toHaveAttribute('type','password');
@@ -169,19 +169,19 @@ it('creates an outsourced seat from an intent and does not keep the password on 
   expect((await screen.findAllByRole('option')).map(option=>option.textContent)).toEqual(['客服','客服主管']);
   await user.click(await screen.findByRole('option',{name:'客服'}));
   expect(document.querySelector('select')).toBeNull();
-  expect(screen.getByRole('dialog',{name:'新建坐席'})).toBe(form);
+  expect(screen.getByRole('dialog',{name:'新建账号'})).toBe(form);
   expect(page).toContain('dashboardSeats');
   expect(page).not.toContain('password-accounts');
   expect(page).not.toMatch(/seat-account-command|password-account-file|subject-binding|from 'pg'/);
   expect(login).toContain('飞书');expect(login).toContain('账号');expect(login).not.toContain('外包');
-  const kept=await within(screen.getByRole('table',{name:'账号管理'})).findByRole('row',{name:/seatkept/});
+  const kept=await within(screen.getByRole('table',{name:'账号'})).findByRole('row',{name:/seatkept/});
   expect(within(kept).getByRole('cell',{name:'客服主管'})).toBeInTheDocument();
   expect(intents[0]).toEqual({action:'list'});
   await user.type(within(form).getByLabelText('姓名'),'外包甲');
   await user.type(within(form).getByLabelText('登录名'),'seatui');
   setPassword(within(form).getByLabelText('密码'), 'pw-seat-ui');
-  await user.click(within(form).getByRole('button',{name:'保存坐席'}));
-  const table=screen.getByRole('table',{name:'账号管理'});
+  await user.click(within(form).getByRole('button',{name:'保存账号'}));
+  const table=screen.getByRole('table',{name:'账号'});
   const row=await within(table).findByRole('row',{name:/seatui/});
   expect(intents.find(intent=>intent.action==='create')).toEqual({action:'create',displayName:'外包甲',username:'seatui',password:'pw-seat-ui',post:'客服'});
   expect(document.body.innerHTML).not.toContain('pw-seat-ui');
@@ -227,22 +227,22 @@ it('shows member headers before a scope is chosen and closing the dialogs does n
  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
  expect(commands).not.toContain('save');
  expect(commands).not.toContain('preview');
- await user.click(screen.getByRole('tab',{name:'账号管理'}));
- const seatTable=await screen.findByRole('table',{name:'账号管理'});
+ await user.click(screen.getByRole('tab',{name:'账号'}));
+ const seatTable=await screen.findByRole('table',{name:'账号'});
  for(const header of ['姓名','登录名','岗位','状态']) expect(within(seatTable).getByRole('columnheader',{name:header})).toBeInTheDocument();
- await user.click(screen.getByRole('button',{name:'新建坐席'}));
- const seat=screen.getByRole('dialog',{name:'新建坐席'});
+ await user.click(screen.getByRole('button',{name:'新建账号'}));
+ const seat=screen.getByRole('dialog',{name:'新建账号'});
  await user.type(within(seat).getByLabelText('姓名'),'不保存');
  setPassword(within(seat).getByLabelText('密码'), 'pw-left-behind');
  await user.click(within(seat).getByRole('button',{name:'关闭'}));
  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
  expect(document.body.innerHTML).not.toContain('pw-left-behind');
  expect(intents.every(intent=>intent.action==='list')).toBe(true);
- await user.click(screen.getByRole('button',{name:'新建坐席'}));
- const again=screen.getByRole('dialog',{name:'新建坐席'});
+ await user.click(screen.getByRole('button',{name:'新建账号'}));
+ const again=screen.getByRole('dialog',{name:'新建账号'});
  fireEvent.change(within(again).getByLabelText('姓名'),{target:{value:'另一人'}});
  fireEvent.change(within(again).getByLabelText('登录名'),{target:{value:'other'}});
- expect(within(again).getByRole('button',{name:'保存坐席'})).toBeDisabled();
+ expect(within(again).getByRole('button',{name:'保存账号'})).toBeDisabled();
  expect(document.body.innerHTML).not.toContain('pw-left-behind');
 });
 
@@ -278,7 +278,7 @@ it('shows the fixed denial when grant is missing, and still hides the grant butt
   expect(block).toHaveTextContent('你还不能给他人开通权限');
   expect(block).toHaveTextContent('没有权限，请找人开通。');
   expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
-  await userEvent.setup().click(screen.getByRole('tab', { name: '账号管理' }));
+  await userEvent.setup().click(screen.getByRole('tab', { name: '账号' }));
   expect(screen.queryByTestId('workbench-no-access')).toBeNull();
 });
 
@@ -331,7 +331,7 @@ it('keeps the existing sentence when a permission read throws', async () => {
     onInvalidated: () => () => undefined,
   };
   render(<IntakePermissions active />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('权限配置暂不可用，请重新读取。');
+  expect(await screen.findByRole('alert')).toHaveTextContent('设置暂不可用，请重新读取。');
   expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
 });
 
@@ -343,7 +343,7 @@ it('shows the reply sentence when a permission read fails without a view', async
   };
   render(<IntakePermissions active />);
   expect(await screen.findByRole('alert')).toHaveTextContent('权限、人员状态或输入已变化，请刷新后核对。');
-  expect(screen.queryByText('权限配置暂不可用，请重新读取。')).not.toBeInTheDocument();
+  expect(screen.queryByText('设置暂不可用，请重新读取。')).not.toBeInTheDocument();
 });
 
 it('shows 请先登录。 for a signed-out permission view', async () => {

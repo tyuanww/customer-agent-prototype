@@ -13,11 +13,11 @@ function die(code, message) {
   process.exit(code);
 }
 
-const wiringStart = main.indexOf('const hangzhouWorkbench =');
+const wiringStart = main.indexOf('const intakeWorkbench =');
 const wiringEnd = main.indexOf('const workbenchSession =', wiringStart);
 const statementEnd = main.indexOf('\n', main.indexOf(';', wiringEnd));
 if (wiringStart < 0 || wiringEnd < 0 || statementEnd < 0) {
-  die(2, 'model out of sync: hangzhouWorkbench / workbenchSession markers are gone from apps/desktop/src/main/main.ts');
+  die(2, 'model out of sync: intakeWorkbench / workbenchSession markers are gone from apps/desktop/src/main/main.ts');
 }
 const wiring = main.slice(wiringStart, statementEnd);
 const mount = new Function('productProfile', 'productSession', `${wiring}\nreturn workbenchSession;`);
@@ -26,7 +26,6 @@ const registrations = [
   'registerContentIntakeCatalogIpc(workbenchSession,',
   'registerContentIntakePermissionsIpc(workbenchSession,',
   'registerContentIntakeManagementIpc(workbenchSession,',
-  'registerDeskKnowledgeIpc(workbenchSession,',
   'registerContentIntakeQueryIpc(workbenchSession,',
 ];
 for (const call of registrations) {
@@ -49,7 +48,14 @@ for (const apiOrigin of loopbacks) {
   for (const identityOrigin of loopbacks) {
     if (apiOrigin === identityOrigin) continue;
     for (const contentIntake of [undefined, 'faq-v2']) {
-      profiles.push(contentIntake ? { apiOrigin, identityOrigin, contentIntake } : { apiOrigin, identityOrigin });
+      for (const mode of [undefined, 'product-remote']) {
+        profiles.push({
+          apiOrigin,
+          identityOrigin,
+          ...(contentIntake ? { contentIntake } : {}),
+          ...(mode ? { mode } : {}),
+        });
+      }
     }
   }
 }
@@ -57,7 +63,14 @@ for (const apiOrigin of remotes) {
   for (const identityOrigin of remotes) {
     if (apiOrigin === identityOrigin) continue;
     for (const contentIntake of [undefined, 'faq-v2']) {
-      profiles.push(contentIntake ? { apiOrigin, identityOrigin, contentIntake } : { apiOrigin, identityOrigin });
+      for (const mode of [undefined, 'product-remote']) {
+        profiles.push({
+          apiOrigin,
+          identityOrigin,
+          ...(contentIntake ? { contentIntake } : {}),
+          ...(mode ? { mode } : {}),
+        });
+      }
     }
   }
 }
@@ -68,11 +81,11 @@ for (const productProfile of profiles) {
   const mounted = mount(productProfile, productSession);
   const expectMounted = Boolean(productProfile) && (
     productProfile.contentIntake === 'faq-v2'
-    || (typeof productProfile.apiOrigin === 'string' && productProfile.apiOrigin.startsWith('https://'))
+    || productProfile.mode === 'product-remote'
   );
   const label = JSON.stringify(productProfile);
   if (expectMounted && mounted !== productSession) {
-    die(1, `https or faq-v2 profile left upload unmounted: ${label}`);
+    die(1, `faq-v2 or product-remote profile left upload unmounted: ${label}`);
   }
   if (!expectMounted && mounted !== null) {
     die(1, `profile mounted an upload that cannot be the production origin: ${label}`);
@@ -83,5 +96,5 @@ for (const productProfile of profiles) {
 console.log(JSON.stringify({
   ok: true,
   checked,
-  property: 'materials upload is mounted exactly for faq-v2 or an https API origin, on that origin',
+  property: 'materials upload is mounted exactly for faq-v2 or product-remote profiles, on that origin',
 }));

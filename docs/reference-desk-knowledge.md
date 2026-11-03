@@ -1,17 +1,16 @@
 # 人设知识库
 
-工作台将原导航 id `content` 收入「内容库 / 本机草稿」，与「已发布」共用一个导航入口。这一页是本机一问一答，不是旧工作台的整库替换，也不是服务器上的 FAQ 候选流。查询浮层仍读原来的目录，不读这张表。
+> **2026-11-03 起停用：** 工作台已删除「内容库 / 本机草稿」页签、`DeskKnowledge`、renderer `dashboardDesk` 与 Main IPC，既有 `userData/desk-knowledge.json` 不再读取或写入。下文保留为已撤功能的工程历史，不再是现行操作或验收说明。
+
+历史上，工作台曾将原导航 id `content` 收入「内容库 / 本机草稿」。这一页是本机一问一答，不是旧工作台的整库替换，也不是服务器上的 FAQ 候选流。
 
 ## 存储和通道
 
 文件是 Electron `userData/desk-knowledge.json`，权限 `0o600`。没有文件时从空库开始。文件损坏或读不出来时页面从空库开始，并写「本机知识库读不出来，已从空库开始。」写入失败时知识已在内存更新，文案是「知识已更新，但没能写入本机。」
 
-| 通道 | renderer | 作用 |
-| --- | --- | --- |
-| `dashboard:desk-current` | `dashboardDesk.current()` | 读取当前视图 |
-| `dashboard:desk-command` | `dashboardDesk.command(command)` | 提交一条意图 |
+原通道 `dashboard:desk-current` / `dashboard:desk-command` 与 renderer `dashboardDesk.current/command` 已删除。
 
-只有 Dashboard 主帧可以调用。角色来自 `session.view()`，renderer 不能自报角色。`agent` 是坐席，`coach` 和 `owner` 是运营。未登录时写操作返回「请先在查询窗口登录。」
+历史上只有 Dashboard 主帧可以调用。角色来自 `session.view()`，renderer 不能自报角色。`agent` 是坐席，`coach` 和 `owner` 是运营。未登录时写操作返回「请先在查询窗口登录。」
 
 ## 角色
 
@@ -57,12 +56,12 @@ xlsx 图片：只认锚在单元格上的 PNG / JPEG，归到图片左上角所�
 
 页面按全店、售前客服和售后客服切换人设。运营用表格查看话术名称、内容、状态、更新时间和操作；图片可以预览。点「添加话术」打开 520px 弹窗，支持逐条填写或文件导入。导入和删除均需确认。坐席只看已投递条目。
 
-权限页是侧栏「成员与权限」，不进入 `DASHBOARD_MODULE_IDS`。外观遵守 `DESIGN.md` 的工作台规则。刷新、预览、确认保存、撤销和坐席账号命令没有改。
+权限与账号现在都收在侧栏「设置」，页内分为「成员权限」「账号管理」。
 
-实现在 `apps/desktop/src/shared/desk-knowledge.ts`、`apps/desktop/src/main/desk-knowledge-ipc.ts` 和 `apps/desktop/src/renderer/features/dashboard/DeskKnowledge.tsx`。
+原实现文件已在停用时删除。
 
 ## 相关
 
 - [如何记下一条人设知识](how-to-operate-desk-knowledge.md)
 - [为什么知识库不读查询目录](explanation-desk-knowledge.md)
-- [资料页与权限页](reference-intake-pages.md)
+- [资料页与设置页](reference-intake-pages.md)

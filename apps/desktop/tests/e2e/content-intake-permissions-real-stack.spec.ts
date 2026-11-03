@@ -48,8 +48,8 @@ test('director previews without saving, grants a named seat query access, then r
     expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-    await dashboard.getByRole('tab', { name: '成员与权限', exact: true }).click();
-    const panel = dashboard.getByRole('region', { name: '权限配置', exact: true });
+    await dashboard.getByRole('tab', { name: '设置', exact: true }).click();
+    const panel = dashboard.getByRole('region', { name: '设置', exact: true });
     await expect(panel.getByRole('table', { name: '成员权限', exact: true })).toBeVisible();
     // Appearance is judged on the panel before the modal opens, because an antd mask owns the
     // pointer and would intercept the chrome menu.

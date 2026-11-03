@@ -85,16 +85,16 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
         expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
         expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
         expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
-        expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
+        expect(screen.getByTestId('nav-settings')).toBeInTheDocument();
         expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
         expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
         continue;
       }
-      expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('成员与权限');
+      expect(await screen.findByTestId('nav-settings')).toHaveAccessibleName('设置');
       expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料审核');
-      await user.click(screen.getByTestId('nav-permissions'));
-      expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
-      expect(screen.getByRole('region', { name: '权限配置' })).toBeInTheDocument();
+      await user.click(screen.getByTestId('nav-settings'));
+      expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'settings');
+      expect(screen.getByRole('region', { name: '设置' })).toBeInTheDocument();
       expect(screen.queryByTestId('workbench-no-access')).not.toBeInTheDocument();
       await user.click(screen.getByTestId('nav-materials'));
       expect(await screen.findByRole('heading', { name: '资料审核' })).toBeInTheDocument();
@@ -129,7 +129,7 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
     expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
     expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
     expect(screen.getByTestId('module-job-pending')).toHaveTextContent('正在确认你的职务……');
     expect(screen.getByText('正在确认')).toBeInTheDocument();
@@ -141,7 +141,7 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
     expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
   } finally {
     owner.dispose();
     cleanup();
@@ -157,7 +157,7 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
     render(<DashboardApp />);
     expect(await screen.findByTestId('nav-wording')).toHaveAccessibleName('内容库');
     expect(screen.getByTestId('nav-materials')).toBeInTheDocument();
-    expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-settings')).toBeInTheDocument();
     expect(screen.getByTestId('nav-wording')).toBeInTheDocument();
     expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
     expect(screen.queryByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).not.toBeInTheDocument();
@@ -189,12 +189,12 @@ it('says please sign in after the session returns logged out', async () => {
   }
 });
 
-it('keeps 权限 hidden when the job snapshot is missing and the page snapshot is closed', async () => {
+it('keeps 设置 hidden when the job snapshot is missing and the page snapshot is closed', async () => {
   const owner = install(observeSessionJob(null));
   try {
     render(<DashboardApp />);
     expect(await screen.findByTestId('nav-wording')).toBeInTheDocument();
-    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
   } finally {
     owner.dispose();
   }

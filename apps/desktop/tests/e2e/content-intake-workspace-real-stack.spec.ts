@@ -64,10 +64,9 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
       const knowledgeNav = dashboard.getByTestId('nav-wording');
       await knowledgeNav.click();
-      await dashboard.getByRole('tab', { name: '本机草稿', exact: true }).click();
       await expect(knowledgeNav).toHaveAttribute('aria-selected', 'true');
-      await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'content');
-      await expect(dashboard.getByRole('region', { name: '本机草稿', exact: true })).toBeVisible();
+      await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'wording');
+      await expect(dashboard.getByRole('tab', { name: '本机草稿', exact: true })).toHaveCount(0);
       await dashboard.getByTestId('nav-overview').click();
       await expect(dashboard.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
       await expect(dashboard.getByTestId('module-overview')).toBeVisible();

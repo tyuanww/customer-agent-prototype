@@ -7,7 +7,6 @@ import { v9Headline } from '../fixtures/v9-overview-model';
 import { listUsageLog, type UsageSourceRow } from '../../src/shared/usage-log-csv';
 import type { DashboardIterationTask } from '../../src/shared/dashboard-iteration';
 import type { DashboardWordingEntry, DashboardWordingView } from '../../src/shared/dashboard-wording';
-import type { DeskItemView, DeskView } from '../../src/shared/desk-knowledge';
 import { WORKBENCH_EMPTY } from '../../src/shared/workbench-empty';
 
 if (typeof window.matchMedia !== 'function') {
@@ -56,26 +55,10 @@ function wording(
   };
 }
 
-function deskItem(id: string, name: string, statusLabel: string): DeskItemView {
-  return {
-    id, personaId: 'shop', name, category: 'product', customCategory: null,
-    fileName: '问答.txt', body: name, parseState: 'ok', validity: 'scheduled',
-    validFrom: '2026-10-20T00:00:00.000Z', validUntil: '2026-10-21T00:00:00.000Z',
-    updatedAt: '2026-10-13T00:00:00.000Z', statusLabel, delivered: false,
-  };
-}
-
 function insideRecentWeek(hour: number, minute = 0): string {
   const date = new Date();
   date.setHours(hour, minute, 0, 0);
   return date.toISOString();
-}
-
-function deskView(items: DeskItemView[]): DeskView {
-  return {
-    signedIn: true, role: 'operator', displayName: '运营', personas: [], selectedPersonaId: 'shop',
-    items, delivered: [], tacit: [], revision: 1, notice: null, persistence: 'ok',
-  };
 }
 
 function tileText(label: string): string {
@@ -90,7 +73,6 @@ afterEach(() => {
   cleanup();
   delete window.dashboardIteration;
   delete window.dashboardWording;
-  delete window.dashboardDesk;
   delete window.dashboardUsageLog;
   delete window.dashboardOps;
   window.history.pushState({}, '', '/');
@@ -132,8 +114,8 @@ it('lists only open iteration tasks and does not invent a rate', async () => {
   expect(screen.getByRole('button', { name: '开始处理' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '已处理' })).not.toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: /处理说明/ })).not.toBeInTheDocument();
-  await userEvent.setup().click(screen.getByRole('button', { name: '去知识库' }));
-  expect(onOpen).toHaveBeenCalledWith('content');
+  await userEvent.setup().click(screen.getByRole('button', { name: '去资料审核' }));
+  expect(onOpen).toHaveBeenCalledWith('materials');
 });
 
 it('shows only 待处理 and 处理中', async () => {
@@ -204,34 +186,6 @@ it('shows a separate 无命中 list and no percentage', async () => {
   const misses = screen.getByRole('region', { name: '没查到的问题' });
   expect(misses).toHaveTextContent('坐席查询后会出现');
   expect(misses).not.toHaveTextContent('话术不准');
-});
-
-it('does not turn knowledge reminders into 不准 rows', async () => {
-  window.dashboardIteration = {
-    list: vi.fn(async () => ({ ok: true as const, items: [task('open')], nextCursor: null })),
-    start: vi.fn(),
-    close: vi.fn(),
-  };
-  window.dashboardDesk = {
-    current: vi.fn(async () => ({
-      ok: true as const,
-      view: deskView([
-        deskItem('k-due', '退货运费什么时候到', '待生效'),
-        deskItem('k-old', '旧包装说明', '已失效'),
-        deskItem('k-live', '生效中的运费', '生效中'),
-      ]),
-    })),
-    command: vi.fn(),
-  };
-  render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
-  const iteration = await screen.findByRole('table', { name: '话术迭代' });
-  expect(iteration).toHaveTextContent('话术不准：script-a');
-  expect(iteration).not.toHaveTextContent('退货运费什么时候到');
-  expect(iteration).not.toHaveTextContent('旧包装说明');
-  expect(screen.queryByRole('table', { name: '知识有效期提醒' })).not.toBeInTheDocument();
-  expect(screen.queryByText('退货运费什么时候到')).not.toBeInTheDocument();
-  expect(screen.queryByText('旧包装说明')).not.toBeInTheDocument();
-  expect(screen.queryByText('生效中的运费')).not.toBeInTheDocument();
 });
 
 async function settleWording(list: ReturnType<typeof vi.fn>) {
@@ -333,7 +287,6 @@ it('does not treat a local catalog without a refresh time as a newer release', a
 
 it('defers another cause only with a reason and does not rewrite the script', async () => {
   const close = vi.fn(async () => ({ ok: true as const, task: { ...task('wont_fix'), suspectedCause: 'ranking' as const } }));
-  const command = vi.fn();
   window.dashboardIteration = {
     list: vi.fn(async () => ({
       ok: true as const,
@@ -342,10 +295,6 @@ it('defers another cause only with a reason and does not rewrite the script', as
     })),
     start: vi.fn(),
     close,
-  };
-  window.dashboardDesk = {
-    current: vi.fn(async () => ({ ok: true as const, view: deskView([]) })),
-    command,
   };
   const user = userEvent.setup();
   render(<IntakeOverview mode="legacy" onOpen={() => undefined} />);
@@ -358,7 +307,6 @@ it('defers another cause only with a reason and does not rewrite the script', as
   expect(close).toHaveBeenCalledWith({
     taskId: 'task-1', expectedVersion: 1, status: 'wont_fix', resolutionNote: '排序问题：先观察',
   });
-  expect(command).not.toHaveBeenCalled();
 });
 
 it('does not fill the counts with the v9 sample when preview=intake', () => {

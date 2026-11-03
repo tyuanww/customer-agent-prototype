@@ -63,7 +63,7 @@ Mac 只做两件事。开发用本机合成库 `customer_agent_synthetic`，端�
 
 旧工作台在坐席接受当前告知之后，查询改走 `POST /v1/search`，`collection_mode` 为 `pilot_recorded`，问题写入该 API 所连库的 `query_events`。没有当前告知、告知还没点、或者点了拒绝时，查询保持 `synthetic`，本机 hydrate 继续可用，不写这张训练账。
 
-六页 faq-v2 的查询和复制仍只读快照、只写剪贴板，不写 `query_events`。把六页也写进同一张训练账需要合同允许，这次没有改合同。
+五页 faq-v2 的查询和复制仍只读快照、只写剪贴板，不写 `query_events`。把工作台使用情况也写进同一张训练账需要合同允许，这次没有改合同。
 
 杭州库里的告知正文要由人写出再入库。这次没有连接杭州，没有插入告知，也没有把采集模式改成无条件的 `pilot_recorded`。
 

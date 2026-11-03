@@ -88,8 +88,8 @@ test('a director with query but no allocation cannot grant permissions', async (
       const snapshot = await dashboard.evaluate(() => window.dashboardPageUse!.current());
       return snapshot.phase === 'ready' ? snapshot.permissions.state : snapshot.phase;
     }).toBe('closed');
-    await expect(dashboard.getByTestId('nav-permissions')).toHaveCount(0);
-    await expect(dashboard.getByRole('region', { name: '权限配置', exact: true })).toHaveCount(0);
+    await expect(dashboard.getByTestId('nav-settings')).toHaveCount(0);
+    await expect(dashboard.getByRole('region', { name: '设置', exact: true })).toHaveCount(0);
     await expect(dashboard.getByRole('button', { name: '新增授权', exact: true })).toHaveCount(0);
 
     await dashboard.screenshot({ path: path.join(evidence, 'denied-grant.png') });

@@ -6,11 +6,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { intakeDestinationsExcludeAnnounce, readIntakePreviewPage } from '../../src/renderer/features/dashboard/intake-destinations';
-import { DeskKnowledgeStore } from '../../src/shared/desk-knowledge';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
-import type { UsageLogRow } from '../../src/shared/dashboard-usage-log';
 import { observeSessionJob } from '../../src/shared/product-session';
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -22,16 +20,6 @@ const SURFACE_LIGHT = ['var(--wb-surface)', 'rgba(0, 0, 0, 0)', 'rgb(253, 252, 2
 const SURFACE_DARK = ['var(--wb-surface)', 'rgba(0, 0, 0, 0)', 'rgb(18, 17, 19)'];
 function expectSurface(element: Element, theme: 'light' | 'dark') {
   expect(theme === 'light' ? SURFACE_LIGHT : SURFACE_DARK).toContain(getComputedStyle(element).backgroundColor);
-}
-
-function expectSeatFontSize(element: HTMLElement) {
-  const size = getComputedStyle(element).fontSize;
-  expect(size === '14px' || size === 'var(--wb-text-body)' || size.startsWith('var(--ant-'), `${element.textContent} font size`).toBe(true);
-}
-
-function expectSeatFontWeight(element: HTMLElement, weight: '500' | '600') {
-  const value = getComputedStyle(element).fontWeight;
-  expect(value === weight || value.startsWith('var(--ant-'), `${element.textContent} font weight`).toBe(true);
 }
 
 function allowGrant() {
@@ -76,7 +64,6 @@ function installShippedDashboardCss() {
 function cleanupDashboardWithWindowBridges() {
   cleanup();
   delete window.dashboardIntake;
-  delete window.dashboardDesk;
   delete window.dashboardIntakeCatalog;
   delete window.dashboardContent;
   delete window.dashboardPermissions;
@@ -121,11 +108,10 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   const shell = await screen.findByTestId('dashboard-shell');
   await waitFor(() => expect(document.title).toBe(DASHBOARD_WINDOW_TITLE));
   await waitFor(() => expect(within(shell).getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(4));
-  expect(screen.queryByRole('tab', { name: '成员与权限' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: '设置' })).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: '内容管理工作区' })).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
   await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
   const tab = screen.getByTestId('nav-wording');
   expect(tab).toHaveAttribute('aria-selected', 'true');
   for (const [key,module] of [['ArrowDown','sop'],['ArrowUp','wording'],['Home','overview'],['End','materials']]) {
@@ -143,7 +129,7 @@ it('reuses workspace chrome and theme without mounting legacy modules or calling
   expect(screen.getByTestId('module-sop')).toBeInTheDocument();
 });
 
-it('opens the six-page shell without waiting on the intake mode lookup', async () => {
+it('opens the five-page shell without waiting on the intake mode lookup', async () => {
   window.dashboardIntake = { mode: async () => ({ ok: false, code: 'UNAVAILABLE' }),
     current: vi.fn(), command: vi.fn(async () => ({ ok:false,code:'UNAVAILABLE',message:'无法读取资料',view:null })), onInvalidated: () => () => undefined } as unknown as typeof window.dashboardIntake;
   render(<DashboardApp />);
@@ -152,56 +138,19 @@ it('opens the six-page shell without waiting on the intake mode lookup', async (
   expect(window.dashboardIntake!.command).toHaveBeenCalledWith({ action:'list', next:false });
 });
 
-it('keeps an unsent knowledge name across workspace navigation', async () => {
-  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
-  window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
-  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }), command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }), onInvalidated: () => () => undefined };
-  const user = userEvent.setup();
-  installShippedDashboardCss();
-  render(<DashboardApp />);
-  await user.click(await screen.findByTestId('nav-wording'));
-  await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-  const write = await screen.findByRole('button', { name: '添加话术' });
-  const content = screen.getByTestId('dashboard-content');
-  const knowledge = document.querySelector('.desk-knowledge');
-  const column = document.querySelector('.desk-knowledge .desk-column');
-  if (!(knowledge instanceof HTMLElement) || !(column instanceof HTMLElement) || !(knowledge.parentElement instanceof HTMLElement)) {
-    throw new Error('missing knowledge page');
-  }
-  expectSurface(content, 'light');
-  expectSurface(knowledge.parentElement, 'light');
-  expect(getComputedStyle(column).maxWidth).toBe('none');
-  expectSeatFontSize(write);
-  expectSeatFontWeight(write, '600');
-  expectSeatFontSize(screen.getByRole('tab', { name: '全店' }));
-  expectSeatFontWeight(screen.getByRole('tab', { name: '全店' }), '600');
-  await user.click(write);
-  await user.click(screen.getByRole('button', { name: '没有文档？手动填写一条' }));
-  const question = screen.getByRole('textbox', { name: '问题' });
-  expectSeatFontSize(question);
-  const save = screen.getByRole('button', { name: '保存' });
-  expectSeatFontSize(save);
-  expectSeatFontWeight(save, '600');
-  await user.type(question, '退货时效');
-  await user.click(screen.getByTestId('nav-overview'));
-  await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-  expect(screen.getByRole('textbox', { name: '问题' })).toHaveValue('退货时效');
-});
 it('preserves an unsaved permission preview across outer navigation',async()=>{
   const fixture=intakePermissionsData(),owner=new ContentIntakePermissions(fixture.session),user=userEvent.setup();
   window.dashboardPermissions={current:async()=>({ok:true,view:owner.view()}),command:async c=>({ok:true,view:await owner.command(c)}),onInvalidated:fn=>owner.subscribe(fn)};
   showPermissionsNav();
   window.dashboardIntake={mode:async()=>({ok:true,enabled:true}),current:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),command:async()=>({ok:false,code:'UNAVAILABLE',message:'未读取资料',view:null}),onInvalidated:()=>()=>undefined};
   try{installShippedDashboardCss();allowGrant();render(<DashboardApp/>);
-    expect(await screen.findByRole('tab',{name:'成员与权限'})).toHaveAttribute('data-nav-group','治理与架构');
+    expect(await screen.findByTestId('nav-settings')).toHaveAttribute('data-nav-group','治理与架构');
     expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('data-testid')?.startsWith('nav-'))).toHaveLength(5);
     await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
     fireEvent.keyDown(screen.getByTestId('nav-wording'), { key: 'ArrowDown' });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.queryByRole('group',{name:'内容管理工作区'})).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-permissions'));
+    await user.click(screen.getByTestId('nav-settings'));
     const permissionsPage = document.querySelector('.desk-permissions-page');
     const permissionsColumn = document.querySelector('.desk-permissions');
     if (!(permissionsPage instanceof HTMLElement) || !(permissionsColumn instanceof HTMLElement)) throw new Error('missing permissions page');
@@ -222,7 +171,7 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
     await user.click(screen.getByLabelText('失效时间'));
     await user.type(screen.getByLabelText('失效时间'), '2026-10-09 18:00{Enter}');
     await user.type(screen.getByRole('textbox',{name:'授权原因'}),'合成导航保留');await user.click(screen.getByRole('button',{name:'预览权限'}));await screen.findByText('预览，尚未保存');
-    await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-permissions'));
+    await user.click(screen.getByTestId('nav-overview'));await user.click(screen.getByTestId('nav-settings'));
     expect(screen.getByText('预览，尚未保存')).toBeVisible();expect(fixture.grants).toHaveLength(0);
     await user.click(screen.getByRole('button',{name:'返回修改'}));expect(screen.getByRole('textbox',{name:'授权原因'})).toHaveValue('合成导航保留');
   }finally{cleanup();owner.dispose();}
@@ -230,8 +179,6 @@ it('preserves an unsaved permission preview across outer navigation',async()=>{
 
 it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
-  window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
   window.dashboardIntake = {
     mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
@@ -252,7 +199,7 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     shell.style.width = '980px';
     shell.style.height = '680px';
     const content = screen.getByTestId('dashboard-content');
-    const pages = ['overview', 'wording', 'sop', 'materials', 'permissions'] as const;
+    const pages = ['overview', 'wording', 'sop', 'materials', 'settings'] as const;
     for (const theme of ['light', 'dark'] as const) {
       await user.click(screen.getByTestId('dashboard-theme-trigger'));
       await user.click(screen.getByTestId(`dashboard-theme-${theme}`));
@@ -272,13 +219,8 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     expect(screen.getByTestId('module-sop')).toHaveTextContent('SOP 学习与执行尚未开放。');
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-    const add = await screen.findByRole('button', { name: '添加话术' });
-    for (let step = 0; step < 8 && document.activeElement !== add; step += 1) await user.tab();
-    expect(add).toHaveFocus();
-    const focused = getComputedStyle(add);
-    expect(focused.outlineStyle === 'none' && focused.outlineWidth === '0px').toBe(false);
+    await user.click(screen.getByTestId('nav-settings'));
+    expect(content).toHaveAttribute('data-active-module', 'settings');
   } finally {
     owner.dispose();
     delete window.dashboardSeats;
@@ -301,8 +243,6 @@ async function tabUntil(user: ReturnType<typeof userEvent.setup>, target: HTMLEl
 
 it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard flows usable at 980 by 680 in %s mode', async (theme) => {
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-  const desk = new DeskKnowledgeStore({ now: () => '2026-10-13T00:00:00.000Z', load: () => null, save: () => undefined });
-  window.dashboardDesk = { current: async () => desk.reply('operator', '合成经理'), command: async (command) => desk.command('operator', command, '合成经理') };
   window.dashboardIntake = {
     mode: async () => ({ ok: true, enabled: true }),
     current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取资料', view: null }),
@@ -313,14 +253,6 @@ it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard f
   window.dashboardPermissions = { current: async () => ({ ok: true, view: owner.view() }), command: async (command) => ({ ok: true, view: await owner.command(command) }), onInvalidated: (fn) => owner.subscribe(fn) };
   showPermissionsNav();
   window.dashboardSeats = { command: async (intent) => (intent.action === 'list' ? { ok: true, action: 'list' as const, seats: [] } : { ok: false, message: '未保存' }) };
-  const usageRows: UsageLogRow[] = [
-    { id: '1', askedAt: '2026-10-13T01:02:03.000Z', agent: '坐席甲', question: '退货多久', scriptTitle: '退货时效', result: 'copied', snapshotStale: false },
-  ];
-  window.dashboardUsageLog = {
-    list: async () => ({ ok: true, rows: usageRows, nextCursor: null, canExport: true }),
-    previewExport: async () => ({ ok: true, exportable: 1, redacted: 0, withoutConsent: 0 }),
-    export: async () => ({ ok: true, written: 1 }),
-  };
   installShippedDashboardCss();
   allowGrant();
   document.documentElement.style.width = '980px';
@@ -337,22 +269,8 @@ it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard f
     expect(shell).toHaveAttribute('data-theme', theme);
     if (theme === 'dark') await waitFor(() => expectSurface(content, 'dark'));
 
-    await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-    const add = await screen.findByRole('button', { name: '添加话术' });
-    await user.click(add);
-    const addDialog = screen.getByRole('dialog', { name: '添加话术' });
-    await tabUntil(user, within(addDialog).getByRole('button', { name: '关闭' }));
-    await user.click(within(addDialog).getByRole('button', { name: '没有文档？手动填写一条' }));
-    await tabUntil(user, within(addDialog).getByRole('textbox', { name: '问题' }));
-    await user.type(within(addDialog).getByRole('textbox', { name: '问题' }), '焦点不保存');
-    await user.click(within(addDialog).getByRole('button', { name: '关闭' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('cell', { name: '焦点不保存' })).not.toBeInTheDocument();
-    expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
-
-    await user.click(screen.getByTestId('nav-permissions'));
-    const businessTab = screen.queryByRole('tab', { name: '成员权限' });
+    await user.click(screen.getByTestId('nav-settings'));
+    const businessTab = screen.queryByRole('tab', { name: '权限' });
     if (businessTab && businessTab.getAttribute('aria-selected') !== 'true') await user.click(businessTab);
     await screen.findByRole('row', { name: /合成坐席/ });
     expect(screen.queryByRole('button', { name: '停止等待' })).not.toBeInTheDocument();
@@ -364,9 +282,9 @@ it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard f
     await user.click(within(grant).getByRole('button', { name: '关闭' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: '账号管理' }));
-    await user.click(screen.getByRole('button', { name: '新建坐席' }));
-    const seat = screen.getByRole('dialog', { name: '新建坐席' });
+    await user.click(screen.getByRole('tab', { name: '账号' }));
+    await user.click(screen.getByRole('button', { name: '新建账号' }));
+    const seat = screen.getByRole('dialog', { name: '新建账号' });
     await tabUntil(user, within(seat).getByRole('button', { name: '关闭' }));
     await tabUntil(user, within(seat).getByLabelText('姓名'));
     await user.click(within(seat).getByRole('button', { name: '取消' }));
@@ -378,8 +296,8 @@ it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard f
     await tabUntil(user, refresh);
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
     expect(content.scrollWidth).toBeLessThanOrEqual(Math.max(content.clientWidth, 980));
-    await user.click(screen.getByTestId('nav-permissions'));
-    await user.click(screen.getByRole('tab', { name: '成员权限' }));
+    await user.click(screen.getByTestId('nav-settings'));
+    await user.click(screen.getByRole('tab', { name: '权限' }));
     await user.click(screen.getByRole('button', { name: '新增授权' }));
     const person = owner.view().people[0]!;
     await user.click(screen.getByRole('combobox', { name: '成员' }));
@@ -422,7 +340,8 @@ it('opens 话术库 for page=announce and leaves that URL alone', () => {
   expect(readIntakePreviewPage(location, false)).toBe('wording');
   expect(location.search).toBe('?preview=intake&page=announce');
   expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=permissions' }, false)).toBe('overview');
-  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=permissions' }, true)).toBe('permissions');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=permissions' }, true)).toBe('settings');
+  expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=settings' }, true)).toBe('settings');
   expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?preview=intake&page=materials' }, false)).toBe('materials');
   expect(readIntakePreviewPage({ hostname: 'example.test', search: '?preview=intake&page=wording' }, true)).toBe('overview');
   expect(readIntakePreviewPage({ hostname: '127.0.0.1', search: '?page=announce' }, true)).toBe('overview');

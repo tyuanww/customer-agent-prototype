@@ -236,8 +236,8 @@ describe('DashboardApp', () => {
     window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await screen.findByTestId('nav-sop');
-    expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-permissions'));
+    expect(screen.getByTestId('nav-settings')).toBeInTheDocument();
+    await user.click(screen.getByTestId('nav-settings'));
     expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('没有权限，请找人开通。');
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
@@ -253,9 +253,8 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await screen.findByText('请先登录');
     expect(screen.queryByTestId('nav-materials')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('nav-permissions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '本机草稿' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '上传团队资料' })).not.toBeInTheDocument();
   });
 
   it('opens grant navigation and sop upload only from an open server snapshot', async () => {
@@ -282,13 +281,13 @@ describe('DashboardApp', () => {
     };
     window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
-    await screen.findByTestId('nav-permissions');
+    await screen.findByTestId('nav-settings');
     await user.click(screen.getByTestId('nav-sop'));
     expect(await screen.findByText('停手')).toBeInTheDocument();
     expect(screen.getByTestId('sop-upload')).toBeEnabled();
   });
 
-  it('keyboard-walks 话术运营 from wording through SOP into content', async () => {
+  it('keyboard-walks 话术运营 from wording through SOP into materials', async () => {
     render(<DashboardApp />);
     const sopNav = screen.getByTestId('nav-sop');
     expect(sopNav).toHaveAccessibleName('SOP');
@@ -313,7 +312,7 @@ describe('DashboardApp', () => {
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
   });
 
-  it('adds 资料 last on the intake sidebar and projects the whitelist line', async () => {
+  it('adds 设置 last on the intake sidebar and projects the whitelist line', async () => {
     const user = userEvent.setup();
     window.dashboardPermissions = {
       current: async () => ({ ok: false, code: 'UNAVAILABLE', message: '未读取权限', view: null }),
@@ -340,9 +339,9 @@ describe('DashboardApp', () => {
     const materials = await screen.findByTestId('nav-materials');
     expect(materials).toHaveAccessibleName('资料审核');
     expect(materials.querySelectorAll('svg path').length).toBeGreaterThan(0);
-    await screen.findByTestId('nav-permissions');
+    await screen.findByTestId('nav-settings');
     expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid')).filter((id) => id?.startsWith('nav-'))).toEqual([
-      'nav-overview', 'nav-wording', 'nav-sop', 'nav-materials', 'nav-permissions',
+      'nav-overview', 'nav-wording', 'nav-sop', 'nav-materials', 'nav-settings',
     ]);
     expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('内容库');
@@ -354,9 +353,8 @@ describe('DashboardApp', () => {
     expect(await screen.findByRole('heading', { name: '资料审核' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '本机草稿' })).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-wording'));
-    await user.click(screen.getByRole('tab', { name: '本机草稿' }));
-    expect(await screen.findByRole('heading', { name: '本机草稿' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '资料审核' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '本机草稿' })).not.toBeInTheDocument();
   });
 
   it('hides the intake shell line unless both whitelist strings are present', async () => {

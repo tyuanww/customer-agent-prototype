@@ -51,7 +51,7 @@ curl --fail --show-error --max-time 15 https://agent-auth.jianghua.site/health
 
 坐席机器上的趋势图读的是本机 `usage-journal.json`。杭州有 `GET /v1/events/usage` 不等于已安装的 `0.3.28` 会去调它。打包后的应用不读 `CUSTOMER_AGENT_DESKTOP_*`。要看新包，先完全退出再打开。
 
-工作台模式不要靠预加载对象猜测。`contentIntake` 为 `faq-v2` 时保留「权限」和「资料管理」。没有这份设置的远端工作台会藏起「知识库」「权限」「资料管理」，并保留「内容管理」。
+工作台模式不要靠预加载对象猜测。`contentIntake` 为 `faq-v2` 时保留「设置」和「资料审核」；「设置」内分「权限」「账号」。没有这份设置的远端工作台会藏起这些 intake 页面，并保留旧内容管理路径。
 
 ## Troubleshooting
 

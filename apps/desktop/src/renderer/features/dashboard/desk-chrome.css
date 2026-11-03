@@ -12,27 +12,10 @@
 .dashboard-shell .desk-personas button[aria-pressed='true'] {
   font-weight: 600;
 }
-.dashboard-shell .desk-save,
-.dashboard-shell .desk-cancel,
-.dashboard-shell .desk-field input,
-.dashboard-shell .desk-field textarea,
-.dashboard-shell .desk-field select,
-.dashboard-shell .desk-tacit-field select,
-.dashboard-shell .desk-tacit-field textarea {
-  font-size:var(--wb-text-body);
-}
-.dashboard-shell .desk-save {
-  font-weight: 600;
-}
-.dashboard-shell .desk-knowledge .ant-input,
-.dashboard-shell .desk-knowledge textarea,
-.dashboard-shell .desk-knowledge input,
-.dashboard-shell .desk-knowledge .ant-btn,
 .dashboard-shell .desk-permissions .ant-btn,
 .dashboard-shell .desk-permissions-page .ant-btn {
   font-size:var(--wb-text-body);
 }
-.dashboard-shell .desk-knowledge .ant-btn,
 .dashboard-shell .desk-permissions .ant-btn,
 .dashboard-shell .desk-permissions-page .ant-btn {
   font-weight: 600;

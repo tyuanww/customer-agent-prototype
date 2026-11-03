@@ -19,7 +19,7 @@ export function registerContentIntakePermissionsIpc(
   for(const channel of channels)ipcMain.handle(channel,async(event,...args:unknown[]):Promise<IntakePermissionReply>=>{
     const wc=dashboard();
     if(!wc || !isTrustedMainFrameSender(event,[wc],devUrl()))return {ok:false,message:'无权访问此窗口能力。',view:null};
-    if(channel==='dashboard:permissions-command'?args.length!==1 || !isIntakePermissionCommand(args[0]):args.length!==0)return {ok:false,message:'权限配置输入无效。',view:null};
+    if(channel==='dashboard:permissions-command'?args.length!==1 || !isIntakePermissionCommand(args[0]):args.length!==0)return {ok:false,message:'设置输入无效。',view:null};
     if(!session)return {ok:false,message:WORKBENCH_EMPTY.intakeUnmounted,view:null};
     if(bound && channel==='dashboard:permissions-command'){
       const action=(args[0] as {action?:string}).action;
@@ -35,7 +35,7 @@ export function registerContentIntakePermissionsIpc(
       owner=bound?.permissions ?? new ContentIntakePermissions(session);owners.set(wc,owner);const owned=owner;const shared=Boolean(bound);
       const closing=(event:{preventDefault():void})=>{if(!owned.closeRisk())return;
         const unknown=owned.view().resultUnknown;
-        if(dialog.showMessageBoxSync(win,{type:'warning',title:'关闭权限配置',
+        if(dialog.showMessageBoxSync(win,{type:'warning',title:'关闭设置',
           message:unknown?'授权操作可能已提交。关闭后原请求会丢失，无法按原请求重试；请由有权人员核对授权列表，确认结果后再操作。':'仍有未保存的权限预览或读取。关闭会丢弃本机内容。',
           buttons:unknown?['继续核对','已知需人工核对，仍然关闭']:['返回编辑','仍然关闭'],defaultId:0,cancelId:0,noLink:true})!==1)event.preventDefault();};
       win.on('close',closing);owned.subscribe(()=>{if(!wc.isDestroyed())wc.send('dashboard:permissions-invalidated');});
@@ -56,7 +56,7 @@ export function registerContentIntakePermissionsIpc(
   const allowClose=()=>{
     if(![...owners.values()].some(owner=>owner.closeRisk()))return true;
     const unknown=[...owners.values()].some(owner=>owner.view().resultUnknown);
-    return dialog.showMessageBoxSync({type:'warning',title:'退出权限配置',
+    return dialog.showMessageBoxSync({type:'warning',title:'退出设置',
       message:unknown?'授权操作可能已提交。退出后原请求会丢失，无法按原请求重试；请由有权人员核对授权列表，确认结果后再操作。':'仍有未保存的权限预览或读取。退出会丢弃本机内容。',
       buttons:unknown?['继续核对','已知需人工核对，仍然退出']:['返回编辑','仍然退出'],defaultId:0,cancelId:0,noLink:true})===1;
   };

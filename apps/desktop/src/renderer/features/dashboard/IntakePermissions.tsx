@@ -105,11 +105,11 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
   return <section>
     {problem && <p role="alert">{problem}</p>}
     <A11yTable<SeatAccountRecord>
-      aria-label="账号管理"
+      aria-label="账号"
       pagination={false}
       rowKey="username"
       dataSource={rows}
-      locale={{ emptyText: <PermissionsEmpty description="新建坐席后会出现在这里。" /> }}
+      locale={{ emptyText: <PermissionsEmpty description="新建账号后会出现在这里。" /> }}
       columns={[
         { title: '姓名', dataIndex: 'displayName' },
         { title: '登录名', dataIndex: 'username' },
@@ -121,7 +121,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
         </div> : null },
       ]}
     />
-    <Modal open={createOpen} title="新建坐席" width={440} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeAll}>
+    <Modal open={createOpen} title="新建账号" width={440} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeAll}>
         <fieldset className="fields" disabled={blocked} style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
           <label>姓名<Input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></label>
           <label>登录名<Input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></label>
@@ -129,14 +129,14 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
           <label>岗位<Select<IntakePost> aria-label="坐席岗位" value={post} disabled={blocked} virtual={false} style={{ width: '100%' }} options={INTAKE_POSTS.map(item => ({ value: item, label: item }))} onChange={choose} /></label>
         </fieldset>
         <footer><DeskButton onClick={closeAll}>取消</DeskButton>
-          <DeskButton type="primary" disabled={blocked || !name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存坐席</DeskButton></footer>
+          <DeskButton type="primary" disabled={blocked || !name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存账号</DeskButton></footer>
     </Modal>
     <Modal open={resetting !== ''} title="重置密码" width={440} footer={null} destroyOnHidden onCancel={closeAll}>
         <div className="fields"><label>新密码<Input.Password aria-label="新密码" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label></div>
         <footer><DeskButton disabled={blocked} onClick={closeAll}>取消</DeskButton>
           <DeskButton type="primary" disabled={blocked || nextPassword.length === 0} onClick={() => void reset(resetting)}>确认重置</DeskButton></footer>
     </Modal>
-    <Modal open={disabling !== ''} title="停用坐席" closable={false} footer={null} destroyOnHidden onCancel={closeAll}>
+    <Modal open={disabling !== ''} title="停用账号" closable={false} footer={null} destroyOnHidden onCancel={closeAll}>
       <p>停用后该账号无法再登录。</p>
       <footer>
         <DeskButton autoFocus disabled={blocked} onClick={closeAll}>取消</DeskButton>
@@ -146,7 +146,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
   </section>;
 }
 const LOGGED_OUT = '请先登录。';
-const READ_FAILED = '权限配置暂不可用，请重新读取。';
+const READ_FAILED = '设置暂不可用，请重新读取。';
 
 function resourceFromMissingApi(): AsyncResource<IntakePermissionView> {
   return { status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted };
@@ -353,8 +353,8 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     } },
     { title: '操作', key: 'ops', width: 124, render: (_value, grant) => grant.revoked ? '—' : <DeskButton type="text" danger disabled={disabled || !grant.canRevoke || !!view?.preview} onClick={() => { setRevoke(grant.selection); setRevokeReason(''); }}>撤销该权限</DeskButton> },
   ];
-  return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="权限配置">
-    <h1 className="desk-sr">权限配置</h1>
+  return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="设置">
+    <h1 className="desk-sr">设置</h1>
     {loading ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
     {!gate && resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
     {!gate && resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
@@ -365,9 +365,9 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     {view && !view.signedIn && <p>请先登录。</p>}
     {view?.signedIn && !available && !view.pending && <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p>}
     {available && view && <>
-      <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="权限工作">
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>成员权限</DeskButton>
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();closeMember();setJob('seats');}}>账号管理</DeskButton>
+      <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="设置分类">
+        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>权限</DeskButton>
+        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();closeMember();setJob('seats');}}>账号</DeskButton>
       </div>
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
@@ -375,7 +375,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
             ? ((gate || canGrant)
               ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
               : null)
-            : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建坐席</DeskButton>}
+            : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建账号</DeskButton>}
         </span>
       </div>
       {!gate && job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />

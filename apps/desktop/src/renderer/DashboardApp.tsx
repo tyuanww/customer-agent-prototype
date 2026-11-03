@@ -169,10 +169,8 @@ function DashboardWorkspace() {
     : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
   const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown && contentSignedIn !== false);
   const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, permissionsOpen));
-  const activeNav = active === 'content' ? 'wording' : active;
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
-  const [scriptDraft, setScriptDraft] = useState<string | null>(null);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
   const navWidth = DASHBOARD_NAV_DEFAULT_WIDTH;
   const [themeMode, setThemeMode] = useState<DashboardThemeMode>('system');
@@ -213,16 +211,15 @@ function DashboardWorkspace() {
   };
   useLayoutEffect(() => {
     if (!jobKnown) return;
-    if (active === 'content' && seatLibraryOnly) { setActive('wording'); return; }
-    if (navItems.some((item) => item.id === activeNav)) return;
+    if (navItems.some((item) => item.id === active)) return;
     const next = navItems[0]?.id;
     if (next) setActive(next);
-  }, [jobKnown, navItems, active, activeNav, seatLibraryOnly]);
+  }, [jobKnown, navItems, active]);
   useLayoutEffect(() => {
     if (!permissionsOpen) return;
-    if (readIntakePreviewPage(window.location, true) !== 'permissions') return;
-    if (new URLSearchParams(window.location.search).get('page') !== 'permissions') return;
-    setActive((current) => (current === 'overview' ? 'permissions' : current));
+    const requested = new URLSearchParams(window.location.search).get('page');
+    if (requested !== 'settings' && requested !== 'permissions') return;
+    setActive((current) => (current === 'overview' ? 'settings' : current));
   }, [permissionsOpen]);
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
@@ -606,7 +603,7 @@ function DashboardWorkspace() {
   }, []);
 
   const move = (delta: number) => {
-    const nextId = nextSidebarDestination(activeNav, delta, navItems);
+    const nextId = nextSidebarDestination(active, delta, navItems);
     selectNav(nextId);
     window.requestAnimationFrame(() => {
       document.getElementById(`dash-nav-${nextId}`)?.focus();
@@ -712,7 +709,7 @@ function DashboardWorkspace() {
           aria-orientation="vertical"
         >
           {navItems.map((item) => {
-            const selected = item.id === activeNav;
+            const selected = item.id === active;
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
             return (
@@ -847,7 +844,7 @@ function DashboardWorkspace() {
           ref={contentRef}
           className="dashboard-content"
           role="tabpanel"
-          aria-labelledby={navItems.some((item) => item.id === activeNav) ? `dash-nav-${activeNav}` : undefined}
+          aria-labelledby={navItems.some((item) => item.id === active) ? `dash-nav-${active}` : undefined}
           data-testid="dashboard-content"
           data-active-module={active}
         >
@@ -863,13 +860,9 @@ function DashboardWorkspace() {
             workbenchMode,
             workbenchStatus,
             onRetryWorkbench: () => setWorkbenchAttempt(value => value + 1),
-            contentSignedIn,
             snapshot,
             onOpen: jump,
             onTodoCount: setTodoCount,
-            onSupplyScript: (question) => { setScriptDraft(question); jump('content'); },
-            scriptDraft,
-            onDraftConsumed: () => setScriptDraft(null),
           })}
         </main>
       </div>
