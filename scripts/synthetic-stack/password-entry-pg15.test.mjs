@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { Pg15Harness } from '../../packages/database/dist/testkit/index.js';
@@ -10,10 +9,11 @@ import { buildAccount, loadPasswordAccounts, passwordMatches, seatBindingIdFor }
 import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
 import { bindKnownPrincipal } from '../../apps/api/src/content-intake/bind-known-principal.ts';
 
-const root = mkdtempSync(path.join(os.tmpdir(), 'password-entry-test-'));
+const root = realpathSync.native(mkdtempSync('/tmp/pw-entry-'));
 const previousRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
 process.env.CUSTOMER_AGENT_STACK_ROOT = root;
 const { passwordBindingAllowedFromStack: lookup } = await import('./seat-binding-lookup.ts');
+const { PG_PORT, stackPortPairForRoot } = await import('./profile.ts');
 const profileFile = path.join(root, 'profile.json');
 const password = 'synthetic-password-entry-test';
 const usernames = ['normal', '_seat', '-seat', 'A'.repeat(64)];
@@ -23,17 +23,24 @@ let owner;
 let profile;
 
 before(async () => {
-  harness = new Pg15Harness();
+  harness = new Pg15Harness({
+    port: PG_PORT,
+    socketDirectory: path.join(root, 'data', 'pg15-socket'),
+  });
   harness.start();
   database = harness.createDatabase('password_entry');
   owner = await harness.connect(database.config);
   await applyDatabaseMigrations(owner);
   await owner.query('CREATE ROLE stack_intake_business LOGIN NOINHERIT');
   await owner.query('GRANT intake_business TO stack_intake_business');
+  const ports = stackPortPairForRoot(root);
   profile = {
-    version: 1, stackRoot: root, databaseName: database.name,
-    apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
-    pgSocketDirectory: harness.socket, pgPort: harness.port,
+    version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: root,
+    apiOrigin: `http://127.0.0.1:${String(ports.api)}`,
+    identityOrigin: `http://127.0.0.1:${String(ports.identity)}`,
+    apiPort: ports.api, identityPort: ports.identity, databaseName: database.name,
+    pgPort: PG_PORT, pgSocketDirectory: harness.socket,
+    objectStoreDirectory: path.join(root, 'objects'), clientId: 'desk_password_entry_test',
   };
   writeFileSync(profileFile, JSON.stringify(profile));
   await owner.query('BEGIN');

@@ -51,15 +51,33 @@ function removeTemporaryCluster(root: string): void {
  */
 export class Pg15Harness {
   readonly owner = 'gate_owner';
-  readonly port = randomInt(49_152, 65_535);
+  readonly port: number;
   readonly environment = cleanPgEnvironment();
   readonly bin = discoverPg15Bin(this.environment);
   readonly root = mkdtempSync(path.join(os.tmpdir(), TEMPORARY_PREFIX));
   readonly data = path.join(this.root, 'data');
-  readonly socket = path.join(this.root, 'socket');
+  readonly socket: string;
   readonly log = path.join(this.root, 'postgres.log');
   private started = false;
   private startAttempted = false;
+
+  /**
+   * A caller that validates a stack profile can place the socket at the
+   * profile-owned path and port. That caller owns cleanup of an external
+   * socket directory; the harness still removes its private cluster root.
+   */
+  constructor(options: Readonly<{
+    port?: number;
+    socketDirectory?: string;
+  }> = {}) {
+    this.port = options.port ?? randomInt(49_152, 65_535);
+    if (!Number.isSafeInteger(this.port) || this.port < 1 || this.port > 65_535) {
+      throw new Error(`Invalid temporary PostgreSQL port: ${String(this.port)}`);
+    }
+    this.socket = options.socketDirectory === undefined
+      ? path.join(this.root, 'socket')
+      : path.resolve(options.socketDirectory);
+  }
 
   start(): void {
     try {
