@@ -8,6 +8,7 @@ All notable changes to this customer-agent product implementation repository are
 
 - 工作台整理为工作台、内容库、SOP、资料审核、成员与权限五个入口。资料审核改为批次表和单份详情，成员权限先显示摘要，内容库统一已发布话术与本机草稿。
 - 切换页面保留未提交输入，并关闭相关弹窗；签出后隐藏写入口，工作台模式读取失败时提供重试。
+- 查询复制、登录会话和工作台范围边界修复一并进入 `0.3.40`。
 
 ### Fixed
 

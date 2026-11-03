@@ -27,7 +27,7 @@
 
 1. 在跟踪 `origin/main` 的工作树里改桌面包版本，合进 `main`。不要把功能分支推成 `main`。不要改已经合过的迁移 `0042` 到 `0045`。
 
-2. 打三个平台的未签名包。Linux 包不在这台 Mac 上打。新的 GitHub Release 用新 tag。不要替换 `v0.3.27` 已有附件。
+2. 按本轮获批的平台打未签名包。`v0.3.40` 只打 Windows 和 macOS，跳过 Linux。新的 GitHub Release 用新 tag。不要替换 `v0.3.27` 已有附件。
 
 3. 下载页由 `.github/workflows/download-page.yml` 在 `release: published` 之后改写。页面可以暂时仍显示旧版本，用带查询串的地址再看一次。步骤见 [发布到官网下载页](how-to-publish-download-page.md)。
 
