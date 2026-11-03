@@ -47,6 +47,14 @@ curl --fail --show-error --max-time 15 https://agent-auth.jianghua.site/health
 
 期望 body 里的 `version` 等于这次 `CUSTOMER_AGENT_BUILD_VERSION`。未登录的 `GET /v1/intake/sources` 和 `GET /v1/events/usage` 应是 `401`。`POST /v1/intake/health` 不是现有路径，`404` 不表示录入没挂上。
 
+部署后可运行完整公网烟测：
+
+```bash
+pnpm test:production:smoke -- --expected-version "$(cat VERSION)"
+```
+
+这条命令同时检查 `/health`、`/ready`、身份服务健康和两个未认证 `401` 边界。范围与限制见[生产烟测](how-to-run-production-smoke.md)。
+
 话术指针仍要用杭州上的 `stack_owner` 去读 `content_current`。这次读到的是 id `1`、`rel_27`。不要为了核对去发布。
 
 坐席机器上的趋势图读的是本机 `usage-journal.json`。杭州有 `GET /v1/events/usage` 不等于已安装的 `0.3.28` 会去调它。打包后的应用不读 `CUSTOMER_AGENT_DESKTOP_*`。要看新包，先完全退出再打开。
