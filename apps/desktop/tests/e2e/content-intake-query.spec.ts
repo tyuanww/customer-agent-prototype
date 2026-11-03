@@ -142,7 +142,8 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(await query.evaluate(() => ({ node: typeof window.require, process: typeof window.process }))).toEqual({ node: 'undefined', process: 'undefined' });
     expect(requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);
     await query.evaluate(() => window.customerAgent!.product!.logout());
-    await expect(shop).toBeDisabled();
+    await expect(shop).toHaveCount(0);
+    await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally {
