@@ -10,7 +10,7 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
   it('registers seat management for an administrator and refuses a query-only user', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'seat-stack-registration-'));
     const profile = {
-      version: 1, createdAt: new Date().toISOString(), stackRoot: root,
+      version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: root,
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
       apiPort: 43100, identityPort: 43101, databaseName: 'synthetic', pgPort: 43199,
       pgSocketDirectory: path.join(root, 'socket'), objectStoreDirectory: path.join(root, 'objects'), clientId: 'synthetic',

@@ -71,7 +71,7 @@ describe('synthetic seed content', () => {
 describe('stack profile', () => {
   it('builds loopback-only API environment with distinct login roles', () => {
     const profile = {
-      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
       apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
       pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
@@ -95,7 +95,7 @@ describe('stack profile', () => {
 
   it('enables Feishu OAuth while keeping the loopback password origin', () => {
     const profile = {
-      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
       apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
       pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
@@ -176,6 +176,34 @@ describe('stack profile', () => {
     assert.ok(body.indexOf('stackEnvironmentForRoot(STACK_ROOT)') < body.indexOf('stopProcess'));
   });
 
+  it('rejects a profile whose declared environment disagrees with its root', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'packaged-profile-environment-'));
+    const locator = {
+      env: { CUSTOMER_AGENT_DESKTOP_USERDATA: directory },
+      platform: 'darwin' as const,
+      home: '/tmp/unused-home',
+    };
+    try {
+      assert.throws(() => writeDesktopPackagedProfile({
+        version: 1,
+        environment: 'wsl-test',
+        createdAt: '2026-10-14T00:00:00.000Z',
+        stackRoot: '/tmp/synthetic-stack',
+        apiOrigin: 'http://127.0.0.1:43110',
+        identityOrigin: 'http://127.0.0.1:43111',
+        apiPort: 43110,
+        identityPort: 43111,
+        databaseName: 'customer_agent_synthetic',
+        pgPort: 43199,
+        pgSocketDirectory: '/tmp/synthetic-stack/data/pg15-socket',
+        objectStoreDirectory: '/tmp/synthetic-stack/objects',
+        clientId: 'desk_x',
+      }, locator), /environment does not match stack root/u);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('keeps an existing faq-v2 marker only for two different loopback origins', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'packaged-profile-'));
     const locator = {
@@ -186,6 +214,7 @@ describe('stack profile', () => {
     const file = desktopPackagedProfilePath(locator);
     const profile = {
       version: 1 as const,
+      environment: 'synthetic-local' as const,
       createdAt: '2026-10-14T00:00:00.000Z',
       stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43110',
@@ -945,16 +974,19 @@ describe('stack production env', () => {
     // that silently kept them would write idempotency and log-hash rows under
     // keys the migrated data was not hashed with.
     const profile = {
-      version: 1 as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: DEFAULT_STACK_ROOT,
-      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
-      apiPort: 43100, identityPort: 43101, databaseName: 'customer_agent_formal', pgPort: 43199,
-      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+      version: 1 as const, environment: 'production' as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: PRODUCTION_STACK_ROOT,
+      apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.api)}`,
+      identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.identity)}`,
+      apiPort: RUNTIME_PORT_PAIRS.production.api, identityPort: RUNTIME_PORT_PAIRS.production.identity,
+      databaseName: 'customer_agent_formal', pgPort: 43199,
+      pgSocketDirectory: path.join(PRODUCTION_STACK_ROOT, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(PRODUCTION_STACK_ROOT, 'objects'), clientId: 'desk_x',
     };
     const environment = apiEnvironment(profile, parseApiEnvFile('LOG_HASH_KEY=real-material'));
     assert.equal(environment.LOG_HASH_KEY, 'real-material');
     assert.equal(environment.INTAKE_BUSINESS_DATABASE_URL, undefined);
     // The DSN still comes from the profile, never from the file.
-    assert.match(String(environment.DATABASE_URL), /host=%2Ftmp%2Fsocket&port=43199/u);
+    assert.match(String(environment.DATABASE_URL), /host=%2Fsrv%2Fcustomer-agent%2Fstack%2Fdata%2Fpg15-socket&port=43199/u);
   });
 
   it('refuses a key set in both api.env and content.env', () => {

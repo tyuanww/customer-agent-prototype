@@ -419,7 +419,6 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 
 async function runStart(foreground: boolean): Promise<void> {
   requireDist();
-  ensureStackDirectories();
   // Read once: `resolveProfile` needs the database name and `contentOverrides`
   // needs the content constants, and two reads could disagree if the file
   // changed between them - the profile would end up naming one catalog while the

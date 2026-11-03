@@ -371,7 +371,7 @@ export const LOCAL_SECRETS = Object.freeze({
 
 export type StackProfile = Readonly<{
   version: 1;
-  environment?: StackEnvironment;
+  environment: StackEnvironment;
   createdAt: string;
   stackRoot: string;
   apiOrigin: string;
@@ -455,8 +455,11 @@ export function writeDesktopPackagedProfile(
   profile: StackProfile,
   locator: DesktopUserDataLocator = {},
 ): string {
-  const environment = profile.environment ?? stackEnvironmentForRoot(profile.stackRoot);
-  if (environment === 'production') {
+  const rootEnvironment = stackEnvironmentForRoot(profile.stackRoot);
+  if (profile.environment !== rootEnvironment) {
+    throw new Error('Stack profile environment does not match stack root');
+  }
+  if (profile.environment === 'production') {
     throw new Error('A production stack cannot write a synthetic desktop profile');
   }
   const packagedPath = desktopPackagedProfilePath(locator);
@@ -485,7 +488,7 @@ export function writeDesktopPackagedProfile(
 }
 
 function readPackagedProfileForWrite(packagedPath: string):
-  | { readonly mode: string; readonly apiOrigin?: string; readonly identityOrigin?: string }
+  | { readonly mode: string }
   | undefined {
   if (!existsSync(packagedPath)) return undefined;
   const stat = lstatSync(packagedPath);
@@ -500,11 +503,7 @@ function readPackagedProfileForWrite(packagedPath: string):
   if (typeof record.mode !== 'string') {
     throw new Error('Refusing to replace an invalid desktop profile');
   }
-  return {
-    mode: record.mode,
-    ...(typeof record.apiOrigin === 'string' ? { apiOrigin: record.apiOrigin } : {}),
-    ...(typeof record.identityOrigin === 'string' ? { identityOrigin: record.identityOrigin } : {}),
-  };
+  return { mode: record.mode };
 }
 
 export function ensureStackDirectories(): void {
