@@ -338,6 +338,10 @@ describe('stack profile', () => {
       () => parseStackProfile({ ...base, apiOrigin: 'http://127.0.0.1:43100/admin' }, STACK_ROOT),
       /origins do not match/u,
     );
+    assert.throws(
+      () => parseStackProfile({ ...base, apiOrigin: 'not-a-url' }, STACK_ROOT),
+      /apiOrigin must be a valid URL/u,
+    );
   });
 });
 

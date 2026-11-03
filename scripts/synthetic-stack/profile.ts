@@ -522,6 +522,14 @@ export function ensureStackDirectories(): void {
   }
 }
 
+function parseProfileUrl(value: string, file: string, field: 'apiOrigin' | 'identityOrigin'): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new Error(`Invalid stack profile: ${file}: ${field} must be a valid URL`);
+  }
+}
+
 export function parseStackProfile(
   value: unknown,
   expectedRoot: string,
@@ -569,8 +577,8 @@ export function parseStackProfile(
     || profile.objectStoreDirectory !== expectedObjects) {
     throw new Error(`Invalid stack profile: ${file}: storage paths do not match stack root`);
   }
-  const api = new URL(profile.apiOrigin);
-  const identity = new URL(profile.identityOrigin);
+  const api = parseProfileUrl(profile.apiOrigin, file, 'apiOrigin');
+  const identity = parseProfileUrl(profile.identityOrigin, file, 'identityOrigin');
   if (api.protocol !== 'http:' || identity.protocol !== 'http:'
     || api.hostname !== '127.0.0.1' || identity.hostname !== '127.0.0.1'
     || Number(api.port) !== profile.apiPort || Number(identity.port) !== profile.identityPort
