@@ -15,6 +15,8 @@
 
 ## 端口合同
 
+固定端口对只由 [`apps/desktop/src/shared/runtime-ports.ts`](../apps/desktop/src/shared/runtime-ports.ts) 定义。栈脚本、Desktop profile 校验和生产一致性探针都读取这一张表。
+
 | 端口 | 监听地址 | 所属 | 说明 |
 | --- | --- | --- | --- |
 | `3100` | `127.0.0.1` | Mac 直接 `formal-dev` API | `pnpm dev:api` 默认端口；只用于 API 配置 / 路由开发，桌面不会自动接入 |
@@ -25,6 +27,17 @@
 | `43180` | `127.0.0.1` | 测试 API | 临时测试端口，验收后应无监听 |
 | `43181` | `127.0.0.1` | 测试口令身份服务 | 临时测试端口，验收后应无监听 |
 | `43199` | Unix socket 文件名后缀 | 各 stack 的 PG15 | 只在对应 stack root 的 socket 目录内使用，不开放 TCP；`profile.json.pgPort` 只是 socket 连接参数，不是 TCP listener |
+
+栈根决定环境，不能用端口反推：
+
+| stack root | environment | 固定端口对 | 数据库限制 |
+| --- | --- | --- | --- |
+| `/srv/customer-agent/stack` | `production` | `43115/43116` | 只能是 `customer_agent_formal` |
+| `/srv/customer-agent/test-stack` | `wsl-test` | `43180/43181` | 不能是 `customer_agent_formal` |
+| 默认 Mac 合成根 | `synthetic-local` | `43100/43101` | 不能是 `customer_agent_formal` |
+| 其他自定义合成根 | `synthetic-local` | 按根目录稳定偏移 | 不能是 `customer_agent_formal`，且不能占用测试或生产端口 |
+
+`profile.json` 读取时会核对根目录、环境、端口对、数据库类别、origin 和 PostgreSQL/对象目录。缺少早期 `environment` 字段的现有生产、测试 profile 可由根目录安全推断。未知版本、软链、错配端口或跨环境数据库会让命令失败关闭。WSL 测试客户端可以读取 `synthetic-local` profile 并使用 `43180/43181`；`43115/43116` 不允许写成合成 profile。
 
 查看端口和 readiness：
 

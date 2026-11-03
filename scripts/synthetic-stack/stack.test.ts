@@ -11,13 +11,17 @@ import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './cont
 import {
   DEFAULT_STACK_ROOT,
   DESKTOP_APP_NAME,
+  PRODUCTION_STACK_ROOT,
+  WSL_TEST_STACK_ROOT,
   defaultDesktopUserDataDirectory,
   desktopPackagedProfilePath,
   writeDesktopPackagedProfile,
   PID_DIRECTORY, PREFERRED_PORTS, STACK_ROOT, apiEnvironment, loadApiStackConfig, loadContentStackConfig,
   mergeStackOverrides, parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
-  readProfile, shouldSeedSyntheticCatalog, stackPortOffset,
+  parseStackProfile, readProfile, shouldSeedSyntheticCatalog, stackEnvironmentForRoot,
+  stackPortOffset, stackPortPairForRoot,
 } from './profile.ts';
+import { RUNTIME_PORT_PAIRS, isReservedSyntheticPort } from '../../apps/desktop/src/shared/runtime-ports.ts';
 import {
   forgetProcess, isAlive, isOwnedProcessLive, pidIsAlive, portInUse, processCommandLine,
   processSignature, readProcess, recordProcess, stopProcess,
@@ -67,7 +71,7 @@ describe('synthetic seed content', () => {
 describe('stack profile', () => {
   it('builds loopback-only API environment with distinct login roles', () => {
     const profile = {
-      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
       apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
       pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
@@ -91,7 +95,7 @@ describe('stack profile', () => {
 
   it('enables Feishu OAuth while keeping the loopback password origin', () => {
     const profile = {
-      version: 1, createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
+      version: 1, environment: 'synthetic-local', createdAt: new Date().toISOString(), stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
       apiPort: 43100, identityPort: 43101, databaseName: 'db', pgPort: 43199,
       pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
@@ -164,6 +168,42 @@ describe('stack profile', () => {
     }
   });
 
+  it('refuses production destroy before stopping any owned process', () => {
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    const start = stack.indexOf('async function commandDestroy()');
+    const end = stack.indexOf('\nfunction commandDesktop()', start);
+    const body = stack.slice(start, end);
+    assert.ok(body.indexOf('stackEnvironmentForRoot(STACK_ROOT)') < body.indexOf('stopProcess'));
+  });
+
+  it('rejects a profile whose declared environment disagrees with its root', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'packaged-profile-environment-'));
+    const locator = {
+      env: { CUSTOMER_AGENT_DESKTOP_USERDATA: directory },
+      platform: 'darwin' as const,
+      home: '/tmp/unused-home',
+    };
+    try {
+      assert.throws(() => writeDesktopPackagedProfile({
+        version: 1,
+        environment: 'wsl-test',
+        createdAt: '2026-10-14T00:00:00.000Z',
+        stackRoot: '/tmp/synthetic-stack',
+        apiOrigin: 'http://127.0.0.1:43110',
+        identityOrigin: 'http://127.0.0.1:43111',
+        apiPort: 43110,
+        identityPort: 43111,
+        databaseName: 'customer_agent_synthetic',
+        pgPort: 43199,
+        pgSocketDirectory: '/tmp/synthetic-stack/data/pg15-socket',
+        objectStoreDirectory: '/tmp/synthetic-stack/objects',
+        clientId: 'desk_x',
+      }, locator), /environment does not match stack root/u);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('keeps an existing faq-v2 marker only for two different loopback origins', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'packaged-profile-'));
     const locator = {
@@ -174,6 +214,7 @@ describe('stack profile', () => {
     const file = desktopPackagedProfilePath(locator);
     const profile = {
       version: 1 as const,
+      environment: 'synthetic-local' as const,
       createdAt: '2026-10-14T00:00:00.000Z',
       stackRoot: '/tmp/stack',
       apiOrigin: 'http://127.0.0.1:43110',
@@ -215,12 +256,14 @@ describe('stack profile', () => {
         identityOrigin: 'http://127.0.0.1:43101',
         contentIntake: 'faq-v2',
       })}\n`);
-      writeDesktopPackagedProfile({
+      assert.throws(() => writeDesktopPackagedProfile({
         ...profile,
         apiOrigin: 'http://127.0.0.1:43100',
         identityOrigin: 'http://127.0.0.1:43100',
-      }, locator);
-      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+        apiPort: 43100,
+        identityPort: 43100,
+      }, locator), /non-production loopback origins/u);
+      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), true);
 
       writeFileSync(file, `${JSON.stringify({
         mode: 'product-remote',
@@ -228,12 +271,19 @@ describe('stack profile', () => {
         apiOrigin: 'https://api.example.test',
         identityOrigin: 'https://id.example.test',
       })}\n`);
-      writeDesktopPackagedProfile(profile, locator);
-      assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+      assert.throws(
+        () => writeDesktopPackagedProfile(profile, locator),
+        /existing product-remote desktop profile/u,
+      );
+      assert.equal(JSON.parse(readFileSync(file, 'utf8')).mode, 'product-remote');
 
       rmSync(file);
       writeDesktopPackagedProfile(profile, locator);
       assert.equal('contentIntake' in JSON.parse(readFileSync(file, 'utf8')), false);
+
+      writeFileSync(file, `${JSON.stringify({ mode: 'synthetic-offline' })}\n`);
+      writeDesktopPackagedProfile(profile, locator);
+      assert.equal(JSON.parse(readFileSync(file, 'utf8')).mode, 'synthetic-local');
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
@@ -267,13 +317,31 @@ describe('stack profile', () => {
   });
 
   it('rejects a profile file that is not the current version or root', () => {
-    const file = new URL('./profile.ts', import.meta.url);
-    // PROFILE_FILE resolves once at import time, so assert the parser contract
-    // directly: an unknown version or a foreign stack root must not be adopted.
-    const source = readFileSync(file, 'utf8');
-    assert.ok(source.includes('profile.version !== 1'), 'profile reader must reject other versions');
-    assert.ok(source.includes('profile.stackRoot !== STACK_ROOT'), 'profile reader must reject a foreign root');
-    assert.equal(readProfile()?.version === 1 || readProfile() === undefined, true);
+    const base = {
+      version: 1 as const,
+      environment: 'synthetic-local' as const,
+      createdAt: '2026-09-30T00:00:00.000Z',
+      stackRoot: STACK_ROOT,
+      apiOrigin: 'http://127.0.0.1:43100',
+      identityOrigin: 'http://127.0.0.1:43101',
+      apiPort: 43100,
+      identityPort: 43101,
+      databaseName: 'customer_agent_synthetic',
+      pgPort: 43199,
+      pgSocketDirectory: path.join(STACK_ROOT, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(STACK_ROOT, 'objects'),
+      clientId: 'desk_x',
+    };
+    assert.throws(() => parseStackProfile({ ...base, version: 2 }, STACK_ROOT), /version|malformed/u);
+    assert.throws(() => parseStackProfile({ ...base, stackRoot: '/tmp/other' }, STACK_ROOT), /root mismatch/u);
+    assert.throws(
+      () => parseStackProfile({ ...base, apiOrigin: 'http://127.0.0.1:43100/admin' }, STACK_ROOT),
+      /origins do not match/u,
+    );
+    assert.throws(
+      () => parseStackProfile({ ...base, apiOrigin: 'not-a-url' }, STACK_ROOT),
+      /apiOrigin must be a valid URL/u,
+    );
   });
 });
 
@@ -817,6 +885,7 @@ describe('stack content env', () => {
     const claimed = new Map<number, number>();
     for (const offset of offsets) {
       for (const port of Object.values(PREFERRED_PORTS)) {
+        assert.equal(isReservedSyntheticPort(port + offset), false, `${String(port + offset)} is reserved`);
         const previous = claimed.get(port + offset);
         assert.equal(
           previous,
@@ -826,6 +895,18 @@ describe('stack content env', () => {
         claimed.set(port + offset, offset);
       }
     }
+  });
+
+  it('maps managed stack roots to their fixed environments and ports', () => {
+    assert.deepEqual(stackPortPairForRoot(DEFAULT_STACK_ROOT), RUNTIME_PORT_PAIRS.macSynthetic);
+    assert.equal(stackEnvironmentForRoot(PRODUCTION_STACK_ROOT), 'production');
+    assert.deepEqual(stackPortPairForRoot(PRODUCTION_STACK_ROOT), RUNTIME_PORT_PAIRS.production);
+    assert.equal(stackEnvironmentForRoot(WSL_TEST_STACK_ROOT), 'wsl-test');
+    assert.deepEqual(stackPortPairForRoot(WSL_TEST_STACK_ROOT), RUNTIME_PORT_PAIRS.wslTest);
+    assert.throws(
+      () => stackEnvironmentForRoot('/srv/customer-agent/unknown-stack'),
+      /Unregistered stack root/u,
+    );
   });
 });
 
@@ -897,16 +978,19 @@ describe('stack production env', () => {
     // that silently kept them would write idempotency and log-hash rows under
     // keys the migrated data was not hashed with.
     const profile = {
-      version: 1 as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: DEFAULT_STACK_ROOT,
-      apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101',
-      apiPort: 43100, identityPort: 43101, databaseName: 'customer_agent_formal', pgPort: 43199,
-      pgSocketDirectory: '/tmp/socket', objectStoreDirectory: '/tmp/objects', clientId: 'desk_x',
+      version: 1 as const, environment: 'production' as const, createdAt: '2026-09-29T00:00:00.000Z', stackRoot: PRODUCTION_STACK_ROOT,
+      apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.api)}`,
+      identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.identity)}`,
+      apiPort: RUNTIME_PORT_PAIRS.production.api, identityPort: RUNTIME_PORT_PAIRS.production.identity,
+      databaseName: 'customer_agent_formal', pgPort: 43199,
+      pgSocketDirectory: path.join(PRODUCTION_STACK_ROOT, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(PRODUCTION_STACK_ROOT, 'objects'), clientId: 'desk_x',
     };
     const environment = apiEnvironment(profile, parseApiEnvFile('LOG_HASH_KEY=real-material'));
     assert.equal(environment.LOG_HASH_KEY, 'real-material');
     assert.equal(environment.INTAKE_BUSINESS_DATABASE_URL, undefined);
     // The DSN still comes from the profile, never from the file.
-    assert.match(String(environment.DATABASE_URL), /host=%2Ftmp%2Fsocket&port=43199/u);
+    assert.match(String(environment.DATABASE_URL), /host=%2Fsrv%2Fcustomer-agent%2Fstack%2Fdata%2Fpg15-socket&port=43199/u);
   });
 
   it('refuses a key set in both api.env and content.env', () => {
@@ -924,23 +1008,24 @@ describe('stack profile reuse', () => {
   const freshFile = (): string => path.join(mkdtempSync(path.join(tmpdir(), 'stack-profile-')), 'profile.json');
   const wellFormed = {
     version: 1 as const,
+    environment: 'synthetic-local' as const,
     createdAt: '2026-09-30T00:00:00.000Z',
     stackRoot: STACK_ROOT,
     apiOrigin: 'http://127.0.0.1:43100',
     identityOrigin: 'http://127.0.0.1:43101',
     apiPort: 43100,
     identityPort: 43101,
-    databaseName: 'customer_agent_formal',
+    databaseName: 'customer_agent_synthetic',
     pgPort: 43199,
-    pgSocketDirectory: '/tmp/socket',
-    objectStoreDirectory: '/tmp/objects',
+    pgSocketDirectory: path.join(STACK_ROOT, 'data', 'pg15-socket'),
+    objectStoreDirectory: path.join(STACK_ROOT, 'objects'),
     clientId: 'desk_x',
   };
 
   it('adopts a profile it can use', () => {
     const file = freshFile();
     writeFileSync(file, JSON.stringify(wellFormed));
-    assert.equal(readProfile(file)?.databaseName, 'customer_agent_formal');
+    assert.equal(readProfile(file)?.databaseName, 'customer_agent_synthetic');
   });
 
   it('refuses a profile whose database name would reach CREATE DATABASE', () => {
@@ -955,8 +1040,56 @@ describe('stack profile reuse', () => {
       else profile.databaseName = databaseName;
       const file = freshFile();
       writeFileSync(file, JSON.stringify(profile));
-      assert.equal(readProfile(file), undefined, `must refuse databaseName ${JSON.stringify(databaseName)}`);
+      assert.throws(() => readProfile(file), /profile/u, `must refuse databaseName ${JSON.stringify(databaseName)}`);
     }
+  });
+
+  it('accepts the legacy untyped production profile only at the production root', () => {
+    const profile = parseStackProfile({
+      version: 1,
+      createdAt: '2026-10-28T00:00:00.000Z',
+      stackRoot: PRODUCTION_STACK_ROOT,
+      apiOrigin: 'http://127.0.0.1:43115',
+      identityOrigin: 'http://127.0.0.1:43116',
+      apiPort: 43115,
+      identityPort: 43116,
+      databaseName: 'customer_agent_formal',
+      pgPort: 43199,
+      pgSocketDirectory: path.join(PRODUCTION_STACK_ROOT, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(PRODUCTION_STACK_ROOT, 'objects'),
+      clientId: 'desk_x',
+    }, PRODUCTION_STACK_ROOT);
+    assert.equal(profile.environment, 'production');
+    assert.throws(
+      () => parseStackProfile({ ...profile, stackRoot: STACK_ROOT }, STACK_ROOT),
+      /production|environment|root mismatch|port pair|formal database/u,
+    );
+  });
+
+  it('accepts the legacy test profile and rejects cross-wired ports or databases', () => {
+    const legacyTest = {
+      version: 1,
+      createdAt: '2026-10-28T00:00:00.000Z',
+      stackRoot: WSL_TEST_STACK_ROOT,
+      apiOrigin: 'http://127.0.0.1:43180',
+      identityOrigin: 'http://127.0.0.1:43181',
+      apiPort: 43180,
+      identityPort: 43181,
+      databaseName: 'customer_agent_intake_test',
+      pgPort: 43199,
+      pgSocketDirectory: path.join(WSL_TEST_STACK_ROOT, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(WSL_TEST_STACK_ROOT, 'objects'),
+      clientId: 'desk_x',
+    };
+    assert.equal(parseStackProfile(legacyTest, WSL_TEST_STACK_ROOT).environment, 'wsl-test');
+    assert.throws(
+      () => parseStackProfile({ ...legacyTest, apiPort: 43115, apiOrigin: 'http://127.0.0.1:43115' }, WSL_TEST_STACK_ROOT),
+      /port pair/u,
+    );
+    assert.throws(
+      () => parseStackProfile({ ...legacyTest, databaseName: 'customer_agent_formal' }, WSL_TEST_STACK_ROOT),
+      /formal database/u,
+    );
   });
 });
 

@@ -385,6 +385,16 @@ export function generateAppIconMaster(options = {}) {
   }
   const decoded = decodePng(readFileSync(sourceIcon));
   const master = composeAppIconMaster(decoded.pixels, decoded.width, decoded.height);
+  if (existsSync(destination)) {
+    try {
+      const existing = decodePng(readFileSync(destination));
+      if (existing.width === APP_ICON_MASTER_SIZE
+        && existing.height === APP_ICON_MASTER_SIZE
+        && existing.pixels.equals(master)) return destination;
+    } catch {
+      // Replace malformed or non-PNG output with the canonical generated image.
+    }
+  }
   const png = encodePngRgba(master, APP_ICON_MASTER_SIZE, APP_ICON_MASTER_SIZE);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, png);

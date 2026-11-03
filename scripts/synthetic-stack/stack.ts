@@ -48,9 +48,10 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
-  PREFERRED_PORTS, PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
+  PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
   loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
-  readProfile, shouldSeedSyntheticCatalog, stackPortOffset, writeDesktopPackagedProfile, writeProfile,
+  readProfile, shouldSeedSyntheticCatalog, stackEnvironmentForRoot, stackPortPairForRoot,
+  writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
 import type { ContentStackConfig, FeishuStackConfig } from './profile.ts';
 import {
@@ -157,15 +158,14 @@ function requireDist(): void {
   }
 }
 
-async function resolvePort(name: keyof typeof PREFERRED_PORTS): Promise<number> {
-  const port = PREFERRED_PORTS[name] + stackPortOffset(path.dirname(PROFILE_FILE));
+async function resolvePort(port: number, name: 'api' | 'identity'): Promise<number> {
   if (await portInUse(port)) {
-    // Naming the resolved port matters: the offset is derived from the stack
-    // root, so "already in use" on a shifted port means a real conflict rather
-    // than a second stack, and the reader needs the number to find the holder.
+    const environment = stackEnvironmentForRoot(STACK_ROOT);
+    const recovery = environment === 'synthetic-local'
+      ? ' Stop the process using it, or point CUSTOMER_AGENT_STACK_ROOT at a different path, which shifts both ports.'
+      : ' Stop the process registered for this environment; managed test and production ports must not be shifted.';
     fail(
-      `Port ${String(port)} (${name}) is already in use. Stop the process using it, or point `
-      + `CUSTOMER_AGENT_STACK_ROOT at a different path, which shifts both ports.`,
+      `Port ${String(port)} (${name}, ${environment}) is already in use.${recovery}`,
     );
   }
   return port;
@@ -173,11 +173,33 @@ async function resolvePort(name: keyof typeof PREFERRED_PORTS): Promise<number> 
 
 async function resolveProfile(content: ContentStackConfig | undefined, { reuse }: { reuse: boolean }): Promise<StackProfile> {
   const existing = readProfile();
-  if (reuse && existing) return existing;
-  const apiPort = await resolvePort('api');
-  const identityPort = await resolvePort('identity');
+  const environment = stackEnvironmentForRoot(STACK_ROOT);
+  if (environment !== 'synthetic-local' && content?.databaseName === undefined) {
+    const label = environment === 'production' ? 'production' : 'test';
+    fail(`${label} stack requires content.env with DATABASE_NAME`);
+  }
+  if (environment === 'production' && content?.databaseName !== 'customer_agent_formal') {
+    fail('Production stack content.env must declare customer_agent_formal');
+  }
+  if (environment === 'wsl-test' && content?.databaseName === 'customer_agent_formal') {
+    fail('Test stack content.env must not declare customer_agent_formal');
+  }
+  if (existing) {
+    if (content?.databaseName !== undefined && content.databaseName !== existing.databaseName) {
+      fail(`Recorded profile database ${existing.databaseName} does not match content.env ${content.databaseName}`);
+    }
+    if (reuse) return existing;
+  }
+  if (environment === 'production' && !existing) {
+    fail('Production stack profile is missing; provision or review profile.json before starting');
+  }
+  const rootEnvironment = environment;
+  const rootPorts = stackPortPairForRoot(STACK_ROOT);
+  const apiPort = await resolvePort(rootPorts.api, 'api');
+  const identityPort = await resolvePort(rootPorts.identity, 'identity');
   return Object.freeze({
     version: 1,
+    environment: rootEnvironment,
     createdAt: new Date().toISOString(),
     stackRoot: path.dirname(PROFILE_FILE),
     apiOrigin: `http://127.0.0.1:${String(apiPort)}`,
@@ -397,7 +419,6 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 
 async function runStart(foreground: boolean): Promise<void> {
   requireDist();
-  ensureStackDirectories();
   // Read once: `resolveProfile` needs the database name and `contentOverrides`
   // needs the content constants, and two reads could disagree if the file
   // changed between them - the profile would end up naming one catalog while the
@@ -411,10 +432,12 @@ async function runStart(foreground: boolean): Promise<void> {
   const skipReason = process.argv.includes('--no-seed') ? '--no-seed' : 'content.env names its own database';
   const profile = await resolveProfile(content, { reuse: true });
   writeProfile(profile);
-  const packagedProfilePath = writeDesktopPackagedProfile(profile);
   log(`stack root: ${profile.stackRoot}`);
   log(`api origin: ${profile.apiOrigin}  identity origin: ${profile.identityOrigin}`);
-  log(`packaged desktop profile: ${packagedProfilePath}`);
+  if (profile.environment !== 'production') {
+    const packagedProfilePath = writeDesktopPackagedProfile(profile);
+    log(`packaged desktop profile: ${packagedProfilePath}`);
+  }
 
   const cluster = new SyntheticCluster();
   cluster.ensureRunning();
@@ -525,6 +548,9 @@ async function commandStatus(): Promise<void> {
 }
 
 async function commandDestroy(): Promise<void> {
+  if (stackEnvironmentForRoot(STACK_ROOT) === 'production') {
+    fail('Production stack destroy is disabled');
+  }
   for (const name of ['worker', 'api', 'identity']) log(await stopProcess(name));
   log(new SyntheticCluster().destroy());
   for (const name of ['worker', 'api', 'identity']) forgetProcess(name);
@@ -534,8 +560,7 @@ async function commandDestroy(): Promise<void> {
 function commandDesktop(): void {
   const profile = readProfile();
   if (!profile) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
-  // Refresh the packaged client handoff file without extra stdout: callers
-  // parse this command's single line as development environment assignments.
+  if (profile.environment === 'production') fail('Production stack has no desktop development handoff');
   writeDesktopPackagedProfile(profile);
   process.stdout.write(`${desktopCommand(profile)}\n`);
 }
@@ -543,6 +568,7 @@ function commandDesktop(): void {
 function commandPackagedProfile(): void {
   const profile = readProfile();
   if (!profile) fail(`no profile at ${PROFILE_FILE}; run "start" first`);
+  if (profile.environment === 'production') fail('Production stack cannot write a synthetic desktop profile');
   process.stdout.write(`${writeDesktopPackagedProfile(profile)}\n`);
 }
 

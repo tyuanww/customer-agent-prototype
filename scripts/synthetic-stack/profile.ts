@@ -11,15 +11,55 @@
  * root so the desktop client (development and packaged) can read the same
  * origins without duplicating them.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  RUNTIME_PORT_PAIRS, isAdjacentPortPair, isProductionRuntimePort, isReservedSyntheticPort,
+} from '../../apps/desktop/src/shared/runtime-ports.ts';
 
 export const DEFAULT_STACK_ROOT = path.join(os.homedir(), '.customer-agent-synthetic-stack');
+export const PRODUCTION_STACK_ROOT = '/srv/customer-agent/stack';
+export const WSL_TEST_STACK_ROOT = '/srv/customer-agent/test-stack';
 
-export const STACK_ROOT = process.env.CUSTOMER_AGENT_STACK_ROOT
+function canonicalPath(value: string): string {
+  const resolved = path.resolve(value);
+  try {
+    return realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+export const STACK_ROOT = canonicalPath(process.env.CUSTOMER_AGENT_STACK_ROOT
   ? path.resolve(process.env.CUSTOMER_AGENT_STACK_ROOT)
-  : DEFAULT_STACK_ROOT;
+  : DEFAULT_STACK_ROOT);
+
+export type StackEnvironment = 'synthetic-local' | 'wsl-test' | 'production';
+
+export function stackEnvironmentForRoot(root: string): StackEnvironment {
+  const canonical = canonicalPath(root);
+  if (canonical === PRODUCTION_STACK_ROOT) return 'production';
+  if (canonical === WSL_TEST_STACK_ROOT) return 'wsl-test';
+  if (canonical.startsWith(`${path.dirname(PRODUCTION_STACK_ROOT)}${path.sep}`)) {
+    throw new Error(`Unregistered stack root under the managed deployment tree: ${root}`);
+  }
+  return 'synthetic-local';
+}
+
+export function stackPortPairForRoot(root: string): { readonly api: number; readonly identity: number } {
+  const environment = stackEnvironmentForRoot(root);
+  if (environment === 'production') return RUNTIME_PORT_PAIRS.production;
+  if (environment === 'wsl-test') return RUNTIME_PORT_PAIRS.wslTest;
+  if (canonicalPath(root) === canonicalPath(DEFAULT_STACK_ROOT)) return RUNTIME_PORT_PAIRS.macSynthetic;
+  const offset = stackPortOffset(root);
+  return {
+    api: RUNTIME_PORT_PAIRS.macSynthetic.api + offset,
+    identity: RUNTIME_PORT_PAIRS.macSynthetic.identity + offset,
+  };
+}
 
 /**
  * TCP loopback ports are shared machine-wide, so two stacks need two sets. The
@@ -31,9 +71,10 @@ export const STACK_ROOT = process.env.CUSTOMER_AGENT_STACK_ROOT
  * stack root, so two clusters cannot collide even on the same port number.
  */
 export function stackPortOffset(stackRoot: string): number {
-  if (stackRoot === DEFAULT_STACK_ROOT) return 0;
+  const canonicalRoot = canonicalPath(stackRoot);
+  if (canonicalRoot === canonicalPath(DEFAULT_STACK_ROOT)) return 0;
   let hash = 0;
-  for (const byte of Buffer.from(stackRoot, 'utf8')) hash = (hash * 31 + byte) % 1000;
+  for (const byte of Buffer.from(canonicalRoot, 'utf8')) hash = (hash * 31 + byte) % 1000;
   // The same offset is added to every preferred port, and those ports are one
   // apart, so an offset that is not a multiple of the span interleaves two
   // stacks: offsets 75 and 76 put the first stack's `identity` port and the
@@ -42,7 +83,10 @@ export function stackPortOffset(stackRoot: string): number {
   // count keeps the highest shifted port (43197) below PG_PORT, so a shifted
   // stack never claims a number the cluster is documented to own.
   const span = Math.max(...Object.values(PREFERRED_PORTS)) - Math.min(...Object.values(PREFERRED_PORTS)) + 1;
-  return span * (1 + (hash % 48));
+  const candidates = Array.from({ length: 48 }, (_, index) => span * (index + 1))
+    .filter((offset) => !isReservedSyntheticPort(RUNTIME_PORT_PAIRS.macSynthetic.api + offset)
+      && !isReservedSyntheticPort(RUNTIME_PORT_PAIRS.macSynthetic.identity + offset));
+  return candidates[hash % candidates.length]!;
 }
 
 export const PROFILE_FILE = path.join(STACK_ROOT, 'profile.json');
@@ -305,8 +349,8 @@ export const DATABASE_ROLES = Object.freeze({
  * `profile.json` and a silent move would desynchronise the two sides.
  */
 export const PREFERRED_PORTS = Object.freeze({
-  api: 43100,
-  identity: 43101,
+  api: RUNTIME_PORT_PAIRS.macSynthetic.api,
+  identity: RUNTIME_PORT_PAIRS.macSynthetic.identity,
 });
 
 export const PG_PORT = 43199;
@@ -327,6 +371,7 @@ export const LOCAL_SECRETS = Object.freeze({
 
 export type StackProfile = Readonly<{
   version: 1;
+  environment: StackEnvironment;
   createdAt: string;
   stackRoot: string;
   apiOrigin: string;
@@ -410,14 +455,27 @@ export function writeDesktopPackagedProfile(
   profile: StackProfile,
   locator: DesktopUserDataLocator = {},
 ): string {
+  const rootEnvironment = stackEnvironmentForRoot(profile.stackRoot);
+  if (profile.environment !== rootEnvironment) {
+    throw new Error('Stack profile environment does not match stack root');
+  }
+  if (profile.environment === 'production') {
+    throw new Error('A production stack cannot write a synthetic desktop profile');
+  }
   const packagedPath = desktopPackagedProfilePath(locator);
-  mkdirSync(path.dirname(packagedPath), { recursive: true });
   const apiOrigin = packagedLoopbackOrigin(profile.apiOrigin);
   const identityOrigin = packagedLoopbackOrigin(profile.identityOrigin);
-  const keepFaqV2 = apiOrigin !== undefined
-    && identityOrigin !== undefined
-    && apiOrigin !== identityOrigin
-    && existingPackagedFaqV2(packagedPath);
+  if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin
+    || !isAdjacentPortPair({ api: profile.apiPort, identity: profile.identityPort })
+    || isProductionRuntimePort(profile.apiPort) || isProductionRuntimePort(profile.identityPort)) {
+    throw new Error('Synthetic desktop profile requires two non-production loopback origins');
+  }
+  const existing = readPackagedProfileForWrite(packagedPath);
+  if (existing !== undefined && existing.mode !== 'synthetic-local' && existing.mode !== 'synthetic-offline') {
+    throw new Error(`Refusing to replace an existing ${existing.mode} desktop profile`);
+  }
+  const keepFaqV2 = existingPackagedFaqV2(packagedPath);
+  mkdirSync(path.dirname(packagedPath), { recursive: true });
   const temporary = `${packagedPath}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify({
     mode: 'synthetic-local',
@@ -429,44 +487,143 @@ export function writeDesktopPackagedProfile(
   return packagedPath;
 }
 
+function readPackagedProfileForWrite(packagedPath: string):
+  | { readonly mode: string }
+  | undefined {
+  if (!existsSync(packagedPath)) return undefined;
+  const stat = lstatSync(packagedPath);
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw new Error('Refusing to replace a non-regular desktop profile');
+  }
+  const value: unknown = JSON.parse(readFileSync(packagedPath, 'utf8'));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Refusing to replace an invalid desktop profile');
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.mode !== 'string') {
+    throw new Error('Refusing to replace an invalid desktop profile');
+  }
+  return { mode: record.mode };
+}
+
 export function ensureStackDirectories(): void {
+  stackEnvironmentForRoot(STACK_ROOT);
   for (const directory of [
     STACK_ROOT, PID_DIRECTORY, LOG_DIRECTORY, DATA_DIRECTORY,
     OBJECT_STORE_DIRECTORY, PG_SOCKET_DIRECTORY,
-  ]) mkdirSync(directory, { recursive: true, mode: 0o700 });
+  ]) {
+    if (existsSync(directory)) {
+      const stat = lstatSync(directory);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) {
+        throw new Error(`Stack path must be a private directory: ${directory}`);
+      }
+    }
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+  }
+}
+
+function parseProfileUrl(value: string, file: string, field: 'apiOrigin' | 'identityOrigin'): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new Error(`Invalid stack profile: ${file}: ${field} must be a valid URL`);
+  }
+}
+
+export function parseStackProfile(
+  value: unknown,
+  expectedRoot: string,
+  file = '<memory>',
+): StackProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid stack profile: ${file}: expected an object`);
+  }
+  const profile = value as Record<string, unknown>;
+  if (profile.version !== 1 || typeof profile.createdAt !== 'string'
+    || typeof profile.apiOrigin !== 'string' || typeof profile.identityOrigin !== 'string'
+    || typeof profile.stackRoot !== 'string' || typeof profile.databaseName !== 'string'
+    || typeof profile.clientId !== 'string' || !Number.isSafeInteger(profile.apiPort)
+    || !Number.isSafeInteger(profile.identityPort) || !Number.isSafeInteger(profile.pgPort)
+    || typeof profile.pgSocketDirectory !== 'string'
+    || typeof profile.objectStoreDirectory !== 'string') {
+    throw new Error(`Invalid stack profile: ${file}: missing or malformed fields`);
+  }
+
+  const root = canonicalPath(expectedRoot);
+  if (canonicalPath(profile.stackRoot) !== root) {
+    throw new Error(`Invalid stack profile: ${file}: stack root mismatch`);
+  }
+  const environment = stackEnvironmentForRoot(root);
+  if (profile.environment !== undefined && profile.environment !== environment) {
+    throw new Error(`Invalid stack profile: ${file}: environment does not match stack root`);
+  }
+  const ports = stackPortPairForRoot(root);
+  if (profile.apiPort !== ports.api || profile.identityPort !== ports.identity) {
+    throw new Error(`Invalid stack profile: ${file}: port pair does not match ${environment}`);
+  }
+  if (!SQL_IDENTIFIER_PATTERN.test(profile.databaseName)) {
+    throw new Error(`Invalid stack profile: ${file}: database name is invalid`);
+  }
+  if (environment === 'production' && profile.databaseName !== 'customer_agent_formal') {
+    throw new Error(`Invalid stack profile: ${file}: production must use customer_agent_formal`);
+  }
+  if (environment !== 'production' && profile.databaseName === 'customer_agent_formal') {
+    throw new Error(`Invalid stack profile: ${file}: non-production stack uses the formal database`);
+  }
+  const expectedSocket = path.join(root, 'data', 'pg15-socket');
+  const expectedObjects = path.join(root, 'objects');
+  if (profile.pgPort !== PG_PORT
+    || profile.pgSocketDirectory !== expectedSocket
+    || profile.objectStoreDirectory !== expectedObjects) {
+    throw new Error(`Invalid stack profile: ${file}: storage paths do not match stack root`);
+  }
+  const api = parseProfileUrl(profile.apiOrigin, file, 'apiOrigin');
+  const identity = parseProfileUrl(profile.identityOrigin, file, 'identityOrigin');
+  if (api.protocol !== 'http:' || identity.protocol !== 'http:'
+    || api.hostname !== '127.0.0.1' || identity.hostname !== '127.0.0.1'
+    || Number(api.port) !== profile.apiPort || Number(identity.port) !== profile.identityPort
+    || api.username || api.password || api.pathname !== '/' || api.search || api.hash
+    || identity.username || identity.password || identity.pathname !== '/' || identity.search || identity.hash) {
+    throw new Error(`Invalid stack profile: ${file}: origins do not match profile ports`);
+  }
+  return Object.freeze({
+    version: 1,
+    environment,
+    createdAt: profile.createdAt,
+    stackRoot: root,
+    apiOrigin: api.origin,
+    identityOrigin: identity.origin,
+    apiPort: profile.apiPort,
+    identityPort: profile.identityPort,
+    databaseName: profile.databaseName,
+    pgPort: profile.pgPort,
+    pgSocketDirectory: profile.pgSocketDirectory,
+    objectStoreDirectory: profile.objectStoreDirectory,
+    clientId: profile.clientId,
+  });
 }
 
 export function readProfile(file = PROFILE_FILE): StackProfile | undefined {
   if (!existsSync(file)) return undefined;
+  const stat = lstatSync(file);
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw new Error(`Synthetic stack profile is not a regular file: ${file}`);
+  }
   try {
-    const value: unknown = JSON.parse(readFileSync(file, 'utf8'));
-    if (!value || typeof value !== 'object') return undefined;
-    const profile = value as StackProfile;
-    // The recorded root must match where the file was actually read from: a
-    // profile left by a different stack root (for example an isolated test run)
-    // would otherwise make the stack adopt unrelated paths and pids.
-    if (profile.version !== 1 || typeof profile.apiOrigin !== 'string'
-      || typeof profile.identityOrigin !== 'string'
-      || profile.stackRoot !== STACK_ROOT) return undefined;
-    // The database name is validated here for the same reason it is validated
-    // when it comes from content.env, and this is the path that matters: only
-    // the first `start` builds a profile, and every one after it reuses this
-    // file. It reaches `CREATE DATABASE` by interpolation and the five DSNs by
-    // concatenation, so a name that is missing or malformed has to fail here
-    // rather than create a database called `undefined` and report ready.
-    if (typeof profile.databaseName !== 'string' || !SQL_IDENTIFIER_PATTERN.test(profile.databaseName)) {
-      return undefined;
+    return parseStackProfile(JSON.parse(readFileSync(file, 'utf8')), STACK_ROOT, file);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid stack profile: ${file}: malformed JSON`);
     }
-    return profile;
-  } catch {
-    return undefined;
+    throw error;
   }
 }
 
 export function writeProfile(profile: StackProfile): void {
+  const validated = parseStackProfile(profile, STACK_ROOT, PROFILE_FILE);
   ensureStackDirectories();
   const temporary = `${PROFILE_FILE}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(profile, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
   renameSync(temporary, PROFILE_FILE);
 }
 

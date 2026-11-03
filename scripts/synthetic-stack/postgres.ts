@@ -10,12 +10,14 @@
  * after verifying it is inside the stack root.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { Client } from 'pg';
 import {
   DATABASE_ROLES, PG_DATA_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
-  STACK_ROOT, ensureStackDirectories, pgEnvironment,
+  STACK_ROOT, ensureStackDirectories, pgEnvironment, stackEnvironmentForRoot,
 } from './profile.ts';
 
 const TEMPORARY_OWNER = 'stack_owner';
@@ -96,6 +98,14 @@ export class SyntheticCluster {
   /** Create the cluster and start it if needed. Idempotent. */
   ensureRunning(): void {
     ensureStackDirectories();
+    for (const [label, directory] of [['PostgreSQL data', this.data], ['PostgreSQL socket', this.socket]] as const) {
+      if (existsSync(directory)) {
+        const stat = lstatSync(directory);
+        if (stat.isSymbolicLink() || !stat.isDirectory()) {
+          throw new Error(`${label} path must be a private directory: ${directory}`);
+        }
+      }
+    }
     mkdirSync(this.socket, { recursive: true, mode: 0o700 });
     if (this.state() === 'absent') this.init();
     if (!this.isRunning()) this.start();
@@ -145,9 +155,14 @@ export class SyntheticCluster {
 
   /** Remove the cluster directory. Only ever targets the stack root subtree. */
   destroy(): string {
+    if (stackEnvironmentForRoot(STACK_ROOT) === 'production') {
+      throw new Error('Production cluster removal is disabled');
+    }
     this.stop();
     const resolved = path.resolve(this.data);
-    if (!resolved.startsWith(`${path.resolve(STACK_ROOT)}${path.sep}`)) {
+    if (resolved !== path.resolve(PG_DATA_DIRECTORY)
+      || !resolved.startsWith(`${path.resolve(STACK_ROOT)}${path.sep}`)
+      || (existsSync(resolved) && lstatSync(resolved).isSymbolicLink())) {
       throw new Error(`Refusing to remove a cluster outside the stack root: ${resolved}`);
     }
     rmSync(resolved, { recursive: true, force: true });
