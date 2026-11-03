@@ -998,11 +998,10 @@
         <div class="download-box">
           <p class="eyebrow">DOWNLOAD</p>
           <h2 class="section-title">选择你的工作环境。</h2>
-          <p class="section-lead">Windows 版本已就绪，macOS 与 Linux 版本保留更新入口。</p>
+          <p class="section-lead">Windows 与 macOS 版本已就绪。</p>
           <div class="tabs" id="os-tabs" role="tablist" aria-label="系统">
             <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true" data-tab="win">Windows</button>
             <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" data-tab="mac">macOS</button>
-            <button type="button" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" data-tab="linux">Linux</button>
           </div>
 
           <div class="panel is-on" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
@@ -1028,19 +1027,6 @@
                   <button class="chip" type="button" aria-live="polite" data-copy="957f5a7416e6aea0243df1f0241e9379edd44f8b0b8fdd91a2946ed63bf6ed10">SHA-256　957f5a74…3bf6ed10</button>
                 </div>
                 <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.34/Demo-0.3.34-mac-universal-UNSIGNED.dmg">下载 · 234.6 MB <span class="arrow" aria-hidden="true">↗</span></a>
-              </div>
-            </div>
-          </div>
-          <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
-            <div class="platform-panel">
-              <div class="row">
-                <div>
-                  <h3>Linux AppImage</h3>
-                  <p class="platform-version">x86_64 · 未签名</p>
-                  <p class="platform-meta">v0.3.34 · 147.6 MB</p>
-                  <button class="chip" type="button" aria-live="polite" data-copy="b416a9c08dd24586cb0f0c97f8611af85ebb1bfdbb71932fe79b05609bdc403f">SHA-256　b416a9c0…9bdc403f</button>
-                </div>
-                <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.34/Demo-0.3.34-linux-x86_64-UNSIGNED.AppImage">下载 · 147.6 MB <span class="arrow" aria-hidden="true">↗</span></a>
               </div>
             </div>
           </div>
@@ -1256,9 +1242,8 @@
     const osPanels = {
       win: document.getElementById('panel-win'),
       mac: document.getElementById('panel-mac'),
-      linux: document.getElementById('panel-linux'),
     };
-    const osOrder = ['win', 'mac', 'linux'];
+    const osOrder = ['win', 'mac'];
     function showOs(name) {
       osTabs.forEach((tab) => {
         const on = tab.dataset.tab === name;
@@ -1286,7 +1271,6 @@
     });
     const ua = navigator.userAgent;
     if (/Mac/i.test(ua) && !/iPhone|iPad|iPod/.test(ua)) showOs('mac');
-    else if (/Linux/i.test(ua) && !/Android/.test(ua)) showOs('linux');
     else showOs('win');
 
     document.querySelectorAll('[data-copy]').forEach((btn) => {
