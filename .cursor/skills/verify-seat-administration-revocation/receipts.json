@@ -1,7 +1,7 @@
 {
-  "syncCommit": "88463a139d24",
-  "workingTree": "dirty at capture; file hashes are authoritative for this run",
-  "capturedAt": "2026-11-03T17:22:45.000Z",
+  "syncCommit": "0a661262cf19ab036095fb1a50f89acd1629fe12",
+  "workingTree": "covered sources clean at syncCommit",
+  "capturedAt": "2026-11-03T17:36:25.000Z",
   "files": {
     "apps/api/src/content-intake/seats.ts": "6fe08dc25a091b1464f52e50a40522a4fcd904c740634c501ed6658098d0093a",
     "apps/api/src/content-intake/seats-http.ts": "49d28a3686bd1d05e927f603aec9ca8bf97af370f2552eaba568088a855a17a8",

@@ -41,7 +41,7 @@ The 27 profiles are the ones `readPackagedProductProfile` can hand this code: no
 | Origin of that session | `new ProductHttp(productProfile.apiOrigin)` and `ProductHttp.request` in `apps/desktop/src/main/product-http.ts` |
 | No five-page swap | `apps/desktop/src/renderer/DashboardApp.tsx` |
 
-Last confirmed that this description matches that code: `88463a139d247bab5b2012c3f60799d9a265fc0a`.
+Last confirmed that this description matches that code: `0a661262cf19ab036095fb1a50f89acd1629fe12`.
 
 Move that commit forward only after you open the listed lines at the new commit and confirm the script still describes them. A green run on a commit that rewrote the wiring without those markers is exit 2, not a pass.
 
