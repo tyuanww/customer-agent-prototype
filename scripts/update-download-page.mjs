@@ -32,9 +32,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const RELEASE_REPO = 'tyuanww/customer-agent-prototype';
-export const PLATFORMS = Object.freeze(['win', 'mac', 'linux']);
+export const PUBLISHED_PLATFORMS = Object.freeze(['win', 'mac']);
 
-/** The three panels the page links, and how to recognise each asset name. */
+/** Known package families, including assets retained by older releases. */
 const PLATFORM_MATCHERS = Object.freeze([
   ['win', /win-x64/u, /\.exe$/u],
   ['mac', /mac-universal/u, /\.dmg$/u],
@@ -83,9 +83,9 @@ export function formatDateZh(iso) {
 
 /**
  * Normalise a `gh release view --json tagName,publishedAt,assets` payload into
- * the manifest the renderer consumes. Fails closed: a missing platform asset or
- * an asset without a sha256 digest stops the publish instead of shipping a page
- * with a broken link or a wrong checksum.
+ * the manifest the renderer consumes. Fails closed: a missing published platform
+ * asset or an asset without a sha256 digest stops the publish instead of shipping
+ * a page with a broken link or a wrong checksum.
  */
 export function manifestFromRelease(release) {
   if (!release || typeof release !== 'object') throw new Error('release payload must be an object');
@@ -100,7 +100,7 @@ export function manifestFromRelease(release) {
     if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error(`asset ${asset.name} has no sha256 digest`);
     assets[platform] = { name: asset.name, bytes: asset.size, sha256 };
   }
-  for (const platform of PLATFORMS) {
+  for (const platform of PUBLISHED_PLATFORMS) {
     if (!assets[platform]) throw new Error(`release v${version} is missing its ${platform} asset`);
   }
   return { version, date: formatDateZh(release.publishedAt), assets };
@@ -140,9 +140,9 @@ const PAGE_VERSIONS = /\bv(\d+\.\d+\.\d+)\b/gu;
  * the `Demo-<version>-` filename prefix. The asset URL is authoritative — the
  * version inside it comes from the release, not from string surgery.
  *
- * `required` lists the platforms the page has to link. Everything is checked
- * before anything is written, so a page that has drifted is reported instead of
- * being published half-rewritten.
+ * `required` lists the published platforms the page has to link. A page that
+ * still links a retired platform fails closed instead of retaining a stale
+ * download. Everything is checked before anything is written.
  */
 function applyReleaseIdentity(html, manifest, required) {
   const versions = new Set(html.match(PAGE_VERSIONS) ?? []);
@@ -157,6 +157,9 @@ function applyReleaseIdentity(html, manifest, required) {
     }
     const platform = platformOf(oldName);
     if (!platform) throw new Error(`page links an asset this script cannot map: ${oldName}`);
+    if (!required.includes(platform)) {
+      throw new Error(`page links the unsupported ${platform} platform`);
+    }
     seen.add(platform);
     return `${RELEASE_BASE}/v${manifest.version}/${manifest.assets[platform].name}`;
   });
@@ -178,13 +181,13 @@ function digestChip(sha256) {
 
 /** `index.html` carries the panels, hero size, checksum chips and the date. */
 export function renderIndex(html, manifest) {
-  let next = applyReleaseIdentity(html, manifest, PLATFORMS);
+  let next = applyReleaseIdentity(html, manifest, PUBLISHED_PLATFORMS);
   next = next.replace(/\d{4}年\d{1,2}月\d{1,2}日/u, manifest.date);
 
   const windowsSize = formatSizeMb(manifest.assets.win.bytes);
   next = next.replace(/Windows 10\+ x64 · [\d.]+ MB/u, `Windows 10+ x64 · ${windowsSize} MB`);
 
-  for (const platform of PLATFORMS) {
+  for (const platform of PUBLISHED_PLATFORMS) {
     const asset = manifest.assets[platform];
     const size = formatSizeMb(asset.bytes);
     const { full, short } = digestChip(asset.sha256);

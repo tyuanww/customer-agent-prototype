@@ -16,6 +16,7 @@ import {
   renderIndex,
   renderWindows,
   updateDownloadPages,
+  PUBLISHED_PLATFORMS,
 } from './update-download-page.mjs';
 
 const script = fileURLToPath(new URL('./update-download-page.mjs', import.meta.url));
@@ -71,11 +72,6 @@ function indexFixture() {
     <button class="chip" type="button" data-copy="476d16e7dc7258c9f2a9765bd0e88ddf3084e5335c869b2e33f1c7406f157eb3">SHA-256\u3000476d16e7…6f157eb3</button>
     <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-mac-universal-UNSIGNED.dmg">下载 · 213.5 MB</a>
   </div>
-  <div class="panel" id="panel-linux" role="tabpanel" hidden>
-    <p class="platform-meta">v0.3.24 · 3.0 MB</p>
-    <button class="chip" type="button" data-copy="af48a3362379932cb8cd4a42e82be3f1eba2963986c2bd5677e473723f19068e">SHA-256\u3000af48a336…3f19068e</button>
-    <a class="btn btn-ghost" href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载 · 125.9 MB</a>
-  </div>
 </body>
 </html>
 `;
@@ -101,7 +97,7 @@ function writeFixtureDir() {
   return dir;
 }
 
-test('platformOf maps exactly the three linked platforms', () => {
+test('platformOf recognises current and retained package families', () => {
   assert.equal(platformOf('Demo-0.3.25-win-x64-UNSIGNED.exe'), 'win');
   assert.equal(platformOf('Demo-0.3.25-mac-universal-UNSIGNED.dmg'), 'mac');
   assert.equal(platformOf('Demo-0.3.25-linux-x86_64-UNSIGNED.AppImage'), 'linux');
@@ -119,7 +115,8 @@ test('formatSizeMb and formatDateZh match the printed page', () => {
   assert.throws(() => formatSizeMb(0), /invalid asset size/u);
 });
 
-test('manifestFromRelease keeps linked assets, drops the zip, and requires all three', () => {
+test('manifestFromRelease keeps linked assets, drops the zip, and requires Windows and macOS', () => {
+  assert.deepEqual(PUBLISHED_PLATFORMS, ['win', 'mac']);
   const manifest = manifestFromRelease(RELEASE_0325);
   assert.equal(manifest.version, '0.3.25');
   assert.equal(manifest.date, '2026年9月29日');
@@ -129,7 +126,9 @@ test('manifestFromRelease keeps linked assets, drops the zip, and requires all t
   assert.ok(!JSON.stringify(manifest).includes('.zip'));
 
   const missing = { ...RELEASE_0325, assets: RELEASE_0325.assets.filter((a) => platformOf(a.name) !== 'linux') };
-  assert.throws(() => manifestFromRelease(missing), /missing its linux asset/u);
+  assert.deepEqual(Object.keys(manifestFromRelease(missing).assets).sort(), ['mac', 'win']);
+  const missingMac = { ...RELEASE_0325, assets: RELEASE_0325.assets.filter((a) => platformOf(a.name) !== 'mac') };
+  assert.throws(() => manifestFromRelease(missingMac), /missing its mac asset/u);
 
   const noDigest = RELEASE_0325.assets.map((a) => (a.name.includes('win') ? { ...a, digest: undefined } : a));
   assert.throws(() => manifestFromRelease({ ...RELEASE_0325, assets: noDigest }), /no sha256 digest/u);
@@ -146,18 +145,13 @@ test('renderIndex rewrites version, date, sizes, checksums and every URL', () =>
   assert.match(rendered, /Windows 10\+ x64 · 87\.2 MB/u);
   assert.match(rendered, new RegExp(`data-copy="${WIN_SHA}">SHA-256\u300084795e68…a479aac1`, 'u'));
   assert.match(rendered, new RegExp(`data-copy="${MAC_SHA}">SHA-256\u3000556b3fa7…4834e2f5`, 'u'));
-  assert.match(rendered, new RegExp(`data-copy="${LINUX_SHA}">SHA-256\u300054ece299…b6deb610`, 'u'));
   assert.match(rendered, /download\/v0\.3\.25\/Demo-0\.3\.25-win-x64-UNSIGNED\.exe/u);
   assert.match(rendered, /download\/v0\.3\.25\/Demo-0\.3\.25-mac-universal-UNSIGNED\.dmg/u);
-  assert.match(rendered, /download\/v0\.3\.25\/Demo-0\.3\.25-linux-x86_64-UNSIGNED\.AppImage/u);
   assert.match(rendered, /下载 · 213\.5 MB/u);
-  assert.match(rendered, /下载 · 125\.9 MB/u);
   assert.match(rendered, /class="platform-meta">v0\.3\.25 · 87\.2 MB/u);
   assert.match(rendered, /class="platform-meta">v0\.3\.25 · 213\.5 MB/u);
-  assert.match(rendered, /class="platform-meta">v0\.3\.25 · 125\.9 MB/u);
   assert.ok(!rendered.includes('1.0 MB'), 'stale windows meta size is gone');
   assert.ok(!rendered.includes('2.0 MB'), 'stale mac meta size is gone');
-  assert.ok(!rendered.includes('3.0 MB'), 'stale linux meta size is gone');
 });
 
 test('renderIndex and renderWindows are idempotent', () => {
@@ -197,6 +191,19 @@ test('renderIndex refuses a page that stopped linking a platform', () => {
   assert.throws(
     () => renderIndex(windowsFixture(), manifestFromRelease(RELEASE_0325)),
     /no longer links the mac asset/u,
+  );
+});
+
+test('renderIndex refuses a page that still links the retired Linux platform', () => {
+  const withLinux = indexFixture().replace(
+    '</body>',
+    `<div class="panel" id="panel-linux" role="tabpanel">
+      <a href="https://github.com/tyuanww/customer-agent-prototype/releases/download/v0.3.24/Demo-0.3.24-linux-x86_64-UNSIGNED.AppImage">下载</a>
+    </div>\n</body>`,
+  );
+  assert.throws(
+    () => renderIndex(withLinux, manifestFromRelease(RELEASE_0325)),
+    /links the unsupported linux platform/u,
   );
 });
 

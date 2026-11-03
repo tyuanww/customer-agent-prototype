@@ -1,17 +1,18 @@
 # How to 发布一版到官网下载页
 
-官网就是本仓的 `gh-pages` 分支，域名 `download.jianghua.site`。页面上的版本号、三个平台下载链接、文件大小和 SHA-256 都是**写死在 HTML 里**的，没有构建步骤。以前每次发版只能靠人手工改这 8 处，所以官网很容易落后于 GitHub Release。
+官网就是本仓的 `gh-pages` 分支，域名 `download.jianghua.site`。页面上的版本号、各平台下载链接、文件大小和 SHA-256 都是**写死在 HTML 里**的，没有构建步骤。
 
-现在由 `.github/workflows/download-page.yml` 自动改：**每次 `gh release create` 后**（`release: published`），workflow 拉取该 Release 的三个资产元数据，重写 `gh-pages` 上的 `index.html` 和 `windows.html`，然后提交推送。数据全部来自 Release，不来自页面，所以页面最多是「旧」，不会「错」。
+现在由 `.github/workflows/download-page.yml` 自动改：**每次 `gh release create` 后**（`release: published`），workflow 拉取该 Release 的 Windows 和 macOS 资产元数据，重写 `gh-pages` 上的 `index.html` 和 `windows.html`，然后提交推送。数据全部来自 Release，不来自页面，所以页面最多是「旧」，不会「错」。
+
+当前发布配置只展示 Windows 和 macOS。`gh-pages` 页面不得保留指向旧 Linux 包的链接；脚本遇到 Linux 链接会失败关闭。以后恢复 Linux 发布时，同时修改官网面板、`scripts/update-download-page.mjs` 和对应测试。
 
 ## Prerequisites
 
-1. 这次发布的 Release 已经建好，且带三个平台的资产：
+1. 这次发布的 Release 已经建好，且带两个当前发布平台的资产：
    - `Demo-<VERSION>-win-x64-UNSIGNED.exe`
    - `Demo-<VERSION>-mac-universal-UNSIGNED.dmg`
-   - `Demo-<VERSION>-linux-x86_64-UNSIGNED.AppImage`
-2. 那三个资产都有 GitHub 的 `sha256:` digest。缺一个，脚本会直接失败，不会发出带错链接或错校验值的页面。
-3. 改 workflow 或脚本的 PR 已合入 `main`（workflow 从默认分支取脚本，不从那三个 tag 取，所以补发老 Release 不会因为 tag 里没有脚本而失败）。
+2. 那两个资产都有 GitHub 的 `sha256:` digest。缺一个，脚本会直接失败，不会发出带错链接或错校验值的页面。
+3. 改 workflow 或脚本的 PR 已合入 `main`（workflow 从默认分支取脚本，不从那两个 tag 取，所以补发老 Release 不会因为 tag 里没有脚本而失败）。
 
 ## Steps
 
@@ -42,7 +43,8 @@ node scripts/update-download-page.mjs --dir /tmp/jianghua-download-pages --check
 | 情形 | 报错 |
 | --- | --- |
 | 页面上的下载链接指向**别的仓库** | `page links a release on <owner>/<repo>, but this script publishes ...` |
-| 页面不再链接某个平台（少一个下载按钮） | `page no longer links the mac asset` |
+| 页面不再链接 Windows 或 macOS（少一个下载按钮） | `page no longer links the mac asset` |
+| 页面仍链接已停用的 Linux 平台 | `page links the unsupported linux platform` |
 | 一个页面里出现了**两个不同版本号** | `page carries more than one version: ...` |
 | 某个链接的文件名无法归类到平台 | `page links an asset this script cannot map: ...` |
 | 要发布的版本**比页面现有的更旧** | `<file> advertises vX.Y.Z; refusing to publish the older v...` |
@@ -96,6 +98,6 @@ FROM ops_loop.software_release_catalog WHERE is_current;
 | --- | --- |
 | workflow 报 `refusing to publish the older vX.Y.Z` | 你要发的版本比页面现有的旧。确认确实要回滚才加 `--allow-downgrade`（本机跑）；CI 里没有这个开关，页面只会向前走。 |
 | Actions 里没跑 | Release 是 `draft` 或 `prerelease`；这两种不会触发 `published`。发布正式 Release，或用 `workflow_dispatch` 补。 |
-| workflow 红在「Rewrite the page」 | 该 Release 缺一个平台资产，或资产没有 sha256 digest。补资产后重跑。 |
+| workflow 红在「Rewrite the page」 | 该 Release 缺 Windows/macOS 资产、资产没有 sha256 digest，或页面仍保留 Linux 链接。修复后重跑。 |
 | 页面没变 | 页面已经是该版本（workflow 会跳过推送）；或 Cloudflare 还在缓存，等一会儿。 |
 | 官网更新了但工作台没更新 | 预期。两条链路，工作台要直写上面那张表。 |
