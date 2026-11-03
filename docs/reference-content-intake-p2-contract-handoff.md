@@ -367,7 +367,7 @@ A/B 已按原提交加追加修复接收到产品实验目录，C 只接收到�
 
 服务复用 OpenAPI 1.20 已冻结的 `GET/POST /v1/intake/grants`、`POST /v1/intake/grants/preview` 和 `PATCH /v1/intake/grants/{grantId}`。原 authority 拥有批量校验和保存/撤销，预览共用校验且不写数据库；discovery 列表在扫描前限制当前可管理范围。HTTP plugin 注入 management 唯一 service。主体目录 `purpose=grant-recipient` 与 authorization 共同提供短期界面选择，不能把目录可见或预览成功当成已生效授权。
 
-Main 拥有选择句柄、会话和到期代际、原预览/写请求及未知提交恢复；Dashboard 独立 preload 只开放 permissions current/command/invalidated 窄能力。姓名隐藏或过期不会泄露隐藏人员资料，已有可管理授权仍可凭记录编号、范围、时间与原原因核对后撤销。详细使用方法与模块位置见[开发指南](how-to-develop-content-intake.md#p2-内容管理内的权限配置)。定向 HTTP/PG 与桌面单元/组件证据已取得；本次权限 Electron 已在主集成通过具名总监预览取消、保存生效和撤销拒绝新资格；经理不冒称独立实跑，也不重复旧角色 15/15 审核。
+Main 拥有选择句柄、会话和到期代际、原预览/写请求及未知提交恢复；Dashboard 独立 preload 只开放 permissions current/command/invalidated 窄能力。姓名隐藏或过期不会泄露隐藏人员资料，已有可管理授权仍可凭记录编号、范围、时间与原原因核对后撤销。详细使用方法与模块位置见[开发指南](how-to-develop-content-intake.md#p2-设置内的权限配置)。定向 HTTP/PG 与桌面单元/组件证据已取得；本次权限 Electron 已在主集成通过具名总监预览取消、保存生效和撤销拒绝新资格；经理不冒称独立实跑，也不重复旧角色 15/15 审核。
 
 用途能力候选现已超出原离线 probe：显式 purpose-candidate 宿主使用环境 LOGIN→NOLOGIN capability 及候选安装账本校验，实际四域 HTTP 和 Mac FAQ/回退 Electron 的证据见[本轮发布验收](../evidence/qa/intake-release-acceptance/README.md)。其中原生文件读写、报告回读和系统剪贴板发生；组织池只预检、对话框响应受控，不能推断真实组织写入、人工设备操作或四套桌面界面验收。生产配置/账号、旧目录认领和真实店铺名单没有由合成通过自动补齐。
 

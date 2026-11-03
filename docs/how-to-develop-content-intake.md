@@ -204,7 +204,7 @@ Main `ContentIntakeQuery` 从授权发现组合选店，查询时通过 `Content
 
 ```sh
 pnpm --filter @customer-agent/desktop build
-pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-management.spec.ts tests/e2e/content-intake-query.spec.ts
+pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-intake-real-stack.spec.ts tests/e2e/content-intake-query.spec.ts
 ```
 
 当前冻结合同下，新候选支持来源确认、人工质量检查和原生确认直发；历史审批只读。Main 从已读取材料和候选冻结摘要、基线、来源证据版本、confirmed 和操作编号，renderer 只提交用户意图与表单。取消弹窗不发 HTTP、不建立未知操作；确认后重新核对会话、权限与取消代际。来源丢响应重放原 POST，direct-v1 发布可查询原回执或重试完全相同的请求；旧审批 wire 的未知操作只查回执。已确认发布后读取失败不会回退为未知写入。

@@ -480,9 +480,6 @@ CSV 用例保留 BOM、逗号、引号及多行正文原字节，回读 `CSV!H3`
 
 原生文件选择、报告保存与发布二次确认由 Main 拥有。单元测试覆盖有界文件/报告、停止等待、迟到响应、取消不提交、会话失效与原操作恢复；[实际 Electron 上传测试](../apps/desktop/tests/e2e/content-intake-real-stack.spec.ts)从选择工作簿、阻断报告落盘回读、整批更正与修订，贯穿来源确认、人工质量检查、原生取消/确认直发，再换另一普通客服查询并通过系统剪贴板复制。新候选为 `direct-v1`，没有 review HTTP 请求；测试读取实际数据库，验证审批绑定和审批事实均为0，发布由直发政策记录。原生文件选择和确认响应使用受控替身，文件、HTTP、PostgreSQL 15、Main/preload 与系统剪贴板实际执行；不计作真人点击 macOS 原生对话框、Windows GUI 或真实飞书验收。报告预算 probe 只证明其记录的合成规模，不能将实测最大样例冒充所有可能 XLSX 的数学上界。跨边界改动仍须运行根 lint/typecheck/test/build。
 
-另一个 [Electron 管理 wire 测试](../apps/desktop/tests/e2e/content-intake-management.spec.ts)使用自有合成 HTTP 替身，验证未知质量回执恢复、原生确认取消/提交与 sandbox 边界；它不替代上述真实 HTTP/PG 发布产物被另一客服消费的证据。
-
-
 ## FAQ Mac 安装副本合成验收
 
 先按[打包约束](reference-packaging-and-signing.md)运行 `pnpm package:mac:local`，从实际 DMG/ZIP 解包到专用目录，核对副本与构建 app.asar 摘要，不覆盖已安装应用。既有完整场景可显式选择该副本：
