@@ -26,6 +26,12 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 设置内用「权限」「账号」两个页签；成员详情逐条显示实际授权。新建账号收集姓名、登录名、密码、岗位。岗位只有下面两种，默认「客服」。
 
+设置导航不是岗位的附属开关。Main 并行读取授权分配资格与账号管理资格，并分别投影为 `settings.grants` 和 `settings.accounts`。权限资格为 `open` 时显示并允许「权限」，账号资格为 `open` 时显示并允许「账号」。只有恢复说明的 `closed` 授权仍保留数据模型中的文案，但不能单独让设置入口出现。仅审核管理员可管理账号却不能新增授权，仅查询管理员两个能力都关闭。
+
+坐席管理采用请求时授权。服务端 `seat_administration_allowed` 返回 `true` 时，命令完成授权线性化。管理员资格在此后撤销，不取消已经受理的命令；撤销提交之后才开始的新命令必须失败。Main 的 `settings.accounts` 只控制窗口入口，API 的资格检查才是授权边界。
+
+提交时授权没有采用。它要求每次数据库写入前重新校验资格，并用共享锁或两阶段状态覆盖口令文件，但 PostgreSQL 事务不能原子包含文件系统。只有产品要求“撤销必须中止在途命令”时才重新打开该设计；当前不以它作为发布门。
+
 ## 岗位
 
 | 岗位 | 动作 |
@@ -39,7 +45,7 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 ## 坐席命令
 
-通道是 `dashboard:seats-command`。远程工作台和显式 FAQ 合成工作台可使用；窗口、会话与账号管理权限由 Main 和服务端检查。renderer 提交下面四种意图，不能带主体 ID、URL 或操作 ID。
+通道是 `dashboard:seats-command`。远程工作台和显式 FAQ 合成工作台可使用；窗口、会话与账号管理权限由 Main 和服务端检查。账号能力来自 `GET /v1/intake/seats/administration` 的 `{ canManage: boolean }`；Main 在每次调用前检查当前 `settings.accounts`，服务端再用 `content_intake.seat_administration_allowed(actorId)` 复核。renderer 提交下面四种意图，不能带主体 ID、URL 或操作 ID。
 
 | `action` | 字段 | 成功回复 |
 | --- | --- | --- |
@@ -52,13 +58,23 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 登录名必须匹配 `^[A-Za-z0-9_-]{1,64}$`，由 `seatUsername` 检查。不合规则、姓名为空或长于 256 字、重置或停用找不到人，错误都是 `missing-person`，文案是「没有可授权的人。」绑定 ID 是 `synthetic_` 加登录名。停用只把人员标成不可用，不删除。
 
-运行脚本映射的失败文案还有：请选择岗位。请设定密码。人员没有写入，已停止。口令没有写入，已停止。账号没有读取。未知错误码变成「账号没有保存。」IPC 在调用脚本前还会返回：账号输入无效。无权访问此窗口能力。账号还不能在这里改。node 没启动、15 秒超时、标准输出超过 64KiB，或回复通不过 `seatAccountReply`，也是「账号没有保存。」
+Main 把服务端的可操作拒绝映射为岗位、登录名、重名、权限或口令文件错误。回复形状不通过 `seatAccountReply`、IPC 输入或窗口校验失败时返回明确失败，不伪造保存成功。
 
-Electron 主进程把意图交给产品 API 的三个路由（`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0068` 引入的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
+Electron 主进程把意图交给产品 API 的账号路由（`GET /v1/intake/seats/administration`、`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0068` 引入的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
 
 迁移 `0078` 将建席与业务授权分开。创建和登录只建立身份、岗位及其事实，不签发或恢复业务授权，也不要求存在已发布或可分配来源。管理员需另行人工授予查询权限。迁移不修改已有授权；已有自动授权需要按实际业务情况另行审查。
 
 口令只以 salt 和 scrypt 哈希写入服务端 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，由身份服务的 `/password` 每次重读，所以写入立即生效。明文密码不进页面、不进数据库、不进 git。
+
+身份行与口令文件是两个存储边界，不能伪装成单个原子提交。数据库身份先提交，口令随后写入。口令写入失败时 API 返回 `SEAT_PASSWORD_NOT_WRITTEN`，界面明确提示身份记录没有丢失并引导从账号列表重置密码，不误报“账号没有保存”。该恢复路径不要求重新创建登录名。
+
+同一口令文件的写入由相邻的 `.lock` 目录跨进程串行。创建和重置先异步计算 scrypt 哈希，再在短临界区内读取、修改、同步临时文件并原子替换账号文件。锁等待使用异步定时器，不阻塞 API 事件循环，10 秒后失败。锁目录记录随机持有者令牌和进程 ID；持有进程仍存活时，即使目录时间很旧也不能抢锁。持有进程已退出时可以立即回收。无法读到持有者的锁目录超过 30 秒后才回收。释放时先复核令牌仍属于自己，再删除锁。两个管理员并发写入时，后完成的一方会读到前一方提交的完整文件，不会用旧快照覆盖它。
+
+进程在锁内崩溃时，旧账号文件保持完整。下一次写入会识别已退出的持有者并回收锁，同时删除同一目标留下的临时文件。若崩溃发生在临时文件同步后、rename 前，旧文件生效；若发生在 rename 后、锁清理前，新文件已经完整生效。macOS 和 Unix 在 rename 后同步父目录；Windows 的断电后目录持久性未被本验证证明。PostgreSQL 与文件系统无法组成同一事务，所以创建在数据库提交后、口令写入前崩溃会留下可由账号列表识别的身份记录，重置口令完成恢复。
+
+三个命令的完成边界分别如下。新建账号在身份提交且口令文件写入成功后完成；口令写入失败时保留身份，由重置口令恢复。重置密码在口令文件原子替换后完成，数据库只读取并确认账号存在。停用在数据库绑定被标记为停用后完成，口令条目保留，登录准入拒绝已停用绑定。
+
+网络延迟不改变服务端语义。请求到达后，资格查询在撤销提交前返回 `true`，该命令已经受理，可以在撤销后完成；资格查询在撤销提交后执行，必须返回 `SEAT_FORBIDDEN`。API 回复丢失时，操作结果可能未知。`create` 可由列表和重置口令恢复；`reset` 可再次用同一目标账号重置；`disable` 是幂等操作。客户端不能根据超时推断这些操作失败。
 
 旧路径（桌面 `spawn` `scripts/synthetic-stack/seat-account-runtime.ts` 并以 `stack_owner` 连 `customer_agent_synthetic`）已删除：那个脚本不在安装包内，那个 socket 也不在坐席的机器上，所以按钮在打包版里从未成功过。
 

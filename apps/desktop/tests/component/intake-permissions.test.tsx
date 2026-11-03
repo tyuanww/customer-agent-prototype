@@ -35,7 +35,7 @@ it('selects a post, previews that post through the existing command, then saves 
  const f=intakePermissionsData([...supervisor.actions,...agent.actions]),main=new ContentIntakePermissions(f.session),user=userEvent.setup();
  const commands:IntakePermissionCommand[]=[];
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>{commands.push(c);return {ok:true,view:await main.command(c)};},onInvalidated:fn=>main.subscribe(fn)};
- try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   const people=screen.getByRole('table',{name:'成员权限'});
   for(const header of ['成员','具备能力','当前状态','操作']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
   expect(within(within(people).getByRole('row',{name:/合成坐席/})).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['合成坐席','—','未授权','查看权限']);
@@ -123,7 +123,7 @@ it('selects a post, previews that post through the existing command, then saves 
 it('does not offer a post the current scope cannot grant',async()=>{
  const main=new ContentIntakePermissions(intakePermissionsData().session);
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
- try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await userEvent.click(screen.getByRole('button',{name:'新增授权'}));
   const post=screen.getByRole('combobox',{name:/^岗位$/});
   expect(post.closest('.ant-select')).toHaveTextContent('客服');
@@ -156,7 +156,7 @@ it('creates an outsourced seat from an intent and does not keep the password on 
   return {ok:true,action:'disable',username:intent.username};}};
  const login=readFileSync(resolve(dirname(fileURLToPath(import.meta.url)),'../../src/renderer/LoginApp.tsx'),'utf8');
  const page=readFileSync(PAGE,'utf8');
- try{render(<IntakePermissions canGrant active/>);await screen.findAllByRole('row',{name:/合成坐席/});
+ try{render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await user.click(screen.getByRole('tab',{name:'账号'}));
   await user.click(screen.getByRole('button',{name:'新建账号'}));
   const form=screen.getByRole('dialog',{name:'新建账号'});
@@ -212,7 +212,7 @@ it('shows member headers before a scope is chosen and closing the dialogs does n
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async c=>{commands.push(c.action);if(c.action==='source')view={...view,source:c.selection};return {ok:true,view};},onInvalidated:()=>()=>undefined};
  window.dashboardSeats={command:async intent=>{intents.push(intent);return intent.action==='list'?{ok:true,action:'list',seats:[]}:{ok:false,message:'未保存'};}};
  const user=userEvent.setup();
- render(<IntakePermissions canGrant active/>);
+ render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);
  const people=await screen.findByRole('table',{name:'成员权限'});
  for(const header of ['成员','具备能力','当前状态','操作']) expect(within(people).getByRole('columnheader',{name:header})).toBeInTheDocument();
  expect(people).toHaveTextContent('请选择配置范围');
@@ -252,7 +252,7 @@ it('keeps an unsaved permission preview open when discard fails',async()=>{
  const commands:string[]=[];
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async c=>{commands.push(c.action);if(c.action==='discard')return {ok:false,message:'这次没有放弃预览。',view};return {ok:true,view};},onInvalidated:()=>()=>undefined};
  const user=userEvent.setup();
- render(<IntakePermissions canGrant active/>);
+ render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);
  await user.click(await screen.findByRole('button',{name:'新增授权'}));
  const dialog=screen.getByRole('dialog',{name:'预览，尚未保存'});
  await user.click(within(dialog).getByRole('button',{name:'关闭'}));
@@ -261,19 +261,23 @@ it('keeps an unsaved permission preview open when discard fails',async()=>{
  expect(screen.getByRole('dialog',{name:'预览，尚未保存'})).toHaveTextContent('这次没有放弃预览。');
 });
 
-it('hides 新增授权 when the server publish bit is false', async () => {
+it('shows only account capability when no supported grant action is allocatable', async () => {
   const view = { signedIn: true, available: true, busy: false, validUntil: null, sources: [{ selection: 'scope-1', label: '合成范围' }], source: 'scope-1', people: [], actions: ['query' as const], grants: [], preview: null, pending: false, resultUnknown: false, notice: null };
   window.dashboardPermissions = { current: async () => ({ ok: true, view }), command: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
-  render(<IntakePermissions canGrant={false} grantBlock="没有权限，请找人开通。" active />);
-  expect(await screen.findByText('没有权限，请找人开通。')).toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('没有权限，请找人开通。');
+  window.dashboardSeats = { command: async () => ({ ok: true, action: 'list', seats: [] }) };
+  render(<IntakePermissions canViewGrantSettings={false} canManageAccounts active />);
+  expect(await screen.findByRole('table', { name: '账号' })).toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: '权限' })).toBeNull();
   expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
 });
 
-it('shows the fixed denial when grant is missing, and still hides the grant button', async () => {
+it('shows the fixed denial inside a readable grant page without exposing the grant action', async () => {
   const view = { signedIn: true, available: true, busy: false, validUntil: null, sources: [{ selection: 'scope-1', label: '合成范围' }], source: 'scope-1', people: [], actions: ['query' as const], grants: [], preview: null, pending: false, resultUnknown: false, notice: null };
   window.dashboardPermissions = { current: async () => ({ ok: true, view }), command: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
-  render(<IntakePermissions canGrant={false} grantAccess={{ need: '给他人开通权限', detail: '没有权限，请找人开通。' }} active />);
+  const { rerender } = render(<IntakePermissions canViewGrantSettings canManageAccounts={false} grantBlock="没有权限，请找人开通。" active />);
+  expect(screen.queryByRole('button', { name: '新增授权' })).toBeNull();
+  expect(await screen.findByText('没有权限，请找人开通。')).toBeInTheDocument();
+  rerender(<IntakePermissions canViewGrantSettings canManageAccounts grantAccess={{ need: '给他人开通权限', detail: '没有权限，请找人开通。' }} active />);
   const block = await screen.findByTestId('workbench-no-access');
   expect(block).toHaveTextContent('你还不能给他人开通权限');
   expect(block).toHaveTextContent('没有权限，请找人开通。');
@@ -282,10 +286,30 @@ it('shows the fixed denial when grant is missing, and still hides the grant butt
   expect(screen.queryByTestId('workbench-no-access')).toBeNull();
 });
 
+it('opens account-only settings without reading or exposing grant controls', async () => {
+  const permissionCommand = vi.fn();
+  window.dashboardPermissions = {
+    current: permissionCommand,
+    command: permissionCommand,
+    onInvalidated: () => () => undefined,
+  };
+  window.dashboardSeats = {
+    command: async intent => intent.action === 'list'
+      ? { ok: true, action: 'list', seats: [] }
+      : { ok: false, message: '不应调用写入' },
+  };
+  render(<IntakePermissions active canViewGrantSettings={false} canManageAccounts />);
+  expect(await screen.findByRole('table', { name: '账号' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: '账号' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.queryByRole('tab', { name: '权限' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '新增授权' })).not.toBeInTheDocument();
+  expect(permissionCommand).not.toHaveBeenCalled();
+});
+
 it('does not say the read window expired when no countdown is running',async()=>{
  const view={signedIn:true,available:false,busy:false,validUntil:null,sources:[],source:null,people:[],actions:[],grants:[],preview:null,pending:false,resultUnknown:false,notice:null};
  window.dashboardPermissions={current:async()=>({ok:true,view}),command:async()=>({ok:true,view}),onInvalidated:()=>()=>undefined};
- render(<IntakePermissions canGrant active/>);
+ render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);
  expect(await screen.findByText('请刷新权限列表。')).toBeInTheDocument();
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'停止等待'})).not.toBeInTheDocument();
@@ -309,7 +333,7 @@ it('shows a loading skeleton before the permission read resolves', async () => {
     command: () => new Promise(resolve => { release = resolve; }),
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions canGrant active />);
+  render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   expect(screen.getByLabelText('正在读取权限')).toBeInTheDocument();
   expect(screen.queryByRole('table', { name: '成员权限' })).not.toBeInTheDocument();
   release({ ok: true, view });
@@ -318,7 +342,7 @@ it('shows a loading skeleton before the permission read resolves', async () => {
 });
 
 it('keeps the existing sentence when the permissions API is missing', async () => {
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('资料还不能在这里改。请把表交给客服经理。');
   expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('正在读取权限')).not.toBeInTheDocument();
@@ -330,7 +354,7 @@ it('keeps the existing sentence when a permission read throws', async () => {
     command: async () => { throw new Error('down'); },
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('设置暂不可用，请重新读取。');
   expect(screen.queryByText('请先登录。')).not.toBeInTheDocument();
 });
@@ -341,7 +365,7 @@ it('shows the reply sentence when a permission read fails without a view', async
     command: async () => ({ ok: false, message: '权限、人员状态或输入已变化，请刷新后核对。', view: null }),
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('权限、人员状态或输入已变化，请刷新后核对。');
   expect(screen.queryByText('设置暂不可用，请重新读取。')).not.toBeInTheDocument();
 });
@@ -353,7 +377,7 @@ it('shows 请先登录。 for a signed-out permission view', async () => {
     command: async () => ({ ok: true, view }),
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByText('请先登录。')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
@@ -370,7 +394,7 @@ it('shows 请先登录。 without a loading flash while the next read is in flig
     },
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByText('请先登录。')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: '刷新权限列表' }));
@@ -391,14 +415,14 @@ it('does not read again or close an unsaved preview when the page is left and op
     onInvalidated: () => () => undefined,
   };
   const user = userEvent.setup();
-  const { rerender } = render(<IntakePermissions canGrant active={false} />);
+  const { rerender } = render(<IntakePermissions canViewGrantSettings canManageAccounts active={false} />);
   expect(commands).toEqual([]);
-  rerender(<IntakePermissions canGrant active />);
+  rerender(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   await user.click(await screen.findByRole('button', { name: '新增授权' }));
   expect(screen.getByRole('dialog', { name: '预览，尚未保存' })).toBeInTheDocument();
   expect(commands).toEqual(['refresh']);
-  rerender(<IntakePermissions canGrant active={false} />);
-  rerender(<IntakePermissions canGrant active />);
+  rerender(<IntakePermissions canViewGrantSettings canManageAccounts active={false} />);
+  rerender(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   expect(screen.getByRole('dialog', { name: '预览，尚未保存' })).toBeInTheDocument();
   expect(commands).toEqual(['refresh']);
 });
@@ -432,7 +456,7 @@ it('shows a revoked grant as closed and does not offer a way to restore it', asy
     onInvalidated: (fn) => main.subscribe(fn),
   };
   try {
-    render(<IntakePermissions canGrant active />);
+    render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
     await userEvent.click(await screen.findByRole('button', { name: '查看权限' }));
     const grants = await screen.findByRole('table', { name: '权限明细' });
     expect(grants).toHaveTextContent('已撤销');
@@ -459,7 +483,7 @@ function permissionGrant(patch: Partial<IntakePermissionView['grants'][number]> 
 function showPermissionView(view: IntakePermissionView) {
   const command = vi.fn(async (_command: IntakePermissionCommand): Promise<IntakePermissionReply> => ({ ok: true, view }));
   window.dashboardPermissions = { current: async () => ({ ok: true, view }), command, onInvalidated: () => () => undefined };
-  render(<IntakePermissions canGrant active />);
+  render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   return command;
 }
 
@@ -578,7 +602,7 @@ it.each([null, 'person-one'])('revokes only the chosen grant for grouping key %s
     return { ok: true, view };
   });
   window.dashboardPermissions = { current: async () => ({ ok: true, view }), command, onInvalidated: () => () => undefined };
-  render(<IntakePermissions canGrant active />);
+  render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   const user = userEvent.setup();
   const chosen = await screen.findByRole('row', { name: personSelection ? /同一成员/ : /reference-1/ });
   await user.click(within(chosen).getByRole('button', { name: '查看权限' }));
@@ -617,7 +641,7 @@ it('clears the member detail and revoke confirmation at the read deadline even w
     command: async () => ({ ok: true, view }),
     onInvalidated: () => () => undefined,
   };
-  render(<IntakePermissions canGrant active />);
+  render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   await act(async () => {});
   fireEvent.click(screen.getByRole('button', { name: '查看权限' }));
   fireEvent.click(screen.getByRole('button', { name: '撤销该权限' }));
@@ -645,11 +669,11 @@ it('keeps original-request recovery available when no permission list is readabl
 it('uses the supplied server gate and clears details when that view is replaced', async () => {
   const view = permissionView({ grants: [permissionGrant()] });
   window.dashboardPermissions = { current: async () => ({ ok: true, view }), command: async () => ({ ok: true, view }), onInvalidated: () => () => undefined };
-  const { rerender } = render(<IntakePermissions active canGrant={false} gate={{ state: 'open', body: view }} />);
+  const { rerender } = render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} gate={{ state: 'open', body: view }} />);
   await userEvent.click(screen.getByRole('button', { name: '查看权限' }));
   expect(screen.getByRole('table', { name: '权限明细' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '新增授权' })).toBeEnabled();
-  rerender(<IntakePermissions active canGrant={false} gate={{ state: 'open', body: permissionView({ signedIn: false, available: false, source: null }) }} />);
+  rerender(<IntakePermissions active canViewGrantSettings={false} canManageAccounts={false} gate={{ state: 'open', body: permissionView({ signedIn: false, available: false, source: null }) }} />);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '新增授权' })).not.toBeInTheDocument();

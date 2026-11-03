@@ -32,12 +32,17 @@ const STATUS: Readonly<Record<SeatReason, number>> = Object.freeze({
   SEAT_DISPLAY_NAME_TAKEN: 409,
   SEAT_NOT_FOUND: 404,
   SEAT_FORBIDDEN: 403,
+  SEAT_PASSWORD_NOT_WRITTEN: 500,
 });
 
 function seatFailure(reply: FastifyReply, reason: SeatReason, diagnosticId: string = randomUUID()) {
+  const code = reason === 'SEAT_NOT_FOUND' ? 'NOT_FOUND'
+    : reason === 'SEAT_FORBIDDEN' ? 'FORBIDDEN'
+      : reason === 'SEAT_PASSWORD_NOT_WRITTEN' ? 'INTERNAL_ERROR'
+        : 'VALIDATION';
   return reply.code(STATUS[reason]).send({
     error: {
-      code: reason === 'SEAT_NOT_FOUND' ? 'NOT_FOUND' : reason === 'SEAT_FORBIDDEN' ? 'FORBIDDEN' : 'VALIDATION',
+      code,
       message: reason,
       details: { reason, diagnosticId },
     },
@@ -61,6 +66,12 @@ export const contentIntakeSeatRoutes: FastifyPluginAsync<{
       throw error;
     }
   };
+
+  app.get('/v1/intake/seats/administration', { exposeHeadRoute: false }, async (request, reply) => {
+    if (!noQuery(request)) return seatFailure(reply, 'SEAT_INPUT_INVALID');
+    const who = actor(request);
+    return respond(reply, async () => seats.capabilities(who.user_id));
+  });
 
   app.get('/v1/intake/seats', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request)) return seatFailure(reply, 'SEAT_INPUT_INVALID');

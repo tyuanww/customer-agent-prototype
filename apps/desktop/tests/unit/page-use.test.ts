@@ -7,7 +7,17 @@ import { ContentIntakePermissions } from '../../src/main/content-intake-permissi
 import { PageUseReader, sopUseFromCatalog } from '../../src/main/page-use';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
-import { canGrant, canOpenPermissions, canViewPermissions, grantUse, isPageUseSnapshot, type PageUseSnapshot, type PermissionsUse, type SopUse } from '../../src/shared/page-use';
+import {
+  canManageAccounts,
+  canOpenSettings,
+  canViewGrantSettings,
+  grantUse,
+  isPageUseSnapshot,
+  type AccountsUse,
+  type PageUseSnapshot,
+  type PermissionsUse,
+  type SopUse,
+} from '../../src/shared/page-use';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 
 vi.mock('electron', () => ({
@@ -16,21 +26,21 @@ vi.mock('electron', () => ({
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-function ready(permissions: PermissionsUse, sop: SopUse): PageUseSnapshot {
-  return { phase: 'ready', epoch: 1, permissions, sop };
+function ready(grants: PermissionsUse, accounts: AccountsUse, sop: SopUse): PageUseSnapshot {
+  return { phase: 'ready', epoch: 1, settings: { grants, accounts }, sop };
 }
 
 it('rejects a closed catalog that still carries nodes', () => {
   expect(isPageUseSnapshot({
     phase: 'ready',
     epoch: 1,
-    permissions: { state: 'closed', recovery: null },
+    settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
     sop: { state: 'closed', nodes: [{ nodeId: 'n1' }] },
   })).toBe(false);
   expect(isPageUseSnapshot({
     phase: 'ready',
     epoch: 1,
-    permissions: { state: 'closed', recovery: null },
+    settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
     sop: { state: 'closed' },
   })).toBe(true);
 });
@@ -38,7 +48,7 @@ it('rejects a closed catalog that still carries nodes', () => {
 const closedReady = {
   phase: 'ready',
   epoch: 1,
-  permissions: { state: 'closed', recovery: null },
+  settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
   sop: { state: 'closed' },
 };
 
@@ -56,8 +66,16 @@ function preloadPageUseSnapshot(): (value: unknown) => boolean {
       'function onlyKeys(value, allowed)',
     )
     .replace(
-      'function permissionsPayload(permissions: Record<string, unknown>): boolean',
-      'function permissionsPayload(permissions)',
+      'function grantsPayload(grants: Record<string, unknown>): boolean',
+      'function grantsPayload(grants)',
+    )
+    .replace(
+      'function accountsPayload(value: unknown): boolean',
+      'function accountsPayload(value)',
+    )
+    .replace(
+      'function settingsPayload(settings: Record<string, unknown>): boolean',
+      'function settingsPayload(settings)',
     )
     .replace(
       'function sopPayload(sop: Record<string, unknown>): boolean',
@@ -70,9 +88,12 @@ function preloadPageUseSnapshot(): (value: unknown) => boolean {
   return new Function(`${javascript}\nreturn pageUseSnapshot;`)() as (value: unknown) => boolean;
 }
 
-it('rejects a closed page that still carries people, grants, seats, or step text', () => {
+it('rejects a closed page that still carries settings, people, grants, seats, or step text', () => {
   const leaked = [
-    { ...closedReady, permissions: { state: 'closed', recovery: null, people: [], grants: [], seats: [] } },
+    { ...closedReady, settings: { ...closedReady.settings, people: [] } },
+    { ...closedReady, settings: { ...closedReady.settings, grants: { state: 'closed', recovery: null, grants: [] } } },
+    { ...closedReady, settings: { grants: { state: 'closed', recovery: null }, accounts: 'maybe' } },
+    { ...closedReady, permissions: { state: 'closed', recovery: null } },
     { ...closedReady, sop: { state: 'closed', body: 'step text' } },
     { ...closedReady, body: 'step text' },
     { ...closedReady, people: [] },
@@ -86,29 +107,48 @@ it('rejects a closed page that still carries people, grants, seats, or step text
   expect(accept(closedReady)).toBe(true);
 });
 
-it('does not open the permissions page for review-only mayAllocate', () => {
-  const closed = grantUse([{ mayAllocate: ['review'] }], null);
-  const snapshot = ready(closed.state === 'open' ? { state: 'open', body: null } : closed, { state: 'pending' });
-  expect(canOpenPermissions(snapshot)).toBe(false);
-  expect(canGrant(snapshot)).toBe(canOpenPermissions(snapshot));
-  expect(snapshot.phase === 'ready' && snapshot.permissions.state === 'open').toBe(false);
+it('keeps account administration independent from grantable actions', () => {
+  const reviewOnly = ready(grantUse([{ mayAllocate: ['review'] }], null) as PermissionsUse, 'open', { state: 'pending' });
+  expect(canOpenSettings(reviewOnly)).toBe(true);
+  expect(canViewGrantSettings(reviewOnly)).toBe(false);
+  expect(canManageAccounts(reviewOnly)).toBe(true);
+
+  const grantOnly = ready({ state: 'open', body: null }, 'closed', { state: 'pending' });
+  expect(canOpenSettings(grantOnly)).toBe(true);
+  expect(canViewGrantSettings(grantOnly)).toBe(true);
+  expect(canManageAccounts(grantOnly)).toBe(false);
+
+  const neither = ready({ state: 'closed', recovery: null }, 'closed', { state: 'pending' });
+  expect(canOpenSettings(neither)).toBe(false);
 });
 
-it('keeps a recovery explanation visible after the last permission closes', () => {
-  expect(canViewPermissions(ready({ state: 'closed', recovery: '没有权限，请找人开通。' }, { state: 'closed' }))).toBe(true);
-  expect(canViewPermissions(ready({ state: 'closed', recovery: null }, { state: 'closed' }))).toBe(false);
+it('keeps recovery copy in the closed model without making Settings reachable', () => {
+  expect(canOpenSettings(ready(
+    { state: 'closed', recovery: '没有权限，请找人开通。' },
+    'closed',
+    { state: 'closed' },
+  ))).toBe(false);
+  expect(canOpenSettings(ready(
+    { state: 'closed', recovery: null },
+    'closed',
+    { state: 'closed' },
+  ))).toBe(false);
 });
 
-it('opens the permissions page when mayAllocate contains a grantable action', () => {
+it('opens grant settings when mayAllocate contains a supported grant action', () => {
   for (const action of ['query', 'publish', 'rollback'] as const) {
     const opened = grantUse([{ mayAllocate: ['review', action] }], null);
     expect(opened.state).toBe('open');
-    const snapshot = ready({ state: 'open', body: null }, { state: 'pending' });
-    expect(canOpenPermissions(snapshot)).toBe(true);
-    expect(canGrant(snapshot)).toBe(true);
+    const snapshot = ready({ state: 'open', body: null }, 'closed', { state: 'pending' });
+    expect(canOpenSettings(snapshot)).toBe(true);
+    expect(canViewGrantSettings(snapshot)).toBe(true);
   }
   const empty = grantUse([{ mayAllocate: [] }], null);
-  expect(canOpenPermissions(ready(empty.state === 'open' ? { state: 'open', body: null } : empty, { state: 'pending' }))).toBe(false);
+  expect(canOpenSettings(ready(
+    empty.state === 'open' ? { state: 'open', body: null } : empty,
+    'closed',
+    { state: 'pending' },
+  ))).toBe(false);
 });
 
 it('cannot read nodes from a FORBIDDEN catalog outcome', () => {
@@ -169,13 +209,19 @@ it('does not write the previous person lists after the session epoch changes', a
   try {
     await vi.waitFor(() => {
       const snap = reader.current();
-      if (snap.phase !== 'ready' || snap.permissions.state === 'pending' || snap.sop.state === 'pending') {
+      if (snap.phase !== 'ready'
+        || snap.settings.grants.state === 'pending'
+        || snap.settings.accounts === 'pending'
+        || snap.sop.state === 'pending') {
         throw new Error('still warming');
       }
     });
     expect(reader.current()).toMatchObject({
       phase: 'ready',
-      permissions: { state: 'open', body: null },
+      settings: {
+        grants: { state: 'open', body: null },
+        accounts: 'closed',
+      },
       sop: { state: 'closed' },
     });
     expect(Object.hasOwn(reader.current().phase === 'ready' ? reader.current() : {}, 'sop')).toBe(true);
@@ -194,9 +240,43 @@ it('does not write the previous person lists after the session epoch changes', a
     await refresh;
     const snap = reader.current();
     expect(JSON.stringify(snap)).not.toContain('合成坐席');
-    expect(snap.phase === 'ready' && snap.permissions.state === 'open' ? snap.permissions.body : null).toBeNull();
+    expect(snap.phase === 'ready' && snap.settings.grants.state === 'open'
+      ? snap.settings.grants.body
+      : null).toBeNull();
   } finally {
     releaseHold();
+    reader.dispose();
+  }
+});
+
+it('opens account-only settings for a server-confirmed seat administrator without loading grant lists', async () => {
+  const fixture = intakePermissionsData(['review'], { canManageSeats: true });
+  const permissions = new ContentIntakePermissions(fixture.session);
+  const reader = new PageUseReader(fixture.session as unknown as ProductSession, permissions);
+  try {
+    await vi.waitFor(() => {
+      const current = reader.current();
+      if (current.phase !== 'ready'
+        || current.settings.grants.state === 'pending'
+        || current.settings.accounts === 'pending') {
+        throw new Error('still warming');
+      }
+    });
+    const current = reader.current();
+    expect(current).toMatchObject({
+      phase: 'ready',
+      settings: {
+        grants: { state: 'closed', recovery: null },
+        accounts: 'open',
+      },
+    });
+    expect(canOpenSettings(current)).toBe(true);
+    expect(canViewGrantSettings(current)).toBe(false);
+    expect(canManageAccounts(current)).toBe(true);
+    expect(fixture.requests.map((request) => request.path)).toContain('/v1/intake/seats/administration');
+    expect(fixture.requests.some((request) => request.path.startsWith('/v1/intake/sources?'))).toBe(false);
+    expect(fixture.requests.some((request) => request.path.startsWith('/v1/intake/principals?'))).toBe(false);
+  } finally {
     reader.dispose();
   }
 });

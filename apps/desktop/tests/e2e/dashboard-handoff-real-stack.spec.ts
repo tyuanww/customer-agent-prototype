@@ -76,6 +76,9 @@ test('dashboard handoff: collapsed filters and account logout across windows', a
     await expect(dashboard.getByText('未登录')).toBeVisible();
     await expect.poll(async () => (await host.status()).requests.filter(p => p === '/v1/auth/logout').length).toBe(before + 1);
     await expect.poll(() => query.evaluate(async () => { const v = await window.customerAgent!.product!.sessionStatus(); return v.ok && v.signedIn; })).toBe(false);
+    await expect(query.getByRole('combobox', { name: '当前店铺' })).toHaveCount(0);
+    await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
+    await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
     const hasToken = await dashboard.evaluate(() => JSON.stringify(Object.keys(window.dashboardContent ?? {})));
     expect(hasToken).not.toMatch(/token|invoke|send/i);
     await dashboard.screenshot({ path: path.join(evidence, 'signed-out.png') });

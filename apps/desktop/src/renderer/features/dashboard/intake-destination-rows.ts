@@ -94,13 +94,13 @@ export function intakeDestinationItem(id: IntakeDestination): IntakeSidebarItem 
 
 export function readIntakePreviewPage(
   location: Pick<Location, 'hostname' | 'search'>,
-  canViewPermissions: boolean,
+  canOpenSettings: boolean,
 ): IntakeDestination {
   const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   const params = new URLSearchParams(location.search);
   if (!local || params.get('preview') !== 'intake') return 'overview';
   const page = params.get('page');
-  if ((page === 'settings' || page === 'permissions') && !canViewPermissions) return 'overview';
+  if ((page === 'settings' || page === 'permissions') && !canOpenSettings) return 'overview';
   if (page === 'announce') return 'wording';
   if (page === 'permissions') return 'settings';
   if (page !== null && isIntakeDestination(page)) return page;
@@ -109,20 +109,20 @@ export function readIntakePreviewPage(
 
 export function intakeRowVisible(
   row: IntakeDestinationRow,
-  canViewPermissions: boolean,
+  canOpenSettings: boolean,
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): boolean {
-  if (row.id === 'settings') return canViewPermissions;
+  if (row.id === 'settings') return canOpenSettings;
   if (row.audience === 'staff' && (!jobKnown || seatLibraryOnly)) return false;
-  if (row.needsPermissionBridge && !canViewPermissions) return false;
+  if (row.needsPermissionBridge && !canOpenSettings) return false;
   return true;
 }
 
 export function intakeSidebarItems(
-  canViewPermissions: boolean,
+  canOpenSettings: boolean,
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): readonly IntakeSidebarItem[] {
-  return INTAKE_DESTINATION_ROWS.filter((row) => intakeRowVisible(row, canViewPermissions, seatLibraryOnly, jobKnown));
+  return INTAKE_DESTINATION_ROWS.filter((row) => intakeRowVisible(row, canOpenSettings, seatLibraryOnly, jobKnown));
 }

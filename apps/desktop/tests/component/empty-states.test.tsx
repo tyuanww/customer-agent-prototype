@@ -49,7 +49,7 @@ it('names a missing usage source on the usage log and an empty log separately', 
 });
 
 it('shows 资料还不能在这里改。请把表交给客服经理。 on 设置 and 资料 without accusing the operator', async () => {
-  render(<IntakePermissions active />);
+  render(<IntakePermissions active canViewGrantSettings canManageAccounts={false} />);
   expect(await screen.findByText(WORKBENCH_EMPTY.intakeUnmounted)).toBeVisible();
   expect(screen.queryByText(/没有可用的资料管理权限|权限配置尚未接入/)).toBeNull();
   expect(screen.getByRole('region', { name: '设置' })).toBeVisible();

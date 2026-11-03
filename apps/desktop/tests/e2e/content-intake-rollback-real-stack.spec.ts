@@ -10,7 +10,6 @@ import { launchIntakeElectron } from '../support/intake-electron';
  * then crosses renderer/preload/Main/HTTP/PG and a separately signed-in seat. */
 test('confirmed rollback creates a new release whose historical FAQ is consumed by another seat', async () => {
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
-  test.fixme(true, 'Previous-preview excluded from the launch candidate; retained for later verification.');
   test.setTimeout(180_000);
   const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
   const { createIntakeSyntheticHost, createIntakeSyntheticWorkbook, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
@@ -86,13 +85,11 @@ test('confirmed rollback creates a new release whose historical FAQ is consumed 
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.getByTestId('nav-materials').click();
     const rollback = dashboard.getByRole('region', { name: '已发布目录纠正回退' });
-    await dashboard.getByRole('radiogroup', { name: '候选筛选', exact: true }).getByText('已发布', { exact: true }).click();
+    await dashboard.getByRole('radiogroup', { name: '批次筛选', exact: true }).getByText('已发布', { exact: true }).click();
     await dashboard.getByRole('button', { name: '回退', exact: true }).first().click();
     await expect(rollback).toBeVisible();
-    await expect(rollback.getByRole('button', { name: '查看回退影响' })).toBeVisible();
-    await rollback.getByRole('button', { name: '查看回退影响' }).click();
-    await expect(rollback.getByText(`当前版 ${base}`, { exact: true })).toBeVisible();
-    await expect(rollback.getByText(`上一版 ${target}`, { exact: true })).toBeVisible();
+    await expect(rollback.getByText(base, { exact: true })).toBeVisible();
+    await expect(rollback.getByText(target, { exact: true })).toBeVisible();
     await expect(rollback.getByText(/来源 source-a/)).toBeVisible();
     await expect(rollback.getByRole('button', { name: '发起回退复核', exact: true })).toHaveCount(0);
     await expect(rollback.getByRole('button', { name: '确认回退并发布' })).toBeEnabled();

@@ -3,6 +3,8 @@ import { expect,it,vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import type { IpcMainInvokeEvent,WebContents } from 'electron';
 import type { ProductSession } from '../../src/main/product-session';
+import type { PageUseReader } from '../../src/main/page-use';
+import type { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { registerContentIntakePermissionsIpc } from '../../src/main/content-intake-permissions-ipc';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 import { observeSessionJob } from '../../src/shared/product-session';
@@ -20,6 +22,22 @@ it('rejects other windows, child frames and forged fields before accessing a ses
   expect(await current(event(dashboard),{})).toMatchObject({ok:false,message:'设置输入无效。'});
   expect(await command(event(dashboard),{action:'refresh'})).toMatchObject({ok:false,message:'资料还不能在这里改。请把表交给客服经理。'});
  }finally{owned.dispose();}expect(handlers.size).toBe(0);
+});
+it('rejects permission reads and commands when only account administration is open',async()=>{
+ const frame={parent:null},dashboard={id:1,mainFrame:frame,isDestroyed:()=>false,getURL:()=> 'http://127.0.0.1:5173/?role=dashboard'} as unknown as WebContents;
+ const event={sender:dashboard,senderFrame:frame} as IpcMainInvokeEvent;
+ const fixture=intakePermissionsData();
+ const bound={
+  pageUse:{current:()=>({phase:'ready',epoch:1,settings:{grants:{state:'closed',recovery:null},accounts:'open'},sop:{state:'closed'}})},
+  permissions:{} as ContentIntakePermissions,
+ } as unknown as {pageUse:PageUseReader;permissions:ContentIntakePermissions};
+ const owned=registerContentIntakePermissionsIpc(fixture.session as unknown as ProductSession,()=>dashboard,()=> 'http://127.0.0.1:5173/',bound);
+ try{
+  const command=handlers.get('dashboard:permissions-command')!,current=handlers.get('dashboard:permissions-current')!;
+  const denied={ok:false,message:'没有权限，请找人开通。',view:null};
+  expect(await current(event)).toEqual(denied);
+  expect(await command(event,{action:'refresh'})).toEqual(denied);
+ }finally{owned.dispose();}
 });
 it('warns about losing an uncertain grant request and permits an explicit close or exit',async()=>{
  const f=intakePermissionsData(),frame={parent:null},wc=Object.assign(new EventEmitter(),{id:1,mainFrame:frame,isDestroyed:()=>false,getURL:()=> 'http://127.0.0.1:5173/?role=dashboard',send:vi.fn()}) as unknown as WebContents;

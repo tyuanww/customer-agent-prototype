@@ -30,23 +30,32 @@ export const SEAT_REASONS = Object.freeze([
   'SEAT_POST_INVALID', 'SEAT_PASSWORD_INVALID', 'SEAT_ROLE_NOT_IN_CEILING',
   'SEAT_HOME_INVALID', 'SEAT_HOME_UNKNOWN', 'SEAT_EXISTS',
   'SEAT_DISPLAY_NAME_TAKEN', 'SEAT_NOT_FOUND', 'SEAT_FORBIDDEN',
+  'SEAT_PASSWORD_NOT_WRITTEN',
 ] as const);
 export type SeatReason = (typeof SEAT_REASONS)[number];
 
 export class SeatRefusal extends Error {
-  constructor(readonly reason: SeatReason) { super(reason); }
+  constructor(readonly reason: SeatReason, options?: ErrorOptions) { super(reason, options); }
 }
 
 const POSTS: readonly string[] = Object.freeze(['客服', '客服主管']);
 const ACTIONABLE = new Set<string>(SEAT_REASONS);
 const USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
+const UNIQUE_SEAT_CONSTRAINTS: Readonly<Record<string, SeatReason>> = Object.freeze({
+  subject_bindings_pkey: 'SEAT_EXISTS',
+  subject_bindings_user_id_key: 'SEAT_EXISTS',
+  subject_bindings_provider_tenant_subject_key: 'SEAT_DISPLAY_NAME_TAKEN',
+});
 
-/** A database refusal that names a cause the operator can fix is re-raised as a SeatRefusal. A
- *  constraint violation or a permission error is not: reporting one of those as "wrong input"
- *  would send the operator chasing the wrong thing. */
+/** Database refusals map to SeatRefusal only when the operator can act on the named cause.
+ *  Permission failures and unrelated constraint violations keep their original error. */
 function translated(error: unknown): never {
   if (error && typeof error === 'object' && 'code' in error) {
-    const failure = error as { code?: string; message?: string };
+    const failure = error as { code?: string; constraint?: string; message?: string };
+    if (failure.code === '23505' && typeof failure.constraint === 'string') {
+      const reason = UNIQUE_SEAT_CONSTRAINTS[failure.constraint];
+      if (reason) throw new SeatRefusal(reason);
+    }
     if (failure.code === 'ZA001' || failure.code === 'ZA003') {
       const reason = typeof failure.message === 'string' ? failure.message.split('\n')[0]!.trim() : '';
       if (ACTIONABLE.has(reason)) throw new SeatRefusal(reason as SeatReason);
@@ -77,6 +86,7 @@ function passwordOf(value: unknown): string {
 }
 
 export type SeatService = Readonly<{
+  capabilities: (actorId: string) => Promise<{ readonly canManage: boolean }>;
   list: (actorId: string) => Promise<readonly SeatView[]>;
   create: (actorId: string, input: unknown) => Promise<SeatView>;
   reset: (actorId: string, input: unknown) => Promise<{ username: string }>;
@@ -121,6 +131,16 @@ export function createSeatService(
   }
 
   return Object.freeze({
+    async capabilities(actorId) {
+      try {
+        await requireAdministrator(actorId);
+        return { canManage: true };
+      } catch (error) {
+        if (error instanceof SeatRefusal && error.reason === 'SEAT_FORBIDDEN') return { canManage: false };
+        throw error;
+      }
+    },
+
     async list(actorId) {
       await requireAdministrator(actorId);
       return list();
@@ -144,7 +164,11 @@ export function createSeatService(
       // The identity rows are committed first. A crash here leaves a seat that exists and cannot
       // log in, which the list shows and a reset repairs; the reverse order would leave a working
       // password for a binding that was rolled back.
-      passwordFile.upsert(username, `synthetic_seat_${username}`, password);
+      try {
+        await passwordFile.upsert(username, `synthetic_seat_${username}`, password);
+      } catch (error) {
+        throw new SeatRefusal('SEAT_PASSWORD_NOT_WRITTEN', { cause: error });
+      }
       return Object.freeze({ displayName, username, post, enabled: true });
     },
 
@@ -157,7 +181,11 @@ export function createSeatService(
       const password = passwordOf(record.password);
       // Reset writes no database state, so existence comes from the list the operator reads.
       if (!(await list()).some((seat) => seat.username === username)) throw new SeatRefusal('SEAT_NOT_FOUND');
-      passwordFile.upsert(username, `synthetic_seat_${username}`, password);
+      try {
+        await passwordFile.upsert(username, `synthetic_seat_${username}`, password);
+      } catch (error) {
+        throw new SeatRefusal('SEAT_PASSWORD_NOT_WRITTEN', { cause: error });
+      }
       return { username };
     },
 

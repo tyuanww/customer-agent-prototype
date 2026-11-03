@@ -2,12 +2,15 @@ import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { parseContractSchema } from '@customer-agent/contracts';
 import type { DashboardSopNode } from '../shared/dashboard-ops-loop';
 import {
+  canManageAccounts,
   grantUse,
   openGrantBrand,
   withPermissionsBody,
+  type AccountsUse,
   type OpenGrant,
   type PageUseSnapshot,
   type PermissionsUse,
+  type SettingsUse,
   type SopUse,
 } from '../shared/page-use';
 import type { SeatAccountRecord } from '../shared/seat-account-intent';
@@ -50,6 +53,10 @@ export function sopUseFromCatalog(outcome: CatalogOutcome): Exclude<SopUse, { st
 type AuthorizationRead =
   | { readonly ok: true; readonly capabilities: readonly { readonly mayAllocate: readonly string[] }[] }
   | { readonly ok: false; readonly failure: 'unauthorized' | 'forbidden' | 'unavailable' | 'stale' };
+
+type SeatAdministrationRead =
+  | { readonly ok: true; readonly canManage: boolean }
+  | { readonly ok: false; readonly failure: 'unauthorized' | 'unavailable' | 'stale' };
 
 function catalogOutcomeFromError(error: unknown): CatalogOutcome {
   if (!(error instanceof ProductHttpError)) return { kind: 'unavailable' };
@@ -111,45 +118,56 @@ export class PageUseReader {
     this.permissions.dispose();
   }
 
-  async warmPermissions(epoch: number): Promise<PermissionsUse> {
+  async warmSettings(epoch: number): Promise<SettingsUse> {
     const id = ++this.permissionGeneration;
-    const opened = this.applyAuthorization(id, epoch, await this.readAuthorization(epoch));
-    if (isOpenGrant(opened)) return { state: 'open', body: null };
-    return opened;
+    const [grants, accounts] = await Promise.all([
+      this.readAuthorization(epoch),
+      this.readSeatAdministration(epoch),
+    ]);
+    return this.applySettings(id, epoch, grants, accounts);
   }
 
-  async refreshPermissions(epoch: number): Promise<PermissionsUse> {
+  async refreshPermissions(epoch: number): Promise<SettingsUse> {
     const id = ++this.permissionGeneration;
-    const first = await this.readAuthorization(epoch);
-    const opened = this.applyAuthorization(id, epoch, first);
-    if (!this.permissionCurrent(id, epoch)) return this.droppedPermissions();
-    if (!isOpenGrant(opened)) return opened;
+    const [grantRead, accountRead] = await Promise.all([
+      this.readAuthorization(epoch),
+      this.readSeatAdministration(epoch),
+    ]);
+    const first = this.applySettings(id, epoch, grantRead, accountRead);
+    if (!this.permissionCurrent(id, epoch)) return this.droppedSettings();
+    const gate = this.openGate;
+    if (!gate || !isOpenGrant(gate)) return first;
     this.suppress += 1;
     try {
-      const body = await this.permissions.loadLists(opened, epoch);
+      const body = await this.permissions.loadLists(gate, epoch);
       if (!this.permissionCurrent(id, epoch)) return this.abandonStale(id);
-      const second = await this.readAuthorization(epoch);
-      if (!this.permissionCurrent(id, epoch)) return this.abandonStale(id);
-      const still = this.applyAuthorization(id, epoch, second);
-      if (!isOpenGrant(still)) {
+      const [secondGrant, secondAccounts] = await Promise.all([
+        this.readAuthorization(epoch),
+        this.readSeatAdministration(epoch),
+      ]);
+      const still = this.applySettings(id, epoch, secondGrant, secondAccounts);
+      const currentGate = this.openGate;
+      if (!currentGate || !isOpenGrant(currentGate)) {
         this.permissions.dropLists();
         this.listsReady = false;
-        this.openGate = null;
         return still;
       }
-      this.openGate = still;
       this.listsReady = true;
-      const next = withPermissionsBody(still, body);
-      this.commitPermissions(epoch, next);
+      const next: SettingsUse = {
+        ...still,
+        grants: withPermissionsBody(currentGate, body),
+      };
+      this.commitSettings(epoch, next);
       return next;
     } catch {
       if (!this.permissionCurrent(id, epoch)) return this.abandonStale(id);
       this.permissions.dropLists();
       this.listsReady = false;
       this.openGate = null;
-      const unavailable: PermissionsUse = { state: 'unavailable' };
-      this.commitPermissions(epoch, unavailable);
-      return unavailable;
+      const accounts = this.currentAccounts();
+      const next: SettingsUse = { grants: { state: 'unavailable' }, accounts };
+      this.commitSettings(epoch, next);
+      return next;
     } finally {
       this.suppress -= 1;
     }
@@ -191,9 +209,9 @@ export class PageUseReader {
   }
 
   async listSeats(epoch: number): Promise<SeatList | { readonly state: 'closed' }> {
-    if (!this.permissionsAreOpen(epoch)) return { state: 'closed' };
+    if (!this.accountsAreOpen(epoch)) return { state: 'closed' };
     const result = await this.session.request(epoch, '/v1/intake/seats', { method: 'GET', maxResponseBytes: 262_144 });
-    if (!this.permissionsAreOpen(epoch)) return { state: 'closed' };
+    if (!this.accountsAreOpen(epoch)) return { state: 'closed' };
     const rows = (result.value as { seats?: unknown }).seats;
     if (!Array.isArray(rows)) throw new ProductHttpError('UNAVAILABLE');
     const seats: SeatAccountRecord[] = [];
@@ -202,7 +220,7 @@ export class PageUseReader {
       if (!seat) throw new ProductHttpError('UNAVAILABLE');
       seats.push(seat);
     }
-    if (!this.permissionsAreOpen(epoch)) return { state: 'closed' };
+    if (!this.accountsAreOpen(epoch)) return { state: 'closed' };
     return { seats };
   }
 
@@ -219,11 +237,11 @@ export class PageUseReader {
     this.snapshot = {
       phase: 'ready',
       epoch: view.sessionEpoch,
-      permissions: { state: 'pending' },
+      settings: { grants: { state: 'pending' }, accounts: 'pending' },
       sop: { state: 'pending' },
     };
     this.emit();
-    void this.warmPermissions(view.sessionEpoch);
+    void this.warmSettings(view.sessionEpoch);
     void this.openSop(view.sessionEpoch);
   }
 
@@ -231,7 +249,10 @@ export class PageUseReader {
     if (this.suppress > 0 || !this.listsReady || !this.openGate) return;
     const snap = this.snapshot;
     if (snap.phase !== 'ready' || !this.sameEpoch(snap.epoch)) return;
-    this.commitPermissions(snap.epoch, withPermissionsBody(this.openGate, this.permissions.view()));
+    this.commitSettings(snap.epoch, {
+      grants: withPermissionsBody(this.openGate, this.permissions.view()),
+      accounts: snap.settings.accounts,
+    });
   }
 
   private sameEpoch(epoch: number): boolean {
@@ -256,32 +277,32 @@ export class PageUseReader {
     for (const listener of this.listeners) listener(snapshot);
   }
 
-  private commitPermissions(epoch: number, permissions: PermissionsUse): void {
+  private commitSettings(epoch: number, settings: SettingsUse): void {
     if (!this.sameEpoch(epoch)) return;
     const sop = this.snapshot.phase === 'ready' && this.snapshot.epoch === epoch
       ? this.snapshot.sop
       : { state: 'pending' as const };
-    this.snapshot = { phase: 'ready', epoch, permissions, sop };
+    this.snapshot = { phase: 'ready', epoch, settings, sop };
     this.emit();
   }
 
   private commitSop(epoch: number, sop: SopUse): void {
     if (!this.sameEpoch(epoch)) return;
-    const permissions = this.snapshot.phase === 'ready' && this.snapshot.epoch === epoch
-      ? this.snapshot.permissions
-      : { state: 'pending' as const };
-    this.snapshot = { phase: 'ready', epoch, permissions, sop };
+    const settings = this.snapshot.phase === 'ready' && this.snapshot.epoch === epoch
+      ? this.snapshot.settings
+      : { grants: { state: 'pending' as const }, accounts: 'pending' as const };
+    this.snapshot = { phase: 'ready', epoch, settings, sop };
     this.emit();
   }
 
-  private droppedPermissions(): PermissionsUse {
+  private droppedSettings(): SettingsUse {
     if (!this.session.view().signedIn) {
       if (this.snapshot.phase !== 'signed-out') this.becomeSignedOut();
-      return { state: 'closed', recovery: null };
+      return { grants: { state: 'closed', recovery: null }, accounts: 'closed' };
     }
     const snap = this.snapshot;
-    if (snap.phase === 'ready' && snap.epoch === this.session.view().sessionEpoch) return snap.permissions;
-    return { state: 'pending' };
+    if (snap.phase === 'ready' && snap.epoch === this.session.view().sessionEpoch) return snap.settings;
+    return { grants: { state: 'pending' }, accounts: 'pending' };
   }
 
   private dropSop(): SopUse {
@@ -294,39 +315,56 @@ export class PageUseReader {
     return { state: 'pending' };
   }
 
-  private abandonStale(id: number): PermissionsUse {
+  private abandonStale(id: number): SettingsUse {
     if (id === this.permissionGeneration) this.permissions.dropLists();
-    return this.droppedPermissions();
+    return this.droppedSettings();
   }
 
-  private applyAuthorization(id: number, epoch: number, read: AuthorizationRead): OpenGrant | PermissionsUse {
-    if (!this.permissionCurrent(id, epoch) || (!read.ok && read.failure === 'stale')) return this.droppedPermissions();
-    if (!read.ok) {
-      if (read.failure === 'unauthorized') {
-        this.becomeSignedOut();
-        return { state: 'closed', recovery: null };
+  private applySettings(
+    id: number,
+    epoch: number,
+    grantRead: AuthorizationRead,
+    accountRead: SeatAdministrationRead,
+  ): SettingsUse {
+    if (!this.permissionCurrent(id, epoch)
+      || (!grantRead.ok && grantRead.failure === 'stale')
+      || (!accountRead.ok && accountRead.failure === 'stale')) {
+      return this.droppedSettings();
+    }
+    if ((!grantRead.ok && grantRead.failure === 'unauthorized')
+      || (!accountRead.ok && accountRead.failure === 'unauthorized')) {
+      this.becomeSignedOut();
+      return { grants: { state: 'closed', recovery: null }, accounts: 'closed' };
+    }
+
+    let grants: PermissionsUse;
+    if (grantRead.ok) {
+      const opened = grantUse(grantRead.capabilities, this.permissions.recovery());
+      if (opened.state === 'open') {
+        this.openGate = opened;
+        grants = { state: 'open', body: null };
+      } else {
+        grants = opened;
       }
-      this.listsReady = false;
-      this.openGate = null;
-      const next: PermissionsUse = read.failure === 'forbidden'
+    } else {
+      grants = grantRead.failure === 'forbidden'
         ? { state: 'closed', recovery: this.permissions.recovery() }
         : { state: 'unavailable' };
-      this.permissions.dropLists();
-      this.commitPermissions(epoch, next);
-      return next;
     }
-    const opened = grantUse(read.capabilities, this.permissions.recovery());
-    if (opened.state !== 'open') {
-      this.listsReady = false;
+
+    if (grants.state !== 'open') {
       this.openGate = null;
       this.permissions.dropLists();
-      this.commitPermissions(epoch, opened);
-      return opened;
     }
-    this.openGate = opened;
     this.listsReady = false;
-    this.commitPermissions(epoch, { state: 'open', body: null });
-    return opened;
+
+    let accounts: AccountsUse;
+    if (accountRead.ok) accounts = accountRead.canManage ? 'open' : 'closed';
+    else accounts = 'unavailable';
+
+    const next: SettingsUse = { grants, accounts };
+    this.commitSettings(epoch, next);
+    return next;
   }
 
   private async readAuthorization(epoch: number): Promise<AuthorizationRead> {
@@ -358,9 +396,41 @@ export class PageUseReader {
     }
   }
 
-  private permissionsAreOpen(epoch: number): boolean {
+  private async readSeatAdministration(epoch: number): Promise<SeatAdministrationRead> {
+    try {
+      const result = await this.session.request(epoch, '/v1/intake/seats/administration', {
+        method: 'GET',
+        maxResponseBytes: 16_384,
+      });
+      if (!this.sameEpoch(epoch)) return { ok: false, failure: 'stale' };
+      if (!result.value || typeof result.value !== 'object' || Array.isArray(result.value)) {
+        return { ok: false, failure: 'unavailable' };
+      }
+      const value = result.value as Record<string, unknown>;
+      if (Object.keys(value).length !== 1 || typeof value.canManage !== 'boolean') {
+        return { ok: false, failure: 'unavailable' };
+      }
+      return { ok: true, canManage: value.canManage };
+    } catch (error) {
+      if (!this.sameEpoch(epoch) || (error instanceof ProductHttpError && error.code === 'STALE')) {
+        return { ok: false, failure: 'stale' };
+      }
+      if (error instanceof ProductHttpError && error.code === 'UNAUTHORIZED') {
+        return { ok: false, failure: 'unauthorized' };
+      }
+      return { ok: false, failure: 'unavailable' };
+    }
+  }
+
+  private currentAccounts(): AccountsUse {
     const snap = this.snapshot;
-    return this.sameEpoch(epoch) && snap.phase === 'ready' && snap.epoch === epoch && snap.permissions.state === 'open';
+    return snap.phase === 'ready' && this.sameEpoch(snap.epoch) ? snap.settings.accounts : 'pending';
+  }
+
+  private accountsAreOpen(epoch: number): boolean {
+    const snap = this.snapshot;
+    return this.sameEpoch(epoch) && snap.phase === 'ready' && snap.epoch === epoch
+      && canManageAccounts(snap);
   }
 }
 

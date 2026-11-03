@@ -505,7 +505,7 @@ pnpm --filter @customer-agent/desktop exec playwright test \
 
 ## FAQ 统一工作台
 
-`pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录，以及[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。
+`pnpm test:intake:desktop` 包含原上传/回退/权限配置/店铺目录、[四域工作台测试](../apps/desktop/tests/e2e/content-intake-workspace-real-stack.spec.ts)，以及统一工作台的 denied、跨窗口退出和账号管理旅程。实际受限 HTTP/PG15 先发布资料，Electron 的话术库按产品/活动/售前/售后归类读取同一产物；系统同步展示相同发布版本，撤权后刷新清空正文。仅审核管理员只得到账号能力，可完成 list/create/reset/disable 且看不到授权入口；仅查询管理员不能打开设置或调用账号命令。Dashboard 刷新不能破坏 Query 的既有合法复制资格，禁止走旧公告/内容/话术/SOP适配器。原上传和权限测试还验证跨导航保留未提交输入及预览。完整截图保存在 ignored `.gstack/intake-workspace/`；光暗和最小窗口证据不替代办公 Windows 与人工系统窗验收。
 
 目录只表示当前店铺、商品、场景条件下可读内容。无条件维度只读通用内容，不能据此声称全库同步。定向边界测试：
 

@@ -76,7 +76,10 @@ function showPermissionsNav() {
     current: async () => ({
       phase: 'ready' as const,
       epoch: 1,
-      permissions: { state: 'open' as const, body: null },
+      settings: {
+        grants: { state: 'open' as const, body: null },
+        accounts: 'open' as const,
+      },
       sop: { state: 'closed' as const },
     }),
     onChanged: () => () => undefined,
