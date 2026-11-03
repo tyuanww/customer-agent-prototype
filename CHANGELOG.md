@@ -4,11 +4,22 @@ All notable changes to this customer-agent product implementation repository are
 
 ## [0.3.40] - 2026-11-03
 
+### Changed
+
+- 工作台整理为工作台、内容库、SOP、资料审核、成员与权限五个入口。资料审核改为批次表和单份详情，成员权限先显示摘要，内容库统一已发布话术与本机草稿。
+- 切换页面保留未提交输入，并关闭相关弹窗；签出后隐藏写入口，工作台模式读取失败时提供重试。
+
 ### Fixed
 
 - 开发、WSL 测试和生产端口统一读取 `runtime-ports.ts`。生产根只接受 `43115/43116` 与 `customer_agent_formal`，测试根只接受 `43180/43181` 与非正式库，其他合成根的稳定偏移会跳过这两组保留端口。
 - `profile.json` 现在按根目录、环境、端口、数据库和派生存储目录整体校验；损坏、软链或跨环境 profile 会失败关闭，生产栈不能再生成合成 Desktop profile。
 - 图标生成在解码后的 RGBA 未变化时保留已跟踪 PNG 字节，避免 Linux zlib 版本差异让干净 checkout 在打包后变脏。
+- 自定义合成根的端口偏移现在避开生产与 WSL 测试的保留端口；旧 `profile.json` 与新偏移不一致时，先 destroy 本地合成栈再重建。
+
+### Release
+
+- 仓库版本是 `0.3.40`。本轮按授权只发布未签名 Windows 和 macOS 包，跳过 Linux 构建、Linux 验收和全部签名、公证。
+- 官网下载页只展示当前存在的 Windows 和 macOS 资产，不再保留旧 Linux 链接。
 
 ## [0.3.39] - 2026-10-29
 
