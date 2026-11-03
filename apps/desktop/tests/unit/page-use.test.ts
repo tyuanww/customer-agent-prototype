@@ -7,7 +7,7 @@ import { ContentIntakePermissions } from '../../src/main/content-intake-permissi
 import { PageUseReader, sopUseFromCatalog } from '../../src/main/page-use';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
-import { canGrant, canOpenPermissions, grantUse, isPageUseSnapshot, type PageUseSnapshot, type PermissionsUse, type SopUse } from '../../src/shared/page-use';
+import { canGrant, canOpenPermissions, canViewPermissions, grantUse, isPageUseSnapshot, type PageUseSnapshot, type PermissionsUse, type SopUse } from '../../src/shared/page-use';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 
 vi.mock('electron', () => ({
@@ -92,6 +92,11 @@ it('does not open the permissions page for review-only mayAllocate', () => {
   expect(canOpenPermissions(snapshot)).toBe(false);
   expect(canGrant(snapshot)).toBe(canOpenPermissions(snapshot));
   expect(snapshot.phase === 'ready' && snapshot.permissions.state === 'open').toBe(false);
+});
+
+it('keeps a recovery explanation visible after the last permission closes', () => {
+  expect(canViewPermissions(ready({ state: 'closed', recovery: '没有权限，请找人开通。' }, { state: 'closed' }))).toBe(true);
+  expect(canViewPermissions(ready({ state: 'closed', recovery: null }, { state: 'closed' }))).toBe(false);
 });
 
 it('opens the permissions page when mayAllocate contains a grantable action', () => {

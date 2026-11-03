@@ -1,5 +1,5 @@
 import { Button, Modal, type ButtonProps } from 'antd';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { IntakeManagementCommand, IntakeManagementView } from '@shared/content-intake-management';
 import { formatSeatClock } from './intake-time';
 import { joinDisplayParts } from '@shared/display-separator';
@@ -10,14 +10,17 @@ function ActionButton(props: ButtonProps) {
 const labels: Record<string, string> = { creating: '审批创建结果待确认', pending: '待审批', approved: '审批已通过', rejected: '审批未通过', revoked: '审批已撤回', unavailable: '审批结果尚未核验', published: '回退已发布', unknown: '回退结果待确认', failed: '回退未完成', cancelled: '回退已取消' };
 /** Rollback publishes a new version of the entire catalog. Its controls only send
  * human intent; Main retains material identity and any uncertain operation. */
-export function IntakeRollback({ view, busy, blocked, apply, onDirty }: { view: Pick<IntakeManagementView, 'rollback' | 'candidates'>; busy: boolean; blocked: boolean;
+export function IntakeRollback({ active = true, view, busy, blocked, apply, onDirty }: { active?: boolean; view: Pick<IntakeManagementView, 'rollback' | 'candidates'>; busy: boolean; blocked: boolean;
   apply: (command: IntakeManagementCommand) => void; onDirty: (id: string, dirty: boolean) => void }) {
   const rollback = view.rollback, impact = rollback.impact, review = rollback.review;
-  const disabled = busy || blocked || !!rollback.pending;
+  const disabled = !active || busy || blocked || !!rollback.pending;
+  const confirmation = useRef<ReturnType<typeof Modal.confirm> | null>(null);
+  useEffect(() => () => { confirmation.current?.destroy(); confirmation.current = null; }, [active]);
   useEffect(() => { onDirty('rollback-input', false); return () => onDirty('rollback-input', false); }, [onDirty]);
   const reset = () => apply({ action: 'rollback-discard' });
   const execute = () => {
-    Modal.confirm({
+    confirmation.current?.destroy();
+    confirmation.current = Modal.confirm({
       title: '回退整个发布目录到上一版',
       content: '回退之后不能撤销这次发布。坐席重新查询后会使用上一版内容。要回到现在这一版，需要再发布一次。',
       okText: '确认回退',

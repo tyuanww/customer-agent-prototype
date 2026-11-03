@@ -1,8 +1,8 @@
 export const INTAKE_DESTINATION_ROWS = [
   {
     id: 'overview',
-    label: '概览',
-    blurb: '当前登录者的查询、待办和不准样本',
+    label: '工作台',
+    blurb: '当前有权处理的资料和待办',
     group: '经营总览',
     audience: 'staff',
     needsPermissionBridge: false,
@@ -10,8 +10,8 @@ export const INTAKE_DESTINATION_ROWS = [
   },
   {
     id: 'wording',
-    label: '话术库',
-    blurb: '当前可用话术目录',
+    label: '内容库',
+    blurb: '已发布话术与本机草稿',
     group: '话术运营',
     audience: 'everyone',
     needsPermissionBridge: false,
@@ -20,7 +20,7 @@ export const INTAKE_DESTINATION_ROWS = [
   {
     id: 'sop',
     label: 'SOP',
-    blurb: '当前产品会话 SOP 树',
+    blurb: '学习与执行操作流程',
     group: '话术运营',
     audience: 'everyone',
     needsPermissionBridge: false,
@@ -28,8 +28,8 @@ export const INTAKE_DESTINATION_ROWS = [
   },
   {
     id: 'content',
-    label: '知识库',
-    blurb: '人设知识',
+    label: '内容库',
+    blurb: '本机草稿',
     group: '治理与架构',
     audience: 'staff',
     needsPermissionBridge: false,
@@ -37,7 +37,7 @@ export const INTAKE_DESTINATION_ROWS = [
   },
   {
     id: 'materials',
-    label: '资料',
+    label: '资料审核',
     blurb: '上传、确认来源、发布',
     group: '治理与架构',
     audience: 'staff',
@@ -46,7 +46,7 @@ export const INTAKE_DESTINATION_ROWS = [
   },
   {
     id: 'permissions',
-    label: '权限',
+    label: '成员与权限',
     blurb: '授权',
     group: '治理与架构',
     audience: 'staff',
@@ -103,13 +103,13 @@ export function intakeDestinationItem(id: IntakeDestination): IntakeSidebarItem 
 
 export function readIntakePreviewPage(
   location: Pick<Location, 'hostname' | 'search'>,
-  canOpenPermissions: boolean,
+  canViewPermissions: boolean,
 ): IntakeDestination {
   const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   const params = new URLSearchParams(location.search);
   if (!local || params.get('preview') !== 'intake') return 'overview';
   const page = params.get('page');
-  if (page === 'permissions' && !canOpenPermissions) return 'overview';
+  if (page === 'permissions' && !canViewPermissions) return 'overview';
   if (page === 'announce') return 'wording';
   if (page !== null && isIntakeDestination(page)) return page;
   return 'overview';
@@ -117,20 +117,20 @@ export function readIntakePreviewPage(
 
 export function intakeRowVisible(
   row: IntakeDestinationRow,
-  canOpenPermissions: boolean,
+  canViewPermissions: boolean,
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): boolean {
-  if (row.id === 'permissions') return canOpenPermissions;
+  if (row.id === 'permissions') return canViewPermissions;
   if (row.audience === 'staff' && (!jobKnown || seatLibraryOnly)) return false;
-  if (row.needsPermissionBridge && !canOpenPermissions) return false;
+  if (row.needsPermissionBridge && !canViewPermissions) return false;
   return true;
 }
 
 export function intakeSidebarItems(
-  canOpenPermissions: boolean,
+  canViewPermissions: boolean,
   seatLibraryOnly: boolean,
   jobKnown: boolean,
 ): readonly IntakeSidebarItem[] {
-  return INTAKE_DESTINATION_ROWS.filter((row) => intakeRowVisible(row, canOpenPermissions, seatLibraryOnly, jobKnown));
+  return INTAKE_DESTINATION_ROWS.filter((row) => row.id !== 'content' && intakeRowVisible(row, canViewPermissions, seatLibraryOnly, jobKnown));
 }

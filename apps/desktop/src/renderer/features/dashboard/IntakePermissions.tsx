@@ -1,41 +1,33 @@
-import { Button, Empty, Input, Modal, Select, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
+import { Button, Drawer, Empty, Input, Modal, Select, Steps, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import './workbench-v9.css';
+import './intake-permissions.css';
 import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionReply, type IntakePermissionView } from '@shared/content-intake-permissions';
 import type { PermissionsUse } from '@shared/page-use';
 import { type AsyncResource } from '@shared/async-resource';
-import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostStatusForGrants, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
-import { formatSeatClock, timeoutUntil } from './intake-time';
+import { formatIntakeTime, formatSeatClock, timeoutUntil } from './intake-time';
 import { IntakeAntdTheme } from './intake-antd';
 import { SeatDateTime } from './seat-date-time';
 import { useAsyncResource } from './use-async-resource';
 import { WorkbenchFailed, WorkbenchLoading, WorkbenchNoAccess, WorkbenchUncertain } from './WorkbenchState';
 import type { AccessBlock } from '@shared/workbench-access';
+import { memberPermissionSummary, permissionMembers, permissionStatus, shortPermissionReference, type MemberRow, type PermissionGrant } from './intake-permission-members';
 
 function DeskButton(props: ButtonProps) {
   return <Button {...props} autoInsertSpace={false} />;
 }
 
 function PermissionsEmpty({ description }: { description: string }) {
-  return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
+  return <Empty image={null} description={description} />;
 }
 
 /** rc-table copies aria-label onto the table. antd's prop type omits it. */
 function A11yTable<RecordType extends object>(props: TableProps<RecordType> & { 'aria-label': string }) {
   return createElement(Table as ComponentType<typeof props>, props);
 }
-
-type PeopleRow = { key: string; label: string; post: string; status: string };
-type GrantRow = IntakePermissionView['grants'][number];
-
-const peopleColumns: TableColumnsType<PeopleRow> = [
-  { title: '姓名', dataIndex: 'label', key: 'label' },
-  { title: '登录名', key: 'login', render: () => '—' },
-  { title: '岗位', dataIndex: 'post', key: 'post' },
-  { title: '状态', dataIndex: 'status', key: 'status', render: (status: PeopleRow['status']) => <span className="state"><i className={`dot${status === '已授权' ? ' ok' : ''}`} />{status}</span> },
-];
 
 function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boolean; createOpen: boolean; setCreateOpen: (open: boolean) => void }) {
   const [name, setName] = useState('');
@@ -113,11 +105,11 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
   return <section>
     {problem && <p role="alert">{problem}</p>}
     <A11yTable<SeatAccountRecord>
-      aria-label="外包坐席"
+      aria-label="账号管理"
       pagination={false}
       rowKey="username"
       dataSource={rows}
-      locale={{ emptyText: <PermissionsEmpty description="还没有外包坐席。" /> }}
+      locale={{ emptyText: <PermissionsEmpty description="新建坐席后会出现在这里。" /> }}
       columns={[
         { title: '姓名', dataIndex: 'displayName' },
         { title: '登录名', dataIndex: 'username' },
@@ -187,6 +179,10 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
+  const [memberKey,setMemberKey]=useState<string | null>(null);
+  const [confirmRevoke,setConfirmRevoke]=useState(false);
+  const revokeCancel = useRef<HTMLButtonElement>(null);
+  const [,refreshClock]=useState(0);
   const [job,setJob]=useState<'grants'|'seats'>('grants');
   const [grantOpen,setGrantOpen]=useState(false),[seatCreateOpen,setSeatCreateOpen]=useState(false);
   const [eligibilityEnded,setEligibilityEnded]=useState(false);
@@ -217,6 +213,9 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   }, [allowRead], active ? { status: 'loading' } : { status: 'idle' }, { retainReady: true });
   resourceRef.current = resource;
   const view = gate?.body ?? (resource.status === 'ready' ? resource.value : null);
+  const now = Date.now();
+  const available = !!view?.signedIn && view.available && !eligibilityEnded
+    && (!view.validUntil || Date.parse(view.validUntil) > now);
   const loading = view === null && resource.status === 'loading';
   const apply = useCallback(async (command?: IntakePermissionCommand): Promise<boolean> => {
     if (pending.current && command?.action !== 'stop') return false;
@@ -257,14 +256,24 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     const api=window.dashboardPermissions;if(!api)return;
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
   },[apply]);
-  useEffect(()=>{setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');},[view?.source]);
   useEffect(()=>{
+    setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');
+    setMemberKey(null);setConfirmRevoke(false);
+  },[view?.source,available]);
+  useEffect(()=>{
+    setEligibilityEnded(false);
     if(!view?.validUntil)return undefined;
     const until=Date.parse(view.validUntil);
     if(!Number.isFinite(until))return undefined;
-    setEligibilityEnded(false);
     return timeoutUntil(()=>{setEligibilityEnded(true);void apply();},until);
   },[view?.validUntil, apply]);
+  useEffect(()=>{
+    const next = (view?.grants ?? []).filter(grant => !grant.revoked)
+      .flatMap(grant => [Date.parse(grant.startsAt), Date.parse(grant.expiresAt)])
+      .filter(time => time > now);
+    if (next.length === 0) return;
+    return timeoutUntil(() => refreshClock(tick => tick + 1), Math.min(...next));
+  },[view?.grants,now]);
   useEffect(()=>()=>{mounted.current=false;generation.current++;},[]);
   const disabled=busy || !!view?.busy || !!view?.pending;
   const readAgain=()=>{
@@ -274,6 +283,8 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   };
   const offered=intakePostsCoveredBy(view?.actions??[]);
   const chosen=offered.includes(post)?post:undefined;
+  const chosenActions = actionsForIntakePost(chosen);
+  const scopeLabel = view?.sources.find(source => source.selection === view.source)?.label;
   const previewPost=()=>{
     if(!chosen){setError('当前范围没有可授予的岗位。');return;}
     const mapped=actionsForIntakePost(chosen);
@@ -288,52 +299,75 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     if(!view?.preview){setGrantOpen(false);return;}
     void apply({action:'discard'}).then((ok)=>{if(ok)setGrantOpen(false);});
   };
-  const askRevoke=()=>{
-    const grant=view?.grants.find(item=>item.selection===revoke);
-    if(!grant || !revokeReason.trim())return;
-    Modal.confirm({
-      title:`收回 ${grant.person} 在 ${grant.scope}的${labels[grant.action]}`,
-      content:'收回之后不能撤销。以后要用，需要重新开通。',
-      okText:'确认收回',
-      cancelText:'取消',
-      focusable:{autoFocusButton:'cancel'},
-      okButtonProps:{danger:true,autoInsertSpace:false},
-      cancelButtonProps:{autoInsertSpace:false},
-      onOk:()=>apply({action:'revoke',selection:revoke,reason:revokeReason}),
-      transitionName:'',
-      maskTransitionName:'',
-    });
+  const memberRows = available && view ? permissionMembers(view) : [];
+  const selectedMember = memberRows.find(member => member.key === memberKey);
+  const detailOpen = active && !!selectedMember && job === 'grants';
+  const grantDialogOpen = active && available && grantOpen;
+  const revokeTarget = selectedMember?.grants.find(grant => grant.selection === revoke);
+  const revokeDisabled = disabled || !revokeTarget?.canRevoke || !!revokeTarget?.revoked || !!view?.preview;
+  const closeMember = () => {
+    setMemberKey(null);setRevoke('');setRevokeReason('');setConfirmRevoke(false);
   };
-  const peopleRows=view?.source && view.people.length ? view.people.map(p=>{const grant=intakePostStatusForGrants(view.grants.filter(g=>g.personSelection===p.selection));return {key:p.selection,label:p.label,post:grant.post ?? '—',status:grant.status};}) : [];
-  const grantColumns: TableColumnsType<GrantRow> = [
-    { title: '人员', key: 'person', render: (_value, grant) => <>{grant.person}<span className="cell-sub">{labels[grant.action]}</span><span className="cell-sub">原授权原因：{grant.reason}</span></> },
-    { title: '范围名称', dataIndex: 'scope', key: 'scope' },
-    { title: '有效期', key: 'period', render: (_value, grant) => {
-      const ended = !grant.revoked && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) <= Date.now();
-      return <>{`${formatSeatClock(grant.startsAt)} 至 ${formatSeatClock(grant.expiresAt)}`}{grant.revoked ? <span className="state">已撤销</span> : ended ? <span className="state">已过期</span> : null}</>;
+  const commitRevoke = () => {
+    if (!available || revokeDisabled || !revokeTarget || !revokeReason.trim()) return;
+    setConfirmRevoke(false);
+    void apply({ action: 'revoke', selection: revokeTarget.selection, reason: revokeReason });
+  };
+  const operationFeedback = <>
+    {error && <WorkbenchFailed message={error} onRetry={disabled || view?.preview ? undefined : readAgain} retryLabel="刷新权限列表" />}
+    {view?.notice && <p role="status">{view.notice}</p>}
+    {view?.pending && <WorkbenchUncertain
+      message={view.resultUnknown ? '权限操作结果待确认，请按原请求确认。关闭窗口会丢失这次请求。' : '正在确认权限操作结果，请勿重复操作。'}
+      checkLabel="按原请求确认结果"
+      disabled={busy}
+      onCheck={()=>void apply({action:'retry'})} />}
+  </>;
+  const memberColumns: TableColumnsType<MemberRow> = [
+    { title: '成员', key: 'member', render: (_value, member) => <>{member.label}{member.kind === 'unresolved'
+      ? <span className="intake-permissions-meta">记录 {shortPermissionReference(member.grants[0].reference)}</span> : null}</> },
+    { title: '具备能力', key: 'abilities', render: (_value, member) => {
+      const { abilities } = memberPermissionSummary(member, now);
+      const names = Object.entries(labels).filter(([action]) => abilities.some(value => value === action)).map(([, label]) => label);
+      return names.length ? <>{names.slice(0, 2).join('、')}{names.length > 2 && <span className="intake-permissions-meta">等 {names.length} 项</span>}</> : '—';
     } },
-    { title: '操作', key: 'ops', width: 140, render: (_value, grant) => <DeskButton type="text" danger disabled={disabled || !grant.canRevoke || !!view?.preview} onClick={() => { setRevoke(grant.selection); setRevokeReason(''); }}>撤销该权限</DeskButton> },
+    { title: '当前状态', key: 'status', render: (_value, member) => <div className="intake-permissions-statuses">
+      {member.grants.length === 0 ? '未授权' : memberPermissionSummary(member, now).counts.map(([status, count]) =>
+        <span className="intake-permissions-status" data-status={status} key={status}>{status} {count} 项</span>)}
+    </div> },
+    { title: '操作', key: 'ops', width: 112, render: (_value, member) => <DeskButton type="text" onClick={() => {
+      setMemberKey(member.key);setRevoke('');setRevokeReason('');setConfirmRevoke(false);
+    }}>查看权限</DeskButton> },
+  ];
+  const grantColumns: TableColumnsType<PermissionGrant> = [
+    { title: '权限与范围', key: 'permission', render: (_value, grant) => <>{labels[grant.action]}
+      <span className="intake-permissions-meta">{grant.scope}</span>
+      <span className="intake-permissions-meta">记录 {shortPermissionReference(grant.reference)}</span>
+      {grant.reason.trim() ? <details className="intake-permissions-reason"><summary>授权原因</summary><p>{grant.reason}</p></details> : null}
+    </> },
+    { title: '有效期', key: 'period', width: 192, render: (_value, grant) =>
+      <><time dateTime={grant.startsAt} title={formatIntakeTime(grant.startsAt)}>{formatSeatClock(grant.startsAt)}</time><br />{' 至 '}
+        <time dateTime={grant.expiresAt} title={formatIntakeTime(grant.expiresAt)}>{formatSeatClock(grant.expiresAt)}</time></> },
+    { title: '状态', key: 'status', width: 90, render: (_value, grant) => {
+      const status = permissionStatus(grant, now);
+      return <span className="intake-permissions-status" data-status={status}>{status}</span>;
+    } },
+    { title: '操作', key: 'ops', width: 124, render: (_value, grant) => grant.revoked ? '—' : <DeskButton type="text" danger disabled={disabled || !grant.canRevoke || !!view?.preview} onClick={() => { setRevoke(grant.selection); setRevokeReason(''); }}>撤销该权限</DeskButton> },
   ];
   return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="权限配置">
     <h1 className="desk-sr">权限配置</h1>
     {loading ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
     {!gate && resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
     {!gate && resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
-    {error && !grantOpen && <WorkbenchFailed message={error} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" />}{view?.notice && <p role="status">{view.notice}</p>}
-    {view?.pending && <WorkbenchUncertain
-      message={view.resultUnknown ? '不确定授权是否已保存。请按原请求确认，不要重新开通；关闭窗口会丢失这次请求。' : '正在确认授权结果，请勿重复开通。'}
-      checkLabel="按原请求确认结果"
-      disabled={busy}
-      onCheck={()=>void apply({action:'retry'})} />}
-    {!view?.available && <div className="toolbar" style={{marginBottom:12}}><div className="left">
+    {!detailOpen && !grantDialogOpen && operationFeedback}
+    {!available && <div className="toolbar" style={{marginBottom:12}}><div className="left">
       <DeskButton disabled={disabled || !!view?.preview} onClick={readAgain}>刷新权限列表</DeskButton>
       {(busy || view?.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}</div></div>}
     {view && !view.signedIn && <p>请先登录。</p>}
-    {view?.signedIn && !view.available && !view.pending && <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p>}
-    {view?.available && <>
+    {view?.signedIn && !available && !view.pending && <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p>}
+    {available && view && <>
       <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="权限工作">
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>业务授权</DeskButton>
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();setJob('seats');}}>外包坐席</DeskButton>
+        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>成员权限</DeskButton>
+        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();closeMember();setJob('seats');}}>账号管理</DeskButton>
       </div>
         <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
           {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
@@ -347,45 +381,70 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
       {!gate && job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
         : !gate && grantBlock ? <p role="status">{grantBlock}</p> : null}
       <div hidden={job!=='grants'}>
-        <div className="sub"><label className="lbl" htmlFor="permissions-scope">配置范围</label>
-          <Select<string> id="permissions-scope" aria-label="配置范围" style={{width:260}} disabled={disabled || !!view.preview} value={view.source ?? undefined} placeholder="请选择已有范围" virtual={false}
+        <div className="intake-permissions-scope"><label className="lbl" htmlFor="permissions-scope">配置范围</label>
+          <Select<string> id="permissions-scope" aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source ?? undefined} placeholder="请选择已有范围" virtual={false}
             options={view.sources.map(source => ({ value: source.selection, label: source.label }))} onChange={selection => { void apply({ action: 'source', selection }); }} />
-          <DeskButton style={{marginLeft:8}} aria-label="刷新权限列表" disabled={disabled || !!view.preview} onClick={readAgain}>刷新</DeskButton></div>
-        <A11yTable<PeopleRow> className="sub" aria-label="人员" pagination={false} rowKey="key" tableLayout="fixed" dataSource={peopleRows} columns={peopleColumns}
-          locale={{ emptyText: <PermissionsEmpty description={view.source ? '当前没有可选择的人员。' : '请选择配置范围。'} /> }} />
-        <div className="sec"><div className="sec-head"><h2>当前可管理的业务权限</h2></div>
-          <section aria-label="已有业务权限">
-          <A11yTable<GrantRow> aria-label="已有业务权限" pagination={false} rowKey="selection" tableLayout="fixed" dataSource={view.grants} columns={grantColumns}
-            locale={{ emptyText: <PermissionsEmpty description="此范围暂无可管理业务权限。" /> }} />
-          {revoke ? <fieldset disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}><div className="note-row"><span className="lbl">撤销原因</span>
-            <Input aria-label="撤销原因" maxLength={512} value={revokeReason} onChange={event => setRevokeReason(event.target.value)} />
-            <DeskButton danger disabled={!revokeReason.trim()} onClick={askRevoke}>确认撤销</DeskButton>
-            <DeskButton onClick={() => setRevoke('')}>取消</DeskButton></div></fieldset> : null}
-          </section></div>
+          <DeskButton aria-label="刷新权限列表" disabled={disabled || !!view.preview} onClick={readAgain}>刷新</DeskButton></div>
+        <A11yTable<MemberRow> className="intake-permissions-members" aria-label="成员权限" pagination={false} rowKey="key" tableLayout="fixed" dataSource={memberRows} columns={memberColumns}
+          locale={{ emptyText: <PermissionsEmpty description={view.source ? '添加成员或授权后会出现在这里。' : '请选择配置范围。'} /> }} />
       </div>
+      <Drawer open={detailOpen} title={selectedMember ? `${selectedMember.label}的权限` : '权限详情'} size={800}
+        rootClassName="intake-permissions-detail" destroyOnHidden onClose={closeMember}>
+        {detailOpen && operationFeedback}
+        {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
+        <A11yTable<PermissionGrant> aria-label="权限明细" pagination={false} rowKey="selection" tableLayout="fixed" scroll={{ x: 680 }} dataSource={selectedMember?.grants ?? []} columns={grantColumns}
+          locale={{ emptyText: <PermissionsEmpty description="开通权限后会出现在这里。" /> }} />
+        {revokeTarget && !revokeTarget.revoked ? <fieldset className="intake-permissions-form" disabled={revokeDisabled}>
+          <div>{labels[revokeTarget.action]}<span className="intake-permissions-meta">{revokeTarget.scope}，记录 {shortPermissionReference(revokeTarget.reference)}</span></div>
+          <label><span>撤销原因</span><Input aria-label="撤销原因" disabled={revokeDisabled} maxLength={512} value={revokeReason} onChange={event => setRevokeReason(event.target.value)} /></label>
+          <div className="intake-permissions-actions">
+            <DeskButton disabled={disabled} onClick={() => setRevoke('')}>取消</DeskButton>
+            <DeskButton danger disabled={revokeDisabled || !revokeReason.trim()} onClick={() => setConfirmRevoke(true)}>确认撤销</DeskButton>
+          </div>
+        </fieldset> : null}
+      </Drawer>
+      <Modal open={active && confirmRevoke && !!revokeTarget && !revokeTarget.revoked} title={revokeTarget ? `收回 ${revokeTarget.person} 在 ${revokeTarget.scope}的${labels[revokeTarget.action]}` : '撤销权限'}
+        footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={() => setConfirmRevoke(false)}
+        afterOpenChange={open => { if (open) revokeCancel.current?.focus(); }}>
+        <p>仅撤销这条权限。撤销后如需使用，须重新授权。</p>
+        {revokeTarget ? <p>{formatSeatClock(revokeTarget.startsAt)} 至 {formatSeatClock(revokeTarget.expiresAt)}<span className="intake-permissions-meta">记录 {shortPermissionReference(revokeTarget.reference)}</span></p> : null}
+        <div className="intake-permissions-actions">
+          <Button ref={revokeCancel} autoInsertSpace={false} onClick={() => setConfirmRevoke(false)}>取消</Button>
+          <DeskButton danger disabled={revokeDisabled || !revokeReason.trim()} onClick={commitRevoke}>确认收回</DeskButton>
+        </div>
+      </Modal>
       <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} createOpen={seatCreateOpen} setCreateOpen={setSeatCreateOpen} /></div>
-      <Modal open={grantOpen && view !== null} title={view?.preview ? '预览，尚未保存' : '新增业务权限'} width={520} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeGrant}>
-          {error ? <p role="alert">{error}</p> : null}
-          {view && !view.preview ? <>
-            <fieldset className="fields" disabled={disabled} style={{border:0,padding:0,margin:'12px 0 0'}}>
-              <div className="two"><label>人员<Select<string> aria-label="人员" value={person || undefined} placeholder="请选择已确认人员" disabled={disabled} virtual={false} style={{ width: '100%' }}
+      <Modal open={grantDialogOpen} title={view.preview ? '预览，尚未保存' : '新增授权'} width={520} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeGrant}>
+          {grantDialogOpen && operationFeedback}
+          {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
+          <Steps size="small" current={view.preview ? 1 : 0} items={[{ title: '设置权限' }, { title: '确认保存' }]} />
+          {!view.preview ? <>
+            <fieldset className="intake-permissions-form" disabled={disabled}>
+              <div><span className="intake-permissions-meta">授权范围</span>{scopeLabel}</div>
+              <div className="two"><label><span>成员</span><Select<string> aria-label="成员" value={person || undefined} placeholder="请选择成员" disabled={disabled} virtual={false}
                 options={view.people.map(item => ({ value: item.selection, label: item.label }))} onChange={setPerson} /></label>
-              <label>岗位<Select<string> aria-label="岗位" value={chosen} disabled={disabled || offered.length === 0} virtual={false} style={{ width: '100%' }}
+              <label><span>岗位</span><Select<string> aria-label="岗位" value={chosen} disabled={disabled || offered.length === 0} virtual={false}
                 placeholder={offered.length === 0 ? '当前范围没有可授予的岗位' : '请选择岗位'} options={offered.map(name => ({ value: name, label: name }))} onChange={choosePost} /></label></div>
-              <div className="two"><label>生效时间<SeatDateTime label="生效时间" placeholder="选择生效时间" value={starts} onChange={setStarts} disabled={disabled} /></label>
-              <label>失效时间<SeatDateTime label="失效时间" placeholder="选择失效时间" value={expires} onChange={setExpires} disabled={disabled} /></label></div>
-              <span className="hint">时间按本机时区填写，范围和期限仍由服务器核对。</span>
-              <label>授权原因<Input aria-label="授权原因" maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+              {chosenActions.ok ? <div><span className="intake-permissions-meta">包含能力</span>{chosenActions.actions.map(action => labels[action]).join('、')}</div> : null}
+              <div className="two"><label><span>生效时间</span><SeatDateTime label="生效时间" placeholder="选择生效时间" value={starts} onChange={setStarts} disabled={disabled} /></label>
+              <label><span>失效时间</span><SeatDateTime label="失效时间" placeholder="选择失效时间" value={expires} onChange={setExpires} disabled={disabled} /></label></div>
+              <span className="intake-permissions-meta">时间为本机时间</span>
+              <label><span>授权原因</span><Input aria-label="授权原因" disabled={disabled} maxLength={512} value={reason} onChange={e=>setReason(e.target.value)}/></label>
             </fieldset>
-            <footer><DeskButton onClick={closeGrant}>取消</DeskButton>
+            <footer className="intake-permissions-actions"><DeskButton onClick={closeGrant}>取消</DeskButton>
               <DeskButton type="primary" disabled={disabled || !person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
                 onClick={previewPost}>预览权限</DeskButton></footer>
-          </> : view?.preview ? <section aria-label="权限预览">
-            <p>{view.preview.person}<span className="mute">{view.preview.scope}</span></p>
-            <p>{view.preview.actions.map(a=>labels[a]).join('、')}</p><p>{formatSeatClock(view.preview.startsAt)} 至 {formatSeatClock(view.preview.expiresAt)}</p><p>{view.preview.reason}</p>
-            <footer><DeskButton disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</DeskButton>
+          </> : <section aria-label="权限预览">
+            <dl className="intake-permissions-preview">
+              <div><dt>成员</dt><dd>{view.preview.person}</dd></div>
+              <div><dt>授权范围</dt><dd>{view.preview.scope}</dd></div>
+              <div><dt>包含能力</dt><dd>{view.preview.actions.map(a=>labels[a]).join('、')}</dd></div>
+              <div><dt>有效期</dt><dd>{formatSeatClock(view.preview.startsAt)} 至 {formatSeatClock(view.preview.expiresAt)}</dd></div>
+              <div><dt>授权原因</dt><dd>{view.preview.reason}</dd></div>
+            </dl>
+            <footer className="intake-permissions-actions"><DeskButton disabled={disabled} onClick={()=>void apply({action:'discard'})}>返回修改</DeskButton>
               <DeskButton type="primary" disabled={disabled} onClick={()=>void apply({action:'save'}).then((ok)=>{if(ok)setGrantOpen(false);})}>确认保存权限</DeskButton></footer>
-          </section> : null}
+          </section>}
       </Modal>
     </>}
   </section></div></IntakeAntdTheme>;

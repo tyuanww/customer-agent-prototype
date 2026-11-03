@@ -10,7 +10,7 @@ const domainWord = { product: '产品', campaign: '活动', presale: '售前', a
 const phases: Record<IntakeUploadView['phase'], string> = {
   idle: '请选择资料来源', selected: '等待选择文件', choosing: '正在选择文件', confirming: '请确认实际参与人',
   uploading: '正在上传文件', receiving: '正在提交校验任务', parsing: '正在校验资料', failed: '整批校验未通过',
-  validated: '校验通过，候选已形成', unknown: '提交结果待确认', stopped: '已停止本机等待',
+  validated: '校验通过，待审核资料已生成', unknown: '提交结果待确认', stopped: '已停止本机等待',
 };
 const jobStates: Record<NonNullable<IntakeUploadView['job']>['state'], string> = {
   reading: '正在读取文件', parsing: '正在校验内容', validated: '校验通过', failed: '校验未通过', cancelled: '解析已终止',
@@ -18,13 +18,16 @@ const jobStates: Record<NonNullable<IntakeUploadView['job']>['state'], string> =
 
 /** This form keeps human choices only. Main owns the selected file, identities,
  * original write requests and candidate; no filesystem or HTTP input crosses it. */
-export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, apply }: {
+export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocked, stopping, apply }: {
+  active?: boolean;
   view: IntakeUploadView; busy: boolean; blocked: boolean; refreshBlocked: boolean; stopping: boolean;
   apply: (command: IntakeUploadCommand) => void;
 }) {
   const [preparer, setPreparer] = useState(view.preparerSelection ?? '');
   const [editors, setEditors] = useState<string[]>(view.editorSelections);
   const [confirmed, setConfirmed] = useState(false);
+  const confirmation = useRef<ReturnType<typeof Modal.confirm> | null>(null);
+  useEffect(() => () => { confirmation.current?.destroy(); confirmation.current = null; }, [active]);
   const declarationRevision = useRef(view.draftRevision);
   useEffect(() => {
     if (declarationRevision.current === view.draftRevision) return;
@@ -33,7 +36,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
     // A successful new native selection has a Main-owned revision, including
     // same-name/same-size corrections. Cancelled dialogs preserve the draft.
   }, [view.draftRevision, view.editorSelections, view.preparerSelection]);
-  const readingDisabled = busy || view.busy || stopping;
+  const readingDisabled = !active || busy || view.busy || stopping;
   const disabled = readingDisabled || blocked;
   const declaring = !!view.file && view.canSubmit;
   const ready = !!preparer && editors.length > 0 && confirmed;
@@ -47,9 +50,9 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {(view.sourceSelection || view.canReset) && <ActionButton disabled={disabled || !view.canReset} onClick={() => {
         const run = () => apply({ action: 'upload-reset' });
         if (!view.file && !view.revisionOf) run();
-        else Modal.confirm({
+        else confirmation.current = Modal.confirm({
           title: '请确认',
-          content: '放弃本地上传准备？已经提交的服务端任务不会因此撤销，原候选也不会因此取消。',
+          content: '放弃本地上传准备？已经提交的服务端任务不会因此撤销，原资料也不会因此取消。',
           okText: '确认',
           cancelText: '取消',
           okButtonProps: { autoInsertSpace: false },
@@ -62,7 +65,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       <span className="intake-upload-state" role="status" aria-live="polite">{phases[view.phase]}{view.file ? `：${view.file.name}` : ''}</span>
     </Space>
     {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId}，原版本 {view.revisionOf.version}。请上传完整修订稿。</p>}
-    {blocked && <p className="intake-notice">开始新的上传前，请先完成当前候选中的输入并关闭候选，或关闭时明确放弃尚未提交的输入。</p>}
+    {blocked && <p className="intake-notice">开始新的上传前，请完成当前审核并关闭，或在批次详情中放弃未提交的输入。</p>}
     {!view.authorized && <p>请核对登录与来源授权。</p>}
     {view.notice && <p role="status">{view.notice}</p>}
     {declaring && <fieldset className="intake-fields" disabled={disabled}>
@@ -88,9 +91,9 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
       {view.canStop && <ActionButton disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</ActionButton>}
       {view.canRefresh && (!!view.file || !!view.job) && <ActionButton disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</ActionButton>}
       {view.canSaveReport && <ActionButton disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</ActionButton>}
-      {view.canOpen && <ActionButton disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>查看候选并完成检查</ActionButton>}
+      {view.canOpen && <ActionButton disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>审核本次资料</ActionButton>}
     </div>
-    {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；形成候选后再按其权限处理。</p>}
+    {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；生成待审核资料后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">
       <h3>校验结果</h3>
       <p>最近读取的服务端状态：{jobStates[view.job.state]}。停止本机等待不会改变此状态。</p>
@@ -108,7 +111,7 @@ export function IntakeUpload({ view, busy, blocked, refreshBlocked, stopping, ap
           { title: '问题与修正建议', dataIndex: 'message' },
         ]}
       />}
-      {view.job.state === 'failed' && <p>本批尚未形成候选。请按报告修正资料中的全部阻断问题，再重新选择 CSV / Excel 文件。</p>}
+      {view.job.state === 'failed' && <p>本批尚未生成待审核资料。请按报告修正资料中的全部阻断问题，再重新选择 CSV / Excel 文件。</p>}
     </section>}
   </section>;
 }

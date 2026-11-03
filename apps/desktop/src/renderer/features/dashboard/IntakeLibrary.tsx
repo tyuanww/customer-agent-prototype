@@ -1,13 +1,13 @@
 import { createElement, useCallback, useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
-import { Button, Checkbox, Empty, Input, Select, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
+import { Button, Checkbox, Drawer, Input, Select, Table, Tag, Tooltip, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import type { IntakeCatalogCommand, IntakeCatalogRow, IntakeCatalogView } from '@shared/content-intake-catalog';
 import type { IntakeQueryOption } from '@shared/content-intake-query';
 import { READ_DISCARDED, useAsyncResource } from './use-async-resource';
-import { catalogAvailability, catalogAvailabilitySentence } from './catalog-availability';
 import { formatIntakeDay, formatSeatClock, timeoutUntil } from './intake-time';
 import './intake-management.css';
 import './workbench-v9.css';
+import './content-library.css';
 import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
 
 const RISK_LEVEL_LABEL = {
@@ -27,7 +27,7 @@ function LibraryButton(props: ButtonProps) {
 }
 
 function CatalogEmpty({ description }: { description: string }) {
-  return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
+  return <p className="content-empty">{description}</p>;
 }
 
 /** rc-table copies aria-label onto the table. antd's prop type omits it. */
@@ -49,7 +49,7 @@ function Conditions({ label, options, selected, disabled, change }: {
 }) {
   const [search, setSearch] = useState('');
   const matches = options.filter(option => option.label.includes(search.trim()) || option.id.includes(search.trim()));
-  return <details className="intake-catalog-conditions"><summary>{label}<span className="cond-value">{selected.length ? `已选 ${selected.length}` : '通用'}</span></summary>
+  return <section className="content-filter-group"><h3>{label}<span className="cond-value">{selected.length ? `已选 ${selected.length}` : '全部'}</span></h3>
     <fieldset disabled={disabled}><legend className="sr-only">目录{label}条件</legend>
       <label>查找{label}<Input aria-label={`目录查找${label}`} value={search} onChange={e => setSearch(e.target.value)} /></label>
       <LibraryButton disabled={!selected.length} onClick={() => change([])}>清除{label}条件</LibraryButton>
@@ -58,7 +58,7 @@ function Conditions({ label, options, selected, disabled, change }: {
         onChange={e => change(e.target.checked ? [...selected,option.id] : selected.filter(id => id !== option.id))}>{option.label}</Checkbox>)}</div>
       {!matches.length && <p>暂无匹配{label}。</p>}{matches.length > 100 && <p>请输入名称缩小范围。</p>}
     </fieldset>
-  </details>;
+  </section>;
 }
 
 const LOGGED_OUT = '请先在查询窗口登录。';
@@ -66,7 +66,7 @@ const UNAVAILABLE = '可用资料暂不可读取，请重试。';
 const SESSION_CHANGED = '登录状态已变化，请刷新可用资料。';
 const SESSION_CONFIRM = '登录状态需要确认，请刷新可用资料。';
 
-type CatalogIntent = { kind: 'current' } | { kind: 'command'; command: IntakeCatalogCommand };
+type CatalogIntent = { kind: 'current' } | { kind: 'command'; command: IntakeCatalogCommand; refreshAfter?: boolean };
 
 function readFailure(code: string, message: string): AsyncResource<IntakeCatalogView> {
   return asyncFailure(code, { forbidden: LOGGED_OUT, error: message });
@@ -80,7 +80,7 @@ function hang(): Promise<typeof READ_DISCARDED> {
   return Promise.resolve(READ_DISCARDED);
 }
 
-export function IntakeLibrary({ active, seatNotice = false }: { active: boolean; seatNotice?: boolean }) {
+export function IntakeLibrary({ active, includeSop = true, seatNotice = false }: { active: boolean; includeSop?: boolean; seatNotice?: boolean }) {
   const shownRef = useRef<IntakeCatalogView | null>(null);
   const intentRef = useRef<CatalogIntent | null>(null);
   const generationRef = useRef(0);
@@ -93,6 +93,10 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   const [busy, setBusy] = useState(() => active && window.dashboardIntakeCatalog !== undefined);
   const [domain, setDomain] = useState<LibraryTab>('product');
   const [question, setQuestion] = useState('');
+  const [filters, setFilters] = useState<{ productIds: string[]; scenarioIds: string[] } | null>(null);
+  useEffect(() => {
+    if (!includeSop && domain === 'sop') setDomain('product');
+  }, [domain, includeSop]);
   if (active && !startedRef.current) {
     startedRef.current = true;
     intentRef.current = { kind: 'command', command: { action: 'refresh' } };
@@ -122,7 +126,9 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
         deadlineRef.current = 0;
         return { status: 'error', message: UNAVAILABLE };
       }
-      const reply = pending?.kind === 'command' ? await api.command(pending.command) : await api.current();
+      let reply = pending?.kind === 'command' ? await api.command(pending.command) : await api.current();
+      if (generationRef.current !== gen) return hang();
+      if (reply.ok && pending?.kind === 'command' && pending.refreshAfter) reply = await api.command({ action: 'refresh' });
       if (generationRef.current !== gen) return hang();
       deadlineRef.current = reply.view?.validUntil
         ? performance.now() + Math.max(0, Date.parse(reply.view.validUntil) - Date.now())
@@ -143,11 +149,11 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
       }
     }
   }, [], initial);
-  const begin = useCallback((command?: IntakeCatalogCommand) => {
+  const begin = useCallback((command?: IntakeCatalogCommand, refreshAfter = false) => {
     if (flightRef.current !== 0 && command?.action !== 'cancel') return;
     const gen = ++generationRef.current;
     flightRef.current = gen;
-    intentRef.current = command ? { kind: 'command', command } : { kind: 'current' };
+    intentRef.current = command ? { kind: 'command', command, refreshAfter } : { kind: 'current' };
     deadlineRef.current = 0;
     setBusy(true);
     const current = shownRef.current;
@@ -173,6 +179,7 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
       flightRef.current = 0;
       deadlineRef.current = 0;
       setBusy(false);
+      setFilters(null);
       remember(null);
       replace({ status: 'error', message: SESSION_CHANGED });
       // current projects Main memory; it cannot silently acquire a new snapshot.
@@ -215,7 +222,6 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
       replace((state) => (state.status === 'ready' ? { status: 'ready', value: next } : state));
     }, Date.parse(until));
   }, [view?.context.shopNamesValidUntil, remember, replace]);
-  const availability = catalogAvailability(view, fresh);
   const rows = fresh && view ? view.rows : [];
   const loggedOut = resource.status === 'forbidden'
     ? resource.message
@@ -227,10 +233,13 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   const shopLabel=(id:string) => names.has(id) ? `${names.get(id)}${counts.get(names.get(id)!)!>1 ? `（${id}）` : ''}` : id;
   const changeDomain=(id:LibraryTab) => setDomain(id);
   const needle=question.trim();
-  const visible=rows.filter(row => row.domain===domain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
+  const shownDomain = includeSop || domain !== 'sop' ? domain : 'product';
+  const visible=rows.filter(row => row.domain===shownDomain && (!needle || row.title.includes(needle) || row.answerText.includes(needle)));
+  const tabs = includeSop ? libraryTabs : libraryTabs.filter(item => item.id !== 'sop');
+  const filterCount = (context?.productIds.length ?? 0) + (context?.scenarioIds.length ?? 0);
   const domainKey=(event:KeyboardEvent<HTMLElement>,index:number) => {
-    const next=event.key==='ArrowRight' ? (index+1)%libraryTabs.length : event.key==='ArrowLeft' ? (index+libraryTabs.length-1)%libraryTabs.length : event.key==='Home' ? 0 : event.key==='End' ? libraryTabs.length-1 : null;
-    if(next===null)return;event.preventDefault();changeDomain(libraryTabs[next].id);document.getElementById(`intake-domain-${libraryTabs[next].id}`)?.focus();
+    const next=event.key==='ArrowRight' ? (index+1)%tabs.length : event.key==='ArrowLeft' ? (index+tabs.length-1)%tabs.length : event.key==='Home' ? 0 : event.key==='End' ? tabs.length-1 : null;
+    if(next===null)return;event.preventDefault();changeDomain(tabs[next].id);document.getElementById(`intake-domain-${tabs[next].id}`)?.focus();
   };
   const entryState=(row:IntakeCatalogRow):{label:string;dot:string} => {
     const now=Date.now(),from=Date.parse(row.effectiveFrom),to=row.effectiveTo?Date.parse(row.effectiveTo):NaN;
@@ -254,54 +263,62 @@ export function IntakeLibrary({ active, seatNotice = false }: { active: boolean;
   ];
   return <div hidden={!active}>
     {active ? <section className="dash-module intake-management intake-library wb9" aria-label="可用话术目录">
-      <h1 className="desk-sr">话术库</h1>
+      <h1 className="desk-sr">已发布话术</h1>
       {seatNotice ? <p data-testid="seat-library-notice">你现在可以查话术。需要看数据或管内容，请联系客服主管。</p> : null}
-      <div className="sync-line">
-        <span className="state">
-          <i className={availability.kind === 'available' ? 'dot ok' : 'dot'} />
-          <b role="status">{catalogAvailabilitySentence(availability)}</b>
-        </span>
-        {availability.kind === 'available' && availability.remaining
-          ? <span className="rel">{availability.remaining}</span>
-          : null}
-      </div>
       <div className="toolbar">
         <div className="left">
           <label className="lbl">目标店铺<Select aria-label="目录店铺" virtual={false} disabled={disabled || !context?.shops.length}
             value={context?.shopId ?? undefined} placeholder={context?.shops.length ? '请选择店铺' : '暂无可用店铺'} style={{ width: 220 }}
             options={(context?.shops ?? []).map(id => ({ value: id, label: shopLabel(id) }))}
             onChange={shopId => { begin({ action: 'select-shop', shopId }); }} /></label>
-          <label className="lbl">问题<Input style={{width:220}} placeholder="搜索问题" aria-label="问题搜索" value={question} onChange={e => setQuestion(e.target.value)} /></label>
+          <label className="lbl">搜索<Input style={{width:220}} placeholder="搜索标题或内容" aria-label="问题搜索" value={question} allowClear onChange={e => setQuestion(e.target.value)} /></label>
         </div>
         <div className="right">
+          <LibraryButton disabled={disabled || !context?.shopId} onClick={() => setFilters({ productIds: context?.productIds ?? [], scenarioIds: context?.scenarioIds ?? [] })}>高级筛选{filterCount ? `（${filterCount}）` : ''}</LibraryButton>
           {disabled && <LibraryButton onClick={() => begin({ action: 'cancel' })}>停止目录读取</LibraryButton>}
           <LibraryButton aria-label="刷新可用资料" disabled={disabled} onClick={() => begin({ action: 'refresh' })}>{refreshIcon}</LibraryButton>
         </div>
       </div>
       {context && context.shops.length>0 && names.size!==context.shops.length && <p role="status" className="hint">当前显示店铺编号。</p>}
-      {context?.shopId && <div className="intake-catalog-filter-grid">
-        <Conditions label="商品" options={context.products} selected={context.productIds} disabled={disabled}
-          change={productIds => begin({ action: 'select-conditions', productIds, scenarioIds: context.scenarioIds })}/>
-        <Conditions label="场景" options={context.scenarios} selected={context.scenarioIds} disabled={disabled}
-          change={scenarioIds => begin({ action: 'select-conditions', productIds: context.productIds, scenarioIds })}/>
+      {context && filterCount > 0 && <div className="content-active-filters" aria-label="已用筛选">
+        {context.productIds.map(id => <Tag key={`product-${id}`}>商品：{context.products.find(item => item.id === id)?.label ?? id}</Tag>)}
+        {context.scenarioIds.map(id => <Tag key={`scenario-${id}`}>场景：{context.scenarios.find(item => item.id === id)?.label ?? id}</Tag>)}
+        <LibraryButton type="text" disabled={disabled} onClick={() => begin({ action: 'select-conditions', productIds: [], scenarioIds: [] }, true)}>清除筛选</LibraryButton>
       </div>}
+      <Drawer title="高级筛选" open={filters !== null} onClose={() => setFilters(null)} destroyOnHidden
+        footer={<div className="content-filter-actions"><LibraryButton onClick={() => setFilters(null)}>取消</LibraryButton><LibraryButton type="primary" disabled={disabled || !filters} onClick={() => {
+          if (!filters) return;
+          begin({ action: 'select-conditions', ...filters }, true);
+          setFilters(null);
+        }}>应用筛选</LibraryButton></div>}>
+        {filters && context && <><Conditions label="商品" options={context.products} selected={filters.productIds} disabled={disabled}
+          change={productIds => setFilters(current => current && { ...current, productIds })} />
+          <Conditions label="场景" options={context.scenarios} selected={filters.scenarioIds} disabled={disabled}
+            change={scenarioIds => setFilters(current => current && { ...current, scenarioIds })} /></>}
+      </Drawer>
       {resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : () => begin({ action: 'refresh' })} /> : null}
       {disabled && !fresh ? <WorkbenchLoading rows={6} label="正在读取可用资料" /> : null}
       {loggedOut ? <p>{loggedOut}</p> : null}
       {!disabled && view?.signedIn && !context?.shopId && <p>请选择有权查看的店铺；没有可用店铺时请核对身份与范围。</p>}
       {!disabled && context?.shopId && !fresh && <p role="status">当前没有可展示的有效资料，请刷新可用资料。</p>}
       <div className="tabbar sub"><div className="tabs" role="tablist" aria-label="话术类型">
-        {libraryTabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
-          aria-selected={domain===item.id} aria-controls="intake-domain-panel" tabIndex={domain===item.id?0:-1}
+        {tabs.map((item,index) => <LibraryButton type="text" role="tab" key={item.id} id={`intake-domain-${item.id}`}
+          aria-selected={shownDomain===item.id} aria-controls="intake-domain-panel" tabIndex={shownDomain===item.id?0:-1}
           className="tab" onClick={() => changeDomain(item.id)} onKeyDown={e=>domainKey(e,index)}>{item.label}</LibraryButton>)}
       </div></div>
       <section id="intake-domain-panel" role="tabpanel" aria-labelledby={`intake-domain-${domain}`}>
         {fresh ? <ScriptTable<IntakeCatalogRow>
           aria-label="可用话术" pagination={false} tableLayout="fixed" rowKey="id" rowClassName={() => 'item'}
           dataSource={visible} columns={scriptColumns}
-          locale={{ emptyText: <CatalogEmpty description="当前条件下没有此类可用话术。" /> }} />
+          locale={{ emptyText: <CatalogEmpty description={needle || filterCount ? '没有匹配内容，请调整搜索或筛选。' : '此分类还没有可用话术，资料审核发布后会出现在这里。'} /> }} />
           : <CatalogEmpty description={context?.shops.length ? '选择店铺后，可用话术会出现在这里。' : '暂无可用店铺。目录接入后会出现在这里。'} />}
       </section>
+      {fresh && <footer className="content-library-status" role="status">
+        <span>当前显示 {visible.length} 条</span>
+        <Tooltip title="这是本次读取的有效期，到期后可刷新；每条话术的有效期请查看内容明细。">
+          <span>读取有效至 {formatSeatClock(view?.validUntil)}</span>
+        </Tooltip>
+      </footer>}
     </section> : null}
   </div>;
 }

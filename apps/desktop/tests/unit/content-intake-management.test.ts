@@ -182,6 +182,33 @@ it('does not expose revoked candidate rows while the next page is in flight', as
   } finally { release(); await next; f.main.dispose(); }
 });
 
+it('keeps a selected candidate out of a different list page after detail refresh', async () => {
+  const f = fixture();
+  const second = structuredClone(f.data.candidate);
+  second.key.candidateId = 'candidate-b';
+  second.key.digest = 'b'.repeat(64);
+  const original = f.request.getMockImplementation()!;
+  f.request.mockImplementation(async (...args) => {
+    const result = await original(...args);
+    if (args[1].startsWith('/v1/intake/candidates?')) {
+      const page = new URL(args[1], 'http://127.0.0.1').searchParams.has('cursor')
+        ? { items: [second], nextCursor: null }
+        : { items: [f.data.candidate], nextCursor: 'next-page' };
+      result.value = page;
+    }
+    return result;
+  });
+  try {
+    await f.select();
+    await f.main.command({ action: 'list', next: false });
+    await f.main.command({ action: 'list', next: true });
+    expect(f.main.view().candidates.map(row => row.candidate.key.candidateId)).toEqual(['candidate-b']);
+    expect(f.main.view().selected?.key.candidateId).toBe('candidate-a');
+    await f.main.command({ action: 'refresh-candidate' });
+    expect(f.main.view().candidates.map(row => row.candidate.key.candidateId)).toEqual(['candidate-b']);
+  } finally { f.main.dispose(); }
+});
+
 const confirm = { action: 'confirm-source', versionKind: 'opaque', versionValue: 'synthetic-export-v1', reason: '已人工核对合成来源' } as const;
 const publish = { action: 'publish', title: '合成 FAQ 更新', summary: '新增合成条目' } as const;
 async function ready(f: ReturnType<typeof fixture>) {
@@ -353,6 +380,7 @@ it.each(['recover','retry'] as const)('recovers cancellation via %s with the ori
     await expect(f.main.command({ action: 'discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
     const result = await f.main.command({ action: recovery });
     expect(result.pending).toBeNull();
+    expect(result).toMatchObject({ authorized: false, validUntil: null, candidates: [], selected: null });
     await f.main.command({ action: 'list', next: false });
     const current = f.main.view();
     expect(current).toMatchObject({ selected: { state: 'cancelled' }, material: null, quality: null, review: null, canCancel: false, canRevise: false, workflowResult: { action: 'cancel', state: 'cancelled', operationId: pending.operationId } });
@@ -501,5 +529,33 @@ it('rollback confirmation shares the Main single-operation fence and ignores log
     await expect(f.main.command({ action: 'rollback-discard' })).rejects.toMatchObject({ code: 'CONFLICT' });
     f.logout(); resolve(true); await expect(pending).rejects.toMatchObject({ code: 'STALE' });
     expect(f.request).not.toHaveBeenCalled(); expect(f.main.view().rollback.pending).toBeNull();
+  } finally { f.main.dispose(); }
+});
+
+it.each(['published', 'cancelled'] as const)('retains the verified %s list state after closing its detail', async state => {
+  const f = fixture();
+  try {
+    const opened = await f.select();
+    const selection = opened.candidates[0].selection;
+    f.data.candidate.state = state;
+    if (state === 'published') f.data.candidate.publishedReleaseId = 'rel_completed';
+    const refreshed = await f.main.command({ action: 'refresh-candidate' });
+    expect(refreshed.candidates).toHaveLength(1);
+    expect(refreshed.candidates[0]).toMatchObject({ selection, candidate: { state } });
+    const closed = await f.main.command({ action: 'discard' });
+    expect(closed.selected).toBeNull();
+    expect(closed.candidates[0]).toMatchObject({ selection, candidate: { state } });
+  } finally { f.main.dispose(); }
+});
+
+it('refreshes the selected detail from a newer list observation without retaining editable material', async () => {
+  const f = fixture();
+  try {
+    await f.select();
+    await f.main.command({ action: 'material', next: false });
+    f.data.candidate.state = 'cancelled';
+    const listed = await f.main.command({ action: 'list', next: false });
+    expect(listed).toMatchObject({ selected: { state: 'cancelled' }, material: null, canReview: false, canCancel: false });
+    expect(listed.candidates[0].candidate.state).toBe('cancelled');
   } finally { f.main.dispose(); }
 });

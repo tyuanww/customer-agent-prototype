@@ -134,7 +134,7 @@ export class ContentIntakeManagement {
    * button sends the same `upload-refresh` command, so this is the automatic path, not
    * the only one. A failed tick keeps the last known phase and the next tick retries. */
   async settleUpload(): Promise<void> {
-    if (this.disposed || !this.session.view().signedIn || !this.upload.needsSettle()) return;
+    if (this.disposed || this.active || !this.session.view().signedIn || !this.upload.needsSettle()) return;
     try { await this.upload.command({ action: 'upload-refresh' }, this.validAccess()); }
     catch { /* The next poll tick retries; the view keeps its last known phase. */ }
   }
@@ -197,7 +197,7 @@ export class ContentIntakeManagement {
           if (!this.selected) {
             this.clearSelection(); this.quality.select(candidate.key);
           }
-          this.selected = candidate;
+          this.observeCandidate(candidate, true);
         }
       } else if (c.action === 'recover' || c.action === 'retry') {
         if (this.workflowPending) {
@@ -226,6 +226,9 @@ export class ContentIntakeManagement {
             const page = parseContractSchema('IntakeCandidateList', await request(`/v1/intake/candidates?${q}`));
             if (page.items.some(item => !this.can('content-manage', item.sourceId))) return reject('FORBIDDEN');
             this.rows = page.items.map(candidate => ({ selection: randomUUID(), candidate })); this.cursor = page.nextCursor;
+            const selected = this.selected;
+            const current = selected && page.items.find(candidate => sameKey(candidate.key, selected.key) && candidate.sourceId === selected.sourceId);
+            if (current) this.observeCandidate(current);
           } else { this.rows = []; this.cursor = null; this.selected = null; this.quality.cancelRead(); }
         } else if (c.action === 'discard') {
           this.clearSelection();
@@ -235,7 +238,7 @@ export class ContentIntakeManagement {
           if (!row || !this.can('content-manage', row.candidate.sourceId)) return reject('FORBIDDEN');
           const v = parseContractSchema('IntakeCandidate', await request(this.address(row.candidate)));
           if (!sameKey(v.key, row.candidate.key) || v.sourceId !== row.candidate.sourceId) return reject('STALE');
-          this.clearSelection(); this.quality.select(v.key); this.selected = v;
+          this.clearSelection(); this.quality.select(v.key); this.observeCandidate(v);
         } else {
           const selected = this.selected;
           if (!selected || !this.can('content-manage', selected.sourceId)) return reject('FORBIDDEN');
@@ -325,6 +328,16 @@ export class ContentIntakeManagement {
     if (!selected) return reject('STALE');
     const next = parseContractSchema('IntakeCandidate', await request(this.address(selected)));
     if (!sameKey(next.key, selected.key) || next.sourceId !== selected.sourceId) return reject('STALE');
+    this.observeCandidate(next);
+  }
+  /** A verified candidate read updates both detail and list, so closing the detail
+   * cannot resurrect a completed batch as pending. List handles remain stable. */
+  private observeCandidate(next: C['IntakeCandidate'], addToList = false) {
+    if (this.can('content-manage', next.sourceId)) {
+      const row = this.rows.find(row => sameKey(row.candidate.key, next.key) && row.candidate.sourceId === next.sourceId);
+      if (row) row.candidate = next;
+      else if (addToList) this.rows.unshift({ selection: randomUUID(), candidate: next });
+    }
     if (next.approvalEvidenceVersion !== this.review?.evidenceVersion) this.review = null;
     if (!['awaiting-evidence','ready'].includes(next.state)) {
       this.quality.cancelRead(); this.material = null; this.materialTrail = []; this.review = null; this.receipt = null;

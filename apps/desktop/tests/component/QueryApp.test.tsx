@@ -2570,7 +2570,7 @@ describe('QueryApp', () => {
     render(<QueryApp intake />); activateQuery();
     await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toHaveClass('intake-filter-toggle'));
     await user.click(screen.getByRole('button', { name: '筛选' }));
-    await user.click(await screen.findByText('商品 · 通用'));
+    await user.click(await screen.findByText('商品 · 全部'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成客户问题' } });
     await user.click(screen.getByRole('checkbox', { name: '合成商品' }));
     expect(screen.getByTestId('search-button')).toBeDisabled();

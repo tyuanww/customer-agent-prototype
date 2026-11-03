@@ -50,6 +50,12 @@ export function canOpenPermissions(snapshot: PageUseSnapshot): boolean {
   return snapshot.phase === 'ready' && snapshot.permissions.state === 'open';
 }
 
+export function canViewPermissions(snapshot: PageUseSnapshot): boolean {
+  return snapshot.phase === 'ready'
+    && (snapshot.permissions.state === 'open'
+      || (snapshot.permissions.state === 'closed' && snapshot.permissions.recovery !== null));
+}
+
 export function canGrant(snapshot: PageUseSnapshot): boolean {
   return canOpenPermissions(snapshot);
 }

@@ -33,9 +33,10 @@ it('keeps the current workbench pages when the mode is product-remote', async ()
   } as unknown as Window['dashboardPermissions'];
   window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'product-remote' }) };
   render(<DashboardApp />);
-  expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料');
-  expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
-  expect(screen.getByTestId('nav-content')).toHaveAccessibleName(/知识库/);
+  expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料审核');
+  expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('成员与权限');
+  expect(screen.queryByTestId('nav-content')).not.toBeInTheDocument();
+  expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('内容库');
   expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
   expect(screen.getByTestId('nav-sop')).toBeInTheDocument();
   expect(screen.queryByTestId('nav-announce')).not.toBeInTheDocument();
@@ -63,6 +64,6 @@ it('keeps 权限 and 资料 when the mode is faq-v2', async () => {
   } as unknown as Window['dashboardPermissions'];
   window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'faq-v2' }) };
   render(<DashboardApp />);
-  expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
-  expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
+  expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('成员与权限');
+  expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料审核');
 });

@@ -62,11 +62,12 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=dashboard'))).toBe(true);
       const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
-      const knowledgeNav = dashboard.getByTestId('nav-content');
+      const knowledgeNav = dashboard.getByTestId('nav-wording');
       await knowledgeNav.click();
+      await dashboard.getByRole('tab', { name: '本机草稿', exact: true }).click();
       await expect(knowledgeNav).toHaveAttribute('aria-selected', 'true');
       await expect(dashboard.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'content');
-      await expect(dashboard.getByRole('region', { name: '知识库', exact: true })).toBeVisible();
+      await expect(dashboard.getByRole('region', { name: '本机草稿', exact: true })).toBeVisible();
       await dashboard.getByTestId('nav-overview').click();
       await expect(dashboard.getByTestId('nav-overview')).toHaveAttribute('aria-selected', 'true');
       await expect(dashboard.getByTestId('module-overview')).toBeVisible();
@@ -97,12 +98,12 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       const scripts = library.getByRole('table', { name: '可用话术', exact: true });
       await expect(scripts.getByRole('row')).toHaveCount(4);
       for (const faq of INTAKE_SYNTHETIC_FAQ) await expect(library.getByText(faq.answer, { exact: true })).toBeVisible();
-      await expect(library.getByRole('status')).toContainText('当前可用 3 条');
+      await expect(library.getByRole('status')).toContainText('当前显示 3 条');
       await expect(library.getByRole('button', { name: /复制|下架|导出/ })).toHaveCount(0);
       for (const other of Object.values(domains).filter(value => value !== label)) {
         await library.getByRole('tab', { name: other, exact: true }).click();
         await expect(scripts.getByRole('row')).toHaveCount(2);
-        await expect(scripts.getByText('当前条件下没有此类可用话术。')).toBeVisible();
+        await expect(scripts.getByText('此分类还没有可用话术，资料审核发布后会出现在这里。')).toBeVisible();
       }
       await library.getByRole('tab', { name: label, exact: true }).click();
       const nativeDashboard = await app.browserWindow(dashboard);

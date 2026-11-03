@@ -79,7 +79,7 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
     const owner = install(job, true);
     try {
       render(<DashboardApp />);
-      expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('话术库');
+      expect(screen.getByTestId('nav-wording')).toHaveAccessibleName('内容库');
       expect(screen.getByTestId('nav-sop')).toHaveAccessibleName('SOP');
       if (job.status === 'resolved' && job.role === 'agent') {
         expect(await screen.findByText('你现在可以查话术。需要看数据或管内容，请联系客服主管。')).toBeInTheDocument();
@@ -90,14 +90,14 @@ it('keeps 权限 and 资料 reachable for an engineer and a 客服坐席', async
         expect(screen.queryByTestId('nav-overview')).not.toBeInTheDocument();
         continue;
       }
-      expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('权限');
-      expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料');
+      expect(await screen.findByTestId('nav-permissions')).toHaveAccessibleName('成员与权限');
+      expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料审核');
       await user.click(screen.getByTestId('nav-permissions'));
       expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'permissions');
       expect(screen.getByRole('region', { name: '权限配置' })).toBeInTheDocument();
       expect(screen.queryByTestId('workbench-no-access')).not.toBeInTheDocument();
       await user.click(screen.getByTestId('nav-materials'));
-      expect(await screen.findByRole('heading', { name: '资料' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: '资料审核' })).toBeInTheDocument();
       expect(screen.queryByTestId('nav-publish')).not.toBeInTheDocument();
       expect(screen.queryByTestId('content-publish-denied')).not.toBeInTheDocument();
     } finally {
@@ -155,7 +155,7 @@ it('shows only 话术库 and SOP until a non-seat job resolves', async () => {
   const again = install(supervisor, true);
   try {
     render(<DashboardApp />);
-    expect(await screen.findByTestId('nav-content')).toBeInTheDocument();
+    expect(await screen.findByTestId('nav-wording')).toHaveAccessibleName('内容库');
     expect(screen.getByTestId('nav-materials')).toBeInTheDocument();
     expect(screen.getByTestId('nav-permissions')).toBeInTheDocument();
     expect(screen.getByTestId('nav-wording')).toBeInTheDocument();
