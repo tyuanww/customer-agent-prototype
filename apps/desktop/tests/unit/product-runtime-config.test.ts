@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUNTIME_PORT_PAIRS } from '../../src/shared/runtime-ports';
 import { workbenchKind } from '../../src/shared/workbench-mode';
 import {
   PackagedProfileError,
@@ -78,6 +79,34 @@ describe('packaged synthetic product profile', () => {
       apiOrigin: 'http://127.0.0.1:43100',
       identityOrigin: 'http://127.0.0.1:43101',
     });
+  });
+
+  it('accepts the WSL test pair and rejects production or cross-wired loopback pairs', () => {
+    const directory = userDataDirectory();
+    write(directory, {
+      mode: 'synthetic-local',
+      apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.api)}`,
+      identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.identity)}`,
+      contentIntake: 'faq-v2',
+    });
+    expect(readPackagedProductProfile(directory)).toEqual({
+      mode: 'synthetic-local',
+      apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.api)}`,
+      identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.identity)}`,
+      contentIntake: 'faq-v2',
+    });
+
+    for (const [api, identity] of [
+      [RUNTIME_PORT_PAIRS.production.api, RUNTIME_PORT_PAIRS.production.identity],
+      [RUNTIME_PORT_PAIRS.wslTest.api + 2, RUNTIME_PORT_PAIRS.wslTest.api + 10],
+    ] as const) {
+      write(directory, {
+        mode: 'synthetic-local',
+        apiOrigin: `http://127.0.0.1:${String(api)}`,
+        identityOrigin: `http://127.0.0.1:${String(identity)}`,
+      });
+      expect(() => readPackagedProductProfile(directory), String(api)).toThrow(PACKAGED_PROFILE_ERROR);
+    }
   });
 
   it('fail-closes for a missing, malformed or widened profile', () => {
@@ -313,6 +342,10 @@ describe('packaged synthetic product profile', () => {
       { CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'http://127.0.0.1:43101' },
       { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'http://example.com:43100', CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'http://127.0.0.1:43101' },
       { CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'http://127.0.0.1:43100', CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'not-a-url' },
+      {
+        CUSTOMER_AGENT_DESKTOP_API_ORIGIN: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.api)}`,
+        CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.identity)}`,
+      },
     ]) {
       expect(() => developmentProductProfile(environment), JSON.stringify(environment)).toThrow(/loopback/);
     }
@@ -341,8 +374,8 @@ it('preserves the explicit synthetic FAQ shell projection and remote compatibili
   expect(projectIntakeShellLine({ contentIntake: 'faq-v2' })).toBeNull();
   expect(projectIntakeShellLine({
     mode: 'synthetic-local',
-    apiOrigin: 'http://127.0.0.1:43100',
-    identityOrigin: 'http://127.0.0.1:43101',
+    apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.api)}`,
+    identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.wslTest.identity)}`,
     contentIntake: 'faq-v2',
   })).toEqual({ profileMode: 'synthetic-local', contentIntake: 'faq-v2' });
   expect(JSON.stringify(projectIntakeShellLine({
@@ -354,6 +387,12 @@ it('preserves the explicit synthetic FAQ shell projection and remote compatibili
   expect(projectIntakeShellLine({ mode: 'synthetic-local', apiOrigin: 'http://127.0.0.1:43100', identityOrigin: 'http://127.0.0.1:43101' })).toBeNull();
   expect(projectIntakeShellLine(null)).toBeNull();
   expect(projectIntakeShellLine(undefined)).toBeNull();
+  expect(projectIntakeShellLine({
+    mode: 'synthetic-local',
+    apiOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.api)}`,
+    identityOrigin: `http://127.0.0.1:${String(RUNTIME_PORT_PAIRS.production.identity)}`,
+    contentIntake: 'faq-v2',
+  })).toBeNull();
 });
 
 it.each([

@@ -144,11 +144,14 @@ const mutations = [
   ['a systemd cwd mismatch fails', (value) => { value.units[0].workingDirectoryPath = '/srv/other'; }, 'systemdWorkingDirectoriesMatchCurrent'],
   ['a process cwd mismatch fails', (value) => { value.units[1].processCwdPath = '/srv/other'; }, 'processWorkingDirectoriesMatchCurrent'],
   ['a profile outside its file directory fails', (value) => { value.profile.stackRootPath = '/srv/other'; }, 'profileStackRootMatchesProfileFile'],
+  ['a non-production stack root fails', (value) => { value.profile.stackRootPath = '/srv/customer-agent/test-stack'; value.profile.profileDirectoryPath = '/srv/customer-agent/test-stack'; }, 'profileStackRootMatchesProduction'],
+  ['a test port pair fails', (value) => { value.profile.apiPort = 43180; value.profile.identityPort = 43181; value.profile.apiOrigin = 'http://127.0.0.1:43180'; value.profile.identityOrigin = 'http://127.0.0.1:43181'; }, 'profilePortsMatchProduction'],
   ['different observed stack roots fail', (value) => { value.units[1].stackRootPath = '/srv/other'; }, 'observedUnitsUseSameStackRoot'],
   ['a wildcard listener fails', (value) => { value.listeners[0].host = '0.0.0.0'; }, 'apiListenerLoopbackOnly'],
   ['a missing identity listener fails', (value) => { value.listeners.pop(); }, 'identityListenerLoopbackOnly'],
   ['a current target basename mismatch fails', (value) => { value.current.releasePath = '/srv/release'; }, 'currentTargetNameMatchesGitHead'],
   ['an invalid database name fails', (value) => { value.profile.databaseName = 'not-a-database'; }, 'profileDatabaseNameValid'],
+  ['a non-production database fails', (value) => { value.profile.databaseName = 'customer_agent_intake_test'; }, 'profileDatabaseMatchesProduction'],
   ['a VERSION mismatch fails', (value) => { value.versions.packageVersion = '0.3.34'; }, 'versionFileMatchesPackage'],
   ['an API health version mismatch fails', (value) => { value.probes.localApiHealth.json.version = '0.3.34'; }, 'apiHealthVersionMatchesTree'],
   ['local API liveness failure fails', (value) => { value.probes.localApiHealth.status = 503; }, 'localApiHealthReady'],
@@ -340,7 +343,13 @@ test('collection reads real fixture state instead of trusting a self-reported pr
       readProcessCwd: () => realpathSync.native(releasePath),
     });
     const report = validateConsistency(observation);
-    assert.equal(report.ok, true, JSON.stringify(report.checks));
+    assert.equal(
+      report.checks.profileStackRootMatchesProduction,
+      false,
+      'a disposable fixture root must not pass the production path gate',
+    );
+    assert.equal(report.checks.profilePortsMatchProduction, true);
+    assert.equal(report.checks.profileDatabaseMatchesProduction, true);
     assert.equal(report.gitHead, SHA);
     assert.match(report.profileConfigSha256, /^[0-9a-f]{64}$/u);
     assert.match(report.clientConfigSha256, /^[0-9a-f]{64}$/u);

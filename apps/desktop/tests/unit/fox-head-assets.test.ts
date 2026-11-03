@@ -359,6 +359,16 @@ describe('fox head brand assets', () => {
       expect(regenerated.width).toBe(master.width);
       expect(regenerated.height).toBe(master.height);
       expect(sha256(regenerated.pixels)).toBe(sha256(master.pixels));
+
+      const canonicalDestination = path.join(appIconTemp, 'canonical.png');
+      const canonicalBytes = readFileSync(path.join(root, 'assets/app-icon.png'));
+      writeFileSync(canonicalDestination, canonicalBytes);
+      generateAppIconMaster({
+        root,
+        source: path.join(root, 'fox-head.png'),
+        destination: canonicalDestination,
+      });
+      expect(readFileSync(canonicalDestination)).toEqual(canonicalBytes);
     } finally {
       rmSync(appIconTemp, { recursive: true, force: true });
     }

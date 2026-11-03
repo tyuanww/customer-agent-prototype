@@ -27,6 +27,8 @@
 
 `43115/43116` 永远不是开发端口。WSL 测试完成后，测试服务必须停止，并确认 `43180/43181` 没有监听。`43199` 是 PostgreSQL Unix socket 的连接参数，不是对外开放的 TCP listener；不同 stack 通过不同 socket 目录隔离。
 
+端口对源码真源是 `apps/desktop/src/shared/runtime-ports.ts`。`/srv/customer-agent/stack` 与 `/srv/customer-agent/test-stack` 分别固定使用生产、测试端口，不能靠更换根目录把这些端口偏移开。其他合成根才会派生稳定偏移，并跳过测试和生产已占用的端口。`profile.json` 的端口、数据库和目录不匹配时，栈命令和桌面启动都会失败关闭。
+
 `scripts/formal-dev-up.mjs` 是带 worker 的本机专用 helper，默认 API 端口为 `43110`。它不替代 `stack.ts` 的合成 profile，也不改变 WSL 测试或生产端口；只有按照对应的数据迁移或本机 formal-dev 操作手册使用它。标准桌面开发请选择上表的 S0 或 Mac 合成产品栈。
 
 ## Steps
@@ -132,7 +134,7 @@ git diff --check
 | 现象 | 处理 |
 | --- | --- |
 | `ERR_PNPM_NO_SCRIPT` 或 `Missing script` | 运行 `pnpm help:dev`，不要猜 `serve` 或 `desktop` |
-| `43100` 或 `43101` 被占用 | 先运行 `stack.ts status`；停止属于当前 stack 的进程，或为另一套合成栈设置新的 `CUSTOMER_AGENT_STACK_ROOT` |
+| `43100` 或 `43101` 被占用 | 先运行 `stack.ts status`；停止属于当前 stack 的进程，或为另一套本地合成栈设置新的 `CUSTOMER_AGENT_STACK_ROOT`。生产和测试的固定端口不能靠偏移绕过 |
 | 查询提示「内容已变化，请重新查询」 | 先确认仍在使用 `43100/43101` 对应的 profile，再点胶囊「登录」回写 hydrate；不要为解决它重新 `stack start` |
 | 桌面登录不了 | 检查 API origin 和 identity origin 是否来自同一个 profile，且各自是 loopback origin；不要把 `3100`、`43100`、`43110` 混在一套桌面环境里 |
 | WSL 验收结束后仍有测试端口 | 停止测试 unit，重新检查 `ss -ltnp`；生产端口不受测试停止影响 |

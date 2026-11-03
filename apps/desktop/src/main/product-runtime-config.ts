@@ -1,5 +1,6 @@
 import { readFileSync, lstatSync, writeFileSync, type Stats } from 'node:fs';
 import path from 'node:path';
+import { isAdjacentPortPair, isProductionRuntimePort } from '../shared/runtime-ports';
 
 /**
  * Resolves the product profile for a packaged build.
@@ -56,7 +57,7 @@ export function projectIntakeShellLine(
   if (!('apiOrigin' in profile) || !('identityOrigin' in profile)) return null;
   const apiOrigin = loopbackOrigin(profile.apiOrigin);
   const identityOrigin = loopbackOrigin(profile.identityOrigin);
-  if (!apiOrigin || !identityOrigin || apiOrigin === identityOrigin) return null;
+  if (!apiOrigin || !identityOrigin || loopbackPorts(apiOrigin, identityOrigin) === undefined) return null;
   return Object.freeze({ profileMode: MODE, contentIntake: 'faq-v2' });
 }
 
@@ -92,6 +93,16 @@ function loopbackOrigin(value: unknown): string | undefined {
     || !Number.isInteger(port) || port < 1024 || port > 65_535
     || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return undefined;
   return url.origin;
+}
+
+function loopbackPorts(apiOrigin: string, identityOrigin: string):
+  | { readonly api: number; readonly identity: number }
+  | undefined {
+  const api = Number(new URL(apiOrigin).port);
+  const identity = Number(new URL(identityOrigin).port);
+  if (!isAdjacentPortPair({ api, identity })
+    || isProductionRuntimePort(api) || isProductionRuntimePort(identity)) return undefined;
+  return { api, identity };
 }
 
 function isPublicHostname(hostname: string): boolean {
@@ -178,7 +189,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if (record.mode !== MODE) return { ok: false, kind: 'invalid' };
   const apiOrigin = loopbackOrigin(record.apiOrigin);
   const identityOrigin = loopbackOrigin(record.identityOrigin);
-  if (apiOrigin === undefined || identityOrigin === undefined || apiOrigin === identityOrigin) {
+  if (apiOrigin === undefined || identityOrigin === undefined
+    || loopbackPorts(apiOrigin, identityOrigin) === undefined) {
     return { ok: false, kind: 'invalid' };
   }
   return { ok: true, profile: Object.freeze({ mode: MODE, apiOrigin, identityOrigin,
@@ -273,7 +285,11 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const apiOrigin = environment.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
   const identityOrigin = environment.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
   const contentIntake = environment.CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE;
-  if (contentIntake !== undefined && (contentIntake !== 'faq-v2' || !loopbackOrigin(apiOrigin) || !loopbackOrigin(identityOrigin))) {
+  const loopbackApi = loopbackOrigin(apiOrigin);
+  const loopbackIdentity = loopbackOrigin(identityOrigin);
+  if (contentIntake !== undefined && (contentIntake !== 'faq-v2'
+    || loopbackApi === undefined || loopbackIdentity === undefined
+    || loopbackPorts(loopbackApi, loopbackIdentity) === undefined)) {
     throw new Error('FAQ intake requires explicit loopback synthetic origins');
   }
   if (apiOrigin === undefined && identityOrigin === undefined) return undefined;
@@ -281,6 +297,10 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const identity = productOrigin(identityOrigin);
   if (api === undefined || identity === undefined || api === identity) {
     throw new Error('Synthetic desktop requires both exact loopback or https origins in development');
+  }
+  if (loopbackApi !== undefined && loopbackIdentity !== undefined
+    && loopbackPorts(loopbackApi, loopbackIdentity) === undefined) {
+    throw new Error('Synthetic loopback development origins must use a non-production adjacent port pair');
   }
   return Object.freeze({ mode: httpsOrigin(api) ? REMOTE_MODE : MODE, apiOrigin: api, identityOrigin: identity,
     ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) });

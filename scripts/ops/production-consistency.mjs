@@ -10,6 +10,8 @@ import {
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { RUNTIME_PORT_PAIRS } from '../../apps/desktop/src/shared/runtime-ports.ts';
+import { PRODUCTION_STACK_ROOT } from '../synthetic-stack/profile.ts';
 
 const GIT_SHA = /^[0-9a-f]{40}$/u;
 const VERSION = /^\d+\.\d+\.\d+$/u;
@@ -307,6 +309,9 @@ export function validateConsistency(observation) {
       current.releasePath,
     ),
     profileStackRootMatchesProfileFile: profile.stackRootPath === profile.profileDirectoryPath,
+    profileStackRootMatchesProduction: profile.stackRootPath === PRODUCTION_STACK_ROOT,
+    profilePortsMatchProduction: profile.apiPort === RUNTIME_PORT_PAIRS.production.api
+      && profile.identityPort === RUNTIME_PORT_PAIRS.production.identity,
     observedUnitsUseSameStackRoot: unitsShareStackRoot,
     sameObservedConfigurationEntry: unitsShareStackRoot
       && profile.stackRootPath === profile.profileDirectoryPath,
@@ -314,6 +319,7 @@ export function validateConsistency(observation) {
       && parseLoopbackOrigin(profile.identityOrigin)?.port === profile.identityPort,
     profileDatabaseNameValid: typeof profile.databaseName === 'string'
       && SQL_IDENTIFIER.test(profile.databaseName),
+    profileDatabaseMatchesProduction: profile.databaseName === 'customer_agent_formal',
     versionFileMatchesPackage: safeVersion(versions.versionFile) !== null
       && safeVersion(versions.versionFile) === safeVersion(versions.packageVersion),
     apiHealthVersionMatchesTree: apiVersion !== null && apiVersion === safeVersion(versions.versionFile),

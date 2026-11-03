@@ -2,6 +2,14 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.40] - 2026-11-03
+
+### Fixed
+
+- 开发、WSL 测试和生产端口统一读取 `runtime-ports.ts`。生产根只接受 `43115/43116` 与 `customer_agent_formal`，测试根只接受 `43180/43181` 与非正式库，其他合成根的稳定偏移会跳过这两组保留端口。
+- `profile.json` 现在按根目录、环境、端口、数据库和派生存储目录整体校验；损坏、软链或跨环境 profile 会失败关闭，生产栈不能再生成合成 Desktop profile。
+- 图标生成在解码后的 RGBA 未变化时保留已跟踪 PNG 字节，避免 Linux zlib 版本差异让干净 checkout 在打包后变脏。
+
 ## [0.3.39] - 2026-10-29
 
 ### Changed
