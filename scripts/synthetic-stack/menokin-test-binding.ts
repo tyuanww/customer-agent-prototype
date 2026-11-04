@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { bindKnownPrincipal } from '../../apps/api/src/content-intake/bind-known-principal.ts';
-import { assertSyntheticSourceTenants, SYNTHETIC_STACK_TENANT } from './bootstrap.ts';
+import { assertSyntheticSourceTenants, SYNTHETIC_STACK_TENANT } from './synthetic-tenancy.ts';
 
 type Queryable = {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;

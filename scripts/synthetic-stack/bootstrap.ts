@@ -17,19 +17,15 @@ import { applyDatabaseMigrations, inspectDatabaseMigrations } from '../../packag
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
 import { SYNTHETIC_IDENTITIES, type FeishuStackBinding } from './profile.ts';
 import { SEED_INTENT } from './seed.ts';
+import { assertSyntheticSourceTenants, SYNTHETIC_STACK_TENANT } from './synthetic-tenancy.ts';
 
 const CAPABILITIES: readonly (readonly [string, string])[] = Object.freeze([
   ['synthetic_coach', 'content_review_lead'],
   ['synthetic_owner', 'content_review_manager'],
   ['synthetic_quality', 'content_quality_reviewer'],
 ]);
-export const SYNTHETIC_STACK_TENANT = 'tenant-menokin';
 export const SYNTHETIC_STACK_NOTICE_VERSION = 'synthetic-stack-notice-v1';
 const SYNTHETIC_STACK_NOTICE_TEXT = '仅用于本地合成功能验证，不包含真实客户数据。';
-
-type Queryable = {
-  query: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<{ rows: readonly T[] }>;
-};
 
 function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -38,26 +34,6 @@ function sha256(value: string | Buffer): string {
 export async function applyMigrations(client): Promise<string> {
   const result = await applyDatabaseMigrations(client);
   return `migrations: ${String(result.applied?.length ?? 0)} applied`;
-}
-
-export async function assertSyntheticSourceTenants(
-  client: Queryable,
-  sourceVersionIds: readonly string[],
-): Promise<void> {
-  const result = await client.query<{ source_version_id: string; tenant_id: string }>(`
-    SELECT source_version_id, tenant_id
-    FROM public.authoritative_source_versions
-    WHERE source_version_id = ANY($1::text[])
-  `, [sourceVersionIds]);
-  const tenants = new Map(result.rows.map(row => [row.source_version_id, row.tenant_id]));
-  for (const sourceVersionId of sourceVersionIds) {
-    const tenantId = tenants.get(sourceVersionId);
-    if (tenantId !== SYNTHETIC_STACK_TENANT) {
-      throw new Error(
-        `Synthetic source ${sourceVersionId} has tenant ${tenantId ?? 'missing'}; expected ${SYNTHETIC_STACK_TENANT}. Destroy and rebuild the synthetic stack.`,
-      );
-    }
-  }
 }
 
 /**
