@@ -89,13 +89,17 @@ export function normalizeSnapshot(raw) {
     if (!row || typeof row !== 'object'
       || !ACTIVE_STATUSES.includes(row.status)
       || !['default', 'explicit'].includes(row.tenant_kind)
-      || !['missing', 'mismatch', 'bound'].includes(row.actor_state)) {
+      || !['missing', 'mismatch', 'bound'].includes(row.actor_state)
+      || !['missing', 'stale', 'current'].includes(row.base_state)
+      || !['missing', 'mismatch', 'bound'].includes(row.base_tenant_state)) {
       throw new Error('SNAPSHOT_INVALID');
     }
     return Object.freeze({
       status: row.status,
       tenantKind: row.tenant_kind,
       actorState: row.actor_state,
+      baseState: row.base_state,
+      baseTenantState: row.base_tenant_state,
       rowCount: count(row.row_count),
       sourceCount: count(row.source_count),
       sourceMismatchCount: count(row.source_mismatch_count),
@@ -124,6 +128,10 @@ export function evaluateSnapshot(input) {
     if (row.tenantKind === 'default') blockers.add('ACTIVE_IMPORT_BATCH_DEFAULT_TENANT');
     if (row.actorState === 'missing') blockers.add('ACTIVE_IMPORT_BATCH_PRINCIPAL_MISSING');
     if (row.actorState === 'mismatch') blockers.add('ACTIVE_IMPORT_BATCH_TENANT_MISMATCH');
+    if (row.baseState !== 'current') blockers.add('ACTIVE_IMPORT_BATCH_BASE_RELEASE_STALE');
+    if (row.baseTenantState === 'mismatch') {
+      blockers.add('ACTIVE_IMPORT_BATCH_BASE_RELEASE_TENANT_MISMATCH');
+    }
     if (row.sourceCount < 1) blockers.add('ACTIVE_IMPORT_BATCH_SOURCE_MISSING');
     if (row.sourceCount > 0 && row.sourceCount !== EXPECTED_SOURCE_DOMAIN_COUNT) {
       blockers.add('ACTIVE_IMPORT_BATCH_SOURCE_SET_INVALID');
@@ -152,17 +160,51 @@ export function evaluateSnapshot(input) {
 
 export async function collectSnapshot(client) {
   const batches = await client.query(`
-    WITH active AS (
+    WITH current_release AS (
+      SELECT current.current_release_id, release.tenant_id
+      FROM public.content_current AS current
+      JOIN public.content_releases AS release
+        ON release.release_id = current.current_release_id
+      WHERE current.id = 1
+    ),
+    active AS (
       SELECT
         b.import_batch_id,
         b.status,
         b.tenant_id,
+        b.base_release_id,
+        base_release.tenant_id AS base_tenant,
         principal.principal_id,
         principal.tenant_id AS actor_tenant
       FROM public.import_batches AS b
+      LEFT JOIN public.content_releases AS base_release
+        ON base_release.release_id = b.base_release_id
       LEFT JOIN content_intake.principals AS principal
         ON principal.user_id = b.actor_user_id
       WHERE b.status = ANY($1::text[])
+    ),
+    prospective AS (
+      SELECT
+        active.import_batch_id,
+        binding.domain,
+        binding.source_version_id
+      FROM active
+      JOIN public.import_batch_source_bindings AS binding
+        ON binding.import_batch_id = active.import_batch_id
+      UNION ALL
+      SELECT
+        active.import_batch_id,
+        binding.domain,
+        binding.source_version_id
+      FROM active
+      JOIN public.release_source_bindings AS binding
+        ON binding.release_id = active.base_release_id
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.import_batch_source_bindings AS batch_binding
+        WHERE batch_binding.import_batch_id = active.import_batch_id
+          AND batch_binding.domain = binding.domain
+      )
     )
     SELECT
       active.status,
@@ -172,18 +214,36 @@ export async function collectSnapshot(client) {
         WHEN active.actor_tenant IS DISTINCT FROM active.tenant_id THEN 'mismatch'
         ELSE 'bound'
       END AS actor_state,
-      count(DISTINCT active.import_batch_id)::int AS row_count,
-      count(source.source_version_id)::int AS source_count,
-      count(source.source_version_id) FILTER (
-        WHERE source.tenant_id IS DISTINCT FROM active.tenant_id
+      CASE
+        WHEN active.base_release_id IS NULL THEN 'missing'
+        WHEN active.base_release_id = (SELECT current_release_id FROM current_release) THEN 'current'
+        ELSE 'stale'
+      END AS base_state,
+      CASE
+        WHEN active.base_release_id IS NULL OR active.base_tenant IS NULL THEN 'missing'
+        WHEN active.base_tenant = coalesce(active.actor_tenant, active.tenant_id) THEN 'bound'
+        ELSE 'mismatch'
+      END AS base_tenant_state,
+      1::int AS row_count,
+      count(DISTINCT prospective.domain)::int AS source_count,
+      count(DISTINCT prospective.domain) FILTER (
+        WHERE source.tenant_id IS DISTINCT FROM coalesce(active.actor_tenant, active.tenant_id)
       )::int AS source_mismatch_count
     FROM active
-    LEFT JOIN public.import_batch_source_bindings AS binding
-      ON binding.import_batch_id = active.import_batch_id
+    LEFT JOIN prospective
+      ON prospective.import_batch_id = active.import_batch_id
     LEFT JOIN public.authoritative_source_versions AS source
-      ON source.source_version_id = binding.source_version_id
-    GROUP BY active.status, active.tenant_id, active.principal_id, active.actor_tenant
-    ORDER BY active.status, tenant_kind, actor_state
+      ON source.source_version_id = prospective.source_version_id
+     AND source.domain = prospective.domain
+    GROUP BY
+      active.import_batch_id,
+      active.status,
+      active.tenant_id,
+      active.base_release_id,
+      active.base_tenant,
+      active.principal_id,
+      active.actor_tenant
+    ORDER BY active.status, tenant_kind, actor_state, active.import_batch_id
   `, [ACTIVE_STATUSES]);
   const historical = await client.query(`
     SELECT count(*)::int AS default_count

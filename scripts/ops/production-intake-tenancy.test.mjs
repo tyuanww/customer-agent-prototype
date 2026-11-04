@@ -39,6 +39,8 @@ test('accepts clean active imports and ignores completed historical defaults', (
       status: 'staged',
       tenant_kind: 'explicit',
       actor_state: 'bound',
+      base_state: 'current',
+      base_tenant_state: 'bound',
       row_count: 1,
       source_count: 4,
       source_mismatch_count: 0,
@@ -57,6 +59,8 @@ test('blocks active default, missing actor, and tenant mismatch groups', () => {
         status: 'validating',
         tenant_kind: 'default',
         actor_state: 'missing',
+        base_state: 'current',
+        base_tenant_state: 'bound',
         row_count: 2,
         source_count: 0,
         source_mismatch_count: 0,
@@ -65,6 +69,8 @@ test('blocks active default, missing actor, and tenant mismatch groups', () => {
         status: 'staged',
         tenant_kind: 'explicit',
         actor_state: 'mismatch',
+        base_state: 'current',
+        base_tenant_state: 'bound',
         row_count: 1,
         source_count: 4,
         source_mismatch_count: 1,
@@ -103,12 +109,59 @@ test('blocks an active batch with an incomplete source set', () => {
       status: 'staged',
       tenant_kind: 'explicit',
       actor_state: 'bound',
+      base_state: 'current',
+      base_tenant_state: 'bound',
       row_count: 1,
       source_count: 3,
       source_mismatch_count: 0,
     }],
   }));
   assert.deepEqual(report.blockers, ['ACTIVE_IMPORT_BATCH_SOURCE_SET_INVALID']);
+});
+
+test('blocks an active batch whose base release is stale or missing', () => {
+  const report = evaluateSnapshot(snapshot({
+    batches: [
+      {
+        status: 'staged',
+        tenant_kind: 'explicit',
+        actor_state: 'bound',
+        base_state: 'stale',
+        base_tenant_state: 'bound',
+        row_count: 1,
+        source_count: 4,
+        source_mismatch_count: 0,
+      },
+      {
+        status: 'validating',
+        tenant_kind: 'explicit',
+        actor_state: 'bound',
+        base_state: 'missing',
+        base_tenant_state: 'missing',
+        row_count: 1,
+        source_count: 4,
+        source_mismatch_count: 0,
+      },
+    ],
+  }));
+  assert.deepEqual(report.blockers, ['ACTIVE_IMPORT_BATCH_BASE_RELEASE_STALE']);
+  assert.equal(report.activeBatchCount, 2);
+});
+
+test('blocks an active batch whose base release belongs to another tenant', () => {
+  const report = evaluateSnapshot(snapshot({
+    batches: [{
+      status: 'staged',
+      tenant_kind: 'explicit',
+      actor_state: 'bound',
+      base_state: 'current',
+      base_tenant_state: 'mismatch',
+      row_count: 1,
+      source_count: 4,
+      source_mismatch_count: 0,
+    }],
+  }));
+  assert.deepEqual(report.blockers, ['ACTIVE_IMPORT_BATCH_BASE_RELEASE_TENANT_MISMATCH']);
 });
 
 test('blocks a missing current release and rejects malformed counts', () => {
@@ -130,6 +183,8 @@ test('blocks a missing current release and rejects malformed counts', () => {
       status: 'unknown',
       tenant_kind: 'explicit',
       actor_state: 'bound',
+      base_state: 'current',
+      base_tenant_state: 'bound',
       row_count: 1,
       source_count: 4,
       source_mismatch_count: 0,

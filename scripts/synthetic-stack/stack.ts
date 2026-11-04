@@ -451,7 +451,7 @@ async function runStart(foreground: boolean): Promise<void> {
   const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {
-    for (const step of await bootstrapDatabase(database)) log(step);
+    for (const step of await bootstrapDatabase(database, { syntheticReferenceData: !noSeed })) log(step);
     const feishu = loadFeishuStackConfig();
     if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
     if (profile.databaseName !== 'customer_agent_formal') log(await bindMenokinTestIdentities(database, profile.databaseName));
@@ -583,7 +583,7 @@ async function commandMigrate(): Promise<void> {
   const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {
-    for (const step of await bootstrapDatabase(database)) log(step);
+    for (const step of await bootstrapDatabase(database, { syntheticReferenceData: false })) log(step);
   } finally {
     await database.end();
   }
