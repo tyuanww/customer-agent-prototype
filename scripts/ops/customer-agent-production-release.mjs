@@ -160,13 +160,21 @@ function readManifest(releaseRoot) {
   return Object.freeze(migrations);
 }
 
-function releaseGitState(releaseRoot, requireClean) {
+function gitEnvironment(releaseRoot) {
   const env = {
     ...process.env,
     GIT_CONFIG_GLOBAL: os.devNull,
     GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'safe.directory',
+    GIT_CONFIG_VALUE_0: releaseRoot,
     GIT_OPTIONAL_LOCKS: '0',
   };
+  return env;
+}
+
+function releaseGitState(releaseRoot, requireClean) {
+  const env = gitEnvironment(releaseRoot);
   let sha;
   let status;
   try {
@@ -893,6 +901,7 @@ export function assertMigrationCompletion(databaseIds, nextIds, migration) {
 }
 
 function defaultDependencies(options) {
+  assertApplyPrivilege(options.apply);
   return Object.freeze({
     readCurrent: async () => readCurrent(options.root),
     readNext: async () => readRelease(options.root, options.sha, options.expectedVersion, true),
@@ -947,6 +956,12 @@ function defaultDependencies(options) {
     },
     waitForReady: async (profile, version, assertActive) => waitForReady(profile.apiOrigin, version, assertActive),
   });
+}
+
+export function assertApplyPrivilege(apply, getEffectiveUid = () => process.geteuid?.()) {
+  if (apply && getEffectiveUid() !== 0) {
+    fail('DEPLOYMENT_PRIVILEGE_REQUIRED', 'apply must run as root to restart the systemd unit');
+  }
 }
 
 function createDeploymentState(next, previous, backupId) {

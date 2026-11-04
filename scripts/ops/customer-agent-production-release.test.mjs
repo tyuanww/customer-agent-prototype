@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   acquireDeploymentLock,
+  assertApplyPrivilege,
   assertMigrationCompletion,
   parseOptions,
   ProductionReleaseError,
@@ -216,6 +217,19 @@ test('production apply requires authorization equal to the full candidate SHA', 
     () => parseOptions([...base, '--authorization', NEXT, '--unit', 'other.service']),
     (error) => error instanceof Error && 'code' in error && error.code === 'INVALID_ARGUMENTS',
   );
+});
+
+test('production apply requires root before any writer is initialized', () => {
+  assert.doesNotThrow(() => assertApplyPrivilege(false, () => 1000));
+  assert.throws(
+    () => assertApplyPrivilege(true, () => 1000),
+    (error) => error instanceof Error && 'code' in error && error.code === 'DEPLOYMENT_PRIVILEGE_REQUIRED',
+  );
+  assert.throws(
+    () => assertApplyPrivilege(true, () => undefined),
+    (error) => error instanceof Error && 'code' in error && error.code === 'DEPLOYMENT_PRIVILEGE_REQUIRED',
+  );
+  assert.doesNotThrow(() => assertApplyPrivilege(true, () => 0));
 });
 
 test('apply migrates before switching, updating the version and proving readiness', async () => {
