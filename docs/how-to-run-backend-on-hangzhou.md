@@ -97,6 +97,15 @@ LOG_HASH_KEY  LOG_HASH_KEY_VERSION
 
 生产备份与隔离恢复命令见[备份集与恢复验证](how-to-verify-backup-set.md)。本页记录操作边界，不表示本轮候选已经发布。
 
+部署包含导入租户变更的候选前，先运行只读租户预检：
+
+```bash
+node scripts/ops/production-intake-tenancy.mjs \
+  --stack-root /srv/customer-agent/stack
+```
+
+命令复用仓库的 stack profile 解析器校验环境、端口、数据库和 socket，并使用 `profile.json` 中的 Unix socket 与数据库，在 `REPEATABLE READ READ ONLY` 事务内聚合检查活动导入批次、actor principal、来源版本和当前发布。退出 `0` 表示没有租户阻断，退出 `1` 表示存在活动 `default`、未知 actor、租户错配、不完整来源集或 `CHECK_FAILED`，退出 `2` 表示参数或 profile 无效。输出只包含聚合计数和稳定阻断码。不要为让检查通过而直接改写批次租户；先按阻断码决定取消、回填或停止发布。
+
 ## 迁数据
 
 源：Mac 的 `~/.customer-agent-formal/pg15`，库 `customer_agent_formal`，socket 端口 43299。
