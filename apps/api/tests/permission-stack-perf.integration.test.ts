@@ -66,8 +66,9 @@ describe.runIf(enabled)('permission stack perf probe', () => {
         VALUES ('srcv_perf_product','SRC-PERF-PRODUCT','product','v1',repeat('ab',32),
           'canonical','ROLE-CONTENT-LEAD','EVD-PERF','synthetic-owner',
           '2020-01-01T00:00:00Z','2099-01-01T00:00:00Z','tenant-perf')`);
-      await admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status, tenant_id)
-        VALUES ('perf_staged_batch','csv',repeat('ab',32),'staged','tenant-perf')`);
+      await admin.query(`INSERT INTO public.import_batches(
+          import_batch_id, source_type, source_binding_hash, status, tenant_id, actor_user_id
+        ) VALUES ('perf_staged_batch','csv',repeat('ab',32),'staged','tenant-perf','usr_perf_agent_0')`);
       await admin.query("SELECT set_config('app.import_binding_write','on',false)");
       await admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
         VALUES ('perf_staged_batch','product','srcv_perf_product')`);

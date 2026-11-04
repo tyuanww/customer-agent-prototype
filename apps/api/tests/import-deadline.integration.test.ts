@@ -81,6 +81,10 @@ describe.skipIf(!enabled)('import reads the source set by domain', () => {
     );
     expect(await revisions()).toBe(4);
     expect(await fixture.importMessage('user-director', 'agent', bindingsFor(DOMAINS))).toBe('accepted');
+    expect((await fixture.admin.query(
+      'SELECT actor_user_id, tenant_id FROM public.import_batches WHERE import_batch_id = $1',
+      ['imp_probe'],
+    )).rows).toEqual([{ actor_user_id: 'user-director', tenant_id: 'tenant-menokin' }]);
   });
 
   it('matches the batch domains to the import set in both directions', async () => {
