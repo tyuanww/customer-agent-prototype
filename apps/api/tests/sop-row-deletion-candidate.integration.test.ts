@@ -28,8 +28,10 @@ describe.skipIf(!enabled)('Versioned SOP row deletion: actual PG15, restricted b
   let stage: ReturnType<typeof createTrustedSopStage>;
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_row');
-    admin = await pg.connect(db.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
+    admin = await pg.connect(db.config);
+    const migrationCount = (await applyDatabaseMigrations(admin)).applied.length;
+    await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
     await admin.query('CREATE ROLE sop_business LOGIN NOINHERIT; GRANT intake_business TO sop_business');
     business = createIntakePurposePool({ ...db.config, user: 'sop_business', max: 4 }, 'business');
     setupPool = new Pool(db.config);

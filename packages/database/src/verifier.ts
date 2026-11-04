@@ -169,6 +169,8 @@ const LATEST_TRIGGER_SHA256 = '82025d3049c834f4b66faffca9e9bcc132e221ab7c1ec93b4
 // at this length, so the allowance below has to name this fingerprint too.
 const POLICY_RESTAMP_TRIGGER_ENTRIES = 115;
 const POLICY_RESTAMP_TRIGGER_SHA256 = 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b';
+const CURRENT_IMPORT_BATCH_TRIGGER_SHA256 = '92be2db46447f1ed44d1ceefd2820d5a8132e3544be46b03d30f9d019f498cfd';
+const CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = '5adc531fbc48161b54528d999affab3085f5343584a4b11f4c30db2fb7c651c9';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -925,6 +927,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === POLICY_RESTAMP_TRIGGER_ENTRIES
     && expectedTriggerSha === POLICY_RESTAMP_TRIGGER_SHA256
+  ) || (
+    expectedTriggerEntries === 116
+    && expectedTriggerSha === CURRENT_IMPORT_BATCH_TRIGGER_SHA256
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -946,7 +951,9 @@ async function verifyCatalogueState(
       && explained
       && trigger.entries === expectedTriggerEntries
       && explained.disabledTriggers.length > 0
-      && explained.sha256 === expectedTriggerSha
+      && (explained.sha256 === expectedTriggerSha
+        || (catalogue.migrations.length === 80
+          && triggerSha === CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
@@ -1142,6 +1149,7 @@ const READINESS_SUFFIX = [
   { length: 77, index: 76, id: '0077_manual_identity_grants' },
   { length: 78, index: 77, id: '0078_seat_manual_grants' },
   { length: 79, index: 78, id: '0079_directory_identity_activity' },
+  { length: 80, index: 79, id: '0080_bind_import_batch_tenant' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1216,6 +1224,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   77: { tables: 111, functions: 299, objectEntries: 3443, objectSha256: 'de15fb78bd355d1926f2544fd6625b22c3b4c4d32f826ed507aeac0f56d8d328', functionEntries: 299, functionSha256: 'a7f7a1efec5d6a93042be4dd2d505d16ee818c8244bd2571a982f9d2400fa579', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   78: { tables: 111, functions: 299, objectEntries: 3443, objectSha256: 'de15fb78bd355d1926f2544fd6625b22c3b4c4d32f826ed507aeac0f56d8d328', functionEntries: 299, functionSha256: '961313240944ec1ce51e7fb2036297371262e0696750b4e6a76ebdcee084c846', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   79: { tables: 111, functions: 300, objectEntries: 3444, objectSha256: '43b61731970b249e58fcb03a1e64cd05cc030df93e5d38b918a158dbf3175c6d', functionEntries: 300, functionSha256: '1040ddfdfd2d0c093c28532fff035c0f1ce20467d0328bcf95bc1e0353de5b2d', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
+  80: { tables: 111, functions: 301, objectEntries: 3445, objectSha256: '34b9f8ce333fa221c9e8d15635212e0203ca8069523e2adc58b028e69a005762', functionEntries: 301, functionSha256: 'f387f4ea6a63ffe5095162779b0e89a48504710de09978b9d560894859e15d05', triggerEntries: 116, triggerSha256: CURRENT_IMPORT_BATCH_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1267,6 +1276,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   77: { entries: 654, sha256: 'cf90d1c23de6e40d9c43ab6c14f5028c62731ceb1f64958a0938442c37e14940' },
   78: { entries: 654, sha256: 'cf90d1c23de6e40d9c43ab6c14f5028c62731ceb1f64958a0938442c37e14940' },
   79: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
+  80: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
 };
 
 export async function verifyReadinessSuccessor(

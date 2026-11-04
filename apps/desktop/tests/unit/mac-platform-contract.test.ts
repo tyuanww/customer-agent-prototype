@@ -292,12 +292,14 @@ describe('macOS runtime contract', () => {
     expect(controller).toContain('setFoxFocusable(false)');
     expect(controller).toContain('this.platform.yieldPreviousApp');
     expect(controller).toContain('if (this.chromeHandoffMode !== null)');
-    expect(controller).not.toContain('macPanel: false');
+    expect(controller).toContain('macPanel: false');
     expect(controller).not.toMatch(/app\.focus\([^)]*steal/);
     expect(overlayPlatform).toMatch(/app\.hide\(\)/);
     expect(overlayPlatform).toMatch(/generation !== this\.yieldGeneration/);
     expect(overlayPlatform).not.toMatch(/app\.focus\([^)]*steal/);
-    expect(overlayPlatform).toMatch(/if \(process\.platform !== 'darwin'\) \{\s*try \{\s*app\.focus\(\);/);
+    expect(overlayPlatform).toMatch(
+      /if \(process\.platform === 'darwin'\) \{[\s\S]*?app\.isHidden\(\)[\s\S]*?app\.show\(\);[\s\S]*?\} else \{\s*try \{\s*app\.focus\(\);/,
+    );
   });
 
   it('adopts WindowServer fox bounds without moving the native window on hover', () => {

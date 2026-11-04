@@ -237,7 +237,9 @@ export async function applyMigrationCatalogue(
           else if (readinessSuccessor) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 41) });
           else if (occupiedDomain) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 42) });
           else if (defaultTenant) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 43) });
-          else if (directoryActivity) await verifyReadinessSuccessor(client, catalogue);
+          else if (directoryActivity) {
+            await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 79) });
+          }
           else await verifyMigrationPrefix(client, migration.position);
         }
       } catch (error) {

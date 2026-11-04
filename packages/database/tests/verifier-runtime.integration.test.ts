@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, applyMigrationCatalogue } from '../src/runner.js';
 import { Pg15Harness } from '../src/testkit/index.js';
 import { legacyCheckPredecessorCatalogue, verifyDatabaseMigrations, verifyLegacyCheckPredecessor } from '../src/verifier.js';
+import { generatedMigrationCatalogue } from '../src/generated/migrations.generated.js';
 
 // Explicit opt-in keeps the normal package unit command independent of local PG.
 // This fixture owns its cluster; no environment database or credentials are used.
@@ -19,8 +20,8 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
 
   it('verifies the actual current installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
-      status: 'PASS', migrationCount: 79,
-      inventory: { tables: 111, views: 7, functions: 300 },
+      status: 'PASS', migrationCount: generatedMigrationCatalogue.migrations.length,
+      inventory: { tables: 111, views: 7, functions: 301 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
     const empty = await client.query(`SELECT script_id FROM ops_loop.list_resolved_inaccuracy_outcomes('coach')`);
@@ -173,7 +174,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
     }
   }, 180_000);
 
-  it('accepts the two disabled import-batch triggers on the 115-entry fingerprint and leaves them disabled', async () => {
+  it('accepts the two disabled import-batch triggers on the current fingerprint and leaves them disabled', async () => {
     const local = new Pg15Harness();
     let readiness: Client | undefined;
     try {
@@ -184,10 +185,10 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       await readiness.query('ALTER TABLE public.import_batches DISABLE TRIGGER import_batches_restore_snapshots');
       expect(await verifyDatabaseMigrations(readiness)).toMatchObject({
         status: 'PASS',
-        migrationCount: 79,
+        migrationCount: generatedMigrationCatalogue.migrations.length,
         triggerFingerprint: {
-          entries: 115,
-          frozenSha256: 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b',
+          entries: 116,
+          frozenSha256: '92be2db46447f1ed44d1ceefd2820d5a8132e3544be46b03d30f9d019f498cfd',
           difference: 'import_batches_tgenabled',
           disabledTriggers: [
             'backend_review_sync_wait_on_batch_failed',

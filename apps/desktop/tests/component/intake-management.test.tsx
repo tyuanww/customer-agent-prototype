@@ -21,7 +21,7 @@ function setup() {
   const command = vi.fn(async (c: Parameters<ContentIntakeManagement['command']>[0]) => ({ ok: true as const, view: await main.command(c) }));
   window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), current: async () => ({ ok: true, view: main.view() }), command,
     onInvalidated: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; } };
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null });
   return { data, main, command, user, listeners, confirmation };
 }
 async function choose(user: ReturnType<typeof userEvent.setup>, name: string, option: string) {
@@ -344,12 +344,14 @@ it('keeps review navigation separate from the existing source, sample and public
     await f.user.click(screen.getByRole('button', { name: '暂存本条判断' }));
     expect(progress()).toHaveTextContent('完成本轮质量检查');
     expect(f.data.samples[0].check).toBeNull();
-    await f.user.click(screen.getByRole('button', { name: '提交本轮审核' }));
-    expect(progress()).toHaveTextContent('读取最新检查状态');
+    const submit = screen.getByRole('button', { name: '提交本轮审核' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await f.user.click(submit);
+    await waitFor(() => expect(progress()).toHaveTextContent('读取最新检查状态'));
     await f.user.click(screen.getByRole('button', { name: '读取审核清单' }));
-    expect(progress()).toHaveTextContent('核对审核状态');
+    await waitFor(() => expect(progress()).toHaveTextContent('核对审核状态'));
     await f.user.click(screen.getByRole('button', { name: '刷新审核状态' }));
-    expect(progress()).toHaveTextContent('确认发布');
+    await waitFor(() => expect(progress()).toHaveTextContent('确认发布'));
     expect(f.data.candidate.publishedReleaseId).toBeNull();
   } finally { f.main.dispose(); }
 });

@@ -55,6 +55,7 @@ const SOP_REPAIR_SUFFIX = [
   '0077_manual_identity_grants',
   '0078_seat_manual_grants',
   '0079_directory_identity_activity',
+  '0080_bind_import_batch_tenant',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -204,7 +205,10 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect((await client.query('SELECT max(position)::int AS position FROM customer_agent_meta.schema_migrations')).rows).toEqual([{ position: 78 }]);
       expect((await client.query("SELECT to_regprocedure('content_intake.principal_has_new_identity_activity(text)') AS function")).rows).toEqual([{ function: null }]);
       await client.query(repair);
-      expect((await applyDatabaseMigrations(client)).applied.map(migration => migration.id)).toEqual(['0079_directory_identity_activity']);
+      expect((await applyDatabaseMigrations(client)).applied.map(migration => migration.id)).toEqual([
+        '0079_directory_identity_activity',
+        '0080_bind_import_batch_tenant',
+      ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
   }, 120_000);
@@ -669,7 +673,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     try {
       const fresh = await inspectDatabaseMigrations(client);
       expect(fresh.state).toBe('FRESH');
-      expect(fresh.pending).toHaveLength(79);
+      expect(fresh.pending).toHaveLength(generatedMigrationCatalogue.migrations.length);
 
       const applied = await applyDatabaseMigrations(client);
       expect(applied.before).toBe('FRESH');
@@ -681,12 +685,12 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       const report = await verifyDatabaseMigrations(client);
       expect(report).toMatchObject({
         status: 'PASS',
-        migrationCount: 79,
-        inventory: { tables: 111, views: 7, functions: 300 },
+        migrationCount: generatedMigrationCatalogue.migrations.length,
+        inventory: { tables: 111, views: 7, functions: 301 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
-          priorUpgrade: 'SUPPORTED · immutable 9-migration baseline → 70-migration current suffix',
+          priorUpgrade: `SUPPORTED · immutable 9-migration baseline → ${String(generatedMigrationCatalogue.migrations.length - 9)}-migration current suffix`,
         },
       });
 
@@ -833,7 +837,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterProjection.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 79,
+        migrationCount: generatedMigrationCatalogue.migrations.length,
       });
     } finally {
       await client.end();
@@ -1089,7 +1093,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(afterNoHitContext.rows[0]?.value).toContain('is_candidate boolean');
       await expect(verifyDatabaseMigrations(client)).resolves.toMatchObject({
         status: 'PASS',
-        migrationCount: 79,
+        migrationCount: generatedMigrationCatalogue.migrations.length,
       });
     } finally {
       await client.end();

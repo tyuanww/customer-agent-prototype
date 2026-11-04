@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import { bindKnownPrincipal } from '../../apps/api/src/content-intake/bind-known-principal.ts';
+import { assertSyntheticSourceTenants, SYNTHETIC_STACK_TENANT } from './bootstrap.ts';
 
 type Queryable = {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
 };
 
-const TENANT = 'tenant-menokin';
+const TENANT = SYNTHETIC_STACK_TENANT;
 const APP = 'app-customer-agent';
+const FIXTURE_STORE_SET_VERSION = 1;
 const PEOPLE = [
   { principalId: 'synthetic_owner', userId: 'usr_synthetic_owner', jobId: 'job-director', role: 'director' },
   { principalId: 'synthetic_coach', userId: 'usr_synthetic_coach', jobId: 'job-lead', role: 'lead' },
@@ -29,6 +31,37 @@ export async function bindMenokinTestIdentities(client: Queryable, databaseName:
     `INSERT INTO content_intake.policy_versions(tenant_id, app_id, version) VALUES ($1, $2, 1) ON CONFLICT DO NOTHING`,
     [TENANT, APP],
   );
+  await client.query(
+    `INSERT INTO content_intake.store_sets(tenant_id, app_id, version, approved_at, provenance)
+     VALUES ($1, $2, 1, clock_timestamp(), 'synthetic')
+     ON CONFLICT DO NOTHING`,
+    [TENANT, APP],
+  );
+  await client.query(
+    `INSERT INTO content_intake.store_set_current(tenant_id, app_id, version)
+     VALUES ($1, $2, 1)
+     ON CONFLICT (tenant_id, app_id) DO NOTHING`,
+    [TENANT, APP],
+  );
+  const currentStoreSet = await client.query<{ version: string | number }>(
+    `SELECT version FROM content_intake.store_set_current WHERE tenant_id = $1 AND app_id = $2`,
+    [TENANT, APP],
+  );
+  const currentStoreSetVersion = Number(currentStoreSet.rows[0]?.version);
+  if (currentStoreSetVersion !== FIXTURE_STORE_SET_VERSION) {
+    throw new Error(
+      `Synthetic stack uses store-set version ${String(currentStoreSet.rows[0]?.version)}; expected ${String(FIXTURE_STORE_SET_VERSION)}. Destroy and rebuild the synthetic stack.`,
+    );
+  }
+  for (const [scopeId, sourceId] of SCOPES) {
+    await client.query(
+      `INSERT INTO content_intake.store_set_members(
+         tenant_id, app_id, version, scope_id, source_id, content_valid_until)
+       VALUES ($1, $2, 1, $3, $4, clock_timestamp() + interval '2 days')
+       ON CONFLICT DO NOTHING`,
+      [TENANT, APP, scopeId, sourceId],
+    );
+  }
   for (const person of PEOPLE) {
     const bound = await bindKnownPrincipal(client, {
       principalId: person.principalId,
@@ -56,21 +89,42 @@ export async function bindMenokinTestIdentities(client: Queryable, databaseName:
          ON CONFLICT (grant_id) DO NOTHING`,
         [rootId, TENANT, APP, scopeId, action],
       );
+      const ownerIssuerAllocation = `menokin-owner-issuer2-${scopeId}-${action}`;
+      await client.query(
+        `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason, steward_id)
+         VALUES ($1, 'allocation', 'synthetic_owner', 'synthetic_coach', $2, $3, $4, $5, clock_timestamp() - interval '1 hour', clock_timestamp() + interval '2 days', '测试负责人签发分配', 'synthetic_owner')
+         ON CONFLICT (grant_id) DO NOTHING`,
+        [ownerIssuerAllocation, TENANT, APP, scopeId, action],
+      );
+      await client.query(
+        `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+         SELECT $1::content_intake.identifier, 'business', 'synthetic_coach', 'synthetic_owner', $2::content_intake.identifier, $3::content_intake.identifier, $4::content_intake.identifier, $5::content_intake.identifier, $6::text,
+           clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试负责人业务授权', 'synthetic_owner', $7::content_intake.identifier,
+           CASE WHEN $6::text='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier) END,
+           CASE WHEN $6::text='query' THEN (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier) END
+         WHERE NOT EXISTS (SELECT 1 FROM content_intake.grants WHERE grant_id=$1::content_intake.identifier)
+         ON CONFLICT (grant_id) DO NOTHING`,
+        [`menokin-owner2-${scopeId}-${action}`, TENANT, APP, scopeId, sourceId, action, ownerIssuerAllocation],
+      );
     }
     const queryRoot = `menokin-root2-${scopeId}-query`;
     // BEFORE INSERT validates the parent even when ON CONFLICT would discard the row.
     // Reusing a fixture must retain its original deadline and revocation history.
     await client.query(
-      `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id)
-       SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_agent', $2, $3, $4, $5, 'query', clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试坐席查询', 'synthetic_owner', $6
+      `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+       SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_agent', $2::content_intake.identifier, $3::content_intake.identifier, $4::content_intake.identifier, $5::content_intake.identifier, 'query', clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试坐席查询', 'synthetic_owner', $6,
+         (SELECT version FROM content_intake.policy_versions WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier),
+         (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier)
        WHERE NOT EXISTS (SELECT 1 FROM content_intake.grants WHERE grant_id=$1::content_intake.identifier)
        ON CONFLICT (grant_id) DO NOTHING`,
       [`menokin-agent2-${scopeId}-query`, TENANT, APP, scopeId, sourceId, queryRoot],
     );
     for (const action of OWNER_ACTIONS) {
       await client.query(
-        `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id)
-         SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_coach', $2, $3, $4, $5, $6, clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试整理授权', 'synthetic_owner', $7
+        `INSERT INTO content_intake.grants(grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action, starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
+         SELECT $1::content_intake.identifier, 'business', 'synthetic_owner', 'synthetic_coach', $2::content_intake.identifier, $3::content_intake.identifier, $4::content_intake.identifier, $5::content_intake.identifier, $6::text, clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 day', '测试整理授权', 'synthetic_owner', $7::content_intake.identifier,
+           CASE WHEN $6::text='query' THEN (SELECT version FROM content_intake.policy_versions WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier) END,
+           CASE WHEN $6::text='query' THEN (SELECT version FROM content_intake.store_set_current WHERE tenant_id=$2::content_intake.identifier AND app_id=$3::content_intake.identifier) END
          WHERE NOT EXISTS (SELECT 1 FROM content_intake.grants WHERE grant_id=$1::content_intake.identifier)
          ON CONFLICT (grant_id) DO NOTHING`,
         [`menokin-coach2-${scopeId}-${action}`, TENANT, APP, scopeId, sourceId, action, `menokin-root2-${scopeId}-${action}`],
@@ -97,6 +151,7 @@ export async function bindMenokinTestIdentities(client: Queryable, databaseName:
       [`srcv_menokin_${domain}`, `SRC-MENOKIN-${domain.toUpperCase()}`, domain, TENANT],
     );
   }
+  await assertSyntheticSourceTenants(client, domains.map(domain => `srcv_menokin_${domain}`));
   await client.query(
     `INSERT INTO public.content_releases(release_id, release_seq, title, status, source_binding_hash, tenant_id)
      VALUES ('rel_menokin_base', 1, 'Menokin 测试空目录基线', 'published', $1, $2)

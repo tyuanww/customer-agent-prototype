@@ -75,5 +75,6 @@ describe('overlay chrome window security contract', () => {
       backgroundThrottling: false,
     });
     expect(options).not.toHaveProperty('type');
+    expect(options).not.toHaveProperty('hiddenInMissionControl');
   });
 });

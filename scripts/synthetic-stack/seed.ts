@@ -1,21 +1,18 @@
 /**
  * Seed the synthetic stack through the real governed chain.
  *
- * Order: authenticate as owner -> import CSV -> wait for the worker to park it
- * -> lead/manager/quality review decisions -> resume -> publish -> verify the
- * published scripts are recommendable over `/v1/search`.
+ * Order: authenticate as owner -> import CSV -> wait for the staged quality
+ * gate -> publish -> verify the published scripts are recommendable over
+ * `/v1/search`.
  *
- * Nothing is inserted into `scripts` directly and no review decision is
- * self-asserted by the importer, so the seeded state is reachable exactly the
- * way a real operator would reach it.
+ * Nothing is inserted into `scripts` directly. The worker runs the staging
+ * quality gate before the owner-only publish route.
  */
 import { createHash } from 'node:crypto';
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
 
 const INTENT_TAXONOMY_VERSION = 'itax_synthetic_stack_v1';
 const INTENT_ID = 'intent_synthetic_stack_shipping';
-const REVIEW_EVIDENCE = 'EVD-STACK-REVIEW-001';
-const QUALITY_EVIDENCE = 'EVD-STACK-QUALITY-001';
 const PKCE_VERIFIER = 'v'.repeat(43);
 
 export const SEED_INTENT = Object.freeze({ version: INTENT_TAXONOMY_VERSION, id: INTENT_ID });
@@ -88,94 +85,6 @@ async function waitForImport(apiOrigin: string, token: string, batchId: string, 
 }
 
 /**
- * A batch parked for review keeps the `validating` status; the review queue
- * entry is what proves the worker finished. Waiting on a "parked" HTTP status
- * would never resolve.
- */
-async function waitForReview(apiOrigin: string, token: string, batchId: string, timeoutMs = 30_000): Promise<string> {
-  const deadline = Date.now() + timeoutMs;
-  let last = '';
-  while (Date.now() < deadline) {
-    const response = await fetch(`${apiOrigin}/v1/admin/content/reviews`, {
-      headers: { authorization: `Bearer ${token}` },
-    });
-    const body = await json(response);
-    last = JSON.stringify(body);
-    const items = Array.isArray(body.items) ? body.items : [];
-    for (const item of items) {
-      if (item && typeof item === 'object' && Reflect.get(item, 'batch_id') === batchId) {
-        const revision = Reflect.get(item, 'review_revision');
-        if (typeof revision === 'string') return revision;
-      }
-    }
-    await sleep(250);
-  }
-  throw new Error(`timed out waiting for batch ${batchId} to appear in the review queue; last=${last}`);
-}
-
-async function reviewBatch(apiOrigin: string, batchId: string): Promise<void> {
-  const lead = await loginAs(apiOrigin, 'synthetic_coach');
-  const revision = await waitForReview(apiOrigin, lead, batchId);
-  // The review page is paged (default 20); follow `next_after` so a seed set
-  // larger than one page is still fully decided rather than silently partial.
-  const items: Record<string, unknown>[] = [];
-  for (let after = 0; ;) {
-    const page = await fetch(
-      `${apiOrigin}/v1/admin/content/reviews/${batchId}?review_revision=${encodeURIComponent(revision)}&after=${String(after)}&limit=100`,
-      { headers: { authorization: `Bearer ${lead}` } },
-    );
-    if (!page.ok) throw new Error(`review page HTTP ${String(page.status)}: ${JSON.stringify(await json(page))}`);
-    const body = await json(page);
-    const pageItems = Array.isArray(body.items) ? body.items : [];
-    for (const item of pageItems) if (item && typeof item === 'object') items.push(item as Record<string, unknown>);
-    const next = body.next_after;
-    if (typeof next !== 'number' || pageItems.length === 0) break;
-    after = next;
-  }
-  if (items.length === 0) throw new Error(`review page for ${batchId} has no items`);
-
-  // Two distinct subjects: the lead and manager decisions are recorded with
-  // different reviewer hashes, which the dual-review gate requires.
-  const manager = await loginAs(apiOrigin, 'synthetic_owner');
-  for (const [index, item] of items.entries()) {
-    const scriptId = String(Reflect.get(item, 'script_id'));
-    const contentHash = String(Reflect.get(item, 'content_hash'));
-    for (const [token, role, key] of [[lead, 'lead', 'lead'], [manager, 'manager', 'manager']] as const) {
-      const decision = await fetch(`${apiOrigin}/v1/admin/content/reviews/${batchId}/decisions`, {
-        method: 'POST',
-        headers: { ...(await authed(token)), 'idempotency-key': `dec-${key}-${batchId}-${String(index)}` },
-        body: JSON.stringify({ review_revision: revision, script_id: scriptId, content_hash: contentHash, decision: 'approved', evidence_id: REVIEW_EVIDENCE }),
-      });
-      if (!decision.ok) throw new Error(`decision ${role} HTTP ${String(decision.status)}: ${JSON.stringify(await json(decision))}`);
-    }
-  }
-
-  // Quality evidence and resume require the dedicated quality capability, not
-  // the lead's. Using the lead here fails closed with CAPABILITY_DENIED.
-  const quality = await loginAs(apiOrigin, 'synthetic_quality');
-  const evidence = await fetch(`${apiOrigin}/v1/admin/content/reviews/${batchId}/quality-evidence`, {
-    method: 'POST',
-    headers: { ...(await authed(quality)), 'idempotency-key': `quality-${batchId}` },
-    body: JSON.stringify({
-      review_revision: revision, phase: 'initial', evidence_id: QUALITY_EVIDENCE,
-      checks: items.map((item) => ({
-        script_id: String(Reflect.get(item as object, 'script_id')),
-        content_hash: String(Reflect.get(item as object, 'content_hash')),
-        defect: false,
-      })),
-    }),
-  });
-  if (!evidence.ok) throw new Error(`quality evidence HTTP ${String(evidence.status)}: ${JSON.stringify(await json(evidence))}`);
-
-  const resume = await fetch(`${apiOrigin}/v1/admin/content/reviews/${batchId}/resume`, {
-    method: 'POST',
-    headers: await authed(quality),
-    body: JSON.stringify({ review_revision: revision }),
-  });
-  if (!resume.ok) throw new Error(`resume HTTP ${String(resume.status)}: ${JSON.stringify(await json(resume))}`);
-}
-
-/**
  * True when the stack's seed content is already published and recommendable.
  * Re-running `start` must not publish a new release every time: that would grow
  * the release sequence on every restart and make "the current release" unstable
@@ -201,7 +110,7 @@ export async function seedContentIfMissing(apiOrigin: string, { log = () => unde
 }
 
 /**
- * Import, review and publish the synthetic catalog. Idempotent per release:
+ * Import, stage and publish the synthetic catalog. Idempotent per release:
  * calling it again publishes a new release with the same content.
  */
 export async function seedContent(apiOrigin: string, { log = () => undefined }: Readonly<{ log?: (message: string) => void }> = {}): Promise<SeedResult> {
@@ -218,10 +127,8 @@ export async function seedContent(apiOrigin: string, { log = () => undefined }: 
   const batchId = String((await json(imported)).import_batch_id);
   log(`import accepted: ${batchId}`);
 
-  await reviewBatch(apiOrigin, batchId);
-  log('worker parked the batch and review completed');
   await waitForImport(apiOrigin, owner, batchId, 'staged');
-  log('batch staged');
+  log('batch staged with the quality gate passed');
 
   const published = await fetch(`${apiOrigin}/v1/content/publish`, {
     method: 'POST',

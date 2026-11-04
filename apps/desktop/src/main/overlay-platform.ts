@@ -41,10 +41,18 @@ export class OverlayPlatform {
   }
 
   focusQuery(query: BrowserWindow): void {
-    // macOS Query is a non-activating panel: key focus without making this
-    // process frontmost. Windows/Linux Query is a normal always-on-top window
-    // and still needs app.focus() (without steal) so the palette can type.
-    if (process.platform !== 'darwin') {
+    // macOS Query is a regular window so IME works. Reopen after a palette
+    // yield by unhiding the app before assigning key focus. Windows/Linux still
+    // need app.focus() without steal so the palette can type.
+    if (process.platform === 'darwin') {
+      if (typeof app.isHidden === 'function' && app.isHidden()) {
+        try {
+          app.show();
+        } catch {
+          // A regular activation policy may already own foreground state.
+        }
+      }
+    } else {
       try {
         app.focus();
       } catch {
