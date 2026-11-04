@@ -1277,7 +1277,7 @@ export class OverlayController {
 
   private scheduleQueryFocusRetry(): void {
     this.clearQueryFocusRetry();
-    // Mapping a hidden macOS panel and assigning native focus are separate
+    // Mapping a hidden macOS regular window and assigning native focus are separate
     // WindowServer operations. Reconcile once after two compositor frames;
     // renderer rAF focus alone cannot route physical keyboard events.
     this.queryFocusRetryTimer = this.scheduler.schedule(() => {

@@ -228,7 +228,7 @@ async function verifySyntheticPassword(
   }
 }
 
-/** Query is a macOS floating panel. A normal window opens behind it, so the next click only activates the panel. */
+/** Query is an always-on-top regular macOS window. The login window uses modal-panel level to stay above it. */
 function presentLoginWindow(window: BrowserWindow): void {
   const previous = BrowserWindow.getFocusedWindow();
   if (process.platform === 'darwin') window.setAlwaysOnTop(true, 'modal-panel');
