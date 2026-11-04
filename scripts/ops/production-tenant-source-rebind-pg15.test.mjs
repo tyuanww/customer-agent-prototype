@@ -13,9 +13,7 @@ import {
 } from './production-tenant-source-rebind.mjs';
 
 const enabled = process.env.CUSTOMER_AGENT_TENANT_REBIND_PG15_INTEGRATION === '1';
-const packageVersion = JSON.parse(
-  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-).version;
+const productVersion = readFileSync(new URL('../../VERSION', import.meta.url), 'utf8').trim();
 const migrationCount = JSON.parse(
   readFileSync(new URL('../../packages/database/migrations/manifest.generated.json', import.meta.url), 'utf8'),
 ).migrations.length;
@@ -399,7 +397,7 @@ test('accepts only a complete candidate-bound restore drill as evidence', (conte
     metadataAndObjectFidelity: 'PASS',
     scratchCleaned: true,
     dataClassification: 'metadata-only',
-    candidateVersion: packageVersion,
+    candidateVersion: productVersion,
     candidateGitSha: 'a'.repeat(40),
     backupId,
     backupCompletedAt: new Date(Date.now() - 60_000).toISOString(),
