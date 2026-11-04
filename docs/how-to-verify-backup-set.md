@@ -45,6 +45,16 @@ CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/restore-evidence.json   sc
 
 核对证据中的 `status`、`verifierStatus`、迁移数、对象数、receipt 数、RPO、恢复耗时和 `scratchCleaned`。必须读取实际证据，不只看 shell 退出码。角色口令与服务环境配置另行恢复，应用启动、登录、查询、权限撤销和对象消费应继续在隔离环境验收。
 
+候选发布还必须从生产备份继续应用追加迁移。传入已构建、版本身份一致的候选 release：
+
+```sh
+CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/candidate-restore-evidence.json \
+  scripts/ops/customer-agent-restore-drill.sh "$backup_set" \
+  --candidate-release /controlled/path/releases/<candidate-sha>
+```
+
+这次运行先从候选的 clean tracked `HEAD` 枚举并只在临时目录原样复制 `packages/database` 的 tracked 文件，再用执行恢复工具自身的固定编译器重建数据库模块，逐文件比对候选自带的 `dist` 后才导入它。未跟踪文件不能进入重建输入，编译器也不从被检查的候选目录取可执行文件。随后在临时 PG15 中验证备份恢复的数据库、角色、ACL、对象和原迁移前缀，再应用追加迁移并运行候选 verifier。证据同时记录 `restoredMigrationCount`、最终 `migrationCount`、`appliedMigrationIds`、候选版本、源 verifier 和候选 verifier。候选目录名必须等于 release 的 Git `HEAD`，tracked 文件保持干净；构建产物可被 Git 忽略，但出现 symlink、额外文件或重建差异都会 fail-closed。该命令不连接生产服务，也不修改源备份。
+
 ## 迁移旧定时任务
 
 脚本与 `backup-set.mjs`、编译后的数据库模块必须来自同一候选。新版 service 从 `current/scripts/ops/` 运行；仅复制 shell 到旧 `/srv/customer-agent/scripts/` 会缺少模块。核对 Node.js 24、PG15 路径、EnvironmentFile 和 `ReadWritePaths`，再按已批准发布流程安装单元并执行一次完整演练。
