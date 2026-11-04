@@ -6,55 +6,69 @@ on:
       tag:
         description: Release tag to attach the package to
         required: true
-      artifact:
-        description: Artifact name produced by the CI workflow
-        required: true
-      run_id:
-        description: Workflow run that produced the artifact
-        required: true
-      expected_sha:
-        description: Full commit the artifact must have been built from
-        required: true
 
 permissions:
   contents: write
   actions: read
+
+concurrency:
+  group: publish-release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Refuse a run built from another commit
+      - name: Check out the tag and resolve its commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Resolve the successful full CI run
+        id: resolve
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ inputs.run_id }}
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -eu
-          ACTUAL_SHA="$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq .head_sha)"
-          test "$ACTUAL_SHA" = "$EXPECTED_SHA" || {
-            echo "run ${RUN_ID} was built from ${ACTUAL_SHA}, not ${EXPECTED_SHA}" >&2
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "tag must look like vX.Y.Z: $TAG" >&2
+            exit 1
+          fi
+
+          EXPECTED_SHA="$(git rev-parse HEAD)"
+          RUN_ID="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --commit "$EXPECTED_SHA" \
+            --limit 20 \
+            --json databaseId,conclusion,event \
+            --jq 'map(select(.conclusion == "success" and .event == "push")) | .[0].databaseId // empty')"
+          test -n "$RUN_ID" || {
+            echo "no successful push-triggered CI run found for $TAG at $EXPECTED_SHA" >&2
             exit 1
           }
 
-      - name: Download the CI artifact
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          printf 'run_id=%s\nexpected_sha=%s\n' "$RUN_ID" "$EXPECTED_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Download all CI artifacts from that commit
         uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          name: ${{ inputs.artifact }}
           path: package
-          run-id: ${{ inputs.run_id }}
+          run-id: ${{ steps.resolve.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attach it to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
-          ARTIFACT: ${{ inputs.artifact }}
         run: |
           set -eu
           mapfile -t FILES < <(find package -type f -name '*UNSIGNED*' -print)
-          test "${#FILES[@]}" -gt 0 || { echo "artifact ${ARTIFACT} has no UNSIGNED package" >&2; exit 1; }
+          test "${#FILES[@]}" -gt 0 || { echo "the checked CI run has no UNSIGNED package" >&2; exit 1; }
           for FILE in "${FILES[@]}"; do
             echo "${FILE} $(stat -c%s "${FILE}") bytes sha256 $(sha256sum "${FILE}" | cut -d' ' -f1)"
           done
