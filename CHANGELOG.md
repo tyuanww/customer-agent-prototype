@@ -2,6 +2,24 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.42] - 2026-11-04
+
+### Fixed
+
+- 工作台把权限与账号拆成独立能力：只负责审核的人员可维护账号，但不会因账号管理而获得授权范围操作。
+- 席位口令文件写入改为异步和跨进程互斥；未知主体失败关闭，并发重复创建按既有合同返回 `409`。
+- 工作台继续停用本机草稿运行时；回退版本标识和真实栈覆盖恢复。
+
+### Operations
+
+- 新增生产只读烟测，覆盖 API 健康、就绪、身份服务和未认证边界。
+- 修复 GitHub Runner 被边缘防护拒绝的问题，并保留安全的探测错误诊断。
+
+### Release
+
+- 仓库版本是 `0.3.42`。截至本条目形成时，已发布安装包和杭州生产仍是 `0.3.41`。
+- 本版本把 #143、#144、#145 绑定到独立版本号；后端部署、安装包、下载页和应用内目录仍需分别授权与验收。
+
 ## [0.3.41] - 2026-11-03
 
 ### Changed

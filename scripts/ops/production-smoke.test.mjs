@@ -18,7 +18,7 @@ function observation(overrides = {}) {
   return {
     apiHealth: {
       status: 200,
-      json: { status: 'ok', service: 'cs-ai-api', version: '0.3.41' },
+      json: { status: 'ok', service: 'cs-ai-api', version: '0.3.42' },
     },
     apiReady: {
       status: 200,
@@ -44,14 +44,14 @@ function observation(overrides = {}) {
 }
 
 test('accepts the production health, readiness, identity, and unauthenticated boundaries', () => {
-  const report = validateObservation(observation(), '0.3.41');
+  const report = validateObservation(observation(), '0.3.42');
   assert.equal(report.ok, true);
-  assert.equal(report.version, '0.3.41');
+  assert.equal(report.version, '0.3.42');
   assert.ok(Object.values(report.checks).every(Boolean));
 });
 
 test('fails when the deployed version differs from the expected version', () => {
-  const report = validateObservation(observation(), '0.3.42');
+  const report = validateObservation(observation(), '0.3.43');
   assert.equal(report.ok, false);
   assert.equal(report.checks.apiVersionMatches, false);
 });
@@ -155,7 +155,7 @@ test('parses only distinct public HTTPS origins and semantic versions', () => {
   assert.equal(parseOptions([
     '--api-origin', API_ORIGIN,
     '--identity-origin', IDENTITY_ORIGIN,
-    '--expected-version', '0.3.41',
+    '--expected-version', '0.3.42',
   ]).ok, true);
   assert.equal(parseOptions(['--api-origin', 'http://api.example.test']).ok, false);
   assert.equal(parseOptions([
