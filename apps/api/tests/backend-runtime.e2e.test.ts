@@ -18,6 +18,7 @@ const apiDirectory = fileURLToPath(new URL('..', import.meta.url));
 const HMAC_KEYS = JSON.stringify({ 'hmac-idempotency-v1': 'synthetic-t6-idempotency-material-0001' });
 const LOG_HASH_KEY = 'synthetic-t6-log-hash-material-00000001';
 const INTENT = Object.freeze({ version: 'itax_synthetic_t6_v1', id: 'intent_synthetic_t6_shipping' });
+const TENANT_ID = 'tenant-t6';
 const BINDINGS = Object.freeze([
   { domain: 'aftersale', source_version_id: 'srcv_t6_aftersale_v1', source_ref: 'SRC-T6-AFTERSALE' },
   { domain: 'campaign', source_version_id: 'srcv_t6_campaign_v1', source_ref: 'SRC-T6-CAMPAIGN' },
@@ -110,10 +111,10 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
       await admin.query(`
         INSERT INTO public.authoritative_source_versions(
           source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
-          use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at
+          use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at, tenant_id
         ) VALUES ($1,$2,$3,'synthetic-t6',$4,'canonical','ROLE-CONTENT-LEAD','EVD-T6-SOURCE',
-          'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days')
-      `, [binding.source_version_id, binding.source_ref, binding.domain, digest]);
+          'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days',$5)
+      `, [binding.source_version_id, binding.source_ref, binding.domain, digest, TENANT_ID]);
     }
     await admin.query(`
       INSERT INTO public.intent_taxonomy_versions(intent_taxonomy_version, approval_evd, approved_by, approved_at)
@@ -148,7 +149,7 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
     }
     // Import, publish, rollback and search read authorization_sources in the dist processes too.
     await seedContentWriteAuthority(admin, {
-      tenantId: 'tenant-t6', appId: 'app-t6', brandId: 'brand-t6',
+      tenantId: TENANT_ID, appId: 'app-t6', brandId: 'brand-t6',
       signer: { principalId: 't6-signer', userId: 'usr_t6_signer', jobId: 'job-t6-director', role: 'director' },
       recipients: [{ principalId: 't6-owner', userId: 'usr_t6_owner', jobId: 'job-t6-director', role: 'director' }],
       domains: BINDINGS.map((binding) => binding.domain),
