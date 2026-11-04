@@ -88,6 +88,7 @@ async function readJsonProbe(url) {
       '--max-filesize', String(MAX_RESPONSE_BYTES),
       '--request', 'GET',
       '--header', 'accept: application/json',
+      '--user-agent', 'customer-agent-production-smoke/1.0',
       '--write-out', '\n%{http_code}',
       url.href,
     ], {

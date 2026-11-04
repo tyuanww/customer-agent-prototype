@@ -9,6 +9,8 @@ pnpm test:production:smoke
 ```
 
 命令使用系统 TLS 根证书调用 `curl`，并限制请求超时和 64 KiB 响应大小。
+请求使用 `customer-agent-production-smoke/1.0` User-Agent，便于边缘防护识别
+这条只读探针。
 
 发布验收时，把检查绑定到候选版本：
 
