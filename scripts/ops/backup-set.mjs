@@ -1672,13 +1672,20 @@ function regularFileDigests(root) {
   return digests;
 }
 
-function materializeTrackedDatabaseSources(releaseRoot, gitSha, destination) {
-  const gitEnvironment = {
+function candidateGitEnvironment(releaseRoot) {
+  return {
     ...process.env,
     GIT_CONFIG_GLOBAL: os.devNull,
     GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'safe.directory',
+    GIT_CONFIG_VALUE_0: releaseRoot,
     GIT_OPTIONAL_LOCKS: '0',
   };
+}
+
+function materializeTrackedDatabaseSources(releaseRoot, gitSha, destination) {
+  const gitEnvironment = candidateGitEnvironment(releaseRoot);
   const listing = spawnSync(
     'git',
     ['-C', releaseRoot, 'ls-tree', '-r', '-z', '--name-only', gitSha, '--', 'packages/database'],
@@ -1772,15 +1779,7 @@ export function readCandidateRelease(candidateRelease) {
   if (!GIT_SHA.test(path.basename(releaseRoot))) {
     fail('CANDIDATE_RELEASE_INVALID', 'Candidate release directory must be named by its full Git SHA');
   }
-  const gitEnvironment = {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: os.devNull,
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: 'safe.directory',
-    GIT_CONFIG_VALUE_0: releaseRoot,
-    GIT_OPTIONAL_LOCKS: '0',
-  };
+  const gitEnvironment = candidateGitEnvironment(releaseRoot);
   const headResult = spawnSync(
     'git',
     ['-C', releaseRoot, 'rev-parse', '--verify', 'HEAD^{commit}'],
