@@ -48,6 +48,8 @@
     "artifact:m0:verify": "node scripts/formal-artifact-boundary.mjs",
     "verify:formal-artifacts": "pnpm artifact:m0:verify",
     "check": "pnpm workspace:check && pnpm contracts:verify && pnpm contracts:codegen:check && pnpm db:migrations:check && pnpm lint && pnpm typecheck && pnpm check:architecture && pnpm artifact:m0:build --check && pnpm artifact:m0:verify",
+    "check:pr": "pnpm workspace:check && pnpm lint && pnpm typecheck && pnpm check:architecture && pnpm test:workflow",
+    "check:desktop": "pnpm workspace:check && pnpm lint && pnpm typecheck && pnpm check:architecture && pnpm --filter @customer-agent/desktop test",
     "check:architecture": "node scripts/architecture-boundary-check.mjs",
     "test:db": "pnpm --filter @customer-agent/database test:all",
     "test:db:integration": "pnpm --filter @customer-agent/database test:integration",

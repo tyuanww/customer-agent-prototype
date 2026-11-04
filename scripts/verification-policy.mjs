@@ -6,18 +6,21 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rootDocs = new Set(['README.md', 'PROJECT_CHARTER.md', 'CHANGELOG.md', 'TODOS.md', 'DESIGN.md', 'DEVELOPMENT_BRIEF.md']);
 export const RULE_DOCUMENTS = new Set(['AGENTS.md', 'CONTRIBUTING.md', 'docs/reference-engineering-workflow.md', 'docs/reference-document-lifecycle.md', 'docs/how-to-verify-desktop.md']);
+const DESKTOP_PATH = /^apps\/desktop(?:\/|$)/u;
 
 /** Unknown files, empty diffs and build metadata fail closed to the full lanes. */
 export function verificationPlan(files) {
   if (!Array.isArray(files) || files.length === 0) return { mode: 'full', rules: true };
   let ruleChange = false;
+  let desktopChange = false;
   for (const file of files) {
     if (typeof file !== 'string' || file.includes('..') || file.includes('\\') || file.startsWith('/')) return { mode: 'full', rules: true };
     if (RULE_DOCUMENTS.has(file)) { ruleChange = true; continue; }
     if (rootDocs.has(file) || /^docs\/.+\.md$/u.test(file)) continue;
+    if (DESKTOP_PATH.test(file)) { desktopChange = true; continue; }
     return { mode: 'full', rules: true };
   }
-  return { mode: 'docs', rules: ruleChange };
+  return { mode: desktopChange ? 'desktop' : 'docs', rules: ruleChange };
 }
 
 /** Includes both sides of renames and deletions. Local mode includes untracked files. */
@@ -33,7 +36,14 @@ export function assertCiGate(needs) {
   for (const key of ['changes', 'quality', 'postgres-15', 'windows-feasibility', 'linux-feasibility']) {
     if (needs?.[key]?.result !== 'success') throw new Error(`CI_REQUIRED_JOB_NOT_SUCCESS: ${key}`);
   }
-  if (!['docs', 'full'].includes(needs.changes.outputs?.mode)) throw new Error('CI_PLAN_MISSING');
+  if (!['docs', 'desktop', 'full'].includes(needs.changes.outputs?.mode)) throw new Error('CI_PLAN_MISSING');
+}
+
+export function assertCiFastGate(needs) {
+  for (const key of ['changes', 'quick']) {
+    if (needs?.[key]?.result !== 'success') throw new Error(`CI_FAST_REQUIRED_JOB_NOT_SUCCESS: ${key}`);
+  }
+  if (!['docs', 'desktop', 'full'].includes(needs?.changes?.outputs?.mode)) throw new Error('CI_FAST_PLAN_MISSING');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -41,6 +51,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (command === 'gate' && args.length === 0) {
     assertCiGate(JSON.parse(process.env.CI_NEEDS ?? 'null'));
     console.log('CI gate PASS: every required job completed successfully.');
+  } else if (command === 'gate-fast' && args.length === 0) {
+    assertCiFastGate(JSON.parse(process.env.CI_NEEDS ?? 'null'));
+    console.log('PR fast gate PASS: precheck and quick checks completed successfully.');
   } else if (command === 'plan') {
     let base; let head;
     for (let i = 0; i < args.length; i += 2) {

@@ -292,9 +292,9 @@ pnpm clean:preview
 
 验证范围以 [AGENTS.md 第6节](../AGENTS.md#6-验证与证据) 为准；本页只解释命令和证据边界。普通文档任务执行 `git diff --check`、`pnpm docs:check` 及引用/语义核对；不默认运行 lint/typecheck/test/build。命令、CI 或构建输入实际变化时，按其代码影响面验证。
 
-`pnpm verify:plan --base <commit>` 显示本地差异的 CI 路由（包含未提交与新增文件）。机器分类由 `scripts/verification-policy.mjs` 唯一拥有：已知文档走轻量检查，规则文档额外核对执行入口，未知路径回退完整检查。CI 保留原有检查名称并以 `CI gate` 汇总，失败、取消或缺失输出不能放行。
+`pnpm verify:plan --base <commit>` 显示本地差异的 CI 路由（包含未提交与新增文件）。机器分类由 `scripts/verification-policy.mjs` 唯一拥有：文档走轻量预检，代码改动进入 PR 快速门禁；主分支和手动运行再执行完整异步 CI，包含 PG15、正式候选和跨平台打包。PR workflow 以 `PR fast gate` 汇总，主分支 workflow 以 `CI gate` 汇总，失败、取消或缺失输出不能放行。
 
-`pnpm test` 构建服务依赖一次并执行测试；`pnpm build` 只构建和检查生成物。干净候选的 `pnpm check` 在构建后执行测试并组装绑定 SHA 的正式候选。未提交开发使用 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；不得为了运行 `pnpm check` 自动提交。`pnpm test:e2e*` 自带桌面 build，不需要紧邻先执行另一次桌面 build。
+`pnpm test` 构建服务依赖一次并执行测试；`pnpm build` 只构建和检查生成物。PR 快速门禁使用 `pnpm check:pr`，覆盖 workspace、lint、typecheck、架构边界和工作流策略测试，不组装正式候选或运行全量测试。干净候选的 `pnpm check` 在主分支完整 CI 中执行测试并组装绑定 SHA 的正式候选。桌面局部开发可使用 `pnpm check:desktop`，覆盖 workspace、lint、typecheck、架构边界和桌面测试。未提交开发使用 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；不得为了运行 `pnpm check` 自动提交。`pnpm test:e2e*` 自带桌面 build，不需要紧邻先执行另一次桌面 build。
 
 PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测试结果实际有用例且无跳过。真实包 runner 继续只在既有明确授权入口运行，不由 CI 启用。
 

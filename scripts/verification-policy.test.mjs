@@ -4,12 +4,14 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertCiGate, changedFiles, verificationPlan } from './verification-policy.mjs';
+import { assertCiFastGate, assertCiGate, changedFiles, verificationPlan } from './verification-policy.mjs';
 
-test('only known documentation paths skip runtime lanes; rules retain semantic checks', () => {
+test('documentation and desktop paths select their narrow scope; other paths fail closed', () => {
   assert.deepEqual(verificationPlan(['README.md','docs/plans/example.md']), { mode: 'docs', rules: false });
   assert.deepEqual(verificationPlan(['AGENTS.md','docs/how-to-verify-desktop.md']), { mode: 'docs', rules: true });
-  for (const file of ['apps/desktop/src/main/main.ts','apps/api/README.md','packages/contracts/src/index.ts','pnpm-lock.yaml','.github/workflows/ci.yml','scripts/check-documentation.mjs','unknown.md','docs/tool.mjs','docs/../src/a.md']) {
+  assert.deepEqual(verificationPlan(['apps/desktop/src/main/main.ts','apps/desktop/tests/component/QueryApp.test.tsx']), { mode: 'desktop', rules: false });
+  assert.deepEqual(verificationPlan(['docs/plans/example.md','apps/desktop/src/renderer/QueryApp.tsx']), { mode: 'desktop', rules: false });
+  for (const file of ['apps/api/README.md','packages/contracts/src/index.ts','pnpm-lock.yaml','.github/workflows/ci.yml','scripts/check-documentation.mjs','unknown.md','docs/tool.mjs','docs/../src/a.md']) {
     assert.equal(verificationPlan([file]).mode, 'full', file);
   }
   assert.equal(verificationPlan([]).mode, 'full');
@@ -17,12 +19,31 @@ test('only known documentation paths skip runtime lanes; rules retain semantic c
 
 test('gate refuses failure, cancellation, skip and missing classifier output', () => {
   const ok = Object.fromEntries(['changes','quality','postgres-15','windows-feasibility','linux-feasibility'].map((key) => [key, { result: 'success' }]));
-  ok.changes.outputs = { mode: 'docs' };
-  assertCiGate(ok);
+  for (const mode of ['docs', 'desktop', 'full']) {
+    ok.changes.outputs = { mode };
+    assertCiGate(ok);
+  }
   for (const key of Object.keys(ok)) {
     for (const result of ['failure','cancelled','skipped',undefined]) assert.throws(() => assertCiGate({ ...ok, [key]: { result } }), /NOT_SUCCESS/u);
   }
   assert.throws(() => assertCiGate({ ...ok, changes: { result: 'success' } }), /PLAN_MISSING/u);
+});
+
+test('fast gate only admits the precheck and quick-check jobs', () => {
+  const ok = {
+    changes: { result: 'success', outputs: { mode: 'full' } },
+    quick: { result: 'success' },
+  };
+  for (const mode of ['docs', 'desktop', 'full']) {
+    ok.changes.outputs = { mode };
+    assertCiFastGate(ok);
+  }
+  for (const key of ['changes', 'quick']) {
+    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+      assert.throws(() => assertCiFastGate({ ...ok, [key]: { result } }), /NOT_SUCCESS/u);
+    }
+  }
+  assert.throws(() => assertCiFastGate({ ...ok, changes: { result: 'success' } }), /PLAN_MISSING/u);
 });
 
 test('real git diff includes old code path of rename, deletion and new local files', () => {

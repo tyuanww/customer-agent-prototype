@@ -1,10 +1,10 @@
 name: CI
 
 on:
-  pull_request:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,10 +28,10 @@ jobs:
         with:
           node-version: 24
       - id: plan
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: node scripts/verification-policy.mjs plan --base "$BASE_SHA" --head "$HEAD_SHA"
+        run: |
+          echo "mode=full" >> "$GITHUB_OUTPUT"
+          echo "rules=true" >> "$GITHUB_OUTPUT"
+          echo "Full verification is authoritative for main and manual runs."
       - run: node --test scripts/verification-policy.test.mjs
       - run: node scripts/check-documentation.mjs
 
@@ -43,21 +43,23 @@ jobs:
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # Historical keyword baseline provenance is verified against Git.
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.19.0
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
+      - if: needs.changes.outputs.mode == 'desktop'
+        run: pnpm check:desktop
       - if: needs.changes.outputs.mode == 'full'
         run: node scripts/check-migration-immutability.mjs
       - if: needs.changes.outputs.mode == 'full'
@@ -71,8 +73,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - if: needs.changes.outputs.mode == 'docs'
-        run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
+      - if: needs.changes.outputs.mode != 'full'
+        run: echo "This change scope does not require PostgreSQL integration."
       - if: needs.changes.outputs.mode == 'full'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -120,30 +122,40 @@ jobs:
     name: Windows feasibility smoke
     runs-on: windows-latest
     timeout-minutes: 35
+    env:
+      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}\electron-builder-cache
     permissions:
       contents: read
       actions: write
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # Historical keyword baseline provenance is verified against Git.
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.19.0
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
+        name: Restore electron-builder cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}\electron-builder-cache
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/package.json') }}
+          restore-keys: |
+            electron-builder-${{ runner.os }}-
+      - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         run: pnpm package:win
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Windows package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -151,10 +163,10 @@ jobs:
           path: release/local-unsigned/windows/*UNSIGNED*.exe
           if-no-files-found: error
           retention-days: 7
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: Smoke the desktop output just built by packaging
         run: pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @windows-feasibility
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: State evidence boundary
         shell: pwsh
         run: |
@@ -166,30 +178,40 @@ jobs:
     name: Linux feasibility smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
     permissions:
       contents: read
       actions: write
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope verified by Verification scope; runtime checks are not applicable."
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # Historical keyword baseline provenance is verified against Git.
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.19.0
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
+        name: Restore electron-builder cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/electron-builder-cache
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/package.json') }}
+          restore-keys: |
+            electron-builder-${{ runner.os }}-
+      - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         run: pnpm package:linux
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Linux package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -197,16 +219,16 @@ jobs:
           path: release/local-unsigned/linux/*UNSIGNED*.AppImage
           if-no-files-found: error
           retention-days: 7
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: Install Xvfb and Electron runtime libraries
         run: |
           sudo apt-get update
           sudo apt-get install --yes xvfb
           pnpm --filter @customer-agent/desktop exec playwright install-deps
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: Smoke electron-vite out/ from packaging (not the AppImage)
         run: xvfb-run --auto-servernum pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/smoke.spec.ts --grep @linux-feasibility
-      - if: needs.changes.outputs.mode == 'full'
+      - if: needs.changes.outputs.mode != 'docs'
         name: State evidence boundary
         run: |
           echo "PASS: hosted Ubuntu UNSIGNED AppImage postconditions; overlay smoke launches packaging build out/main, not the AppImage."
