@@ -12,7 +12,7 @@
  * not in this repo.
  *
  *   node scripts/ops/customer-agent-release.mjs --root <dir> --sha <40-hex> --bundle <path>
- *   node scripts/ops/customer-agent-release.mjs --root <dir> --sha <40-hex> --bundle <path> --apply
+ *   node scripts/ops/customer-agent-release.mjs --root <dir> --sha <40-hex> --bundle <path> --expected-version <x.y.z> --apply
  *   node scripts/ops/customer-agent-release.mjs --rollback-schema
  */
 import {
@@ -24,6 +24,8 @@ import {
   symlinkSync,
   unlinkSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 
 const LIVE_ROOT = '/srv/customer-agent';
@@ -32,6 +34,7 @@ const CURRENT_LINK = 'current';
 const MANIFEST = 'packages/database/migrations/manifest.generated.json';
 const STACK_ENTRY = 'scripts/synthetic-stack/stack.ts';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
 
 function log(message) {
   console.info(`${new Date().toISOString()} ${message}`);
@@ -50,6 +53,7 @@ function parseArguments(argv) {
     root: null,
     sha: null,
     bundle: null,
+    expectedVersion: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -65,6 +69,7 @@ function parseArguments(argv) {
     else if (argument === '--root') options.root = value();
     else if (argument === '--sha') options.sha = value();
     else if (argument === '--bundle') options.bundle = value();
+    else if (argument === '--expected-version') options.expectedVersion = value();
     else fail(`unknown argument ${argument}`);
   }
   return options;
@@ -148,6 +153,69 @@ function releaseEntryReady(releaseDir) {
   }
 }
 
+function productVersion(releaseDir, label) {
+  let rootVersion;
+  let packageDocument;
+  try {
+    rootVersion = readFileSync(path.join(releaseDir, 'VERSION'), 'utf8').trim();
+    packageDocument = JSON.parse(readFileSync(path.join(releaseDir, 'apps/desktop/package.json'), 'utf8'));
+  } catch {
+    fail(`${label} version identity is unreadable`);
+  }
+  if (!VERSION_PATTERN.test(rootVersion) || packageDocument?.version !== rootVersion) {
+    fail(`${label} version identity is invalid`);
+  }
+  return rootVersion;
+}
+
+function releaseGitState(releaseDir, label, requireClean) {
+  let output;
+  try {
+    output = execFileSync('git', ['-C', releaseDir, 'rev-parse', '--verify', 'HEAD^{commit}'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_OPTIONAL_LOCKS: '0',
+      },
+    }).trim();
+  } catch {
+    fail(`${label} Git HEAD is unreadable`);
+  }
+  let status;
+  try {
+    // Build output is intentionally untracked. Tracked edits would make the
+    // executable no longer match the approved source revision.
+    status = execFileSync('git', ['-C', releaseDir, 'status', '--porcelain=v1', '--untracked-files=no'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_OPTIONAL_LOCKS: '0',
+      },
+    });
+  } catch {
+    fail(`${label} Git status is unreadable`);
+  }
+  if (!SHA_PATTERN.test(output)) fail(`${label} Git HEAD is invalid`);
+  if (path.basename(releaseDir) !== output) fail(`${label} directory does not match Git HEAD`);
+  if (requireClean && status.length > 0) fail(`${label} Git tracked files are dirty`);
+  return Object.freeze({ gitSha: output, clean: status.length === 0 });
+}
+
+function assertReleaseReady(releaseDir, expectedSha, expectedVersion, requireClean = true) {
+  const version = productVersion(releaseDir, 'release');
+  const git = releaseGitState(releaseDir, 'release', requireClean);
+  if (git.gitSha !== expectedSha) fail(`release Git HEAD ${git.gitSha} does not match requested ${expectedSha}`);
+  if (expectedVersion !== null && version !== expectedVersion) {
+    fail(`release version ${version} does not match expected ${expectedVersion}`);
+  }
+  if (!releaseEntryReady(releaseDir)) fail(`release missing ${STACK_ENTRY}`);
+  return Object.freeze({ version, gitSha: git.gitSha });
+}
+
 function main() {
   const options = parseArguments(process.argv.slice(2));
   if (options.rollbackSchema) {
@@ -155,12 +223,18 @@ function main() {
     process.exit(1);
   }
   if (options.apply && options.dryRun) fail('pass only one of --apply and --dry-run');
+  if (options.apply && options.expectedVersion === null) {
+    fail('--expected-version is required with --apply');
+  }
   if (!options.root) fail('--root is required');
   if (!options.sha) fail('--sha is required');
   if (!options.bundle) fail('--bundle is required');
   assertSingleLine('root', options.root);
   assertSingleLine('bundle', options.bundle);
   if (!SHA_PATTERN.test(options.sha)) fail('sha must be 40 lowercase hex characters');
+  if (options.expectedVersion !== null && !VERSION_PATTERN.test(options.expectedVersion)) {
+    fail('expected version must be x.y.z');
+  }
   if (isLive(options.root)) fail(`refusing live root ${options.root}`);
 
   let resolved;
@@ -207,11 +281,20 @@ function main() {
   const currentIds = migrationIds(path.join(currentResolved, MANIFEST));
   const nextIds = migrationIds(path.join(releaseResolved, MANIFEST));
   const move = ledgerMove(currentIds, nextIds);
+  const currentVersion = productVersion(currentResolved, 'current release');
+  const currentGit = releaseGitState(currentResolved, 'current release', false);
+  const alreadyCurrent = currentResolved === releaseResolved;
+  const next = assertReleaseReady(releaseResolved, options.sha, options.expectedVersion, !alreadyCurrent);
 
   log(`mode ${options.apply ? 'apply' : 'dry-run'}`);
   log(`root ${resolved}`);
   log(`sha ${options.sha}`);
   log(`bundle ${options.bundle}`);
+  log(`current version ${currentVersion}`);
+  log(`current git sha ${currentGit.gitSha}`);
+  log(`next version ${next.version}`);
+  log(`next git sha ${next.gitSha}`);
+  log(`stack entry: present`);
   log('skip: git fetch origin');
   log(`skip: git bundle create ${options.bundle} origin/main`);
   log(`skip: git bundle list-heads ${options.bundle}`);
@@ -236,7 +319,7 @@ function main() {
     log('skip: systemctl restart customer-agent-stack');
     fail('refusing to switch onto a forked migration ledger');
   }
-  if (currentResolved === releaseResolved) {
+  if (alreadyCurrent) {
     log('current already points at the release');
     log('skip: systemctl restart customer-agent-stack');
     return;
@@ -245,12 +328,6 @@ function main() {
   log(`apply: ${linkCommand}`);
   const previous = targetText;
   point(linkPath, releaseDir);
-  if (!releaseEntryReady(releaseDir)) {
-    point(linkPath, previous);
-    log(`symlink restored to previous target ${previous}`);
-    log('skip: systemctl restart customer-agent-stack');
-    fail(`release missing ${STACK_ENTRY}`);
-  }
   if (readlinkSync(linkPath) !== releaseDir) {
     point(linkPath, previous);
     log(`symlink restored to previous target ${previous}`);

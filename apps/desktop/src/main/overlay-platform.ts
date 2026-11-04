@@ -130,7 +130,7 @@ export class OverlayPlatform {
 
   restorePalette(fox: BrowserWindow): void {
     // Hide Query only. Hiding the whole app would hide the idle fox and help.
-    // A non-activating panel yields IME when it hides; fox stays on screen.
+    // Hiding the regular Query window yields IME; fox stays on screen.
     if (process.platform === 'darwin' && typeof app.isHidden === 'function' && app.isHidden()) {
       try {
         app.show();

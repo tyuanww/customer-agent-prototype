@@ -2,6 +2,18 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## [0.3.43] - 2026-11-05
+
+### Fixed
+
+- 导入批次的新写入必须在数据库内绑定到 actor 的唯一内容主体租户，并拒绝空 actor、未知 actor 或 `default` 租户主体。
+- 修正 Query 已改为普通 macOS 窗口后的登录、焦点和平台注释。
+
+### Operations
+
+- 生产发布候选必须从当前完整 SHA 重新构建，不复用已经发布的 `0.3.42` 安装包或服务产物。
+- 增加生产部署前的租户数据与备份恢复检查入口；真实生产部署、数据写入和客户端发布仍需分别授权和验收。
+
 ## [0.3.42] - 2026-11-04
 
 ### Fixed
