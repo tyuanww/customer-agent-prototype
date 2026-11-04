@@ -24,7 +24,9 @@ pnpm test:production:smoke -- --expected-version "$(cat VERSION)"
 - 身份服务 `/health` 声明 password 服务正常。
 - 未认证的 `GET /v1/intake/sources` 和 `GET /v1/events/usage` 返回 `401`。
 
-输出是 JSON。退出 `1` 表示生产漂移或探测失败，退出 `2` 表示参数无效。
+输出是 JSON。退出 `1` 表示生产漂移或探测失败，退出 `2` 表示参数无效。`probes`
+保留每个端点的 HTTP 状态和安全的传输错误码，例如 `CURL_6` 或 `ENOENT`，
+但不输出响应正文。
 
 GitHub Actions 的 `Production smoke` 每小时运行同一检查，也可手动启动。workflow 不使用生产密钥。
 

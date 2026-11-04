@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import {
   collectObservation,
   parseOptions,
@@ -8,6 +11,7 @@ import {
 
 const API_ORIGIN = 'https://api.example.test';
 const IDENTITY_ORIGIN = 'https://identity.example.test';
+const SMOKE_SCRIPT = fileURLToPath(new URL('./production-smoke.mjs', import.meta.url));
 
 function observation(overrides = {}) {
   return {
@@ -70,6 +74,45 @@ test('fails when the identity service or unauthenticated boundary is wrong', () 
   assert.equal(validateObservation(observation({
     unauthUsage: { status: 200, json: { items: [] } },
   })).checks.usageRequiresAuthentication, false);
+});
+
+test('reports safe probe failures without response contents', () => {
+  const report = validateObservation(observation({
+    apiHealth: {
+      status: 0,
+      json: undefined,
+      error: 'CURL_6',
+    },
+  }));
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.apiVersionMatches, false);
+  assert.deepEqual(report.probes.apiHealth, {
+    status: 0,
+    error: 'CURL_6',
+  });
+});
+
+test('reports when curl cannot be launched', async () => {
+  let failure;
+  try {
+    await promisify(execFile)(process.execPath, [SMOKE_SCRIPT], {
+      env: {
+        HOME: process.env.HOME,
+        PATH: '/definitely/missing',
+      },
+      encoding: 'utf8',
+      timeout: 5_000,
+    });
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure);
+  const report = JSON.parse(failure.stdout);
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.probes.apiHealth, {
+    status: 0,
+    error: 'ENOENT',
+  });
 });
 
 test('collects all public probes without credentials or mutation requests', async () => {

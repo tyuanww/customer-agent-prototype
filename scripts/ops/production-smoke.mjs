@@ -16,6 +16,13 @@ function invalid(code) {
   return Object.freeze({ ok: false, error: code });
 }
 
+function probeFailure(error) {
+  const code = error?.code;
+  if (Number.isInteger(code) && code > 0) return `CURL_${code}`;
+  if (typeof code === 'string' && /^[A-Z][A-Z0-9_]*$/u.test(code)) return code;
+  return 'PROBE_FAILED';
+}
+
 function publicOrigin(value) {
   if (typeof value !== 'string') return null;
   let parsed;
@@ -93,14 +100,16 @@ async function readJsonProbe(url) {
       maxBuffer: MAX_RESPONSE_BYTES + 1024,
       timeout: (PROBE_TIMEOUT_MS + 2) * 1000,
     });
-  } catch {
-    return Object.freeze({ status: 0, json: undefined });
+  } catch (error) {
+    return Object.freeze({ status: 0, json: undefined, error: probeFailure(error) });
   }
   const separator = output.stdout.lastIndexOf('\n');
-  if (separator < 0) return Object.freeze({ status: 0, json: undefined });
+  if (separator < 0) {
+    return Object.freeze({ status: 0, json: undefined, error: 'INVALID_OUTPUT' });
+  }
   const status = Number(output.stdout.slice(separator + 1).trim());
   if (!Number.isSafeInteger(status) || status < 100 || status > 599) {
-    return Object.freeze({ status: 0, json: undefined });
+    return Object.freeze({ status: 0, json: undefined, error: 'INVALID_STATUS' });
   }
   try {
     return Object.freeze({
@@ -149,7 +158,9 @@ export function validateObservation(observation, expectedVersion) {
       && health.service === 'cs-ai-api'
       && typeof health.version === 'string'
       && VERSION.test(health.version),
-    apiVersionMatches: expectedVersion === undefined || healthVersion === expectedVersion,
+    apiVersionMatches: expectedVersion === undefined
+      ? typeof healthVersion === 'string' && VERSION.test(healthVersion)
+      : healthVersion === expectedVersion,
     apiReady: observation.apiReady.status === 200
       && exactKeys(ready, ['status', 'checks'])
       && ready.status === 'ready'
@@ -162,10 +173,18 @@ export function validateObservation(observation, expectedVersion) {
     intakeRequiresAuthentication: observation.unauthSources.status === 401,
     usageRequiresAuthentication: observation.unauthUsage.status === 401,
   });
+  const probes = Object.fromEntries(Object.entries(observation).map(([name, probe]) => [
+    name,
+    Object.freeze({
+      status: probe.status,
+      ...(probe.error === undefined ? {} : { error: probe.error }),
+    }),
+  ]));
   return Object.freeze({
     ok: Object.values(checks).every(Boolean),
     version: typeof healthVersion === 'string' && VERSION.test(healthVersion) ? healthVersion : null,
     checks,
+    probes: Object.freeze(probes),
   });
 }
 
