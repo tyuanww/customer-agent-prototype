@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
 import {
   closeSync,
   constants,
+  copyFileSync,
   cpSync,
   createReadStream,
   existsSync,
@@ -16,6 +17,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
   writeSync,
 } from 'node:fs';
@@ -1639,6 +1641,291 @@ function restoreClusterArguments(cluster) {
   ];
 }
 
+function regularFileDigests(root) {
+  const digests = new Map();
+  let rootInfo;
+  try {
+    rootInfo = lstatSync(root);
+  } catch {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate build input is missing');
+  }
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate build input is not a regular directory');
+  }
+  const visit = (directory, relativeDirectory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      const relative = path.posix.join(relativeDirectory, entry.name);
+      if (entry.isSymbolicLink()) {
+        fail('CANDIDATE_RELEASE_INVALID', `Candidate build input contains a symbolic link: ${relative}`);
+      }
+      if (entry.isDirectory()) {
+        visit(absolute, relative);
+      } else if (entry.isFile()) {
+        digests.set(relative, sha256(readFileSync(absolute)));
+      } else {
+        fail('CANDIDATE_RELEASE_INVALID', `Candidate build output has an unsupported entry: ${relative}`);
+      }
+    }
+  };
+  visit(root, '');
+  return digests;
+}
+
+function materializeTrackedDatabaseSources(releaseRoot, gitSha, destination) {
+  const gitEnvironment = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: os.devNull,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_OPTIONAL_LOCKS: '0',
+  };
+  const listing = spawnSync(
+    'git',
+    ['-C', releaseRoot, 'ls-tree', '-r', '-z', '--name-only', gitSha, '--', 'packages/database'],
+    { encoding: 'utf8', env: gitEnvironment, maxBuffer: 16 * 1024 * 1024 },
+  );
+  if (listing.error || listing.status !== 0) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate tracked source list is unreadable');
+  }
+  const databaseRoot = path.join(destination, 'packages/database');
+  for (const relative of listing.stdout.split('\0').filter(Boolean)) {
+    if (!relative.startsWith('packages/database/')) {
+      fail('CANDIDATE_RELEASE_INVALID', 'Candidate tracked source escapes the database package');
+    }
+    const source = path.join(releaseRoot, relative);
+    let info;
+    try {
+      info = lstatSync(source);
+    } catch {
+      fail('CANDIDATE_RELEASE_INVALID', `Candidate tracked file is missing: ${relative}`);
+    }
+    if (!info.isFile() || info.isSymbolicLink()) {
+      fail('CANDIDATE_RELEASE_INVALID', `Candidate tracked file is not regular: ${relative}`);
+    }
+    const target = path.join(destination, relative);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
+  }
+  symlinkSync(path.join(REPOSITORY_ROOT, 'node_modules'), path.join(destination, 'node_modules'), 'dir');
+  symlinkSync(
+    path.join(REPOSITORY_ROOT, 'packages/database/node_modules'),
+    path.join(databaseRoot, 'node_modules'),
+    'dir',
+  );
+}
+
+function assertCandidateDatabaseBuild(releaseRoot, gitSha) {
+  const buildRoot = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-candidate-database-build-'));
+  const sourceRoot = path.join(buildRoot, 'source');
+  const buildDirectory = path.join(buildRoot, 'dist');
+  mkdirSync(sourceRoot);
+  try {
+    materializeTrackedDatabaseSources(releaseRoot, gitSha, sourceRoot);
+    const tsc = path.join(REPOSITORY_ROOT, 'packages/database/node_modules/.bin/tsc');
+    const build = spawnSync(tsc, [
+      '-p', 'packages/database/tsconfig.build.json',
+      '--outDir', buildDirectory,
+    ], {
+      cwd: sourceRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_OPTIONAL_LOCKS: '0',
+      },
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      timeout: 120_000,
+    });
+    if (build.error || build.status !== 0) {
+      fail('CANDIDATE_RELEASE_BUILD_FAILED', 'Candidate database sources did not build');
+    }
+    // Build output is intentionally ignored by Git. Rebuilding it from the clean
+    // tracked revision is the evidence that the executable came from that revision.
+    const expected = regularFileDigests(buildDirectory);
+    const actual = regularFileDigests(path.join(releaseRoot, 'packages/database/dist'));
+    const expectedFiles = [...expected.keys()].sort();
+    const actualFiles = [...actual.keys()].sort();
+    if (canonicalJson(expectedFiles) !== canonicalJson(actualFiles)) {
+      fail('CANDIDATE_RELEASE_BUILD_MISMATCH', 'Candidate database build file set differs from its sources');
+    }
+    for (const file of expectedFiles) {
+      if (expected.get(file) !== actual.get(file)) {
+        fail('CANDIDATE_RELEASE_BUILD_MISMATCH', 'Candidate database build content differs from its sources');
+      }
+    }
+  } finally {
+    rmSync(buildRoot, { recursive: true, force: true });
+  }
+}
+
+export function readCandidateRelease(candidateRelease) {
+  let releaseRoot;
+  try {
+    releaseRoot = realpathSync(candidateRelease);
+    if (!lstatSync(releaseRoot).isDirectory()) fail('CANDIDATE_RELEASE_INVALID', 'Candidate release is not a directory');
+  } catch (error) {
+    if (error instanceof BackupSetError) throw error;
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release does not exist');
+  }
+  if (!GIT_SHA.test(path.basename(releaseRoot))) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release directory must be named by its full Git SHA');
+  }
+  const gitEnvironment = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: os.devNull,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_OPTIONAL_LOCKS: '0',
+  };
+  const headResult = spawnSync(
+    'git',
+    ['-C', releaseRoot, 'rev-parse', '--verify', 'HEAD^{commit}'],
+    { encoding: 'utf8', env: gitEnvironment },
+  );
+  if (headResult.status !== 0 || !GIT_SHA.test(headResult.stdout.trim())) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release Git HEAD is unreadable');
+  }
+  const gitSha = headResult.stdout.trim();
+  if (gitSha !== path.basename(releaseRoot)) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release directory does not match Git HEAD');
+  }
+  const statusResult = spawnSync(
+    'git',
+    ['-C', releaseRoot, 'status', '--porcelain=v1', '--untracked-files=no'],
+    { encoding: 'utf8', env: gitEnvironment },
+  );
+  if (statusResult.status !== 0) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release Git status is unreadable');
+  }
+  if (statusResult.stdout.length > 0) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate release has tracked working-tree changes');
+  }
+  const manifestPath = path.join(releaseRoot, 'packages/database/migrations/manifest.generated.json');
+  const versionPath = path.join(releaseRoot, 'VERSION');
+  const packagePath = path.join(releaseRoot, 'apps/desktop/package.json');
+  const databaseModulePath = path.join(releaseRoot, 'packages/database/dist/index.js');
+  const verifierModulePath = path.join(releaseRoot, 'packages/database/dist/verifier.js');
+  const generatedModulePath = path.join(releaseRoot, 'packages/database/dist/generated/migrations.generated.js');
+  for (const file of [manifestPath, versionPath, packagePath, databaseModulePath, verifierModulePath, generatedModulePath]) {
+    let info;
+    try {
+      info = lstatSync(file);
+    } catch {
+      fail('CANDIDATE_RELEASE_INVALID', `Candidate release file is missing: ${path.relative(releaseRoot, file)}`);
+    }
+    if (!info.isFile() || info.isSymbolicLink()) {
+      fail('CANDIDATE_RELEASE_INVALID', `Candidate release file is not regular: ${path.relative(releaseRoot, file)}`);
+    }
+  }
+  assertCandidateDatabaseBuild(releaseRoot, gitSha);
+  const manifest = readJson(manifestPath, 'CANDIDATE_RELEASE_INVALID');
+  if (!manifest || !Array.isArray(manifest.migrations) || manifest.migrations.length < 1) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate migration manifest is empty');
+  }
+  const version = readBoundedText(versionPath, 128, 'CANDIDATE_RELEASE_INVALID').trim();
+  const desktop = readJson(packagePath, 'CANDIDATE_RELEASE_INVALID', 1024 * 1024);
+  if (!/^\d+\.\d+\.\d+$/u.test(version) || desktop?.version !== version) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate version identity is inconsistent');
+  }
+  return Object.freeze({
+    root: releaseRoot,
+    gitSha,
+    version,
+    manifest,
+    databaseModulePath,
+    verifierModulePath,
+    generatedModulePath,
+  });
+}
+
+async function applyCandidateRelease(cluster, databaseName, manifest, candidate) {
+  const sourceMigrations = manifest.database.migrations;
+  const nextMigrations = candidate.manifest.migrations;
+  if (nextMigrations.length <= sourceMigrations.length) {
+    fail('CANDIDATE_RELEASE_NOT_FORWARD', 'Candidate release does not advance the restored migration prefix');
+  }
+  for (const [index, restored] of sourceMigrations.entries()) {
+    const next = nextMigrations[index];
+    if (!next
+      || restored.position !== next.position
+      || restored.migrationId !== next.id
+      || restored.sha256 !== next.sha256
+      || restored.contractSetId !== next.contract_set_id
+      || restored.sourceGitSha !== next.source_git_sha
+      || restored.sourceSchemaSha256 !== next.source_schema_sha256) {
+      fail('CANDIDATE_RELEASE_PREFIX_MISMATCH', 'Restored backup is not an exact prefix of the candidate migration catalogue');
+    }
+  }
+  const [databaseModule, verifierModule, generatedModule] = await Promise.all([
+    import(pathToFileURL(candidate.databaseModulePath).href),
+    import(pathToFileURL(candidate.verifierModulePath).href),
+    import(pathToFileURL(candidate.generatedModulePath).href),
+  ]);
+  const catalogue = generatedModule.generatedMigrationCatalogue;
+  const expectedCatalogue = nextMigrations.map((migration) => ({
+    position: migration.position,
+    id: migration.id,
+    sha256: migration.sha256,
+    contractSetId: migration.contract_set_id,
+    sourceGitSha: migration.source_git_sha,
+    sourceSchemaSha256: migration.source_schema_sha256,
+  }));
+  const actualCatalogue = catalogue?.migrations?.map((migration) => ({
+    position: migration.position,
+    id: migration.id,
+    sha256: migration.sha256,
+    contractSetId: migration.contractSetId,
+    sourceGitSha: migration.sourceGitSha,
+    sourceSchemaSha256: migration.sourceSchemaSha256,
+  }));
+  if (!actualCatalogue || canonicalJson(actualCatalogue) !== canonicalJson(expectedCatalogue)) {
+    fail('CANDIDATE_RELEASE_INVALID', 'Candidate compiled catalogue does not match its manifest');
+  }
+  const client = new (await import('pg')).Client({
+    host: cluster.socket,
+    port: cluster.port,
+    user: manifest.database.databaseOwner,
+    database: databaseName,
+  });
+  try {
+    await client.connect();
+    let applied;
+    try {
+      applied = await databaseModule.applyDatabaseMigrations(client);
+    } catch (cause) {
+      throw new BackupSetError('CANDIDATE_MIGRATION_APPLY_FAILED', 'Candidate migrations failed on the restored backup', { cause });
+    }
+    const expectedIds = nextMigrations.slice(sourceMigrations.length).map((migration) => migration.id);
+    const actualIds = applied.applied.map((migration) => migration.id);
+    if (canonicalJson(actualIds) !== canonicalJson(expectedIds)) {
+      fail('CANDIDATE_MIGRATION_APPLY_FAILED', 'Candidate migration application did not match the expected delta');
+    }
+    let verification;
+    try {
+      verification = await verifierModule.verifyDatabaseMigrations(client);
+    } catch (cause) {
+      throw new BackupSetError('CANDIDATE_VERIFIER_FAILED', 'Candidate verifier rejected the migrated backup', { cause });
+    }
+    if (verification.status !== 'PASS' || verification.migrationCount !== nextMigrations.length) {
+      fail('CANDIDATE_VERIFIER_FAILED', 'Candidate verifier did not pass at the expected migration count');
+    }
+    return Object.freeze({
+      candidateRelease: candidate.root,
+      candidateGitSha: candidate.gitSha,
+      candidateVersion: candidate.version,
+      sourceMigrationCount: sourceMigrations.length,
+      migrationCount: nextMigrations.length,
+      lastMigrationId: nextMigrations.at(-1)?.id ?? null,
+      appliedMigrationIds: Object.freeze(actualIds),
+      verifierStatus: verification.status,
+      verifierMode: 'candidate-complete',
+    });
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
 async function verifyRestoredDatabase(pgBin, cluster, databaseName, manifest, objectStore) {
   const databaseModule = path.join(REPOSITORY_ROOT, 'packages/database/dist/index.js');
   const verifierModule = path.join(REPOSITORY_ROOT, 'packages/database/dist/verifier.js');
@@ -1773,18 +2060,40 @@ function writeEvidence(evidence) {
 
 export async function restoreDrill(options = {}) {
   const pgBin = options.pgBin ?? discoverPg15Bin();
-  const requested = options.backupSet ?? process.argv[3];
+  const commandArguments = process.argv.slice(3);
+  let commandBackupSet;
+  let commandCandidateRelease;
+  for (let index = 0; index < commandArguments.length; index += 1) {
+    const value = commandArguments[index];
+    if (value === '--candidate-release') {
+      const next = commandArguments[++index];
+      if (!next || commandCandidateRelease) fail('INVALID_ARGUMENTS', 'Pass one candidate release');
+      commandCandidateRelease = next;
+    } else if (value.startsWith('--')) {
+      fail('INVALID_ARGUMENTS', `Unknown restore option: ${value}`);
+    } else if (commandBackupSet) {
+      fail('INVALID_ARGUMENTS', 'Pass one backup set directory');
+    } else {
+      commandBackupSet = value;
+    }
+  }
+  const requested = options.backupSet ?? commandBackupSet;
   if (!requested) fail('BACKUP_SET_REQUIRED', 'Pass a backup set directory');
+  const candidateRelease = options.candidateRelease ?? commandCandidateRelease;
+  const requestedCandidateRelease = candidateRelease ? path.resolve(candidateRelease) : null;
   const verified = await verifyBackupSet(path.resolve(requested), { pgBin });
   const started = Date.now();
   const startedAt = utcNow();
   let scratch = null;
   let cluster = null;
   let restoredDatabase = null;
+  let candidate = null;
+  let sourceVerification = null;
   let evidence;
   let operationError;
   const keepForReview = process.env.CUSTOMER_AGENT_BACKUP_KEEP_SCRATCH_FOR_REVIEW === '1';
   try {
+    candidate = requestedCandidateRelease ? readCandidateRelease(requestedCandidateRelease) : null;
     scratch = safeScratchRoot();
     const extractedStore = path.join(scratch, 'object-store');
     await extractObjectArchive(
@@ -1816,13 +2125,21 @@ export async function restoreDrill(options = {}) {
       '--dbname', restoredDatabase,
       path.join(verified.directory, DATABASE_DUMP_FILE),
     ], { code: 'DATABASE_RESTORE_FAILED', timeout: 30 * 60_000 });
-    const verification = await verifyRestoredDatabase(
+    sourceVerification = await verifyRestoredDatabase(
       pgBin,
       cluster,
       restoredDatabase,
       verified.manifest,
       extractedStore,
     );
+    const candidateVerification = candidateRelease
+      ? await applyCandidateRelease(
+        cluster,
+        restoredDatabase,
+        verified.manifest,
+        candidate,
+      )
+      : null;
     const completedAt = utcNow();
     const durationMs = Date.now() - started;
     evidence = Object.freeze({
@@ -1839,13 +2156,22 @@ export async function restoreDrill(options = {}) {
       applicationGitSha: verified.manifest.application.gitSha,
       toolingSha256: verified.manifest.tooling.sha256,
       aclFingerprint: verified.manifest.database.aclFingerprint,
-      migrationCount: verified.manifest.database.migrations.length,
-      lastMigrationId: verified.manifest.database.migrations.at(-1)?.migrationId,
-      objectCount: verification.objectCount,
-      receiptCount: verification.receiptCount,
-      unreferencedObjectCount: verification.unreferencedObjectCount,
-      verifierStatus: verification.verifier.status,
-      verifierMode: verification.verifierMode,
+      restoredMigrationCount: verified.manifest.database.migrations.length,
+      restoredLastMigrationId: verified.manifest.database.migrations.at(-1)?.migrationId,
+      migrationCount: candidateVerification?.migrationCount ?? verified.manifest.database.migrations.length,
+      lastMigrationId: candidateVerification?.lastMigrationId
+        ?? verified.manifest.database.migrations.at(-1)?.migrationId,
+      candidateRelease: candidateVerification?.candidateRelease ?? null,
+      candidateGitSha: candidateVerification?.candidateGitSha ?? null,
+      candidateVersion: candidateVerification?.candidateVersion ?? null,
+      appliedMigrationIds: candidateVerification?.appliedMigrationIds ?? Object.freeze([]),
+      objectCount: sourceVerification.objectCount,
+      receiptCount: sourceVerification.receiptCount,
+      unreferencedObjectCount: sourceVerification.unreferencedObjectCount,
+      sourceVerifierStatus: sourceVerification.verifier.status,
+      sourceVerifierMode: sourceVerification.verifierMode,
+      verifierStatus: candidateVerification?.verifierStatus ?? sourceVerification.verifier.status,
+      verifierMode: candidateVerification?.verifierMode ?? sourceVerification.verifierMode,
       metadataAndObjectFidelity: 'PASS',
       scratchCleaned: false,
       dataClassification: 'metadata-only',
@@ -1865,11 +2191,24 @@ export async function restoreDrill(options = {}) {
       applicationGitSha: verified.manifest.application.gitSha,
       toolingSha256: verified.manifest.tooling.sha256,
       aclFingerprint: verified.manifest.database.aclFingerprint,
+      restoredMigrationCount: verified.manifest.database.migrations.length,
+      restoredLastMigrationId: verified.manifest.database.migrations.at(-1)?.migrationId,
       migrationCount: verified.manifest.database.migrations.length,
       lastMigrationId: verified.manifest.database.migrations.at(-1)?.migrationId,
+      candidateRelease: candidate?.root ?? requestedCandidateRelease,
+      candidateGitSha: candidate?.gitSha ?? null,
+      candidateVersion: candidate?.version ?? null,
+      appliedMigrationIds: [],
+      objectCount: sourceVerification?.objectCount ?? null,
+      receiptCount: sourceVerification?.receiptCount ?? null,
+      unreferencedObjectCount: sourceVerification?.unreferencedObjectCount ?? null,
+      sourceVerifierStatus: sourceVerification?.verifier.status ?? null,
+      sourceVerifierMode: sourceVerification?.verifierMode ?? null,
       errorCode: error instanceof BackupSetError ? error.code : 'RESTORE_FAILED',
-      metadataAndObjectFidelity: error?.restoreFidelityPassed === true ? 'PASS' : 'UNCONFIRMED',
-      verifierMode: error?.verifierMode ?? null,
+      metadataAndObjectFidelity: sourceVerification || error?.restoreFidelityPassed === true
+        ? 'PASS'
+        : 'UNCONFIRMED',
+      verifierMode: error?.verifierMode ?? sourceVerification?.verifierMode ?? null,
       verifierDetail: error?.cause instanceof Error ? redactDiagnostic(error.cause.message) : null,
       scratchCleaned: false,
       dataClassification: 'metadata-only',
