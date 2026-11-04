@@ -15,9 +15,7 @@ const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SYNTHETIC_SOURCE_PREFIX = 'srcv_stack_';
 const DOMAINS = Object.freeze(['aftersale', 'campaign', 'presale', 'product']);
 const MAX_EVIDENCE_BYTES = 1024 * 1024;
-const PACKAGE_VERSION = JSON.parse(
-  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-).version;
+const PRODUCT_VERSION = readFileSync(new URL('../../VERSION', import.meta.url), 'utf8').trim();
 
 export class TenantSourceRebindError extends Error {
   constructor(code, message, options = {}) {
@@ -77,7 +75,7 @@ export function readEvidence(file, { environment }) {
     || evidence?.metadataAndObjectFidelity !== 'PASS'
     || evidence?.scratchCleaned !== true
     || evidence?.dataClassification !== 'metadata-only'
-    || evidence?.candidateVersion !== PACKAGE_VERSION
+    || evidence?.candidateVersion !== PRODUCT_VERSION
     || typeof evidence?.candidateGitSha !== 'string'
     || !/^[0-9a-f]{40}$/u.test(evidence.candidateGitSha)
     || typeof evidence?.backupId !== 'string'
