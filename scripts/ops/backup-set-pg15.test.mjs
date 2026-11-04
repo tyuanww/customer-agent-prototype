@@ -9,6 +9,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -226,8 +227,8 @@ async function seedSyntheticDatabase(client, migrationCount) {
     await client.query(`
       INSERT INTO public.import_batches(
         import_batch_id,source_type,source_ref,source_sha256,source_size_bytes,
-        source_binding_hash,status
-      ) VALUES($1,'excel',$2,$3,$4,$5,'validating')
+        source_binding_hash,status,actor_user_id
+      ) VALUES($1,'excel',$2,$3,$4,$5,'validating','user-backup')
     `, [batchId, objectId, objectSha, objectBytes.length, sourceBindingHash]);
     await client.query(`
       INSERT INTO content_intake.objects(
@@ -238,8 +239,8 @@ async function seedSyntheticDatabase(client, migrationCount) {
       )
     `, [objectId, `intake/${objectId}`, objectSha, objectBytes.length]);
     await client.query(`INSERT INTO public.import_batches(
-      import_batch_id,source_type,source_ref,source_binding_hash,status
-    ) VALUES ('legacy-batch','seed','synthetic-seed',$1,'validating')`, [sourceBindingHash]);
+      import_batch_id,source_type,source_ref,source_binding_hash,status,actor_user_id
+    ) VALUES ('legacy-batch','seed','synthetic-seed',$1,'validating','user-backup')`, [sourceBindingHash]);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -256,7 +257,7 @@ async function seedSyntheticDatabase(client, migrationCount) {
   };
 }
 
-async function exerciseBackupSetForMigrationCount(migrationCount) {
+async function exerciseBackupSetForMigrationCount(migrationCount, withCandidateRelease = false) {
   const previousTmpdir = process.env.TMPDIR;
   process.env.TMPDIR = realpathSync('/tmp');
   const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-integration-'));
@@ -377,6 +378,52 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
     assert.notEqual(currentId, firstId);
     const copySets = backupSets(copyRoot);
     assert.deepEqual(copySets.map((entry) => path.basename(entry)), [currentId]);
+    let candidateRelease;
+    let candidateSha;
+    if (withCandidateRelease) {
+      const candidateStaging = path.join(root, 'candidate-staging');
+      mkdirSync(path.join(candidateStaging, 'apps/desktop'), { recursive: true });
+      mkdirSync(path.join(candidateStaging, 'packages/database'), { recursive: true });
+      cpSync(path.join(repositoryRoot, 'packages/database/dist'),
+        path.join(candidateStaging, 'packages/database/dist'), { recursive: true });
+      cpSync(path.join(repositoryRoot, 'packages/database/src'),
+        path.join(candidateStaging, 'packages/database/src'), { recursive: true });
+      cpSync(path.join(repositoryRoot, 'packages/database/migrations'),
+        path.join(candidateStaging, 'packages/database/migrations'), { recursive: true });
+      for (const file of ['package.json', 'tsconfig.json', 'tsconfig.build.json']) {
+        cpSync(path.join(repositoryRoot, 'packages/database', file),
+          path.join(candidateStaging, 'packages/database', file));
+      }
+      writeFileSync(
+        path.join(candidateStaging, '.gitignore'),
+        '/node_modules\n/packages/database/node_modules\n/packages/database/dist/\n',
+      );
+      symlinkSync(path.join(repositoryRoot, 'node_modules'), path.join(candidateStaging, 'node_modules'), 'dir');
+      symlinkSync(path.join(repositoryRoot, 'packages/database/node_modules'),
+        path.join(candidateStaging, 'packages/database/node_modules'), 'dir');
+      writeFileSync(path.join(candidateStaging, 'VERSION'), `${readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8').trim()}\n`);
+      writeFileSync(path.join(candidateStaging, 'apps/desktop/package.json'), JSON.stringify({
+        version: readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8').trim(),
+      }));
+      const gitEnvironment = {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_NOSYSTEM: '1',
+      };
+      execFileSync('git', ['init', '-q'], { cwd: candidateStaging, env: gitEnvironment });
+      execFileSync('git', ['add', '.'], { cwd: candidateStaging, env: gitEnvironment });
+      execFileSync('git', [
+        '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+        '-c', 'commit.gpgsign=false', 'commit', '-qm', 'candidate',
+      ], { cwd: candidateStaging, env: gitEnvironment });
+      candidateSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: candidateStaging,
+        encoding: 'utf8',
+        env: gitEnvironment,
+      }).trim();
+      candidateRelease = path.join(root, candidateSha);
+      renameSync(candidateStaging, candidateRelease);
+    }
 
     const verified = await verifyBackupSet(current, { pgBin: pg15Bin() });
     assert.equal(verified.manifest.databaseName, databaseName);
@@ -458,7 +505,10 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
     assert.equal(failure.scratchCleaned, true);
 
     const validEvidence = path.join(evidenceRoot, 'valid.json');
-    const restoreResult = runCli(restoreScript, [copySets[0]], {
+    const restoreResult = runCli(restoreScript, [
+      copySets[0],
+      ...(candidateRelease ? ['--candidate-release', candidateRelease] : []),
+    ], {
       ...copyEnvironment,
       CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE: validEvidence,
       ...(keepDiagnosticClusters ? { CUSTOMER_AGENT_BACKUP_KEEP_SCRATCH_FOR_REVIEW: '1' } : {}),
@@ -468,7 +518,8 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
     const expectedVerifierMode = migrationCount === generatedMigrationCatalogue.migrations.length ? 'complete' : `readiness-prefix:${migrationCount}`;
     if (restoreResult.status === 1) {
       assert.equal(evidence.status, 'FAIL');
-      assert.equal(evidence.metadataAndObjectFidelity, 'PASS');
+      assert.notEqual(evidence.errorCode, 'RESTORE_FAILED', restoreResult.stderr);
+      assert.equal(evidence.metadataAndObjectFidelity, 'PASS', JSON.stringify(evidence));
       assert.equal(evidence.errorCode, 'MIGRATION_VERIFY_FAILED');
       assert.equal(evidence.verifierMode, expectedVerifierMode);
       assert.equal(evidence.backupSnapshotAt, verified.manifest.snapshotAt);
@@ -490,7 +541,8 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
     assert.equal(evidence.status, 'PASS');
     assert.equal(evidence.backupId, currentId);
     assert.equal(evidence.verifierStatus, 'PASS');
-    assert.equal(evidence.verifierMode, expectedVerifierMode);
+    assert.equal(evidence.verifierMode, candidateRelease ? 'candidate-complete' : expectedVerifierMode);
+    assert.equal(evidence.sourceVerifierMode, expectedVerifierMode);
     assert.equal(evidence.metadataAndObjectFidelity, 'PASS');
     assert.equal(evidence.applicationGitSha, productionApplicationSha);
     assert.equal(evidence.productVersion, productionApplicationVersion);
@@ -500,6 +552,16 @@ async function exerciseBackupSetForMigrationCount(migrationCount) {
     assert.equal(evidence.receiptCount, 1);
     assert.equal(evidence.unreferencedObjectCount, 1);
     assert.equal(evidence.scratchCleaned, !keepDiagnosticClusters);
+    if (candidateRelease) {
+      assert.equal(evidence.restoredMigrationCount, migrationCount);
+      assert.equal(evidence.migrationCount, generatedMigrationCatalogue.migrations.length);
+      assert.deepEqual(
+        evidence.appliedMigrationIds,
+        generatedMigrationCatalogue.migrations.slice(migrationCount).map((migration) => migration.id),
+      );
+      assert.equal(evidence.candidateVersion, readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8').trim());
+      assert.equal(evidence.candidateGitSha, candidateSha);
+    }
     assert.equal(typeof evidence.rpoSeconds, 'number');
     assert.equal(typeof evidence.rtoMs, 'number');
   } finally {
@@ -592,3 +654,8 @@ for (const migrationCount of [75, 76, 77, generatedMigrationCatalogue.migrations
     async () => exerciseBackupSetForMigrationCount(migrationCount),
   );
 }
+
+test('candidate rehearsal applies forward migrations to a restored 79-prefix backup', {
+  skip: enabled ? false : 'set CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION=1',
+  timeout: 20 * 60_000,
+}, async () => exerciseBackupSetForMigrationCount(79, true));

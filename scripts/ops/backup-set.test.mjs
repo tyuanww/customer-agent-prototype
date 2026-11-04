@@ -7,6 +7,8 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -29,6 +31,7 @@ import {
   inspectObjectStore,
   loadStackProfile,
   pruneVerifiedBackupSets,
+  readCandidateRelease,
   replicationConfiguration,
   verifyBackupSet,
 } from './backup-set.mjs';
@@ -517,6 +520,121 @@ test('replication metadata distinguishes same-host copies from declared offsite 
   } finally {
     if (original === undefined) delete process.env.CUSTOMER_AGENT_BACKUP_COPY_SCOPE;
     else process.env.CUSTOMER_AGENT_BACKUP_COPY_SCOPE = original;
+  }
+});
+
+test('candidate release rehearsal input requires one consistent built release', () => {
+  const root = temporaryDirectory('customer-agent-candidate-release-');
+  const candidateRoot = path.join(root, 'candidate');
+  try {
+    mkdirSync(path.join(candidateRoot, 'apps/desktop'), { recursive: true });
+    mkdirSync(path.join(candidateRoot, 'packages/database/migrations'), { recursive: true });
+    mkdirSync(path.join(candidateRoot, 'packages/database/src/generated'), { recursive: true });
+    symlinkSync(path.join(repositoryRoot, 'packages/database/node_modules'),
+      path.join(candidateRoot, 'packages/database/node_modules'), 'dir');
+    writeFileSync(path.join(candidateRoot, 'package.json'), '{"private":true}\n');
+    writeFileSync(path.join(candidateRoot, '.gitignore'), '/packages/database/node_modules\n/packages/database/dist/\n');
+    writeFileSync(path.join(candidateRoot, 'packages/database/tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        target: 'ES2022',
+        strict: true,
+      },
+    }));
+    writeFileSync(path.join(candidateRoot, 'packages/database/tsconfig.build.json'), JSON.stringify({
+      extends: './tsconfig.json',
+      compilerOptions: {
+        rootDir: 'src',
+        outDir: 'dist',
+        declaration: true,
+      },
+      include: ['src/**/*.ts'],
+    }));
+    writeFileSync(path.join(candidateRoot, 'VERSION'), '0.3.43\n');
+    writeFileSync(path.join(candidateRoot, 'apps/desktop/package.json'), '{"version":"0.3.43"}\n');
+    writeFileSync(
+      path.join(candidateRoot, 'packages/database/migrations/manifest.generated.json'),
+      '{"migrations":[{"position":81,"id":"0081_next"}]}\n',
+    );
+    writeFileSync(path.join(candidateRoot, 'packages/database/src/index.ts'), 'export const index = true;\n');
+    writeFileSync(path.join(candidateRoot, 'packages/database/src/verifier.ts'), 'export const verifier = true;\n');
+    writeFileSync(
+      path.join(candidateRoot, 'packages/database/src/generated/migrations.generated.ts'),
+      'export const generatedMigrationCatalogue = { migrations: [] };\n',
+    );
+    const gitEnvironment = {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: os.devNull,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    execFileSync(path.join(repositoryRoot, 'packages/database/node_modules/.bin/tsc'), [
+      '-p', 'packages/database/tsconfig.build.json',
+    ], { cwd: candidateRoot, env: gitEnvironment });
+    execFileSync('git', ['init', '-q'], { cwd: candidateRoot, env: gitEnvironment });
+    execFileSync('git', ['add', '.'], { cwd: candidateRoot, env: gitEnvironment });
+    execFileSync('git', [
+      '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+      '-c', 'commit.gpgsign=false', 'commit', '-qm', 'candidate',
+    ], { cwd: candidateRoot, env: gitEnvironment });
+    const gitSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: candidateRoot,
+      encoding: 'utf8',
+      env: gitEnvironment,
+    }).trim();
+    const releaseRoot = path.join(root, gitSha);
+    renameSync(candidateRoot, releaseRoot);
+    const resolvedRoot = realpathSync(releaseRoot);
+    assert.deepEqual(readCandidateRelease(releaseRoot), {
+      root: resolvedRoot,
+      gitSha,
+      version: '0.3.43',
+      manifest: { migrations: [{ position: 81, id: '0081_next' }] },
+      databaseModulePath: path.join(resolvedRoot, 'packages/database/dist/index.js'),
+      verifierModulePath: path.join(resolvedRoot, 'packages/database/dist/verifier.js'),
+      generatedModulePath: path.join(resolvedRoot, 'packages/database/dist/generated/migrations.generated.js'),
+    });
+    writeFileSync(path.join(releaseRoot, 'packages/database/dist/index.js'), 'export const tampered = true;\n');
+    assert.throws(
+      () => readCandidateRelease(releaseRoot),
+      (error) => error instanceof Error && 'code' in error && error.code === 'CANDIDATE_RELEASE_BUILD_MISMATCH',
+    );
+    execFileSync(path.join(repositoryRoot, 'packages/database/node_modules/.bin/tsc'), [
+      '-p', 'packages/database/tsconfig.build.json',
+    ], { cwd: releaseRoot, env: gitEnvironment });
+    writeFileSync(path.join(releaseRoot, 'packages/database/src/untracked.ts'), 'export const untracked = true;\n');
+    writeFileSync(
+      path.join(releaseRoot, 'packages/database/dist/untracked.js'),
+      'export const untracked = true;\n',
+    );
+    assert.throws(
+      () => readCandidateRelease(releaseRoot),
+      (error) => error instanceof Error && 'code' in error && error.code === 'CANDIDATE_RELEASE_BUILD_MISMATCH',
+    );
+    rmSync(path.join(releaseRoot, 'packages/database/src/untracked.ts'));
+    rmSync(path.join(releaseRoot, 'packages/database/dist/untracked.js'));
+    execFileSync(path.join(repositoryRoot, 'packages/database/node_modules/.bin/tsc'), [
+      '-p', 'packages/database/tsconfig.build.json',
+    ], { cwd: releaseRoot, env: gitEnvironment });
+    const outside = path.join(root, 'outside.js');
+    writeFileSync(outside, 'export const outside = true;\n');
+    rmSync(path.join(releaseRoot, 'packages/database/dist/verifier.js'));
+    symlinkSync(outside, path.join(releaseRoot, 'packages/database/dist/verifier.js'));
+    assert.throws(
+      () => readCandidateRelease(releaseRoot),
+      (error) => error instanceof Error && 'code' in error && error.code === 'CANDIDATE_RELEASE_INVALID',
+    );
+    rmSync(path.join(releaseRoot, 'packages/database/dist/verifier.js'));
+    execFileSync(path.join(repositoryRoot, 'packages/database/node_modules/.bin/tsc'), [
+      '-p', 'packages/database/tsconfig.build.json',
+    ], { cwd: releaseRoot, env: gitEnvironment });
+    writeFileSync(path.join(releaseRoot, 'apps/desktop/package.json'), '{"version":"0.3.42"}\n');
+    assert.throws(
+      () => readCandidateRelease(releaseRoot),
+      (error) => error instanceof Error && 'code' in error && error.code === 'CANDIDATE_RELEASE_INVALID',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
