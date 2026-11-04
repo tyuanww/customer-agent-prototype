@@ -89,7 +89,7 @@ LOG_HASH_KEY  LOG_HASH_KEY_VERSION
 
 部署前保存当前 release 指针、配置摘要和已经验证可恢复的备份集。新 release 目录必须不存在；获取代码后核对 HEAD 和 clean 状态，使用锁定依赖构建，再按候选执行迁移后验。测试栈和生产栈使用不同的 stack root、数据库、端口和对象目录。测试必须使用合成数据。
 
-切换生产需要本次候选的明确发布授权。只在候选全部检查通过后原子替换 `current` 并重启受管 unit，随后核对代码目录、进程 cwd、版本、端口、客户端配置和公网探针。`scripts/ops/production-consistency.mjs --help` 提供只读核对入口，具体 origins 来自现有部署配置，不另建端点真源。
+切换生产需要本次候选的明确发布授权。只在候选全部检查通过后原子替换 `current` 并重启受管 unit，随后核对代码目录、进程 cwd、版本、端口、客户端配置和公网探针。`scripts/ops/production-consistency.mjs --help` 提供只读核对入口，具体 origins 来自现有部署配置，不另建端点真源。公网 health、就绪依赖、身份服务和未认证边界按[生产烟测](how-to-run-production-smoke.md)运行。
 
 不要删 `profile.json`，它固定已有端口。`api.env` 留在 stack root，候选版本必须同时与 `VERSION`、桌面 package 和 `/health` 对齐。迁移只允许追加；代码回退不等于模式回退。需要恢复数据库时使用事先验证的完整备份集，不能直接改写迁移账本。
 
