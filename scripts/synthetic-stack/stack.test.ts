@@ -224,6 +224,7 @@ describe('stack profile', () => {
     const end = rest.indexOf('\nasync function commandAnomaly');
     const body = end === -1 ? rest : rest.slice(0, end);
     assert.ok(body.includes('bootstrapDatabase('), 'migrate must bootstrap the recorded database');
+    assert.ok(body.includes('syntheticReferenceData: false'), 'migrate must not seed synthetic reference data');
     assert.ok(body.includes('resolveProfile(undefined, { reuse: true })'), 'migrate must reuse the recorded profile');
     assert.ok(body.includes("cluster.state() !== 'running'"), 'migrate must refuse to start postgres');
     for (const forbidden of [
@@ -236,6 +237,16 @@ describe('stack profile', () => {
     ]) {
       assert.equal(body.includes(forbidden), false, `migrate must not call ${forbidden}`);
     }
+  });
+
+  it('keeps synthetic reference validation out of no-seed startup', () => {
+    const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
+    const bootstrap = readFileSync(new URL('./bootstrap.ts', import.meta.url), 'utf8');
+    assert.ok(
+      stack.includes('bootstrapDatabase(database, { syntheticReferenceData: !noSeed })'),
+      'startup must gate synthetic reference data on the seed decision',
+    );
+    assert.match(bootstrap, /if \(syntheticReferenceData\) steps\.push\(await seedReferenceData\(client\)\)/u);
   });
 
   it('refuses production destroy before stopping any owned process', () => {

@@ -52,6 +52,7 @@ pnpm start                  # 与 pnpm dev 相同；会先准备 contracts runti
 | 桌面 BM25 + 仓外索引 | [检索参考](docs/reference-desktop-retrieval.md) · [How to](docs/how-to-run-macos-semantic-query.md) · [为什么](docs/explanation-desktop-retrieval.md) |
 | 飞书 + 账号 how-to、P4 远端 how-to | [feishu](docs/how-to-feishu-and-password-mac.md) · [p4](docs/how-to-p4-remote-mac.md) |
 | 两个公网入口跑在杭州（更新 / 迁数据 / 切隧道 / 回滚） | [后端跑在杭州](docs/how-to-run-backend-on-hangzhou.md) |
+| 用单写者入口预检、迁移、切软链并验证生产回滚 | [生产候选切换](docs/how-to-deploy-production-release.md) |
 | 发下一轮桌面安装包，并分清六条发布面 | [下一轮桌面大版本](docs/how-to-ship-the-next-desktop-cut.md) |
 | 从远端仓库开发、在 Windows WSL 测试并按 SHA 交付 | [远端开发与交付](docs/how-to-remote-development-and-deployment.md) |
 | 选择 Mac / API / WSL 开发端口并验证 | [开发端口 How-to](docs/how-to-development-ports.md) |

@@ -1,10 +1,10 @@
 /**
  * Database bootstrap for the synthetic stack.
  *
- * Applies the frozen migrations (0001–0014, never rewritten) to the isolated
- * cluster, then seeds the minimum governed reference data the content chain
- * needs: authoritative source versions, the synthetic intent taxonomy, and the
- * seeded subject bindings plus capability bindings for the review roles.
+ * Applies the frozen migrations to the isolated cluster and optionally seeds
+ * the minimum governed reference data the synthetic content chain needs.
+ * Stacks that serve a real catalog migrate without installing synthetic
+ * authoritative sources, notice decisions, or identity bindings.
  *
  * All of this is synthetic. No real Feishu identity, customer data or
  * production source is represented here.
@@ -133,7 +133,10 @@ export async function seedFeishuBindings(client, bindings: readonly FeishuStackB
   return `feishu bindings: ${bindings.length === 0 ? 'none' : bindings.map((binding) => binding.openId).join(', ')}`;
 }
 
-export async function bootstrapDatabase(client): Promise<readonly string[]> {
+export async function bootstrapDatabase(
+  client,
+  { syntheticReferenceData = true }: Readonly<{ syntheticReferenceData?: boolean }> = {},
+): Promise<readonly string[]> {
   const steps: string[] = [];
   // The database runner owns fresh, partial, complete, and drifted ledger
   // states. A complete ledger must skip the apply path: its verifier runs
@@ -143,6 +146,6 @@ export async function bootstrapDatabase(client): Promise<readonly string[]> {
   const migrationStatus = await inspectDatabaseMigrations(client);
   if (migrationStatus.state === 'COMPLETE') steps.push('migrations: already applied');
   else steps.push(await applyMigrations(client));
-  steps.push(await seedReferenceData(client));
+  if (syntheticReferenceData) steps.push(await seedReferenceData(client));
   return Object.freeze(steps);
 }

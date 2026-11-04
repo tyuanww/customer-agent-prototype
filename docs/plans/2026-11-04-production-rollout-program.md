@@ -86,7 +86,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [x] 复用 `scripts/synthetic-stack/profile.ts` 校验 stack root、环境、端口、正式库名、socket 和对象目录。
 - [x] 在同一个 `REPEATABLE READ READ ONLY` 事务内聚合活动批次、principal、来源版本和 current release。
-- [x] 检查活动 `default`、principal 缺失、actor 租户错配、来源缺失、来源不完整、来源租户错配和不完整 current four-domain set。
+- [x] 检查活动 `default`、principal 缺失、actor 租户错配、批次基线过期、发布后有效来源集不完整、来源租户错配和不完整 current four-domain set。
 - [x] 输出稳定 JSON schema 和聚合阻断码。退出 `0` 表示 ready，`1` 表示 blocked 或检查失败，`2` 表示参数或 profile 无效。
 
 **You see.**
@@ -94,7 +94,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [x] 干净 fixture 返回 `status: "ready"`。
 - [x] 活动 `default` fixture 返回 `ACTIVE_IMPORT_BATCH_DEFAULT_TENANT`。
 - [x] 未知 actor fixture 返回 `ACTIVE_IMPORT_BATCH_PRINCIPAL_MISSING`。
-- [x] 只有三个来源的 fixture 返回 `ACTIVE_IMPORT_BATCH_SOURCE_SET_INVALID`。
+- [x] 单域替换会从当前 release 继承其余三域；有效来源集只有三个域时返回 `ACTIVE_IMPORT_BATCH_SOURCE_SET_INVALID`。
 - [x] PostgreSQL 15 集成测试能从真实表和触发器边界聚合出活动批次与历史 `default` 计数。
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
@@ -275,18 +275,20 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 **Files.**
 
-- [ ] `scripts/ops/customer-agent-production-release.mjs`
-- [ ] `scripts/ops/customer-agent-production-release.test.mjs`
-- [ ] `docs/how-to-deploy-production-release.md`
+- [x] `scripts/ops/customer-agent-production-release.mjs`
+- [x] `scripts/ops/customer-agent-production-release.test.mjs`
+- [x] `docs/how-to-deploy-production-release.md`
 
 **Build.**
 
-- [ ] 引入部署锁，禁止两个实例同时切换同一 root。
-- [ ] 默认 dry-run。真实执行必须同时提交完整 SHA、`0.3.43` 和明确环境参数。
-- [ ] 在写指针前完成 release identity、migration prefix、backup evidence、tenant report 和 readiness target 检查。
-- [ ] 先应用追加迁移，再切换 symlink，再重启 unit。
-- [ ] readiness 失败时恢复上一指针并重启，保留失败 release 诊断目录。
-- [ ] 每一步写入不含敏感数据的结构化审计日志。
+- [x] 引入部署锁，禁止两个实例同时切换同一 root。
+- [x] 默认 dry-run。真实执行必须同时提交完整 SHA、`0.3.43` 和明确环境参数。
+- [x] 在写指针前完成 release identity、migration prefix、backup evidence、tenant report 和 readiness target 检查。
+- [x] 候选数据库构建从完整 tracked SHA 重建核对；实时租户快照必须与输入报告一致。
+- [x] 先应用追加迁移，再切换 symlink，再重启 unit。
+- [x] 首次写入前持久化旧指针、原 `api.env` 备份索引和阶段；SIGKILL 后重试可继续部署或完成回滚。
+- [x] readiness 失败时恢复上一指针并重启，保留失败 release 诊断目录。
+- [x] 每一步写入不含敏感数据的结构化审计日志。
 
 **You see.**
 
@@ -296,8 +298,8 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] 覆盖成功、锁冲突、迁移失败、symlink 失败、restart 失败、readiness 失败和回滚失败。
-- [ ] 覆盖重试时识别已完成的迁移和已有 current 指针。
+- [x] 覆盖成功、锁冲突、迁移失败、候选 verifier 失败、symlink 失败、restart 失败、readiness 失败和回滚失败。
+- [x] 覆盖实时租户报告漂移、已有 current 指针、崩溃后重试和中断回滚恢复。
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `inherit-parent` at the PR head, per the boot recipe.
 
