@@ -127,8 +127,9 @@ covered function changed, rerun first and only then move the commit.
 - **Other actions, scopes, tenants.** One action (`publish`), one scope, one tenant. The ceiling
   applies per action, so a role-band change is exercised through this one action; a scope or
   tenant bug is not.
-- **Concurrency.** The search is serial. Interleaved transactions are covered by the existing
-  deadline suites.
+- **Concurrency.** The search is serial. The seat-administration revocation path is covered by
+  [`verify-seat-administration-revocation`](../verify-seat-administration-revocation/SKILL.md);
+  other interleaved grant transactions are not covered here.
 - **The role ceiling's values.** This check proves sequences cannot break the two promises. It
   does not prove the ceiling says the right thing about each role; that is
   `tests/role-ceiling.integration.test.ts` (the two copies agree) plus the integration suites

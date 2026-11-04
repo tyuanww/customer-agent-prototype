@@ -17,8 +17,7 @@ import { intakeFailure, intakeHttpBoundary, intakePageQuery, materialPageQuery, 
 
 const MAX_PENDING_PARSE = 10;
 
-/** `seatHome` throws when the tenant or app is missing, which is the answer: no home means no
- *  seat routes, and the operator sees a 404 instead of a create that silently lands nowhere. */
+/** Environment-based seat wiring requires both a configured home and an absolute stack root. */
 function seatHomeConfigured(): boolean {
   try { seatHome(process.env); return true; } catch { return false; }
 }
@@ -50,19 +49,20 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   approval?: ApprovalAdapter;
   principalLabels?: IntakePrincipalLabels;
   terminalPool?: IntakePool;
+  seatService?: SeatService;
   report?: (diagnosticId: string, error: unknown) => void;
-}> = async (app, { auth, pool, store, approval, principalLabels, terminalPool, report }) => {
+}> = async (app, { auth, pool, store, approval, principalLabels, terminalPool, seatService, report }) => {
   const actor = intakeHttpBoundary(app, auth, report);
   const service = createContentIntakeService(pool, store, report, approval,
     { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
   await app.register(contentIntakeGrantRoutes, { auth, service, ...(report ? { report } : {}) });
 
-  // Seat accounts need two things the intake plugin cannot invent: the stack root, to find the
-  // identity server's password file, and the home a seat belongs to. Without both, the routes must
-  // not exist at all rather than answer half of an operation.
+  // Production fallback needs the stack root and home. The isolated host injects an already
+  // configured service because its temporary stack does not use process environment.
   const seatStackRoot = process.env.CUSTOMER_AGENT_STACK_ROOT;
-  const seats: SeatService | null = seatStackRoot && path.isAbsolute(seatStackRoot) && seatHomeConfigured()
-    ? createSeatServiceFromEnv(pool, seatStackRoot, process.env) : null;
+  const seats: SeatService | null = seatService
+    ?? (seatStackRoot && path.isAbsolute(seatStackRoot) && seatHomeConfigured()
+      ? createSeatServiceFromEnv(pool, seatStackRoot, process.env) : null);
   if (seats) await app.register(contentIntakeSeatRoutes, { auth, seats, ...(report ? { report } : {}) });
   app.get('/v1/intake/sources/:sourceId/management-context', { exposeHeadRoute: false }, async (request, reply) => {
     if (!noQuery(request)) {

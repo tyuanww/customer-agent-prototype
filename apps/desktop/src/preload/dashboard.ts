@@ -547,21 +547,32 @@ contextBridge.exposeInMainWorld('dashboardWorkbench', {
 
 type DashboardPageSnapshot =
   | { phase: 'signed-out' }
-  | { phase: 'ready'; epoch: number; permissions: Record<string, unknown>; sop: Record<string, unknown> };
+  | { phase: 'ready'; epoch: number; settings: Record<string, unknown>; sop: Record<string, unknown> };
 
 function onlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 
-function permissionsPayload(permissions: Record<string, unknown>): boolean {
-  if (permissions.state === 'pending' || permissions.state === 'unavailable') return onlyKeys(permissions, ['state']);
-  if (permissions.state === 'closed') {
-    return onlyKeys(permissions, ['state', 'recovery'])
-      && (permissions.recovery === null || typeof permissions.recovery === 'string');
+function grantsPayload(grants: Record<string, unknown>): boolean {
+  if (grants.state === 'pending' || grants.state === 'unavailable') return onlyKeys(grants, ['state']);
+  if (grants.state === 'closed') {
+    return onlyKeys(grants, ['state', 'recovery'])
+      && (grants.recovery === null || typeof grants.recovery === 'string');
   }
-  return permissions.state === 'open'
-    && onlyKeys(permissions, ['state', 'body'])
-    && (permissions.body === null || isRecord(permissions.body));
+  return grants.state === 'open'
+    && onlyKeys(grants, ['state', 'body'])
+    && (grants.body === null || isRecord(grants.body));
+}
+
+function accountsPayload(value: unknown): boolean {
+  return value === 'pending' || value === 'unavailable' || value === 'closed' || value === 'open';
+}
+
+function settingsPayload(settings: Record<string, unknown>): boolean {
+  return onlyKeys(settings, ['grants', 'accounts'])
+    && isRecord(settings.grants)
+    && grantsPayload(settings.grants)
+    && accountsPayload(settings.accounts);
 }
 
 function sopPayload(sop: Record<string, unknown>): boolean {
@@ -573,11 +584,11 @@ function pageUseSnapshot(value: unknown): value is DashboardPageSnapshot {
   if (!isRecord(value)) return false;
   if (value.phase === 'signed-out') return onlyKeys(value, ['phase']);
   if (value.phase !== 'ready' || typeof value.epoch !== 'number' || !Number.isSafeInteger(value.epoch)) return false;
-  if (!onlyKeys(value, ['phase', 'epoch', 'permissions', 'sop'])) return false;
-  const permissions = value.permissions;
+  if (!onlyKeys(value, ['phase', 'epoch', 'settings', 'sop'])) return false;
+  const settings = value.settings;
   const sop = value.sop;
-  if (!isRecord(permissions) || !isRecord(sop)) return false;
-  return permissionsPayload(permissions) && sopPayload(sop);
+  if (!isRecord(settings) || !isRecord(sop)) return false;
+  return settingsPayload(settings) && sopPayload(sop);
 }
 
 const SIGNED_OUT: DashboardPageSnapshot = { phase: 'signed-out' };

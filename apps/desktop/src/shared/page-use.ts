@@ -26,6 +26,13 @@ export type PermissionsUse =
   | { readonly state: 'closed'; readonly recovery: string | null }
   | { readonly state: 'open'; readonly body: IntakePermissionView | null };
 
+export type AccountsUse = 'pending' | 'unavailable' | 'closed' | 'open';
+
+export type SettingsUse = Readonly<{
+  grants: PermissionsUse;
+  accounts: AccountsUse;
+}>;
+
 export type SopUse =
   | { readonly state: 'pending' }
   | { readonly state: 'unavailable' }
@@ -37,7 +44,7 @@ export type PageUseSnapshot =
   | {
       readonly phase: 'ready';
       readonly epoch: number;
-      readonly permissions: PermissionsUse;
+      readonly settings: SettingsUse;
       readonly sop: SopUse;
     };
 
@@ -46,18 +53,16 @@ export type PageUseApi = {
   onChanged(listener: (snapshot: PageUseSnapshot) => void): () => void;
 };
 
-export function canOpenPermissions(snapshot: PageUseSnapshot): boolean {
-  return snapshot.phase === 'ready' && snapshot.permissions.state === 'open';
+export function canViewGrantSettings(snapshot: PageUseSnapshot): boolean {
+  return snapshot.phase === 'ready' && snapshot.settings.grants.state === 'open';
 }
 
-export function canViewPermissions(snapshot: PageUseSnapshot): boolean {
-  return snapshot.phase === 'ready'
-    && (snapshot.permissions.state === 'open'
-      || (snapshot.permissions.state === 'closed' && snapshot.permissions.recovery !== null));
+export function canManageAccounts(snapshot: PageUseSnapshot): boolean {
+  return snapshot.phase === 'ready' && snapshot.settings.accounts === 'open';
 }
 
-export function canGrant(snapshot: PageUseSnapshot): boolean {
-  return canOpenPermissions(snapshot);
+export function canOpenSettings(snapshot: PageUseSnapshot): boolean {
+  return canViewGrantSettings(snapshot) || canManageAccounts(snapshot);
 }
 
 export function canUploadSop(snapshot: PageUseSnapshot): boolean {
@@ -100,6 +105,17 @@ function isPermissionsUse(value: unknown): value is PermissionsUse {
     && (value.body === null || isRecord(value.body));
 }
 
+function isAccountsUse(value: unknown): value is AccountsUse {
+  return value === 'pending' || value === 'unavailable' || value === 'closed' || value === 'open';
+}
+
+function isSettingsUse(value: unknown): value is SettingsUse {
+  return isRecord(value)
+    && onlyKeys(value, ['grants', 'accounts'])
+    && isPermissionsUse(value.grants)
+    && isAccountsUse(value.accounts);
+}
+
 function isSopUse(value: unknown): value is SopUse {
   if (!isRecord(value) || typeof value.state !== 'string') return false;
   if (value.state === 'pending' || value.state === 'unavailable' || value.state === 'closed') {
@@ -112,9 +128,9 @@ export function isPageUseSnapshot(value: unknown): value is PageUseSnapshot {
   if (!isRecord(value)) return false;
   if (value.phase === 'signed-out') return onlyKeys(value, ['phase']);
   return value.phase === 'ready'
-    && onlyKeys(value, ['phase', 'epoch', 'permissions', 'sop'])
+    && onlyKeys(value, ['phase', 'epoch', 'settings', 'sop'])
     && typeof value.epoch === 'number'
     && Number.isSafeInteger(value.epoch)
-    && isPermissionsUse(value.permissions)
+    && isSettingsUse(value.settings)
     && isSopUse(value.sop);
 }

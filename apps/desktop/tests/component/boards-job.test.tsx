@@ -17,7 +17,10 @@ afterEach(() => {
 const openPage: PageUseSnapshot = {
   phase: 'ready',
   epoch: 1,
-  permissions: { state: 'open', body: null },
+  settings: {
+    grants: { state: 'open', body: null },
+    accounts: 'open',
+  },
   sop: { state: 'closed' },
 };
 

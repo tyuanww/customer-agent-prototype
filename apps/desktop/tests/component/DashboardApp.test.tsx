@@ -222,13 +222,16 @@ describe('DashboardApp', () => {
     expect(screen.queryByRole('button', { name: '发布' })).not.toBeInTheDocument();
   });
 
-  it('keeps grant and sop upload closed when the server snapshot is closed', async () => {
+  it('hides Settings and keeps SOP upload closed when both server capabilities are closed', async () => {
     const user = userEvent.setup();
     window.dashboardPageUse = {
       current: async () => ({
         phase: 'ready',
         epoch: 1,
-        permissions: { state: 'closed', recovery: '没有权限，请找人开通。' },
+        settings: {
+          grants: { state: 'closed', recovery: '没有权限，请找人开通。' },
+          accounts: 'closed',
+        },
         sop: { state: 'closed' },
       }),
       onChanged: () => () => undefined,
@@ -236,9 +239,7 @@ describe('DashboardApp', () => {
     window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'legacy' }) };
     render(<DashboardApp />);
     await screen.findByTestId('nav-sop');
-    expect(screen.getByTestId('nav-settings')).toBeInTheDocument();
-    await user.click(screen.getByTestId('nav-settings'));
-    expect(screen.getByTestId('workbench-no-access')).toHaveTextContent('没有权限，请找人开通。');
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('nav-sop'));
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
     expect(screen.queryByTestId('sop-library-list')).not.toBeInTheDocument();
@@ -263,7 +264,10 @@ describe('DashboardApp', () => {
       current: async () => ({
         phase: 'ready',
         epoch: 2,
-        permissions: { state: 'open', body: null },
+        settings: {
+          grants: { state: 'open', body: null },
+          accounts: 'closed',
+        },
         sop: {
           state: 'open',
           nodes: [{
@@ -330,7 +334,10 @@ describe('DashboardApp', () => {
       current: async () => ({
         phase: 'ready',
         epoch: 1,
-        permissions: { state: 'open', body: null },
+        settings: {
+          grants: { state: 'open', body: null },
+          accounts: 'open',
+        },
         sop: { state: 'closed' },
       }),
       onChanged: () => () => undefined,

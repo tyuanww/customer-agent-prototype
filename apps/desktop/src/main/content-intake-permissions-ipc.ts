@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
 import { isIntakePermissionCommand, type IntakePermissionReply } from '../shared/content-intake-permissions';
-import { canOpenPermissions } from '../shared/page-use';
+import { canViewGrantSettings } from '../shared/page-use';
 import { ContentIntakePermissions } from './content-intake-permissions';
 import type { PageUseReader } from './page-use';
 import { isTrustedMainFrameSender } from './sender-guard';
@@ -21,14 +21,8 @@ export function registerContentIntakePermissionsIpc(
     if(!wc || !isTrustedMainFrameSender(event,[wc],devUrl()))return {ok:false,message:'无权访问此窗口能力。',view:null};
     if(channel==='dashboard:permissions-command'?args.length!==1 || !isIntakePermissionCommand(args[0]):args.length!==0)return {ok:false,message:'设置输入无效。',view:null};
     if(!session)return {ok:false,message:WORKBENCH_EMPTY.intakeUnmounted,view:null};
-    if(bound && channel==='dashboard:permissions-command'){
-      const action=(args[0] as {action?:string}).action;
-      if(action==='preview'||action==='revoke'||action==='save'||action==='retry'||action==='refresh'){
-        if(!canOpenPermissions(bound.pageUse.current())){
-          return {ok:false,message:'没有权限，请找人开通。',view:null};
-        }
-      }
-    }
+    if(bound && !canViewGrantSettings(bound.pageUse.current()))
+      return {ok:false,message:'没有权限，请找人开通。',view:null};
     let owner=owners.get(wc);
     if(!owner){
       const win=BrowserWindow.fromWebContents(wc);if(!win || win.isDestroyed())return {ok:false,message:'窗口不可用。',view:null};

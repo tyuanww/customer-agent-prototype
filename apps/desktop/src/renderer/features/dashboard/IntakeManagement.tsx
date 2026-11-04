@@ -462,6 +462,10 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
   const pane = reviewPane ?? workflowPane(step?.target, view?.selected?.publicationPolicy);
   const inDetail = !!view?.selected && detailOpen;
   const candidates = view?.candidates ?? [];
+  const currentPublishedReleaseId = candidates
+    .filter(row => row.candidate.state === 'published' && row.candidate.publishedReleaseId !== null)
+    .sort((left, right) => Date.parse(right.candidate.updatedAt) - Date.parse(left.candidate.updatedAt))[0]
+    ?.candidate.publishedReleaseId ?? null;
   const visibleCandidates = candidates.filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
   const rowDisabled = disabled || dirty || !!view?.hasDraft || uploadDraft;
   const batchColumns: TableColumnsType<CandidateRow> = [
@@ -478,9 +482,17 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     { title: '操作', key: 'action', render: (_value, row) => {
       const current = sameCandidate(row.candidate, view?.selected ?? null);
       const label = current ? '继续查看' : isOpenCandidate(row.candidate.state) ? '审核' : '查看';
-      return <ActionButton type="text" disabled={!current && rowDisabled}
-        aria-label={`${label} ${candidateCategory(row.scopeLabel)} / ${shortBatchId(row.candidate.key.candidateId)}`}
-        onClick={() => current ? setDetailOpen(true) : void apply({ action: 'select', selection: row.selection })}>{label}</ActionButton>;
+      const rollbackTarget = view?.rollback.available && row.candidate.state === 'published'
+        ? row.candidate.publishedReleaseId : null;
+      return <div>
+        <ActionButton type="text" disabled={!current && rowDisabled}
+          aria-label={`${label} ${candidateCategory(row.scopeLabel)} / ${shortBatchId(row.candidate.key.candidateId)}`}
+          onClick={() => current ? setDetailOpen(true) : void apply({ action: 'select', selection: row.selection })}>{label}</ActionButton>
+        {rollbackTarget && currentPublishedReleaseId && rollbackTarget !== currentPublishedReleaseId
+          ? <ActionButton type="text" disabled={rowDisabled}
+              onClick={() => void apply({ action: 'rollback-preview', baseReleaseId: currentPublishedReleaseId, targetReleaseId: rollbackTarget })}>回退</ActionButton>
+          : null}
+      </div>;
     } },
   ];
   const selectedRow = view?.candidates.find(row => sameCandidate(row.candidate, view.selected));

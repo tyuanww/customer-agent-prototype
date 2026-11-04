@@ -36,6 +36,7 @@ const REFUSALS: Readonly<Record<string, string>> = Object.freeze({
   FILE_INVALID: '账号输入无效。',
   SCOPE_DENIED: '当前身份不能管理账号。',
   SEAT_FORBIDDEN: '当前身份不能管理账号。',
+  SEAT_PASSWORD_NOT_WRITTEN: '身份记录没有丢失，但口令没有写入。请从账号列表重试重置密码。',
 });
 
 type SeatRow = Readonly<{ displayName: string; username: string; post: string; enabled: boolean }>;
@@ -60,7 +61,7 @@ export function registerSeatAccountIpc(
   dashboard: () => WebContents | null,
   devUrl: () => string | undefined,
   enabled: () => boolean,
-  allowsWrite: () => boolean,
+  canManageAccounts: () => boolean,
   listSeats: ((epoch: number) => Promise<{ readonly seats: readonly SeatAccountRecord[] } | { readonly state: 'closed' }>) | null = null,
 ) {
   async function request(epoch: number, path: string, init: { method: 'GET' | 'POST' | 'DELETE'; body?: unknown }) {
@@ -110,7 +111,7 @@ export function registerSeatAccountIpc(
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return { ok: false, message: '无权访问此窗口能力。' };
     if (!enabled()) return { ok: false, message: '账号还不能在这里改。' };
     if (!isSeatAccountIntent(intent)) return INVALID;
-    if (intent.action !== 'list' && !allowsWrite()) return DENIED;
+    if (!canManageAccounts()) return DENIED;
     return perform(intent);
   });
   return { dispose: () => { ipcMain.removeHandler(CHANNEL); } };

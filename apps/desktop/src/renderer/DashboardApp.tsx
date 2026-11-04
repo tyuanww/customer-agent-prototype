@@ -11,7 +11,13 @@ import {
 import { type DashboardContentRole } from '../shared/dashboard-content';
 import { type SessionJobView } from '../shared/product-session';
 import type { WorkbenchKind } from '../shared/workbench-mode';
-import { canGrant, canUploadSop, canViewPermissions, type PageUseSnapshot } from '../shared/page-use';
+import {
+  canManageAccounts,
+  canOpenSettings,
+  canUploadSop,
+  canViewGrantSettings,
+  type PageUseSnapshot,
+} from '../shared/page-use';
 import {
   useCallback,
   useMemo,
@@ -148,8 +154,9 @@ function DashboardWorkspace() {
     });
     return () => { alive = false; };
   }, [workbenchAttempt]);
-  const permissionsOpen = canViewPermissions(snapshot);
-  const grantAllowed = canGrant(snapshot);
+  const settingsOpen = canOpenSettings(snapshot);
+  const grantAllowed = canViewGrantSettings(snapshot);
+  const accountAllowed = canManageAccounts(snapshot);
   const sopUpload = canUploadSop(snapshot);
   const [sessionJob, setSessionJob] = useState<SessionJobView | null>(null);
   const [sessionName, setSessionName] = useState<string | null>(null);
@@ -167,8 +174,8 @@ function DashboardWorkspace() {
   const sessionKey = !jobKnown || contentSignedIn !== true
     ? 'signed-out'
     : `${contentRole ?? 'none'}:${sessionJob?.status === 'resolved' ? sessionJob.title : sessionJob?.status ?? 'missing'}`;
-  const navItems = intakeSidebarItems(permissionsOpen, seatLibraryOnly, jobKnown && contentSignedIn !== false);
-  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, permissionsOpen));
+  const navItems = intakeSidebarItems(settingsOpen, seatLibraryOnly, jobKnown && contentSignedIn !== false);
+  const [active, setActive] = useState<IntakeDestination>(() => readIntakePreviewPage(window.location, settingsOpen));
   const [backStack, setBackStack] = useState<IntakeDestination[]>([]);
   const [todoCount, setTodoCount] = useState<number | null>(null);
   const [navPhase, setNavPhase] = useState<DashboardNavPhase>('expanded');
@@ -216,11 +223,11 @@ function DashboardWorkspace() {
     if (next) setActive(next);
   }, [jobKnown, navItems, active]);
   useLayoutEffect(() => {
-    if (!permissionsOpen) return;
+    if (!settingsOpen) return;
     const requested = new URLSearchParams(window.location.search).get('page');
     if (requested !== 'settings' && requested !== 'permissions') return;
     setActive((current) => (current === 'overview' ? 'settings' : current));
-  }, [permissionsOpen]);
+  }, [settingsOpen]);
   const iconAnchorOffset = dashboardNavIconAnchorOffset(chromeMode);
   navPhaseRef.current = navPhase;
   const activeItem = useMemo(
@@ -850,8 +857,8 @@ function DashboardWorkspace() {
         >
           {renderIntakeDestinations({
             active,
-            canViewPermissions: permissionsOpen,
-            canGrant: grantAllowed,
+            canViewGrantSettings: grantAllowed,
+            canManageAccounts: accountAllowed,
             canUploadSop: sopUpload,
             seatLibraryOnly,
             jobKnown,
