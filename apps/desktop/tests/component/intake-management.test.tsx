@@ -31,7 +31,7 @@ async function choose(user: ReturnType<typeof userEvent.setup>, name: string, op
 
 function destinationContext(overrides: Partial<IntakeDestinationContext> = {}): IntakeDestinationContext {
   return {
-    active: 'materials', canViewPermissions: false, canGrant: false, canUploadSop: false,
+    active: 'materials', canViewGrantSettings: false, canManageAccounts: false, canUploadSop: false,
     seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'owner:director', workbenchMode: 'faq-v2',
     workbenchStatus: 'ready', onRetryWorkbench: () => undefined,
     snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
@@ -462,6 +462,48 @@ it('opens published materials without an unavailable rollback entry', async () =
     expect(await screen.findByRole('region', { name: '批次详情' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '已发布目录纠正回退' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看回退影响' })).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
+
+it('offers rollback only for an older published release and sends only release ids', async () => {
+  const f = setup(); render(<IntakeManagement />);
+  try {
+    await screen.findByRole('columnheader', { name: '资料批次' });
+    const view = f.main.view();
+    const current = view.candidates[0]!;
+    const target = structuredClone(current);
+    target.selection = 'candidate-older';
+    target.candidate.key = { ...target.candidate.key, candidateId: 'candidate-older' };
+    target.candidate.state = 'published';
+    target.candidate.publishedReleaseId = 'rel_old';
+    target.candidate.updatedAt = '2026-01-01T00:00:00Z';
+    current.candidate.state = 'published';
+    current.candidate.publishedReleaseId = 'rel_current';
+    current.candidate.updatedAt = '2026-02-01T00:00:00Z';
+    view.candidates = [current, target];
+    view.rollback.available = true;
+    window.dashboardIntake!.current = async () => ({ ok: true, view: structuredClone(view) });
+    f.command.mockResolvedValueOnce({
+      ok: true,
+      view: {
+        ...structuredClone(view),
+        rollback: {
+          ...structuredClone(view.rollback),
+          impact: { baseReleaseId: 'rel_current', targetReleaseId: 'rel_old', scopes: [], requiresCorrectiveCandidate: false },
+        },
+      },
+    });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    await f.user.click(within(screen.getByRole('radiogroup', { name: '批次筛选' })).getByText('已发布'));
+    expect(screen.getAllByRole('button', { name: '回退' })).toHaveLength(1);
+    await f.user.click(screen.getByRole('button', { name: '回退' }));
+    expect(f.command).toHaveBeenLastCalledWith({
+      action: 'rollback-preview',
+      baseReleaseId: 'rel_current',
+      targetReleaseId: 'rel_old',
+    });
+    expect(await screen.findByText('rel_current', { selector: 'code' })).toBeInTheDocument();
+    expect(screen.getByText('rel_old', { selector: 'code' })).toBeInTheDocument();
   } finally { f.main.dispose(); }
 });
 

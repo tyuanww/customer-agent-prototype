@@ -2,7 +2,7 @@ import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
 import { ContentIntakePermissions } from './content-intake-permissions';
 import { PageUseReader, registerPageUseIpc } from './page-use';
-import { canOpenPermissions } from '../shared/page-use';
+import { canManageAccounts } from '../shared/page-use';
 import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerWorkbenchModeIpc } from './workbench-mode-ipc';
@@ -280,7 +280,7 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
       () => intakeWorkbench,
-      () => pageUseReader ? canOpenPermissions(pageUseReader.current()) : false,
+      () => pageUseReader ? canManageAccounts(pageUseReader.current()) : false,
       (epoch) => pageUseReader ? pageUseReader.listSeats(epoch) : Promise.resolve({ state: 'closed' as const }));
     intakeManagement = registerContentIntakeManagementIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);

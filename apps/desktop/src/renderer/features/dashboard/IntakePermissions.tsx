@@ -168,9 +168,17 @@ function resourceFromReply(reply: IntakePermissionReply): { resource: AsyncResou
   return { resource: { status: 'ready', value: reply.view }, problem: '' };
 }
 
-export function IntakePermissions({ active, canGrant = false, grantBlock = '', grantAccess = null, gate = null }: {
+export function IntakePermissions({
+  active,
+  canViewGrantSettings = false,
+  canManageAccounts = false,
+  grantBlock = '',
+  grantAccess = null,
+  gate = null,
+}: {
   active: boolean;
-  canGrant?: boolean;
+  canViewGrantSettings: boolean;
+  canManageAccounts: boolean;
   grantBlock?: string;
   grantAccess?: AccessBlock | null;
   gate?: Extract<PermissionsUse, { state: 'open' }> | null;
@@ -183,14 +191,16 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   const [confirmRevoke,setConfirmRevoke]=useState(false);
   const revokeCancel = useRef<HTMLButtonElement>(null);
   const [,refreshClock]=useState(0);
-  const [job,setJob]=useState<'grants'|'seats'>('grants');
+  const [job,setJob]=useState<'grants'|'seats'>(canViewGrantSettings ? 'grants' : 'seats');
   const [grantOpen,setGrantOpen]=useState(false),[seatCreateOpen,setSeatCreateOpen]=useState(false);
   const [eligibilityEnded,setEligibilityEnded]=useState(false);
   const mounted=useRef(true),generation=useRef(0),pending=useRef(false);
-  const allowReadRef=useRef(active);
-  const [allowRead,setAllowRead]=useState(active);
+  const allowReadRef=useRef(active && canViewGrantSettings);
+  const [allowRead,setAllowRead]=useState(active && canViewGrantSettings);
   allowReadRef.current=allowRead;
-  const resourceRef=useRef<AsyncResource<IntakePermissionView>>(active ? { status: 'loading' } : { status: 'idle' });
+  const resourceRef=useRef<AsyncResource<IntakePermissionView>>(
+    active && canViewGrantSettings ? { status: 'loading' } : { status: 'idle' },
+  );
   const { resource, reload, replace } = useAsyncResource(async (): Promise<AsyncResource<IntakePermissionView>> => {
     if (!allowReadRef.current) return { status: 'idle' };
     const gen = generation.current;
@@ -210,7 +220,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
       setError('');
       return failed;
     }
-  }, [allowRead], active ? { status: 'loading' } : { status: 'idle' }, { retainReady: true });
+  }, [allowRead], active && canViewGrantSettings ? { status: 'loading' } : { status: 'idle' }, { retainReady: true });
   resourceRef.current = resource;
   const view = gate?.body ?? (resource.status === 'ready' ? resource.value : null);
   const now = Date.now();
@@ -218,6 +228,7 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
     && (!view.validUntil || Date.parse(view.validUntil) > now);
   const loading = view === null && resource.status === 'loading';
   const apply = useCallback(async (command?: IntakePermissionCommand): Promise<boolean> => {
+    if (!canViewGrantSettings) return false;
     if (pending.current && command?.action !== 'stop') return false;
     const gen = ++generation.current;
     pending.current = true;
@@ -248,14 +259,19 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
         setBusy(false);
       }
     }
-  }, [replace]);
+  }, [canViewGrantSettings, replace]);
   useEffect(()=>{
-    if(active)setAllowRead(true);
-  },[active]);
+    if (active && canViewGrantSettings) setAllowRead(true);
+  },[active, canViewGrantSettings]);
   useEffect(()=>{
+    if (job === 'grants' && !canViewGrantSettings && canManageAccounts) setJob('seats');
+    if (job === 'seats' && !canManageAccounts && canViewGrantSettings) setJob('grants');
+  },[job, canViewGrantSettings, canManageAccounts]);
+  useEffect(()=>{
+    if (!canViewGrantSettings) return;
     const api=window.dashboardPermissions;if(!api)return;
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
-  },[apply]);
+  },[apply, canViewGrantSettings]);
   useEffect(()=>{
     setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');
     setMemberKey(null);setConfirmRevoke(false);
@@ -301,8 +317,8 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   };
   const memberRows = available && view ? permissionMembers(view) : [];
   const selectedMember = memberRows.find(member => member.key === memberKey);
-  const detailOpen = active && !!selectedMember && job === 'grants';
-  const grantDialogOpen = active && available && grantOpen;
+  const detailOpen = active && canViewGrantSettings && !!selectedMember && job === 'grants';
+  const grantDialogOpen = active && canViewGrantSettings && available && grantOpen;
   const revokeTarget = selectedMember?.grants.find(grant => grant.selection === revoke);
   const revokeDisabled = disabled || !revokeTarget?.canRevoke || !!revokeTarget?.revoked || !!view?.preview;
   const closeMember = () => {
@@ -355,39 +371,42 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
   ];
   return <IntakeAntdTheme><div className="desk-permissions-page wb9"><section className="intake-management desk-permissions wb9" aria-label="设置">
     <h1 className="desk-sr">设置</h1>
-    {loading ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
-    {!gate && resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
-    {!gate && resource.status === 'error' ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
-    {!detailOpen && !grantDialogOpen && operationFeedback}
-    {!available && <div className="toolbar" style={{marginBottom:12}}><div className="left">
+    {canViewGrantSettings && loading ? <WorkbenchLoading rows={5} label="正在读取权限" /> : null}
+    {canViewGrantSettings && !gate && resource.status === 'forbidden' ? <p>{resource.message}</p> : null}
+    {canViewGrantSettings && !gate && resource.status === 'error'
+      ? <WorkbenchFailed message={resource.message} onRetry={disabled ? undefined : readAgain} retryLabel="刷新权限列表" /> : null}
+    {canViewGrantSettings && !detailOpen && !grantDialogOpen && operationFeedback}
+    {canViewGrantSettings && !available && <div className="toolbar" style={{marginBottom:12}}><div className="left">
       <DeskButton disabled={disabled || !!view?.preview} onClick={readAgain}>刷新权限列表</DeskButton>
       {(busy || view?.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}</div></div>}
-    {view && !view.signedIn && <p>请先登录。</p>}
-    {view?.signedIn && !available && !view.pending && <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p>}
-    {available && view && <>
-      <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="设置分类">
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>权限</DeskButton>
-        <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();closeMember();setJob('seats');}}>账号</DeskButton>
-      </div>
-        <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
-          {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
-          {job==='grants'
-            ? ((gate || canGrant)
-              ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
-              : null)
-            : <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建账号</DeskButton>}
-        </span>
-      </div>
-      {!gate && job==='grants' && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
+    {canViewGrantSettings && view && !view.signedIn && <p>请先登录。</p>}
+    {canViewGrantSettings && view?.signedIn && !available && !view.pending
+      ? <p>{eligibilityEnded ? '登录状态需要确认。请刷新权限列表。' : '请刷新权限列表。'}</p> : null}
+    <div className="tabbar"><div className="tabs intake-job-switch" role="tablist" aria-label="设置分类">
+      {canViewGrantSettings ? <DeskButton type="text" className="tab" role="tab" aria-selected={job==='grants'} onClick={()=>setJob('grants')}>权限</DeskButton> : null}
+      {canManageAccounts ? <DeskButton type="text" className="tab" role="tab" aria-selected={job==='seats'} onClick={()=>{closeGrant();closeMember();setJob('seats');}}>账号</DeskButton> : null}
+    </div>
+      <span className="row" style={{display:'inline-flex',gap:8,marginBottom:8}}>
+        {canViewGrantSettings && job==='grants' && (busy || view?.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
+        {canViewGrantSettings && job==='grants' && view && !grantAccess && !grantBlock
+          ? <DeskButton type="primary" style={{marginBottom:0}} disabled={disabled || !view.source} onClick={()=>setGrantOpen(true)}>新增授权</DeskButton>
+          : null}
+        {canManageAccounts && job==='seats'
+          ? <DeskButton type="primary" style={{marginBottom:0}} onClick={()=>setSeatCreateOpen(true)}>新建账号</DeskButton>
+          : null}
+      </span>
+    </div>
+    {canViewGrantSettings && job==='grants' && view && <>
+      {!gate && grantAccess ? <WorkbenchNoAccess need={grantAccess.need} ask={grantAccess.ask} detail={grantAccess.detail} />
         : !gate && grantBlock ? <p role="status">{grantBlock}</p> : null}
-      <div hidden={job!=='grants'}>
+      {available ? <>
         <div className="intake-permissions-scope"><label className="lbl" htmlFor="permissions-scope">配置范围</label>
           <Select<string> id="permissions-scope" aria-label="配置范围" disabled={disabled || !!view.preview} value={view.source ?? undefined} placeholder="请选择已有范围" virtual={false}
             options={view.sources.map(source => ({ value: source.selection, label: source.label }))} onChange={selection => { void apply({ action: 'source', selection }); }} />
           <DeskButton aria-label="刷新权限列表" disabled={disabled || !!view.preview} onClick={readAgain}>刷新</DeskButton></div>
         <A11yTable<MemberRow> className="intake-permissions-members" aria-label="成员权限" pagination={false} rowKey="key" tableLayout="fixed" dataSource={memberRows} columns={memberColumns}
           locale={{ emptyText: <PermissionsEmpty description={view.source ? '添加成员或授权后会出现在这里。' : '请选择配置范围。'} /> }} />
-      </div>
+      </> : null}
       <Drawer open={detailOpen} title={selectedMember ? `${selectedMember.label}的权限` : '权限详情'} size={800}
         rootClassName="intake-permissions-detail" destroyOnHidden onClose={closeMember}>
         {detailOpen && operationFeedback}
@@ -413,7 +432,6 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
           <DeskButton danger disabled={revokeDisabled || !revokeReason.trim()} onClick={commitRevoke}>确认收回</DeskButton>
         </div>
       </Modal>
-      <div hidden={job!=='seats'}><SeatAccounts disabled={disabled} createOpen={seatCreateOpen} setCreateOpen={setSeatCreateOpen} /></div>
       <Modal open={grantDialogOpen} title={view.preview ? '预览，尚未保存' : '新增授权'} width={520} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeGrant}>
           {grantDialogOpen && operationFeedback}
           {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
@@ -447,5 +465,6 @@ export function IntakePermissions({ active, canGrant = false, grantBlock = '', g
           </section>}
       </Modal>
     </>}
+    {canManageAccounts ? <div hidden={job!=='seats'}><SeatAccounts disabled={false} createOpen={seatCreateOpen} setCreateOpen={setSeatCreateOpen} /></div> : null}
   </section></div></IntakeAntdTheme>;
 }

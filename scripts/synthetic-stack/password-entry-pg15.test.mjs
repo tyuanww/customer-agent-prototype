@@ -120,14 +120,14 @@ for (const username of usernames) {
     const file = path.join(root, `account-${username}.json`);
     const binding = seatBindingIdFor(username);
     const writer = createSeatPasswordFile(file);
-    writer.upsert(username, binding, password);
+    await writer.upsert(username, binding, password);
     const account = loadPasswordAccounts(file).get(username);
     assert.ok(account, 'the reader must retain a valid writer account even when it is the only row');
     assert.equal(account.bindingId, binding);
     assert.equal(passwordMatches(account, password), true);
     assert.equal(passwordMatches(account, 'wrong-password'), false);
     assert.equal(await lookup(account.bindingId), true);
-    writer.upsert(username, binding, `${password}-reset`);
+    await writer.upsert(username, binding, `${password}-reset`);
     const reset = loadPasswordAccounts(file).get(username);
     assert.equal(passwordMatches(reset, password), false);
     assert.equal(passwordMatches(reset, `${password}-reset`), true);
@@ -139,7 +139,7 @@ test('reader preserves existing dotted admin login alongside writer-created unde
   const file = path.join(root, 'mixed.json');
   writeFileSync(file, JSON.stringify([buildAccount('master.admin', 'binding-master', password)]));
   const writer = createSeatPasswordFile(file);
-  for (const username of ['_seat', '-seat']) writer.upsert(username, seatBindingIdFor(username), password);
+  for (const username of ['_seat', '-seat']) await writer.upsert(username, seatBindingIdFor(username), password);
   const accounts = loadPasswordAccounts(file);
   assert.equal(accounts.size, 3);
   for (const account of accounts.values()) {

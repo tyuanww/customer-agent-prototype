@@ -48,8 +48,8 @@ export function IntakeRollback({ active = true, view, busy, blocked, apply, onDi
         <p>请先读取当前版和上一版。</p>
       </fieldset>}
       {impact && <>
-        <p>当前版</p>
-        <p>上一版</p>
+        <p>当前版 <code>{impact.baseReleaseId}</code></p>
+        <p>上一版 <code>{impact.targetReleaseId}</code></p>
         <h3>{impact.requiresCorrectiveCandidate ? '有权查看的影响范围' : '全部受影响范围'}</h3><ul>{impact.scopes.map((scope, index) => <li key={index}>{joinDisplayParts([`品牌 ${scope.brandId}`, scope.shopId ? `店铺 ${scope.shopId}` : '品牌通用', `来源 ${scope.sourceId ?? '未指定'}`])}</li>)}</ul>
         {impact.requiresCorrectiveCandidate ? <div className="intake-notice"><h3>需要提交纠正候选</h3><p>影响超出当前授权范围，列表不包含无权查看的来源，不能据此执行整库回退。请在有权范围内上传完整纠正稿，重新校验、检查与确认发布。</p>
           <ActionButton disabled={disabled} onClick={() => { apply({ action: 'rollback-correct' }); }}>返回上传纠正稿</ActionButton></div> : <>

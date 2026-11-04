@@ -26,6 +26,7 @@ const registrations = [
   'registerContentIntakeCatalogIpc(workbenchSession,',
   'registerContentIntakePermissionsIpc(workbenchSession,',
   'registerContentIntakeManagementIpc(workbenchSession,',
+  'registerSeatAccountIpc(workbenchSession,',
   'registerContentIntakeQueryIpc(workbenchSession,',
 ];
 for (const call of registrations) {
@@ -43,35 +44,24 @@ if (dashboard.includes('PRODUCT_REMOTE_NAV') || dashboard.includes('remoteSeat')
 
 const loopbacks = ['http://127.0.0.1:43115', 'http://127.0.0.1:43116', 'http://127.0.0.1:43180', 'http://127.0.0.1:43181'];
 const remotes = ['https://agent-auth.jianghua.site', 'https://agent-pass.jianghua.site'];
-const profiles = [undefined, null];
+const profiles = [undefined];
 for (const apiOrigin of loopbacks) {
   for (const identityOrigin of loopbacks) {
     if (apiOrigin === identityOrigin) continue;
     for (const contentIntake of [undefined, 'faq-v2']) {
-      for (const mode of [undefined, 'product-remote']) {
-        profiles.push({
-          apiOrigin,
-          identityOrigin,
-          ...(contentIntake ? { contentIntake } : {}),
-          ...(mode ? { mode } : {}),
-        });
-      }
+      profiles.push({
+        mode: 'synthetic-local',
+        apiOrigin,
+        identityOrigin,
+        ...(contentIntake ? { contentIntake } : {}),
+      });
     }
   }
 }
 for (const apiOrigin of remotes) {
   for (const identityOrigin of remotes) {
     if (apiOrigin === identityOrigin) continue;
-    for (const contentIntake of [undefined, 'faq-v2']) {
-      for (const mode of [undefined, 'product-remote']) {
-        profiles.push({
-          apiOrigin,
-          identityOrigin,
-          ...(contentIntake ? { contentIntake } : {}),
-          ...(mode ? { mode } : {}),
-        });
-      }
-    }
+    profiles.push({ mode: 'product-remote', apiOrigin, identityOrigin });
   }
 }
 

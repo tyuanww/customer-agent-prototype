@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import type { PageUseSnapshot } from '@shared/page-use';
+import { canOpenSettings, type PageUseSnapshot } from '@shared/page-use';
 import type { WorkbenchKind } from '@shared/workbench-mode';
 import { IntakeLibrary } from './IntakeLibrary';
 import { IntakeManagement } from './IntakeManagement';
@@ -31,8 +31,8 @@ export {
 
 export type IntakeDestinationContext = {
   active: IntakeDestination;
-  canViewPermissions: boolean;
-  canGrant: boolean;
+  canViewGrantSettings: boolean;
+  canManageAccounts: boolean;
   canUploadSop: boolean;
   seatLibraryOnly: boolean;
   jobKnown: boolean;
@@ -58,11 +58,16 @@ const INTAKE_DESTINATION_MOUNTS: {
     presentation={ctx.active === 'overview' && ctx.workbenchMode !== 'legacy' ? 'overview' : 'review'} onOpenReview={() => ctx.onOpen('materials')} />,
   settings: (ctx) => (
     <div hidden={ctx.active !== 'settings'}>
-      {ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'open'
-        ? <IntakePermissions active={ctx.active === 'settings'} canGrant={ctx.canGrant} gate={ctx.snapshot.permissions} />
-        : ctx.snapshot.phase === 'ready' && ctx.snapshot.permissions.state === 'closed'
+      {ctx.snapshot.phase === 'ready' && (ctx.canViewGrantSettings || ctx.canManageAccounts)
+        ? <IntakePermissions
+            active={ctx.active === 'settings'}
+            canViewGrantSettings={ctx.canViewGrantSettings}
+            canManageAccounts={ctx.canManageAccounts}
+            gate={ctx.snapshot.settings.grants.state === 'open' ? ctx.snapshot.settings.grants : null}
+          />
+        : ctx.snapshot.phase === 'ready' && ctx.snapshot.settings.grants.state === 'closed'
           ? <section className="dash-module" aria-label="设置"><h1 className="desk-sr">设置</h1>
-            <WorkbenchNoAccess need="查看设置" detail={ctx.snapshot.permissions.recovery ?? '当前没有可查看的设置。'} /></section>
+            <WorkbenchNoAccess need="查看设置" detail={ctx.snapshot.settings.grants.recovery ?? '当前没有可查看的设置。'} /></section>
           : null}
     </div>
   ),
@@ -87,7 +92,7 @@ function MaterialsDestination({ active, presentation, onOpenReview }: { active: 
 }
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {
-  if (!intakeRowVisible(row, ctx.canViewPermissions, ctx.seatLibraryOnly, ctx.jobKnown)) return false;
+  if (!intakeRowVisible(row, canOpenSettings(ctx.snapshot), ctx.seatLibraryOnly, ctx.jobKnown)) return false;
   if (row.keepAlive) return true;
   return row.id === ctx.active;
 }

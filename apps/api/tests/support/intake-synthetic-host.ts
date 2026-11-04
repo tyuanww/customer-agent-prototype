@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { mkdirSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createNetServer, type AddressInfo, type Server } from 'node:net';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { Pool } from 'pg';
@@ -18,6 +19,7 @@ import { authenticateRequestHeaders } from '../../dist/auth-service.js';
 import { createContentObjectStore } from '../../dist/content-object-store.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
+import { createSeatServiceFromEnv } from '../../dist/content-intake/seats.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { createEventRepository } from '../../dist/event-repository.js';
 import { registerSearchRoute } from '../../dist/search-routes.js';
@@ -34,7 +36,7 @@ export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'age
 /** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
  * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
 export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly'
-  | 'roster-stale' | 'roster-nogrant' | 'roster-agent' | 'roster-query-only';
+  | 'roster-stale' | 'roster-nogrant' | 'roster-agent' | 'roster-query-only' | 'roster-review-only';
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -59,6 +61,79 @@ type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
 type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean };
+
+type AdjacentLoopbackPortReservation = Readonly<{
+  apiPort: number;
+  identityPort: number;
+  releaseApi(): Promise<void>;
+  releaseIdentity(): Promise<void>;
+  close(): Promise<void>;
+}>;
+
+function listenNetServer(server: Server, port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error) => {
+      server.off('listening', onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.off('error', onError);
+      resolve();
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+function closeNetServer(server: Server): Promise<void> {
+  if (!server.listening) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    server.close(error => error ? reject(error) : resolve());
+  });
+}
+
+/** Reserve both loopback sockets until each real server can take one over. */
+export async function reserveAdjacentLoopbackPorts(): Promise<AdjacentLoopbackPortReservation> {
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const api = createNetServer();
+    await listenNetServer(api, 0);
+    const address = api.address();
+    if (address === null || typeof address === 'string') {
+      await closeNetServer(api);
+      throw new Error('Synthetic host API probe did not expose a loopback port');
+    }
+    const apiPort = address.port;
+    const identityPort = apiPort + 1;
+    if (identityPort > 65_535) {
+      await closeNetServer(api);
+      continue;
+    }
+    const identity = createNetServer();
+    try {
+      await listenNetServer(identity, identityPort);
+    } catch (error) {
+      await closeNetServer(api);
+      if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') continue;
+      throw error;
+    }
+    return Object.freeze({
+      apiPort,
+      identityPort,
+      releaseApi: () => closeNetServer(api),
+      releaseIdentity: () => closeNetServer(identity),
+      async close() {
+        const failures: unknown[] = [];
+        for (const server of [api, identity]) {
+          try { await closeNetServer(server); } catch (error) { failures.push(error); }
+        }
+        if (failures.length) throw new AggregateError(failures, 'Synthetic host port cleanup failed');
+      },
+    });
+  }
+  throw new Error('Unable to reserve an adjacent synthetic loopback port pair');
+}
+
 export function createIntakeSyntheticHost(options: { prepareCandidate: false; } & HostOptions): Promise<HostState>;
 export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; } & HostOptions): Promise<PreparedHost>;
 export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; } & HostOptions): Promise<HostState> {
@@ -91,11 +166,12 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
   const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
   let apiOrigin = '', identityOrigin = '', selectedIdentity: DesktopSyntheticIdentity = 'enabler';
+  let portReservation: AdjacentLoopbackPortReservation | undefined;
   const loginCodes = new Map<string, { binding: DesktopSyntheticIdentity; expires: number }>();
   const sessions = new Map<DesktopSyntheticIdentity, string>();
   const diagnostics: { id: string; reason: string }[] = [];
   const requests: string[] = [];
-  const identity = createServer((request, response) => {
+  const identity = createHttpServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     if (request.headers.host !== new URL(identityOrigin).host || request.method !== 'GET'
       || url.pathname !== '/authorize' || [...url.searchParams.keys()].some(k => k !== 'state')
@@ -122,7 +198,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     for (const cleanup of [() => app.close(), () => new Promise<void>((resolve, reject) => {
       if (!identity.listening) { resolve(); return; }
       identity.closeAllConnections(); identity.close(error => error ? reject(error) : resolve());
-    }), () => auth?.close(), ...ownedPools.map(pool => () => pool.end()), () => admin?.end(), () => pg.stop()]) {
+    }), () => auth?.close(), ...ownedPools.map(pool => () => pool.end()), () => admin?.end(), () => pg.stop(),
+    ...(portReservation ? [() => portReservation!.close()] : [])]) {
       try { await cleanup(); } catch (error) { failures.push(error); }
     }
     sessions.clear(); loginCodes.clear();
@@ -283,7 +360,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
     for (const [identity, userId] of [['roster-nogrant', 'user-roster-nogrant'],
-      ['roster-agent', 'user-roster-agent'], ['roster-query-only', 'user-roster-query-only']] as const) {
+      ['roster-agent', 'user-roster-agent'], ['roster-query-only', 'user-roster-query-only'],
+      ['roster-review-only', 'user-roster-review-only']] as const) {
       await admin.query(`INSERT INTO backend_identity.subject_bindings(
           binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role)
         VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('a',64),true,'owner')`, [identity, userId]);
@@ -299,6 +377,15 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await admin.query(`INSERT INTO content_intake.principal_facts VALUES
         ('roster-query-only',1,ARRAY['dept-a'],'job-customer-service-director',true,
          statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.principal_facts VALUES
+        ('roster-review-only',1,ARRAY['dept-a'],'job-customer-service-director',true,
+         statement_timestamp()-interval '1 second',statement_timestamp()+interval '299 seconds',repeat('a',64))`);
+    await admin.query(`INSERT INTO content_intake.grants(
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+        starts_at, expires_at, reason, steward_id)
+      VALUES ('alloc-roster-review-only','allocation','director','roster-review-only',
+        'tenant-a','app-a','scope-a','review',
+        clock_timestamp()-interval '2 days', clock_timestamp()+interval '1 hour','合成仅回退审核分配','director')`);
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
         starts_at, expires_at, reason, steward_id, parent_grant_id, policy_version, store_set_version)
@@ -335,8 +422,10 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       pool = ownPool(new Pool({ ...database.config, max: 4 }), 'existing');
       usagePool = pool;
     }
-    await new Promise<void>((resolve, reject) => { identity.once('error', reject); identity.listen(0, '127.0.0.1', () => resolve()); });
-    identityOrigin = `http://127.0.0.1:${(identity.address() as AddressInfo).port}`;
+    portReservation = await reserveAdjacentLoopbackPorts();
+    await portReservation.releaseIdentity();
+    await listenNetServer(identity, portReservation.identityPort);
+    identityOrigin = `http://127.0.0.1:${String((identity.address() as AddressInfo).port)}`;
     auth = await createProductAuthService({ connectionString: `postgresql://synthetic_intake_auth@localhost/${database.name}?${new URLSearchParams({ host: pg.socket, port: String(pg.port) })}`,
       poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 }, {
       authorizeUrl: state => `${identityOrigin}/authorize?state=${state}`,
@@ -372,7 +461,16 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     const report = (id: string, error: unknown) => { diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
-    await app.register(contentIntakeManagementRoutes, { auth, pool, store, report, ...(terminalPool ? { terminalPool } : {}),
+    const seatRoot = path.join(pg.root, 'seat-accounts');
+    mkdirSync(seatRoot, { recursive: true });
+    await app.register(contentIntakeManagementRoutes, {
+      auth, pool, store, report,
+      ...(terminalPool ? { terminalPool } : {}),
+      seatService: createSeatServiceFromEnv(pool, seatRoot, {
+        SEAT_TENANT_ID: 'tenant-a',
+        SEAT_APP_ID: 'app-a',
+        SEAT_DEPARTMENT_ID: 'dept-a',
+      }),
       // Every principal that can appear in the grant-recipient directory needs a label, or the
       // directory fails closed. The roster identities are added here for that reason only.
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
@@ -383,9 +481,11 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
             : principalId === 'roster-nogrant' ? '合成无授权总监'
             : principalId === 'roster-agent' ? '合成名单坐席'
             : principalId === 'roster-query-only' ? '合成仅查询总监'
+            : principalId === 'roster-review-only' ? '合成仅审核总监'
             : null)
         : null });
-    apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
+    await portReservation.releaseApi();
+    apiOrigin = await app.listen({ host: '127.0.0.1', port: portReservation.apiPort });
     let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
     if (prepareCandidate) {
       const workbook = inputFormat === 'csv' ? createIntakeSyntheticCsv({ domain }) : await createIntakeSyntheticWorkbook({ domain });
@@ -428,7 +528,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       selectIdentity(value: DesktopSyntheticIdentity) {
         if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',
-      'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+      'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only', 'roster-review-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
       },
       /** Revoke one principal's live query grant. The grant history is append-only, so this
        * is a versioned revoke rather than a delete, exactly like the product path. */
