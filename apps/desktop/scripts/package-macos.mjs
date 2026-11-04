@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { macPackageOutputDirectory } from './mac-package-paths.mjs';
 import { prepareNodeSystemCaEnvironment } from './node-system-ca.mjs';
 
 const mode = process.argv[2];
@@ -15,7 +16,7 @@ const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const repositoryRoot = path.resolve(desktopRoot, '../..');
 const outputDirectory = path.relative(
   desktopRoot,
-  path.join(repositoryRoot, 'release', mode === 'local' ? 'local-unsigned' : 'distribution'),
+  macPackageOutputDirectory(repositoryRoot, mode),
 );
 const systemCa = prepareNodeSystemCaEnvironment();
 

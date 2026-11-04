@@ -262,7 +262,7 @@ pnpm package:mac:local
 pnpm package:mac
 ```
 
-两个命令都会先从透明狐狸确定性合成 `apps/desktop/assets/app-icon.png` master，再生成 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/`，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`，两者不会同名覆盖。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
+两个命令都会先从透明狐狸确定性合成 `apps/desktop/assets/app-icon.png` master，再生成 `apps/desktop/build/icon.icns` / `apps/desktop/build/icon.ico`，并构建同时包含 `x86_64 + arm64` 的 Universal 应用。本地证明包写入 `release/local-unsigned/mac/`，与 Windows、Linux 产物分目录保留，文件名强制带 `UNSIGNED`；正式包只写入 `release/distribution/`。两类目录都被 Git 忽略。调用方未显式提供 `NODE_EXTRA_CA_CERTS` 时，打包器仅在进程内临时桥接 macOS 系统根证书给 Node，保持 TLS 校验开启并在结束后删除临时文件。包内不生成自动更新元数据，不记录私有 GitHub 仓库坐标，并携带 Electron / Chromium / React 的第三方许可说明。
 
 `package:mac` 默认要求 Hardened Runtime、代码签名和 Apple 公证，并在构建后再次执行 `codesign`、Gatekeeper 和 stapler 校验；缺少任一前置时直接失败，不会静默产出可误外发的未签名包。证书、`.p8` / `.p12`、Apple ID 密码和 Keychain profile 均不得提交仓库或打印到日志。
 

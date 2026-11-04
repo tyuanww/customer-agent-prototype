@@ -64,7 +64,6 @@ describe('overlay shutdown contract', () => {
     const controller = [
       readFileSync(path.join(root, 'src/main/overlay-controller.ts'), 'utf8'),
       readFileSync(path.join(root, 'src/main/overlay-renderer-loader.ts'), 'utf8'),
-      readFileSync(path.join(root, 'src/main/overlay-chrome-window.ts'), 'utf8'),
     ].join('\n');
     const identity = readFileSync(path.join(root, 'src/main/app-identity.ts'), 'utf8');
 

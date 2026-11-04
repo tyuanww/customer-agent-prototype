@@ -145,13 +145,13 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 ### 3.1 `pnpm package:mac:local`
 
-输出目录：`release/local-unsigned/`
+输出目录：`release/local-unsigned/mac/`
 
 预期产物（名称由 `productName` + `version` + `UNSIGNED` 组成）：
 
-- `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.dmg`
-- `release/local-unsigned/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.zip`
-- `release/local-unsigned/mac-universal/*.app`（后验读取此目录；也可从 DMG/ZIP 打开同一份 `.app`）
+- `release/local-unsigned/mac/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.dmg`
+- `release/local-unsigned/mac/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.zip`
+- `release/local-unsigned/mac/mac-universal/*.app`（后验读取此目录；也可从 DMG/ZIP 打开同一份 `.app`）
 
 构建后会跑 `apps/desktop/scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `apps/desktop/scripts/verify-mac-package.mjs local`。
 
@@ -173,7 +173,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 1. `node scripts/synthetic-stack/stack.ts start`（写入 Electron userData 下的 `synthetic-stack.json`：macOS `~/Library/Application Support/客服话术浮窗 Demo/`，Windows `%APPDATA%\客服话术浮窗 Demo\`，Linux `~/.config/客服话术浮窗 Demo/`（若设置 `XDG_CONFIG_HOME` 则走该目录）。只含 `mode` 与两个精确 loopback origin，无 token）
 2. 需要单独刷新或打印路径：`node scripts/synthetic-stack/stack.ts packaged-profile`（stdout 只有路径，不含开发态环境变量）
-3. 打开 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
+3. 打开 `release/local-unsigned/mac/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
 
 打包态**忽略** `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`。缺文件或 origin 不合法则拒启，不回退 S0 fixture。这仍不是签名、公证、外发或 M5 人工验收。
 
@@ -355,7 +355,7 @@ PG lane 的 `pnpm test:g1a:e0:ci` 仅允许纯合成输入，并核对 JSON 测�
 
 办公机首轮勾选（未在本仓代填实机结果）：安装 → 启动出现狐狸头 → 快捷键唤起查询 → 卸载。卸载可能留下 userData，需手工删除上述目录。本勾选不是 M5 验收。
 
-本机未签名 mac 包（2026-09-17，`package:mac:local` 产物 `release/local-unsigned/mac-universal/客服话术浮窗 Demo.app`）：`Contents/Resources/synthetic-offline.json` 为精确 `{"mode":"synthetic-offline"}`。用 `--user-data-dir` 指向空目录启动后写出同样内容的 `synthetic-stack.json`，进程保持运行。**这不是办公机 Windows 安装/卸载验收**，也不代替 Gatekeeper / 公证。
+本机未签名 mac 包（2026-09-17，`package:mac:local` 产物 `release/local-unsigned/mac/mac-universal/客服话术浮窗 Demo.app`）：`Contents/Resources/synthetic-offline.json` 为精确 `{"mode":"synthetic-offline"}`。用 `--user-data-dir` 指向空目录启动后写出同样内容的 `synthetic-stack.json`，进程保持运行。**这不是办公机 Windows 安装/卸载验收**，也不代替 Gatekeeper / 公证。
 
 | 你想证明 | 命令 |
 | --- | --- |

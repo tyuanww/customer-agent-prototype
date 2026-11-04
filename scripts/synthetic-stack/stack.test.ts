@@ -4,10 +4,12 @@ import net from 'node:net';
 import os, { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { seedReferenceData } from './bootstrap.ts';
 import { createIdentityProvider } from './identity-provider.ts';
 import { createPasswordIdentityServer } from './password-identity-server.ts';
 import { buildAccount, identityProcessEnvironment, isAdmittedHost, loadPasswordAccounts } from './identity-admission.ts';
-import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, scriptScope } from './content.ts';
+import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SCRIPT_IDS, SYNTHETIC_SOURCES, scriptScope } from './content.ts';
+import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
 import {
   DEFAULT_STACK_ROOT,
   DESKTOP_APP_NAME,
@@ -28,6 +30,13 @@ import {
 } from './process.ts';
 import { catalogReferences, isCatalogReference } from '../../apps/desktop/src/shared/synthetic-catalog.ts';
 
+function queryable(handler: (sql: string, params?: unknown[]) => readonly Record<string, unknown>[]) {
+  return {
+    async query<T extends Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: readonly T[] }> {
+      return { rows: handler(sql, params) as readonly T[] };
+    },
+  };
+}
 
 describe('synthetic seed content', () => {
   it('declares a scope for every row that the catalog can label', () => {
@@ -65,6 +74,67 @@ describe('synthetic seed content', () => {
       if (cells[categoryIndex] !== 'campaign') continue;
       assert.notEqual(cells[toIndex], '', `campaign row ${cells[0]} needs effective_to`);
     }
+  });
+});
+
+describe('synthetic stack reconciliation', () => {
+  it('refuses to reuse a source whose tenant was written before actor binding', async () => {
+    const sourceTenants = new Map(SYNTHETIC_SOURCES.map(source => [source.source_version_id, 'default']));
+    const client = queryable(sql => {
+      if (sql.includes('SELECT source_version_id, tenant_id')) {
+        return [...sourceTenants].map(([source_version_id, tenant_id]) => ({ source_version_id, tenant_id }));
+      }
+      return [];
+    });
+
+    await assert.rejects(
+      seedReferenceData(client),
+      /expected tenant-menokin.+Destroy and rebuild the synthetic stack/u,
+    );
+  });
+
+  it('refuses to accept identities under a different current privacy notice', async () => {
+    const client = queryable(sql => {
+      if (sql.includes('SELECT source_version_id, tenant_id')) {
+        return SYNTHETIC_SOURCES.map(source => ({
+          source_version_id: source.source_version_id,
+          tenant_id: 'tenant-menokin',
+        }));
+      }
+      if (sql.includes("WHERE status = 'current'")) {
+        return [{
+          notice_version: 'another-current-notice',
+          notice_text: 'another notice',
+          content_hash: 'a'.repeat(64),
+        }];
+      }
+      return [];
+    });
+
+    await assert.rejects(
+      seedReferenceData(client),
+      /requires synthetic-stack-notice-v1 as its current privacy notice; found another-current-notice/u,
+    );
+  });
+
+  it('refuses to downgrade an existing store-set before writing grants', async () => {
+    const statements: string[] = [];
+    const client = queryable((sql, params) => {
+      statements.push(sql);
+      if (sql.includes('SELECT version FROM content_intake.store_set_current')) {
+        return [{ version: '2' }];
+      }
+      if (sql.includes('INSERT INTO content_intake.store_set_current')) {
+        assert.deepEqual(params, ['tenant-menokin', 'app-customer-agent']);
+      }
+      return [];
+    });
+
+    await assert.rejects(
+      bindMenokinTestIdentities(client, 'customer_agent_synthetic'),
+      /store-set version 2; expected 1.+Destroy and rebuild the synthetic stack/u,
+    );
+    assert.equal(statements.some(sql => sql.includes('INSERT INTO content_intake.grants')), false);
   });
 });
 

@@ -253,10 +253,10 @@ export class OverlayController {
       height: QUERY_INPUT_HEIGHT,
       title: '客服话术查询 · Demo',
       backgroundThrottling: false,
+      macPanel: false,
     });
-    // Query is a macOS panel (NSWindowStyleMaskNonactivatingPanel). Keyboard
-    // can land on the palette without making this app the frontmost process.
-    // Dock / Cmd+Tab still belong to Dashboard via the regular activation path.
+    // Query must remain a regular macOS window so IME and physical keyboard
+    // focus work while the app keeps its regular Dock / Cmd+Tab identity.
 
     this.bindWindowLifecycle(this.fox);
     this.bindWindowLifecycle(this.query);

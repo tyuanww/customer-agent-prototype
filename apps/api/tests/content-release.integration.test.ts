@@ -79,9 +79,9 @@ describe.skipIf(!enabled)('content publish and rollback', () => {
       await admin.query(`
         INSERT INTO public.authoritative_source_versions(
           source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
-          use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at
+          use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at, tenant_id
         ) VALUES ($1,$2,$3,'synthetic-t4',$4,'canonical','ROLE-CONTENT-LEAD','EVD-T4-SOURCE',
-          'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days')
+          'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days', 'tenant-t4')
       `, [binding.source_version_id, binding.source_ref, binding.domain, digest]);
     }
     await admin.query(`

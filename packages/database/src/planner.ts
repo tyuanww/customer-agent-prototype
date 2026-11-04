@@ -344,6 +344,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0078_seat_manual_grants',
     requiresPredecessor: 'Directory link status requires manual seat grants',
   },
+  {
+    index: 79,
+    minimumCatalogueLength: 80,
+    id: '0080_bind_import_batch_tenant',
+    predecessorId: '0079_directory_identity_activity',
+    requiresPredecessor: 'Actor-bound import tenancy requires directory identity activity',
+  },
 ];
 
 function requiredSuccessorStep(

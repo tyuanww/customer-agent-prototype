@@ -1,7 +1,8 @@
 import type { PoolClient } from 'pg';
 import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest } from '../material.js';
-import { clock, principalFactWindowMs, type IntakePool } from '../transaction.js';
+import { clock, type IntakePool } from '../transaction.js';
+import { ORGANIZATION_OBSERVATION_MS } from './observation-window.js';
 
 export type OrganizationFactsSnapshot = {
   principalId: string; expectedFactsVersion: number; departmentIds: string[];
@@ -42,7 +43,7 @@ function snapshot(raw: unknown): OrganizationFactsSnapshot {
     || !Number.isFinite(Date.parse(validUntil)) || new Date(validUntil).toISOString() !== validUntil) {
     throw new Rejected('INVALID_INPUT');
   }
-  if (Date.parse(validUntil) <= Date.parse(checkedAt) || Date.parse(validUntil) > Date.parse(checkedAt) + principalFactWindowMs) {
+  if (Date.parse(validUntil) <= Date.parse(checkedAt) || Date.parse(validUntil) > Date.parse(checkedAt) + ORGANIZATION_OBSERVATION_MS) {
     throw new Rejected('INVALID_INPUT');
   }
   return { principalId: id(raw.principalId), expectedFactsVersion: version,

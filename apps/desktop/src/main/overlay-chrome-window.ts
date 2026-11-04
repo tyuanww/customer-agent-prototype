@@ -33,10 +33,9 @@ export function createOverlayChromeWindow(
     autoHideMenuBar: true,
     roundedCorners: true,
     ...(process.platform === 'darwin'
-      ? {
-          ...(size.macPanel === false ? {} : { type: 'panel' as const }),
-          hiddenInMissionControl: true,
-        }
+      ? size.macPanel === false
+        ? {}
+        : { type: 'panel' as const, hiddenInMissionControl: true }
       : {}),
     webPreferences: {
       preload: preloadPath,

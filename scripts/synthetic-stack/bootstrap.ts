@@ -17,12 +17,15 @@ import { applyDatabaseMigrations, inspectDatabaseMigrations } from '../../packag
 import { SYNTHETIC_CONTENT_CSV, SYNTHETIC_SOURCES } from './content.ts';
 import { SYNTHETIC_IDENTITIES, type FeishuStackBinding } from './profile.ts';
 import { SEED_INTENT } from './seed.ts';
+import { assertSyntheticSourceTenants, SYNTHETIC_STACK_TENANT } from './synthetic-tenancy.ts';
 
 const CAPABILITIES: readonly (readonly [string, string])[] = Object.freeze([
   ['synthetic_coach', 'content_review_lead'],
   ['synthetic_owner', 'content_review_manager'],
   ['synthetic_quality', 'content_quality_reviewer'],
 ]);
+export const SYNTHETIC_STACK_NOTICE_VERSION = 'synthetic-stack-notice-v1';
+const SYNTHETIC_STACK_NOTICE_TEXT = '仅用于本地合成功能验证，不包含真实客户数据。';
 
 function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -44,12 +47,14 @@ export async function seedReferenceData(client): Promise<string> {
     await client.query(`
       INSERT INTO public.authoritative_source_versions(
         source_version_id, source_ref, domain, upstream_version, snapshot_sha256,
-        use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at
+        use_class, owner_role, approval_evd, approved_by, approved_at, review_due_at, tenant_id
       ) VALUES ($1,$2,$3,'synthetic-stack-v1',$4,'canonical','ROLE-CONTENT-LEAD','EVD-STACK-SOURCE',
-        'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days')
+        'synthetic-owner', clock_timestamp() - interval '1 day', clock_timestamp() + interval '365 days',
+        $5)
       ON CONFLICT (source_version_id) DO NOTHING
-    `, [source.source_version_id, source.source_ref, source.domain, digest]);
+    `, [source.source_version_id, source.source_ref, source.domain, digest, SYNTHETIC_STACK_TENANT]);
   }
+  await assertSyntheticSourceTenants(client, SYNTHETIC_SOURCES.map(source => source.source_version_id));
 
   await client.query(`
     INSERT INTO public.intent_taxonomy_versions(intent_taxonomy_version, approval_evd, approved_by, approved_at)
@@ -77,6 +82,39 @@ export async function seedReferenceData(client): Promise<string> {
       VALUES ($1,$2,true,'EVD-STACK-CAP')
       ON CONFLICT (user_id, capability) DO NOTHING
     `, [identity.userId, capability]);
+  }
+
+  const noticeVersion = SYNTHETIC_STACK_NOTICE_VERSION;
+  const noticeText = SYNTHETIC_STACK_NOTICE_TEXT;
+  await client.query(`
+    INSERT INTO public.privacy_notices(notice_version, notice_text, content_hash, status, published_at)
+    SELECT $1, $2, $3, 'current', clock_timestamp()
+    WHERE NOT EXISTS (SELECT 1 FROM public.privacy_notices WHERE status = 'current')
+    ON CONFLICT DO NOTHING
+  `, [noticeVersion, noticeText, sha256(noticeText)]);
+  const currentNotice = await client.query<{
+    notice_version: string;
+    notice_text: string;
+    content_hash: string;
+  }>(`
+    SELECT notice_version, notice_text, content_hash
+    FROM public.privacy_notices
+    WHERE status = 'current'
+  `);
+  const current = currentNotice.rows[0];
+  if (current?.notice_version !== noticeVersion
+    || current.notice_text !== noticeText
+    || current.content_hash !== sha256(noticeText)) {
+    throw new Error(
+      `Synthetic stack requires ${noticeVersion} as its current privacy notice; found ${current?.notice_version ?? 'none'}. Destroy and rebuild the synthetic stack.`,
+    );
+  }
+  for (const identity of SYNTHETIC_IDENTITIES) {
+    await client.query(`
+      INSERT INTO public.notice_decisions(notice_version, user_id, decision, decision_source)
+      VALUES ($1, $2, 'accepted', 'settings')
+      ON CONFLICT (notice_version, user_id) DO NOTHING
+    `, [noticeVersion, identity.userId]);
   }
 
   return `reference data: ${String(SYNTHETIC_SOURCES.length)} sources, ${String(SYNTHETIC_IDENTITIES.length)} identities`;

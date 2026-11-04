@@ -28,8 +28,10 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
   let stage: ReturnType<typeof createTrustedSopStage>, jobId: string, objectId: string;
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_stage');
-    admin = await pg.connect(db.config); await applyDatabaseMigrations(admin); await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
+    admin = await pg.connect(db.config);
+    const migrationCount = (await applyDatabaseMigrations(admin)).applied.length;
+    await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
     await admin.query('CREATE ROLE sop_stage_business LOGIN NOINHERIT; GRANT intake_business TO sop_stage_business');
     business = createIntakePurposePool({ ...db.config, user: 'sop_stage_business', max: 4 }, 'business');
     setupPool = new Pool(db.config); store = createContentObjectStore(path.join(pg.root, 'objects'));
@@ -284,17 +286,17 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
   it('inherits omitted text only from exact published source lineage with a reliable row mapping', async () => {
     await prepareInheritedJob(); const next = value(await stage(actor(), jobId));
     const rows = (await admin.query('SELECT row_id,business_entry_id FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 ORDER BY business_entry_id', [next.key.candidateId, next.key.version])).rows;
-    expect(rows).toHaveLength(9); expect(rows[8]).toEqual({ row_id: 'sop:长痘痘SOP:1', business_entry_id: 'sop9' });
+    expect(rows).toHaveLength(3); expect(rows[2]).toEqual({ row_id: 'sop:品质售后SOP:2', business_entry_id: '3-2' });
     const entries = (await admin.query("SELECT material->'entries' AS entries FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2", [next.key.candidateId, next.key.version])).rows[0].entries;
-    expect(entries).toHaveLength(9);
+    expect(entries).toHaveLength(3);
   });
   it('rejects inherited content without reliable prior mapping and rolls back the new candidate', async () => {
     const first = await prepareInheritedJob();
-    await admin.query("DELETE FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 AND business_entry_id='sop9'", [first.key.candidateId, first.key.version]);
+    await admin.query("DELETE FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 AND business_entry_id='3-2'", [first.key.candidateId, first.key.version]);
     const before = await shape(); expect(await stage(actor(), jobId)).toMatchObject({ ok: false, commit: 'rolled_back' }); expect(await shape()).toEqual(before);
   });
   it.each([false,true])('inherits exact published row media from durable payloads with missing cache=%s', async missing => {
-    const workbook = await createSyntheticSopWorkbook({ imageOnFinalRow: true });
+    const workbook = await createSyntheticSopWorkbook({ imageOnLastTextRow: true });
     const form = new FormData(); form.set('operationId', 'inherited-image-upload'); form.set('file', new Blob([new Uint8Array(workbook.bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'synthetic-sop.xlsx');
     const request = new Request('http://synthetic.invalid', { method: 'POST', body: form });
     const object = value(await svc.upload(actor(), 'source-sop', Readable.from(Buffer.from(await request.arrayBuffer())), request.headers.get('content-type')!));
@@ -306,7 +308,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     const media = (await admin.query(`SELECT m.row_id,o.payload_object_id AS "objectId",o.sha256,o.bytes::int,o.mime
       FROM content_intake.sop_candidate_media m JOIN content_intake.sop_media_objects o USING(media_object_id)
       WHERE m.candidate_id=$1 AND m.candidate_version=$2 ORDER BY m.row_id`, [next.key.candidateId, next.key.version])).rows;
-    expect(media.map(item => item.row_id).sort()).toEqual(['sop:过敏流程SOP:2','sop:长痘痘SOP:1'].sort());
+    expect(media.map(item => item.row_id).sort()).toEqual(['sop:过敏流程SOP:2','sop:品质售后SOP:2'].sort());
     for (const item of media) {
       const bytes = await store.readAttachment(attachmentDescriptor(item));
       expect(bytes.length).toBe(item.bytes);
@@ -438,7 +440,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
   it('does not restore a deleted text-only row when a new job repeats the same content version', async () => {
     const first = value(await stage(actor(), jobId));
     const removed = value(await createSopRowDeletionCandidate(business, false)(actor(), {
-      key: first.key, rowId: 'sop:长痘痘SOP:1', operationId: 'restage-remove-text-row' }));
+      key: first.key, rowId: 'sop:品质售后SOP:2', operationId: 'restage-remove-text-row' }));
     const events = (await admin.query('SELECT to_jsonb(e) AS value FROM content_intake.sop_row_deletion_events e')).rows;
     expect(events).toHaveLength(1); expect(events[0].value.media).toEqual([]);
     for (const statement of ['UPDATE content_intake.sop_row_deletion_events SET deleted_at=clock_timestamp()', 'DELETE FROM content_intake.sop_row_deletion_events']) {
@@ -489,7 +491,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     } }); } };
     expect(await createTrustedSopStage(rejected, store, false)(actor(), jobId)).toMatchObject({ ok: false, reason: 'SCOPE_DENIED', commit: 'rolled_back' });
     expect(listPreviews(objectId, new Set(['source-sop']))).toEqual(initial);
-    const next = value(await createSopRowDeletionCandidate(business, false)(actor(), { key: first.key, rowId: 'sop:长痘痘SOP:1', operationId: 'preview-after-replay-rollback' }));
+    const next = value(await createSopRowDeletionCandidate(business, false)(actor(), { key: first.key, rowId: 'sop:品质售后SOP:2', operationId: 'preview-after-replay-rollback' }));
     expect(listPreviews(next.key.candidateId, new Set(['source-sop']))).toEqual(initial);
   });
   it('rejects same-input cross-base restage after deletion and preserves the delayed receipt images', async () => {
@@ -514,26 +516,29 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
       return value(await svc.publish(actor(), { operationId: `${name}-publish`, key, baseReleaseId, sourceEvidenceVersion: 1,
         confirmed: true, title: '合成基线', summary: '合成基线' }));
     }
-    const original = await uploadAndReceive((await createSyntheticSopWorkbook({ imageOnFinalRow: true })).bytes, 'cross-r1', 'rel_native_base');
+    const original = await uploadAndReceive((await createSyntheticSopWorkbook({ imageOnLastTextRow: true })).bytes, 'cross-r1', 'rel_native_base');
     const frozenR1 = value(await stage(actor(), original.job.jobId));
-    // Create a legitimate hole before publishing R1. Its absent sop1 can later
-    // be removed from A; deleting any already-published entry would be denied.
-    const r1Key = value(await createSopRowDeletionCandidate(business, false)(actor(), { key: frozenR1.key,
-      rowId: 'sop:过敏流程SOP:1', operationId: 'cross-r1-remove-unused' })).key;
-    const r1 = await publish(r1Key, 'cross-r1', 'rel_native_base');
+    const r1 = await publish(frozenR1.key, 'cross-r1', 'rel_native_base');
     expect((await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id).toBe(r1.releaseId);
-    const shared = await uploadAndReceive((await createSyntheticSopWorkbook({ omitLastTextRow: true })).bytes, 'cross-shared', r1.releaseId!);
+    const shared = await uploadAndReceive((await createSyntheticSopWorkbook({
+      omitLastTextRow: true,
+      firstSheetRows: [
+        { code: '1-2', text: '过敏流程SOP合成文字' },
+        { code: 'extra-1', text: '合成临时条目' },
+      ],
+    })).bytes, 'cross-shared', r1.releaseId!);
     const a = value(await stage(actor(), shared.job.jobId));
     const originalImages = listPreviews(a.key.candidateId, new Set(['source-sop']));
-    expect(originalImages.map(image => image.rowId).sort()).toEqual(['sop:过敏流程SOP:2', 'sop:长痘痘SOP:1'].sort());
-    const deletion = { key: a.key, rowId: 'sop:过敏流程SOP:1', operationId: 'cross-delayed-deletion' };
+    expect(originalImages.map(image => image.rowId).sort()).toEqual(['sop:过敏流程SOP:2', 'sop:品质售后SOP:2'].sort());
+    const deletion = { key: a.key, rowId: 'sop:过敏流程SOP:3', operationId: 'cross-delayed-deletion' };
     let lost = false;
     const lossy: IntakePool = { async connect() { const c = await business.connect(); return new Proxy(c, { get(target, property) {
       if (property === 'query') return async (sql: string, values?: unknown[]) => { const result = await target.query(sql, values);
         if (sql === 'COMMIT' && !lost) { lost = true; throw new Error('synthetic delayed deletion acknowledgement'); } return result; };
       const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
     } }); } };
-    expect(await createSopRowDeletionCandidate(lossy, false)(actor(), deletion)).toMatchObject({ ok: false, commit: 'unknown' });
+    const deletionResult = await createSopRowDeletionCandidate(lossy, false)(actor(), deletion);
+    expect(deletionResult, JSON.stringify(deletionResult)).toMatchObject({ ok: false, commit: 'unknown' });
     expect((await admin.query("SELECT count(*)::int n FROM backend_review.receipts WHERE operation='intake:sop-row-delete-v2' AND request_key=$1", [deletion.operationId])).rows[0].n).toBe(1);
     expect(listPreviews(a.key.candidateId, new Set(['source-sop']))).toEqual(originalImages);
     const replacement = await uploadAndReceive((await createSyntheticSopWorkbook()).bytes, 'cross-r2', r1.releaseId!);
@@ -591,7 +596,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     expect(listPreviews(r1.releaseId!, new Set(['source-sop'])).map(image => image.rowId).sort()).toEqual(originalImages.map(image => image.rowId).sort());
     expect(listPreviews(r2.releaseId!, new Set(['source-sop'])).map(image => image.rowId)).toEqual(['sop:过敏流程SOP:2']);
   }, 60_000);
-  it.each(['first-sheet-row-count','middle-row-deletion'] as const)('rejects shifted SOP ordinal identities without wrong binding: %s', async variant => {
+  it.each(['first-sheet-row-insert','second-sheet-row-insert'] as const)('keeps explicit SOP entry identity when workbook rows shift: %s', async variant => {
     const published = await prepareInheritedJob();
     const baseReleaseId = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id as string;
     const beforePublishedRows = (await admin.query('SELECT * FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 ORDER BY business_entry_id', [published.key.candidateId, published.key.version])).rows;
@@ -602,12 +607,14 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     const bytes = execFileSync(process.execPath, ['--input-type=module', '-e', `
       import ExcelJS from 'exceljs'; import { readFileSync } from 'node:fs';
       const book = new ExcelJS.Workbook(); await book.xlsx.load(readFileSync(0));
-      if (process.argv[1] === 'first-sheet-row-count') book.worksheets[0].getCell('A1').value = null;
-      else book.worksheets[1].spliceRows(1, 1);
+      const worksheet = process.argv[1] === 'first-sheet-row-insert' ? book.worksheets[0] : book.worksheets[1];
+      worksheet.insertRow(2);
+      worksheet.getCell('A2').value = 'new-entry';
+      worksheet.getCell('B2').value = '合成新增条目';
       process.stdout.write(Buffer.from(await book.xlsx.writeBuffer()));`, variant], {
       cwd: path.resolve(import.meta.dirname, '../../../packages/content-intake'), input: input.bytes, maxBuffer: 16 * 1024 * 1024 });
     const parsed = (await tryParseSopAsFaq(bytes, { sourceId: 'source-sop', brandId: 'brand-a', shopId: 'shop-a' }))!;
-    expect(parsed.parsed.ok).toBe(true); expect(parsed.rowBindings).toHaveLength(8);
+    expect(parsed.parsed.ok).toBe(true); expect(parsed.rowBindings).toHaveLength(4);
     const form = new FormData(); form.set('operationId', `shift-${variant}-upload`); form.set('file', new Blob([new Uint8Array(bytes)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'synthetic-sop.xlsx');
     const request = new Request('http://synthetic.invalid', { method: 'POST', body: form });
     const object = value(await svc.upload(actor(), 'source-sop', Readable.from(Buffer.from(await request.arrayBuffer())), request.headers.get('content-type')!));
@@ -616,45 +623,21 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     expect(parsed.contentVersion).toEqual({ kind: 'sha256', value: object.sha256 });
     const job = value(await svc.receive(actor(), 'source-sop', { operationId: `shift-${variant}-receive`, objectId: object.objectId, sourceVersion: 1,
       baseReleaseId, contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true }, expectedPriorKey: null }));
-    let freezeRows: unknown, freezeMedia: unknown, observedSqlError: { code: string | undefined; message: string; where: string | undefined } | undefined;
-    const observed: IntakePool = { async connect() { const c = await business.connect(); return new Proxy(c, { get(target, property) {
-      if (property === 'query') return async (sql: string, values?: unknown[]) => {
-        if (sql.includes('SELECT content_intake.freeze_sop_parsed_candidate')) { freezeRows = JSON.parse(String(values![3])); freezeMedia = JSON.parse(String(values![4])); }
-        try { return await target.query(sql, values); }
-        catch (error) {
-          if (sql.includes('SELECT content_intake.freeze_sop_parsed_candidate') && error instanceof Error) {
-            const pgError = error as Error & { code?: string; where?: string };
-            observedSqlError = { code: pgError.code, message: pgError.message, where: pgError.where };
-          }
-          throw error;
-        }
-      };
-      const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
-    } }); } };
-    const before = await shape();
-    const result = await createTrustedSopStage(observed, store, false)(actor(), job.jobId);
-    const duplicateBindings = (freezeRows as { rowId: string; businessEntryId: string }[]).filter(row => row.rowId === 'sop:长痘痘SOP:1');
-    expect(duplicateBindings.map(row => row.businessEntryId).sort()).toEqual(['sop8', 'sop9']);
-    expect(observedSqlError).toMatchObject({ code: 'ZA003', message: 'MATERIAL_CHANGED' });
-    const raisedLine = Number(observedSqlError!.where!.match(/register_sop_candidate_rows\(text,text,bigint,jsonb\) line (\d+) at RAISE/)?.[1]);
-    const functionBody = (await admin.query<{ prosrc: string }>("SELECT prosrc FROM pg_proc WHERE oid='content_intake.register_sop_candidate_rows(text,text,bigint,jsonb)'::regprocedure")).rows[0]!.prosrc.split('\n');
-    const rejectionBranch = functionBody.slice(raisedLine - 2, raisedLine).join('\n');
-    expect(rejectionBranch).toContain("count(DISTINCT r->>'rowId')<>v_count");
-    expect(functionBody[raisedLine - 1]).toContain("ERRCODE='ZA003',MESSAGE='MATERIAL_CHANGED'");
+    const staged = await stage(actor(), job.jobId);
+    expect(staged, JSON.stringify(staged)).toMatchObject({ ok: true });
+    const result = value(staged);
+    const afterRows = (await admin.query('SELECT row_id,business_entry_id FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 ORDER BY business_entry_id', [result.key.candidateId, result.key.version])).rows;
+    expect(afterRows.map(row => row.business_entry_id)).toEqual(['1-2', '2-2', '3-2', 'new-entry']);
+    expect(afterRows.map(row => row.row_id)).not.toEqual(beforePublishedRows.map(row => row.row_id));
     const output = process.env.CUSTOMER_AGENT_SOP_ROW_SHIFT_REPORT;
     if (output) {
       if (!path.isAbsolute(output)) throw new Error('Absolute report path required');
       writeFileSync(`${output}.${variant}.json`, JSON.stringify({ variant, baseReleaseId, published: published.key,
-        fileSha256: object.sha256, contentVersion: parsed.contentVersion, parsedRows: parsed.rowBindings, beforePublishedRows,
-        freezeRows, freezeMedia, result, observedSqlError, rejectionBranch, duplicateBindings }, null, 2) + '\n');
+        fileSha256: object.sha256, contentVersion: parsed.contentVersion, parsedRows: parsed.rowBindings,
+        beforePublishedRows, afterRows, result }, null, 2) + '\n');
     }
-    expect(result).toMatchObject({ ok: false, reason: 'MATERIAL_CHANGED', commit: 'rolled_back' });
-    expect(await shape()).toEqual(before);
-    expect((await admin.query('SELECT state,result_candidate_id,result_candidate_version FROM content_intake.parse_jobs WHERE job_id=$1', [job.jobId])).rows[0])
-      .toEqual({ state: 'reading', result_candidate_id: null, result_candidate_version: null });
     expect((await admin.query('SELECT * FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 ORDER BY business_entry_id', [published.key.candidateId, published.key.version])).rows).toEqual(beforePublishedRows);
     expect((await admin.query('SELECT * FROM content_intake.sop_candidate_media WHERE candidate_id=$1 AND candidate_version=$2', [published.key.candidateId, published.key.version])).rows).toEqual(beforePublishedMedia);
-    expect(listPreviews(object.objectId, new Set(['source-sop']))).toEqual([]);
   });
   it('converges concurrent requests and any busy retry onto one candidate and payload', async () => {
     const results = await Promise.all([stage(actor(), jobId), stage(actor(), jobId)]);

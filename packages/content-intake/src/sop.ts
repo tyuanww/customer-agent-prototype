@@ -225,7 +225,11 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
       for (let row = 0; row < options.sheetRows[index]!; row++) {
         writeRow(row + 2, row % 4 === 0 ? `${name}合成文字${row + 1}\n第二行` : `${name}合成文字${row + 1}`);
       }
-    } else if (index < 3) writeRow(2, `${name}合成文字${options.textSuffix ?? ''}`);
+    } else if (index < 2 || (index === 2 && !options.omitLastTextRow)) {
+      writeRow(2, `${name}合成文字${options.textSuffix ?? ''}`);
+    } else if (lastSheet && options.imageOnFinalRow) {
+      writeRow(2, `${name}合成文字${options.textSuffix ?? ''}`);
+    }
     if (lastSheet && options.tailRows !== undefined) {
       for (let row = 0; row < options.tailRows; row++) writeRow(row + 2, `合成规模答案${row + 1}`);
     }
@@ -243,7 +247,7 @@ export async function createSyntheticSopWorkbook(options: { omitLastTextRow?: bo
   }
   if (options.imageOnLastTextRow || options.imageOnFinalRow) {
     const secondImage = book.addImage({ buffer: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') as unknown as ExcelJS.Buffer, extension: 'gif' });
-    book.getWorksheet(SOP_SHEET_NAMES[options.imageOnFinalRow ? 5 : 2])!.addImage(secondImage, { tl: { col: 1, row: options.imageOnFinalRow ? 0 : 1 }, ext: { width: 8, height: 8 } });
+    book.getWorksheet(SOP_SHEET_NAMES[options.imageOnFinalRow ? 5 : 2])!.addImage(secondImage, { tl: { col: 1, row: 1 }, ext: { width: 8, height: 8 } });
   }
   return { bytes: Buffer.from(await book.xlsx.writeBuffer()), png: SYNTHETIC_PNG };
 }

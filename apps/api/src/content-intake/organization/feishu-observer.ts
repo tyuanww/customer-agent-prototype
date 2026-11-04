@@ -1,5 +1,6 @@
 import { parseContractSchema } from '@customer-agent/contracts';
 import { canonical, digest } from '../material.js';
+import { ORGANIZATION_OBSERVATION_MS } from './observation-window.js';
 
 /** Offline candidate only. The transport owner must authenticate the fixed tenant/app,
  * use tenant identity, user_id_type=open_id and department_id_type=open_department_id,
@@ -24,7 +25,6 @@ export type OrganizationObservation = { ok: true; snapshot: OrganizationSnapshot
 class Rejected extends Error { constructor(readonly reason: Reason) { super(reason); } }
 const MAX_RESPONSE_BYTES = 1_048_576;
 const MAX_PAGES = 100;
-const OBSERVATION_MS = 300_000;
 const TIMEOUT_MS = 270_000;
 const JOB_TITLE_RATE_WINDOW_MS = 61_000;
 const JOB_TITLE_RATE_CODE = 99991400;
@@ -158,7 +158,7 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
       checkpoint();
       const started = await now();
       checkpoint();
-      if (!Number.isSafeInteger(started) || started < 0 || !Number.isFinite(new Date(started + OBSERVATION_MS).getTime())) {
+      if (!Number.isSafeInteger(started) || started < 0 || !Number.isFinite(new Date(started + ORGANIZATION_OBSERVATION_MS).getTime())) {
         throw new Rejected('OBSERVATION_EXPIRED');
       }
       const first = user(await transport.user(frozen.openId, signal), frozen.openId);
@@ -168,7 +168,7 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
       checkpoint();
       const finished = await now();
       checkpoint();
-      if (!Number.isSafeInteger(finished) || finished < started || finished >= started + OBSERVATION_MS) {
+      if (!Number.isSafeInteger(finished) || finished < started || finished >= started + ORGANIZATION_OBSERVATION_MS) {
         throw new Rejected('OBSERVATION_EXPIRED');
       }
       if (canonical(first) !== canonical(last) || canonical(jobs) !== canonical(confirmedJobs)) {
@@ -178,7 +178,7 @@ export function createFeishuOrganizationObserver(scope: { tenantId: string; appI
       if (matches.length !== 1 || !matches[0]!.enabled) throw new Rejected('JOB_UNRESOLVED');
       return { ok: true, snapshot: { principalId: frozen.principalId, expectedFactsVersion: frozen.expectedFactsVersion,
         departmentIds: last.departmentIds, jobId: matches[0]!.id, enabled: last.enabled,
-        checkedAt: new Date(started).toISOString(), validUntil: new Date(started + OBSERVATION_MS).toISOString() },
+        checkedAt: new Date(started).toISOString(), validUntil: new Date(started + ORGANIZATION_OBSERVATION_MS).toISOString() },
       provenance: { mappingVersion: 'feishu-contact-job-title-v1', directoryDigest: digest(canonical(jobs)),
         observedUntil: new Date(finished).toISOString() } };
     }

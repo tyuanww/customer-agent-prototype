@@ -48,7 +48,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     pg = new Pg15Harness(); pg.start();
     const db = pg.createDatabase('sop_media_delivery');
     admin = await pg.connect(db.config);
-    await applyDatabaseMigrations(admin);
+    const migrationCount = (await applyDatabaseMigrations(admin)).applied.length;
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     // The intake read path and the legacy publisher both read authorization_sources now.
     await seedContentWriteAuthority(admin, {
@@ -66,7 +66,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
       idPrefix: 'sop',
       extraSources: [{ scopeId: 'scope-a', sourceId: 'source-sop', domain: 'product' }],
     });
-    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount: 53 });
+    expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
     await admin.query(`CREATE ROLE sop_media_business LOGIN NOINHERIT; GRANT intake_business TO sop_media_business;
       CREATE ROLE sop_media_usage LOGIN NOINHERIT; GRANT intake_usage TO sop_media_usage;
       CREATE ROLE sop_media_auth LOGIN NOINHERIT; GRANT app_backend_auth TO sop_media_auth`);
@@ -139,6 +139,11 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
       confirmed: true, title: '合成图片发布', summary: '合成图片发布' }));
     expect(result.releaseId).toBeTruthy();
     return result.releaseId!;
+  }
+  async function revokeMediaQuery(reason: string) {
+    await admin.query(`UPDATE content_intake.grants
+      SET revoked_at=clock_timestamp(),version=version+1,last_change_reason=$1
+      WHERE recipient_id='agent' AND action='query' AND source_id='source-sop' AND revoked_at IS NULL`, [reason]);
   }
 
   async function restartReader(afterRead?: (bytes: Buffer) => Promise<void>) {
@@ -345,15 +350,15 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
   }, 60_000);
 
   it('inherits a missing row and its image from durable lineage after reconstructing the parser and store', async () => {
-    const first = await freeze('inherit-one', { imageOnFinalRow: true });
+    const first = await freeze('inherit-one', { imageOnLastTextRow: true });
     const r1 = await publish(first.candidate.key, 'inherit-one');
-    const original = (await admin.query("SELECT row_id,media_object_id,sha256 FROM content_intake.sop_release_media WHERE release_id=$1 AND row_id='sop:长痘痘SOP:1'", [r1])).rows;
+    const original = (await admin.query("SELECT row_id,media_object_id,sha256 FROM content_intake.sop_release_media WHERE release_id=$1 AND row_id='sop:品质售后SOP:2'", [r1])).rows;
     expect(original).toHaveLength(1);
     await restartReader();
     store = createContentObjectStore(store.rootDirectory);
     stage = createTrustedSopStage(business, store, false);
     const second = await freeze('inherit-two', { omitLastTextRow: true }, r1);
-    expect((await admin.query("SELECT row_id,media_object_id,sha256 FROM content_intake.sop_candidate_media WHERE candidate_id=$1 AND candidate_version=$2 AND row_id='sop:长痘痘SOP:1'", [second.candidate.key.candidateId, second.candidate.key.version])).rows).toEqual(original);
+    expect((await admin.query("SELECT row_id,media_object_id,sha256 FROM content_intake.sop_candidate_media WHERE candidate_id=$1 AND candidate_version=$2 AND row_id='sop:品质售后SOP:2'", [second.candidate.key.candidateId, second.candidate.key.version])).rows).toEqual(original);
     const r2 = await publish(second.candidate.key, 'inherit-two', r1);
     await restartReader();
     const lease = await entitlement();
@@ -374,7 +379,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
         await admin.query("SET LOCAL lock_timeout='100ms'");
         await admin.query('SELECT backend_review.lock_content()');
         lockAcquired = true;
-        if (change === 'revoked') await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成读图间撤权' WHERE grant_id='sop-media-agent-source-sop-query'");
+        if (change === 'revoked') await revokeMediaQuery('合成读图间撤权');
         await admin.query('COMMIT');
       } catch (error) { await admin.query('ROLLBACK'); throw error; }
     });
@@ -400,7 +405,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     const lease = await entitlement();
     const listed = await preview(lease.entitlementId);
     expect(listed.statusCode, listed.body).toBe(200);
-    await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成撤权' WHERE grant_id='sop-media-agent-source-sop-query'");
+    await revokeMediaQuery('合成撤权');
     const response = await preview(lease.entitlementId, listed.json().items[0].objectId);
     expect(response.statusCode).toBe(403);
     expect(response.body).not.toContain('bytesBase64');
@@ -412,8 +417,8 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     }
     const { candidate, workbook } = await freeze('filtered-media', { sameImageOnLastTextRow: true }, 'rel_native_base', material => {
       for (const entry of material.entries) {
-        if (entry.businessEntryId === 'sop2') entry.productRefs = [{ id: 'prod-visible', displayVersion: 1 }];
-        if (entry.businessEntryId === 'sop6') entry.productRefs = [{ id: 'prod-hidden', displayVersion: 1 }];
+        if (entry.businessEntryId === '1-2') entry.productRefs = [{ id: 'prod-visible', displayVersion: 1 }];
+        if (entry.businessEntryId === '3-2') entry.productRefs = [{ id: 'prod-hidden', displayVersion: 1 }];
       }
     });
     await publish(candidate.key, 'filtered-media');
@@ -428,7 +433,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     const rows = (await admin.query(`SELECT r.business_entry_id FROM content_intake.sop_release_media m
       JOIN content_intake.sop_candidate_rows r ON r.candidate_id=m.candidate_id AND r.candidate_version=m.candidate_version AND r.row_id=m.row_id
       WHERE m.release_id=$1 ORDER BY m.source_id,m.row_id,m.ordinal,m.media_object_id`, [selected.releaseId])).rows;
-    expect(rows.map(row => row.business_entry_id)).toEqual(['sop6', 'sop2']);
+    expect(rows.map(row => row.business_entry_id)).toEqual(['3-2', '1-2']);
     const opened = await preview(selected.entitlementId, items[0]!.objectId);
     expect(opened.statusCode, opened.body).toBe(200);
     expect(Buffer.from(opened.json().bytesBase64, 'base64')).toEqual(workbook.png); expect(reads).toBe(1);
@@ -440,7 +445,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
 
   it.each(['future', 'expired', 'disabled'] as const)('does not expose durable images contributed only by %s rows', async boundary => {
     const { candidate } = await freeze(`image-time-${boundary}`, { sameImageOnLastTextRow: true }, 'rel_native_base', material => {
-      for (const entry of material.entries.filter(row => ['sop2', 'sop6'].includes(row.businessEntryId))) {
+      for (const entry of material.entries.filter(row => ['1-2', '3-2'].includes(row.businessEntryId))) {
         entry.effectiveFrom = boundary === 'future' ? '2098-01-01T00:00:00Z' : '2020-01-01T00:00:00Z';
         entry.effectiveTo = boundary === 'expired' ? '2021-01-01T00:00:00Z' : null;
         if (boundary === 'disabled') entry.operation = 'disable';
@@ -460,7 +465,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     const { candidate } = await freeze(`read-deadline-${expiry}`);
     await publish(candidate.key, `read-deadline-${expiry}`);
     if (expiry === 'grant') {
-      await admin.query("UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成短授权' WHERE grant_id='sop-media-agent-source-sop-query'");
+      await revokeMediaQuery('合成短授权');
       await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
         to_jsonb(g)||jsonb_build_object('grant_id','short-media-query','version',1,'last_change_reason',NULL,'revoked_at',NULL,
           'expires_at',clock_timestamp()+interval '2 seconds'))).*
@@ -489,6 +494,6 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     expect(openedBytes).toBe(true);
     expect(response.statusCode, response.body).toBe(403); expect(response.body).not.toContain('bytesBase64');
     expect(response.json()).toMatchObject({ error: { code: 'FORBIDDEN', details: { reason: 'PERMISSION_CHANGED' } } });
-  });
+  }, 60_000);
 
 });

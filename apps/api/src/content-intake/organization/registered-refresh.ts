@@ -4,6 +4,7 @@ import { canonical, digest } from '../material.js';
 import { clock, type IntakePool } from '../transaction.js';
 import { createFeishuOrganizationObserver, type OrganizationTransport } from './feishu-observer.js';
 import { createOrganizationFactsWriter, OrganizationFactsRejected, type OrganizationFactsSnapshot } from './facts-writer.js';
+import { ORGANIZATION_OBSERVATION_MS } from './observation-window.js';
 
 type Scope = { tenantId: string; appId: string };
 type Binding = Scope & { principalId: string; openId: string; bindingVersion: number; enabled: boolean; validUntil: string; bindingDigest: string };
@@ -108,7 +109,7 @@ export function createRegisteredOrganizationRefresh(pool: IntakePool, rawScope: 
       const { binding, now, facts } = await read(principalId, true);
       return { kind: 'revocation', binding, snapshot: { principalId, expectedFactsVersion: Number(facts.current_facts_version),
         departmentIds: facts.department_ids, jobId: facts.job_id, enabled: false,
-        checkedAt: new Date(now).toISOString(), validUntil: new Date(now + 300_000).toISOString() } };
+        checkedAt: new Date(now).toISOString(), validUntil: new Date(now + ORGANIZATION_OBSERVATION_MS).toISOString() } };
     },
     async write(raw: RegisteredObservation) {
       let request: RegisteredObservation;
