@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import {
   collectObservation,
   parseOptions,
+  probeFailure,
   validateObservation,
 } from './production-smoke.mjs';
 
@@ -86,10 +87,19 @@ test('reports safe probe failures without response contents', () => {
   }));
   assert.equal(report.ok, false);
   assert.equal(report.checks.apiVersionMatches, false);
-  assert.deepEqual(report.probes.apiHealth, {
-    status: 0,
-    error: 'CURL_6',
+  assert.deepEqual(report.probes, {
+    apiHealth: { status: 0, error: 'CURL_6' },
+    apiReady: { status: 200 },
+    identityHealth: { status: 200 },
+    unauthSources: { status: 401 },
+    unauthUsage: { status: 401 },
   });
+});
+
+test('maps process failures to safe diagnostic codes', () => {
+  assert.equal(probeFailure({ code: 6 }), 'CURL_6');
+  assert.equal(probeFailure({ code: 'ENOENT' }), 'ENOENT');
+  assert.equal(probeFailure({ code: 'private response text' }), 'PROBE_FAILED');
 });
 
 test('reports when curl cannot be launched', async () => {
@@ -97,7 +107,7 @@ test('reports when curl cannot be launched', async () => {
   try {
     await promisify(execFile)(process.execPath, [SMOKE_SCRIPT], {
       env: {
-        HOME: process.env.HOME,
+        ...process.env,
         PATH: '/definitely/missing',
       },
       encoding: 'utf8',

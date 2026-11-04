@@ -16,7 +16,7 @@ function invalid(code) {
   return Object.freeze({ ok: false, error: code });
 }
 
-function probeFailure(error) {
+export function probeFailure(error) {
   const code = error?.code;
   if (Number.isInteger(code) && code > 0) return `CURL_${code}`;
   if (typeof code === 'string' && /^[A-Z][A-Z0-9_]*$/u.test(code)) return code;
