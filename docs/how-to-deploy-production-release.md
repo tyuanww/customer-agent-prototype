@@ -13,6 +13,8 @@
 
 生产 root 固定为 `/srv/customer-agent`。生产 apply 还要求 `--authorization` 或 `CUSTOMER_AGENT_PRODUCTION_RELEASE_APPROVAL` 等于完整候选 SHA。
 
+生产 apply 必须以 root 身份运行，因为入口需要重启 systemd unit。非 root 会在创建部署锁、应用迁移或写指针之前以 `DEPLOYMENT_PRIVILEGE_REQUIRED` 退出。只读 dry-run 可以由服务用户执行。候选和历史 release 的 Git 安全目录由入口按实际路径临时注入，不需要修改 root 的全局 Git 配置。
+
 ## 生产 dry-run
 
 先保存当前指针、服务状态、最新备份 ID、恢复 evidence 和租户报告，再运行：
@@ -92,6 +94,7 @@ apply 的默认审计文件是 `<root>/release-evidence/production-release.jsonl
 | --- | --- |
 | `INVALID_ARGUMENTS` | 路径、SHA、版本、unit 或 environment 无效 |
 | `RELEASE_NOT_AUTHORIZED` | 生产 apply 的授权 SHA 不匹配 |
+| `DEPLOYMENT_PRIVILEGE_REQUIRED` | apply 不是以 root 运行，无法安全重启 systemd unit |
 | `DEPLOYMENT_LOCKED` | 另一个部署持有锁 |
 | `RELEASE_*` | 候选目录、Git、版本或入口无效 |
 | `MIGRATION_PREFIX_MISMATCH` | 当前和候选迁移目录不是严格前缀 |
