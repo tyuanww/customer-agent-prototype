@@ -213,6 +213,47 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     } finally { await client.end(); }
   }, 120_000);
 
+  it('binds a legacy import batch to the actor principal tenant and preserves default for an unknown actor', async () => {
+    const database = harness.createDatabase('import_batch_tenant');
+    const client = await harness.connect(database.config);
+    try {
+      await applyDatabaseMigrations(client);
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          INSERT INTO backend_identity.subject_bindings(
+            binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role
+          ) VALUES (
+            'bound-actor', 'synthetic', 'tenant-bound', 'bound-actor', 'usr-bound',
+            repeat('a', 64), true, 'owner'
+          );
+          INSERT INTO content_intake.principals(
+            principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version
+          ) VALUES (
+            'bound-principal', 'usr-bound', 'tenant-bound', 'app-bound',
+            'confirmed-synthetic', 'bound-person', 1
+          );
+          INSERT INTO public.import_batches(
+            import_batch_id, source_type, source_binding_hash, status, actor_user_id, tenant_id
+          ) VALUES
+            ('batch-bound', 'csv', repeat('a', 64), 'validating', 'usr-bound', 'default'),
+            ('batch-legacy', 'csv', repeat('b', 64), 'validating', 'usr-unknown', 'default');
+        `);
+        expect((await client.query(`
+          SELECT import_batch_id, tenant_id
+          FROM public.import_batches
+          WHERE import_batch_id IN ('batch-bound', 'batch-legacy')
+          ORDER BY import_batch_id
+        `)).rows).toEqual([
+          { import_batch_id: 'batch-bound', tenant_id: 'tenant-bound' },
+          { import_batch_id: 'batch-legacy', tenant_id: 'default' },
+        ]);
+      } finally {
+        await client.query('ROLLBACK');
+      }
+    } finally { await client.end(); }
+  }, 120_000);
+
   it('appends only eight helper grants to the exact thirty-four-row ledger and preserves role attributes', async () => {
     const database = harness.createDatabase('legacy_check_upgrade'); const client = await harness.connect(database.config);
     try {
