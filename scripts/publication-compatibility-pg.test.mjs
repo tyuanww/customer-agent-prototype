@@ -77,7 +77,25 @@ async function seed({ mode = 'owner_acceptance', domain = 'presale', tenant = 't
     }
     const boundSources=onlyDomain?actualSources.filter(s=>s.domain===domain):actualSources;
     const bindingHash=hash((baseReleaseId?actualSources:boundSources).map(s=>`${s.domain}:${s.source_version_id}`).join('|'));
-    await admin.query("INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status,tenant_id,base_release_id) VALUES ($1,'seed',$2,'validating',$3,$4)",[batch,bindingHash,tenant,baseReleaseId]);
+    const actorSuffix=hash(tenant).slice(0,16);
+    const actorUserId=`matrix-actor-${actorSuffix}`;
+    const actorPrincipalId=`matrix-principal-${actorSuffix}`;
+    await admin.query(`INSERT INTO backend_identity.subject_bindings(
+        binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role)
+      VALUES ($1,'synthetic',$2,$1,$1,repeat('a',64),true,'owner')
+      ON CONFLICT (user_id) DO NOTHING`,[actorUserId,tenant]);
+    await admin.query(`INSERT INTO content_intake.principals(
+        principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version)
+      VALUES ($1,$2,$3,'app-synthetic','confirmed-synthetic',$1,1)
+      ON CONFLICT (user_id) DO NOTHING`,[actorPrincipalId,actorUserId,tenant]);
+    await admin.query(`INSERT INTO content_intake.principal_facts(
+        principal_id,facts_version,department_ids,job_id,enabled,checked_at,valid_until,facts_digest)
+      VALUES ($1,1,ARRAY['dept-synthetic'],'job-owner',true,
+        clock_timestamp()-interval '1 second',clock_timestamp()+interval '4 minutes',repeat('a',64))
+      ON CONFLICT (principal_id,facts_version) DO NOTHING`,[actorPrincipalId]);
+    await admin.query(`INSERT INTO public.import_batches(
+        import_batch_id,source_type,source_binding_hash,status,tenant_id,base_release_id,actor_user_id)
+      VALUES ($1,'seed',$2,'validating',$3,$4,$5)`,[batch,bindingHash,tenant,baseReleaseId,actorUserId]);
     await admin.query("SELECT set_config('app.import_binding_write','on',true)");
     for(const s of boundSources)await admin.query('INSERT INTO public.import_batch_source_bindings VALUES ($1,$2,$3)',[batch,s.domain,s.source_version_id]);
     await admin.query(`INSERT INTO public.outbox_jobs(job_id,job_type,payload,status,lease_owner,lease_version,lease_expires_at)

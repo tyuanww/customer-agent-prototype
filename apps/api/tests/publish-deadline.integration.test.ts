@@ -21,8 +21,10 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
       VALUES
         ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z'),
         ('srcv_aftersale','SRC-AFTERSALE','aftersale','v1',repeat('cd',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')`);
-    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
-      VALUES ('batch-covered','csv',repeat('ab',32),'staged'), ('batch-missing','csv',repeat('cd',32),'staged')`);
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status, actor_user_id)
+      VALUES
+        ('batch-covered','csv',repeat('ab',32),'staged','user-director'),
+        ('batch-missing','csv',repeat('cd',32),'staged','user-director')`);
     await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
     await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
       VALUES ('batch-covered','product','srcv_product'), ('batch-missing','aftersale','srcv_aftersale')`);
@@ -45,8 +47,8 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
       VALUES ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),
         'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')
       ON CONFLICT (source_version_id) DO NOTHING`);
-    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
-      VALUES ('batch-allergy','csv',repeat('ef',32),'validating')`);
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status, actor_user_id)
+      VALUES ('batch-allergy','csv',repeat('ef',32),'validating','user-director')`);
     await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
     await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
       VALUES ('batch-allergy','product','srcv_product')`);
@@ -120,8 +122,10 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
       VALUES
         ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z'),
         ('srcv_aftersale','SRC-AFTERSALE','aftersale','v1',repeat('cd',32),'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')`);
-    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
-      VALUES ('batch-covered','csv',repeat('ab',32),'staged'), ('batch-missing','csv',repeat('cd',32),'staged')
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status, actor_user_id)
+      VALUES
+        ('batch-covered','csv',repeat('ab',32),'staged','user-director'),
+        ('batch-missing','csv',repeat('cd',32),'staged','user-director')
       ON CONFLICT (import_batch_id) DO NOTHING`);
     await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
     await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
@@ -160,8 +164,9 @@ describe.skipIf(!enabled)('publish and rollback read the source set by domain', 
       VALUES ('srcv_product','SRC-PRODUCT','product','v1',repeat('ab',32),
         'canonical','ROLE-CONTENT-LEAD','EVD','synthetic-owner','2020-01-01T00:00:00Z','2099-01-01T00:00:00Z')
       ON CONFLICT (source_version_id) DO NOTHING`);
-    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status)
-      VALUES ('batch_http_denied','csv',repeat('ab',32),'staged') ON CONFLICT DO NOTHING`);
+    await fixture.admin.query(`INSERT INTO public.import_batches(import_batch_id, source_type, source_binding_hash, status, actor_user_id)
+      VALUES ('batch_http_denied','csv',repeat('ab',32),'staged','user-director')
+      ON CONFLICT (import_batch_id) DO NOTHING`);
     await fixture.admin.query("SELECT set_config('app.import_binding_write','on',false)");
     await fixture.admin.query(`INSERT INTO public.import_batch_source_bindings(import_batch_id, domain, source_version_id)
       VALUES ('batch_http_denied','product','srcv_product') ON CONFLICT DO NOTHING`);

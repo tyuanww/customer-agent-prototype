@@ -1,6 +1,6 @@
 # 项目架构与目录边界
 
-本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.22.0` / `schema.v1.25`；`packages/database` 当前为八十段，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务，`0033` 原子安装已批准的组织、会话、目录及用途权限伴随合同，`0034` 追加冻结CSV输入格式守卫，`0035` 补齐旧目录校验的八个函数执行权限，`0079` 增加身份活动投影，`0080` 在导入批次写入时将租户绑定到当前内容主体。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线规范 CSV/XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
+本页说明产品仓当前模块职责、运行时边界和文件归属。它描述当前代码，不等于生产架构已经完成；仓库身份和产品化生命周期见 [`PROJECT_CHARTER.md`](../PROJECT_CHARTER.md)，正式衔接见 [原型基线 → 正式九端口](reference-api-adapter-handoff.md)。本期资料接入保持 `v0.3.26`，P2 合同消费锁已推进到 OpenAPI `1.22.0` / `schema.v1.25`；`packages/database` 当前为八十一段，`0031` 接收冻结发布政策 DDL，`0032` 接入确认直发事务，`0033` 原子安装已批准的组织、会话、目录及用途权限伴随合同，`0034` 追加冻结CSV输入格式守卫，`0035` 补齐旧目录校验的八个函数执行权限，`0079` 增加身份活动投影，`0080` 在导入批次写入时将租户绑定到当前内容主体，`0081` 要求该主体存在且使用显式租户。API 已按服务端固定的 `direct-v1` 创建新候选，保留来源确认和质量检查；发布／回退不再创建人工审批，通过 Main 原生二次确认表达操作意图，最终权限、范围、版本和原子提交由 API / SQL 复核。旧 `approval-v1` 候选必须显式修订后才能首次直发；已发布历史与混合目录继续保留旧审批谱系和失效规则，旧未知操作只查原回执。显式 FAQ 合成 profile 已接线规范 CSV/XLSX 上传、候选修订／取消、质量检查、来源确认、确认发布及坐席查询复制；未装配审批 provider，不开放生产路由或新应用 ACL。实现、验证与剩余接入条件见 [P2 交接](reference-content-intake-p2-contract-handoff.md)。`packages/retrieval-core` 已把 BM25、RRF、余弦相似度、分数门槛和字符分词下沉为纯算法包，产品字段权重、数据读取和 Electron 接线仍留在桌面 adapter。DEV-M0 / DEV-M1、G1A-E0、D1～D5 的历史切片和批准边界继续保留在本页与对应计划中；S0 桌面默认仍走合成 fixture，显式 loopback 接入 profile 已接线合成 adapter。合成登录后的查询主链见 [桌面语义检索](reference-desktop-retrieval.md)。真实业务数据、正式 runtime activation 和生产数据接入仍未放行。
 
 ## 1. 先看整体
 
@@ -101,7 +101,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；正式账号从 `app_users.display_name` 取标签，合成宿主可显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；系统主体及两个旧合成身份的已知旧事实不进入目录，后者作为当前操作者或有新事实、姓名、飞书绑定、组织登记或核对基线后的新登录时恢复正常判断。迁移 0079 的受限函数只返回新身份活动的布尔值，不暴露身份标识；通过用途过滤的主体缺标签时整页失败，历史和授权不变 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成当前八十段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫，0035追加旧CHECK执行闭包，0079 投影身份活动，0080 将导入批次租户绑定到当前内容主体；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成当前八十一段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫，0035追加旧CHECK执行闭包，0079 投影身份活动，0080 将导入批次租户绑定到当前内容主体，0081 拒绝没有 principal 或只有 `default` 租户主体的新增导入批次；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |
@@ -109,7 +109,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 
 历史 OpenAPI1.19 管理上下文未新增 DDL，当时26段 SQL 的来源和校验和保持不变。当前1.21/schema1.23消费保留前32段，已有三十二行账本只追加0033。迁移规划器仍允许同 DDL、不同合同身份的已审前序，但逐行来源和校验和不得改写；旧1.17与1.18的同目录兼容证据保留。证据见[管理上下文验收](../evidence/qa/content-intake-p2-management-context/README.md)。
 
-产品迁移 `0080_bind_import_batch_tenant` 拥有导入批次的租户绑定。历史导入入口仍写入 `default` 租户，但授权已经按当前 actor 的内容主体判断；该触发器从 `content_intake.principals` 读取同一 actor 的真实租户，使批次、当前发布、暂存行和来源版本在同一租户下完成发布校验。触发器缺少内容主体时保留原值，不创建主体，也不接受 renderer 或 HTTP 传入的租户。
+产品迁移 `0080_bind_import_batch_tenant` 拥有导入批次的租户绑定。历史导入入口仍写入 `default` 租户，但授权已经按当前 actor 的内容主体判断；该触发器从 `content_intake.principals` 读取同一 actor 的真实租户，使批次、当前发布、暂存行和来源版本在同一租户下完成发布校验。`0081_require_import_batch_principal` 把该边界收紧为强制不变量，actor 缺少唯一 principal 或 principal 仍使用 `default` 租户时拒绝新增批次，不创建主体，也不接受 renderer 或 HTTP 传入的租户。
 
 产品迁移 `0026_intake_discovery_index` 只增加非撤销授权按主体/范围/来源/动作/截止检索的物理索引；`authorization_deadline` 仍是业务判定所有者，原 ACL 与旧迁移不变。容量消费及边界见[授权发现验收](../evidence/qa/content-intake-p2-discovery/README.md)。
 

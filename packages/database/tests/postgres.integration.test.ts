@@ -56,6 +56,7 @@ const SOP_REPAIR_SUFFIX = [
   '0078_seat_manual_grants',
   '0079_directory_identity_activity',
   '0080_bind_import_batch_tenant',
+  '0081_require_import_batch_principal',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -208,12 +209,13 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect((await applyDatabaseMigrations(client)).applied.map(migration => migration.id)).toEqual([
         '0079_directory_identity_activity',
         '0080_bind_import_batch_tenant',
+        '0081_require_import_batch_principal',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
   }, 120_000);
 
-  it('binds a legacy import batch to the actor principal tenant and preserves default for an unknown actor', async () => {
+  it('binds a legacy import batch to the actor principal tenant and rejects an unknown actor', async () => {
     const database = harness.createDatabase('import_batch_tenant');
     const client = await harness.connect(database.config);
     try {
@@ -233,11 +235,42 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
             'bound-principal', 'usr-bound', 'tenant-bound', 'app-bound',
             'confirmed-synthetic', 'bound-person', 1
           );
+          INSERT INTO content_intake.principal_facts(
+            principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest
+          ) VALUES (
+            'bound-principal', 1, ARRAY['dept-bound'], 'job-bound', TRUE,
+            clock_timestamp() - interval '1 second', clock_timestamp() + interval '4 minutes', repeat('d', 64)
+          );
+          INSERT INTO backend_identity.subject_bindings(
+            binding_id, provider, tenant, subject, user_id, subject_hash, enabled, role
+          ) VALUES (
+            'default-actor', 'synthetic', 'default', 'default-actor', 'usr-default',
+            repeat('e', 64), true, 'owner'
+          );
+          INSERT INTO content_intake.principals(
+            principal_id, user_id, tenant_id, app_id, identity_scope, person_key, current_facts_version
+          ) VALUES (
+            'default-principal', 'usr-default', 'default', 'app-default',
+            'confirmed-synthetic', 'default-person', 1
+          );
+          INSERT INTO content_intake.principal_facts(
+            principal_id, facts_version, department_ids, job_id, enabled, checked_at, valid_until, facts_digest
+          ) VALUES (
+            'default-principal', 1, ARRAY['dept-default'], 'job-default', TRUE,
+            clock_timestamp() - interval '1 second', clock_timestamp() + interval '4 minutes', repeat('f', 64)
+          )
+        `);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+      await client.query('BEGIN');
+      try {
+        await client.query(`
           INSERT INTO public.import_batches(
             import_batch_id, source_type, source_binding_hash, status, actor_user_id, tenant_id
-          ) VALUES
-            ('batch-bound', 'csv', repeat('a', 64), 'validating', 'usr-bound', 'default'),
-            ('batch-legacy', 'csv', repeat('b', 64), 'validating', 'usr-unknown', 'default');
+          ) VALUES ('batch-bound', 'csv', repeat('a', 64), 'validating', 'usr-bound', 'default');
         `);
         expect((await client.query(`
           SELECT import_batch_id, tenant_id
@@ -246,11 +279,28 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
           ORDER BY import_batch_id
         `)).rows).toEqual([
           { import_batch_id: 'batch-bound', tenant_id: 'tenant-bound' },
-          { import_batch_id: 'batch-legacy', tenant_id: 'default' },
         ]);
       } finally {
         await client.query('ROLLBACK');
       }
+      await expectSqlState(
+        client,
+        "INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status,actor_user_id,tenant_id) VALUES ('batch-unknown','csv',repeat('b',64),'validating','usr-unknown','default')",
+        'ZA003',
+        'TENANT_BINDING_REQUIRED',
+      );
+      await expectSqlState(
+        client,
+        "INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status,actor_user_id,tenant_id) VALUES ('batch-null','csv',repeat('c',64),'validating',NULL,'default')",
+        'ZA003',
+        'TENANT_BINDING_REQUIRED',
+      );
+      await expectSqlState(
+        client,
+        "INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status,actor_user_id,tenant_id) VALUES ('batch-default-principal','csv',repeat('d',64),'validating','usr-default','default')",
+        'ZA003',
+        'TENANT_BINDING_REQUIRED',
+      );
     } finally { await client.end(); }
   }, 120_000);
 

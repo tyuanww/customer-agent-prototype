@@ -351,6 +351,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0079_directory_identity_activity',
     requiresPredecessor: 'Actor-bound import tenancy requires directory identity activity',
   },
+  {
+    index: 80,
+    minimumCatalogueLength: 81,
+    id: '0081_require_import_batch_principal',
+    predecessorId: '0080_bind_import_batch_tenant',
+    requiresPredecessor: 'Required import tenant binding requires actor-bound import tenancy',
+  },
 ];
 
 function requiredSuccessorStep(

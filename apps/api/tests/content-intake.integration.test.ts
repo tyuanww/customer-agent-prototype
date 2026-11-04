@@ -2587,8 +2587,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const batchId = `quality-probe-${label}`;
     const planId = `qplan_probe-${label}`;
     const jobId = `quality-job-${label}`;
-    await admin.query(`INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status)
-      VALUES ($1,'other',repeat('a',64),'validating')`, [batchId]);
+    await admin.query(`INSERT INTO public.import_batches(import_batch_id,source_type,source_binding_hash,status,actor_user_id)
+      VALUES ($1,'other',repeat('a',64),'validating','user-enabler')`, [batchId]);
     await admin.query(`INSERT INTO public.outbox_jobs(job_id,job_type,payload,status,lease_owner,lease_version,lease_expires_at)
       VALUES ($1,'import_validate',jsonb_build_object('import_batch_id',$2::text),'running','quality-probe',1,clock_timestamp()+interval '60 seconds')`, [jobId,batchId]);
     const frozen = await admin.query(`SELECT * FROM public.freeze_content_quality_review_plan(
