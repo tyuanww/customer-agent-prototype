@@ -7,12 +7,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repositoryRoot = path.resolve(root, '../..');
 const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+  desktopName: string;
   scripts: Record<string, string>;
   build: {
     extraResources: Array<{ from: string; to: string }>;
     linux: {
       executableName: string;
       icon: string;
+      syncDesktopName: boolean;
       target: Array<{ target: string; arch: string[] }>;
       artifactName: string;
     };
@@ -44,6 +46,8 @@ describe('Linux local-unsigned packaging contract', () => {
     );
     expect(packageJson.build.linux.executableName).toMatch(/^[A-Za-z0-9._-]+$/);
     expect(packageJson.build.linux.executableName).not.toContain('@');
+    expect(packageJson.desktopName).toBe(packageJson.build.linux.executableName);
+    expect(packageJson.build.linux.syncDesktopName).toBe(true);
     expect(packageJson.build.linux.icon).toBe('build/icon.png');
     expect(packageJson.build.linux.target).toEqual([{ target: 'AppImage', arch: ['x64'] }]);
     expect(packageJson.build.linux.artifactName).toContain('UNSIGNED');

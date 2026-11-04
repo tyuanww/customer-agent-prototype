@@ -6,6 +6,7 @@
   "author": "Customer Agent Demo",
   "type": "module",
   "main": "./out/main/index.js",
+  "desktopName": "customer-agent-desktop",
   "scripts": {
     "dev": "electron-vite dev",
     "typecheck": "tsc --noEmit",
@@ -168,6 +169,7 @@
     },
     "linux": {
       "executableName": "customer-agent-desktop",
+      "syncDesktopName": true,
       "icon": "build/icon.png",
       "category": "Office",
       "target": [
