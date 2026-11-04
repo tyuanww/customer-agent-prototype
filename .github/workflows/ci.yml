@@ -122,8 +122,6 @@ jobs:
     name: Windows feasibility smoke
     runs-on: windows-latest
     timeout-minutes: 35
-    env:
-      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}\electron-builder-cache
     permissions:
       contents: read
       actions: write
@@ -154,6 +152,8 @@ jobs:
       - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode != 'docs'
+        env:
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}\electron-builder-cache
         run: pnpm package:win
       - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Windows package
@@ -178,8 +178,6 @@ jobs:
     name: Linux feasibility smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    env:
-      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
     permissions:
       contents: read
       actions: write
@@ -210,6 +208,8 @@ jobs:
       - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode != 'docs'
+        env:
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
         run: pnpm package:linux
       - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Linux package
