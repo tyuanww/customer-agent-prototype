@@ -121,7 +121,7 @@ describe('macOS distribution contract', () => {
     expect(packageRunner).toContain("buildEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'");
     expect(packageRunner).toContain("'-c.mac.identity=null'");
     expect(packageRunner).toContain("'-c.mac.notarize=false'");
-    expect(packageRunner).toContain("mode === 'local' ? 'local-unsigned' : 'distribution'");
+    expect(packageRunner).toContain('macPackageOutputDirectory(repositoryRoot, mode)');
     expect(packageJson.build.directories.output).toBe('../../release');
     expect(packageRunner).toContain('-UNSIGNED.${ext}');
     expect(packageRunner).toContain("'scripts/finalize-mac-package.mjs', mode");
@@ -146,6 +146,25 @@ describe('macOS distribution contract', () => {
       entitlements: 'build/entitlements.mac.plist',
       entitlementsInherit: 'build/entitlements.mac.inherit.plist',
     });
+  });
+
+  it('writes local and distribution outputs to separate platform roots', async () => {
+    const paths = await import(
+      pathToFileURL(path.join(root, 'scripts/mac-package-paths.mjs')).href
+    ) as {
+      macPackageOutputDirectory: (projectRoot: string, mode: string) => string;
+    };
+    const projectRoot = path.join(os.tmpdir(), 'customer-agent-mac-outputs');
+
+    expect(paths.macPackageOutputDirectory(projectRoot, 'local')).toBe(
+      path.join(projectRoot, 'release', 'local-unsigned', 'mac'),
+    );
+    expect(paths.macPackageOutputDirectory(projectRoot, 'distribution')).toBe(
+      path.join(projectRoot, 'release', 'distribution'),
+    );
+    expect(() => paths.macPackageOutputDirectory(projectRoot, 'other')).toThrow(
+      /Unknown macOS package mode/,
+    );
   });
 
   it('bridges the macOS system trust store without disabling TLS verification', () => {

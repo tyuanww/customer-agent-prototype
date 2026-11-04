@@ -20,7 +20,7 @@
 
 做法：
 
-1. 在产品仓 `main` 上跑 `pnpm package:mac:local`。产物在 `release/local-unsigned/`，文件名含 `UNSIGNED` 和当前 `VERSION`。
+1. 在产品仓 `main` 上跑 `pnpm package:mac:local`。产物在 `release/local-unsigned/mac/`，文件名含 `UNSIGNED` 和当前 `VERSION`。
 2. 确认 `https://agent-auth.jianghua.site/health` 为 200。本机不要另装 PostgreSQL。
 3. 把下面的 `synthetic-stack.json` 放到 `~/Library/Application Support/客服话术浮窗 Demo/`。打包态忽略 `CUSTOMER_AGENT_DESKTOP_*`。
 4. 关掉旧 `.app`，打开这次的 UNSIGNED。按下面表格勾 1–4。账号登录、关窗/断网仍是未观察。

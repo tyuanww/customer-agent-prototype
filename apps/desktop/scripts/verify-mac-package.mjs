@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { macPackageOutputDirectory } from './mac-package-paths.mjs';
 import { verifyMacPackageBrandGate } from './mac-package-brand-gate.mjs';
 import { assertPackagedOfflineProfile } from './verify-packaged-offline-profile.mjs';
 
@@ -12,11 +13,7 @@ if (mode !== 'local' && mode !== 'distribution') {
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
-const outputDir = path.join(
-  repositoryRoot,
-  'release',
-  mode === 'local' ? 'local-unsigned' : 'distribution',
-);
+const outputDir = macPackageOutputDirectory(repositoryRoot, mode);
 const appContainer = path.join(outputDir, 'mac-universal');
 const appName = readdirSync(appContainer).find((name) => name.endsWith('.app'));
 if (!appName) {

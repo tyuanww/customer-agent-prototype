@@ -280,7 +280,7 @@ describe('Windows local-unsigned packaging contract', () => {
       fixtureRoot,
       'release',
       'local-unsigned',
-      'mac-universal',
+      'mac',
     );
     mkdirSync(windowsOutput, { recursive: true });
     mkdirSync(siblingOutput, { recursive: true });

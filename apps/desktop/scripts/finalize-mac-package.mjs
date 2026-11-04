@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { macPackageOutputDirectory } from './mac-package-paths.mjs';
 
 const mode = process.argv[2];
 if (mode !== 'local' && mode !== 'distribution') {
@@ -9,11 +10,7 @@ if (mode !== 'local' && mode !== 'distribution') {
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
-const outputDir = path.join(
-  repositoryRoot,
-  'release',
-  mode === 'local' ? 'local-unsigned' : 'distribution',
-);
+const outputDir = macPackageOutputDirectory(repositoryRoot, mode);
 
 if (!existsSync(outputDir)) {
   throw new Error(`macOS package output does not exist: ${outputDir}`);

@@ -14,7 +14,7 @@
 
 产物目录分账，不会同名覆盖：
 
-- 本机验证 → `release/local-unsigned/`（文件名强制带 `UNSIGNED`）
+- 本机验证 → 每个平台使用独立子目录：`release/local-unsigned/mac/`、`release/local-unsigned/windows/`、`release/local-unsigned/linux/`（文件名强制带 `UNSIGNED`）
 - 正式 macOS → `release/distribution/`（禁止出现 `UNSIGNED`）
 
 两类目录都被 Git 忽略。`release/` 是本地构建缓存，可删后重打。
