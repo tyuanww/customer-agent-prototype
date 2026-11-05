@@ -9,7 +9,8 @@ import type {
   ReportablePhase,
   ResultCount,
 } from './overlay-events';
-import type { Rect } from './overlay-geometry';
+import { activateSearchCommand, shortcutStatusCommand } from './overlay-events';
+import { resolveSessionQueryAnchor, type Rect } from './overlay-geometry';
 import {
   parseOverlaySnapshot,
   validateOverlaySnapshot,
@@ -157,6 +158,7 @@ export type OverlayEvent =
     } & EventGuard)
   | ({ type: 'TOGGLE_REQUESTED' } & EventGuard)
   | ({ type: 'QUERY_SUBSCRIBED' } & EventGuard)
+  | ({ type: 'QUERY_REACTIVATED'; anchor: QueryAnchor } & EventGuard)
   | ({ type: 'HANDOFF_ARMED'; handoffId: number } & EventGuard)
   | ({ type: 'HANDOFF_OPENED'; handoffId: number } & EventGuard)
   | ({ type: 'HANDOFF_CLOSED'; handoffId: number } & EventGuard)
@@ -194,7 +196,12 @@ export type OverlayEvent =
       resultCount: ResultCount;
       contentRevision: number;
     } & EventGuard)
-  | ({ type: 'LAYOUT_TIMEOUT'; handoffId: number; sequence: number } & EventGuard)
+  | ({
+      type: 'LAYOUT_TIMEOUT';
+      handoffId: number;
+      sequence: number;
+      contentRevision: number;
+    } & EventGuard)
   | ({
       type: 'RESIZE_BEGIN';
       handoffId: number;
@@ -255,6 +262,7 @@ export type OverlayEvent =
       edge?: FoxDockEdge;
       foxBounds?: Rect;
       queryBounds?: Rect;
+      queryAnchor?: QueryAnchor;
     } & EventGuard)
   | ({
       type: 'FOX_EDGE_SYNCED';
@@ -285,6 +293,7 @@ export const OVERLAY_EVENT_TYPES = [
   'DISMISS_REQUESTED',
   'TOGGLE_REQUESTED',
   'QUERY_SUBSCRIBED',
+  'QUERY_REACTIVATED',
   'HANDOFF_ARMED',
   'HANDOFF_OPENED',
   'HANDOFF_CLOSED',
@@ -322,7 +331,7 @@ export type NativeEffect =
   | {
       readonly type: 'SEND_RENDERER_COMMAND';
       readonly target: OverlaySurface;
-      readonly commandId: number;
+      readonly commandId?: number;
       readonly command: OverlayCommand;
     }
   | {
@@ -360,9 +369,26 @@ export type NativeEffect =
     }
   | {
       readonly type: 'SCHEDULE_TIMEOUT';
-      readonly timer: OverlayTimer;
+      readonly timer: 'handoff';
       readonly handoffId: number;
       readonly delayMs: number;
+      readonly guard: EventGuard;
+    }
+  | {
+      readonly type: 'SCHEDULE_TIMEOUT';
+      readonly timer: 'layout';
+      readonly handoffId: number;
+      readonly sequence: number;
+      readonly delayMs: number;
+      readonly guard: EventGuard & { readonly contentRevision: number };
+    }
+  | {
+      readonly type: 'SCHEDULE_TIMEOUT';
+      readonly timer: 'drag-settle';
+      readonly handoffId: number;
+      readonly dragGeneration: number;
+      readonly delayMs: number;
+      readonly guard: EventGuard;
     }
   | {
       readonly type: 'CANCEL_TIMEOUT';
@@ -381,6 +407,11 @@ export type NativeEffect =
     }
   | { readonly type: 'CLEAR_CONTENT' }
   | { readonly type: 'APPLY_QUERY_LAYOUT'; readonly desiredHeight: number }
+  | {
+      readonly type: 'APPLY_QUERY_LAYOUT_FALLBACK';
+      readonly handoffId: number;
+      readonly sequence: number;
+    }
   | {
       readonly type: 'APPLY_RESIZE';
       readonly height: number;
@@ -426,6 +457,23 @@ const NO_EFFECTS: readonly NativeEffect[] = Object.freeze([]);
 const HANDOFF_TIMEOUT_MS = 280;
 const LAYOUT_TIMEOUT_MS = 160;
 const DRAG_TIMEOUT_MS = 1_600;
+
+function timerGuard(state: OverlayState): EventGuard {
+  return {
+    sessionEpoch: state.sessionEpoch,
+    generation: state.generation,
+    windowGeneration: state.windowGeneration,
+  };
+}
+
+function layoutTimerGuard(
+  state: OverlayState,
+): EventGuard & { readonly contentRevision: number } {
+  return {
+    ...timerGuard(state),
+    contentRevision: state.contentRevision,
+  };
+}
 
 export function createInitialOverlayState(input: {
   sessionEpoch: number;
@@ -742,6 +790,9 @@ function startOpening(
     },
   };
   return applied(next, [
+    { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
+    { type: 'CANCEL_TIMEOUT', timer: 'layout' },
+    { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
     {
       type: 'SEND_RENDERER_COMMAND',
       target: 'query',
@@ -757,7 +808,13 @@ function startOpening(
     },
     { type: 'SET_WINDOW_BOUNDS', target: 'query', bounds: plan.queryBounds, windowGeneration: state.windowGeneration },
     { type: 'SET_FOCUSABLE', target: 'fox', focusable: false },
-    { type: 'SCHEDULE_TIMEOUT', timer: 'handoff', handoffId, delayMs: HANDOFF_TIMEOUT_MS },
+    {
+      type: 'SCHEDULE_TIMEOUT',
+      timer: 'handoff',
+      handoffId,
+      delayMs: HANDOFF_TIMEOUT_MS,
+      guard: timerGuard(next),
+    },
   ]);
 }
 
@@ -782,7 +839,7 @@ export function applyOverlayEvent(
     }
     if (
       !isPositiveInteger(event.windowGeneration)
-      || event.windowGeneration <= state.windowGeneration
+      || event.windowGeneration !== state.windowGeneration + 1
     ) {
       return rejected(state, 'stale-window');
     }
@@ -862,6 +919,8 @@ export function applyOverlayEvent(
         },
       };
       return applied(next, [
+        { type: 'CANCEL_TIMEOUT', timer: 'layout' },
+        { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
         {
           type: 'SEND_RENDERER_COMMAND',
           target: 'query',
@@ -876,7 +935,13 @@ export function applyOverlayEvent(
             handoffCenterY: event.handoffCenterY,
           },
         },
-        { type: 'SCHEDULE_TIMEOUT', timer: 'handoff', handoffId, delayMs: HANDOFF_TIMEOUT_MS },
+        {
+          type: 'SCHEDULE_TIMEOUT',
+          timer: 'handoff',
+          handoffId,
+          delayMs: HANDOFF_TIMEOUT_MS,
+          guard: timerGuard(next),
+        },
       ]);
     }
 
@@ -899,6 +964,30 @@ export function applyOverlayEvent(
             },
           }])
         : ignored(state, 'invalid-phase');
+
+    case 'QUERY_REACTIVATED': {
+      if (
+        (state.phase !== 'active' && state.phase !== 'opening')
+        || state.handoff.mode !== 'none'
+      ) {
+        return ignored(state, 'invalid-phase');
+      }
+      return applied({ ...state, focusIntent: 'query' }, [
+        { type: 'SHOW_WINDOW', target: 'query', activate: true, windowGeneration: state.windowGeneration },
+        { type: 'HIDE_WINDOW', target: 'fox', windowGeneration: state.windowGeneration },
+        {
+          type: 'FOCUS_WINDOW',
+          target: 'query',
+          sessionEpoch: state.sessionEpoch,
+          windowGeneration: state.windowGeneration,
+        },
+        {
+          type: 'SEND_RENDERER_COMMAND',
+          target: 'query',
+          command: activateSearchCommand(event.anchor, false),
+        },
+      ]);
+    }
 
     case 'HANDOFF_ARMED': {
       if (
@@ -931,7 +1020,13 @@ export function applyOverlayEvent(
             handoffId: event.handoffId,
           },
         },
-        { type: 'SCHEDULE_TIMEOUT', timer: 'handoff', handoffId: event.handoffId, delayMs: HANDOFF_TIMEOUT_MS },
+        {
+          type: 'SCHEDULE_TIMEOUT',
+          timer: 'handoff',
+          handoffId: event.handoffId,
+          delayMs: HANDOFF_TIMEOUT_MS,
+          guard: timerGuard(next),
+        },
       ]);
     }
 
@@ -979,6 +1074,8 @@ export function applyOverlayEvent(
       };
       const effects: NativeEffect[] = [
         { type: 'CANCEL_TIMEOUT', timer: 'handoff', handoffId: event.handoffId },
+        { type: 'CANCEL_TIMEOUT', timer: 'layout' },
+        { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
         { type: 'SHOW_WINDOW', target: 'fox', activate: false, windowGeneration: state.windowGeneration },
         { type: 'HIDE_WINDOW', target: 'query', windowGeneration: state.windowGeneration },
         { type: 'SET_FOCUSABLE', target: 'query', focusable: false },
@@ -1046,6 +1143,8 @@ export function applyOverlayEvent(
       };
       return applied(next, [
         { type: 'CANCEL_TIMEOUT', timer: 'handoff', handoffId: event.handoffId },
+        { type: 'CANCEL_TIMEOUT', timer: 'layout' },
+        { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
       ]);
     }
 
@@ -1064,12 +1163,15 @@ export function applyOverlayEvent(
       if (event.contentPhase === 'COPIED' && state.contentPhase !== 'RESULTS' && state.contentPhase !== 'COPIED') {
         return rejected(state, 'invalid-phase');
       }
-      return applied({
-        ...state,
-        contentPhase: event.contentPhase,
-        resultCount: event.resultCount,
-        contentRevision: event.contentRevision,
-      });
+      return applied(
+        {
+          ...state,
+          contentPhase: event.contentPhase,
+          resultCount: event.resultCount,
+          contentRevision: event.contentRevision,
+        },
+        [{ type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: state.handoff.id }],
+      );
     }
 
     case 'SESSION_CHANGED': {
@@ -1080,6 +1182,9 @@ export function applyOverlayEvent(
         { type: 'CANCEL_QUERY', sessionEpoch: state.sessionEpoch, generation: state.generation },
         { type: 'CANCEL_COPY', sessionEpoch: state.sessionEpoch, generation: state.generation },
         { type: 'CLEAR_CONTENT' },
+        { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
+        { type: 'CANCEL_TIMEOUT', timer: 'layout' },
+        { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
       ] as const satisfies readonly NativeEffect[];
       const reset = resetContent(state);
       const sessionChanged = {
@@ -1119,20 +1224,27 @@ export function applyOverlayEvent(
         };
         return applied(forcedParked, [
           ...cancelling,
-          { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
           { type: 'SHOW_WINDOW', target: 'fox', activate: false, windowGeneration: state.windowGeneration },
           { type: 'HIDE_WINDOW', target: 'query', windowGeneration: state.windowGeneration },
           { type: 'RESTORE_PREVIOUS_APP', sessionEpoch: event.sessionEpoch, windowGeneration: state.windowGeneration },
         ]);
       }
       if (state.phase === 'active' || state.phase === 'opening') {
-        return applied(
-          { ...sessionChanged, focusIntent: 'query' },
-          [
-            ...cancelling,
-            { type: 'FOCUS_WINDOW', target: 'query', sessionEpoch: event.sessionEpoch, windowGeneration: state.windowGeneration },
-          ],
-        );
+        const next = { ...sessionChanged, focusIntent: 'query' as const };
+        const effects: NativeEffect[] = [
+          ...cancelling,
+          { type: 'FOCUS_WINDOW', target: 'query', sessionEpoch: event.sessionEpoch, windowGeneration: state.windowGeneration },
+        ];
+        if (state.phase === 'opening' && state.handoff.mode !== 'none') {
+          effects.push({
+            type: 'SCHEDULE_TIMEOUT',
+            timer: 'handoff',
+            handoffId: state.handoff.id,
+            delayMs: HANDOFF_TIMEOUT_MS,
+            guard: timerGuard(next),
+          });
+        }
+        return applied(next, effects);
       }
       return applied({ ...sessionChanged, focusIntent: 'fox' }, cancelling);
     }
@@ -1209,7 +1321,14 @@ export function applyOverlayEvent(
         },
       };
       return applied(next, [
-        { type: 'SCHEDULE_TIMEOUT', timer: 'layout', handoffId: event.handoffId, delayMs: LAYOUT_TIMEOUT_MS },
+        {
+          type: 'SCHEDULE_TIMEOUT',
+          timer: 'layout',
+          handoffId: event.handoffId,
+          sequence: event.sequence,
+          delayMs: LAYOUT_TIMEOUT_MS,
+          guard: layoutTimerGuard(next),
+        },
         { type: 'APPLY_QUERY_LAYOUT', desiredHeight: event.desiredHeight },
       ]);
     }
@@ -1244,7 +1363,15 @@ export function applyOverlayEvent(
         && event.handoffId === state.handoff.id
         && event.sequence === state.layout.sequence
         && event.sequence > state.layout.ackSequence
-        ? applied(state, [{ type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: event.handoffId }])
+        && event.contentRevision === state.contentRevision
+        ? applied(state, [
+            { type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: event.handoffId },
+            {
+              type: 'APPLY_QUERY_LAYOUT_FALLBACK',
+              handoffId: event.handoffId,
+              sequence: event.sequence,
+            },
+          ])
         : rejected(state, 'stale-layout');
 
     case 'RESIZE_BEGIN': {
@@ -1481,7 +1608,14 @@ export function applyOverlayEvent(
           windowGeneration: state.windowGeneration,
         },
         { type: 'FOX_DRAG_SETTLED', ack },
-        { type: 'SCHEDULE_TIMEOUT', timer: 'drag-settle', handoffId: event.settleId, delayMs: DRAG_TIMEOUT_MS },
+        {
+          type: 'SCHEDULE_TIMEOUT',
+          timer: 'drag-settle',
+          handoffId: event.settleId,
+          dragGeneration: event.dragGeneration,
+          delayMs: DRAG_TIMEOUT_MS,
+          guard: timerGuard(next),
+        },
       ]);
     }
 
@@ -1550,10 +1684,16 @@ export function applyOverlayEvent(
       if (state.drag.session || state.drag.settle) {
         return rejected(state, 'drag-settle-pending');
       }
+      const queryAnchor = event.queryAnchor;
       if (
         !event.foxBounds
         || !isRect(event.foxBounds)
         || (event.queryBounds !== undefined && !isRect(event.queryBounds))
+        || (
+          event.queryBounds !== undefined
+          && queryAnchor !== 'left'
+          && queryAnchor !== 'right'
+        )
         || !event.edge
       ) {
         return rejected(state, 'invalid-event');
@@ -1577,11 +1717,25 @@ export function applyOverlayEvent(
         { type: 'SYNC_FOX_EDGE', edge: event.edge, peekEpoch },
       ];
       if (event.queryBounds) {
+        if (!queryAnchor) {
+          return rejected(state, 'invalid-event');
+        }
         effects.push({
           type: 'SET_WINDOW_BOUNDS',
           target: 'query',
           bounds: event.queryBounds,
           windowGeneration: state.windowGeneration,
+        });
+        effects.push({
+          type: 'SEND_RENDERER_COMMAND',
+          target: 'query',
+          command: {
+            type: 'sync-query-anchor',
+            anchor: resolveSessionQueryAnchor(
+              state.drag.queryAnchor,
+              queryAnchor,
+            ),
+          },
         });
       }
       return applied(next, effects);
@@ -1621,14 +1775,36 @@ export function applyOverlayEvent(
       return applied({ ...state, fox: { ...state.fox, peekIntent: event.intent } });
 
     case 'SHORTCUT_STATUS_CHANGED':
-      return applied({
-        ...state,
-        shortcut: {
-          registered: event.registered,
-          accelerator: event.accelerator,
-          message: event.message,
+      return applied(
+        {
+          ...state,
+          shortcut: {
+            registered: event.registered,
+            accelerator: event.accelerator,
+            message: event.message,
+          },
         },
-      });
+        [
+          {
+            type: 'SEND_RENDERER_COMMAND',
+            target: 'fox',
+            command: shortcutStatusCommand({
+              registered: event.registered,
+              accelerator: event.accelerator,
+              message: event.message,
+            }),
+          },
+          {
+            type: 'SEND_RENDERER_COMMAND',
+            target: 'query',
+            command: shortcutStatusCommand({
+              registered: event.registered,
+              accelerator: event.accelerator,
+              message: event.message,
+            }),
+          },
+        ],
+      );
 
     case 'RENDERER_FRAME_OBSERVED':
       return applied(state);

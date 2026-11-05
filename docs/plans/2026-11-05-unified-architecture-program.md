@@ -55,4 +55,6 @@ ARC-01 建立手写的共享合同源 `packages/unified-contracts`。它为后�
 - reducer 保留原 content 合法迁移，并增加单调 content revision，避免迟到 `COPIED` / `ERROR` / `SEARCH_INPUT` 覆盖较新内容。布局 ACK 只在匹配当前 pending sequence 时消费；同代 drag settle 后的 move 直接拒绝，单个状态不会同时拥有 drag session 和 settle。
 - Main 在 effect 队列完全收敛后发布一次最终 snapshot；取消通过 typed `OverlayWorkPort` 执行，默认端口向 Query 发送关闭查询、复制和内容清理命令，后续正式 adapter 可替换同一端口。
 - 原生 drag transaction 和 blur recheck 由 session/window identity 隔离；session、window 重建或关闭会清除它们。frame 观测以 `kind:id` 复合键有界记录，指标诚实标为 Main 到 renderer rAF callback，而不是 paint。
+- 第二轮独立 verifier 发现 timeout 与直接 renderer command 仍可绕过 reducer。修复后 handoff、layout 和 drag timeout 均携带 captured session/generation/window identity，layout 另带 sequence/content revision；超时先回到 reducer，再由 typed fallback effect 发送 ACK。Query reactivation、display anchor 同步、fallback ACK 和 shortcut status 都改为 `NativeEffect`。
+- frame observation key 现在包含完整 origin identity 和 command kind/id；generation、session、window 或 content revision 变化会清除 pending 样本并计入 dropped。window recreation 的 current+1 规则已移到 reducer，cold 指标明确为 first completed observation。
 - 失败方案：为 commit 使用拖拽前 identity 会因 settle 创建时递增 lifecycle generation 而误拒绝；最终改为 settle 创建不推进 lifecycle generation，内容推进由独立 revision 表达。复杂 native setBounds 测试若复用未 commit 的 harness drag，会产生后续 UI drag 被旧 settle 阻断；测试 harness 现按真实 Fox commit 路径收尾。

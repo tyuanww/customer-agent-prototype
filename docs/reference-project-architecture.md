@@ -250,7 +250,9 @@ v1.17 migrated PG15
 
 Main 将同一个 `OverlaySnapshotProjection` 投影到 Fox / Query：`contract` 的类型、构造与运行时校验直接来自 ARC-01 `@customer-agent/unified-contracts`，外层只增加桌面渲染所需的 content revision、focus、drag、Fox edge 与 shortcut 只读视图。renderer 不维护第二份 authoritative handoff/layout 真值；每条 renderer report 携带发起时的 session epoch、generation、window generation 与 content revision，Main 不让当前状态替旧事件补身份。session epoch 变化通过 injectable typed work port 实际取消旧 query/copy、清空内容并把焦点恢复到仍存活的 Query；窗口重建只接受当前值加一的 generation，并使旧 ACK 全部失效。新增的 `overlay:event` 是固定、精确 payload 的窄通道，也只接受可信主 frame；frame observation 作为其封闭事件变体，没有通用 IPC。
 
-Reducer 的 content transition table 保留原产品的合法路径：`RESULTS` / `COPIED` 才可进入 `COPIED`，空问题、命中、空结果和错误可从活动内容态重置；content revision 单调递增，迟到事件不能覆盖新内容。Main 在完整 effect 队列收敛后只发布一次快照；布局 ACK 的嵌套 effect 不再回放旧快照或重排已消费的超时。原生 Fox drag transaction 与 blur recheck 计时器绑定 session / window identity，变化时立即失效；frame 指标使用复合 command kind/id，并明确只测 Main 发送到 renderer rAF callback，不宣称 paint completion。
+Reducer 的 content transition table 保留原产品的合法路径：`RESULTS` / `COPIED` 才可进入 `COPIED`，空问题、命中、空结果和错误可从活动内容态重置；content revision 单调递增，迟到事件不能覆盖新内容。Main 在完整 effect 队列收敛后只发布一次快照；布局 ACK 的嵌套 effect 不再回放旧快照或重排已消费的超时。handoff、layout 和 drag timeout effect 携带创建时的 session / generation / window identity，layout 还携带 sequence 与 content revision；超时回到 reducer 判定后才执行 fallback，retry、关闭和旧代 timer 不能在当前状态上产生迟到的 renderer command。
+
+所有 transition 驱动的 renderer command 都由 `NativeEffect` 表达，包括 Query reactivation、display anchor 同步、fallback layout ACK 和 shortcut status。Main 只保留 effect executor 内的发送入口；snapshot 发布是 effect 队列收敛后的单向投影，不参与状态转换。原生 Fox drag transaction 与 blur recheck 计时器绑定 session / window identity，变化时立即失效；frame 指标使用完整 origin identity 加 command kind/id，并明确只测 Main 发送到 renderer callback，不宣称 paint completion。
 
 ```text
 unit          纯函数、协议、脚本和安全门

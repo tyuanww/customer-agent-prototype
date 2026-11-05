@@ -483,7 +483,9 @@ describe('overlay geometry', () => {
     expect(controller).toContain('settleQueryDragGesture(queryRect, workArea, queryAnchor)');
     expect(controller).toContain('this.sessionQueryAnchor()');
     expect(controller).toContain('this.sessionQueryAnchor(queryAnchorForFox(foxBounds, workArea))');
-    expect(controller).toContain('this.sessionQueryAnchor(queryAnchorForFox(clampedFox, workArea))');
+    expect(controller).toContain('const queryAnchor = queryBounds');
+    expect(controller).toContain('queryAnchorForFox(clampedFox, workArea)');
+    expect(controller).toContain('queryAnchor,');
     expect(controller).toContain('this.overlayState.drag.queryAnchor ?? undefined');
     expect(controller).toContain(
       'return resolveSessionQueryAnchor(this.overlayState.drag.queryAnchor, computed)',
@@ -522,6 +524,9 @@ describe('overlay geometry', () => {
     expect(controller).not.toContain('-FOX_DRAG_SAFE_OVERFLOW_PX');
     expect(controller).not.toContain('settleAndClearQueryDrag');
     expect(controller).not.toContain('sendToQuery({ type: \'sync-query-anchor\', anchor: settled.anchor })');
+    expect(controller).not.toContain('sendToQuery(activateSearchCommand');
+    expect(controller).not.toContain('sendToQuery(syncQueryAnchorCommand');
+    expect(controller).toContain("case 'APPLY_QUERY_LAYOUT_FALLBACK'");
   });
 
   it('keeps foxOrigin continuous across split Query-drag chunks that cross the midline', () => {

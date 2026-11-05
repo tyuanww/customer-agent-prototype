@@ -2045,6 +2045,7 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
               p95: number | null;
               p99: number | null;
               coldMs: number | null;
+              coldSemantics: 'first-completed-observation';
               pending: number;
               errors: number;
             };
@@ -2069,7 +2070,7 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
       environment: `${process.platform}/${process.arch}; Electron production build; ${process.arch} host`,
       errors: errors + mainMetrics.errors,
       errorMessages,
-      coldWarm: `first native command ${mainMetrics.coldMs ?? 'unavailable'} ms; ${cycles} complete open/focus/layout/close cycles`,
+      coldWarm: `first completed renderer callback ${mainMetrics.coldMs ?? 'unavailable'} ms from the first observed command; ${cycles} complete open/focus/layout/close cycles`,
       evidenceComplete: mainMetrics.count >= 200,
       limiter: 'Main IPC send + renderer scheduling; no paint-completion signal was observed',
       mainCommandToRendererCallback: mainMetrics,
