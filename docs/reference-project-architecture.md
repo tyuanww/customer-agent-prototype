@@ -235,6 +235,14 @@ v1.17 migrated PG15
 
 ## 5. 测试和验证层级
 
+### 5.1 统一架构手写合同（ARC-01）
+
+`packages/unified-contracts/src/index.ts` 是手写跨模块合同的唯一所有者，拥有 branded `UserId` / `SessionEpoch` / `ReleaseId` / `OperationId` / `QueryId`、`AccessDecision` 及其三个最小投影、`QueryOutcome`、`OperationEnvelope`、`ReleaseSnapshot` 和 `OverlaySnapshot`。`packages/contracts` 仍只拥有冻结上游 OpenAPI 的生成资产；两者之间的消费必须经过显式 adapter。
+
+`AUTHORIZATION_MATRIX` 是 role、action、scope kind 和约束的唯一源。`packages/unified-contracts/scripts/generate-policy-artifacts.mjs` 生成 JSON 矩阵和数据库 role-ceiling seed，`check:generated` 以字节级比较拒绝手改漂移。数据库仍是运行时授权权威，矩阵生成物不授予 renderer、Query 或 Dashboard 额外能力。Query 只消费 `QueryAccessView`，Dashboard 设置只消费 `DashboardSettingsView`，管理员操作才消费 `AdminAccessView`。
+
+操作状态的 owner 保持在手写合同包内；API 后续实现负责持久化和恢复，必须遵守 accepted → running → committed/unknown 等显式转换与回执规则。overlay 快照由桌面 adapter 按 epoch 和 generation 消费。本 PR 只验证合同边界和纯函数，不宣称下游 UI、API、数据库并发或真实业务数据已接线。
+
 ```text
 unit          纯函数、协议、脚本和安全门
   ↓
