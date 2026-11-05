@@ -1033,6 +1033,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     reportCloseFrameAndMilestone,
     reportHandoffMilestone,
     reportOverlayEvent,
+    reportPhase,
   ]);
 
   useLayoutEffect(() => {
