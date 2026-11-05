@@ -203,7 +203,12 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
       expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
         'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);
       const result = await applyDatabaseMigrations(client);
-      expect(result.applied.map((migration) => migration.id)).toEqual(['0078_seat_manual_grants', '0079_directory_identity_activity']);
+      expect(result.applied.map((migration) => migration.id)).toEqual([
+        '0078_seat_manual_grants',
+        '0079_directory_identity_activity',
+        '0080_bind_import_batch_tenant',
+        '0081_require_import_batch_principal',
+      ]);
       expect((await snapshot()).rows).toEqual(before);
       expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
         'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);
