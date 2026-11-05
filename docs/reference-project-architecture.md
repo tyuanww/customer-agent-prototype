@@ -243,6 +243,16 @@ v1.17 migrated PG15
 
 操作状态的 owner 保持在手写合同包内；API 后续实现负责持久化和恢复，必须遵守 accepted → running → committed/unknown 等显式转换与精确回执规则，`expired` 是显式终态。SOP branch 必须绑定 decision source；Scope、release index 身份和 content Top 3 的唯一排序/复制句柄也由本包验证。overlay 快照由桌面 adapter 按 epoch 和 generation 消费。本 PR 只验证合同边界和纯函数，不宣称下游 UI、API、数据库并发或真实业务数据已接线。
 
+### 5.2 桌面 overlay 单一状态所有者（OVL-01）
+
+`apps/desktop/src/shared/overlay-machine.ts` 是 Fox / Query overlay 的唯一状态与转换所有者，集中保存 lifecycle/content phase、active surface、handoff identity/mode、focus intent、layout/resize sequence、drag session/settle identity、session epoch、generation 和 window generation。`applyOverlayEvent` 是纯函数，返回 `applied / ignored / rejected`、下一状态和 typing 后的 `NativeEffect[]`；BrowserWindow、focus、bounds、timers 和 renderer command 只能由 `overlay-controller.ts` 执行这些 effect。迟到 handoff、layout、drag、blur、session、release 和内容事件按 window generation、session epoch、handoff/layout sequence、release/content revision 与 drag settle identity fail-closed，不能重新打开已关闭窗口、回滚 release 或提交旧显示器的 bounds。Query 首次订阅晚于打开命令时，reducer 重放创建 opening 时保存的原始 `prepare-search`，不会用零中心或 identity transform 重造动画起点。
+
+Main 将同一个 `OverlaySnapshotProjection` 投影到 Fox / Query：`contract` 的类型、构造与运行时校验直接来自 ARC-01 `@customer-agent/unified-contracts`，外层只增加桌面渲染所需的 content/release sequence、focus、drag、Fox edge 与 shortcut 只读视图。projection 对顶层、handoff、layout、drag、session、settle、Fox、shortcut、rect 和 pending-open plan 都使用 exact-key 校验；renderer 不维护第二份 authoritative handoff/layout 真值。每条 renderer report 携带发起时的 session epoch、generation、window generation 与 content revision，release change 另带服务端单调 `releaseSequence`，Main 不让当前状态替旧事件补身份。没有 snapshot 时 Query 不生成默认 identity，也不报告 UI、layout 或 release。session epoch 变化通过 injectable typed work port 实际取消旧 query/copy、清空内容并把焦点恢复到仍存活的 Query；窗口重建只接受当前值加一的 generation，保留当前 release，并使旧 ACK 全部失效。新增的 `overlay:event` 是固定、精确 payload 的窄通道，也只接受可信主 frame；frame observation 作为其封闭事件变体，没有通用 IPC。
+
+Reducer 的 content transition table 保留原产品的合法路径：`RESULTS` / `COPIED` 才可进入 `COPIED`，空问题、命中、空结果和错误可从活动内容态重置；content revision 单调递增，迟到事件不能覆盖新内容。Main 在完整 effect 队列收敛后只发布一次快照；布局 ACK 的嵌套 effect 不再回放旧快照或重排已消费的超时。handoff、layout 和 drag timeout effect 携带创建时的 session / generation / window identity，layout 还携带 sequence 与 content revision；超时回到 reducer 判定后才执行 fallback，retry、关闭和旧代 timer 不能在当前状态上产生迟到的 renderer command。
+
+所有 transition 驱动的 renderer command 都由 `NativeEffect` 表达，包括 Query reactivation、display anchor 同步、fallback layout ACK 和 shortcut status。fallback native resize 完成后，Main 发出 `LAYOUT_FALLBACK_APPLIED`，再由 reducer 产生 `SEND_RENDERER_COMMAND` ACK。Main 只保留 effect executor 内的发送入口；snapshot 发布是 effect 队列收敛后的单向投影，不参与状态转换。被 reducer 拒绝的 layout report 不再按当前状态改原生 bounds 或提交 ACK。原生 Fox drag transaction、display reconciliation 和 post-drag work 绑定 session / window identity 与 drag generation，lifecycle 或 drag generation 变化后旧 timer 不得执行。frame 指标使用完整 origin identity 加 command kind/id，`coldMs` 是首个完成观测自身的 callback duration，并明确只测 Main 发送到 renderer callback，不宣称 paint completion。
+
 ```text
 unit          纯函数、协议、脚本和安全门
   ↓
@@ -300,14 +310,14 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏五页是工作台、内容库、SOP、资料审核、设置。`IntakeManagement` 同时支撑工作台摘要和资料审核；`IntakePermissions` 挂在「设置」，页内分别渲染授权与账号能力。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这五页一致。知识库组件、本机草稿路由和对应 Main/preload 通道已删除；既有磁盘文件保留但运行时不读写。字段见[资料页与设置页](reference-intake-pages.md)。
 
-四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
+四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。OVL-01 随后把窗口 handoff、layout、focus、drag、session 与 renderer phase 收口到共享 overlay reducer；`overlay-controller.ts` 只执行 typed native effects，`QueryApp.tsx` 和 `FoxApp.tsx` 只消费 snapshot，`DashboardApp.tsx` 继续拥有工作台导航状态。
 
 剩余耦合是有意保留的产品语义：检索 adapter 仍绑定桌面字段与发布租约，API `server.ts` 仍组合本项目的路由和合同，主状态机仍集中在上述入口。三份可复用能力 RFC（合同运行时、Migration 控制面、安全边界）均为 `DRAFT · 等待第二个真实消费者`；当前项目单独通过不能证明跨项目复用，出现第二个真实消费者前不继续抽公共包。
 
 CodeGraph 已就绪：仓根有 `.codegraph/`，本机 CLI 与 MCP 服务均可用（当前服务版本 1.6.0），本轮已用它读取跨模块调用路径。索引属于本机工具状态，不提交到业务仓；改代码前优先用 CodeGraph，索引过期或不可用时按 `AGENTS.md` 的规则降级到定向源码检查。
 
 
-三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
+高耦合业务入口仍按领域分工：`overlay-controller.ts` 执行 overlay typed effects，`QueryApp.tsx` 拥有查询命令与业务内容，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。OVL-01 明确只把 overlay 窗口生命周期、handoff、layout、focus、drag 与 session 的决策移到 shared reducer；query transport、Dashboard、SOP、API 与数据库所有权不变。setBounds、原生焦点和 timer 仍是 Main 的副作用实现，但只在 reducer 接受事件后执行，不再自行推断下一次 handoff。
 
 Query 的模式确认可晚于原生窗口展开。overlay preload 在首次 `onOverlayCommand` 注册之后发出窄 `overlay:query-subscribed` 握手；Main 仅接受可信 Query 主帧，按当前开关意图重新建立交接，不在 preload 排队历史命令，不让迟到订阅撤销已完成的关闭。
 

@@ -148,6 +148,7 @@ export class ProductAnnounce implements AnnounceGate {
     const value: ProductAnnounceContentUpdate = Object.freeze({
       sessionEpoch: this.lease.epoch,
       releaseId: this.lease.releaseId,
+      releaseSeq: this.lease.releaseSeq,
       summary: this.announcement?.summary ?? null,
       domainHashes: this.domainHashes,
       unreadDomains: Object.freeze([...domains]),

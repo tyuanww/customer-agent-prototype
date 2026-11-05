@@ -476,16 +476,19 @@ describe('overlay geometry', () => {
     const controller = readFileSync(path.join(srcRoot, 'main/overlay-controller.ts'), 'utf8');
     const overlayPlatform = readFileSync(path.join(srcRoot, 'main/overlay-platform.ts'), 'utf8');
     const geometry = readFileSync(path.join(srcRoot, 'shared/overlay-geometry.ts'), 'utf8');
-    expect(controller).toContain('this.queryDragAnchor = this.currentQueryAnchor()');
-    expect(controller).toContain('inferFoxRectFromQuery(next, workArea, this.queryDragAnchor)');
+    expect(controller).toContain('this.overlayState.drag.queryAnchor');
+    expect(controller).toContain("type: 'FOX_DRAG_MOVED'");
+    expect(controller).toContain('inferFoxRectFromQuery(next, workArea, anchor)');
     expect(controller).toContain('this.settlePinnedQueryDrag(next, workArea)');
-    expect(controller).toContain('settleQueryDragGesture(queryRect, workArea, this.queryDragAnchor)');
+    expect(controller).toContain('settleQueryDragGesture(queryRect, workArea, queryAnchor)');
     expect(controller).toContain('this.sessionQueryAnchor()');
-    expect(controller).toContain('this.sessionQueryAnchor(queryAnchorForFox(fullFoxRect, workArea))');
-    expect(controller).toContain('this.sessionQueryAnchor(queryAnchorForFox(foxRect, workArea))');
-    expect(controller).toContain('this.queryDragAnchor ?? undefined');
+    expect(controller).toContain('this.sessionQueryAnchor(queryAnchorForFox(foxBounds, workArea))');
+    expect(controller).toContain('const queryAnchor = queryBounds');
+    expect(controller).toContain('queryAnchorForFox(clampedFox, workArea)');
+    expect(controller).toContain('queryAnchor,');
+    expect(controller).toContain('this.overlayState.drag.queryAnchor ?? undefined');
     expect(controller).toContain(
-      'return resolveSessionQueryAnchor(this.queryDragAnchor, computed)',
+      'return resolveSessionQueryAnchor(this.overlayState.drag.queryAnchor, computed)',
     );
     expect(controller).not.toMatch(
       /private cancelChromeHandoff\(\): void \{[^}]*clearQueryDragGesture/,
@@ -493,9 +496,9 @@ describe('overlay geometry', () => {
     expect(controller).toContain('finishOrClearQueryDrag');
     expect(controller).toContain('clearQueryDragGesture');
     expect(controller).toMatch(/if \(!delta\) \{\s*if \(finished\) \{\s*this\.finishOrClearQueryDrag\(\);/s);
-    expect(controller).toMatch(/dismiss\(restorePreviousApp = false\): void \{\s*if \(this\.isInactive\(\)\) \{\s*return;\s*\}\s*this\.restorePreviousAppOnIdle = restorePreviousApp === true;\s*this\.finishOrClearQueryDrag\(\);/s);
+    expect(controller).toMatch(/dismiss\(restorePreviousApp = false\): void \{\s*if \(this\.isInactive\(\)\) \{\s*return;\s*\}\s*this\.finishOrClearQueryDrag\(\);/s);
     expect(controller).toContain('resignPaletteActivation');
-    expect(controller).toContain('restorePreviousAppOnIdle');
+    expect(controller).toContain("focusIntent === 'previous-app'");
     expect(controller).toContain('yieldOrKeepPalette');
     expect(controller).toContain('otherChromeWindowsVisible');
     expect(controller).toContain('isDevToolsWindow');
@@ -506,7 +509,7 @@ describe('overlay geometry', () => {
     expect(overlayPlatform).toContain('yieldGeneration');
     expect(overlayPlatform).toMatch(/app\.hide\(\)/);
     expect(overlayPlatform).toMatch(/generation !== this\.yieldGeneration/);
-    expect(controller).toMatch(/finishClosingHandoff[\s\S]*this\.clearQueryDragGesture\(\)/);
+    expect(controller).toContain("type: 'QUERY_DRAG_CLEARED'");
     expect(controller).toContain('resignQueryKeyboard');
     expect(controller).toContain("webContents.on('before-input-event'");
     expect(controller).toContain('setQueryFocusable(false)');
@@ -521,6 +524,9 @@ describe('overlay geometry', () => {
     expect(controller).not.toContain('-FOX_DRAG_SAFE_OVERFLOW_PX');
     expect(controller).not.toContain('settleAndClearQueryDrag');
     expect(controller).not.toContain('sendToQuery({ type: \'sync-query-anchor\', anchor: settled.anchor })');
+    expect(controller).not.toContain('sendToQuery(activateSearchCommand');
+    expect(controller).not.toContain('sendToQuery(syncQueryAnchorCommand');
+    expect(controller).toContain("case 'APPLY_QUERY_LAYOUT_FALLBACK'");
   });
 
   it('keeps foxOrigin continuous across split Query-drag chunks that cross the midline', () => {

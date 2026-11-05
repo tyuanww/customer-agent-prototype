@@ -31,6 +31,13 @@ import {
   QUERY_CONTENT_BLANK_TOLERANCE_PX,
 } from '../../src/shared/query-layout';
 
+const REPORT_IDENTITY = {
+  sessionEpoch: 1,
+  generation: 2,
+  windowGeneration: 1,
+  contentRevision: 0,
+} as const;
+
 const workArea = { x: 0, y: 25, width: 1440, height: 875 };
 
 describe('query content-hugging layout', () => {
@@ -93,6 +100,7 @@ describe('query content-hugging layout', () => {
       phase: 'RESULTS',
       resultCount: 3,
       desiredHeight: 312,
+      identity: REPORT_IDENTITY,
     })).toBe(true);
     expect(isQueryLayoutRequest({
       sessionId: 2,
@@ -128,6 +136,7 @@ describe('query content-hugging layout', () => {
         sessionId: 2,
         sequence: 1,
         deltaY,
+        identity: REPORT_IDENTITY,
       })).toBe(true);
     }
     for (const deltaY of [-4097, -0.5, 0.5, 4097, Number.POSITIVE_INFINITY, Number.NaN, '12']) {
@@ -136,6 +145,7 @@ describe('query content-hugging layout', () => {
         sessionId: 2,
         sequence: 1,
         deltaY,
+        identity: REPORT_IDENTITY,
       })).toBe(false);
     }
     expect(isQueryResizeRequest({
@@ -263,6 +273,7 @@ describe('query content-hugging layout', () => {
       sessionId: 1,
       sequence: 2,
       deltaY: 12,
+      identity: REPORT_IDENTITY,
     })).toBe(true);
     expect(isQueryResizeRequest({
       type: 'update',
@@ -288,15 +299,16 @@ describe('main query layout policy', () => {
   );
 
   it('keeps natural layout off the resize gesture and advances fallback sequences', () => {
-    expect(controller).toContain('!isQueryContentLayoutPhase(this.phase)');
-    expect(controller).toContain('this.queryResizeSession !== null && !this.queryResizeSession.finished');
-    expect(controller).toContain('this.manualQueryHeight !== null || this.queryResizeSession');
-    expect(controller).toContain('this.lastQueryLayoutSequence += 1');
-    expect(controller).toContain('queryLayoutAckCommand(');
-    expect(controller).toContain('this.activeChromeHandoffId');
-    expect(controller).toContain('reportableOverlayPhase(this.phase)');
-    expect(controller).toContain('this.reportablePhase()');
-    expect(controller).toContain('this.resultCount');
+    expect(controller).toContain('applyOverlayEvent(this.overlayState');
+    expect(controller).toContain("type: 'LAYOUT_REQUESTED'");
+    expect(controller).toContain("type: 'RESIZE_BEGIN'");
+    expect(controller).toContain("type: 'RESIZE_UPDATE'");
+    expect(controller).toContain("type: 'RESIZE_END'");
+    expect(controller).toContain('this.overlayState.layout.resize');
+    expect(controller).toContain('this.overlayState.layout.desiredHeight');
+    expect(controller).toContain('commitNativeLayout');
+    expect(controller).not.toContain('this.lastQueryLayoutSequence');
+    expect(controller).not.toContain('this.queryResizeSession');
     expect(reportableOverlayPhase('FOX_IDLE')).toBe('SEARCH_INPUT');
     expect(reportableOverlayPhase('RESULTS')).toBe('RESULTS');
     expect(acceptedQueryLayoutAck(2, 4, 312, 'bottom', 'RESULTS', 3)).toEqual({
@@ -317,8 +329,8 @@ describe('main query layout policy', () => {
       height: 312,
       resizeEdge: 'bottom',
     });
-    expect(controller).toContain('this.settleQueryResizeSession(true)');
-    expect(controller).toContain('if (this.queryResizeSession && !this.queryResizeSession.finished)');
+    expect(controller).toContain('this.overlayState.layout.sequence');
+    expect(controller).toContain('commitNativeLayout');
     expect(isQueryLayoutRequest({
       sessionId: 2,
       sequence: 1,
