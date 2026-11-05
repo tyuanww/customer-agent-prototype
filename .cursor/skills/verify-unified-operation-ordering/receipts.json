@@ -1,10 +1,10 @@
 {
-  "syncCommit": "40c221970f98de591e70a23c48401aba3d06ee06",
+  "syncCommit": "7790ef016d5cd46e4b6148c151908e4a99d714b4",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-05T08:29:14.282Z",
-  "sourceReceipt": "a2ccdf834e70724ad3161b13135d696995470af18cd849ffe92ac7f25a875f05",
-  "modelStates": 774,
-  "modelEdges": 3046,
+  "capturedAt": "2026-11-05T08:49:00.477Z",
+  "sourceReceipt": "31049cc6323fb1ce1cec05546f2153aa9a2191bdfe159a0c48e6b7815a1be6a7",
+  "modelStates": 1350,
+  "modelEdges": 5830,
   "environment": {
     "node": "24.19.0",
     "pnpm": "11.19.0",
@@ -15,7 +15,7 @@
     "pnpm test:unified-operation-ordering",
     "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api exec vitest run tests/authorization-reachability.integration.test.ts",
     "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .agents/skills/verify-intake-parent-revocation/verify.mjs /tmp/customer-agent-parent-revocation.json",
-    "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/manual-identity-grants.integration.test.ts tests/manual-identity-property.test.ts tests/project-roster-login.integration.test.ts tests/roster-authority.integration.test.ts tests/a6-permission-e2e.integration.test.ts tests/p0-live-lanes.integration.test.ts tests/feishu-login-link.integration.test.ts tests/seat-login-flow.integration.test.ts tests/seat-lifecycle.integration.test.ts",
+    "The formal checker creates a temporary archive of the tested head, verifies BASEFIX 1de1847bdc139fa1665ea36c51329a110460bd7b changes only apps/api/tests/seat-lifecycle.integration.test.ts, replaces only that blob, and runs all nine verify-manual-identity-grants files",
     "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:seat-administration-revocation",
     "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api test:integration",
     "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/database test:integration",
@@ -29,13 +29,15 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "3c12ffcc3e1c9bfbac918d93c5ec07a87818552d315273c3b696a4da76610128",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "cc14d5642d64a022d0cb608bc694045ee99ba4582564e03d3173400c6116cfe0",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
-    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "1d088e4474b3f8e16573e5a08fa5fca9354a238f76fd038c0e11123d09841e36",
-    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "b8e72a36a40452c069d0f6133222ddaaa8d48c57500c2e860d7d94e5293fc9ce",
-    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "d9c24928c378f63fced5954d08be2db5c76721a9d2a3d38583194b0fc5e00e61",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts": "15f41a7a4f90d3d4f3cbdbd2ba6e32d8c898e6f9249f443c38cdf906f4fad7e8",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "2291836a3bb6125a544537a521814d1de37d9acce72ab6eebfb4a3ae043b32cb",
+    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "219eeaab17a53dfbcfd17b199f4c80b419ce5dc70241565bc310cabd618db144",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "cdef09e88598419e8fb0fc83499efd9f44ef03be5086efa418e31ceb6bcf6de2",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "f17b80b597d3fcbacd2b541e786676f7bbb55312294790799a735fa138112632",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts": "fcdfa52c01f2dd95b4ee758efc6d9100cc921b3ce611c3a0443b25204392e84a",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "618e8eb070952dc54d31b43cdf463e80d3ee7f45f830cca83e34cf3f08ee22d9",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts": "9a444747371e9b331d9e01c72b944fa9981d436c986d77dd3a973e4f8d8a8da9",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs": "9809e1bafaa567eb5ce619e05822b557322f2c11eb966e55db30e00c7d74bc2c",
     "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
     "apps/api/src/content-intake/role-ceiling.ts": "8b8e472d4908f0f1283958a0f0e183577a85e9a11aa34bd0b4b9e93607733f74",
@@ -64,8 +66,8 @@
     "apps/api/tests/seat-login-flow.integration.test.ts": "88627a1f85c4e52e33e8c85dff429b2b9169d469b73aa86547754f9a5ec12d75",
     "apps/api/tests/support/authorization-sources-fixture.ts": "a6b0fea9c891a4b40f033eb9387906ebfdc43f36758d1e1e293b928a2a916246",
     "apps/api/tests/support/roster-library.ts": "e7e9254c80761c07bcc00034e8090ccfe2ddceadeeb0cb32e6ce024d2e8b973b",
-    "apps/api/tests/unified-operation-ordering-formal.test.ts": "f6619784ec82e5c9a0bd9448c0f72be5ed192073b129d96584f0dd45f4fe913c",
-    "docs/reference-project-architecture.md": "70d5b1d4b6116740558e10322c5d879b0bd2f0f28f64297f5197b7346f13e20d",
+    "apps/api/tests/unified-operation-ordering-formal.test.ts": "3f4bbe3d01c30c90de4d54829a45e9cd5ea80dfad6dba4e859bd4b3a0383d1a5",
+    "docs/reference-project-architecture.md": "4cc6d6a1bfb115e47d289c553767ee24d92e8acfcc047c23fbfdbf4125479496",
     "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
     "packages/database/migrations/0076_authorization_decision.sql": "a12f5ca4b05c394c3545788bf3cce8b2c6e5bcac0eeba17994e239a1d0dbc2d4",
     "packages/database/migrations/0077_manual_identity_grants.sql": "58585d257a3e164f3b8d6d3610792aad84b509543d476aa7d26a2bbe596ec35d",
@@ -89,22 +91,21 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "40c221970f98de591e70a23c48401aba3d06ee06",
+  "testedSourceCommit": "7790ef016d5cd46e4b6148c151908e4a99d714b4",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
   "verification": [
     {
       "id": "failing-regressions-before-fix",
-      "command": "pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts",
       "status": "FAIL_AS_EXPECTED_ON_BLOCKED_HEAD",
-      "result": "3 failed, 4 passed; missing ordered acceptance witness, missing accept_after_revocation control, and missing post-effect unknown path"
+      "result": "Initial regressions failed against 3a5510b9; independent review then exposed three additional fail-open gaps, now covered by the final 15-test suite"
     },
     {
       "id": "unified-model",
       "command": "pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts",
       "status": "PASS",
-      "result": "11/11 tests; 774 states; 3046 transitions; all 8 witnesses; 5/5 negative controls"
+      "result": "15/15 tests; 1350 states; 5830 transitions; all 11 witnesses; 6/6 negative controls"
     },
     {
       "id": "authorization-reachability",
@@ -126,27 +127,27 @@
     },
     {
       "id": "manual-identity-with-basefix",
-      "command": "verify-manual-identity-grants full nine-file command in temporary combined tree",
+      "command": "formal checker temporary BASEFIX+FOR identity replay",
       "status": "PASS",
-      "result": "9/9 files and 38/38 tests passed after applying only BASEFIX 1de1847bdc139fa1665ea36c51329a110460bd7b"
+      "result": "The standalone integration runner reached 9/9 files and 38/38 tests; the formal checker reruns it at the evidence head"
     },
     {
       "id": "api-integration",
       "command": "pnpm --filter @customer-agent/api test:integration",
       "status": "PASS",
-      "result": "20 files and 172/172 tests passed on PostgreSQL 15"
+      "result": "20 files and 172/172 tests passed on PostgreSQL 15; runtime sources are unchanged by the later FOR-only evidence hardening"
     },
     {
       "id": "database-integration",
       "command": "pnpm --filter @customer-agent/database test:integration",
       "status": "PASS",
-      "result": "5 files and 104/104 tests passed on PostgreSQL 15"
+      "result": "5 files and 104/104 tests passed on PostgreSQL 15; runtime sources are unchanged by the later FOR-only evidence hardening"
     },
     {
       "id": "lint-typecheck-diff",
       "command": "pnpm lint && pnpm typecheck && git diff --check",
       "status": "PASS",
-      "result": "all three completed with exit 0 before the evidence-only commit"
+      "result": "all three completed with exit 0 for the source commit before evidence synchronization"
     }
   ],
   "baselineDependency": {
@@ -154,6 +155,6 @@
     "commit": "1de1847bdc139fa1665ea36c51329a110460bd7b",
     "relationshipAtForSourceCommit": "not an ancestor",
     "requiredChange": "apps/api/tests/seat-lifecycle.integration.test.ts migration suffix through 0081",
-    "verification": "Full verify-manual-identity-grants command passed 38/38 only in the temporary combined tree"
+    "verification": "The formal checker requires and executes the temporary combined tree and records its 9-file / 38-test result"
   }
 }
