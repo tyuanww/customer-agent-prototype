@@ -19,6 +19,11 @@ const migrationPath = fileURLToPath(new URL(
   '../../../packages/database/migrations/0083_sop_pipeline_projection.sql',
   import.meta.url,
 ));
+const sopMigrationId = '0083_sop_pipeline_projection';
+
+function requiresStandaloneSopMigration(applied: readonly Readonly<{ id: string }>[]): boolean {
+  return !applied.some(({ id }) => id === sopMigrationId);
+}
 
 const document: SopAuthoringDocument = {
   definitions: [{
@@ -110,6 +115,21 @@ async function insertRelease(client: Client, releaseId: string, sequence: number
   }
 }
 
+describe('SOP migration source ownership', () => {
+  it('does not reapply 0083 when the unified catalogue installed it', () => {
+    expect(requiresStandaloneSopMigration([
+      { id: '0082_access_evaluator' },
+      { id: sopMigrationId },
+    ])).toBe(false);
+  });
+
+  it('keeps the standalone source path for a migration chain without 0083', () => {
+    expect(requiresStandaloneSopMigration([
+      { id: '0082_access_evaluator' },
+    ])).toBe(true);
+  });
+});
+
 describe.runIf(enabled).sequential('SOP release projection PostgreSQL 15', () => {
   let harness: Pg15Harness;
   let client: Client;
@@ -119,14 +139,16 @@ describe.runIf(enabled).sequential('SOP release projection PostgreSQL 15', () =>
     harness.start();
     const database = harness.createDatabase('sop_pipeline_projection');
     client = await harness.connect(database.config);
-    await applyDatabaseMigrations(client);
-    await client.query('BEGIN');
-    try {
-      await client.query(readFileSync(migrationPath, 'utf8'));
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
+    const migrations = await applyDatabaseMigrations(client);
+    if (requiresStandaloneSopMigration(migrations.after.applied)) {
+      await client.query('BEGIN');
+      try {
+        await client.query(readFileSync(migrationPath, 'utf8'));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
     }
     for (const domain of ['aftersale', 'campaign', 'presale', 'product']) {
       await client.query(
