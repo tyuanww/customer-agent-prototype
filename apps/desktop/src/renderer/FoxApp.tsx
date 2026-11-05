@@ -11,7 +11,10 @@ import {
   type FoxVisualTransform,
 } from '@shared/overlay-events';
 import type { OverlaySnapshotProjection } from '@shared/overlay-machine';
-import type { OverlayReportIdentity } from '@shared/overlay-report';
+import {
+  overlayReportIdentityForSnapshot,
+  type OverlayReportIdentity,
+} from '@shared/overlay-report';
 import {
   FOX_HALO_DURATION_MS,
   FOX_HALO_OPACITY_MAX,
@@ -361,19 +364,10 @@ export function FoxApp() {
 
   const overlayReportIdentity = useCallback((): OverlayReportIdentity | null => {
     const snapshot = overlaySnapshotRef.current;
-    return snapshot
-      ? {
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          generation: snapshot.contract.generation,
-          windowGeneration: snapshot.windowGeneration,
-          contentRevision: snapshot.contentRevision,
-        }
-      : {
-          sessionEpoch: 1,
-          generation: 1,
-          windowGeneration: 1,
-          contentRevision: 0,
-        };
+    return overlayReportIdentityForSnapshot(
+      snapshot,
+      snapshot?.contentRevision ?? 0,
+    );
   }, []);
 
   const reportFoxPeek = useCallback((intent: FoxPeekIntent, epoch: number): Promise<void> => {
