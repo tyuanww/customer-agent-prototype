@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,7 @@ export const RULE_DOCUMENTS = new Set(['AGENTS.md', 'CONTRIBUTING.md', 'docs/ref
 export const JOB_ORDER = ['quick', 'contracts', 'database', 'electron', 'windows', 'linux'];
 export const CHECK_LANES = ['precheck', ...JOB_ORDER, 'packaging'];
 const RUN_LANES = ['precheck', ...JOB_ORDER];
+const SUPPORTED_EXECUTABLES = new Set(['node', 'pnpm']);
 
 function reason(code, detail) { return { code, detail }; }
 
@@ -51,6 +52,53 @@ function assertStringArray(value, label) {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.length === 0)) throw new Error(`${label} must be a string array`);
 }
 
+function normalizeCommandSequence(command, label) {
+  if (!Array.isArray(command) || command.length === 0) throw new Error(`${label} command must be structured argv`);
+  if (command.every((argument) => typeof argument === 'string')) return [command];
+  if (!command.every((argv) => Array.isArray(argv) && argv.length > 0)) throw new Error(`${label} command must be structured argv`);
+  return command;
+}
+
+function assertCommandSequence(command, label) {
+  const sequence = normalizeCommandSequence(command, label);
+  for (const argv of sequence) {
+    if (argv.some((argument) => typeof argument !== 'string' || argument.length === 0)) throw new Error(`${label} argv argument must be a non-empty string`);
+    if (!SUPPORTED_EXECUTABLES.has(argv[0])) throw new Error(`${label} unsupported executable: ${argv[0]}`);
+  }
+  return sequence;
+}
+
+function windowsPath(env) {
+  return [env.PATH, env.Path, env.path].find((value) => typeof value === 'string' && value.length > 0) ?? '';
+}
+
+export function resolvePlanCommand(argv, {
+  platform = process.platform,
+  env = process.env,
+  fileExists = existsSync,
+  nodeExecutable = process.execPath,
+} = {}) {
+  const [executable, ...args] = argv;
+  if (platform !== 'win32' || executable !== 'pnpm') return argv;
+
+  // Windows cannot spawn the .cmd shim with shell:false. Use a real pnpm.exe or
+  // invoke pnpm's JavaScript entrypoint through the current Node executable.
+  const candidates = [];
+  if (typeof env.PNPM_HOME === 'string' && path.win32.isAbsolute(env.PNPM_HOME)) {
+    candidates.push(path.win32.join(env.PNPM_HOME, 'pnpm.exe'));
+    candidates.push(path.win32.resolve(env.PNPM_HOME, '..', 'pnpm', 'bin', 'pnpm.mjs'));
+  }
+  for (const directory of windowsPath(env).split(path.win32.delimiter)) {
+    if (path.win32.isAbsolute(directory)) candidates.push(path.win32.join(directory, 'pnpm.exe'));
+  }
+
+  const resolved = [...new Set(candidates)].find((candidate) => fileExists(candidate));
+  if (!resolved) {
+    throw new Error('PNPM_WINDOWS_EXECUTABLE_NOT_FOUND: expose pnpm.exe or the pnpm script through PNPM_HOME/PATH');
+  }
+  return resolved.endsWith('.mjs') ? [nodeExecutable, resolved, ...args] : [resolved, ...args];
+}
+
 function assertPathPatterns(value, label) {
   assertStringArray(value, label);
   for (const pattern of value) isPathSafe(pattern, `${label.toUpperCase()}_INVALID`);
@@ -78,7 +126,7 @@ export function validateDependencyMap(map) {
     if (id.length === 0 || checkIds.has(id)) throw new Error('check id must be unique and non-empty');
     checkIds.add(id);
     if (!check || typeof check.job !== 'string' || (!JOB_ORDER.includes(check.job) && check.job !== 'precheck')) throw new Error(`check ${id} has invalid job`);
-    if (typeof check.command !== 'string' || check.command.trim().length === 0) throw new Error(`check ${id} has no command`);
+    assertCommandSequence(check.command, `check ${id}`);
   }
   const routeIds = new Set();
   for (const route of map.routes) {
@@ -261,17 +309,42 @@ export function changedFiles(base, head, cwd = root) {
 function requiredJobNames(needs, prefix) {
   const list = needs?.changes?.outputs?.required_jobs;
   if (typeof list !== 'string' || list.length === 0) throw new Error(`${prefix}_REQUIRED_JOB_LIST_MISSING`);
-  return list.split(',').filter(Boolean);
+  const names = list.split(',');
+  if (names.some((name) => name.length === 0)) throw new Error(`${prefix}_REQUIRED_JOB_LIST_MALFORMED`);
+  const allowed = new Set(['changes', ...JOB_ORDER]);
+  if (names.some((name) => !allowed.has(name))) throw new Error(`${prefix}_REQUIRED_JOB_LIST_UNKNOWN`);
+  if (new Set(names).size !== names.length) throw new Error(`${prefix}_REQUIRED_JOB_LIST_DUPLICATE`);
+  return names;
+}
+
+function expectedPrJobs(needs) {
+  const outputs = needs?.changes?.outputs;
+  if (!outputs || typeof outputs !== 'object' || Array.isArray(outputs)) throw new Error('PR_PLAN_MISSING');
+  const mode = outputs.mode;
+  if (!['docs', 'focused', 'full'].includes(mode)) throw new Error('PR_PLAN_MISSING');
+  const selected = Object.fromEntries(JOB_ORDER.map((job) => {
+    if (outputs[job] !== 'true' && outputs[job] !== 'false') throw new Error(`PR_PLAN_JOB_OUTPUT_INVALID: ${job}`);
+    return [job, outputs[job] === 'true'];
+  }));
+  if (!selected.quick) throw new Error('PR_PLAN_JOB_OUTPUT_MISMATCH: quick');
+  let expected;
+  if (mode === 'docs') {
+    if (JOB_ORDER.some((job) => job !== 'quick' && selected[job])) throw new Error('PR_PLAN_JOB_OUTPUT_MISMATCH: docs');
+    expected = ['changes', 'quick'];
+  } else if (mode === 'full') {
+    if (JOB_ORDER.some((job) => !selected[job])) throw new Error('PR_PLAN_JOB_OUTPUT_MISMATCH: full');
+    expected = ['changes', ...JOB_ORDER];
+  } else {
+    expected = ['changes', 'quick', ...JOB_ORDER.slice(1).filter((job) => selected[job])];
+  }
+  return expected;
 }
 
 export function assertPrGate(needs) {
   if (needs?.changes?.result !== 'success') throw new Error('PR_REQUIRED_JOB_NOT_SUCCESS: changes');
-  const mode = needs.changes.outputs?.mode;
-  if (!['docs', 'focused', 'full'].includes(mode)) throw new Error('PR_PLAN_MISSING');
   const requiredJobs = requiredJobNames(needs, 'PR');
-  if (mode === 'full') {
-    for (const job of JOB_ORDER) if (!requiredJobs.includes(job)) throw new Error(`PR_FULL_PLAN_JOB_MISSING: ${job}`);
-  }
+  const expectedJobs = expectedPrJobs(needs);
+  if (requiredJobs.length !== expectedJobs.length || requiredJobs.some((job, index) => job !== expectedJobs[index])) throw new Error('PR_REQUIRED_JOB_LIST_MISMATCH');
   for (const job of requiredJobs) if (needs?.[job]?.result !== 'success') throw new Error(`PR_REQUIRED_JOB_NOT_SUCCESS: ${job}`);
 }
 
@@ -282,7 +355,16 @@ export function assertCiGate(needs) {
 
 export function assertCiFastGate(needs) {
   if (needs?.changes?.result !== 'success' || needs?.quick?.result !== 'success') throw new Error('CI_FAST_REQUIRED_JOB_NOT_SUCCESS');
-  if (!['docs', 'focused', 'full'].includes(needs?.changes?.outputs?.mode)) throw new Error('CI_FAST_PLAN_MISSING');
+  const requiredJobs = requiredJobNames(needs, 'CI_FAST');
+  const expectedJobs = expectedPrJobs(needs);
+  if (
+    expectedJobs.length !== 2
+    || expectedJobs[0] !== 'changes'
+    || expectedJobs[1] !== 'quick'
+    || requiredJobs.length !== 2
+    || requiredJobs[0] !== 'changes'
+    || requiredJobs[1] !== 'quick'
+  ) throw new Error('CI_FAST_PLAN_REQUIRED_JOB_LIST_MISMATCH');
 }
 
 export function matchesWriteBoundary(files, boundary) {
@@ -302,30 +384,41 @@ export function planLaneCommands(plan, lane) {
   if (!CHECK_LANES.includes(lane)) throw new Error(`PLAN_LANE_INVALID: ${lane}`);
   const checks = plan?.checks?.[lane];
   if (!Array.isArray(checks)) throw new Error(`PLAN_LANE_MISSING: ${lane}`);
-  return [...new Set(checks.map((check) => {
-    if (!check || typeof check.id !== 'string' || typeof check.command !== 'string' || check.command.length === 0) throw new Error(`PLAN_CHECK_INVALID: ${lane}`);
-    return check.command;
-  }))];
+  const commands = [];
+  const seen = new Set();
+  for (const check of checks) {
+    if (!check || typeof check.id !== 'string') throw new Error(`PLAN_CHECK_INVALID: ${lane}`);
+    for (const argv of assertCommandSequence(check.command, `PLAN_CHECK_INVALID: ${lane}`)) {
+      const key = JSON.stringify(argv);
+      if (!seen.has(key)) {
+        seen.add(key);
+        commands.push(argv);
+      }
+    }
+  }
+  return commands;
 }
 
-function runPlanLane(plan, lane, dryRun) {
+export function runPlanLane(plan, lane, dryRun) {
   const commands = planLaneCommands(plan, lane);
   if (plan.mode === 'full' && commands.length === 0) throw new Error(`PLAN_LANE_EMPTY: ${lane}`);
   if (commands.length === 0) {
     console.log(`${lane}: no checks selected`);
     return;
   }
-  for (const command of commands) {
-    console.log(`${dryRun ? 'would run' : 'running'} [${lane}]: ${command}`);
+  for (const argv of commands) {
+    const resolved = resolvePlanCommand(argv);
+    const [executable, ...args] = resolved;
+    console.log(`${dryRun ? 'would run' : 'running'} [${lane}]: ${JSON.stringify(resolved)}`);
     if (dryRun) continue;
-    const result = spawnSync(command, {
+    const result = spawnSync(executable, args, {
       cwd: root,
       env: process.env,
-      shell: true,
+      shell: false,
       stdio: 'inherit',
     });
     if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`PLAN_CHECK_FAILED: ${lane}: ${command}`);
+    if (result.status !== 0) throw new Error(`PLAN_CHECK_FAILED: ${lane}: ${JSON.stringify(resolved)}`);
   }
 }
 

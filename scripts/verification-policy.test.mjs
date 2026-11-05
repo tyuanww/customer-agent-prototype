@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -13,6 +13,7 @@ import {
   matchesWriteBoundary,
   percentile,
   planLaneCommands,
+  runPlanLane,
   RULE_DOCUMENTS,
   validateDependencyMap,
   verificationPlan,
@@ -26,12 +27,14 @@ function ids(plan, lane) {
 
 function successfulNeeds(requiredJobs) {
   const allJobs = ['quick', 'contracts', 'database', 'electron', 'windows', 'linux'];
+  const mode = requiredJobs.length === 1 ? 'docs' : requiredJobs.length === allJobs.length ? 'full' : 'focused';
   return {
     changes: {
       result: 'success',
       outputs: {
-        mode: requiredJobs.includes('windows') ? 'full' : requiredJobs.length === 1 ? 'docs' : 'focused',
-        required_jobs: requiredJobs.join(','),
+        mode,
+        required_jobs: ['changes', ...requiredJobs].join(','),
+        ...Object.fromEntries(allJobs.map((job) => [job, String(requiredJobs.includes(job))])),
       },
     },
     ...Object.fromEntries(allJobs.map((job) => [
@@ -39,6 +42,12 @@ function successfulNeeds(requiredJobs) {
       { result: requiredJobs.includes(job) ? 'success' : 'skipped' },
     ])),
   };
+}
+
+function workflowJob(workflow, job) {
+  const match = workflow.match(new RegExp(`\\n  ${job}:\\n([\\s\\S]*?)(?=\\n  [A-Za-z0-9_-]+:\\n|$)`, 'u'));
+  assert.ok(match, `missing workflow job ${job}`);
+  return match[1];
 }
 
 test('dependency map is structurally valid and owns every declared route reference', () => {
@@ -236,7 +245,22 @@ test('every source-code owner selects one deduplicated typecheck quick check', (
 
   const mixed = verificationPlan(sourceFiles, map);
   assert.equal(ids(mixed, 'quick').filter((id) => id === 'typecheck').length, 1);
-  assert.equal(planLaneCommands(mixed, 'quick').filter((command) => command === 'pnpm typecheck').length, 1);
+  assert.equal(planLaneCommands(mixed, 'quick').filter((command) => JSON.stringify(command) === JSON.stringify(['pnpm', 'typecheck'])).length, 1);
+});
+
+test('every source-code route restores the architecture boundary check', () => {
+  const codeRoutes = map.routes.filter((route) => route.id !== 'repository-documents');
+  assert.ok(codeRoutes.length > 0);
+  for (const route of codeRoutes) {
+    assert.ok(route.checks.quick?.includes('architecture'), `${route.id} must run check:architecture`);
+  }
+  assert.deepEqual(map.checks.architecture, {
+    job: 'quick',
+    command: [['pnpm', 'check:architecture']],
+  });
+
+  const full = verificationPlan(['tools/unknown.txt'], map);
+  assert.ok(ids(full, 'quick').includes('architecture'));
 });
 
 test('unknown, invalid, ambiguous and stale-generated paths fail closed to the full gate', () => {
@@ -354,9 +378,9 @@ test('plan commands are lane-scoped and deduplicated', () => {
     'packages/database/src/planner.ts',
   ], map);
   const quick = planLaneCommands(mixed, 'quick');
-  assert.equal(quick.filter((command) => command === 'pnpm --filter @customer-agent/desktop test').length, 1);
-  assert.ok(quick.includes('pnpm lint'));
-  assert.deepEqual(planLaneCommands(mixed, 'electron'), ['pnpm test:e2e:float']);
+  assert.equal(quick.filter((command) => JSON.stringify(command) === JSON.stringify(['pnpm', '--filter', '@customer-agent/desktop', 'test'])).length, 1);
+  assert.ok(quick.some((command) => JSON.stringify(command) === JSON.stringify(['pnpm', 'lint'])));
+  assert.deepEqual(planLaneCommands(mixed, 'electron'), [['pnpm', 'test:e2e:float']]);
   assert.throws(() => planLaneCommands(mixed, 'unknown'), /PLAN_LANE_INVALID/u);
 });
 
@@ -513,6 +537,7 @@ test('PR and main aggregate gates reject missing, skipped, cancelled or failed r
 
   const contractNeeds = successfulNeeds(['quick', 'contracts']);
   assert.doesNotThrow(() => assertPrGate(contractNeeds));
+  assert.throws(() => assertCiFastGate(contractNeeds), /CI_FAST_PLAN_REQUIRED_JOB_LIST_MISMATCH/u);
   for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
     assert.throws(
       () => assertPrGate({
@@ -532,6 +557,7 @@ test('PR and main aggregate gates reject missing, skipped, cancelled or failed r
 
   const fullNeeds = successfulNeeds(['quick', 'contracts', 'database', 'electron', 'windows', 'linux']);
   assert.doesNotThrow(() => assertPrGate(fullNeeds));
+  assert.throws(() => assertCiFastGate(fullNeeds), /CI_FAST_PLAN_REQUIRED_JOB_LIST_MISMATCH/u);
   assert.throws(
     () => assertPrGate({ ...fullNeeds, database: { result: 'skipped' } }),
     /PR_REQUIRED_JOB_NOT_SUCCESS: database/u,
@@ -541,10 +567,10 @@ test('PR and main aggregate gates reject missing, skipped, cancelled or failed r
       ...fullNeeds,
       changes: {
         result: 'success',
-        outputs: { mode: 'full', required_jobs: 'changes,quick' },
+        outputs: { ...fullNeeds.changes.outputs, required_jobs: 'changes,quick' },
       },
     }),
-    /PR_FULL_PLAN_JOB_MISSING: contracts/u,
+    /PR_REQUIRED_JOB_LIST_MISMATCH/u,
   );
 
   const mainOk = {
@@ -564,6 +590,143 @@ test('PR and main aggregate gates reject missing, skipped, cancelled or failed r
     () => assertCiGate({ ...mainOk, changes: { result: 'success', outputs: { mode: 'focused' } } }),
     /CI_FULL_PLAN_MISSING/u,
   );
+});
+
+test('PR gate treats required_jobs as an exact assertion of the plan outputs', () => {
+  const focused = successfulNeeds(['quick', 'contracts']);
+  focused.changes.outputs.mode = 'focused';
+  focused.changes.outputs.required_jobs = 'changes,quick,contracts';
+  focused.changes.outputs.quick = 'true';
+  focused.changes.outputs.contracts = 'true';
+  focused.changes.outputs.database = 'false';
+  focused.changes.outputs.electron = 'false';
+  focused.changes.outputs.windows = 'false';
+  focused.changes.outputs.linux = 'false';
+  assert.doesNotThrow(() => assertPrGate(focused));
+
+  for (const requiredJobs of [
+    'changes,quick,evil',
+    'quick,contracts',
+    'changes,quick',
+    'changes,quick,database',
+    'changes,quick,contracts,quick',
+    'changes,,quick,contracts',
+    'changes,contracts,quick',
+  ]) {
+    assert.throws(
+      () => assertPrGate({ ...focused, changes: { ...focused.changes, outputs: { ...focused.changes.outputs, required_jobs: requiredJobs } } }),
+      /PR_REQUIRED_JOB_LIST_(?:UNKNOWN|MISMATCH|MALFORMED|DUPLICATE)/u,
+      requiredJobs,
+    );
+  }
+
+  const docs = successfulNeeds(['quick']);
+  docs.changes.outputs.mode = 'docs';
+  docs.changes.outputs.required_jobs = 'changes,quick,contracts';
+  docs.changes.outputs.quick = 'true';
+  docs.changes.outputs.contracts = 'false';
+  docs.changes.outputs.database = 'false';
+  docs.changes.outputs.electron = 'false';
+  docs.changes.outputs.windows = 'false';
+  docs.changes.outputs.linux = 'false';
+  assert.throws(() => assertPrGate(docs), /PR_REQUIRED_JOB_LIST_MISMATCH/u);
+
+  const full = successfulNeeds(['quick', 'contracts', 'database', 'electron', 'windows', 'linux']);
+  full.changes.outputs.mode = 'full';
+  for (const job of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) full.changes.outputs[job] = 'true';
+  for (const job of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {
+    const missing = structuredClone(full);
+    missing.changes.outputs.required_jobs = ['changes', ...['quick', 'contracts', 'database', 'electron', 'windows', 'linux'].filter((candidate) => candidate !== job)].join(',');
+    assert.throws(() => assertPrGate(missing), /PR_REQUIRED_JOB_LIST_MISMATCH/u, job);
+  }
+
+  for (const job of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {
+    const malformed = structuredClone(focused);
+    malformed.changes.outputs[job] = 'maybe';
+    assert.throws(() => assertPrGate(malformed), /PR_PLAN_JOB_OUTPUT_INVALID/u, job);
+    delete malformed.changes.outputs[job];
+    assert.throws(() => assertPrGate(malformed), /PR_PLAN_JOB_OUTPUT_INVALID/u, job);
+  }
+});
+
+test('dependency map commands are structured argv and reject shell-only or unsupported entries', () => {
+  assert.ok(Object.values(map.checks).every((check) => Array.isArray(check.command)));
+  assert.throws(
+    () => validateDependencyMap({ ...map, checks: { ...map.checks, bad: { job: 'quick', command: 'node --test' } } }),
+    /command must be structured argv/u,
+  );
+  assert.throws(
+    () => validateDependencyMap({ ...map, checks: { ...map.checks, bad: { job: 'quick', command: ['sh', '-c', 'echo unsafe'] } } }),
+    /unsupported executable/u,
+  );
+  assert.throws(
+    () => validateDependencyMap({ ...map, checks: { ...map.checks, bad: { job: 'quick', command: ['node', ''] } } }),
+    /argv argument/u,
+  );
+  for (const command of [
+    [],
+    [[], []],
+    [['node'], '--test'],
+  ]) {
+    assert.throws(
+      () => validateDependencyMap({ ...map, checks: { ...map.checks, bad: { job: 'quick', command } } }),
+      /structured argv/u,
+    );
+  }
+});
+
+test('argv runner passes shell metacharacters literally and cannot create a second command', () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-argv-'));
+  const script = path.join(cwd, 'write-argv.mjs');
+  const output = path.join(cwd, 'argv.json');
+  const marker = path.join(cwd, 'marker');
+  writeFileSync(script, "import { writeFileSync } from 'node:fs'; writeFileSync(process.argv[2], JSON.stringify(process.argv.slice(3)));\n");
+  try {
+    for (const argument of ['semi; touch ' + marker, '$(touch ' + marker + ')', 'line\n touch ' + marker, '> ' + marker]) {
+      rmSync(output, { force: true });
+      runPlanLane({ mode: 'focused', checks: { quick: [{ id: 'synthetic', command: ['node', script, output, argument] }] } }, 'quick', false);
+      assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), [argument]);
+      assert.equal(existsSync(marker), false);
+    }
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('Windows pnpm resolution never assumes a .cmd shim is spawnable', async () => {
+  const { resolvePlanCommand } = await import('./verification-policy.mjs');
+  assert.equal(typeof resolvePlanCommand, 'function');
+
+  const pnpmHome = 'C:\\setup\\node_modules\\.bin';
+  const pnpmExe = 'C:\\setup\\node_modules\\.bin\\pnpm.exe';
+  const pnpmScript = 'C:\\setup\\node_modules\\pnpm\\bin\\pnpm.mjs';
+  const nodeExecutable = 'C:\\node\\node.exe';
+
+  assert.deepEqual(resolvePlanCommand(['pnpm', 'lint'], {
+    platform: 'win32',
+    env: { PNPM_HOME: pnpmHome, PATH: '' },
+    fileExists: (candidate) => candidate === pnpmExe,
+    nodeExecutable,
+  }), [pnpmExe, 'lint']);
+
+  assert.deepEqual(resolvePlanCommand(['pnpm', '--filter', '@customer-agent/desktop', 'test'], {
+    platform: 'win32',
+    env: { PNPM_HOME: pnpmHome, PATH: '' },
+    fileExists: (candidate) => candidate === pnpmScript,
+    nodeExecutable,
+  }), [nodeExecutable, pnpmScript, '--filter', '@customer-agent/desktop', 'test']);
+
+  assert.throws(
+    () => resolvePlanCommand(['pnpm', 'lint'], {
+      platform: 'win32',
+      env: { PNPM_HOME: pnpmHome, PATH: pnpmHome },
+      fileExists: (candidate) => candidate === 'C:\\setup\\node_modules\\.bin\\pnpm.cmd',
+      nodeExecutable,
+    }),
+    /PNPM_WINDOWS_EXECUTABLE_NOT_FOUND/u,
+  );
+
+  assert.deepEqual(resolvePlanCommand(['pnpm', 'lint'], { platform: 'linux' }), ['pnpm', 'lint']);
 });
 
 test('write-boundary matching rejects files outside the owner declaration', () => {
@@ -594,10 +757,10 @@ test('workflow and package gates consume the dependency-map runner', () => {
     assert.equal(typeof packageJson.scripts[name], 'string', `${name} must exist`);
   }
   assert.match(packageJson.scripts['verify:changed'], /verification-policy\.mjs run/u);
-  assert.match(
-    map.checks['workflow-tests'].command,
-    /@customer-agent\/database build && pnpm test:workflow/u,
-  );
+  assert.deepEqual(map.checks['workflow-tests'].command, [
+    ['pnpm', '--filter', '@customer-agent/database', 'build'],
+    ['pnpm', 'test:workflow'],
+  ]);
 
   const prWorkflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
   for (const lane of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {
@@ -606,4 +769,27 @@ test('workflow and package gates consume the dependency-map runner', () => {
   assert.doesNotMatch(prWorkflow, /run: pnpm test:api/u);
   assert.doesNotMatch(prWorkflow, /run: pnpm test:e2e:float/u);
   assert.doesNotMatch(prWorkflow, /run: pnpm (?:package:win|package:linux)/u);
+});
+
+test('PR lanes fetch full history and precheck runs through the shared map runner', () => {
+  const prWorkflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
+  for (const lane of ['changes', 'quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {
+    assert.match(workflowJob(prWorkflow, lane), /fetch-depth:\s*0/u, `${lane} must fetch full history`);
+  }
+
+  const changes = workflowJob(prWorkflow, 'changes');
+  assert.match(
+    changes,
+    /verification-policy\.mjs run[^\n]*--lane precheck/u,
+    'PR precheck must execute the dependency-map precheck lane',
+  );
+  assert.doesNotMatch(changes, /run: node --test scripts\/verification-policy\.test\.mjs/u);
+  assert.doesNotMatch(changes, /run: node scripts\/check-documentation\.mjs/u);
+});
+
+test('main CI continues to hardcode the authoritative full mode', () => {
+  const mainWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const changes = workflowJob(mainWorkflow, 'changes');
+  assert.match(changes, /echo "mode=full"/u);
+  assert.doesNotMatch(changes, /verification-policy\.mjs plan/u);
 });
