@@ -114,6 +114,54 @@ describe('observability evaluation aggregation', () => {
       }),
     ], 'ordinary')).toThrowError(ObservabilityError);
   });
+
+  it('rejects mixed kinds at the pair boundary with a stable error', () => {
+    const ordinary = ordinaryRecord(10, 1);
+    const sop = sopRecord(10);
+    const expectKindMixed = (run: () => unknown) => {
+      expect(run).toThrowError(expect.objectContaining({
+        name: 'ObservabilityError',
+        code: 'EVALUATION_KIND_MIXED',
+      }));
+    };
+
+    expectKindMixed(() => aggregateEvaluationPair(
+      [ordinary],
+      [ordinary as unknown as SopRecord],
+    ));
+    expectKindMixed(() => aggregateEvaluationPair(
+      [sop as unknown as OrdinaryRecord],
+      [sop],
+    ));
+    expectKindMixed(() => aggregateEvaluationPair(
+      [sop as unknown as OrdinaryRecord],
+      [ordinary as unknown as SopRecord],
+    ));
+  });
+
+  it('rejects missing kinds and nested metrics from the opposite kind', () => {
+    const ordinary = ordinaryRecord(10, 1);
+    const sop = sopRecord(10);
+    const expectRecordInvalid = (run: () => unknown) => {
+      expect(run).toThrowError(expect.objectContaining({
+        name: 'ObservabilityError',
+        code: 'EVALUATION_RECORD_INVALID',
+      }));
+    };
+
+    expectRecordInvalid(() => aggregateEvaluationPair(
+      [{ ...ordinary, kind: undefined } as unknown as OrdinaryRecord],
+      [sop],
+    ));
+    expectRecordInvalid(() => aggregateEvaluationPair(
+      [{ ...ordinary, metrics: sop.metrics } as unknown as OrdinaryRecord],
+      [sop],
+    ));
+    expectRecordInvalid(() => aggregateEvaluationPair(
+      [ordinary],
+      [{ ...sop, metrics: ordinary.metrics } as unknown as SopRecord],
+    ));
+  });
 });
 
 describe('observability report rendering', () => {
