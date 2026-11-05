@@ -151,7 +151,6 @@ export class OverlayController {
   private readonly timeoutHandles = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly commandFrameStartedAt = new Map<string, number>();
   private readonly commandCallbackDurations: number[] = [];
-  private coldCommandStartedAtMs: number | null = null;
   private coldCallbackMs: number | null = null;
   private droppedCommandObservations = 0;
   private staleRendererReports = 0;
@@ -993,6 +992,7 @@ export class OverlayController {
             type: 'RELEASE_CHANGED',
             ...identity,
             releaseId: event.releaseId,
+            releaseRevision: event.releaseRevision,
           })
         : event.type === 'focus-changed'
           ? this.dispatchOverlayEvent({
@@ -1065,7 +1065,6 @@ export class OverlayController {
       resultCount: request.resultCount,
     });
     if (transition.decision !== 'applied') {
-      this.applyFallbackQueryHeight();
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
     this.startCommandObservation('layout', request.sequence, request.identity);
@@ -1235,7 +1234,6 @@ export class OverlayController {
   ): void {
     const key = this.commandObservationKey(commandType, commandId, identity);
     const startedAt = performance.now();
-    this.coldCommandStartedAtMs ??= startedAt;
     if (this.commandFrameStartedAt.has(key)) {
       this.droppedCommandObservations += 1;
     }
@@ -1262,9 +1260,7 @@ export class OverlayController {
     this.commandFrameStartedAt.delete(key);
     const completedAt = performance.now();
     const duration = Math.max(0, completedAt - startedAt);
-    if (this.coldCallbackMs === null && this.coldCommandStartedAtMs !== null) {
-      this.coldCallbackMs = Math.max(0, completedAt - this.coldCommandStartedAtMs);
-    }
+    this.coldCallbackMs ??= duration;
     this.commandCallbackDurations.push(duration);
     if (this.commandCallbackDurations.length > 4_096) {
       this.commandCallbackDurations.splice(

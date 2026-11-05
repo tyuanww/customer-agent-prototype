@@ -449,6 +449,105 @@ describe('OverlayController renderer work ownership', () => {
     }));
   });
 
+  it('rejects a stale layout request without changing native bounds or sending an ACK', () => {
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    const state = activeState();
+    Object.assign(controller as object, { query, overlayState: state });
+    controllers.push(controller);
+
+    const ack = controller.reportQueryLayout({
+      sessionId: state.handoff.id,
+      sequence: 0,
+      phase: state.contentPhase,
+      resultCount: state.resultCount,
+      desiredHeight: 420,
+      identity: {
+        sessionEpoch: state.sessionEpoch,
+        generation: state.generation,
+        windowGeneration: state.windowGeneration,
+        contentRevision: state.contentRevision,
+      },
+    });
+
+    expect(ack).toMatchObject({ ok: false, sequence: 0 });
+    expect(query.setBounds).not.toHaveBeenCalled();
+    expect(query.sent).toEqual([]);
+    expect(Reflect.get(controller, 'overlayState')).toBe(state);
+  });
+
+  it('does not let a same-origin stale release report roll back the current release', () => {
+    const controller = new OverlayController();
+    const state = activeState();
+    Object.assign(controller as object, { overlayState: state });
+    controllers.push(controller);
+
+    expect(controller.reportRendererEvent({
+      type: 'release-changed',
+      releaseId: 'rel_synthetic_next',
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision,
+      releaseRevision: state.releaseRevision,
+    })).not.toBeNull();
+    expect(controller.reportRendererEvent({
+      type: 'release-changed',
+      releaseId: 'rel_synthetic_stale',
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision,
+      releaseRevision: state.releaseRevision,
+    })).toBeNull();
+    expect(Reflect.get(controller, 'overlayState')).toMatchObject({
+      releaseId: 'rel_synthetic_next',
+      releaseRevision: state.releaseRevision + 1,
+    });
+  });
+
+  it('measures cold as the first completed observation duration after earlier work is dropped', () => {
+    const now = vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(120)
+      .mockReturnValueOnce(160);
+    const controller = new OverlayController();
+    const state = activeState();
+    Object.assign(controller as object, { overlayState: state });
+    controllers.push(controller);
+    const identity = {
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision,
+    };
+    const start = Reflect.get(controller, 'startCommandObservation') as (
+      type: 'handoff' | 'layout' | 'settle',
+      id: number,
+      reportIdentity: typeof identity,
+    ) => void;
+    const record = Reflect.get(controller, 'recordRendererFrame') as (
+      type: 'handoff' | 'layout' | 'settle',
+      id: number,
+      reportIdentity: typeof identity,
+    ) => boolean;
+
+    try {
+      start.call(controller, 'layout', 1, identity);
+      Reflect.get(controller, 'clearCommandObservations').call(controller);
+      start.call(controller, 'layout', 2, identity);
+      expect(record.call(controller, 'layout', 2, identity)).toBe(true);
+      expect(controller.performanceSnapshot()).toMatchObject({
+        count: 1,
+        coldMs: 40,
+        droppedObservations: 1,
+        coldSemantics: 'first-completed-observation',
+      });
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('rejects a renderer report that claims a newer session than the originating snapshot', () => {
     const controller = new OverlayController();
     const state = activeState();
@@ -479,6 +578,7 @@ describe('OverlayController renderer work ownership', () => {
         generation: state.generation,
         windowGeneration: state.windowGeneration,
         contentRevision: state.contentRevision,
+        releaseRevision: state.releaseRevision,
       } satisfies OverlayRendererEvent),
     },
     {

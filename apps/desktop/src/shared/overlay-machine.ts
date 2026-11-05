@@ -9,7 +9,12 @@ import type {
   ReportablePhase,
   ResultCount,
 } from './overlay-events';
-import { activateSearchCommand, shortcutStatusCommand } from './overlay-events';
+import {
+  activateSearchCommand,
+  isFoxVisualTransform,
+  isOverlayCommand,
+  shortcutStatusCommand,
+} from './overlay-events';
 import { resolveSessionQueryAnchor, type Rect } from './overlay-geometry';
 import {
   parseOverlaySnapshot,
@@ -49,6 +54,7 @@ export type OverlayState = {
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
   readonly contentRevision: number;
+  readonly releaseRevision: number;
   readonly sessionEpoch: number;
   readonly generation: number;
   readonly windowGeneration: number;
@@ -62,6 +68,7 @@ export type OverlayState = {
     readonly generation: number;
     readonly sessionEpoch: number;
     readonly animate: boolean;
+    readonly prepareCommand: Extract<OverlayCommand, { type: 'prepare-search' }> | null;
   };
   readonly layout: {
     readonly sequence: number;
@@ -121,6 +128,7 @@ export type OverlaySnapshotProjection = {
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
   readonly contentRevision: number;
+  readonly releaseRevision: number;
   readonly windowGeneration: number;
   readonly focusIntent: OverlayFocusIntent;
   readonly handoff: OverlayState['handoff'];
@@ -171,7 +179,7 @@ export type OverlayEvent =
       contentRevision: number;
     } & EventGuard)
   | ({ type: 'SESSION_CHANGED'; releaseId: string } & EventGuard)
-  | ({ type: 'RELEASE_CHANGED'; releaseId: string } & EventGuard)
+  | ({ type: 'RELEASE_CHANGED'; releaseId: string; releaseRevision: number } & EventGuard)
   | ({ type: 'WINDOW_RECREATED' } & EventGuard)
   | ({ type: 'WINDOW_CLOSED' } & EventGuard)
   | ({ type: 'QUERY_FOCUSED' } & EventGuard)
@@ -436,6 +444,7 @@ export type OverlayRejection =
   | 'stale-generation'
   | 'stale-handoff'
   | 'stale-content'
+  | 'stale-release'
   | 'stale-layout'
   | 'stale-drag-session'
   | 'stale-drag-settle'
@@ -480,6 +489,7 @@ export function createInitialOverlayState(input: {
   generation: number;
   windowGeneration: number;
   releaseId: string;
+  releaseRevision?: number;
 }): OverlayState {
   return {
     phase: 'parked',
@@ -487,6 +497,7 @@ export function createInitialOverlayState(input: {
     contentPhase: 'SEARCH_INPUT',
     resultCount: 0,
     contentRevision: 0,
+    releaseRevision: input.releaseRevision ?? 0,
     sessionEpoch: input.sessionEpoch,
     generation: input.generation,
     windowGeneration: input.windowGeneration,
@@ -500,6 +511,7 @@ export function createInitialOverlayState(input: {
       generation: input.generation,
       sessionEpoch: input.sessionEpoch,
       animate: true,
+      prepareCommand: null,
     },
     layout: {
       sequence: 0,
@@ -545,6 +557,7 @@ export function overlaySnapshot(state: OverlayState): OverlaySnapshotProjection 
     contentPhase: state.contentPhase,
     resultCount: state.resultCount,
     contentRevision: state.contentRevision,
+    releaseRevision: state.releaseRevision,
     windowGeneration: state.windowGeneration,
     focusIntent: state.focusIntent,
     handoff: state.handoff,
@@ -557,6 +570,22 @@ export function overlaySnapshot(state: OverlayState): OverlaySnapshotProjection 
 
 export function isOverlaySnapshotProjection(value: unknown): value is OverlaySnapshotProjection {
   if (!value || typeof value !== 'object') {
+    return false;
+  }
+  if (!hasExactKeys(value, [
+    'contract',
+    'contentPhase',
+    'resultCount',
+    'contentRevision',
+    'releaseRevision',
+    'windowGeneration',
+    'focusIntent',
+    'handoff',
+    'layout',
+    'drag',
+    'fox',
+    'shortcut',
+  ])) {
     return false;
   }
   const snapshot = value as Partial<OverlaySnapshotProjection>;
@@ -579,6 +608,8 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
       || snapshot.resultCount === 3)
     && Number.isSafeInteger(snapshot.contentRevision)
     && (snapshot.contentRevision ?? -1) >= 0
+    && Number.isSafeInteger(snapshot.releaseRevision)
+    && (snapshot.releaseRevision ?? -1) >= 0
     && isPositiveInteger(snapshot.windowGeneration)
     && (snapshot.focusIntent === 'fox'
       || snapshot.focusIntent === 'query'
@@ -597,6 +628,14 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
     && isPositiveInteger(handoff.generation)
     && isPositiveInteger(handoff.sessionEpoch)
     && typeof handoff.animate === 'boolean'
+    && (
+      handoff.prepareCommand === null
+      || (
+        isOverlayCommand(handoff.prepareCommand)
+        && handoff.prepareCommand.type === 'prepare-search'
+        && handoff.prepareCommand.handoffId === handoff.id
+      )
+    )
     && layout
     && Number.isSafeInteger(layout.sequence)
     && (layout.sequence ?? -1) >= 0
@@ -658,7 +697,7 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
     )
     && (
       drag.pendingOpen === null
-      || Boolean(drag.pendingOpen)
+      || isOpenPlanFields(drag.pendingOpen)
     )
     && (drag.queryAnchor === null || drag.queryAnchor === 'left' || drag.queryAnchor === 'right')
     && fox
@@ -716,6 +755,11 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
+function hasExactKeys(value: object, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => actual.includes(key));
+}
+
 function isRect(value: unknown): value is Rect {
   if (!value || typeof value !== 'object') {
     return false;
@@ -726,17 +770,28 @@ function isRect(value: unknown): value is Rect {
   ) && (rect.width ?? 0) > 0 && (rect.height ?? 0) > 0;
 }
 
-function isOpenPlan(event: Extract<OverlayEvent, { type: 'OPEN_REQUESTED' }>): boolean {
+function isOpenPlanFields(value: unknown): value is OverlayOpenPlan {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const plan = value as Partial<OverlayOpenPlan>;
   return (
-    (event.anchor === 'left' || event.anchor === 'right')
-    && (event.dockEdge === 'none' || event.dockEdge === 'left' || event.dockEdge === 'right')
-    && isRect(event.queryBounds)
-    && isRect(event.foxBounds)
-    && Number.isFinite(event.handoffCenterX)
-    && Number.isFinite(event.handoffCenterY)
-    && typeof event.animate === 'boolean'
-    && Boolean(event.foxVisualTransform)
+    isPositiveInteger(plan.sessionEpoch)
+    && isPositiveInteger(plan.generation)
+    && isPositiveInteger(plan.windowGeneration)
+    && (plan.anchor === 'left' || plan.anchor === 'right')
+    && (plan.dockEdge === 'none' || plan.dockEdge === 'left' || plan.dockEdge === 'right')
+    && isRect(plan.queryBounds)
+    && isRect(plan.foxBounds)
+    && Number.isFinite(plan.handoffCenterX)
+    && Number.isFinite(plan.handoffCenterY)
+    && typeof plan.animate === 'boolean'
+    && isFoxVisualTransform(plan.foxVisualTransform)
   );
+}
+
+function isOpenPlan(event: Extract<OverlayEvent, { type: 'OPEN_REQUESTED' }>): boolean {
+  return isOpenPlanFields(event);
 }
 
 function resetContent(state: OverlayState): OverlayState {
@@ -764,6 +819,14 @@ function startOpening(
   const sequence = state.handoff.sequence + 1;
   const handoffId = sequence;
   const reset = resetContent(state);
+  const prepareCommand: Extract<OverlayCommand, { type: 'prepare-search' }> = {
+    type: 'prepare-search',
+    handoffId,
+    anchor: plan.anchor,
+    handoffCenterX: plan.handoffCenterX,
+    handoffCenterY: plan.handoffCenterY,
+    foxVisualTransform: plan.foxVisualTransform,
+  };
   const next: OverlayState = {
     ...reset,
     phase: 'opening',
@@ -778,6 +841,7 @@ function startOpening(
       generation,
       sessionEpoch: state.sessionEpoch,
       animate: plan.animate,
+      prepareCommand,
     },
     layout: {
       ...reset.layout,
@@ -797,14 +861,7 @@ function startOpening(
       type: 'SEND_RENDERER_COMMAND',
       target: 'query',
       commandId: handoffId,
-      command: {
-        type: 'prepare-search',
-        handoffId,
-        anchor: plan.anchor,
-        handoffCenterX: plan.handoffCenterX,
-        handoffCenterY: plan.handoffCenterY,
-        foxVisualTransform: plan.foxVisualTransform,
-      },
+      command: prepareCommand,
     },
     { type: 'SET_WINDOW_BOUNDS', target: 'query', bounds: plan.queryBounds, windowGeneration: state.windowGeneration },
     { type: 'SET_FOCUSABLE', target: 'fox', focusable: false },
@@ -847,7 +904,8 @@ export function applyOverlayEvent(
       sessionEpoch: Math.max(state.sessionEpoch, event.sessionEpoch),
       generation: state.generation + 1,
       windowGeneration: event.windowGeneration,
-      releaseId: 'rel_overlay_unbound',
+      releaseId: state.releaseId,
+      releaseRevision: state.releaseRevision,
     });
     return applied(next, [
       { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
@@ -912,6 +970,7 @@ export function applyOverlayEvent(
           generation,
           sessionEpoch: state.sessionEpoch,
           animate: event.animate,
+          prepareCommand: null,
         },
         layout: {
           ...reset.layout,
@@ -949,19 +1008,14 @@ export function applyOverlayEvent(
       return ignored(state, 'no-transition');
 
     case 'QUERY_SUBSCRIBED':
-      return state.phase === 'opening' && state.handoff.mode === 'preparing-open'
+      return state.phase === 'opening'
+        && state.handoff.mode === 'preparing-open'
+        && state.handoff.prepareCommand !== null
         ? applied(state, [{
             type: 'SEND_RENDERER_COMMAND',
             target: 'query',
             commandId: state.handoff.id,
-            command: {
-              type: 'prepare-search',
-              handoffId: state.handoff.id,
-              anchor: state.handoff.anchor,
-              handoffCenterX: 0,
-              handoffCenterY: 0,
-              foxVisualTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-            },
+            command: state.handoff.prepareCommand,
           }])
         : ignored(state, 'invalid-phase');
 
@@ -1001,7 +1055,7 @@ export function applyOverlayEvent(
       const next: OverlayState = {
         ...state,
         activeSurface: 'query',
-        handoff: { ...state.handoff, mode: 'opening' },
+        handoff: { ...state.handoff, mode: 'opening', prepareCommand: null },
         focusIntent: 'query',
       };
       return applied(next, [
@@ -1043,7 +1097,7 @@ export function applyOverlayEvent(
         phase: 'active',
         activeSurface: 'query',
         focusIntent: 'query',
-        handoff: { ...state.handoff, mode: 'none' },
+        handoff: { ...state.handoff, mode: 'none', prepareCommand: null },
       };
       return applied(next, [
         { type: 'CANCEL_TIMEOUT', timer: 'handoff', handoffId: event.handoffId },
@@ -1070,6 +1124,7 @@ export function applyOverlayEvent(
           ...state.handoff,
           mode: 'none',
           generation: state.generation + 1,
+          prepareCommand: null,
         },
       };
       const effects: NativeEffect[] = [
@@ -1098,7 +1153,7 @@ export function applyOverlayEvent(
         const next: OverlayState = {
           ...state,
           activeSurface: 'query',
-          handoff: { ...state.handoff, mode: 'opening' },
+          handoff: { ...state.handoff, mode: 'opening', prepareCommand: null },
           focusIntent: 'query',
         };
         return applied(next, [
@@ -1138,6 +1193,7 @@ export function applyOverlayEvent(
           ...state.handoff,
           mode: 'none',
           generation: state.generation + 1,
+          prepareCommand: null,
         },
         focusIntent: state.phase === 'closing' ? 'previous-app' : 'query',
       };
@@ -1192,10 +1248,14 @@ export function applyOverlayEvent(
         sessionEpoch: event.sessionEpoch,
         generation: state.generation + 1,
         releaseId: event.releaseId,
+        releaseRevision: 0,
         handoff: {
           ...state.handoff,
           generation: state.generation + 1,
           sessionEpoch: event.sessionEpoch,
+          prepareCommand: state.handoff.mode === 'preparing-open'
+            ? state.handoff.prepareCommand
+            : null,
         },
         layout: {
           ...reset.layout,
@@ -1220,6 +1280,7 @@ export function applyOverlayEvent(
             mode: 'none',
             generation: state.generation + 1,
             sessionEpoch: event.sessionEpoch,
+            prepareCommand: null,
           },
         };
         return applied(forcedParked, [
@@ -1250,9 +1311,20 @@ export function applyOverlayEvent(
     }
 
     case 'RELEASE_CHANGED':
-      return event.releaseId
-        ? applied({ ...state, releaseId: event.releaseId })
-        : rejected(state, 'invalid-event');
+      if (
+        !event.releaseId
+        || !Number.isSafeInteger(event.releaseRevision)
+        || event.releaseRevision !== state.releaseRevision
+      ) {
+        return rejected(state, 'stale-release');
+      }
+      return event.releaseId === state.releaseId
+        ? ignored(state, 'no-transition')
+        : applied({
+            ...state,
+            releaseId: event.releaseId,
+            releaseRevision: state.releaseRevision + 1,
+          });
 
     case 'WINDOW_CLOSED': {
       if (state.phase === 'closed') {
@@ -1264,6 +1336,7 @@ export function applyOverlayEvent(
           generation: state.generation + 1,
           windowGeneration: state.windowGeneration,
           releaseId: state.releaseId,
+          releaseRevision: state.releaseRevision,
         }),
         phase: 'closed',
         activeSurface: 'fox',

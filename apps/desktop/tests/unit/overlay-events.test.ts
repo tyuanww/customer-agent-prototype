@@ -270,5 +270,22 @@ describe('overlay command boundary', () => {
       contentRevision: 0,
       extra: true,
     })).toBe(false);
+    expect(isOverlayRendererEvent({
+      type: 'release-changed',
+      releaseId: 'rel_synthetic',
+      sessionEpoch: 1,
+      windowGeneration: 3,
+      generation: 4,
+      contentRevision: 0,
+      releaseRevision: 0,
+    })).toBe(true);
+    expect(isOverlayRendererEvent({
+      type: 'release-changed',
+      releaseId: 'rel_synthetic',
+      sessionEpoch: 1,
+      windowGeneration: 3,
+      generation: 4,
+      contentRevision: 0,
+    })).toBe(false);
   });
 });
