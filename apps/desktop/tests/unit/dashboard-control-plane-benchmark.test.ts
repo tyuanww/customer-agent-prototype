@@ -145,6 +145,7 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
     expect(acceptance).toHaveLength(50);
     expect(statusLookup).toHaveLength(100);
     expect(recovery).toHaveLength(21);
+    expect(readProjection.length + statusLookup.length).toBe(100);
     expect(stale?.state).toBe('committed');
     expect(errors).toBe(0);
 

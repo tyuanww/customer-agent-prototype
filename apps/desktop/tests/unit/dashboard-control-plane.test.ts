@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -222,8 +222,9 @@ describe('DashboardControlPlane lifecycle', () => {
     expect(second.view.state).toBe('committed');
   });
 
-  it('replays after a permission revision change but rejects the same intent after capability loss', async () => {
+  it('reuses only the same access revision and capability identity', async () => {
     let revision = 11;
+    let capability = 'permissions:grant';
     let grants: 'open' | 'closed' = 'open';
     let effects = 0;
     const control = new DashboardControlPlane({
@@ -238,6 +239,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const input = {
       domain: 'permissions' as const,
       command: 'grants-manage' as const,
+      capability,
       authorize: (view: DashboardAccessView) => view.grants === 'open',
       intent: { grant: 'same-grant' },
       execute: async () => {
@@ -247,10 +249,12 @@ describe('DashboardControlPlane lifecycle', () => {
     };
     await control.submit(input);
     revision = 12;
-    await expect(control.submit(input)).resolves.toMatchObject({
-      reused: true,
-      view: { state: 'committed' },
-    });
+    await expect(control.submit(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+    revision = 11;
+    capability = 'permissions:revoke';
+    await expect(control.submit(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+    capability = 'permissions:grant';
+    await expect(control.submit(input)).resolves.toMatchObject({ reused: true });
     expect(effects).toBe(1);
     grants = 'closed';
     await expect(control.submit(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -357,6 +361,20 @@ describe('DashboardControlPlane lifecycle', () => {
       canRecover: true,
     }]);
     expect(JSON.parse(await readFile(path, 'utf8')).records[0].status.state).toBe('unknown');
+  });
+
+  it('repairs an existing operation directory to owner-only mode', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dashboard-operation-mode-'));
+    temporaryDirectories.push(root);
+    const directory = join(root, 'existing');
+    await mkdir(directory, { mode: 0o755 });
+    await chmod(directory, 0o755);
+    const path = join(directory, 'operations.json');
+    const store = new FileDashboardOperationStore(path);
+
+    await store.write([]);
+
+    expect((await stat(directory)).mode & 0o777).toBe(0o700);
   });
 
   it('reconciles a running operation left by process death to unknown, not success or failure', async () => {
@@ -684,11 +702,82 @@ describe('DashboardControlPlane lifecycle', () => {
         domain: 'materials',
         releaseId: 'rel-event',
         sessionEpoch: 7,
+        dedupeKey: '7:operation-event-release:rel-event',
       }));
       await control.retryReleaseInvalidation('operation-event-release');
       expect(listener).toHaveBeenCalledOnce();
     } finally {
       stop();
     }
+  });
+
+  it('delivers a pending release invalidation again after a crash before its emitted marker', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dashboard-operation-outbox-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'operations.json');
+    const fileStore = new FileDashboardOperationStore(path);
+    const crashBeforeMarkerStore = {
+      read: fileStore.read.bind(fileStore),
+      async write(records: readonly DashboardStoredOperation[]) {
+        if (records.some((record) => record.invalidation === 'emitted')) {
+          throw new Error('crash before emitted marker');
+        }
+        await fileStore.write(records);
+      },
+    };
+    const delivered: string[] = [];
+    const effect = new Set<string>();
+    const consume = (value: { dedupeKey: string }) => {
+      delivered.push(value.dedupeKey);
+      if (!effect.has(value.dedupeKey)) effect.add(value.dedupeKey);
+    };
+    const firstStop = subscribeDashboardReleaseInvalidation(consume);
+    const first = new DashboardControlPlane({
+      session: fakeSession(),
+      store: crashBeforeMarkerStore,
+      access: { read: vi.fn(async () => access()) },
+      createOperationId: () => 'operation-outbox',
+      now: () => Date.parse('2026-11-05T08:00:00.000Z'),
+    });
+    await expect(first.submit({
+      domain: 'materials',
+      command: 'publish',
+      capability: 'materials:publish',
+      intent: { candidate: 'candidate-outbox' },
+      execute: async () => ({
+        kind: 'committed',
+        resultRef: 'rel-outbox',
+        releaseId: 'rel-outbox',
+      }),
+    })).resolves.toMatchObject({
+      view: {
+        state: 'committed',
+        releaseInvalidationPending: true,
+      },
+    });
+    firstStop();
+    expect(JSON.parse(await readFile(path, 'utf8')).records[0]).toMatchObject({
+      invalidation: 'pending',
+      releaseId: 'rel-outbox',
+    });
+
+    const secondStop = subscribeDashboardReleaseInvalidation(consume);
+    const restarted = new DashboardControlPlane({
+      session: fakeSession(),
+      store: new FileDashboardOperationStore(path),
+      access: { read: vi.fn(async () => access()) },
+      now: () => Date.parse('2026-11-05T08:01:00.000Z'),
+    });
+    try {
+      await restarted.current();
+    } finally {
+      secondStop();
+    }
+
+    expect(delivered).toEqual([
+      '7:operation-outbox:rel-outbox',
+      '7:operation-outbox:rel-outbox',
+    ]);
+    expect(effect.size).toBe(1);
   });
 });
