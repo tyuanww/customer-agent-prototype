@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseEvaluationRecord,
   type EvaluationRecord,
-} from '../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 import {
   BUDGET_SURFACES,
   ObservabilityError,

@@ -10,7 +10,7 @@ import {
 import type {
   QueryTelemetryRecord,
   StageRecord,
-} from '../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 import {
   makeQuery,
   makeStage,

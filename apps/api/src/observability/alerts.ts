@@ -4,7 +4,7 @@ import type {
   OperationId,
   ReleaseId,
   TraceIdentity,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 import {
   BUDGET_SURFACES,
   DEFAULT_OBSERVABILITY_BUDGETS,

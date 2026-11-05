@@ -3,7 +3,7 @@ import type {
   EvaluationRecord,
   QueryTelemetryRecord,
   StageRecord,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 import {
   redactAlertRecord,
   redactEvaluationRecord,

@@ -407,7 +407,7 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 `apps/desktop/src/main/observability/` 只把 copy、overlay 和 Dashboard 的稳定字段转换成合同 `StageRecord`。它不持有 Query、SOP、release、Dashboard 或授权状态。
 
-`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。`scripts/observability/sync-contract-types.ts` 从 `@customer-agent/unified-contracts` 构建声明快照，供尚未声明 workspace dependency 的 API 与 Desktop 做纯类型检查。INT-WORKSPACE 接入合同依赖后应删除这个临时类型桥。
+API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
 
 当前没有业务接线。INT-API 负责 request ID 和 API stage hooks，QRY-01 与 SOP-01 负责各自 pipeline stages，DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
 

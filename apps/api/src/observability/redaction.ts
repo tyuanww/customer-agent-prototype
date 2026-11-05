@@ -9,7 +9,7 @@ import type {
   StaleReleaseAlert,
   TraceIdentity,
   UnknownOperationAlert,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 
 function copyTrace(trace: TraceIdentity): TraceIdentity {
   const common = {

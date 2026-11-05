@@ -1,7 +1,7 @@
 import type {
   BudgetClass,
   ObservabilityStage,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 import { ObservabilityError } from './errors.js';
 
 export const BUDGET_SURFACES = [

@@ -2,12 +2,12 @@ import {
   parseQueryTelemetryRecord,
   parseStageRecord,
   parseTraceIdentity,
-} from '../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 import type {
   ObservabilityStage,
   StageOutcome,
   TraceIdentity,
-} from '../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 
 export const TEST_RELEASE = 'rel_obs_test';
 export const TEST_TIME = '2026-11-05T00:00:00.000Z';

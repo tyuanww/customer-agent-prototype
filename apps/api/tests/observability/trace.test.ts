@@ -4,7 +4,7 @@ import {
   ObservabilityError,
   type ObservabilityErrorCode,
 } from '../../src/observability/index.js';
-import type { StageRecord } from '../../../../packages/unified-contracts/src/index.ts';
+import type { StageRecord } from '@customer-agent/unified-contracts';
 import {
   makeQuery,
   makeStage,

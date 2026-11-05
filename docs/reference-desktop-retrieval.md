@@ -68,7 +68,7 @@ SOP 查询使用独立 `SopPipeline`，不进入上面的内容 Top 3 管道。�
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
 
-`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器。当前检索链没有调用这些转换器，也没有把数据写入新 sink。QRY-01、SOP-01 和 INT-DESKTOP 接线前，既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是唯一实际桌面检索记录。
+`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器，并直接使用 `@customer-agent/unified-contracts` 的共享类型。当前检索链没有调用这些转换器，也没有把数据写入新 sink。QRY-01、SOP-01 和 INT-DESKTOP 接线前，既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是唯一实际桌面检索记录。
 
 ## 例子
 

@@ -3,7 +3,7 @@ import {
   parseAlertRecord,
   type OperationId,
   type ReleaseId,
-} from '../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 import {
   BUDGET_SURFACES,
   DEFAULT_OBSERVABILITY_BUDGETS,
