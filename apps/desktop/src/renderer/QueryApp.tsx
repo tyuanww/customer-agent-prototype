@@ -36,8 +36,9 @@ import {
 } from '@shared/overlay-events';
 import type {
   OverlayPhase,
-  OverlaySnapshot,
+  OverlaySnapshotProjection,
 } from '@shared/overlay-machine';
+import type { OverlayReportIdentity } from '@shared/overlay-report';
 import { QueryAnnounceBanner } from './features/search/QueryAnnounceBanner';
 import { QueryCapsule } from './features/search/QueryCapsule';
 import { QueryResizeGrip } from './features/search/QueryResizeGrip';
@@ -121,6 +122,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
   const lastAppliedLayoutSequenceRef = useRef(0);
+  const contentRevisionRef = useRef(0);
   const layoutFrameRef = useRef<number | null>(null);
   const hugPassRef = useRef(0);
   const phaseRef = useRef<OverlayPhase>(phase);
@@ -172,7 +174,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const collapseCleanupTimerRef = useRef<number | null>(null);
   const pendingCopyRef = useRef<QueryResult | null>(null);
   const activeHandoffIdRef = useRef(0);
-  const overlaySnapshotRef = useRef<OverlaySnapshot | null>(null);
+  const handoffReportRef = useRef<{
+    handoffId: number;
+    identity: OverlayReportIdentity;
+  } | null>(null);
+  const pendingOpenArmedRef = useRef<number | null>(null);
+  const pendingCloseFrameRef = useRef<number | null>(null);
+  const pendingCloseFinishedRef = useRef<number | null>(null);
+  const closeFrameReportedRef = useRef<number | null>(null);
+  const overlaySnapshotRef = useRef<OverlaySnapshotProjection | null>(null);
   const queryInteractiveRef = useRef(false);
   const openingRef = useRef(false);
   const openingUserInteractionRef = useRef(false);
@@ -214,6 +224,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setLayoutReady(true);
     layoutSequenceRef.current = 0;
     lastAppliedLayoutSequenceRef.current = 0;
+    contentRevisionRef.current = 0;
     resultCountRef.current = 0;
   }, []);
 
@@ -283,7 +294,26 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     [],
   );
 
-  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshot | undefined) => {
+  const overlayReportIdentity = useCallback((
+    contentRevision = contentRevisionRef.current,
+  ): OverlayReportIdentity | null => {
+    const snapshot = overlaySnapshotRef.current;
+    return snapshot
+      ? {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision,
+        }
+      : {
+          sessionEpoch: 1,
+          generation: 1,
+          windowGeneration: 1,
+          contentRevision,
+        };
+  }, []);
+
+  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshotProjection | undefined) => {
     if (!snapshot) {
       return;
     }
@@ -298,15 +328,100 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation < previous.contract.generation
         )
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation === previous.contract.generation
+          && snapshot.contentRevision < previous.contentRevision
+        )
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation === previous.contract.generation
+          && snapshot.contentRevision === previous.contentRevision
+          && snapshot.handoff.id < previous.handoff.id
+        )
       )
     ) {
       return;
     }
     overlaySnapshotRef.current = snapshot;
+    if (
+      activeHandoffIdRef.current > 0
+      && snapshot.handoff.id === activeHandoffIdRef.current
+      && handoffReportRef.current === null
+    ) {
+      handoffReportRef.current = {
+        handoffId: snapshot.handoff.id,
+        identity: {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        },
+      };
+    }
+    const handoffReport = handoffReportRef.current;
+    const reportPendingOpenArmed = (): void => {
+      if (!handoffReport || handoffReport.handoffId !== snapshot.handoff.id) {
+        return;
+      }
+      void window.customerAgent?.reportHandoffMilestone?.(
+        handoffReport.handoffId,
+        'open-armed',
+        handoffReport.identity,
+      ).catch(() => {
+        // Main owns the bounded handoff timeout.
+      });
+    };
+    if (
+      pendingOpenArmedRef.current === snapshot.handoff.id
+      && snapshot.handoff.mode === 'preparing-open'
+    ) {
+      pendingOpenArmedRef.current = null;
+      reportPendingOpenArmed();
+    } else if (
+      pendingOpenArmedRef.current === snapshot.handoff.id
+      && snapshot.handoff.mode !== 'preparing-open'
+    ) {
+      pendingOpenArmedRef.current = null;
+    }
+    if (
+      handoffReport
+      && pendingCloseFrameRef.current === snapshot.handoff.id
+      && snapshot.handoff.mode === 'closing'
+    ) {
+      const complete = pendingCloseFinishedRef.current === snapshot.handoff.id;
+      pendingCloseFrameRef.current = null;
+      if (complete) {
+        pendingCloseFinishedRef.current = null;
+      }
+      void reportOverlayEvent({
+        type: 'frame-observed',
+        commandId: handoffReport.handoffId,
+        commandType: 'handoff',
+        target: 'query',
+        ...handoffReport.identity,
+      }).then(() => {
+        closeFrameReportedRef.current = handoffReport.handoffId;
+        if (complete) {
+          void window.customerAgent?.reportHandoffMilestone?.(
+            handoffReport.handoffId,
+            'close-finished',
+            handoffReport.identity,
+          ).catch(() => {
+            // Main owns the bounded handoff timeout.
+          });
+        }
+      });
+    }
     const sessionChanged = Boolean(
       previous && previous.contract.sessionEpoch !== snapshot.contract.sessionEpoch,
     );
-    if (sessionChanged) {
+    const windowChanged = Boolean(
+      previous && previous.windowGeneration !== snapshot.windowGeneration,
+    );
+    if (sessionChanged || windowChanged) {
       searchGenerationRef.current += 1;
       copyGenerationRef.current += 1;
       pendingCopyRef.current = null;
@@ -319,50 +434,97 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setErrorMessage('');
     }
     activeHandoffIdRef.current = snapshot.handoff.id;
+    const preparingOpen = snapshot.contract.phase === 'opening'
+      && snapshot.handoff.mode === 'preparing-open';
     const openingNow = snapshot.contract.phase === 'opening'
       && snapshot.handoff.mode === 'opening';
     openingRef.current = openingNow;
     queryInteractiveRef.current = openingNow || snapshot.contract.phase === 'active';
     layoutSequenceRef.current = snapshot.layout.sequence;
     lastAppliedLayoutSequenceRef.current = snapshot.layout.ackSequence;
+    if (
+      sessionChanged
+      || windowChanged
+      || snapshot.contract.phase === 'opening'
+      || snapshot.contract.phase === 'parked'
+      || snapshot.contract.phase === 'closed'
+    ) {
+      contentRevisionRef.current = snapshot.contentRevision;
+    } else {
+      contentRevisionRef.current = Math.max(contentRevisionRef.current, snapshot.contentRevision);
+    }
     phaseRef.current = snapshot.contentPhase;
     resultCountRef.current = snapshot.resultCount;
     setPhase(snapshot.contentPhase);
     setAnchor(snapshot.handoff.anchor);
-    setParked(snapshot.contract.phase === 'parked' || snapshot.contract.phase === 'closed');
+    setParked(
+      snapshot.contract.phase === 'parked'
+      || snapshot.contract.phase === 'closed'
+      || preparingOpen,
+    );
     setOpening(openingNow);
     setClosing(snapshot.contract.phase === 'closing');
     setResizeEdge(snapshot.layout.resizeEdge);
     if (snapshot.layout.appliedHeight !== null) {
       setQueryHeight(snapshot.layout.appliedHeight);
+    } else {
+      setQueryHeight(QUERY_INPUT_HEIGHT);
     }
-    if (
-      snapshot.contract.phase === 'active'
+    if (snapshot.contract.phase === 'opening') {
+      setLayoutReady(false);
+    } else if (
+      snapshot.layout.appliedHeight !== null
       || snapshot.contract.phase === 'parked'
       || snapshot.contract.phase === 'closed'
+      || snapshot.contentPhase === 'SEARCH_INPUT'
     ) {
       setLayoutReady(true);
+    } else if (snapshot.layout.desiredHeight === null) {
+      setLayoutReady(false);
     }
     if (
-      sessionChanged
+      (sessionChanged || windowChanged)
       && (snapshot.contract.phase === 'active' || snapshot.contract.phase === 'opening')
     ) {
       window.requestAnimationFrame(() => focusQueryInput(false));
     }
-  }, [focusQueryInput]);
+  }, [focusQueryInput, reportOverlayEvent]);
 
   const reportHandoffMilestone = useCallback(
-    (handoffId: number, milestone: 'open-armed' | 'open-finished' | 'close-finished') => {
+    (
+      handoffId: number,
+      milestone: 'open-armed' | 'open-finished' | 'close-finished',
+      identity: OverlayReportIdentity | null,
+    ) => {
       const report = window.customerAgent?.reportHandoffMilestone;
-      if (!report || handoffId <= 0) {
+      if (!report || handoffId <= 0 || !identity) {
         return;
       }
-      void report(handoffId, milestone).catch(() => {
+      void report(handoffId, milestone, identity).catch(() => {
         // Main owns a bounded fallback timer; renderer failure cannot strand a window.
       });
     },
     [],
   );
+
+  const reportCloseFrameAndMilestone = useCallback((handoffId: number): void => {
+    const report = handoffReportRef.current;
+    if (report?.handoffId !== handoffId) {
+      return;
+    }
+    pendingCloseFrameRef.current = null;
+    pendingCloseFinishedRef.current = null;
+    void reportOverlayEvent({
+      type: 'frame-observed',
+      commandId: handoffId,
+      commandType: 'handoff',
+      target: 'query',
+      ...report.identity,
+    }).then(() => {
+      closeFrameReportedRef.current = handoffId;
+      reportHandoffMilestone(handoffId, 'close-finished', report.identity);
+    });
+  }, [reportHandoffMilestone, reportOverlayEvent]);
 
   const finishOpening = useCallback(() => {
     if (!openingRef.current) {
@@ -376,7 +538,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       // a Query control during the opening transition.
       focusQueryInput(false);
     }
-    reportHandoffMilestone(activeHandoffIdRef.current, 'open-finished');
+    const report = handoffReportRef.current;
+    if (report) {
+      reportHandoffMilestone(report.handoffId, 'open-finished', report.identity);
+    }
   }, [focusQueryInput, reportHandoffMilestone]);
 
   const reportPhase = useCallback((next: OverlayPhase, resultCount: ResultCount = 0) => {
@@ -388,9 +553,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setLayoutReady(false);
     }
     if (next !== 'FOX_IDLE') {
-      void window.customerAgent?.reportUiPhase(next, resultCount);
+      const identity = overlayReportIdentity(++contentRevisionRef.current);
+      if (identity) {
+        void window.customerAgent?.reportUiPhase(next, resultCount, identity);
+      }
     }
-  }, []);
+  }, [overlayReportIdentity]);
 
   const requestQueryLayout = useCallback((phase: OverlayPhase, resultCount: ResultCount) => {
     if (
@@ -450,12 +618,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         })
       : intrinsic;
     const measuredFromDom = lastContentBottom > 0 ? hugged : intrinsic;
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      return;
+    }
+    const sessionId = activeHandoffIdRef.current || 1;
     const request: QueryLayoutRequest = {
-      sessionId: activeHandoffIdRef.current,
+      sessionId,
       sequence: ++layoutSequenceRef.current,
       phase,
       resultCount,
       desiredHeight: measuredFromDom,
+      identity,
     };
     void report(request).then((ack) => {
       if (!acceptQueryLayoutAck({
@@ -463,7 +637,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         requestSessionId: request.sessionId,
         requestSequence: request.sequence,
         minSequence: lastAppliedLayoutSequenceRef.current,
-        activeSessionId: activeHandoffIdRef.current,
+        activeSessionId: activeHandoffIdRef.current || request.sessionId,
         currentPhase: phaseRef.current,
         currentResultCount: resultCountRef.current,
       })) {
@@ -475,20 +649,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setQueryHeight(ack.height);
       setLayoutReady(true);
       window.requestAnimationFrame(() => {
-        const snapshot = overlaySnapshotRef.current;
-        if (snapshot) {
-          void reportOverlayEvent({
-            type: 'frame-observed',
-            commandId: ack.sequence,
-            target: 'query',
-            sessionEpoch: snapshot.contract.sessionEpoch,
-            windowGeneration: snapshot.windowGeneration,
-            generation: snapshot.contract.generation,
-          });
-        }
+        void reportOverlayEvent({
+          type: 'frame-observed',
+          commandId: ack.sequence,
+          commandType: 'layout',
+          target: 'query',
+          ...request.identity,
+        });
       });
     }).catch(() => undefined);
-  }, [closing, opening, reportOverlayEvent]);
+  }, [closing, opening, overlayReportIdentity, reportOverlayEvent]);
 
   useEffect(() => {
     const api = window.customerAgent;
@@ -499,7 +669,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     void api
       .getWindowContext()
       .then((context) => {
-        applyOverlaySnapshot(context.snapshot);
+        if (
+          context.snapshot
+          && context.snapshot.handoff.id > activeHandoffIdRef.current
+        ) {
+          applyOverlaySnapshot(context.snapshot);
+        }
         if (!context.shortcut.registered) {
           setShortcutFailed(true);
           setShortcutHint(context.shortcut.message);
@@ -517,6 +692,48 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         applyOverlaySnapshot(command.snapshot);
         return;
       }
+      const commandIdentity = overlayReportIdentity();
+      if (command.type === 'cancel-query') {
+        searchGenerationRef.current += 1;
+        intakeContextIdRef.current = null;
+        setPlaceholderValues({});
+        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        else void window.customerAgent?.productSearch?.cancelSearch({
+          sessionEpoch: command.sessionEpoch,
+          generation: command.generation,
+        });
+        searchInFlightRef.current = false;
+        if (searchTimerRef.current !== null) {
+          window.clearTimeout(searchTimerRef.current);
+          searchTimerRef.current = null;
+        }
+        setSearching(false);
+        return;
+      }
+      if (command.type === 'cancel-copy') {
+        copyGenerationRef.current += 1;
+        copyInFlightRef.current = false;
+        pendingCopyRef.current = null;
+        if (dismissTimerRef.current !== null) {
+          window.clearTimeout(dismissTimerRef.current);
+          dismissTimerRef.current = null;
+        }
+        setCopying(false);
+        setCopiedRank(null);
+        return;
+      }
+      if (command.type === 'clear-content') {
+        setResults([]);
+        setReportError('');
+        setInvalidMessage('');
+        setErrorMessage('');
+        setHelpStatus('待核实');
+        lastProductQueryRef.current = null;
+        setPhase('SEARCH_INPUT');
+        contentRevisionRef.current = 0;
+        resultCountRef.current = 0;
+        return;
+      }
       if (
         'handoffId' in command
         && command.handoffId !== undefined
@@ -527,19 +744,20 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       const commandId = 'handoffId' in command && command.handoffId !== undefined
         ? command.handoffId
         : 0;
-      if (commandId > 0) {
+      if (commandId > 0 && command.type === 'activate-search') {
         window.requestAnimationFrame(() => {
-          const snapshot = overlaySnapshotRef.current;
-          if (!snapshot) {
+          const reportIdentity = handoffReportRef.current?.handoffId === commandId
+            ? handoffReportRef.current.identity
+            : null;
+          if (!reportIdentity) {
             return;
           }
           void reportOverlayEvent({
             type: 'frame-observed',
             commandId,
+            commandType: 'handoff',
             target: 'query',
-            sessionEpoch: snapshot.contract.sessionEpoch,
-            windowGeneration: snapshot.windowGeneration,
-            generation: snapshot.contract.generation,
+            ...reportIdentity,
           });
         });
       }
@@ -549,6 +767,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         cancelScheduledCollapseContent(true);
         recordNoHitExit();
         activeHandoffIdRef.current = command.handoffId;
+        handoffReportRef.current = commandIdentity
+          && overlaySnapshotRef.current?.handoff.id === command.handoffId
+          ? { handoffId: command.handoffId, identity: commandIdentity }
+          : null;
+        pendingOpenArmedRef.current = command.handoffId;
+        pendingCloseFinishedRef.current = null;
         queryInteractiveRef.current = false;
         openingRef.current = false;
         openingUserInteractionRef.current = false;
@@ -587,14 +811,24 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setLayoutReady(true);
           layoutSequenceRef.current = 0;
           lastAppliedLayoutSequenceRef.current = 0;
+          contentRevisionRef.current = 0;
           resultCountRef.current = 0;
         });
         // With backgroundThrottling disabled for the hidden Query window, this
         // rAF is a real layout/paint barrier rather than an arbitrary delay.
         openingFrameRef.current = window.requestAnimationFrame(() => {
           openingFrameRef.current = null;
-          if (activeHandoffIdRef.current === command.handoffId) {
-            reportHandoffMilestone(command.handoffId, 'open-armed');
+          if (
+            activeHandoffIdRef.current === command.handoffId
+            && pendingOpenArmedRef.current === command.handoffId
+            && handoffReportRef.current?.handoffId === command.handoffId
+          ) {
+            pendingOpenArmedRef.current = null;
+            reportHandoffMilestone(
+              command.handoffId,
+              'open-armed',
+              handoffReportRef.current.identity,
+            );
           }
         });
         return;
@@ -607,10 +841,24 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
             return;
           }
         } else {
+          activeHandoffIdRef.current = Math.max(1, activeHandoffIdRef.current);
           setHandoffGeometry(
             queryHandoffGeometry(QUERY_WIDTH, QUERY_INPUT_HEIGHT, command.anchor),
           );
         }
+        if (commandIdentity) {
+          const snapshot = overlaySnapshotRef.current;
+          handoffReportRef.current = snapshot?.handoff.id === activeHandoffIdRef.current
+            ? {
+                handoffId: activeHandoffIdRef.current,
+                identity: commandIdentity,
+              }
+            : null;
+        }
+        pendingOpenArmedRef.current = null;
+        pendingCloseFrameRef.current = activeHandoffIdRef.current;
+        pendingCloseFinishedRef.current = command.animate ? null : activeHandoffIdRef.current;
+        closeFrameReportedRef.current = null;
         queryInteractiveRef.current = true;
         openingRef.current = command.animate;
         openingUserInteractionRef.current = false;
@@ -624,7 +872,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         });
         focusQueryInput();
         if (!command.animate && command.handoffId !== undefined) {
-          reportHandoffMilestone(command.handoffId, 'open-finished');
+          reportHandoffMilestone(
+            command.handoffId,
+            'open-finished',
+            handoffReportRef.current?.handoffId === command.handoffId
+              ? handoffReportRef.current.identity
+              : null,
+          );
         }
         return;
       }
@@ -639,6 +893,17 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         recordNoHitExit();
         if (command.handoffId !== undefined) {
           activeHandoffIdRef.current = command.handoffId;
+        } else {
+          activeHandoffIdRef.current = Math.max(1, activeHandoffIdRef.current);
+        }
+        if (commandIdentity) {
+          const snapshot = overlaySnapshotRef.current;
+          handoffReportRef.current = snapshot?.handoff.id === activeHandoffIdRef.current
+            ? {
+                handoffId: activeHandoffIdRef.current,
+                identity: commandIdentity,
+              }
+            : null;
         }
         queryInteractiveRef.current = false;
         openingRef.current = false;
@@ -658,6 +923,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setLayoutReady(true);
           layoutSequenceRef.current = 0;
           lastAppliedLayoutSequenceRef.current = 0;
+          contentRevisionRef.current = 0;
           resultCountRef.current = 0;
           setOpening(false);
           // Animated closes keep the shared fox visible until the shell reaches
@@ -696,12 +962,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         } else {
           finishCollapseContent();
           if (command.handoffId !== undefined) {
-            reportHandoffMilestone(command.handoffId, 'close-finished');
+            if (handoffReportRef.current?.handoffId === command.handoffId) {
+              pendingCloseFinishedRef.current = null;
+              reportCloseFrameAndMilestone(command.handoffId);
+            }
           }
         }
         return;
       }
       if (command.type === 'query-layout-ack') {
+        const ackIdentity = commandIdentity;
         const ack: QueryLayoutAck = {
           ok: true,
           sessionId: command.sessionId,
@@ -714,7 +984,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         if (!acceptQueryLayoutAck({
           ack,
           minSequence: lastAppliedLayoutSequenceRef.current,
-          activeSessionId: activeHandoffIdRef.current,
+          activeSessionId: activeHandoffIdRef.current || command.sessionId,
           currentPhase: phaseRef.current,
           currentResultCount: resultCountRef.current,
         })) {
@@ -726,15 +996,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         setQueryHeight(ack.height);
         setLayoutReady(true);
         window.requestAnimationFrame(() => {
-          const snapshot = overlaySnapshotRef.current;
-          if (snapshot) {
+          if (ackIdentity) {
             void reportOverlayEvent({
               type: 'frame-observed',
               commandId: ack.sequence,
+              commandType: 'layout',
               target: 'query',
-              sessionEpoch: snapshot.contract.sessionEpoch,
-              windowGeneration: snapshot.windowGeneration,
-              generation: snapshot.contract.generation,
+              ...ackIdentity,
             });
           }
         });
@@ -754,7 +1022,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     cancelScheduledResultFocus,
     finishCollapseContent,
     focusQueryInput,
+    overlayReportIdentity,
     recordNoHitExit,
+    reportCloseFrameAndMilestone,
     reportHandoffMilestone,
     reportOverlayEvent,
   ]);
@@ -835,14 +1105,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   useEffect(() => {
     const restoreInputFocus = () => {
-      const snapshot = overlaySnapshotRef.current;
-      if (snapshot) {
+      const identity = overlayReportIdentity();
+      if (identity) {
         void reportOverlayEvent({
           type: 'focus-changed',
           focused: true,
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          windowGeneration: snapshot.windowGeneration,
-          generation: snapshot.contract.generation,
+          ...identity,
         });
       }
       if (queryInteractiveRef.current) {
@@ -852,14 +1120,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
     };
     const reportBlur = () => {
-      const snapshot = overlaySnapshotRef.current;
-      if (snapshot) {
+      const identity = overlayReportIdentity();
+      if (identity) {
         void reportOverlayEvent({
           type: 'focus-changed',
           focused: false,
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          windowGeneration: snapshot.windowGeneration,
-          generation: snapshot.contract.generation,
+          ...identity,
         });
       }
     };
@@ -869,7 +1135,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       window.removeEventListener('focus', restoreInputFocus);
       window.removeEventListener('blur', reportBlur);
     };
-  }, [focusQueryInput, reportOverlayEvent]);
+  }, [focusQueryInput, overlayReportIdentity, reportOverlayEvent]);
 
   useEffect(
     () => () => {
@@ -974,13 +1240,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setErrorMessage(result.message); reportPhase('ERROR'); return result;
     }
     const snapshot = overlaySnapshotRef.current;
-    if (snapshot && snapshot.contract.releaseId !== result.releaseId) {
+    const identity = overlayReportIdentity();
+    if (snapshot && identity && snapshot.contract.releaseId !== result.releaseId) {
       void reportOverlayEvent({
         type: 'release-changed',
         releaseId: result.releaseId,
-        sessionEpoch: snapshot.contract.sessionEpoch,
-        windowGeneration: snapshot.windowGeneration,
-        generation: snapshot.contract.generation,
+        ...identity,
       });
     }
     if (announceReleaseRef.current && announceReleaseRef.current !== result.releaseId) {
@@ -991,7 +1256,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     announceReleaseRef.current = result.releaseId;
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
-  }, [reportOverlayEvent, reportPhase, intake]);
+  }, [overlayReportIdentity, reportOverlayEvent, reportPhase, intake]);
 
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
@@ -999,13 +1264,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({}); setAnnounce(null);
       announceReleaseRef.current = null; lastProductQueryRef.current = null; setHelpStatus('待核实');
       const snapshot = overlaySnapshotRef.current;
-      if (snapshot) {
+      const identity = overlayReportIdentity();
+      if (snapshot && identity) {
         void reportOverlayEvent({
           type: 'session-changed',
-          sessionEpoch: Math.max(1, value.sessionEpoch),
+          sessionEpoch: identity.sessionEpoch,
+          nextSessionEpoch: Math.max(1, value.sessionEpoch),
           releaseId: snapshot.contract.releaseId,
-          windowGeneration: snapshot.windowGeneration,
-          generation: snapshot.contract.generation,
+          windowGeneration: identity.windowGeneration,
+          generation: identity.generation,
+          contentRevision: identity.contentRevision,
         });
       }
     }
@@ -1036,6 +1304,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     cancelPendingSearch,
     cancelPendingCopy,
     refreshAnnounce,
+    overlayReportIdentity,
     reportOverlayEvent,
     reportPhase,
   ]);
@@ -1076,17 +1345,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       announceReleaseRef.current = value.releaseId;
       setContentUpdatedDomains([...value.unreadDomains]);
       const snapshot = overlaySnapshotRef.current;
-      if (snapshot && snapshot.contract.releaseId !== value.releaseId) {
+      const identity = overlayReportIdentity();
+      if (snapshot && identity && snapshot.contract.releaseId !== value.releaseId) {
         void reportOverlayEvent({
           type: 'release-changed',
           releaseId: value.releaseId,
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          windowGeneration: snapshot.windowGeneration,
-          generation: snapshot.contract.generation,
+          ...identity,
         });
       }
     });
-  }, [intake, reportOverlayEvent]);
+  }, [intake, overlayReportIdentity, reportOverlayEvent]);
 
   // 已读：Query 窗可见（非 FOX_IDLE、未收起、非 document.hidden）且横幅停留 ≥1s。
   // 计时器随可见性变化重排：事件到达时窗口若不可见，展开/回到前台后会补排，不会卡住。
@@ -1600,7 +1868,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const drag = useWindowDrag(
     (dx, dy, finished) => {
-      void window.customerAgent?.moveFoxBy(dx, dy, finished);
+      const identity = overlayReportIdentity();
+      if (!identity) {
+        return;
+      }
+      void window.customerAgent?.moveFoxBy(dx, dy, finished, undefined, identity);
     },
     dismiss,
   );
@@ -1679,13 +1951,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const applyQueryResizeAck = useCallback((
     ack: QueryLayoutAck | null | undefined,
     request: { sessionId: number; sequence: number },
+    identity: OverlayReportIdentity,
   ) => {
     if (!acceptQueryLayoutAck({
       ack,
       requestSessionId: request.sessionId,
       requestSequence: request.sequence,
       minSequence: lastAppliedLayoutSequenceRef.current,
-      activeSessionId: activeHandoffIdRef.current,
+      activeSessionId: activeHandoffIdRef.current || request.sessionId,
       currentPhase: phaseRef.current,
       currentResultCount: resultCountRef.current,
     }) || !ack) {
@@ -1696,17 +1969,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setResizeEdge(ack.resizeEdge);
     setQueryHeight(ack.height);
     window.requestAnimationFrame(() => {
-      const snapshot = overlaySnapshotRef.current;
-      if (snapshot) {
-        void reportOverlayEvent({
-          type: 'frame-observed',
-          commandId: ack.sequence,
-          target: 'query',
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          windowGeneration: snapshot.windowGeneration,
-          generation: snapshot.contract.generation,
-        });
-      }
+      void reportOverlayEvent({
+        type: 'frame-observed',
+        commandId: ack.sequence,
+        commandType: 'layout',
+        target: 'query',
+        ...identity,
+      });
     });
   }, [reportOverlayEvent]);
 
@@ -1749,6 +2018,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (!api || activeHandoffIdRef.current <= 0) {
       return;
     }
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      return;
+    }
     const request = {
       type: kind,
       sessionId: activeHandoffIdRef.current,
@@ -1759,10 +2032,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       type: kind,
       sessionId: request.sessionId,
       sequence: request.sequence,
+      identity,
     }).then((ack) => {
-      applyQueryResizeAck(ack, request);
+      applyQueryResizeAck(ack, request, identity);
     }).catch(() => undefined);
-  }, [applyQueryResizeAck, releaseQueryResizeCapture]);
+  }, [applyQueryResizeAck, overlayReportIdentity, releaseQueryResizeCapture]);
 
   const startQueryResize = (event: React.PointerEvent<HTMLDivElement>) => {
     if (parked || opening || closing || !showQueryResizeGrip) {
@@ -1782,6 +2056,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     resizeOriginYRef.current = event.screenY;
     resizeDeltaRef.current = 0;
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      finishQueryResize('cancel', event.pointerId);
+      return;
+    }
     const request = {
       type: 'begin' as const,
       sessionId: activeHandoffIdRef.current,
@@ -1792,8 +2071,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       type: 'begin',
       sessionId: request.sessionId,
       sequence: request.sequence,
+      identity,
     }).then((ack) => {
-      applyQueryResizeAck(ack, request);
+      applyQueryResizeAck(ack, request, identity);
     }).catch(() => undefined);
   };
 
@@ -1812,6 +2092,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (resizeFrameRef.current !== null) {
       return;
     }
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      finishQueryResize('cancel', event.pointerId);
+      return;
+    }
     resizeFrameRef.current = window.requestAnimationFrame(() => {
       resizeFrameRef.current = null;
       if (resizeFinishedRef.current) {
@@ -1827,8 +2112,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         sessionId: request.sessionId,
         sequence: request.sequence,
         deltaY: resizeDeltaRef.current,
+        identity,
       }).then((ack) => {
-        applyQueryResizeAck(ack, request);
+        applyQueryResizeAck(ack, request, identity);
       }).catch(() => undefined);
     });
   };
@@ -1843,6 +2129,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return;
     }
     event.preventDefault();
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      return;
+    }
     const request = {
       sessionId: activeHandoffIdRef.current,
       sequence: ++layoutSequenceRef.current,
@@ -1854,8 +2144,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       sequence: request.sequence,
       key: event.key,
       shiftKey: event.shiftKey,
+      identity,
     }).then((ack) => {
-      applyQueryResizeAck(ack, request);
+      applyQueryResizeAck(ack, request, identity);
     }).catch(() => undefined);
   };
 
@@ -1911,6 +2202,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       data-close-duration-ms={QUERY_CLOSE_DURATION_MS}
       data-handoff-id={activeHandoffIdRef.current}
       data-window-generation={overlaySnapshotRef.current?.windowGeneration ?? 0}
+      data-query-height={queryHeight}
       aria-busy={searching}
       onPointerDownCapture={() => {
         if (openingRef.current) {
@@ -1937,7 +2229,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               setParked(true);
               setClosing(false);
             });
-            reportHandoffMilestone(activeHandoffIdRef.current, 'close-finished');
+            const report = handoffReportRef.current;
+            if (report) {
+              if (closeFrameReportedRef.current === report.handoffId) {
+                reportHandoffMilestone(report.handoffId, 'close-finished', report.identity);
+              } else {
+                reportCloseFrameAndMilestone(report.handoffId);
+              }
+            }
           }
         }}
       >

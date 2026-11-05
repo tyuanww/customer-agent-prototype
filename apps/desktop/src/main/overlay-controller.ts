@@ -70,11 +70,15 @@ import {
   type FoxVisualTransform,
   type HandoffMilestone,
   type OverlayCommand,
+  type OverlayRendererEvent,
   type OverlayRole,
   type QueryAnchor,
   type ReportablePhase,
   type ResultCount,
 } from '../shared/overlay-events';
+import {
+  type OverlayReportIdentity,
+} from '../shared/overlay-report';
 import {
   openDashboardUnavailable,
   type OpenDashboardResult,
@@ -102,6 +106,25 @@ import { attachTestHarness, isTestHarnessEnabled } from './overlay-test-harness'
 
 const BLUR_GRACE_MS = 240;
 const DISPLAY_RECONCILE_DELAY_MS = 100;
+const MAX_COMMAND_OBSERVATIONS = 256;
+
+export type OverlayWorkPort = {
+  cancelQuery(identity: Pick<OverlayReportIdentity, 'sessionEpoch' | 'generation'>): void;
+  cancelCopy(identity: Pick<OverlayReportIdentity, 'sessionEpoch' | 'generation'>): void;
+  clearContent(): void;
+};
+
+type FoxDragTransaction = {
+  geometry: FoxDockDragSession;
+  sessionEpoch: number;
+  windowGeneration: number;
+  generation: number;
+};
+
+type OverlayReportOrigin = Pick<
+  OverlayReportIdentity,
+  'sessionEpoch' | 'generation' | 'windowGeneration'
+>;
 
 export type OverlayControllerOptions = {
   dashboardEnabled?: boolean;
@@ -113,6 +136,7 @@ export type OverlayControllerOptions = {
   onDispose?: () => void;
   onDashboardShown?: () => void;
   runningPoint?: RunningPoint;
+  overlayWork?: OverlayWorkPort;
 };
 
 export class OverlayController {
@@ -128,14 +152,19 @@ export class OverlayController {
     releaseId: 'rel_overlay_unbound',
   });
   private readonly timeoutHandles = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly commandFrameStartedAt = new Map<number, number>();
-  private readonly commandFirstFrameDurations: number[] = [];
-  private coldFirstFrameMs: number | null = null;
+  private readonly commandFrameStartedAt = new Map<string, number>();
+  private readonly commandCallbackDurations: number[] = [];
+  private coldCallbackMs: number | null = null;
+  private droppedCommandObservations = 0;
+  private staleRendererReports = 0;
+  private lastStaleRendererReport: string | null = null;
+  private effectExecutionDepth = 0;
+  private snapshotDirty = false;
   private fox: BrowserWindow | null = null;
   private query: BrowserWindow | null = null;
   private dashboard: BrowserWindow | null = null;
   private foxOrigin = { x: 80, y: 80 };
-  private foxDragSession: FoxDockDragSession | null = null;
+  private foxDragTransaction: FoxDragTransaction | null = null;
   private legacyFoxDragGenerationSequence = 0;
   private foxDragSettleSequence = 0;
   private displayReconcilePending = false;
@@ -143,6 +172,7 @@ export class OverlayController {
   private ignoreBlurUntil = 0;
   private pendingQueryBlur = false;
   private blurRecheckTimer: ReturnType<typeof setTimeout> | null = null;
+  private blurRecheckIdentity: OverlayReportOrigin | null = null;
   private queryFocusRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private displayReconcileTimer: ReturnType<typeof setTimeout> | null = null;
   private displayLifecycleBound = false;
@@ -158,6 +188,7 @@ export class OverlayController {
   readonly dashboardEnabled: boolean;
   readonly rendererDevServerUrl: string | undefined;
   private readonly runningLine: string;
+  private readonly overlayWork: OverlayWorkPort;
 
   get phase(): OverlayPhase {
     return this.overlayState.phase === 'parked' || this.overlayState.phase === 'closed'
@@ -179,6 +210,17 @@ export class OverlayController {
     this.rendererDevServerUrl = options.rendererDevServerUrl;
     this.onDispose = options.onDispose;
     this.onDashboardShown = options.onDashboardShown;
+    this.overlayWork = options.overlayWork ?? {
+      cancelQuery: (identity) => {
+        this.sendToQuery({ type: 'cancel-query', ...identity });
+      },
+      cancelCopy: (identity) => {
+        this.sendToQuery({ type: 'cancel-copy', ...identity });
+      },
+      clearContent: () => {
+        this.sendToQuery({ type: 'clear-content' });
+      },
+    };
   }
 
   isDisposed(): boolean {
@@ -234,18 +276,59 @@ export class OverlayController {
     };
   }
 
-  private dispatchOverlayEvent(event: OverlayEvent): void {
+  private currentReportOrigin(): OverlayReportOrigin {
+    return {
+      sessionEpoch: this.overlayState.sessionEpoch,
+      generation: this.overlayState.generation,
+      windowGeneration: this.overlayState.windowGeneration,
+    };
+  }
+
+  private matchesReportOrigin(identity: OverlayReportOrigin): boolean {
+    return this.overlayState.sessionEpoch === identity.sessionEpoch
+      && this.overlayState.generation === identity.generation
+      && this.overlayState.windowGeneration === identity.windowGeneration;
+  }
+
+  private matchesReportIdentity(identity: OverlayReportIdentity): boolean {
+    return this.matchesReportOrigin(identity)
+      && this.overlayState.contentRevision === identity.contentRevision;
+  }
+
+  private dispatchOverlayEvent(event: OverlayEvent) {
     if (this.isInactive()) {
-      return;
+      return null;
     }
     const transition = applyOverlayEvent(this.overlayState, event);
     if (transition.decision === 'rejected') {
-      return;
+      return transition;
     }
+    const previous = this.overlayState;
     this.overlayState = transition.state;
+    this.reconcileControllerOwnership(previous, transition.state);
     if (transition.decision === 'applied') {
+      this.snapshotDirty = true;
       this.executeNativeEffects(transition.effects);
     }
+    return transition;
+  }
+
+  private reconcileControllerOwnership(previous: OverlayState, next: OverlayState): void {
+    if (
+      previous.sessionEpoch === next.sessionEpoch
+      && previous.windowGeneration === next.windowGeneration
+      && next.phase !== 'closed'
+    ) {
+      return;
+    }
+    this.foxDragTransaction = null;
+    this.ignoreBlurUntil = 0;
+    this.clearPendingQueryBlur();
+    this.clearQueryFocusRetry();
+    this.scheduler.clear(this.postFoxDragTimer);
+    this.postFoxDragTimer = null;
+    this.commandFrameStartedAt.clear();
+    this.displayReconcilePending = false;
   }
 
   private timeoutKey(timer: NativeEffect & { type: 'SCHEDULE_TIMEOUT' }): string {
@@ -273,11 +356,13 @@ export class OverlayController {
   }
 
   private executeNativeEffects(effects: readonly NativeEffect[]): void {
-    for (const effect of effects) {
-      switch (effect.type) {
+    this.effectExecutionDepth += 1;
+    try {
+      for (const effect of effects) {
+        switch (effect.type) {
         case 'SEND_RENDERER_COMMAND': {
           if (effect.target === 'query') {
-            this.commandFrameStartedAt.set(effect.commandId, performance.now());
+            this.startCommandObservation('handoff', effect.commandId);
             this.sendToQuery(effect.command);
           } else {
             this.sendToFox(effect.command);
@@ -402,8 +487,19 @@ export class OverlayController {
           this.clearTimeoutEffect(effect);
           break;
         case 'CANCEL_QUERY':
+          this.overlayWork.cancelQuery({
+            sessionEpoch: effect.sessionEpoch,
+            generation: effect.generation,
+          });
+          break;
         case 'CANCEL_COPY':
+          this.overlayWork.cancelCopy({
+            sessionEpoch: effect.sessionEpoch,
+            generation: effect.generation,
+          });
+          break;
         case 'CLEAR_CONTENT':
+          this.overlayWork.clearContent();
           break;
         case 'APPLY_QUERY_LAYOUT': {
           const workArea = this.currentWorkArea();
@@ -445,17 +541,24 @@ export class OverlayController {
         case 'SYNC_FOX_EDGE':
           this.sendToFox(foxEdgeCommand(effect.edge, effect.peekEpoch));
           break;
-        case 'PUBLISH_SNAPSHOT': {
-          const command: OverlayCommand = {
-            type: 'overlay-snapshot',
-            snapshot: effect.snapshot,
-          };
-          this.sendToFox(command);
-          this.sendToQuery(command);
-          break;
         }
       }
+    } finally {
+      this.effectExecutionDepth -= 1;
+      if (this.effectExecutionDepth === 0 && this.snapshotDirty) {
+        this.snapshotDirty = false;
+        this.publishOverlaySnapshot();
+      }
     }
+  }
+
+  private publishOverlaySnapshot(): void {
+    const command: OverlayCommand = {
+      type: 'overlay-snapshot',
+      snapshot: overlaySnapshot(this.overlayState),
+    };
+    this.sendToFox(command);
+    this.sendToQuery(command);
   }
 
   private commitNativeLayout(height: number, edge: QueryResizeEdge, sequence: number): void {
@@ -471,11 +574,23 @@ export class OverlayController {
       resizeEdge: edge,
       contentPhase: this.overlayState.contentPhase,
       resultCount: this.overlayState.resultCount,
+      contentRevision: this.overlayState.contentRevision,
     });
-    if (transition.decision === 'applied') {
-      this.overlayState = transition.state;
-      this.executeNativeEffects(transition.effects);
+    this.commitAppliedTransition(transition);
+  }
+
+  private commitAppliedTransition(
+    transition: ReturnType<typeof applyOverlayEvent>,
+  ): boolean {
+    if (transition.decision !== 'applied') {
+      return false;
     }
+    const previous = this.overlayState;
+    this.overlayState = transition.state;
+    this.reconcileControllerOwnership(previous, transition.state);
+    this.snapshotDirty = true;
+    this.executeNativeEffects(transition.effects);
+    return true;
   }
 
   async start(): Promise<void> {
@@ -779,64 +894,104 @@ export class OverlayController {
     return this.trustedContents().some((contents) => contents.id === this.dashboard?.webContents.id);
   }
 
-  reportSessionChange(sessionEpoch: number, releaseId: string): void {
-    if (this.isInactive() || !Number.isSafeInteger(sessionEpoch)) {
-      return;
+  reportRendererEvent(event: OverlayRendererEvent) {
+    if (this.isInactive()) {
+      return null;
     }
-    this.dispatchOverlayEvent({
-      type: 'SESSION_CHANGED',
-      ...this.overlayEventGuard(),
-      sessionEpoch: Math.max(1, sessionEpoch),
-      releaseId: releaseId || 'rel_overlay_unbound',
-    });
+    if (!this.matchesReportOrigin({
+      sessionEpoch: event.sessionEpoch,
+      generation: event.generation,
+      windowGeneration: event.windowGeneration,
+    })) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = event.type === 'frame-observed'
+        ? `${event.type}:${event.commandType}:${event.commandId}:identity`
+        : event.type;
+      return null;
+    }
+    if (
+      event.type === 'window-recreated'
+      && event.nextWindowGeneration !== this.overlayState.windowGeneration + 1
+    ) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `window-recreated:${event.nextWindowGeneration}`;
+      return null;
+    }
+    if (event.type === 'frame-observed') {
+      const observed = this.recordRendererFrame(event.commandType, event.commandId);
+      if (!observed) {
+        this.staleRendererReports += 1;
+        this.lastStaleRendererReport = `frame-observed:${event.commandType}:${event.commandId}`;
+      }
+      return observed ? overlaySnapshot(this.overlayState) : null;
+    }
+    const identity = {
+      sessionEpoch: event.sessionEpoch,
+      generation: event.generation,
+      windowGeneration: event.windowGeneration,
+    };
+    const transition = event.type === 'session-changed'
+      ? this.dispatchOverlayEvent({
+          type: 'SESSION_CHANGED',
+          ...identity,
+          sessionEpoch: event.nextSessionEpoch,
+          releaseId: event.releaseId || 'rel_overlay_unbound',
+        })
+      : event.type === 'release-changed'
+        ? this.dispatchOverlayEvent({
+            type: 'RELEASE_CHANGED',
+            ...identity,
+            releaseId: event.releaseId,
+          })
+        : event.type === 'focus-changed'
+          ? this.dispatchOverlayEvent({
+              type: event.focused ? 'QUERY_FOCUSED' : 'QUERY_BLURRED',
+              ...identity,
+            })
+          : this.dispatchOverlayEvent({
+              type: 'WINDOW_RECREATED',
+              ...identity,
+              windowGeneration: event.nextWindowGeneration,
+            });
+    return transition?.decision === 'applied'
+      ? overlaySnapshot(this.overlayState)
+      : null;
   }
 
-  reportReleaseChange(releaseId: string): void {
-    if (this.isInactive() || !releaseId) {
-      return;
-    }
-    this.dispatchOverlayEvent({
-      type: 'RELEASE_CHANGED',
-      ...this.overlayEventGuard(),
-      releaseId,
-    });
-  }
-
-  reportFocus(focused: boolean): void {
+  reportUiPhase(
+    phase: ReportablePhase,
+    resultCount: ResultCount,
+    identity: OverlayReportIdentity,
+  ): void {
     if (this.isInactive()) {
       return;
     }
-    this.dispatchOverlayEvent({
-      type: focused ? 'QUERY_FOCUSED' : 'QUERY_BLURRED',
-      ...this.overlayEventGuard(),
-    });
-  }
-
-  reportWindowRecreated(): void {
-    if (this.isInactive()) {
+    if (!this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `content-changed:${phase}`;
       return;
     }
-    this.dispatchOverlayEvent({
-      type: 'WINDOW_RECREATED',
-      ...this.overlayEventGuard(),
-      windowGeneration: this.overlayState.windowGeneration + 1,
-    });
-  }
-
-  reportUiPhase(phase: ReportablePhase, resultCount: ResultCount): void {
-    if (this.isInactive()) {
-      return;
-    }
-    this.dispatchOverlayEvent({
+    const transition = this.dispatchOverlayEvent({
       type: 'CONTENT_CHANGED',
-      ...this.overlayEventGuard(),
+      sessionEpoch: identity.sessionEpoch,
+      generation: identity.generation,
+      windowGeneration: identity.windowGeneration,
+      contentRevision: identity.contentRevision,
       contentPhase: phase,
       resultCount,
     });
+    if (transition?.decision !== 'applied') {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `content-changed:${phase}`;
+    }
   }
 
   reportQueryLayout(request: QueryLayoutRequest): QueryLayoutAck {
     if (this.isInactive()) {
+      return this.rejectedLayoutAck(request.sessionId, request.sequence);
+    }
+    if (!this.matchesReportIdentity(request.identity)) {
+      this.staleRendererReports += 1;
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
     if (
@@ -846,10 +1001,12 @@ export class OverlayController {
     ) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    this.commandFrameStartedAt.set(request.sequence, performance.now());
     const transition = applyOverlayEvent(this.overlayState, {
       type: 'LAYOUT_REQUESTED',
-      ...this.overlayEventGuard(),
+      sessionEpoch: request.identity.sessionEpoch,
+      generation: request.identity.generation,
+      windowGeneration: request.identity.windowGeneration,
+      contentRevision: request.identity.contentRevision,
       handoffId: request.sessionId,
       sequence: request.sequence,
       desiredHeight: request.desiredHeight,
@@ -860,8 +1017,8 @@ export class OverlayController {
       this.applyFallbackQueryHeight();
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    this.overlayState = transition.state;
-    this.executeNativeEffects(transition.effects);
+    this.startCommandObservation('layout', request.sequence);
+    this.commitAppliedTransition(transition);
     return this.acceptedLayoutAck(request.sessionId, request.sequence);
   }
 
@@ -869,10 +1026,17 @@ export class OverlayController {
     if (this.isInactive()) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
+    if (!this.matchesReportIdentity(request.identity)) {
+      this.staleRendererReports += 1;
+      return this.rejectedLayoutAck(request.sessionId, request.sequence);
+    }
     if (request.type === 'end' || request.type === 'cancel') {
       const transition = applyOverlayEvent(this.overlayState, {
         type: 'RESIZE_END',
-        ...this.overlayEventGuard(),
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
         handoffId: request.sessionId,
         sequence: request.sequence,
         height: this.currentQueryHeight(),
@@ -881,8 +1045,8 @@ export class OverlayController {
       if (transition.decision !== 'applied') {
         return this.rejectedLayoutAck(request.sessionId, request.sequence);
       }
-      this.overlayState = transition.state;
-      this.executeNativeEffects(transition.effects);
+      this.startCommandObservation('layout', request.sequence);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence);
     }
 
@@ -895,7 +1059,10 @@ export class OverlayController {
       const edge = this.queryResizeEdgeForCurrent(this.currentWorkArea());
       const transition = applyOverlayEvent(this.overlayState, {
         type: 'RESIZE_BEGIN',
-        ...this.overlayEventGuard(),
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
         handoffId: request.sessionId,
         sequence: request.sequence,
         baselineHeight: bounds.height,
@@ -904,8 +1071,8 @@ export class OverlayController {
       if (transition.decision !== 'applied') {
         return this.rejectedLayoutAck(request.sessionId, request.sequence);
       }
-      this.overlayState = transition.state;
-      this.executeNativeEffects(transition.effects);
+      this.startCommandObservation('layout', request.sequence);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence, bounds.height, edge);
     }
 
@@ -926,7 +1093,10 @@ export class OverlayController {
             : currentHeight + delta;
       const transition = applyOverlayEvent(this.overlayState, {
         type: 'RESIZE_KEYBOARD',
-        ...this.overlayEventGuard(),
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
         handoffId: request.sessionId,
         sequence: request.sequence,
         height: nextHeight,
@@ -935,8 +1105,8 @@ export class OverlayController {
       if (transition.decision !== 'applied') {
         return this.rejectedLayoutAck(request.sessionId, request.sequence);
       }
-      this.overlayState = transition.state;
-      this.executeNativeEffects(transition.effects);
+      this.startCommandObservation('layout', request.sequence);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence);
     }
 
@@ -948,7 +1118,10 @@ export class OverlayController {
     const signed = edge === 'top' ? -request.deltaY : request.deltaY;
     const transition = applyOverlayEvent(this.overlayState, {
       type: 'RESIZE_UPDATE',
-      ...this.overlayEventGuard(),
+      sessionEpoch: request.identity.sessionEpoch,
+      generation: request.identity.generation,
+      windowGeneration: request.identity.windowGeneration,
+      contentRevision: request.identity.contentRevision,
       handoffId: request.sessionId,
       sequence: request.sequence,
       height: baseline + signed,
@@ -957,13 +1130,22 @@ export class OverlayController {
     if (transition.decision !== 'applied') {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    this.overlayState = transition.state;
-    this.executeNativeEffects(transition.effects);
+    this.startCommandObservation('layout', request.sequence);
+    this.commitAppliedTransition(transition);
     return this.acceptedLayoutAck(request.sessionId, request.sequence, this.currentQueryHeight(), edge);
   }
 
-  reportHandoffMilestone(handoffId: number, milestone: HandoffMilestone): void {
+  reportHandoffMilestone(
+    handoffId: number,
+    milestone: HandoffMilestone,
+    identity: OverlayReportIdentity,
+  ): void {
     if (this.isInactive()) {
+      return;
+    }
+    if (!this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `handoff:${milestone}:${handoffId}`;
       return;
     }
     const type = milestone === 'open-armed'
@@ -973,34 +1155,55 @@ export class OverlayController {
         : 'HANDOFF_CLOSED';
     this.dispatchOverlayEvent({
       type,
-      ...this.overlayEventGuard(),
+      sessionEpoch: identity.sessionEpoch,
+      generation: identity.generation,
+      windowGeneration: identity.windowGeneration,
       handoffId,
     } as OverlayEvent);
-    this.recordRendererFrame(handoffId);
   }
 
-  reportRendererFrame(commandId: number): void {
-    if (this.isInactive() || !Number.isSafeInteger(commandId) || commandId <= 0) {
-      return;
+  private commandObservationKey(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+  ): string {
+    return `${commandType}:${commandId}`;
+  }
+
+  private startCommandObservation(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+  ): void {
+    const key = this.commandObservationKey(commandType, commandId);
+    if (this.commandFrameStartedAt.size >= MAX_COMMAND_OBSERVATIONS) {
+      const oldest = this.commandFrameStartedAt.keys().next().value;
+      if (oldest !== undefined) {
+        this.commandFrameStartedAt.delete(oldest);
+        this.droppedCommandObservations += 1;
+      }
     }
-    this.recordRendererFrame(commandId);
+    this.commandFrameStartedAt.set(key, performance.now());
   }
 
-  private recordRendererFrame(commandId: number): void {
-    const startedAt = this.commandFrameStartedAt.get(commandId);
+  private recordRendererFrame(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+  ): boolean {
+    const key = this.commandObservationKey(commandType, commandId);
+    const startedAt = this.commandFrameStartedAt.get(key);
     if (startedAt === undefined) {
-      return;
+      return false;
     }
-    this.commandFrameStartedAt.delete(commandId);
+    this.commandFrameStartedAt.delete(key);
     const duration = Math.max(0, performance.now() - startedAt);
-    this.coldFirstFrameMs ??= duration;
-    this.commandFirstFrameDurations.push(duration);
-    if (this.commandFirstFrameDurations.length > 4_096) {
-      this.commandFirstFrameDurations.splice(
+    this.coldCallbackMs ??= duration;
+    this.commandCallbackDurations.push(duration);
+    if (this.commandCallbackDurations.length > 4_096) {
+      this.commandCallbackDurations.splice(
         0,
-        this.commandFirstFrameDurations.length - 4_096,
+        this.commandCallbackDurations.length - 4_096,
       );
     }
+    return true;
   }
 
   moveBy(
@@ -1008,8 +1211,13 @@ export class OverlayController {
     dy: unknown,
     finished = false,
     generation?: number,
+    identity?: OverlayReportIdentity,
   ): FoxDragSettleAck | null {
     if (this.isInactive()) {
+      return null;
+    }
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return null;
     }
     const delta = sanitizeDragDelta(dx, dy);
@@ -1029,6 +1237,9 @@ export class OverlayController {
       if (foxGeneration === null) {
         return null;
       }
+      if (this.overlayState.drag.settle?.generation === foxGeneration) {
+        return null;
+      }
       const activeGeneration = this.overlayState.drag.session?.generation;
       if (
         (finished && activeGeneration !== foxGeneration)
@@ -1046,24 +1257,42 @@ export class OverlayController {
       : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     if (target === this.fox && !finished) {
       if (
-        !this.foxDragSession
+        !this.foxDragTransaction
         && (this.overlayState.fox.edge === 'left' || this.overlayState.fox.edge === 'right')
       ) {
-        this.foxDragSession = createFoxDockDragSession(
-          this.overlayState.fox.edge,
-          this.overlayState.fox.peekIntent === 'peek',
-          nativeBounds,
-        );
+        this.foxDragTransaction = {
+          geometry: createFoxDockDragSession(
+            this.overlayState.fox.edge,
+            this.overlayState.fox.peekIntent === 'peek',
+            nativeBounds,
+          ),
+          generation: foxGeneration ?? 1,
+          sessionEpoch: this.overlayState.sessionEpoch,
+          windowGeneration: this.overlayState.windowGeneration,
+        };
       }
-      if (this.foxDragSession) {
+      if (
+        this.foxDragTransaction
+        && (
+          this.foxDragTransaction.generation !== foxGeneration
+          || this.foxDragTransaction.sessionEpoch !== this.overlayState.sessionEpoch
+          || this.foxDragTransaction.windowGeneration !== this.overlayState.windowGeneration
+        )
+      ) {
+        this.foxDragTransaction = null;
+      }
+      if (this.foxDragTransaction) {
         const stepped = advanceFoxDockDragSession(
-          this.foxDragSession,
+          this.foxDragTransaction.geometry,
           delta.dx,
           delta.dy,
           sessionWorkArea,
         );
-        this.foxDragSession = stepped.session;
-        this.dispatchOverlayEvent({
+        this.foxDragTransaction = {
+          ...this.foxDragTransaction,
+          geometry: stepped.session,
+        };
+        const transition = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_MOVED',
           ...this.overlayEventGuard(),
           dragGeneration: foxGeneration ?? 1,
@@ -1073,6 +1302,10 @@ export class OverlayController {
           nextBounds: stepped.nativeRect,
           displayId: screen.getDisplayMatching(stepped.nativeRect).id,
         });
+        if (transition?.decision !== 'applied') {
+          this.foxDragTransaction = null;
+          return null;
+        }
         if (
           foxDockDragSessionVisuallyUndocked(stepped.session)
           && this.overlayState.fox.edge !== 'none'
@@ -1100,8 +1333,8 @@ export class OverlayController {
     );
     if (finished) {
       if (target === this.fox) {
-        const session = this.foxDragSession;
-        this.foxDragSession = null;
+        const transaction = this.foxDragTransaction;
+        this.foxDragTransaction = null;
         const settledGeneration = this.overlayState.drag.session?.generation ?? null;
         if (settledGeneration === null) {
           return null;
@@ -1113,8 +1346,8 @@ export class OverlayController {
           height: FOX_SIZE,
         };
         const foxWorkArea = screen.getDisplayMatching(inferredFox).workArea;
-        const settled = session
-          ? finishFoxDockDragSession(session, foxWorkArea)
+        const settled = transaction
+          ? finishFoxDockDragSession(transaction.geometry, foxWorkArea)
           : {
               rect: dockFoxNativeRect(
                 inferredFox,
@@ -1125,7 +1358,7 @@ export class OverlayController {
             };
         this.foxOrigin = { x: settled.rect.x, y: settled.rect.y };
         const settleId = ++this.foxDragSettleSequence;
-        this.dispatchOverlayEvent({
+        const transition = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_ENDED',
           ...this.overlayEventGuard(),
           dragGeneration: settledGeneration,
@@ -1135,6 +1368,9 @@ export class OverlayController {
           settleId,
           displayId: screen.getDisplayMatching(settled.rect).id,
         });
+        if (transition?.decision !== 'applied') {
+          return null;
+        }
         this.schedulePostFoxDragWork();
         const active = this.overlayState.drag.settle;
         return active?.id === settleId
@@ -1147,7 +1383,7 @@ export class OverlayController {
           : null;
       } else {
         const anchor = this.currentQueryAnchor();
-        this.dispatchOverlayEvent({
+        const moved = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_MOVED',
           ...this.overlayEventGuard(),
           dragGeneration: Math.max(1, this.overlayState.drag.generation),
@@ -1158,7 +1394,10 @@ export class OverlayController {
           displayId: targetDisplay.id,
           queryAnchor: anchor,
         });
-        this.dispatchOverlayEvent({
+        if (moved?.decision !== 'applied') {
+          return null;
+        }
+        const ended = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_ENDED',
           ...this.overlayEventGuard(),
           dragGeneration: Math.max(1, this.overlayState.drag.generation),
@@ -1171,10 +1410,13 @@ export class OverlayController {
           settleId: ++this.foxDragSettleSequence,
           displayId: targetDisplay.id,
         });
+        if (ended?.decision !== 'applied') {
+          return null;
+        }
         this.settlePinnedQueryDrag(next, workArea);
       }
     } else {
-      this.dispatchOverlayEvent({
+      const transition = this.dispatchOverlayEvent({
         type: 'FOX_DRAG_MOVED',
         ...this.overlayEventGuard(),
         dragGeneration: foxGeneration ?? Math.max(1, this.overlayState.drag.generation),
@@ -1187,6 +1429,9 @@ export class OverlayController {
           ? this.overlayState.drag.queryAnchor ?? this.currentQueryAnchor()
           : undefined,
       });
+      if (transition?.decision !== 'applied') {
+        return null;
+      }
       if (target === this.fox) {
         this.foxOrigin = { x: next.x, y: next.y };
       } else {
@@ -1198,8 +1443,12 @@ export class OverlayController {
     return null;
   }
 
-  commitFoxDragSettle(settleId: number): void {
+  commitFoxDragSettle(settleId: number, identity?: OverlayReportIdentity): void {
     if (this.isInactive()) {
+      return;
+    }
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return;
     }
     const settle = this.overlayState.drag.settle;
@@ -1214,7 +1463,11 @@ export class OverlayController {
     });
   }
 
-  setFoxPeek(intent: FoxPeekIntent, epoch: number): void {
+  setFoxPeek(
+    intent: FoxPeekIntent,
+    epoch: number,
+    identity?: OverlayReportIdentity,
+  ): void {
     const fox = this.fox;
     if (
       this.isInactive() ||
@@ -1224,6 +1477,10 @@ export class OverlayController {
       this.overlayState.fox.edge === 'none' ||
       epoch !== this.overlayState.fox.peekEpoch
     ) {
+      return;
+    }
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return;
     }
     // Peek/retract is a renderer-only crop. Read the frame that WindowServer
@@ -1271,7 +1528,7 @@ export class OverlayController {
     this.clearQueryFocusRetry();
     this.clearFoxYieldShow();
     this.displayReconcilePending = false;
-    this.foxDragSession = null;
+    this.foxDragTransaction = null;
     this.scheduler.clear(this.postFoxDragTimer);
     this.postFoxDragTimer = null;
     for (const handle of this.timeoutHandles.values()) {
@@ -1478,7 +1735,7 @@ export class OverlayController {
     // Display topology is authoritative, but interrupting an in-flight dock
     // drag would split Main's native frame from the renderer's crop offset.
     // Defer one reconcile until the finished drag acknowledgement is produced.
-    if (this.foxDragSession || this.overlayState.drag.session || this.overlayState.drag.settle) {
+    if (this.foxDragTransaction || this.overlayState.drag.session || this.overlayState.drag.settle) {
       this.displayReconcilePending = true;
       return;
     }
@@ -1643,13 +1900,20 @@ export class OverlayController {
 
   performanceSnapshot(): {
     count: number;
+    pending: number;
+    pendingKeys: string[];
     p50: number | null;
     p95: number | null;
     p99: number | null;
     coldMs: number | null;
     errors: number;
+    droppedObservations: number;
+    staleReports: number;
+    lastStaleReport: string | null;
+    signal: 'renderer-callback';
+    paintObserved: false;
   } {
-    const sorted = [...this.commandFirstFrameDurations].sort((a, b) => a - b);
+    const sorted = [...this.commandCallbackDurations].sort((a, b) => a - b);
     const percentile = (p: number): number | null => {
       if (sorted.length === 0) return null;
       const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1);
@@ -1657,11 +1921,18 @@ export class OverlayController {
     };
     return {
       count: sorted.length,
+      pending: this.commandFrameStartedAt.size,
+      pendingKeys: [...this.commandFrameStartedAt.keys()].slice(0, 16),
       p50: percentile(0.5),
       p95: percentile(0.95),
       p99: percentile(0.99),
-      coldMs: this.coldFirstFrameMs,
-      errors: this.commandFrameStartedAt.size,
+      coldMs: this.coldCallbackMs,
+      errors: this.droppedCommandObservations + this.staleRendererReports,
+      droppedObservations: this.droppedCommandObservations,
+      staleReports: this.staleRendererReports,
+      lastStaleReport: this.lastStaleRendererReport,
+      signal: 'renderer-callback',
+      paintObserved: false,
     };
   }
 
@@ -1783,7 +2054,7 @@ export class OverlayController {
       this.postFoxDragTimer = null;
       if (
         this.isInactive()
-        || this.foxDragSession
+        || this.foxDragTransaction
         || this.overlayState.drag.session
         || this.overlayState.drag.settle
       ) {
@@ -1817,6 +2088,7 @@ export class OverlayController {
 
   private armBlurGrace(): void {
     this.ignoreBlurUntil = Date.now() + BLUR_GRACE_MS;
+    this.blurRecheckIdentity = this.currentReportOrigin();
     this.schedulePendingBlurRecheck();
   }
 
@@ -1834,6 +2106,7 @@ export class OverlayController {
       this.clearPendingQueryBlur();
       return;
     }
+    this.blurRecheckIdentity = this.currentReportOrigin();
     this.pendingQueryBlur = true;
     this.schedulePendingBlurRecheck();
   }
@@ -1841,7 +2114,13 @@ export class OverlayController {
   private schedulePendingBlurRecheck(): void {
     this.scheduler.clear(this.blurRecheckTimer);
     this.blurRecheckTimer = null;
-    if (this.isInactive() || !this.pendingQueryBlur) {
+    if (
+      this.isInactive()
+      || !this.pendingQueryBlur
+      || !this.blurRecheckIdentity
+      || !this.matchesReportOrigin(this.blurRecheckIdentity)
+    ) {
+      this.clearPendingQueryBlur();
       return;
     }
     const remaining = this.ignoreBlurUntil - Date.now();
@@ -1856,6 +2135,7 @@ export class OverlayController {
       return;
     }
     this.pendingQueryBlur = false;
+    this.blurRecheckIdentity = null;
     if (
       (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active')
       && this.isWindowVisible(this.query)
@@ -1866,6 +2146,7 @@ export class OverlayController {
 
   private clearPendingQueryBlur(): void {
     this.pendingQueryBlur = false;
+    this.blurRecheckIdentity = null;
     this.scheduler.clear(this.blurRecheckTimer);
     this.blurRecheckTimer = null;
   }

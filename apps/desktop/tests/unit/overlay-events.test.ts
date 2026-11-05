@@ -253,17 +253,21 @@ describe('overlay command boundary', () => {
     expect(isOverlayCommand({ type: 'overlay-snapshot', snapshot, extra: true })).toBe(false);
     expect(isOverlayRendererEvent({
       type: 'session-changed',
-      sessionEpoch: 2,
+      sessionEpoch: 1,
+      nextSessionEpoch: 2,
       releaseId: 'rel_synthetic',
       windowGeneration: 3,
       generation: 4,
+      contentRevision: 0,
     })).toBe(true);
     expect(isOverlayRendererEvent({
       type: 'session-changed',
-      sessionEpoch: 2,
+      sessionEpoch: 1,
+      nextSessionEpoch: 2,
       releaseId: 'rel_synthetic',
       windowGeneration: 3,
       generation: 4,
+      contentRevision: 0,
       extra: true,
     })).toBe(false);
   });

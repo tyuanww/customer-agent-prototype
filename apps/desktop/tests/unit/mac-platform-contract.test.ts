@@ -327,7 +327,7 @@ describe('macOS runtime contract', () => {
 
   it('adopts WindowServer fox bounds without moving the native window on hover', () => {
     const peekMethod = controller.match(
-      /setFoxPeek\(intent: FoxPeekIntent, epoch: number\): void \{([\s\S]*?)\n {2}\}\n\n {2}beginNativeContextMenu/,
+      /setFoxPeek\(\s*intent: FoxPeekIntent,\s*epoch: number,[\s\S]*?\): void \{([\s\S]*?)\n {2}\}\n\n {2}beginNativeContextMenu/,
     )?.[1] ?? '';
     expect(peekMethod).toContain('this.syncFoxOriginFromNativeBounds(fox)');
     expect(peekMethod).toContain("type: 'FOX_PEEK_CHANGED'");

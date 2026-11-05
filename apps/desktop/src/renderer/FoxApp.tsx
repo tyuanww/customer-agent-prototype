@@ -10,7 +10,8 @@ import {
   type FoxPeekIntent,
   type FoxVisualTransform,
 } from '@shared/overlay-events';
-import type { OverlaySnapshot } from '@shared/overlay-machine';
+import type { OverlaySnapshotProjection } from '@shared/overlay-machine';
+import type { OverlayReportIdentity } from '@shared/overlay-report';
 import {
   FOX_HALO_DURATION_MS,
   FOX_HALO_OPACITY_MAX,
@@ -136,7 +137,7 @@ export function FoxApp() {
   const lastCommittedSettleIdRef = useRef(0);
   const mountedRef = useRef(true);
   const rootRef = useRef<HTMLDivElement>(null);
-  const overlaySnapshotRef = useRef<OverlaySnapshot | null>(null);
+  const overlaySnapshotRef = useRef<OverlaySnapshotProjection | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const openingSearchRef = useRef(false);
   const dragRafRef = useRef<number | null>(null);
@@ -300,11 +301,19 @@ export function FoxApp() {
     setTransient(next);
   }, []);
 
-  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshot | undefined): void => {
+  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshotProjection | undefined): void => {
     if (!snapshot) {
       return;
     }
     const previous = overlaySnapshotRef.current;
+    if (
+      !previous
+      && openingSearchRef.current
+      && snapshot.contract.phase === 'parked'
+      && snapshot.handoff.id === 0
+    ) {
+      return;
+    }
     if (
       previous
       && (
@@ -315,16 +324,32 @@ export function FoxApp() {
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation < previous.contract.generation
         )
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation === previous.contract.generation
+          && snapshot.contentRevision < previous.contentRevision
+        )
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation === previous.contract.generation
+          && snapshot.contentRevision === previous.contentRevision
+          && snapshot.handoff.id < previous.handoff.id
+        )
       )
     ) {
       return;
     }
     overlaySnapshotRef.current = snapshot;
     if (snapshot.fox.peekEpoch >= peekEpochRef.current) {
+      const liveDrag = dragSessionRef.current !== null || settlingRef.current;
       peekEpochRef.current = snapshot.fox.peekEpoch;
       peekIntentRef.current = snapshot.fox.peekIntent;
-      dockEdgeRef.current = snapshot.fox.edge;
-      setDockEdge(snapshot.fox.edge);
+      if (!liveDrag) {
+        dockEdgeRef.current = snapshot.fox.edge;
+        setDockEdge(snapshot.fox.edge);
+      }
     }
     const frozen = snapshot.contract.phase === 'opening'
       || snapshot.contract.phase === 'closing';
@@ -333,6 +358,31 @@ export function FoxApp() {
       openingSearchRef.current = false;
     }
   }, []);
+
+  const overlayReportIdentity = useCallback((): OverlayReportIdentity | null => {
+    const snapshot = overlaySnapshotRef.current;
+    return snapshot
+      ? {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        }
+      : {
+          sessionEpoch: 1,
+          generation: 1,
+          windowGeneration: 1,
+          contentRevision: 0,
+        };
+  }, []);
+
+  const reportFoxPeek = useCallback((intent: FoxPeekIntent, epoch: number): Promise<void> => {
+    const identity = overlayReportIdentity();
+    const api = window.customerAgent;
+    return identity && api
+      ? Promise.resolve(api.setFoxPeek(intent, epoch, identity))
+      : Promise.resolve();
+  }, [overlayReportIdentity]);
 
   const reportOverlayEvent = useCallback(
     (event: Parameters<OverlayControlApi['reportOverlayEvent']>[0]) => {
@@ -433,10 +483,21 @@ export function FoxApp() {
     wake();
     // Main owns the pending shortcut intent. This Fox-only commit releases the
     // native settle fence only after the renderer has painted the same frame.
-    void window.customerAgent?.commitFoxDragSettle(ack.settleId).catch(() => {
+    const identity = overlayReportIdentity();
+    if (!identity) {
+      return;
+    }
+    void window.customerAgent?.commitFoxDragSettle(ack.settleId, identity).catch(() => {
       // Fail closed: without a successful commit Main keeps Query handoff fenced.
     });
-  }, [cancelDragRaf, clearAnnoyedDragTimer, clearSettleWatchdog, resetFollow, wake]);
+  }, [
+    cancelDragRaf,
+    clearAnnoyedDragTimer,
+    clearSettleWatchdog,
+    overlayReportIdentity,
+    resetFollow,
+    wake,
+  ]);
 
   const abortDragSettle = useCallback((generation: number): void => {
     if (generation !== dragGenerationRef.current || !settlingRef.current) {
@@ -502,7 +563,7 @@ export function FoxApp() {
       document.removeEventListener('visibilitychange', onVisible);
       unsubscribe?.();
     };
-  }, []);
+  }, [overlayReportIdentity]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -543,10 +604,12 @@ export function FoxApp() {
             void reportOverlayEvent({
               type: 'frame-observed',
               commandId: command.settleId,
+              commandType: 'settle',
               target: 'fox',
               sessionEpoch: snapshot.contract.sessionEpoch,
               windowGeneration: snapshot.windowGeneration,
               generation: snapshot.contract.generation,
+              contentRevision: snapshot.contentRevision,
             });
           });
         }
@@ -673,12 +736,12 @@ export function FoxApp() {
     // macOS may clamp a partially off-screen transparent window after the CSS
     // snap has already started. Reconcile the native bounds at the animation
     // boundary, while preserving a hover peek that arrived during the snap.
-    void Promise.resolve(window.customerAgent?.setFoxPeek(intent, epoch)).finally(() => {
+    void reportFoxPeek(intent, epoch).finally(() => {
       if (peekEpochRef.current === epoch) {
         setSnapping(false);
       }
     });
-  }, []);
+  }, [reportFoxPeek]);
 
   useEffect(() => {
     if (!snapping) {
@@ -732,9 +795,9 @@ export function FoxApp() {
       openingSearchRef.current = false;
       setHandoffFrozen(false);
       resetPeekVisualState();
-      void api.setFoxPeek('retract', epoch);
+      void reportFoxPeek('retract', epoch);
     });
-  }, [clearRetractTimer, resetFollow, resetPeekVisualState, wake]);
+  }, [clearRetractTimer, reportFoxPeek, resetFollow, resetPeekVisualState, wake]);
 
   const finishRetract = useCallback(
     (epoch: number) => {
@@ -755,8 +818,7 @@ export function FoxApp() {
       // Keep the CSS image at its tucked end frame until the main process has
       // actually applied the native 44px bounds. Clearing the class first made
       // the image spring back for one compositor frame.
-      void api
-        .setFoxPeek('retract', epoch)
+      void reportFoxPeek('retract', epoch)
         .then(() => {
           if (
             peekEpochRef.current === epoch &&
@@ -772,16 +834,23 @@ export function FoxApp() {
           // pointer leave sends an idempotent reconcile request again.
         });
     },
-    [clearRetractTimer, resetPeekVisualState],
+    [clearRetractTimer, reportFoxPeek, resetPeekVisualState],
   );
 
   const drag = useWindowDrag(
     (dx, dy, finished) => {
       const api = window.customerAgent;
       const generation = dragGenerationRef.current;
+      const identity = overlayReportIdentity();
+      if (!identity) {
+        if (finished) {
+          queueMicrotask(() => abortDragSettle(generation));
+        }
+        return;
+      }
       let request: Promise<FoxDragSettleAck | null> | undefined;
       try {
-        request = api?.moveFoxBy(dx, dy, finished, generation);
+        request = api?.moveFoxBy(dx, dy, finished, generation, identity);
       } catch {
         if (finished) {
           queueMicrotask(() => abortDragSettle(generation));
@@ -904,7 +973,6 @@ export function FoxApp() {
         return;
       }
 
-      const api = window.customerAgent;
       const epoch = peekEpochRef.current;
 
       if (intent === 'peek') {
@@ -923,7 +991,7 @@ export function FoxApp() {
         peekIntentRef.current = 'peek';
         peekingRef.current = true;
         setPeeking(true);
-        void api?.setFoxPeek('peek', epoch);
+        void reportFoxPeek('peek', epoch);
         return;
       }
 
@@ -933,7 +1001,7 @@ export function FoxApp() {
         }
         // Do not trust the logical intent alone. Reconcile the native bounds as
         // well; the main process performs an idempotent bounds comparison.
-        void api?.setFoxPeek('retract', epoch);
+        void reportFoxPeek('retract', epoch);
         return;
       }
 
@@ -946,7 +1014,7 @@ export function FoxApp() {
         pendingRetractEpochRef.current = null;
         retractingRef.current = false;
         setRetracting(false);
-        void api?.setFoxPeek('retract', epoch);
+        void reportFoxPeek('retract', epoch);
         return;
       }
 
@@ -961,7 +1029,7 @@ export function FoxApp() {
         finishRetract(epoch);
       }, FOX_RETRACT_DURATION_MS + 80);
     },
-    [clearRetractTimer, dockEdge, finishRetract],
+    [clearRetractTimer, dockEdge, finishRetract, reportFoxPeek],
   );
 
   const snapEdge = snapping && (dockEdge === 'left' || dockEdge === 'right') ? dockEdge : 'none';
