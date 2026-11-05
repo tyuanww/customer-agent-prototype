@@ -142,6 +142,21 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
     await searchCurrentContent();
     let dashboard = await dashboardPage();
     expect((await current(dashboard)).some(view => view.domain === 'release' && view.state === 'committed')).toBe(true);
+    const security = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .map(window => {
+        const role = new URL(window.webContents.getURL()).searchParams.get('role');
+        const preferences = (window.webContents as unknown as {
+          getLastWebPreferences(): { sandbox: boolean; nodeIntegration: boolean; contextIsolation: boolean };
+        }).getLastWebPreferences();
+        return { role, sandbox: preferences.sandbox, nodeIntegration: preferences.nodeIntegration, contextIsolation: preferences.contextIsolation };
+      })
+      .filter((window): window is { role: string; sandbox: boolean; nodeIntegration: boolean; contextIsolation: boolean } => window.role !== null)
+      .sort((left, right) => left.role.localeCompare(right.role)));
+    expect(security).toEqual([
+      { role: 'dashboard', sandbox: true, nodeIntegration: false, contextIsolation: true },
+      { role: 'fox', sandbox: true, nodeIntegration: false, contextIsolation: true },
+      { role: 'query', sandbox: true, nodeIntegration: false, contextIsolation: true },
+    ]);
 
     await app.evaluate(async () => {
       const plane = (globalThis as unknown as {
