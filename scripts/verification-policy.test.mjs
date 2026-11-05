@@ -1,65 +1,495 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { assertCiFastGate, assertCiGate, changedFiles, verificationPlan } from './verification-policy.mjs';
+import {
+  assertCiGate,
+  assertCiFastGate,
+  assertPrGate,
+  changedFiles,
+  loadDependencyMap,
+  matchesWriteBoundary,
+  percentile,
+  planLaneCommands,
+  RULE_DOCUMENTS,
+  validateDependencyMap,
+  verificationPlan,
+} from './verification-policy.mjs';
 
-test('documentation and desktop paths select their narrow scope; other paths fail closed', () => {
-  assert.deepEqual(verificationPlan(['README.md','docs/plans/example.md']), { mode: 'docs', rules: false });
-  assert.deepEqual(verificationPlan(['AGENTS.md','docs/how-to-verify-desktop.md']), { mode: 'docs', rules: true });
-  assert.deepEqual(verificationPlan(['apps/desktop/src/main/main.ts','apps/desktop/tests/component/QueryApp.test.tsx']), { mode: 'desktop', rules: false });
-  assert.deepEqual(verificationPlan(['docs/plans/example.md','apps/desktop/src/renderer/QueryApp.tsx']), { mode: 'desktop', rules: false });
-  for (const file of ['apps/api/README.md','packages/contracts/src/index.ts','pnpm-lock.yaml','.github/workflows/ci.yml','scripts/check-documentation.mjs','unknown.md','docs/tool.mjs','docs/../src/a.md']) {
-    assert.equal(verificationPlan([file]).mode, 'full', file);
-  }
-  assert.equal(verificationPlan([]).mode, 'full');
-});
+const map = loadDependencyMap();
 
-test('gate refuses failure, cancellation, skip and missing classifier output', () => {
-  const ok = Object.fromEntries(['changes','quality','postgres-15','windows-feasibility','linux-feasibility'].map((key) => [key, { result: 'success' }]));
-  for (const mode of ['docs', 'desktop', 'full']) {
-    ok.changes.outputs = { mode };
-    assertCiGate(ok);
-  }
-  for (const key of Object.keys(ok)) {
-    for (const result of ['failure','cancelled','skipped',undefined]) assert.throws(() => assertCiGate({ ...ok, [key]: { result } }), /NOT_SUCCESS/u);
-  }
-  assert.throws(() => assertCiGate({ ...ok, changes: { result: 'success' } }), /PLAN_MISSING/u);
-});
+function ids(plan, lane) {
+  return plan.checks[lane].map((check) => check.id);
+}
 
-test('fast gate only admits the precheck and quick-check jobs', () => {
-  const ok = {
-    changes: { result: 'success', outputs: { mode: 'full' } },
-    quick: { result: 'success' },
+function successfulNeeds(requiredJobs) {
+  const allJobs = ['quick', 'contracts', 'database', 'electron', 'windows', 'linux'];
+  return {
+    changes: {
+      result: 'success',
+      outputs: {
+        mode: requiredJobs.includes('windows') ? 'full' : requiredJobs.length === 1 ? 'docs' : 'focused',
+        required_jobs: requiredJobs.join(','),
+      },
+    },
+    ...Object.fromEntries(allJobs.map((job) => [
+      job,
+      { result: requiredJobs.includes(job) ? 'success' : 'skipped' },
+    ])),
   };
-  for (const mode of ['docs', 'desktop', 'full']) {
-    ok.changes.outputs = { mode };
-    assertCiFastGate(ok);
+}
+
+test('dependency map is structurally valid and owns every declared route reference', () => {
+  const loaded = validateDependencyMap(map);
+  assert.equal(loaded.schemaVersion, 1);
+  assert.ok(loaded.owners.length >= 9);
+  assert.ok(loaded.routes.length >= 13);
+  assert.ok(Object.keys(loaded.checks).length >= 21);
+  assert.ok(loaded.routes.every((route) => Array.isArray(route.generatedInputs)));
+  assert.ok(RULE_DOCUMENTS.has('docs/reference-engineering-workflow.md'));
+});
+
+test('docs-only changes skip runtime, database, Electron and packaging lanes', () => {
+  const plan = verificationPlan([
+    'README.md',
+    'docs/reference-engineering-workflow.md',
+    'evidence/qa/example/README.md',
+  ], map);
+
+  assert.equal(plan.mode, 'docs');
+  assert.equal(plan.rules, true);
+  assert.deepEqual(plan.owners, ['repository-docs']);
+  assert.deepEqual(plan.requiredJobs, ['changes', 'quick']);
+  assert.deepEqual(plan.jobs, {
+    quick: true,
+    contracts: false,
+    database: false,
+    electron: false,
+    packaging: false,
+  });
+  assert.deepEqual(ids(plan, 'precheck'), ['policy-tests', 'documentation']);
+  assert.deepEqual(ids(plan, 'quick'), []);
+  assert.deepEqual(ids(plan, 'database'), []);
+  assert.deepEqual(plan.fullFallbackReasons, []);
+});
+
+test('contract changes select drift checks and every known workspace consumer', () => {
+  const plan = verificationPlan(['packages/contracts/src/index.ts'], map);
+
+  assert.equal(plan.mode, 'focused');
+  assert.deepEqual(plan.owners, ['contracts']);
+  assert.equal(plan.jobs.contracts, true);
+  assert.deepEqual(plan.requiredJobs, ['changes', 'quick', 'contracts']);
+  assert.deepEqual(ids(plan, 'contracts'), [
+    'contracts-intake',
+    'contracts-drift',
+    'contracts-tests',
+    'contracts-consumer-api',
+    'contracts-consumer-desktop',
+  ]);
+  assert.ok(plan.liveLanes.includes('contract-generation'));
+});
+
+test('database changes select generated, PG15, backup and consumer database lanes', () => {
+  const plan = verificationPlan(['packages/database/src/planner.ts'], map);
+
+  assert.equal(plan.mode, 'focused');
+  assert.deepEqual(plan.owners, ['database']);
+  assert.equal(plan.jobs.database, true);
+  assert.deepEqual(plan.requiredJobs, ['changes', 'quick', 'database']);
+  assert.deepEqual(ids(plan, 'database'), [
+    'database-migrations',
+    'database-unit',
+    'database-pg15',
+    'database-backup-pg15',
+    'api-database-integration',
+    'identity-database-integration',
+    'api-database-e2e',
+  ]);
+  assert.deepEqual(plan.databaseLanes, [
+    'migration-generation',
+    'postgres-15',
+    'backup-restore',
+    'api-integration',
+    'backend-e2e',
+  ]);
+});
+
+test('workflow, desktop, API, query, SOP and overlay paths select their intended lanes', () => {
+  const workflow = verificationPlan(['.github/workflows/ci-pr.yml'], map);
+  assert.equal(workflow.mode, 'focused');
+  assert.equal(workflow.jobs.quick, true);
+  assert.ok(ids(workflow, 'quick').includes('workspace-check'));
+
+  const desktop = verificationPlan(['apps/desktop/src/main/main.ts'], map);
+  assert.equal(desktop.jobs.quick, true);
+  assert.equal(desktop.jobs.electron, true);
+  assert.ok(ids(desktop, 'quick').includes('desktop-tests'));
+  assert.deepEqual(ids(desktop, 'electron'), ['overlay-electron']);
+
+  const api = verificationPlan(['apps/api/src/app.ts'], map);
+  assert.deepEqual(api.owners, ['api']);
+  assert.ok(ids(api, 'quick').includes('api-tests'));
+
+  const query = verificationPlan(['packages/retrieval-core/src/index.ts'], map);
+  assert.equal(query.jobs.quick, true);
+  assert.ok(ids(query, 'quick').includes('retrieval-core-tests'));
+  assert.ok(ids(query, 'quick').includes('query-api-tests'));
+  assert.ok(query.liveLanes.includes('query-content'));
+
+  const sop = verificationPlan(['packages/content-intake/src/sop.ts'], map);
+  assert.equal(sop.jobs.quick, true);
+  assert.ok(ids(sop, 'quick').includes('sop-content-tests'));
+  assert.ok(ids(sop, 'quick').includes('sop-api-tests'));
+  assert.ok(ids(sop, 'quick').includes('sop-desktop-tests'));
+  assert.ok(sop.liveLanes.includes('sop-path'));
+
+  const overlay = verificationPlan(['apps/desktop/src/main/overlay-controller.ts'], map);
+  assert.equal(overlay.jobs.electron, true);
+  assert.ok(ids(overlay, 'quick').includes('overlay-unit'));
+  assert.deepEqual(ids(overlay, 'electron'), ['overlay-electron']);
+  assert.ok(overlay.liveLanes.includes('overlay-native'));
+});
+
+test('job-roster changes select both shared consumers', () => {
+  const plan = verificationPlan(['packages/job-roster/src/index.ts'], map);
+
+  assert.equal(plan.mode, 'focused');
+  assert.deepEqual(plan.owners, ['job-roster']);
+  assert.equal(plan.jobs.quick, true);
+  assert.ok(ids(plan, 'quick').includes('api-tests'));
+  assert.ok(ids(plan, 'quick').includes('desktop-tests'));
+  assert.deepEqual(plan.liveLanes, ['job-roster-consumers']);
+});
+
+test('mixed changes union owners, checks, lanes and jobs', () => {
+  const plan = verificationPlan([
+    'docs/reference-engineering-workflow.md',
+    'packages/contracts/src/index.ts',
+    'packages/database/src/planner.ts',
+    'apps/desktop/src/main/overlay-controller.ts',
+  ], map);
+
+  assert.equal(plan.mode, 'focused');
+  assert.deepEqual(plan.owners, ['contracts', 'database', 'desktop', 'repository-docs']);
+  assert.equal(plan.jobs.contracts, true);
+  assert.equal(plan.jobs.database, true);
+  assert.equal(plan.jobs.electron, true);
+  assert.equal(plan.jobs.packaging, false);
+  assert.ok(plan.requiredJobs.includes('contracts'));
+  assert.ok(plan.requiredJobs.includes('database'));
+  assert.ok(plan.requiredJobs.includes('electron'));
+  assert.ok(plan.fullFallbackReasons.length === 0);
+});
+
+test('unknown, invalid, ambiguous and stale-generated paths fail closed to the full gate', () => {
+  const unknown = verificationPlan(['tools/new-secret-policy.txt'], map);
+  assert.equal(unknown.mode, 'full');
+  assert.deepEqual(unknown.fullFallbackReasons, [
+    { code: 'unknown-path', detail: 'tools/new-secret-policy.txt' },
+  ]);
+  assert.equal(unknown.jobs.packaging, true);
+  assert.deepEqual(unknown.requiredJobs, ['changes', 'quick', 'contracts', 'database', 'electron', 'windows', 'linux']);
+
+  const invalidPath = verificationPlan(['docs/../src/a.ts'], map);
+  assert.equal(invalidPath.mode, 'full');
+  assert.equal(invalidPath.fullFallbackReasons[0].code, 'invalid-change-path');
+
+  const ambiguousMap = structuredClone(map);
+  ambiguousMap.owners.push({
+    id: 'competing-api-owner',
+    paths: ['apps/api/src/app.ts'],
+    description: 'Synthetic ambiguity for the policy test.',
+  });
+  const ambiguous = verificationPlan(['apps/api/src/app.ts'], ambiguousMap);
+  assert.equal(ambiguous.mode, 'full');
+  assert.equal(ambiguous.fullFallbackReasons[0].code, 'ambiguous-path');
+
+  const stale = verificationPlan([
+    'contracts/upstream/customer-agent/example/openapi.v1.yaml',
+  ], map);
+  assert.equal(stale.mode, 'full');
+  assert.ok(stale.fullFallbackReasons.some((reason) => reason.code === 'stale-contract-generated'));
+  assert.ok(stale.fullFallbackReasons.some((reason) => reason.code === 'stale-database-generated'));
+
+  const generatedWithoutInput = verificationPlan([
+    'packages/contracts/src/generated/openapi.generated.ts',
+  ], map);
+  assert.equal(generatedWithoutInput.mode, 'full');
+  assert.deepEqual(generatedWithoutInput.fullFallbackReasons, [
+    {
+      code: 'stale-generated',
+      detail: 'packages/contracts/src/generated/openapi.generated.ts',
+    },
+  ]);
+
+  const generatedWithInput = verificationPlan([
+    'contracts/upstream/customer-agent/example/openapi.v1.yaml',
+    'packages/contracts/src/generated/openapi.generated.ts',
+  ], map);
+  assert.equal(generatedWithInput.mode, 'full');
+  assert.ok(generatedWithInput.fullFallbackReasons.some((reason) => reason.code === 'stale-contract-generated'));
+  assert.ok(!generatedWithInput.fullFallbackReasons.some((reason) => reason.code === 'stale-generated'));
+});
+
+test('malformed dependency maps and missing references cannot throw or select a narrow gate', () => {
+  const malformed = verificationPlan(['docs/readme.md'], { schemaVersion: 1 });
+  assert.equal(malformed.mode, 'full');
+  assert.equal(malformed.fullFallbackReasons[0].code, 'dependency-map-invalid');
+
+  const missingReference = structuredClone(map);
+  missingReference.routes.push({
+    id: 'broken-route',
+    paths: ['docs/**'],
+    checks: { quick: ['does-not-exist'] },
+    liveLanes: [],
+    databaseLanes: [],
+    packagingLanes: [],
+  });
+  const missing = verificationPlan(['docs/readme.md'], missingReference);
+  assert.equal(missing.mode, 'full');
+  assert.equal(missing.fullFallbackReasons[0].code, 'dependency-map-invalid');
+  assert.match(missing.fullFallbackReasons[0].detail, /missing check reference/u);
+
+  const missingRoute = structuredClone(map);
+  missingRoute.routes = missingRoute.routes.filter((route) => route.id !== 'api-sources');
+  const noRoute = verificationPlan(['apps/api/src/app.ts'], missingRoute);
+  assert.equal(noRoute.mode, 'full');
+  assert.deepEqual(noRoute.fullFallbackReasons, [
+    { code: 'missing-route', detail: 'apps/api/src/app.ts' },
+  ]);
+
+  const wrongLane = structuredClone(map);
+  wrongLane.routes.find((route) => route.id === 'api-sources').checks.quick.push('database-pg15');
+  const invalidLane = verificationPlan(['apps/api/src/app.ts'], wrongLane);
+  assert.equal(invalidLane.mode, 'full');
+  assert.equal(invalidLane.fullFallbackReasons[0].code, 'dependency-map-invalid');
+  assert.match(invalidLane.fullFallbackReasons[0].detail, /database-pg15.*quick/u);
+
+  const wrongOwner = structuredClone(map);
+  wrongOwner.routes.find((route) => route.id === 'api-sources').owner = 'desktop';
+  const invalidOwner = verificationPlan(['apps/api/src/app.ts'], wrongOwner);
+  assert.equal(invalidOwner.mode, 'full');
+  assert.equal(invalidOwner.fullFallbackReasons[0].code, 'dependency-map-invalid');
+  assert.match(invalidOwner.fullFallbackReasons[0].detail, /outside owner desktop/u);
+});
+
+test('full fallback materializes every map-owned check', () => {
+  const full = verificationPlan(['tools/unknown.txt'], map);
+
+  assert.equal(full.mode, 'full');
+  assert.deepEqual(full.requiredJobs, ['changes', 'quick', 'contracts', 'database', 'electron', 'windows', 'linux']);
+  assert.ok(full.databaseLanes.includes('postgres-15'));
+  assert.ok(full.liveLanes.includes('overlay-native'));
+  for (const [id, check] of Object.entries(map.checks)) {
+    assert.ok(ids(full, check.job).includes(id), `${id} must be present in ${check.job}`);
   }
-  for (const key of ['changes', 'quick']) {
+});
+
+test('plan commands are lane-scoped and deduplicated', () => {
+  const docs = verificationPlan(['docs/reference-engineering-workflow.md'], map);
+  assert.deepEqual(planLaneCommands(docs, 'quick'), []);
+
+  const mixed = verificationPlan([
+    'apps/desktop/src/main/main.ts',
+    'packages/job-roster/src/index.ts',
+    'packages/contracts/src/index.ts',
+    'packages/database/src/planner.ts',
+  ], map);
+  const quick = planLaneCommands(mixed, 'quick');
+  assert.equal(quick.filter((command) => command === 'pnpm --filter @customer-agent/desktop test').length, 1);
+  assert.ok(quick.includes('pnpm lint'));
+  assert.deepEqual(planLaneCommands(mixed, 'electron'), ['pnpm test:e2e:float']);
+  assert.throws(() => planLaneCommands(mixed, 'unknown'), /PLAN_LANE_INVALID/u);
+});
+
+test('real git diffs include both sides of renames and deletions', () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-routing-'));
+  const git = (...args) => execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+  try {
+    mkdirSync(path.join(cwd, 'docs'));
+    mkdirSync(path.join(cwd, 'apps', 'desktop', 'src'), { recursive: true });
+    writeFileSync(path.join(cwd, 'docs', 'old.md'), '# old\n');
+    writeFileSync(path.join(cwd, 'docs', 'deleted.md'), '# delete\n');
+    git('init');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'synthetic fixture',
+    );
+    const base = git('rev-parse', 'HEAD');
+
+    git('mv', 'docs/old.md', 'docs/moved.md');
+    rmSync(path.join(cwd, 'docs', 'deleted.md'));
+    writeFileSync(path.join(cwd, 'apps', 'desktop', 'src', 'new.ts'), 'export const value = 1;\n');
+    const files = changedFiles(base, undefined, cwd);
+
+    assert.ok(files.includes('docs/moved.md'));
+    assert.ok(files.includes('docs/deleted.md'));
+    assert.ok(files.includes('apps/desktop/src/new.ts'));
+    assert.equal(verificationPlan(files, map).mode, 'focused');
+    assert.equal(
+      verificationPlan(['docs/deleted.md', 'docs/moved.md'], map).mode,
+      'docs',
+    );
+    assert.throws(() => changedFiles('--unsafe', undefined, cwd), /REF_INVALID/u);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('review diffs use the merge base instead of unrelated base-branch movement', () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-review-range-'));
+  const git = (...args) => execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+  try {
+    mkdirSync(path.join(cwd, 'docs'));
+    mkdirSync(path.join(cwd, 'apps', 'api'), { recursive: true });
+    writeFileSync(path.join(cwd, 'docs', 'base.md'), '# base\n');
+    git('init', '-b', 'main');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'synthetic fixture',
+    );
+
+    git('switch', '-c', 'feature');
+    writeFileSync(path.join(cwd, 'docs', 'feature.md'), '# feature\n');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'feature change',
+    );
+    const feature = git('rev-parse', 'HEAD');
+
+    git('switch', 'main');
+    writeFileSync(path.join(cwd, 'apps', 'api', 'main.ts'), 'export const main = true;\n');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'advance main',
+    );
+
+    assert.deepEqual(changedFiles(git('rev-parse', 'main'), feature, cwd), ['docs/feature.md']);
+    assert.deepEqual(changedFiles('main', 'feature', cwd), ['docs/feature.md']);
+    assert.throws(() => changedFiles('--unsafe', undefined, cwd), /REF_INVALID/u);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('PR and main aggregate gates reject missing, skipped, cancelled or failed required jobs', () => {
+  const docsNeeds = successfulNeeds(['quick']);
+  docsNeeds.changes.outputs.mode = 'docs';
+  assert.doesNotThrow(() => assertPrGate(docsNeeds));
+  assert.doesNotThrow(() => assertCiFastGate(docsNeeds));
+
+  const contractNeeds = successfulNeeds(['quick', 'contracts']);
+  assert.doesNotThrow(() => assertPrGate(contractNeeds));
+  for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+    assert.throws(
+      () => assertPrGate({
+        ...contractNeeds,
+        contracts: { result },
+      }),
+      /PR_REQUIRED_JOB_NOT_SUCCESS: contracts/u,
+    );
+  }
+  assert.throws(
+    () => assertPrGate({
+      ...contractNeeds,
+      changes: { result: 'success', outputs: { ...contractNeeds.changes.outputs, required_jobs: '' } },
+    }),
+    /PR_REQUIRED_JOB_LIST_MISSING/u,
+  );
+
+  const fullNeeds = successfulNeeds(['quick', 'contracts', 'database', 'electron', 'windows', 'linux']);
+  assert.doesNotThrow(() => assertPrGate(fullNeeds));
+  assert.throws(
+    () => assertPrGate({ ...fullNeeds, database: { result: 'skipped' } }),
+    /PR_REQUIRED_JOB_NOT_SUCCESS: database/u,
+  );
+  assert.throws(
+    () => assertPrGate({
+      ...fullNeeds,
+      changes: {
+        result: 'success',
+        outputs: { mode: 'full', required_jobs: 'changes,quick' },
+      },
+    }),
+    /PR_FULL_PLAN_JOB_MISSING: contracts/u,
+  );
+
+  const mainOk = {
+    changes: { result: 'success', outputs: { mode: 'full' } },
+    quality: { result: 'success' },
+    'postgres-15': { result: 'success' },
+    'windows-feasibility': { result: 'success' },
+    'linux-feasibility': { result: 'success' },
+  };
+  assert.doesNotThrow(() => assertCiGate(mainOk));
+  for (const key of Object.keys(mainOk).filter((key) => key !== 'changes')) {
     for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
-      assert.throws(() => assertCiFastGate({ ...ok, [key]: { result } }), /NOT_SUCCESS/u);
+      assert.throws(() => assertCiGate({ ...mainOk, [key]: { result } }), /NOT_SUCCESS/u);
     }
   }
-  assert.throws(() => assertCiFastGate({ ...ok, changes: { result: 'success' } }), /PLAN_MISSING/u);
+  assert.throws(
+    () => assertCiGate({ ...mainOk, changes: { result: 'success', outputs: { mode: 'focused' } } }),
+    /CI_FULL_PLAN_MISSING/u,
+  );
 });
 
-test('real git diff includes old code path of rename, deletion and new local files', () => {
-  const cwd = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-routing-'));
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
-  try {
-    git('init'); mkdirSync(path.join(cwd,'src')); mkdirSync(path.join(cwd,'docs'));
-    writeFileSync(path.join(cwd,'src/code.ts'),'export const x = 1;\n');
-    git('add','src/code.ts'); git('-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','-c','core.hooksPath=/dev/null','commit','-m','synthetic fixture');
-    const base = git('rev-parse','HEAD');
-    git('mv','src/code.ts','docs/moved.md');
-    assert.equal(verificationPlan(changedFiles(base, undefined, cwd)).mode,'full');
-    git('reset','--hard',base); rmSync(path.join(cwd,'src/code.ts'));
-    assert.ok(changedFiles(base, undefined, cwd).includes('src/code.ts'));
-    writeFileSync(path.join(cwd,'new-script.mjs'),'');
-    assert.ok(changedFiles(base, undefined, cwd).includes('new-script.mjs'));
-    assert.throws(() => changedFiles('--unsafe',undefined,cwd),/REF_INVALID/u);
-  } finally { rmSync(cwd,{recursive:true,force:true}); }
+test('write-boundary matching rejects files outside the owner declaration', () => {
+  assert.equal(matchesWriteBoundary(
+    ['scripts/verification-policy.mjs', 'scripts/verification-dependencies.json', 'package.json'],
+    ['scripts/**', 'package.json'],
+  ), true);
+  assert.equal(matchesWriteBoundary(
+    ['scripts/verification-policy.mjs', 'apps/api/src/app.ts'],
+    ['scripts/**', 'package.json'],
+  ), false);
+  assert.throws(
+    () => matchesWriteBoundary(['docs/../src/a.ts'], ['docs/**']),
+    /WRITE_PATH_INVALID/u,
+  );
+});
+
+test('percentile helper is deterministic for benchmark evidence', () => {
+  assert.equal(percentile([], 50), null);
+  assert.equal(percentile([10], 95), 10);
+  assert.equal(percentile([1, 2, 3, 4, 5], 50), 3);
+  assert.equal(percentile([1, 2, 3, 4, 5], 95), 5);
+});
+
+test('workflow and package gates consume the dependency-map runner', () => {
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  for (const name of ['verify:fast', 'verify:changed', 'verify:full', 'verify:release']) {
+    assert.equal(typeof packageJson.scripts[name], 'string', `${name} must exist`);
+  }
+  assert.match(packageJson.scripts['verify:changed'], /verification-policy\.mjs run/u);
+
+  const prWorkflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
+  for (const lane of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {
+    assert.match(prWorkflow, new RegExp(`verification-policy\\.mjs run[^\\n]*--lane ${lane}`, 'u'));
+  }
+  assert.doesNotMatch(prWorkflow, /run: pnpm test:api/u);
+  assert.doesNotMatch(prWorkflow, /run: pnpm test:e2e:float/u);
+  assert.doesNotMatch(prWorkflow, /run: pnpm (?:package:win|package:linux)/u);
 });

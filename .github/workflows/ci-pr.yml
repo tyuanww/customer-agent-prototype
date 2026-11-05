@@ -17,6 +17,13 @@ jobs:
     outputs:
       mode: ${{ steps.plan.outputs.mode }}
       rules: ${{ steps.plan.outputs.rules }}
+      required_jobs: ${{ steps.plan.outputs.required_jobs }}
+      quick: ${{ steps.plan.outputs.quick }}
+      contracts: ${{ steps.plan.outputs.contracts }}
+      database: ${{ steps.plan.outputs.database }}
+      electron: ${{ steps.plan.outputs.electron }}
+      windows: ${{ steps.plan.outputs.windows }}
+      linux: ${{ steps.plan.outputs.linux }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -56,12 +63,120 @@ jobs:
       - if: needs.changes.outputs.mode != 'docs'
         run: pnpm install --frozen-lockfile
       - if: needs.changes.outputs.mode != 'docs'
-        run: pnpm check:pr
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane quick
+
+  contracts:
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    name: PR contracts checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane contracts
+
+  database:
+    needs: changes
+    if: needs.changes.outputs.database == 'true'
+    name: PR database checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane database
+
+  electron:
+    needs: changes
+    if: needs.changes.outputs.electron == 'true'
+    name: PR Electron checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane electron
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    name: PR Windows packaging
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane windows
+
+  linux:
+    needs: changes
+    if: needs.changes.outputs.linux == 'true'
+    name: PR Linux packaging
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane linux
 
   gate:
     name: PR fast gate
     if: always()
-    needs: [changes, quick]
+    needs: [changes, quick, contracts, database, electron, windows, linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -70,4 +185,4 @@ jobs:
           node-version: 24
       - env:
           CI_NEEDS: ${{ toJSON(needs) }}
-        run: node scripts/verification-policy.mjs gate-fast
+        run: node scripts/verification-policy.mjs gate-pr
