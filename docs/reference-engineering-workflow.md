@@ -99,6 +99,23 @@ Skill 缺失或工具失败时先判断能否完成等价核验：可选环节�
 
 工具故障先区分观察失败与执行失败：已有进程或 CI 未结束时继续观察同一 handle；真实执行失败按其授权的重试范围处理。一次性运行、冻结题集、不可变证据和有效期不得自动重用、覆盖或延长。
 
+### 5.1 变更路径验证计划
+
+`scripts/verification-dependencies.json` 是变更路径、模块 owner、检查、生成输入、数据库 lane、live lane 与 full-fallback 原因的唯一机器可读维护源。`scripts/verification-policy.mjs` 只负责校验该图、读取 Git 变更（包含重命名两侧、删除路径和本地未跟踪文件）、归并计划和执行聚合门禁；`.github/workflows/ci-pr.yml` 及 `.github/workflows/ci.yml` 只消费计划输出，不复制路径分类规则。
+
+本地入口分工固定为：`pnpm verify:changed` 按当前变更执行计划选中检查，`pnpm verify:fast` 是快速 PR 门，`pnpm verify:full` 是完整测试与仓库门，`pnpm verify:release` 在完整门之后构建可消费产物。`pnpm verify:plan --base <sha>` 只输出计划；PR workflow 的 precheck 及各 job lane 都使用同一策略文件的 `run --lane` 入口执行依赖图中的命令，不再在 YAML 内复制检查命令。每个解析显式 PR base/head 的 job 都检出完整历史，避免浅克隆在运行检查前无法解析比较范围。
+
+路径必须只对应一个 owner，未知、非法、重复 owner、缺 route、缺检查引用、空变更集、stale-generated 或需要重新生成的冻结输入都 fail-closed 到 full gate。文档-only 计划只保留 precheck、documentation 和聚合 quick job；所有代码路由都执行 `pnpm check:architecture`，full fallback 也保留该门。合同计划包含生成 / drift 与已声明消费者；数据库计划包含 migration、隔离 PostgreSQL 15、备份恢复和 API / identity / backend 消费者。PR 聚合门从计划输出推导精确 job 集合并核对 `required_jobs`，因此 focused PR 可以跳过无关的昂贵 lane，缺失、额外、未知或乱序 job 以及合同、数据库和 unknown PR 的失败仍会阻止聚合门通过。
+
+每个 PR 只能由一个 owner 在一个独立 worktree 和 branch 写入其声明边界。写入边界由依赖图的 `writeBoundary` 与提交前的 `matchesWriteBoundary` 检查共同约束；超出边界的依赖必须停止并报告给协调者。每个工作单元保留一份 canonical decision log，至少区分架构选择、失败方案、验证结果和真实 blocker；普通命令不逐条写入日志。
+
+仓库保护应将以下精确状态检查设为 required：`PR fast gate`（PR 工作流的动态聚合门）和 `CI gate`（main full gate）。上传分支后，协调者可用下面的命令读取 main 的实际保护配置；命令返回的 contexts 才是外部设置证据，本 PR 不声称已修改这些设置：
+
+```sh
+gh api "repos/$(gh repo view --json nameWithOwner --jq .nameWithOwner)/branches/main/protection" \
+  --jq '.required_status_checks.contexts[]'
+```
+
 ## 6. 进度、等待与恢复
 
 - 状态更新说明实际成果、证据、未解决问题和下一动作；避免把阅读规则、生成计划或等待用户本身写成产品交付。
