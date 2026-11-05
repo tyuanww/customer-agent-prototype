@@ -23,11 +23,6 @@ function observabilityRuntime(): Promise<typeof import('../../apps/api/dist/obse
   if (runtimePromise !== null) return runtimePromise;
   runtimePromise = (async () => {
     execFileSync(
-      process.execPath,
-      [resolve(repositoryRoot, 'scripts/observability/sync-contract-types.ts'), '--check'],
-      { cwd: repositoryRoot, stdio: 'pipe' },
-    );
-    execFileSync(
       'pnpm',
       ['--filter', '@customer-agent/api', 'build'],
       { cwd: repositoryRoot, stdio: 'pipe' },

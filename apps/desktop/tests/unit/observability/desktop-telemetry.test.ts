@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseStageRecord,
   parseTraceIdentity,
-} from '../../../../../packages/unified-contracts/src/index.ts';
+} from '@customer-agent/unified-contracts';
 import {
   DesktopObservabilityInputError,
   observeDashboardStage,

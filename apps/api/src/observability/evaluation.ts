@@ -1,7 +1,7 @@
 import type {
   EvaluationRecord,
   QueryKind,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 import { ObservabilityError } from './errors.js';
 
 type OrdinaryEvaluation = Extract<EvaluationRecord, { kind: 'ordinary' }>;

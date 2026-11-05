@@ -4,7 +4,7 @@ import type {
   StageOutcome,
   StageRecord,
   TraceIdentity,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 import { ObservabilityError } from './errors.js';
 
 export const TRACE_STAGE_ORDERS = Object.freeze({

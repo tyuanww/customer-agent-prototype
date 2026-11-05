@@ -2,7 +2,7 @@ import type {
   StageOutcome,
   StageRecord,
   TraceIdentity,
-} from './contracts.generated.js';
+} from '@customer-agent/unified-contracts';
 
 export type DesktopStageObservation = Readonly<{
   startedAt: string;
