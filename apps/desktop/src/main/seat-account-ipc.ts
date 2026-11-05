@@ -147,6 +147,7 @@ export function registerSeatAccountIpc(
           const run = await plane.submit({
             domain: 'accounts',
             command: 'accounts-manage',
+            capability: `accounts:${intent.action}`,
             expectedVersion: 0,
             intent,
             authorize: (view) => view.accounts === 'open',

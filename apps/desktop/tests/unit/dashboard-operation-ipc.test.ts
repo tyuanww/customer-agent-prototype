@@ -84,6 +84,7 @@ it('projects durable status and accepts only domain-level cancel or recovery int
   await plane.submit({
     domain: 'release',
     command: 'publish',
+    capability: 'release:publish',
     intent: { title: 'synthetic' },
     execute: async () => ({ kind: 'unknown' }),
   });

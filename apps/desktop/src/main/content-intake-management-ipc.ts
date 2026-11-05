@@ -288,6 +288,9 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       const run = await plane.submit({
         domain: boundary.domain,
         command: boundary.operationCommand,
+        capability: boundary.domain === 'rollback'
+          ? 'rollback:execute'
+          : `materials:${boundary.operationCommand}`,
         expectedVersion: 0,
         scope: operationScope(manager.view()),
         intent: command,

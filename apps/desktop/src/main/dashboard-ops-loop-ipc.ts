@@ -135,6 +135,7 @@ export function registerDashboardOpsLoopIpc(
   const runWrite = async <T extends object>(
     domain: DashboardOperationDomain,
     command: 'content-manage' | 'import' | 'publish' | 'candidate-cancel',
+    capability: string,
     intent: unknown,
     expectedVersion: number,
     work: (client: DashboardOpsSessionClient) => Promise<T>,
@@ -145,6 +146,7 @@ export function registerDashboardOpsLoopIpc(
       const run = await plane.submit({
         domain,
         command,
+        capability,
         expectedVersion,
         intent,
         execute: async (operation) => {
@@ -165,6 +167,7 @@ export function registerDashboardOpsLoopIpc(
       return followWrite(await runWrite(
         'ops-loop',
         'import',
+        'ops-loop:sop-import',
         args[0],
         0,
         (client) => dashboardSopImport(client, args[0] as string),
@@ -179,6 +182,7 @@ export function registerDashboardOpsLoopIpc(
       return followWrite(await runWrite(
         'ops-loop',
         'content-manage',
+        'ops-loop:sop-patch',
         args[0],
         typeof request?.expectedVersion === 'number' ? request.expectedVersion : 0,
         (client) => dashboardSopPatch(client, args[0]),
@@ -193,6 +197,7 @@ export function registerDashboardOpsLoopIpc(
       return followWrite(await runWrite(
         'ops-loop',
         'content-manage',
+        'ops-loop:sop-delete',
         args[0],
         typeof request?.expectedVersion === 'number' ? request.expectedVersion : 0,
         (client) => dashboardSopDelete(client, args[0]),
@@ -207,6 +212,7 @@ export function registerDashboardOpsLoopIpc(
       return runWrite(
         'ops-loop',
         'content-manage',
+        'ops-loop:script-delete',
         args[0],
         typeof request?.expectedVersion === 'number' ? request.expectedVersion : 0,
         (client) => dashboardScriptDelete(client, args[0]),

@@ -256,6 +256,7 @@ export function registerDashboardContentIpc(
         const run = await plane.submit({
           domain: 'release',
           command: 'publish',
+          capability: 'release:publish',
           expectedVersion: 0,
           intent: args[0],
           ...(afterPublish ? {
@@ -289,6 +290,7 @@ export function registerDashboardContentIpc(
         const run = await plane.submit({
           domain: 'rollback',
           command: 'rollback',
+          capability: 'rollback:execute',
           expectedVersion: 0,
           intent: { action: 'rollback-previous' },
           ...(afterPublish ? {
@@ -318,6 +320,7 @@ export function registerDashboardContentIpc(
         const run = await plane.submit({
           domain: 'materials',
           command: 'candidate-cancel',
+          capability: 'materials:candidate-cancel',
           expectedVersion: 0,
           intent: { action: 'cancel-release-import' },
           execute: async (context) => {

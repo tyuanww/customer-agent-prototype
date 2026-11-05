@@ -132,6 +132,7 @@ export type DashboardOperationSubmit<R> = Readonly<{
   domain: DashboardOperationDomain;
   operationId?: OperationId;
   command: OperationCommand;
+  capability: string;
   expectedVersion?: number;
   scope?: unknown;
   intent: unknown;
@@ -150,6 +151,7 @@ export type DashboardOperationRun<R> = Readonly<{
 
 export type DashboardReleaseInvalidation = Readonly<{
   operationId: OperationId;
+  dedupeKey: string;
   domain: DashboardOperationDomain;
   sessionEpoch: number;
   releaseId: string;
@@ -159,6 +161,7 @@ export type DashboardStoredOperation = Readonly<{
   envelope: OperationEnvelope;
   status: OperationStatus;
   domain: DashboardOperationDomain;
+  capability: string;
   domainRef: string | null;
   invalidation: 'none' | 'pending' | 'emitted';
   releaseId: string | null;
@@ -251,6 +254,29 @@ function iso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
 
+function capabilityIdentity(value: unknown): string {
+  if (typeof value !== 'string'
+    || value.length < 3
+    || value.length > 128
+    || !/^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/u.test(value)) {
+    throw new DashboardControlPlaneError('VALIDATION', '操作能力标识无效。');
+  }
+  return value;
+}
+
+function releaseInvalidationFor(
+  operation: DashboardStoredOperation,
+  releaseId: string,
+): DashboardReleaseInvalidation {
+  return Object.freeze({
+    operationId: operation.status.operationId,
+    dedupeKey: `${String(operation.status.sessionEpoch)}:${operation.status.operationId}:${releaseId}`,
+    domain: operation.domain,
+    sessionEpoch: operation.status.sessionEpoch,
+    releaseId,
+  });
+}
+
 function cloneRecord(value: DashboardStoredOperation): DashboardStoredOperation {
   return structuredClone(value);
 }
@@ -338,7 +364,7 @@ export function createDashboardAccessPort(
 
 function parseStoredOperation(value: unknown): DashboardStoredOperation {
   const item = record(value);
-  if (!item || Object.keys(item).length !== 6) {
+  if (!item || Object.keys(item).length !== 7) {
     throw new DashboardOperationStoreError('DASHBOARD_OPERATION_STORE_INVALID');
   }
   let envelope: OperationEnvelope;
@@ -356,6 +382,10 @@ function parseStoredOperation(value: unknown): DashboardStoredOperation {
     || envelope.recoveryDeadline !== status.recoveryDeadline
     || typeof item.domain !== 'string'
     || !DOMAINS.has(item.domain)
+    || typeof item.capability !== 'string'
+    || item.capability.length < 3
+    || item.capability.length > 128
+    || !/^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/u.test(item.capability)
     || (item.domainRef !== null
       && (typeof item.domainRef !== 'string'
         || item.domainRef.length === 0
@@ -374,6 +404,7 @@ function parseStoredOperation(value: unknown): DashboardStoredOperation {
     envelope,
     status,
     domain: item.domain as DashboardOperationDomain,
+    capability: item.capability,
     domainRef: item.domainRef,
     invalidation: item.invalidation as DashboardStoredOperation['invalidation'],
     releaseId: item.releaseId as string | null,
@@ -418,7 +449,18 @@ export class FileDashboardOperationStore implements DashboardOperationStore {
 
   async write(records: readonly DashboardStoredOperation[]): Promise<void> {
     const directory = dirname(this.path);
-    await mkdir(directory, { recursive: true, mode: 0o700 });
+    try {
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      if (process.platform !== 'win32') {
+        await chmod(directory, 0o700);
+        const current = await stat(directory);
+        if (!current.isDirectory() || (current.mode & 0o777) !== 0o700) {
+          throw new Error('operation directory is not owner-only');
+        }
+      }
+    } catch (error) {
+      throw new DashboardOperationStoreError('DASHBOARD_OPERATION_STORE_WRITE_FAILED', { cause: error });
+    }
     const temporary = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
     try {
       const handle = await open(temporary, 'w', 0o600);
@@ -520,6 +562,7 @@ export class DashboardControlPlane {
     await this.ready();
     const view = this.requireSession();
     const permission = await this.access.read();
+    const capability = capabilityIdentity(input.capability);
     if (permission.sessionEpoch !== view.sessionEpoch) {
       throw new DashboardControlPlaneError('STALE', '会话已变化，请重新读取。');
     }
@@ -614,6 +657,10 @@ export class DashboardControlPlane {
         throw new DashboardControlPlaneError('STALE', '会话已变化，请重新操作。');
       }
       if (reuse === 'replay') {
+        if (candidate.envelope.accessRevision !== envelope.accessRevision
+          || candidate.capability !== capability) {
+          throw new DashboardControlPlaneError('CONFLICT', '操作权限标识与请求不一致。');
+        }
         const execution = this.executions.get(operationId);
         if (execution) return await execution as DashboardOperationRun<R>;
         return {
@@ -638,6 +685,7 @@ export class DashboardControlPlane {
       envelope,
       status,
       domain: input.domain,
+      capability,
       domainRef: null,
       invalidation: 'none',
       releaseId: null,
@@ -968,31 +1016,31 @@ export class DashboardControlPlane {
 
   private async tryReleaseInvalidation(operation: DashboardStoredOperation): Promise<void> {
     if (!operation.releaseId || operation.invalidation !== 'pending') return;
+    const invalidation = releaseInvalidationFor(operation, operation.releaseId);
     const handler = this.operationReleaseInvalidation.get(operation.status.operationId)
       ?? this.releaseInvalidation;
     if (handler) {
       try {
-        await handler({
-          operationId: operation.status.operationId,
-          domain: operation.domain,
-          sessionEpoch: operation.status.sessionEpoch,
-          releaseId: operation.releaseId,
-        });
+        await handler(invalidation);
       } catch {
         return;
       }
     }
-    emitDashboardReleaseInvalidation({
-      operationId: operation.status.operationId,
-      domain: operation.domain,
-      sessionEpoch: operation.status.sessionEpoch,
-      releaseId: operation.releaseId,
-    });
+    // The emitted marker persists after dispatch, so delivery is at least once.
+    // Consumers collapse retries by dedupeKey and must not key effects by arrival order.
+    emitDashboardReleaseInvalidation(invalidation);
     const current = this.records.get(operation.status.operationId);
     if (!current) return;
-    this.records.set(current.status.operationId, { ...current, invalidation: 'emitted' });
+    const emitted = { ...current, invalidation: 'emitted' } as const;
+    this.records.set(current.status.operationId, emitted);
+    try {
+      await this.persist();
+    } catch {
+      this.records.set(current.status.operationId, current);
+      this.emit();
+      return;
+    }
     this.operationReleaseInvalidation.delete(current.status.operationId);
-    await this.persist();
     this.emit();
   }
 
@@ -1004,8 +1052,9 @@ export class DashboardControlPlane {
 
   private async persist(): Promise<void> {
     const snapshot = [...this.records.values()];
-    this.storeTail = this.storeTail.then(() => this.options.store.write(snapshot));
-    await this.storeTail;
+    const write = this.storeTail.then(() => this.options.store.write(snapshot));
+    this.storeTail = write.catch(() => undefined);
+    await write;
   }
 
   private project(operation: DashboardStoredOperation): DashboardOperationView {

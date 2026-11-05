@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { arch, cpus, loadavg, platform, release, totalmem } from 'node:os';
+import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import {
   DashboardControlPlane,
@@ -13,6 +13,32 @@ import {
 } from '../../src/main/dashboard-control-plane';
 
 const enabled = process.env.CUSTOMER_AGENT_DASHBOARD_OPERATION_BENCHMARK === '1';
+const RUN_COUNT = 5;
+const MUTATIONS_PER_RUN = 50;
+const READS_PER_RUN = 100;
+const RECOVERIES_PER_RUN = 21;
+const DASHBOARD_DOMAINS = ['release', 'permissions', 'accounts', 'materials', 'rollback', 'ops-loop'] as const;
+
+type Latency = Readonly<{ p50: number; p95: number; p99: number }>;
+
+type RunReport = Readonly<{
+  run: number;
+  coldMs: Readonly<{
+    acceptance: number;
+    readProjection: number;
+    statusLookup: number;
+    recovery: number;
+  }>;
+  latencyMs: Readonly<{
+    acceptance: Latency;
+    readProjection: Latency;
+    statusLookup: Latency;
+    recovery: Latency;
+  }>;
+  storeWriteMs: Readonly<Latency & { calls: number }>;
+  readCalls: Readonly<{ projection: number; status: number; total: number }>;
+  errors: number;
+}>;
 
 function percentile(values: readonly number[], fraction: number): number {
   const sorted = [...values].sort((left, right) => left - right);
@@ -20,8 +46,20 @@ function percentile(values: readonly number[], fraction: number): number {
   return sorted[Math.max(0, index)] ?? 0;
 }
 
-it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'dashboard-operation-benchmark-'));
+function latency(values: readonly number[]): Latency {
+  return {
+    p50: percentile(values, 0.5),
+    p95: percentile(values, 0.95),
+    p99: percentile(values, 0.99),
+  };
+}
+
+function median(values: readonly number[]): number {
+  return percentile(values, 0.5);
+}
+
+async function runBenchmark(run: number): Promise<RunReport> {
+  const directory = await mkdtemp(join(tmpdir(), `dashboard-operation-benchmark-${String(run)}-`));
   const path = join(directory, 'operations.json');
   const fileStore = new FileDashboardOperationStore(path);
   const storeWrite: number[] = [];
@@ -81,6 +119,7 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
       await plane.submit({
         domain,
         command: 'content-manage',
+        capability: `${domain}:benchmark`,
         intent: { benchmark: index },
         execute: async () => ({ kind: 'committed', resultRef: `result-${String(index)}` }),
       });
@@ -101,17 +140,15 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
     }
     storeWrite.length = 0;
 
-    for (let index = 0; index < 50; index += 1) {
-      for (let read = 0; read < 2; read += 1) {
-        const started = performance.now();
-        plane.currentSync();
-        readProjection.push(performance.now() - started);
-      }
-      for (let read = 0; read < 2; read += 1) {
-        const started = performance.now();
-        await plane.current();
-        statusLookup.push(performance.now() - started);
-      }
+    for (let index = 0; index < MUTATIONS_PER_RUN; index += 1) {
+      const projectionStarted = performance.now();
+      plane.currentSync();
+      readProjection.push(performance.now() - projectionStarted);
+
+      const statusStarted = performance.now();
+      await plane.current();
+      statusLookup.push(performance.now() - statusStarted);
+
       await mutate(20 + index);
     }
     const measuredStoreWrite = [...storeWrite];
@@ -121,6 +158,7 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
       await plane.submit({
         domain: 'release',
         command: 'publish',
+        capability: 'release:publish',
         intent: { benchmarkUnknown: index },
         execute: async () => ({ kind: 'unknown' }),
       });
@@ -132,6 +170,7 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
     await plane.submit({
       domain: 'materials',
       command: 'import',
+      capability: 'materials:import',
       intent: { benchmarkStaleRecovery: true },
       execute: async () => ({ kind: 'unknown' }),
     });
@@ -141,77 +180,92 @@ it.skipIf(!enabled)('measures durable Dashboard operation reads and mutations', 
     const stale = await plane.recover('materials');
     recovery.push(performance.now() - staleStarted);
 
-    expect(readProjection).toHaveLength(100);
-    expect(acceptance).toHaveLength(50);
-    expect(statusLookup).toHaveLength(100);
-    expect(recovery).toHaveLength(21);
-    expect(readProjection.length + statusLookup.length).toBe(100);
+    expect(readProjection).toHaveLength(MUTATIONS_PER_RUN);
+    expect(statusLookup).toHaveLength(MUTATIONS_PER_RUN);
+    expect(readProjection.length + statusLookup.length).toBe(READS_PER_RUN);
+    expect(acceptance).toHaveLength(MUTATIONS_PER_RUN);
+    expect(recovery).toHaveLength(RECOVERIES_PER_RUN);
     expect(stale?.state).toBe('committed');
     expect(errors).toBe(0);
 
-    const report = {
-      environment: {
-        node: process.version,
-        platform: platform(),
-        arch: arch(),
-        kernel: release(),
-        cpus: cpus().length,
-        memoryBytes: totalmem(),
-        loadAverage: loadavg(),
-      },
-      input: {
-        persistedMutations: 50,
-        warmupMutations: 20,
-        interleavedReadCalls: readProjection.length + statusLookup.length,
-        readProjectionCalls: readProjection.length,
-        statusLookupCalls: statusLookup.length,
-        recoveryCalls: recovery.length,
-        store: 'FileDashboardOperationStore',
-        concurrency: 1,
-      },
+    return {
+      run,
       coldMs: {
-        acceptance: acceptance[0],
-        readProjection: readProjection[0],
-        statusLookup: statusLookup[0],
-        recovery: recovery[0],
+        acceptance: acceptance[0] ?? 0,
+        readProjection: readProjection[0] ?? 0,
+        statusLookup: statusLookup[0] ?? 0,
+        recovery: recovery[0] ?? 0,
       },
       latencyMs: {
-        acceptance: {
-          p50: percentile(acceptance, 0.5),
-          p95: percentile(acceptance, 0.95),
-          p99: percentile(acceptance, 0.99),
-        },
-        readProjection: {
-          p50: percentile(readProjection, 0.5),
-          p95: percentile(readProjection, 0.95),
-          p99: percentile(readProjection, 0.99),
-        },
-        statusLookup: {
-          p50: percentile(statusLookup, 0.5),
-          p95: percentile(statusLookup, 0.95),
-          p99: percentile(statusLookup, 0.99),
-        },
-        recovery: {
-          p50: percentile(recovery, 0.5),
-          p95: percentile(recovery, 0.95),
-          p99: percentile(recovery, 0.99),
-        },
+        acceptance: latency(acceptance),
+        readProjection: latency(readProjection),
+        statusLookup: latency(statusLookup),
+        recovery: latency(recovery),
       },
       storeWriteMs: {
+        ...latency(measuredStoreWrite),
         calls: measuredStoreWrite.length,
-        p50: percentile(measuredStoreWrite, 0.5),
-        p95: percentile(measuredStoreWrite, 0.95),
-        p99: percentile(measuredStoreWrite, 0.99),
+      },
+      readCalls: {
+        projection: readProjection.length,
+        status: statusLookup.length,
+        total: readProjection.length + statusLookup.length,
       },
       errors,
-      limiter: 'single Node event loop, serialized FileDashboardOperationStore snapshots and fsync per transition',
     };
-    const reportPath = process.env.CUSTOMER_AGENT_DASHBOARD_OPERATION_BENCHMARK_OUT;
-    if (reportPath) await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-    console.info(`DASHBOARD_OPERATION_BENCHMARK ${JSON.stringify(report)}`);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
-});
+}
 
-const DASHBOARD_DOMAINS = ['release', 'permissions', 'accounts', 'materials', 'rollback', 'ops-loop'] as const;
+it.skipIf(!enabled)('measures five runs of 100 interleaved reads across 50 mutations', async () => {
+  const runs: RunReport[] = [];
+  for (let run = 1; run <= RUN_COUNT; run += 1) runs.push(await runBenchmark(run));
+
+  const summary = Object.fromEntries(
+    (['acceptance', 'readProjection', 'statusLookup', 'recovery'] as const).map((metric) => [
+      metric,
+      {
+        p50: median(runs.map((run) => run.latencyMs[metric].p50)),
+        p95: median(runs.map((run) => run.latencyMs[metric].p95)),
+        p99: median(runs.map((run) => run.latencyMs[metric].p99)),
+      },
+    ]),
+  );
+  const report = {
+    environment: {
+      node: process.version,
+      platform: platform(),
+      arch: arch(),
+      kernel: release(),
+      cpus: cpus().length,
+      memoryBytes: totalmem(),
+      loadAverage: loadavg(),
+    },
+    method: {
+      runs: RUN_COUNT,
+      warmupMutationsPerRun: 20,
+      mutationsPerRun: MUTATIONS_PER_RUN,
+      interleavedReadsPerRun: READS_PER_RUN,
+      recoveriesPerRun: RECOVERIES_PER_RUN,
+      store: 'FileDashboardOperationStore',
+      concurrency: 1,
+    },
+    summary,
+    runs,
+    errors: runs.reduce((total, run) => total + run.errors, 0),
+    limiter: 'single Node event loop, serialized FileDashboardOperationStore snapshots and fsync per transition',
+  };
+
+  const reportPath = process.env.CUSTOMER_AGENT_DASHBOARD_OPERATION_BENCHMARK_OUT;
+  if (reportPath) await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  console.info(`DASHBOARD_OPERATION_BENCHMARK ${JSON.stringify(report)}`);
+
+  for (const run of runs) {
+    expect(run.errors).toBe(0);
+    expect(run.readCalls.total).toBe(READS_PER_RUN);
+    expect(run.latencyMs.acceptance.p95).toBeLessThanOrEqual(300);
+    expect(run.latencyMs.readProjection.p95).toBeLessThanOrEqual(300);
+    expect(run.latencyMs.statusLookup.p95).toBeLessThanOrEqual(300);
+  }
+}, 120_000);
