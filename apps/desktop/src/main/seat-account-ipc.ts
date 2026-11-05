@@ -1,9 +1,15 @@
-import { ipcMain, type WebContents } from 'electron';
+import { app, ipcMain, type WebContents } from 'electron';
 import { isSeatAccountIntent, type SeatAccountIntent, type SeatAccountRecord, type SeatAccountReply } from '../shared/seat-account-intent';
 import { isTrustedMainFrameSender } from './sender-guard';
 import type { ProductSession } from './product-session';
 import { ProductHttpError } from './product-http';
 import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
+import {
+  DashboardControlPlaneError,
+  dashboardControlPlaneForSession,
+  type DashboardOperationContext,
+  type DashboardDomainOutcome,
+} from './dashboard-control-plane';
 
 /**
  * Seat administration over the product API.
@@ -18,10 +24,39 @@ import { WORKBENCH_EMPTY } from '../shared/workbench-empty';
  * and still answers with the same reply shape. Only the transport moved.
  */
 const CHANNEL = 'dashboard:seats-command';
-const NOT_SAVED: SeatAccountReply = { ok: false, message: '账号没有保存。' };
+const NOT_SAVED_MESSAGE = '账号没有保存。';
+const NOT_SAVED: SeatAccountReply = { ok: false, message: NOT_SAVED_MESSAGE };
 const INVALID: SeatAccountReply = { ok: false, message: '账号输入无效。' };
 const NO_SESSION: SeatAccountReply = { ok: false, message: WORKBENCH_EMPTY.intakeUnmounted };
 const DENIED: SeatAccountReply = { ok: false, message: '没有权限，请找人开通。' };
+
+function userDataDirectory(): string | null {
+  try {
+    return app?.getPath('userData') ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function seatOutcome(
+  reply: SeatAccountReply,
+  username: string,
+): DashboardDomainOutcome<SeatAccountReply> {
+  if (reply.ok) return { kind: 'committed', result: reply, resultRef: username };
+  const failure = reply as { ok: false; message: string };
+  if (failure.message === NOT_SAVED_MESSAGE) {
+    return { kind: 'unknown', result: reply };
+  }
+  return { kind: 'failed', result: reply, failureCode: 'FORBIDDEN' };
+}
+
+function controlSeatFailure(error: unknown): SeatAccountReply {
+  if (!(error instanceof DashboardControlPlaneError)) return NOT_SAVED;
+  if (error.code === 'UNAUTHORIZED') return NO_SESSION;
+  if (error.code === 'FORBIDDEN') return DENIED;
+  if (error.code === 'VALIDATION') return INVALID;
+  return { ok: false, message: '操作结果还未确认。请刷新账号列表核对。' };
+}
 
 /** Server refusals the operator can act on, keyed by the reason the API returns. Anything else is
  *  a state change or an outage, and "try again" would be the wrong instruction. */
@@ -56,6 +91,16 @@ function refusalReason(error: unknown): string | null {
   return error instanceof ProductHttpError && typeof error.reason === 'string' ? error.reason : null;
 }
 
+function seatFailureReply(error: unknown): SeatAccountReply | null {
+  const message = REFUSALS[refusalReason(error) ?? ''];
+  if (message) return { ok: false, message };
+  if (error instanceof ProductHttpError
+    && !['UNAVAILABLE', 'OVERLOADED', 'RATE_LIMITED', 'CANCELLED'].includes(error.code)) {
+    return NOT_SAVED;
+  }
+  return null;
+}
+
 export function registerSeatAccountIpc(
   session: ProductSession | null,
   dashboard: () => WebContents | null,
@@ -64,8 +109,22 @@ export function registerSeatAccountIpc(
   canManageAccounts: () => boolean,
   listSeats: ((epoch: number) => Promise<{ readonly seats: readonly SeatAccountRecord[] } | { readonly state: 'closed' }>) | null = null,
 ) {
-  async function request(epoch: number, path: string, init: { method: 'GET' | 'POST' | 'DELETE'; body?: unknown }) {
-    const response = await session!.request(epoch, path, { ...init, maxResponseBytes: 262_144 });
+  const plane = session
+    ? dashboardControlPlaneForSession(session, userDataDirectory())
+    : null;
+  async function request(
+    epoch: number,
+    path: string,
+    init: { method: 'GET' | 'POST' | 'DELETE'; body?: unknown },
+    operation?: DashboardOperationContext,
+  ) {
+    operation?.signal.throwIfAborted();
+    operation?.beginCommit();
+    const response = await session!.request(epoch, path, {
+      ...init,
+      ...(operation ? { signal: operation.signal } : {}),
+      maxResponseBytes: 262_144,
+    });
     return response.value;
   }
 
@@ -79,22 +138,72 @@ export function registerSeatAccountIpc(
         if (!('seats' in listed)) return DENIED;
         return { ok: true, action: 'list', seats: [...listed.seats] };
       }
+      const runMutation = async (
+        work: (operation?: DashboardOperationContext) => Promise<SeatAccountReply>,
+        username: string,
+      ): Promise<SeatAccountReply> => {
+        if (!plane) return work();
+        try {
+          const run = await plane.submit({
+            domain: 'accounts',
+            command: 'accounts-manage',
+            expectedVersion: 0,
+            intent,
+            authorize: (view) => view.accounts === 'open',
+            execute: async (operation) => {
+              try {
+                return seatOutcome(await work(operation), username);
+              } catch (error) {
+                if (operation.signal.aborted) throw error;
+                const reply = seatFailureReply(error);
+                if (reply) {
+                  return {
+                    kind: 'failed',
+                    result: reply,
+                    failureCode: error instanceof ProductHttpError ? error.code : 'UNAVAILABLE',
+                  };
+                }
+                return { kind: 'unknown', result: NOT_SAVED };
+              }
+            },
+          });
+          return run.result ?? {
+            ok: false,
+            message: run.view.state === 'unknown'
+              ? '操作结果还未确认。请刷新账号列表核对。'
+              : '操作已完成，请刷新账号列表核对。',
+          };
+        } catch (error) {
+          return controlSeatFailure(error);
+        }
+      };
       if (intent.action === 'create') {
-        const value = await request(epoch, '/v1/intake/seats', {
-          method: 'POST',
-          body: { displayName: intent.displayName, username: intent.username, password: intent.password, post: intent.post },
-        });
-        const seat = sameRow((value as { seat?: unknown }).seat);
-        return seat ? { ok: true, action: 'create', seat: seat as SeatAccountRecord } : NOT_SAVED;
+        return runMutation(async (operation) => {
+          const value = await request(epoch, '/v1/intake/seats', {
+            method: 'POST',
+            body: { displayName: intent.displayName, username: intent.username, password: intent.password, post: intent.post },
+          }, operation);
+          const seat = sameRow((value as { seat?: unknown }).seat);
+          return seat ? { ok: true, action: 'create', seat: seat as SeatAccountRecord } : NOT_SAVED;
+        }, intent.username);
       }
       if (intent.action === 'reset') {
-        await request(epoch, `/v1/intake/seats/${encodeURIComponent(intent.username)}/password`, {
-          method: 'POST', body: { password: intent.password },
-        });
-        return { ok: true, action: 'reset', username: intent.username };
+        return runMutation(async (operation) => {
+          await request(epoch, `/v1/intake/seats/${encodeURIComponent(intent.username)}/password`, {
+            method: 'POST', body: { password: intent.password },
+          }, operation);
+          return { ok: true, action: 'reset', username: intent.username };
+        }, intent.username);
       }
-      await request(epoch, `/v1/intake/seats/${encodeURIComponent(intent.username)}`, { method: 'DELETE' });
-      return { ok: true, action: 'disable', username: intent.username };
+      return runMutation(async (operation) => {
+        await request(
+          epoch,
+          `/v1/intake/seats/${encodeURIComponent(intent.username)}`,
+          { method: 'DELETE' },
+          operation,
+        );
+        return { ok: true, action: 'disable', username: intent.username };
+      }, intent.username);
     } catch (error) {
       const reason = refusalReason(error);
       const message = reason === null ? null : REFUSALS[reason];

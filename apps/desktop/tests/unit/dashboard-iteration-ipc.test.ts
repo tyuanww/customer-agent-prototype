@@ -294,7 +294,29 @@ it('guards start/close IPC senders, argument counts, and thrown view errors', as
   vi.mocked(coach.request)
     .mockResolvedValueOnce({
       status: 200,
+      value: {
+        state: 'open',
+        accessRevision: 1,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        grants: 'closed',
+        accounts: 'closed',
+        denyReason: null,
+      },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
       value: { ...contractTask, status: 'in_progress', version: 2, updated_at: '2026-09-20T03:20:00.000Z' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        state: 'open',
+        accessRevision: 1,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        grants: 'closed',
+        accounts: 'closed',
+        denyReason: null,
+      },
     })
     .mockResolvedValueOnce({
       status: 200,
