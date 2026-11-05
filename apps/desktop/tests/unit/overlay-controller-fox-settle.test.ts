@@ -65,6 +65,7 @@ import {
   createInitialOverlayState,
   type OverlayState,
 } from '../../src/shared/overlay-machine';
+import type { OverlayReportIdentity } from '../../src/shared/overlay-report';
 
 type FoxWindowFixture = BrowserWindow & {
   sent: OverlayCommand[];
@@ -295,7 +296,12 @@ describe('OverlayController fox drag settle transaction', () => {
     controllers.push(controller);
     expect(controller.moveBy(24, 0, false, 1)).toBeNull();
     expect(Reflect.get(controller, 'foxDragTransaction')).not.toBeNull();
-    Reflect.get(controller, 'startCommandObservation').call(controller, 'layout', 1);
+    Reflect.get(controller, 'startCommandObservation').call(
+      controller,
+      'layout',
+      1,
+      Reflect.get(controller, 'currentReportIdentity').call(controller),
+    );
     expect((Reflect.get(controller, 'commandFrameStartedAt') as Map<string, number>).size).toBe(1);
 
     const state = Reflect.get(controller, 'overlayState') as OverlayState;
@@ -681,12 +687,9 @@ describe('OverlayController renderer work ownership', () => {
         target: 'query',
         commandId,
         command: {
-          type: 'prepare-search',
-          handoffId: commandId,
+          type: 'activate-search',
           anchor: 'right',
-          handoffCenterX: 0,
-          handoffCenterY: 0,
-          foxVisualTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+          animate: false,
         },
       }]);
     }
@@ -709,6 +712,7 @@ describe('OverlayController renderer work ownership', () => {
     const startCommandObservation = Reflect.get(controller, 'startCommandObservation') as (
       type: 'handoff' | 'layout' | 'settle',
       id: number,
+      identity: OverlayReportIdentity,
     ) => void;
     const identity = {
       sessionEpoch: state.sessionEpoch,
@@ -721,15 +725,12 @@ describe('OverlayController renderer work ownership', () => {
       target: 'query',
       commandId: 5,
       command: {
-        type: 'prepare-search',
-        handoffId: 5,
+        type: 'activate-search',
         anchor: 'right',
-        handoffCenterX: 0,
-        handoffCenterY: 0,
-        foxVisualTransform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+        animate: false,
       },
     }]);
-    startCommandObservation.call(controller, 'layout', 5);
+    startCommandObservation.call(controller, 'layout', 5, identity);
 
     controller.reportRendererEvent({
       type: 'frame-observed',
@@ -744,7 +745,77 @@ describe('OverlayController renderer work ownership', () => {
       Array.from(
         (Reflect.get(controller, 'commandFrameStartedAt') as Map<string, number>).keys(),
       ),
-    ).toEqual(['handoff:5']);
+    ).toEqual([expect.stringMatching(/:handoff:5$/)]);
+  });
+
+  it('clears pending command observations when content identity advances', () => {
+    const controller = new OverlayController();
+    const state = activeState();
+    Object.assign(controller as object, { overlayState: state });
+    controllers.push(controller);
+    Reflect.get(controller, 'startCommandObservation').call(
+      controller,
+      'layout',
+      1,
+      {
+        sessionEpoch: state.sessionEpoch,
+        generation: state.generation,
+        windowGeneration: state.windowGeneration,
+        contentRevision: state.contentRevision,
+      },
+    );
+
+    controller.reportUiPhase('EMPTY', 0, {
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision + 1,
+    });
+
+    expect(controller.performanceSnapshot()).toMatchObject({
+      pending: 0,
+      droppedObservations: 1,
+    });
+  });
+
+  it('rejects a layout timeout whose captured identity is stale', () => {
+    vi.useFakeTimers();
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    const state = activeState();
+    Object.assign(controller as object, { query, overlayState: state });
+    controllers.push(controller);
+    const requested = applyOverlayEvent(state, {
+      type: 'LAYOUT_REQUESTED',
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      handoffId: state.handoff.id,
+      sequence: state.layout.sequence + 1,
+      desiredHeight: 420,
+      contentPhase: state.contentPhase,
+      resultCount: state.resultCount,
+      contentRevision: state.contentRevision,
+    });
+    const schedule = requested.effects.find(
+      (effect) => effect.type === 'SCHEDULE_TIMEOUT' && effect.timer === 'layout',
+    );
+    expect(schedule).toBeDefined();
+    Object.assign(controller as object, { overlayState: requested.state });
+    Reflect.get(controller, 'executeNativeEffects').call(controller, [schedule]);
+
+    const nextSession = applyOverlayEvent(requested.state, {
+      type: 'SESSION_CHANGED',
+      sessionEpoch: requested.state.sessionEpoch + 1,
+      generation: requested.state.generation,
+      windowGeneration: requested.state.windowGeneration,
+      releaseId: 'rel_synthetic_next',
+    }).state;
+    Object.assign(controller as object, { overlayState: nextSession });
+
+    vi.advanceTimersByTime(200);
+
+    expect(query.sent.filter((command) => command.type === 'query-layout-ack')).toEqual([]);
   });
 });
 

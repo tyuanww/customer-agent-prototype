@@ -231,6 +231,9 @@ describe('authoritative overlay reducer', () => {
       expect.objectContaining({ type: 'CANCEL_QUERY', sessionEpoch: withResults.sessionEpoch, generation: withResults.generation }),
       expect.objectContaining({ type: 'CANCEL_COPY', sessionEpoch: withResults.sessionEpoch, generation: withResults.generation }),
       expect.objectContaining({ type: 'CLEAR_CONTENT' }),
+      expect.objectContaining({ type: 'CANCEL_TIMEOUT', timer: 'handoff' }),
+      expect.objectContaining({ type: 'CANCEL_TIMEOUT', timer: 'layout' }),
+      expect.objectContaining({ type: 'CANCEL_TIMEOUT', timer: 'drag-settle' }),
       expect.objectContaining({ type: 'FOCUS_WINDOW', target: 'query', sessionEpoch: withResults.sessionEpoch + 1 }),
     ]));
   });
@@ -394,6 +397,107 @@ describe('authoritative overlay reducer', () => {
     expect(staleSession.reason).toBe('stale-session');
     expect(staleSession.state).toBe(opened.state);
     expect(staleSession.effects).toEqual([]);
+
+    const skippedWindow = applyOverlayEvent(opened.state, at(opened.state, {
+      type: 'WINDOW_RECREATED',
+      windowGeneration: opened.state.windowGeneration + 2,
+    }));
+    expect(skippedWindow.decision).toBe('rejected');
+    expect(skippedWindow.reason).toBe('stale-window');
+    expect(skippedWindow.state).toBe(opened.state);
+  });
+
+  it('routes reactivation, display sync and layout fallback through typed effects', () => {
+    const opened = active();
+    const reactivated = applyOverlayEvent(opened.state, at(opened.state, {
+      type: 'QUERY_REACTIVATED',
+      anchor: 'right',
+    }));
+    expect(reactivated.decision).toBe('applied');
+    expect(reactivated.effects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'query',
+        command: expect.objectContaining({ type: 'activate-search', anchor: 'right' }),
+      }),
+      expect.objectContaining({ type: 'FOCUS_WINDOW', target: 'query' }),
+    ]));
+
+    const displayed = applyOverlayEvent(reactivated.state, at(reactivated.state, {
+      type: 'DISPLAY_CHANGED',
+      displayId: 2,
+      edge: 'left',
+      foxBounds,
+      queryBounds,
+      queryAnchor: 'right',
+    }));
+    expect(displayed.decision).toBe('applied');
+    expect(displayed.effects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'query',
+        command: { type: 'sync-query-anchor', anchor: 'right' },
+      }),
+    ]));
+
+    const requested = applyOverlayEvent(displayed.state, at(displayed.state, {
+      type: 'LAYOUT_REQUESTED',
+      handoffId: displayed.state.handoff.id,
+      sequence: displayed.state.layout.sequence + 1,
+      desiredHeight: 420,
+      contentPhase: displayed.state.contentPhase,
+      resultCount: displayed.state.resultCount,
+      contentRevision: displayed.state.contentRevision,
+    }));
+    expect(requested.effects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'SCHEDULE_TIMEOUT',
+        timer: 'layout',
+        sequence: requested.state.layout.sequence,
+        guard: expect.objectContaining({
+          contentRevision: requested.state.contentRevision,
+        }),
+      }),
+    ]));
+
+    const timedOut = applyOverlayEvent(requested.state, at(requested.state, {
+      type: 'LAYOUT_TIMEOUT',
+      handoffId: requested.state.handoff.id,
+      sequence: requested.state.layout.sequence,
+      contentRevision: requested.state.contentRevision,
+    }));
+    expect(timedOut.decision).toBe('applied');
+    expect(timedOut.effects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'APPLY_QUERY_LAYOUT_FALLBACK',
+        handoffId: requested.state.handoff.id,
+        sequence: requested.state.layout.sequence,
+      }),
+    ]));
+  });
+
+  it('routes shortcut status to both overlay surfaces through typed effects', () => {
+    const state = initial();
+    const transition = applyOverlayEvent(state, at(state, {
+      type: 'SHORTCUT_STATUS_CHANGED',
+      registered: false,
+      accelerator: 'CommandOrControl+Shift+Space',
+      message: 'click the fox',
+    }));
+
+    expect(transition.decision).toBe('applied');
+    expect(transition.effects).toEqual([
+      expect.objectContaining({
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'fox',
+        command: expect.objectContaining({ type: 'shortcut-status', registered: false }),
+      }),
+      expect.objectContaining({
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'query',
+        command: expect.objectContaining({ type: 'shortcut-status', registered: false }),
+      }),
+    ]);
   });
 
   it('has an exhaustive valid, stale and invalid outcome matrix', () => {
@@ -450,6 +554,7 @@ describe('authoritative overlay reducer', () => {
       ]),
       active: new Set([
         'DISMISS_REQUESTED',
+        'QUERY_REACTIVATED',
         'CONTENT_CHANGED',
         'SESSION_CHANGED',
         'RELEASE_CHANGED',
@@ -497,6 +602,7 @@ describe('authoritative overlay reducer', () => {
         'DISMISS_REQUESTED',
         'TOGGLE_REQUESTED',
         'QUERY_SUBSCRIBED',
+        'QUERY_REACTIVATED',
         'QUERY_FOCUSED',
         'QUERY_BLURRED',
         'FOCUS_RESTORED',
@@ -505,6 +611,7 @@ describe('authoritative overlay reducer', () => {
       opening: new Set([
         'OPEN_REQUESTED',
         'TOGGLE_REQUESTED',
+        'QUERY_REACTIVATED',
         'FOCUS_RESTORED',
         'QUERY_DRAG_CLEARED',
         'FOX_PEEK_CHANGED',
@@ -523,6 +630,7 @@ describe('authoritative overlay reducer', () => {
         'DISMISS_REQUESTED',
         'TOGGLE_REQUESTED',
         'QUERY_SUBSCRIBED',
+        'QUERY_REACTIVATED',
         'QUERY_FOCUSED',
         'QUERY_BLURRED',
         'QUERY_DRAG_CLEARED',
@@ -533,6 +641,7 @@ describe('authoritative overlay reducer', () => {
         'DISMISS_REQUESTED',
         'TOGGLE_REQUESTED',
         'QUERY_SUBSCRIBED',
+        'QUERY_REACTIVATED',
         'WINDOW_CLOSED',
         'QUERY_FOCUSED',
         'QUERY_BLURRED',
@@ -564,6 +673,8 @@ describe('authoritative overlay reducer', () => {
           return type === 'WINDOW_RECREATED'
             ? { type, ...base, windowGeneration: state.windowGeneration + 1 }
             : { type, ...base };
+        case 'QUERY_REACTIVATED':
+          return { type, ...base, anchor: 'left' };
         case 'HANDOFF_ARMED':
         case 'HANDOFF_OPENED':
         case 'HANDOFF_CLOSED':
@@ -615,6 +726,7 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
+            contentRevision: state.contentRevision,
           };
         case 'RESIZE_BEGIN':
           return {
