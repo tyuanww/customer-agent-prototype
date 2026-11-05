@@ -226,7 +226,12 @@ function fileHash(file) {
 
 export function syncReceipts({ repositoryRoot = defaultRepositoryRoot } = {}) {
   const workingTree = git(repositoryRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
-  if (workingTree !== '') throw new Error(`receipt synchronization requires a clean source commit: ${workingTree}`);
+  const unexpectedChanges = workingTree === '' ? [] : workingTree.split('\n')
+    .map(line => line.slice(3))
+    .filter(relative => !allowedAfterSourceCommit.includes(relative));
+  if (unexpectedChanges.length > 0) {
+    throw new Error(`receipt synchronization found source changes: ${unexpectedChanges.join(', ')}`);
+  }
   const syncCommit = git(repositoryRoot, ['rev-parse', '--verify', 'HEAD^{commit}']);
   const primary = exploreOperationOrdering('correct');
   if (primary.violation !== null) throw new Error(`primary model failed before receipt sync: ${primary.violation}`);
