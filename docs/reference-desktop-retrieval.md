@@ -65,7 +65,9 @@ API composition 已把这些规则接入真实 `/v1/search`。`QueryCoordinator`
 
 当前 API index 消费 `release_items`，与既有 SearchResponse、candidate impression 和复制身份保持一致。若当前 intake lineage 的 upsert 尚无对应 `release_items` 投影，API activation 以 `RELEASE_INDEX_ITEM_GAP` 失败关闭，避免只返回一部分已发布内容。把规范化 intake 条目映射到旧 SearchResponse 字段仍需单独合同或 migration，不由 API composition 猜测。
 
-桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。当前分支只提供 typed seam 和独立 Electron 验证，生产窗口与 preload 组合仍由 INT-DESKTOP 完成。
+桌面 Main 的 `apps/desktop/src/main/integration/query-api-adapter.ts` 在 API 边界解析 ordinary `SearchResponse`、HTTP 503 `OverloadedErrorEnvelope` 和 `retry-after`。只有 `SOURCE_GATE_NOT_READY` 同时携带四个批准的 `sop_reason` 之一时才保留 typed SOP-unavailable 结果；未知、缺失或 malformed reason 归一为稳定 generic error，绝不落成 ordinary candidates。现有 `ProductSearch` 仍拥有查询排序、候选 provenance、复制与事件语义。
+
+桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。`apps/desktop/src/main/integration/desktop-composition.ts` 只组合现有 Query session adapter、DSH control plane 和 OVL typed cancellation seam，不复制任一领域 reducer 或生命周期状态机。
 
 ## 失败
 

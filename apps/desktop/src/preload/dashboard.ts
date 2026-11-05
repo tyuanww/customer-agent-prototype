@@ -3,12 +3,18 @@ import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/con
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
-import {
-  ACCESS_ACTIONS,
-  OPERATION_TRANSITIONS,
-  type OperationCommand,
-  type OperationState,
-} from '../../../../packages/unified-contracts/src/index.ts';
+import type { OperationCommand, OperationState } from '../../../../packages/unified-contracts/src/index.ts';
+
+// The Dashboard preload validates the Main projection only. Keep these small
+// runtime sets local so the sandboxed entry does not load a shared preload
+// chunk; Main remains the owner of operation transitions and authorization.
+const DASHBOARD_ACCESS_ACTIONS = [
+  'query', 'content-manage', 'import', 'source-confirm', 'review', 'publish',
+  'candidate-cancel', 'rollback', 'dashboard-read', 'grants-manage', 'accounts-manage',
+] as const;
+const DASHBOARD_OPERATION_STATES = new Set<OperationState>([
+  'accepted', 'running', 'unknown', 'committed', 'failed', 'cancelled', 'expired',
+]);
 
 // Keep these literals aligned with IPC_CHANNELS. Do not import shared modules:
 // a second preload entry that shares overlay session helpers would split a
@@ -76,7 +82,7 @@ const OPERATION_DOMAINS = new Set<DashboardViewOperationDomain>([
   'ops-loop',
 ]);
 const OPERATION_COMMANDS = new Set<string>([
-  ...ACCESS_ACTIONS,
+  ...DASHBOARD_ACCESS_ACTIONS,
   'query',
   'settings-preview',
   'settings-save',
@@ -106,7 +112,7 @@ function isOperationView(value: unknown): value is DashboardViewOperation {
     && typeof value.command === 'string'
     && OPERATION_COMMANDS.has(value.command)
     && typeof value.state === 'string'
-    && Object.hasOwn(OPERATION_TRANSITIONS, value.state)
+    && DASHBOARD_OPERATION_STATES.has(value.state as OperationState)
     && isIsoText(value.updatedAt)
     && isIsoText(value.recoveryDeadline)
     && Date.parse(value.recoveryDeadline) >= Date.parse(value.updatedAt)

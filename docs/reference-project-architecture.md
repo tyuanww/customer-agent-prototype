@@ -407,7 +407,7 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 `apps/api/src/query/sop-pipeline.ts` consumes only that immutable projection. It classifies SOP ownership before ranking, requires the complete order in `sop_release_severity`, returns the ARC SOP outcome shape, and never mixes ordinary content candidates into an SOP result. `apps/api/src/content-intake/sop-source.ts` parses the persisted projection at the database boundary. `publication.ts` exposes the same-transaction publication seam.
 
-`apps/desktop/src/shared/sop-pipeline.ts` owns the typed minimal projection, sales-agent branch choice, release, session, and revocation invalidation, and the one native clipboard payload. Image-bearing steps fail when metadata or bytes are missing. `SopPipelinePresenter` owns Main-side copy authority and checks the lease and selected step both before and after asynchronous media reads. INT-DESKTOP still owns production window and IPC composition. The current `main.ts` fixture path remains until CLEAN-01.
+`apps/desktop/src/shared/sop-pipeline.ts` owns the typed minimal projection, sales-agent branch choice, release, session, and revocation invalidation, and the one native clipboard payload. Image-bearing steps fail when metadata or bytes are missing. `SopPipelinePresenter` owns Main-side copy authority and checks the lease and selected step both before and after asynchronous media reads. INT-DESKTOP owns production window and IPC composition. The current composition keeps the existing SOP window contract fail closed while the dedicated positive transport remains unapproved.
 
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
@@ -419,7 +419,7 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
 
-INT-API 已把 API request ID、QueryCoordinator 的 access、release-read、recall 或 SOP stage，以及 response validation 接到 typed observer port。默认序列化 sink 使用 OBS runtime 的 canonical serializer；observer 或 sink 失败不会改变查询结果。QRY-01 与 SOP-01 仍拥有各自的 pipeline 行为。DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件，这些路径尚未接线。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+INT-API 已把 API request ID、QueryCoordinator 的 access、release-read、recall 或 SOP stage，以及 response validation 接到 typed observer port。默认序列化 sink 使用 OBS runtime 的 canonical serializer；observer 或 sink 失败不会改变查询结果。QRY-01 与 SOP-01 仍拥有各自的 pipeline 行为。INT-DESKTOP 在 Main 组合一个 Query/API session adapter、一个共享 DSH control plane 和一个 OVL `OverlayController`。DSH release invalidation 通过既有 typed Query command seam 取消查询、使复制失效并清空旧内容，不经过通用广播。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
 
 ### INT-API unified query composition
 
@@ -433,7 +433,7 @@ While the dedicated SOP response contract remains open, `/v1/search` returns HTT
 
 Successful content publish and rollback responses trigger a single-flight reload through the app lifecycle hook. Startup uses the same activation path. Each query rechecks the current release identity with one lightweight read; if it moved out of band, the request returns the stable unavailable failure, the old index is not served, and a reload is requested. Runtime shutdown waits for an in-flight activation and makes later queries fail closed.
 
-The API default OBS sink receives no raw question or answer. It receives stable request/query tokens, the existing redacted query fingerprint, stable failure codes and measured stage durations. The final exact-head verifier and the desktop INT-DESKTOP adapter are still required before this composition is treated as a complete product runtime.
+The API default OBS sink receives no raw question or answer. It receives stable request/query tokens, the existing redacted query fingerprint, stable failure codes and measured stage durations. The desktop adapter now parses ordinary `SearchResponse` and the four approved SOP fail-closed reasons at the Main HTTP boundary. A real Electron and synthetic HTTP/PostgreSQL host run is still required before this composition is treated as a complete product runtime.
 
 The current index projection reads the source-gated `release_items` that back the existing `SearchResponse` and `candidate_impressions` foreign keys. If the current intake lineage contains an upsert that has no corresponding `release_items` row, activation fails with `RELEASE_INDEX_ITEM_GAP` instead of serving a partial index. Mapping normalized intake entries into the ordinary SearchResponse and event candidate identity still needs an approved contract or migration change; INT-API does not invent those fields.
 

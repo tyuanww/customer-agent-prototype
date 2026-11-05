@@ -35,6 +35,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
     });
     await expect.poll(() => app!.windows().some(page => page.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(page => page.url().includes('role=query'))!;
+    await query.waitForFunction(() => Boolean(window.customerAgent));
     async function openQuery() {
       await app!.evaluate(({ app }) => app.focus({ steal: true }));
       await query.evaluate(() => window.customerAgent!.openSearch());

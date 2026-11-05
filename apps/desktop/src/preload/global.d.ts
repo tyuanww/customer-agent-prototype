@@ -11,6 +11,7 @@ import type { DashboardUsageLogApi } from '../shared/dashboard-usage-log';
 import type { WorkbenchModeReply } from '../shared/workbench-mode';
 import type { SopWorkbookOpenReply } from '../shared/sop-workbook-preview';
 import type { DashboardWordingApi } from '../shared/dashboard-wording';
+import type { DashboardOperationsApi } from './dashboard';
 import type { LoginWindowApi } from '../shared/login-window';
 import type { SopWindowApi } from '../shared/sop-window';
 
@@ -23,6 +24,7 @@ declare global {
     dashboardIntake?: IntakeManagementApi;
     customerAgent?: CustomerAgentApi;
     dashboardWording?: DashboardWordingApi;
+    dashboardOperations?: DashboardOperationsApi;
     dashboardContent?: DashboardContentApi;
     dashboardIteration?: DashboardIterationApi;
     dashboardOps?: DashboardOpsApi;
