@@ -245,9 +245,11 @@ v1.17 migrated PG15
 
 ### 5.2 统一操作顺序验证（FOR-01）
 
-`.cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs` 对 ARC-01 的手写操作合同做有限状态穷举。模型直接导入 `OPERATION_TRANSITIONS`、`classifyOperationReuse` 和 `parseOperationStatus`，只拥有事件交错与不变量，不维护第二份状态转换或复用策略。它覆盖授权检查、命令受理、撤权、写入、重复提交、未知提交、状态读取、恢复和全部终态，并要求源码/Actor/Command/RequestHash/SessionEpoch 绑定、至多一次已提交效果及原回执恢复。
+`.cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs` 对 ARC-01 的手写操作合同做有限状态穷举。模型直接导入 `OPERATION_TRANSITIONS`、`classifyOperationReuse` 和 `parseOperationStatus`，只拥有事件交错与不变量，不维护第二份状态转换或复用策略。它覆盖授权检查、命令受理、撤权、写入、重复提交、未知提交、状态读取、恢复和全部终态，并要求源码/Actor/Command/RequestHash/SessionEpoch 绑定、至多一次已提交效果及原回执恢复。受理只在撤权前可达，witness 记录真实事件顺序；写入效果后丢失持久回执可从 `running + effects=1 + durable=none` 到达 `unknown`，恢复在读到持久回执前保持 `unknown`。
 
-该模型证明的是有限合同状态机，不证明 PostgreSQL MVCC、网络分区、COMMIT 中途进程死亡、文件系统持久性、HTTP 或 IPC。真实 PostgreSQL 15 的请求时授权线性化由 `pnpm test:seat-administration-revocation` 验证：检查成功后撤权的已受理命令可以完成，撤权后开始的新命令必须被拒绝；授权生命周期另由 `authorization-reachability.integration.test.ts` 深度五的穷举回放验证。ARC-01 当前只有合同，没有产品 operation store，因此上述真实回放不冒充 envelope 已接入运行时。`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令、环境和状态数；改动受测源码后必须先重跑再更新。
+该模型证明的是有限合同状态机，不证明 PostgreSQL MVCC、网络分区、COMMIT 中途进程死亡、文件系统持久性、HTTP 或 IPC。真实 PostgreSQL 15 的请求时授权线性化由 `pnpm test:seat-administration-revocation` 验证：检查成功后撤权的已受理命令可以完成，撤权后开始的新命令必须被拒绝；授权生命周期另由 `authorization-reachability.integration.test.ts` 深度五的穷举回放验证。ARC-01 当前只有合同，没有产品 operation store，因此上述真实回放不冒充 envelope 已接入运行时。
+
+`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令结果、环境和状态数，并递归核验 seat 回执及其来源哈希。检查器对缺失回执、缺失来源或来源漂移 fail-closed；它要求 `syncCommit` 是受测 head 的祖先，且该提交之后只允许两个回执文件变化。运行时可生成机器可读报告，绑定精确 tested head、witness 路径、负向控制与错误数。改动受测源码后必须先重跑再更新证据。`verify-manual-identity-grants` 在 BASEFIX-01 落入前需在临时树叠加其测试修正，FORM 本身不修改该测试。
 
 ```text
 unit          纯函数、协议、脚本和安全门

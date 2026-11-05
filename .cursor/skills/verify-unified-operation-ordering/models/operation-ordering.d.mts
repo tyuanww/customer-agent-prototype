@@ -1,6 +1,7 @@
 export type OperationOrderingMode =
   | 'correct'
   | 'skip-authorization-check'
+  | 'accept-after-revocation'
   | 'ignore-epoch'
   | 'ignore-request-hash'
   | 'skip-recovery-lookup';
@@ -17,7 +18,10 @@ export type OperationOrderingResult = Readonly<{
     unknownRetained: boolean;
     recoveryStayedUnknown: boolean;
     replayReturnedOriginalReceipt: boolean;
+    unknownAfterEffectWithoutDurability: boolean;
+    recoveryStayedUnknownAfterEffect: boolean;
   }>;
+  witnessPaths: Readonly<Record<keyof OperationOrderingResult['witnesses'], readonly string[] | null>>;
   path: readonly string[] | null;
   violation: string | null;
   state: Readonly<Record<string, unknown>> | null;

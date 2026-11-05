@@ -39,6 +39,7 @@ const initialState = Object.freeze({
   authorization: 'none',
   revoked: false,
   accepted: false,
+  acceptedBeforeRevocation: false,
   operationState: null,
   effects: 0,
   durable: 'none',
@@ -61,6 +62,7 @@ function stateKey(state) {
     state.authorization,
     state.revoked ? '1' : '0',
     state.accepted ? '1' : '0',
+    state.acceptedBeforeRevocation ? '1' : '0',
     state.operationState ?? '-',
     String(state.effects),
     state.durable,
@@ -141,13 +143,21 @@ function actions(mode, state) {
     result.push(next('revokeAuthorization', { ...state, revoked: true }));
   }
   if (state.requestObserved && !state.accepted && state.operationState === null) {
-    const admitted = state.authorization === 'allowed';
-    if (mode === 'skip-authorization-check' || admitted) {
+    const admitted = state.authorization === 'allowed' && !state.revoked;
+    const skippedAuthorization = mode === 'skip-authorization-check';
+    const acceptedAfterRevocation = mode === 'accept-after-revocation'
+      && state.revoked
+      && state.authorization === 'allowed';
+    if (admitted || skippedAuthorization || acceptedAfterRevocation) {
+      const violation = skippedAuthorization
+        ? 'accept_without_authorization'
+        : acceptedAfterRevocation ? 'accept_after_revocation' : null;
       result.push(next('acceptCommand', {
         ...state,
         accepted: true,
+        acceptedBeforeRevocation: !state.revoked,
         operationState: 'accepted',
-      }, admitted ? null : 'accept_without_authorization'));
+      }, violation));
     }
   }
   if (state.operationState === 'accepted') {
@@ -183,6 +193,10 @@ function actions(mode, state) {
       durable: 'committed',
       reported: 'unknown',
     }));
+    result.push(moveByContract('commitUnknownAfterEffect', state, 'unknown', {
+      durable: 'none',
+      reported: 'unknown',
+    }));
   }
   if (state.operationState === 'running' && state.effects === 0) {
     result.push(moveByContract('failRunning', state, 'failed', {
@@ -212,6 +226,13 @@ function actions(mode, state) {
       }));
     } else {
       result.push(next('readUnknownStatus', { ...state, statusLookup: true }));
+      if (state.statusLookup && state.effects === 1) {
+        result.push(moveByContract('readDurableReceipt', state, 'committed', {
+          durable: 'committed',
+          reported: 'success',
+          receiptReturned: 'original-receipt',
+        }));
+      }
     }
     result.push(moveByContract('expireUnknown', state, 'expired', {
       durable: 'expired',
@@ -219,7 +240,9 @@ function actions(mode, state) {
       receiptReturned: 'expired-receipt',
     }));
     if (!state.recoveryAttempted) {
-      const shouldInventSuccess = mode === 'skip-recovery-lookup' && state.durable !== 'committed';
+      const shouldInventSuccess = mode === 'skip-recovery-lookup'
+        && state.effects === 1
+        && state.durable !== 'committed';
       if (state.durable === 'committed') {
         result.push(moveByContract('recoverUnknown', state, 'committed', {
           recoveryAttempted: true,
@@ -262,6 +285,7 @@ function actions(mode, state) {
 
 function invariant(state) {
   if (state.accepted && state.authorization !== 'allowed') return 'accepted_without_authorization';
+  if (state.accepted && !state.acceptedBeforeRevocation) return 'accept_after_revocation';
   if (state.effects > 0 && (!state.accepted || state.authorization !== 'allowed')) {
     return 'write_without_authorization';
   }
@@ -302,30 +326,52 @@ export function exploreOperationOrdering(mode = 'correct') {
     unknownRetained: false,
     recoveryStayedUnknown: false,
     replayReturnedOriginalReceipt: false,
+    unknownAfterEffectWithoutDurability: false,
+    recoveryStayedUnknownAfterEffect: false,
   };
+  const witnessPaths = Object.fromEntries(
+    Object.keys(witnesses).map(witness => [witness, null]),
+  );
   let visited = 0;
   let edges = 0;
+
+  function observeWitness(name, path, condition) {
+    if (witnesses[name] || !condition) return;
+    witnesses[name] = true;
+    witnessPaths[name] = Object.freeze(path);
+  }
 
   while (queue.length > 0) {
     const current = queue.shift();
     visited += 1;
     if (current.state.operationState !== null) states.add(current.state.operationState);
-    if (current.state.revoked && current.state.accepted
-      && current.state.authorization === 'allowed') witnesses.acceptedBeforeRevocation = true;
-    if (current.state.revoked && !current.state.accepted
-      && current.state.authorization === 'denied') witnesses.admissionDeniedAfterRevocation = true;
-    if (current.state.revoked && current.state.effects === 1) {
-      witnesses.admittedWriteAfterRevocation = true;
-    }
-    if (current.state.operationState === 'unknown' && current.state.reported === 'unknown') {
-      witnesses.unknownRetained = true;
-    }
-    if (current.state.recoveryAttempted && current.state.operationState === 'unknown') {
-      witnesses.recoveryStayedUnknown = true;
-    }
-    if (current.state.duplicateReplay && current.state.receiptReturned === 'original-receipt') {
-      witnesses.replayReturnedOriginalReceipt = true;
-    }
+    observeWitness('acceptedBeforeRevocation', current.path,
+      current.state.revoked
+      && current.state.accepted
+      && current.state.acceptedBeforeRevocation
+      && current.state.authorization === 'allowed');
+    observeWitness('admissionDeniedAfterRevocation', current.path,
+      current.state.revoked
+      && !current.state.accepted
+      && current.state.authorization === 'denied');
+    observeWitness('admittedWriteAfterRevocation', current.path,
+      current.state.revoked && current.state.effects === 1);
+    observeWitness('unknownRetained', current.path,
+      current.state.operationState === 'unknown' && current.state.reported === 'unknown');
+    observeWitness('recoveryStayedUnknown', current.path,
+      current.state.recoveryAttempted && current.state.operationState === 'unknown');
+    observeWitness('replayReturnedOriginalReceipt', current.path,
+      current.state.duplicateReplay && current.state.receiptReturned === 'original-receipt');
+    observeWitness('unknownAfterEffectWithoutDurability', current.path,
+      current.state.operationState === 'unknown'
+      && current.state.effects === 1
+      && current.state.durable === 'none');
+    observeWitness('recoveryStayedUnknownAfterEffect', current.path,
+      current.state.operationState === 'unknown'
+      && current.state.effects === 1
+      && current.state.durable === 'none'
+      && current.state.recoveryAttempted
+      && current.state.reported === 'unknown');
     validateReachableStatus(current.state);
     const broken = invariant(current.state);
     if (broken !== null) {
@@ -335,6 +381,7 @@ export function exploreOperationOrdering(mode = 'correct') {
         edges,
         reachedStates: Object.freeze([...states].sort()),
         witnesses: Object.freeze(witnesses),
+        witnessPaths: Object.freeze(witnessPaths),
         path: Object.freeze(current.path),
         violation: broken,
         state: current.state,
@@ -351,6 +398,7 @@ export function exploreOperationOrdering(mode = 'correct') {
           edges,
           reachedStates: Object.freeze([...states].sort()),
           witnesses: Object.freeze(witnesses),
+          witnessPaths: Object.freeze(witnessPaths),
           path: Object.freeze(path),
           violation: action.violation,
           state: action.state,
@@ -369,6 +417,7 @@ export function exploreOperationOrdering(mode = 'correct') {
     edges,
     reachedStates: Object.freeze([...states].sort()),
     witnesses: Object.freeze(witnesses),
+    witnessPaths: Object.freeze(witnessPaths),
     path: null,
     violation: null,
     state: null,
