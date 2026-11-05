@@ -1,3 +1,5 @@
+import type { OverlaySnapshotProjection } from './overlay-machine';
+
 /**
  * Identity attached to every renderer report. Main compares these values with
  * the authoritative state instead of rebuilding the report from a newer state.
@@ -8,6 +10,20 @@ export type OverlayReportIdentity = {
   readonly windowGeneration: number;
   readonly contentRevision: number;
 };
+
+export function overlayReportIdentityForSnapshot(
+  snapshot: OverlaySnapshotProjection | null,
+  contentRevision: number,
+): OverlayReportIdentity | null {
+  return snapshot
+    ? {
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        generation: snapshot.contract.generation,
+        windowGeneration: snapshot.windowGeneration,
+        contentRevision,
+      }
+    : null;
+}
 
 export function isPositiveOverlayIdentityInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;

@@ -1681,6 +1681,11 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
     await fox.emulateMedia({ forcedColors: 'active' });
     await fox.keyboard.press('Tab');
     await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-fox-keyboard-focus', 'true');
+    await expect.poll(async () => (
+      await fox.getByTestId('fox-focus-ring').evaluate(
+        (ring) => Number(getComputedStyle(ring).opacity),
+      )
+    )).toBe(1);
     const forced = await fox.getByTestId('fox-button').evaluate((button) => {
       const ring = button.querySelector<HTMLElement>('[data-testid="fox-focus-ring"]');
       const style = ring ? getComputedStyle(ring) : null;

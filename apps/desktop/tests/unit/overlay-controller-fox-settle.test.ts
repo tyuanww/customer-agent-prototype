@@ -489,7 +489,7 @@ describe('OverlayController renderer work ownership', () => {
       generation: state.generation,
       windowGeneration: state.windowGeneration,
       contentRevision: state.contentRevision,
-      releaseRevision: state.releaseRevision,
+      releaseSequence: 11,
     })).not.toBeNull();
     expect(controller.reportRendererEvent({
       type: 'release-changed',
@@ -498,11 +498,11 @@ describe('OverlayController renderer work ownership', () => {
       generation: state.generation,
       windowGeneration: state.windowGeneration,
       contentRevision: state.contentRevision,
-      releaseRevision: state.releaseRevision,
+      releaseSequence: 10,
     })).toBeNull();
     expect(Reflect.get(controller, 'overlayState')).toMatchObject({
       releaseId: 'rel_synthetic_next',
-      releaseRevision: state.releaseRevision + 1,
+      releaseSequence: 11,
     });
   });
 
@@ -548,6 +548,59 @@ describe('OverlayController renderer work ownership', () => {
     }
   });
 
+  it('drops a scheduled display reconciliation after the lifecycle identity changes', () => {
+    vi.useFakeTimers();
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    const state = activeState();
+    Object.assign(controller as object, { query, overlayState: state });
+    controllers.push(controller);
+    Reflect.get(controller, 'scheduleDisplayReconcile').call(controller);
+
+    controller.reportRendererEvent({
+      type: 'session-changed',
+      sessionEpoch: state.sessionEpoch,
+      nextSessionEpoch: state.sessionEpoch + 1,
+      releaseId: 'rel_synthetic_next',
+      windowGeneration: state.windowGeneration,
+      generation: state.generation,
+      contentRevision: state.contentRevision,
+    });
+    vi.mocked(query.setBounds).mockClear();
+    vi.advanceTimersByTime(1_000);
+
+    expect(query.setBounds).not.toHaveBeenCalled();
+  });
+
+  it('does not run post-drag reconciliation from an older drag generation', () => {
+    vi.useFakeTimers();
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    const state = activeState();
+    Object.assign(controller as object, {
+      query,
+      overlayState: state,
+      displayReconcilePending: true,
+    });
+    controllers.push(controller);
+    Reflect.get(controller, 'schedulePostFoxDragWork').call(controller);
+    Object.assign(controller as object, {
+      overlayState: {
+        ...state,
+        drag: {
+          ...state.drag,
+          generation: 1,
+          session: null,
+          settle: null,
+        },
+      },
+    });
+    vi.mocked(query.setBounds).mockClear();
+    vi.advanceTimersByTime(1);
+
+    expect(query.setBounds).not.toHaveBeenCalled();
+  });
+
   it('rejects a renderer report that claims a newer session than the originating snapshot', () => {
     const controller = new OverlayController();
     const state = activeState();
@@ -578,7 +631,7 @@ describe('OverlayController renderer work ownership', () => {
         generation: state.generation,
         windowGeneration: state.windowGeneration,
         contentRevision: state.contentRevision,
-        releaseRevision: state.releaseRevision,
+        releaseSequence: state.releaseSequence,
       } satisfies OverlayRendererEvent),
     },
     {

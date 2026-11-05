@@ -68,7 +68,38 @@ function activateQueryIfParked() {
   }
 }
 
-async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
+async function waitForInitialSnapshot() {
+  await waitFor(() => {
+    expect(screen.getByTestId('query-shell')).not.toHaveAttribute(
+      'data-window-generation',
+      '0',
+    );
+  });
+}
+
+function activeQuerySnapshot() {
+  const initial = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 2,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  });
+  return overlaySnapshot({
+    ...initial,
+    phase: 'active',
+    activeSurface: 'query',
+    focusIntent: 'query',
+    handoff: { ...initial.handoff, id: 1, sequence: 1, mode: 'none' },
+  });
+}
+
+async function searchCleanser(
+  user: ReturnType<typeof userEvent.setup>,
+  requireSnapshot = true,
+) {
+  if (requireSnapshot) {
+    await waitForInitialSnapshot();
+  }
   activateQueryIfParked();
   await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
   await user.click(screen.getByTestId('search-button'));
@@ -290,6 +321,37 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
   });
 
+  it('consumes the initial parked snapshot even when its handoff id is zero', async () => {
+    const parked = createInitialOverlayState({
+      sessionEpoch: 9,
+      generation: 10,
+      windowGeneration: 2,
+      releaseId: 'rel_synthetic',
+    });
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'EMPTY',
+      platform: 'darwin',
+      shortcut: {
+        registered: true,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '',
+      },
+      snapshot: overlaySnapshot({
+        ...parked,
+        contentPhase: 'EMPTY',
+      }),
+      testHarness: false,
+    });
+
+    render(<QueryApp />);
+    await waitFor(() => {
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-window-generation', '2');
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-handoff-id', '0');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'EMPTY');
+  });
+
   it('clears stale height and layout readiness when a new opening has no applied layout', () => {
     render(<QueryApp />);
     const base = createInitialOverlayState({
@@ -466,6 +528,7 @@ describe('QueryApp', () => {
       f.contentUpdated.forEach(listener => listener({
         sessionEpoch: 10,
         releaseId: 'rel_25',
+        releaseSeq: 25,
         summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用',
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: ['presale'],
@@ -482,7 +545,7 @@ describe('QueryApp', () => {
     expect(reportOverlayEvent).toHaveBeenCalledWith(expect.objectContaining({
       type: 'release-changed',
       releaseId: 'rel_25',
-      releaseRevision: 0,
+      releaseSequence: 25,
     }));
     // 横幅可关：点「知道了」即已读并清掉。
     const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
@@ -501,7 +564,7 @@ describe('QueryApp', () => {
     const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
     const fire = (domains: readonly string[]) => act(() => {
       f.contentUpdated.forEach(listener => listener({
-        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: domains as import('../../src/shared/library-delta').LibraryDomain[],
       }));
@@ -547,7 +610,7 @@ describe('QueryApp', () => {
       markRead.mockClear();
       act(() => {
         f.contentUpdated.forEach((listener) => listener({
-          sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+          sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
           domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
           unreadDomains: ['presale'],
         }));
@@ -570,7 +633,7 @@ describe('QueryApp', () => {
     await screen.findByRole('button', { name: /· 退出$/ });
     act(() => {
       f.contentUpdated.forEach(listener => listener({
-        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: ['presale'],
       }));
@@ -1564,6 +1627,7 @@ describe('QueryApp', () => {
 
   it('uses a synchronous single-flight guard for same-tick duplicate search submissions', async () => {
     render(<QueryApp />);
+    await waitForInitialSnapshot();
     const input = screen.getByTestId('question-input');
     fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
 
@@ -2169,6 +2233,7 @@ describe('QueryApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '全局快捷键注册失败',
       },
+      snapshot: activeQuerySnapshot(),
       testHarness: false,
     });
     const offsetHeight = vi
@@ -2229,9 +2294,10 @@ describe('QueryApp', () => {
     render(<QueryApp />);
     await waitFor(() => expect(getWindowContext).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('shortcut-fallback')).not.toBeInTheDocument();
-    await searchCleanser(user);
+    await searchCleanser(user, false);
     expect(screen.getByTestId('copy-button-1')).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).toBeEnabled();
+    expect(reportUiPhase).not.toHaveBeenCalled();
   });
 
   it('measures shortcut and ERROR banners as independent layout owners', async () => {
@@ -2244,6 +2310,7 @@ describe('QueryApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '全局快捷键注册失败',
       },
+      snapshot: activeQuerySnapshot(),
       testHarness: false,
     });
     copyText.mockResolvedValue({ ok: false, message: '复制失败，请重试' });
