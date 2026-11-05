@@ -1,0 +1,205 @@
+import { describe, expect, it } from 'vitest';
+import type { ReleaseId, Scope } from '@customer-agent/unified-contracts';
+import { createApiApp } from '../../src/app.js';
+import { createMockAccessEvaluator } from '../../src/access/evaluator.js';
+import { unavailableContentImportRepository } from '../../src/content-import-repository.js';
+import { createEventRepository } from '../../src/event-repository.js';
+import {
+  createApiQueryRuntime,
+  type QueryObservation,
+} from '../../src/integration/query-runtime.js';
+import type { LoadedQueryRelease } from '../../src/integration/release.js';
+import type { ContentIndexItem } from '../../src/query/content-pipeline.js';
+import { parseApiRuntimeConfig } from '../../src/runtime-config.js';
+import type { ServiceRepository } from '../../src/service-repository.js';
+
+const releaseId = 'rel_int_api_http_001' as ReleaseId;
+const scope: Scope = {
+  kind: 'source',
+  tenantId: 'synthetic-tenant' as never,
+  appId: 'synthetic-app' as never,
+  brandId: 'synthetic-brand' as never,
+  shopId: 'synthetic-shop' as never,
+  domain: 'product',
+  sourceId: 'synthetic-source' as never,
+};
+
+function loaded(): LoadedQueryRelease {
+  const item: ContentIndexItem = {
+    releaseId,
+    scriptId: 'synthetic-source:shipping',
+    scriptVersion: 1,
+    contentHash: 'c'.repeat(64),
+    title: '合成发货时效',
+    body: '合成回答：今天发货。',
+    questionTexts: ['什么时候发货'],
+    platformScope: ['qianniu', 'douyin'],
+    productScopeType: 'storewide',
+    productScopeRefs: [],
+    effectiveFrom: '2026-01-01T00:00:00.000Z',
+    effectiveTo: null,
+    scope,
+  };
+  return {
+    snapshot: {
+      releaseId,
+      sequence: 1,
+      publishedAt: '2026-11-05T00:00:00.000Z',
+      content: {
+        state: 'ready',
+        indexId: `content:${releaseId}`,
+        indexVersion: 1,
+        itemCount: 1,
+        indexHash: 'a'.repeat(64),
+      },
+      sop: {
+        state: 'empty',
+        indexId: null,
+        indexVersion: null,
+        itemCount: 0,
+        indexHash: null,
+      },
+    },
+    sourceBindingHash: 'd'.repeat(64),
+    items: [item],
+    candidates: new Map([[
+      item.scriptId,
+      {
+        release_id: releaseId,
+        script_id: 'shipping',
+        script_version: 1,
+        content_hash: item.contentHash,
+        title: item.title,
+        category: 'product',
+        answer_text: item.body,
+        platform_scope: ['qianniu', 'douyin'],
+        product_scope_type: 'storewide',
+        product_scope_refs: [],
+        effective_from: item.effectiveFrom,
+        effective_to: null,
+        intent_taxonomy_version: 'itax_synthetic_v1',
+        intent_id: 'intent_shipping',
+        risk_level: 'low',
+        risk_categories: [],
+        has_conflict: false,
+        placeholder_keys: [],
+      },
+    ]]),
+    sourceScopes: [scope],
+    sopProjection: null,
+  };
+}
+
+function repository(): ServiceRepository {
+  return {
+    readiness: async () => ({
+      database: 'ok',
+      schema: 'ok',
+      auth: 'ok',
+      storage: 'not_ready',
+      content: 'not_ready',
+    }),
+    readPolicyFlags: async () => null,
+    searchCandidates: async () => ({ ok: false, code: 'SOURCE_GATE_NOT_READY' }),
+    executeSearch: async () => ({ ok: false, code: 'OVERLOADED' }),
+    recordAdoption: async () => ({ ok: false, code: 'OVERLOADED' }),
+    recordEscalation: async () => ({ ok: false, code: 'OVERLOADED' }),
+    contentImport: unavailableContentImportRepository(),
+    close: async () => undefined,
+  };
+}
+
+function eventPool() {
+  const statements: string[] = [];
+  const query = async (sql: string) => {
+    statements.push(sql);
+    if (sql.includes('idempotency_request_hash_version')) return { rows: [{ version: null }] };
+    if (sql.includes('idempotency_lookup')) return { rows: [{ action: 'miss' }] };
+    if (sql.includes('idempotency_claim')) return { rows: [{ action: 'proceed', lease_version: 1 }] };
+    return { rows: [] };
+  };
+  return {
+    pool: { connect: async () => ({ query, release: () => undefined }) },
+    statements,
+  };
+}
+
+function config() {
+  return parseApiRuntimeConfig({
+    CUSTOMER_AGENT_PROFILE: 'test',
+    AUTH_MODE: 'mock',
+    CUSTOMER_AGENT_API_PORT: '0',
+    CUSTOMER_AGENT_BUILD_VERSION: '0.3.0-int-api-http-test',
+  });
+}
+
+describe('coordinated /v1/search composition', () => {
+  it('keeps the HTTP contract and records the event through the existing transaction owner', async () => {
+    const access = createMockAccessEvaluator(() => new Date('2026-11-05T00:30:00.000Z'));
+    const observations: QueryObservation[] = [];
+    const runtime = createApiQueryRuntime({
+      loader: async () => loaded(),
+      access,
+      observer: { record: (observation) => observations.push(observation) },
+      now: () => new Date('2026-11-05T00:30:00.000Z'),
+    });
+    await runtime.initialize();
+    const events = eventPool();
+    const eventRepository = createEventRepository(events.pool as never, 'int_api_http_test');
+    const app = createApiApp({
+      config: config(),
+      repository: repository(),
+      accessEvaluator: access,
+      queryRuntime: runtime,
+      searchDependencies: {
+        operation: {
+          execute: (request) => eventRepository.executeSearch(request, () => runtime.search(request)),
+        },
+        logHash: { version: 'hmac-log-v1', key: 'synthetic-search-route-key-000001' },
+        idempotencyHmac: {
+          currentVersion: 'hmac-idempotency-v1',
+          keys: { 'hmac-idempotency-v1': 'synthetic-idempotency-route-key-0001' },
+        },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/search',
+      headers: {
+        'x-mock-user': 'usr_synthetic_agent',
+        'x-mock-role': 'agent',
+      },
+      payload: {
+        query_id: '4d690ef7-a98d-4a56-a9c4-92ae4c52168f',
+        parent_query_id: null,
+        interaction_reason: 'original',
+        query_text: '什么时候发货',
+        collection_mode: 'synthetic',
+        detected_platform: 'qianniu',
+        platform: 'qianniu',
+        platform_source: 'foreground_process',
+        product_context_type: null,
+        product_context_ref: null,
+        top_k: 3,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      hit_status: 'hit',
+      release_id: releaseId,
+      telemetry_status: 'recorded',
+      candidates: [{
+        rank: 1,
+        script_id: 'shipping',
+        answer_text: '合成回答：今天发货。',
+      }],
+    });
+    expect(events.statements.some((sql) => sql.includes('INSERT INTO public.query_events'))).toBe(true);
+    expect(events.statements.some((sql) => sql.includes('WITH scoped AS MATERIALIZED'))).toBe(false);
+    expect(observations).toHaveLength(1);
+    expect(JSON.stringify(observations[0])).not.toContain('什么时候发货');
+    await app.close();
+  });
+});

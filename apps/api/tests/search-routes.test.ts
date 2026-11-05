@@ -126,6 +126,7 @@ describe('search HTTP route', () => {
     expect(httpResponse.statusCode).toBe(200);
     expect(httpResponse.headers['cache-control']).toBe('no-store');
     const prepared = execute.mock.calls[0]?.[0];
+    expect(prepared?.requestId).toMatch(/^req-/u);
     expect(prepared?.search.normalizedQuery).toBe('联系电话[redacted],什么时候发货');
     expect(prepared?.queryHash).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(prepared)).not.toContain('13800138000');

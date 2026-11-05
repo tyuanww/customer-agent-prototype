@@ -409,7 +409,21 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
 
-当前没有业务接线。INT-API 负责 request ID 和 API stage hooks，QRY-01 与 SOP-01 负责各自 pipeline stages，DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+INT-API 已把 API request ID、QueryCoordinator 的 access、release-read、recall 或 SOP stage，以及 response validation 接到 typed observer port。默认序列化 sink 使用 OBS runtime 的 canonical serializer；observer 或 sink 失败不会改变查询结果。QRY-01 与 SOP-01 仍拥有各自的 pipeline 行为。DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件，这些路径尚未接线。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+
+### INT-API unified query composition
+
+`apps/api/src/integration/access.ts` owns the database-to-ARC access adapter. `integration/release.ts` reads the source-gated current release through the `intake_usage` capability and maps content and SOP projections into typed index inputs. `integration/query-runtime.ts` owns the lifecycle that shares one `AccessEvaluator`, one `QueryCoordinator`, one `ContentPipeline`, one mutable active `SopPipeline`, and one OBS observer port per API process. The content index is built at activation time and is not rebuilt inside a query.
+
+`server.ts` creates the runtime from the configured intake pools, initializes it before listening, and passes the same evaluator to route admission and query evaluation. The integration adapter maps legacy intake domains (`presale`, `campaign`, `aftersale`) to ARC scope domains at the database boundary. It expands shopless source grants against the active release's source scopes; it does not convert a renderer projection into authority.
+
+`/v1/search` still enters the existing search route and event transaction. The event repository claims idempotency first, then requests the coordinated `SearchBackendResult` from the runtime, and continues to own `query_events`, `candidate_impressions`, source-denial audit and response mapping. It does not expose SOP flows through the ordinary SearchResponse contract. A selected SOP that cannot produce a valid flow fails closed without ordinary candidates.
+
+Successful content publish and rollback responses trigger a single-flight reload through the app lifecycle hook. Startup uses the same activation path. Each query rechecks the current release identity with one lightweight read; if it moved out of band, the request returns the stable unavailable failure, the old index is not served, and a reload is requested. Runtime shutdown waits for an in-flight activation and makes later queries fail closed.
+
+The API default OBS sink receives no raw question or answer. It receives stable request/query tokens, the existing redacted query fingerprint, stable failure codes and measured stage durations. The final exact-head verifier and the desktop INT-DESKTOP adapter are still required before this composition is treated as a complete product runtime.
+
+The current index projection reads the source-gated `release_items` that back the existing `SearchResponse` and `candidate_impressions` foreign keys. If the current intake lineage contains an upsert that has no corresponding `release_items` row, activation fails with `RELEASE_INDEX_ITEM_GAP` instead of serving a partial index. Mapping normalized intake entries into the ordinary SearchResponse and event candidate identity still needs an approved contract or migration change; INT-API does not invent those fields.
 
 ### 精确修复后继的版本接收（2026-10-12）
 

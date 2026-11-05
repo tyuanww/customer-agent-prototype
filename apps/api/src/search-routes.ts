@@ -33,6 +33,7 @@ type SearchResponse = components['schemas']['SearchResponse'];
 
 export type PreparedSearchOperation = Readonly<{
   actor: AuthenticatedUser;
+  requestId?: string;
   queryId: string;
   parentQueryId: string | null;
   interactionReason: 'original' | 'reselection';
@@ -162,6 +163,7 @@ export function registerSearchRoute(
     );
     const prepared = Object.freeze({
       actor,
+      requestId: request.id,
       queryId: contract.value.query_id,
       parentQueryId: contract.value.parent_query_id,
       interactionReason: contract.value.interaction_reason,

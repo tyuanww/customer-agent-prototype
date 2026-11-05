@@ -15,7 +15,10 @@ import {
   rankingClusterKey,
 } from './iteration-task-signals.js';
 import { createSearchRepository } from './search-repository.js';
-import { createSearchBackend } from './search-service.js';
+import {
+  createSearchBackend,
+  type SearchBackendResult,
+} from './search-service.js';
 import type { PreparedSearchOperation } from './search-routes.js';
 
 type SearchResponse = components['schemas']['SearchResponse'];
@@ -39,7 +42,10 @@ export type PreparedEscalationOperation = Readonly<{
 }>;
 
 export type EventRepository = Readonly<{
-  executeSearch: (request: PreparedSearchOperation) => Promise<OperationResult<SearchResponse>>;
+  executeSearch: (
+    request: PreparedSearchOperation,
+    resolveSearch?: () => Promise<SearchBackendResult>,
+  ) => Promise<OperationResult<SearchResponse>>;
   recordAdoption: (
     request: PreparedAdoptionOperation,
   ) => Promise<OperationResult<AdoptionEventResponse>>;
@@ -248,7 +254,7 @@ export function createEventRepository(
   }
 
   return Object.freeze({
-    async executeSearch(request): Promise<OperationResult<SearchResponse>> {
+    async executeSearch(request, resolveSearch): Promise<OperationResult<SearchResponse>> {
       if (request.collectionMode !== 'synthetic' && request.collectionMode !== 'pilot_recorded') {
         return failure('POLICY_DENIED');
       }
@@ -283,10 +289,11 @@ export function createEventRepository(
         }
 
         const startedAt = performance.now();
-        const backend = createSearchBackend({
-          searchCandidates: createSearchRepository(client, request.actor.user_id).search,
-        });
-        const search = await backend.search(request.search);
+        const search = resolveSearch === undefined
+          ? await createSearchBackend({
+            searchCandidates: createSearchRepository(client, request.actor.user_id).search,
+          }).search(request.search)
+          : await resolveSearch();
         if (!search.ok) {
           releaseAsBroken = !(await rollback(client));
           if (search.code === 'SOURCE_GATE_NOT_READY') {
