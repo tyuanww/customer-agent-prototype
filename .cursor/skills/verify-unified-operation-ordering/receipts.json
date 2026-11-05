@@ -1,14 +1,14 @@
 {
-  "syncCommit": "d00fd2ed408dac628033dc3b1a7061e51c4c8868",
-  "candidateState": "verified source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-05T06:55:37Z",
-  "sourceReceipt": "3db79b28dd6f61a462b6bcf9333bfa34963d17ef1a86612f5bea5aa9a45aad82",
-  "modelStates": 614,
-  "modelEdges": 2295,
+  "syncCommit": "40c221970f98de591e70a23c48401aba3d06ee06",
+  "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
+  "capturedAt": "2026-11-05T08:29:14.282Z",
+  "sourceReceipt": "a2ccdf834e70724ad3161b13135d696995470af18cd849ffe92ac7f25a875f05",
+  "modelStates": 774,
+  "modelEdges": 3046,
   "environment": {
     "node": "24.19.0",
     "pnpm": "11.19.0",
-    "postgresql": "15.18",
+    "postgresql": "15.18 (Homebrew)",
     "platform": "Darwin 25.5.0 arm64"
   },
   "commands": [
@@ -17,35 +17,143 @@
     "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .agents/skills/verify-intake-parent-revocation/verify.mjs /tmp/customer-agent-parent-revocation.json",
     "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/manual-identity-grants.integration.test.ts tests/manual-identity-property.test.ts tests/project-roster-login.integration.test.ts tests/roster-authority.integration.test.ts tests/a6-permission-e2e.integration.test.ts tests/p0-live-lanes.integration.test.ts tests/feishu-login-link.integration.test.ts tests/seat-login-flow.integration.test.ts tests/seat-lifecycle.integration.test.ts",
     "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:seat-administration-revocation",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api test:integration",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/database test:integration",
     "pnpm lint",
     "pnpm typecheck",
-    "pnpm --filter @customer-agent/database test:integration",
     "git diff --check"
   ],
   "files": {
-    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "36e645f1fc7a3ea3063909ae4fef7dc8864963be72437854ddf72a18cfb16387",
-    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "fb96921b50af0ab5fa719614b23685085b522153c5f197a5479f1da4a6fbe11a",
-    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "5d00ec4c8ec78395f08082adbe849fea781919faf74962a9f02a2589cddc4ed7",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "6caadc108a7476e9e0914dc22eb8c7dd67a80debf8e602595c7561cf3eaecd17",
-    ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
-    ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".agents/skills/verify-intake-parent-revocation/SKILL.md": "87c94347fecd00d0136f85ee43325a7cd1b5bc0e6a709546be8ebb37c7696f33",
     ".agents/skills/verify-intake-parent-revocation/verify.mjs": "963096533f250342f23d13b78910e582e6d4d3efb280cb425a34ddf736e97ca1",
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
-    "apps/api/tests/unified-operation-ordering-formal.test.ts": "de6054571ad10c8792688b5794b6a1b1c4e7d50c431218b06adc411f6cb72f07",
-    "apps/api/tests/authorization-reachability.integration.test.ts": "cb32d063438afa687eb0694ea18f69d706142b5ae11b0325be5c9206bfb965ad",
+    ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
+    ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "3c12ffcc3e1c9bfbac918d93c5ec07a87818552d315273c3b696a4da76610128",
+    ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
+    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "1d088e4474b3f8e16573e5a08fa5fca9354a238f76fd038c0e11123d09841e36",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "b8e72a36a40452c069d0f6133222ddaaa8d48c57500c2e860d7d94e5293fc9ce",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "d9c24928c378f63fced5954d08be2db5c76721a9d2a3d38583194b0fc5e00e61",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts": "15f41a7a4f90d3d4f3cbdbd2ba6e32d8c898e6f9249f443c38cdf906f4fad7e8",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "2291836a3bb6125a544537a521814d1de37d9acce72ab6eebfb4a3ae043b32cb",
+    "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
+    "apps/api/src/content-intake/role-ceiling.ts": "8b8e472d4908f0f1283958a0f0e183577a85e9a11aa34bd0b4b9e93607733f74",
+    "apps/api/src/content-intake/seat-password-file.ts": "b097439e7a7acfdb9af581ba15ea73ea84ad841c8707ef28ce4817eac7ed0437",
+    "apps/api/src/content-intake/seats-http.ts": "49d28a3686bd1d05e927f603aec9ca8bf97af370f2552eaba568088a855a17a8",
+    "apps/api/src/content-intake/seats.ts": "6fe08dc25a091b1464f52e50a40522a4fcd904c740634c501ed6658098d0093a",
+    "apps/api/src/content-intake/service.ts": "ce6630d6b5acc5f5b4e83219767bc2640b089a45ae5838ec3341d00ebdba9dc2",
     "apps/api/src/content-intake/transaction.ts": "2f932481533344022b85c6a9f077e35f1e5d003c80ceea7976b09b92687eede0",
+    "apps/api/src/content-object-store.ts": "303c52830bc9363104cdde9299cae9847a3203b29a0d0fc1d320a6826979fad5",
+    "apps/api/src/feishu-admit.ts": "0fce0f711833b618826ed61b4d058687e68df37ef8838dc92b55f0b66490162d",
+    "apps/api/src/feishu-job-snapshot.ts": "e980a5e5c0dd83cfaa81eec6d2c01e5758da3c8b71e85864d5666482c1f551ba",
+    "apps/api/src/feishu-login-link.ts": "e2496f3ac128bbd11f6261f1d38f9c0d36ebc470075fe4f43a0264264db628e2",
+    "apps/api/src/operator-display-names.ts": "541838f4d8a2a603f74cb6b2c805df34dad87f8d36e557d138fb422df9c248bb",
+    "apps/api/src/product-auth-service.ts": "dee69281044ac4f1313b5c523e31d04a7dcdf49c7c0924bc67e4a3e8f99fe38e",
+    "apps/api/src/project-roster-login.ts": "700a5cb99c5e364b4fa5ac7b41571b92063f8cd6cf9034720a058c5be1fe8680",
+    "apps/api/src/synthetic-identity-provider.ts": "5f41f6b1ba453fc6b77455c61f3fb50581fb15728900bf81f8143f38287854cc",
+    "apps/api/tests/a6-permission-e2e.integration.test.ts": "768a4bee315fded05c095709588fe3b19ec9c42f0752895e2746295e6ff65ede",
+    "apps/api/tests/authorization-reachability.integration.test.ts": "cb32d063438afa687eb0694ea18f69d706142b5ae11b0325be5c9206bfb965ad",
+    "apps/api/tests/feishu-login-link.integration.test.ts": "01c7a7adbaf45b5a530486815ddf09cac8a09d7b78a8aa817a656bc55e356bcd",
+    "apps/api/tests/manual-identity-grants.integration.test.ts": "597885f7377c366b3d52a684c041c2519745faeca1023741f4e86f4599b85bd6",
+    "apps/api/tests/manual-identity-property.test.ts": "b2b33736da337d30898f1bca5ce88cfe8f17f1ce7c8e6b76d712a3264cae7290",
+    "apps/api/tests/p0-live-lanes.integration.test.ts": "4ecaaf128ab66aa51b8cfccd33fec964383d59df50eb4053af439e9ca28cb1ee",
+    "apps/api/tests/project-roster-login.integration.test.ts": "90debd422ce2bc607b8c591985a7c42be394f689aba3347a471372e06c7e1c02",
+    "apps/api/tests/roster-authority.integration.test.ts": "a9b513d90fbb5bd1e6646badccbb85a25561ca68b3aae8eb98cb912b8576cb8b",
+    "apps/api/tests/seat-lifecycle.integration.test.ts": "2f7d47cdd3d7d2d36de369454844d2d256ad58ff9e60d356776816249fba0eab",
+    "apps/api/tests/seat-login-flow.integration.test.ts": "88627a1f85c4e52e33e8c85dff429b2b9169d469b73aa86547754f9a5ec12d75",
+    "apps/api/tests/support/authorization-sources-fixture.ts": "a6b0fea9c891a4b40f033eb9387906ebfdc43f36758d1e1e293b928a2a916246",
+    "apps/api/tests/support/roster-library.ts": "e7e9254c80761c07bcc00034e8090ccfe2ddceadeeb0cb32e6ce024d2e8b973b",
+    "apps/api/tests/unified-operation-ordering-formal.test.ts": "f6619784ec82e5c9a0bd9448c0f72be5ed192073b129d96584f0dd45f4fe913c",
+    "docs/reference-project-architecture.md": "70d5b1d4b6116740558e10322c5d879b0bd2f0f28f64297f5197b7346f13e20d",
+    "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
+    "packages/database/migrations/0076_authorization_decision.sql": "a12f5ca4b05c394c3545788bf3cce8b2c6e5bcac0eeba17994e239a1d0dbc2d4",
+    "packages/database/migrations/0077_manual_identity_grants.sql": "58585d257a3e164f3b8d6d3610792aad84b509543d476aa7d26a2bbe596ec35d",
+    "packages/database/migrations/0078_seat_manual_grants.sql": "cc9d706f5459462ccc120bcedb236db56b6d4e9c5f4dc292231f20e466643166",
+    "packages/database/migrations/0079_directory_identity_activity.sql": "ea733968b5ded041c69339a86b73b147092719da0923824d87688609ac01925a",
+    "packages/database/migrations/0080_bind_import_batch_tenant.sql": "a23ea43a51572ab518c240a504a34c5150cbd86e485902cb12a9daec09e708b3",
+    "packages/database/migrations/0081_require_import_batch_principal.sql": "577f2f997d19b6b9a4984402a51f2403525b7b2321492eefed7feef6952369a9",
+    "packages/database/migrations/manifest.generated.json": "59fa1aff075404c2ca10e1526a34f92faa0bb4d2a8c4ffd3a8bbde6fdebd7dc7",
     "packages/database/overlays/0076_authorization_decision.sql": "208106b53b6f9d327ab85dded06bd2ada0dcfe45bbf460d5eb9bbb40da9be788",
+    "packages/database/overlays/0077_manual_identity_grants.sql": "1cc9503bec350411d7d8d6a718cd06d6c8de323babc9d2664e68d6629b1f7b85",
+    "packages/database/overlays/0078_seat_manual_grants.sql": "3fca105445c1f5f2130210dc1ea730f406cfb3fbc12bf8b36ff0f691876f7bbc",
+    "packages/database/src/verifier.ts": "1c771deccebb93cf917cf43e861713a8e2fab621adba091e6849a6ae5ab1c3b8",
     "packages/unified-contracts/src/index.ts": "cf05fdb0523f947aacccbdcdf88c5eaa2e4ab19caaf4b3e83a68a0517678fcc6",
     "packages/unified-contracts/tests/contracts.test.ts": "322546a77a8d46322e853fe3ed78250b589992ea198d6ab09051c35b823a6b39",
-    "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
-    "docs/reference-project-architecture.md": "da5f289a98e39ed730dd65e66f43af98fc28a634938c8262bb139e29a0423655"
+    "scripts/synthetic-stack/identity-admission.ts": "ad391247fcc1e8eb7d5c54f59d662066057b52bb2926dbd0bdef64ccd0f0c4b2",
+    "scripts/synthetic-stack/identity-provider.ts": "1a6ce75f9e31b26174eb4e8beca7805ea1d9365865db799417035a9bd99a80f8",
+    "scripts/synthetic-stack/password-identity-server.ts": "34f4cbe1a62b90a12b7d53aaf29116b3e84703383f360b1bfe3ae0f3acd41569"
   },
   "limitations": [
     "The exhaustive model covers contract state and event order, not PostgreSQL MVCC or process death during COMMIT.",
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
-    "PostgreSQL replays cover existing authorization, seat administration, receipts, and grant lifecycle code."
-  ]
+    "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
+  ],
+  "testedSourceCommit": "40c221970f98de591e70a23c48401aba3d06ee06",
+  "nestedReceipts": [
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json"
+  ],
+  "verification": [
+    {
+      "id": "failing-regressions-before-fix",
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts",
+      "status": "FAIL_AS_EXPECTED_ON_BLOCKED_HEAD",
+      "result": "3 failed, 4 passed; missing ordered acceptance witness, missing accept_after_revocation control, and missing post-effect unknown path"
+    },
+    {
+      "id": "unified-model",
+      "command": "pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts",
+      "status": "PASS",
+      "result": "11/11 tests; 774 states; 3046 transitions; all 8 witnesses; 5/5 negative controls"
+    },
+    {
+      "id": "authorization-reachability",
+      "command": "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/authorization-reachability.integration.test.ts",
+      "status": "PASS",
+      "result": "1/1; 12 distinct states; deepest path 3; PostgreSQL 15"
+    },
+    {
+      "id": "parent-revocation",
+      "command": "node .agents/skills/verify-intake-parent-revocation/verify.mjs /tmp/customer-agent-parent-revocation.json",
+      "status": "PASS",
+      "result": "672/672 checked; 0 violations; mutationCaught=true; restored=true; temporaryClusterRemoved=true"
+    },
+    {
+      "id": "seat-administration-revocation",
+      "command": "pnpm test:seat-administration-revocation",
+      "status": "PASS",
+      "result": "request-time model and real create/reset/disable replay passed; both mutations detected; password concurrency boundaries passed"
+    },
+    {
+      "id": "manual-identity-with-basefix",
+      "command": "verify-manual-identity-grants full nine-file command in temporary combined tree",
+      "status": "PASS",
+      "result": "9/9 files and 38/38 tests passed after applying only BASEFIX 1de1847bdc139fa1665ea36c51329a110460bd7b"
+    },
+    {
+      "id": "api-integration",
+      "command": "pnpm --filter @customer-agent/api test:integration",
+      "status": "PASS",
+      "result": "20 files and 172/172 tests passed on PostgreSQL 15"
+    },
+    {
+      "id": "database-integration",
+      "command": "pnpm --filter @customer-agent/database test:integration",
+      "status": "PASS",
+      "result": "5 files and 104/104 tests passed on PostgreSQL 15"
+    },
+    {
+      "id": "lint-typecheck-diff",
+      "command": "pnpm lint && pnpm typecheck && git diff --check",
+      "status": "PASS",
+      "result": "all three completed with exit 0 before the evidence-only commit"
+    }
+  ],
+  "baselineDependency": {
+    "id": "BASEFIX-01",
+    "commit": "1de1847bdc139fa1665ea36c51329a110460bd7b",
+    "relationshipAtForSourceCommit": "not an ancestor",
+    "requiredChange": "apps/api/tests/seat-lifecycle.integration.test.ts migration suffix through 0081",
+    "verification": "Full verify-manual-identity-grants command passed 38/38 only in the temporary combined tree"
+  }
 }

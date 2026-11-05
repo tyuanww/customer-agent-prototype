@@ -1,13 +1,13 @@
 {
-  "syncCommit": "d00fd2ed408dac628033dc3b1a7061e51c4c8868",
+  "syncCommit": "40c221970f98de591e70a23c48401aba3d06ee06",
   "workingTree": "covered sources clean at syncCommit",
-  "capturedAt": "2026-11-05T06:55:37Z",
+  "capturedAt": "2026-11-05T08:29:14.269Z",
   "files": {
-    "apps/api/src/content-intake/seats.ts": "6fe08dc25a091b1464f52e50a40522a4fcd904c740634c501ed6658098d0093a",
-    "apps/api/src/content-intake/seats-http.ts": "49d28a3686bd1d05e927f603aec9ca8bf97af370f2552eaba568088a855a17a8",
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
     "apps/api/src/content-intake/organization/facts-writer.ts": "0aa7cc516c97f7bc4553ca6e553fb3b4924a7474544872217d441527dcffcd5b",
     "apps/api/src/content-intake/seat-password-file.ts": "b097439e7a7acfdb9af581ba15ea73ea84ad841c8707ef28ce4817eac7ed0437",
+    "apps/api/src/content-intake/seats-http.ts": "49d28a3686bd1d05e927f603aec9ca8bf97af370f2552eaba568088a855a17a8",
+    "apps/api/src/content-intake/seats.ts": "6fe08dc25a091b1464f52e50a40522a4fcd904c740634c501ed6658098d0093a",
     "packages/database/migrations/0058_grant_steward_no_restore.sql": "d64654b5beef9b38e70d4e0ac144841e47d7fcb51b194d3df2286da91856f147",
     "packages/database/migrations/0068_seat_lifecycle.sql": "8ebd5bfd6fb24c442cfb4dfaf97a388bac5e61d8de5a356d21a04ca353514ebd"
   }
