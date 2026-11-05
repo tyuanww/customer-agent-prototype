@@ -389,6 +389,16 @@ SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用�
 
 SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件与独占文件锁，`experiments/sop-row-deletion/media-lifecycle.ts` 拥有同任务稳定预约、持锁重核、写入登记及失败清理，治理候选窄函数复用原 objects/object_reservations 容量账本。文件锁不随 DB 断连释放；所有附件写入及通用回收共用它，锁作用域结束前等待真实 I/O 完成。未知提交、锁竞争及崩溃残锁保守保留计费，不做自动 TTL 清理。`persistent-media.ts` 只读取绑定会话／租约的行级图片元数据及单张已授权文件；`usage.ts` 继续唯一拥有会话、当前权限、租约、适用性与最终截止核验，先过滤行再对可见图片去重。图片读取分为授权选取、锁外读文件、返回前重新选取三步，第二个短事务核对同一图片及最早授权截止，避免持有全局内容锁等待磁盘。内部 payload ID 不进 HTTP，列表不携带字节，文件坏损不能回退内存缓存。生产 factory 不注入这个实验 reader；旧调用默认内存 reader。
 
+### SOP pipeline source and release projection
+
+`packages/content-intake/src/sop-authoring.ts` owns the normalized authoring workbook model, graph validation, authoring preview metadata, and release-fact materialization. `sop-wps-image.ts` owns WPS `DISPIMG` extraction. It accepts only safe internal PNG, JPEG, or GIF relationships, applies archive and media budgets, and returns no partial images after an error. The six normalized sheets own scene, step, branch, message, resource, and search-entry facts. Gate-B node IDs stay unclassified until the workbook supplies an explicit node type.
+
+`packages/database/migrations/0083_sop_pipeline_projection.sql` is the SOP source migration. `publish_sop_release_facts` writes the normalized release tables and immutable `sop-release-v1` projection in the caller's transaction. The shared migration manifest and catalogue stay with INT-SCHEMA, so this branch does not generate them.
+
+`apps/api/src/query/sop-pipeline.ts` consumes only that immutable projection. It classifies SOP ownership before ranking, requires the complete order in `sop_release_severity`, returns the ARC SOP outcome shape, and never mixes ordinary content candidates into an SOP result. `apps/api/src/content-intake/sop-source.ts` parses the persisted projection at the database boundary. `publication.ts` exposes the same-transaction publication seam.
+
+`apps/desktop/src/shared/sop-pipeline.ts` owns the typed minimal projection, sales-agent branch choice, release, session, and revocation invalidation, and the one native clipboard payload. Image-bearing steps fail when metadata or bytes are missing. `SopPipelinePresenter` owns Main-side copy authority and checks the lease and selected step both before and after asynchronous media reads. INT-DESKTOP still owns production window and IPC composition. The current `main.ts` fixture path remains until CLEAN-01.
+
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
 ### 精确修复后继的版本接收（2026-10-12）
