@@ -332,12 +332,20 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           snapshot.windowGeneration === previous.windowGeneration
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation === previous.contract.generation
+          && snapshot.releaseRevision < previous.releaseRevision
+        )
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation === previous.contract.generation
+          && snapshot.releaseRevision === previous.releaseRevision
           && snapshot.contentRevision < previous.contentRevision
         )
         || (
           snapshot.windowGeneration === previous.windowGeneration
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation === previous.contract.generation
+          && snapshot.releaseRevision === previous.releaseRevision
           && snapshot.contentRevision === previous.contentRevision
           && snapshot.handoff.id < previous.handoff.id
         )
@@ -1245,6 +1253,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       void reportOverlayEvent({
         type: 'release-changed',
         releaseId: result.releaseId,
+        releaseRevision: snapshot.releaseRevision,
         ...identity,
       });
     }
@@ -1350,6 +1359,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         void reportOverlayEvent({
           type: 'release-changed',
           releaseId: value.releaseId,
+          releaseRevision: snapshot.releaseRevision,
           ...identity,
         });
       }

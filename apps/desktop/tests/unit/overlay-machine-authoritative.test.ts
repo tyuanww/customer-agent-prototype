@@ -66,6 +66,17 @@ describe('authoritative overlay reducer', () => {
       ...projection,
       contract: { ...projection.contract, extra: true },
     })).toBe(false);
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      extra: true,
+    })).toBe(false);
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      drag: {
+        ...projection.drag,
+        pendingOpen: {},
+      },
+    })).toBe(false);
   });
 
   it('owns lifecycle, surface, handoff, focus, layout, drag, session and window identities', () => {
@@ -108,6 +119,66 @@ describe('authoritative overlay reducer', () => {
       handoffSequence: 1,
       layoutSequence: 0,
       releaseId: 'rel_synthetic_10',
+    });
+  });
+
+  it('replays the exact stored prepare-search command after a late Query subscription', () => {
+    const state = initial();
+    const opening = applyOverlayEvent(state, at(state));
+    const subscribed = applyOverlayEvent(opening.state, at(opening.state, {
+      type: 'QUERY_SUBSCRIBED',
+    }));
+    const prepare = subscribed.effects.find(
+      (effect) => effect.type === 'SEND_RENDERER_COMMAND'
+        && effect.command.type === 'prepare-search',
+    );
+
+    expect(subscribed.decision).toBe('applied');
+    expect(prepare).toEqual({
+      type: 'SEND_RENDERER_COMMAND',
+      target: 'query',
+      commandId: opening.state.handoff.id,
+      command: {
+        type: 'prepare-search',
+        handoffId: opening.state.handoff.id,
+        anchor: 'right',
+        handoffCenterX: 500,
+        handoffCenterY: 44,
+        foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+      },
+    });
+  });
+
+  it('fences release changes and preserves the release across window recreation', () => {
+    const opened = active();
+    const release = applyOverlayEvent(opened.state, at(opened.state, {
+      type: 'RELEASE_CHANGED',
+      releaseId: 'rel_synthetic_11',
+      releaseRevision: opened.state.releaseRevision,
+    }));
+    expect(release.decision).toBe('applied');
+    expect(release.state).toMatchObject({
+      releaseId: 'rel_synthetic_11',
+      releaseRevision: opened.state.releaseRevision + 1,
+    });
+
+    const stale = applyOverlayEvent(release.state, at(release.state, {
+      type: 'RELEASE_CHANGED',
+      releaseId: 'rel_synthetic_10',
+      releaseRevision: opened.state.releaseRevision,
+    }));
+    expect(stale.decision).toBe('rejected');
+    expect(stale.reason).toBe('stale-release');
+
+    const recreated = applyOverlayEvent(release.state, at(release.state, {
+      type: 'WINDOW_RECREATED',
+      windowGeneration: release.state.windowGeneration + 1,
+    }));
+    expect(recreated.decision).toBe('applied');
+    expect(recreated.state).toMatchObject({
+      releaseId: 'rel_synthetic_11',
+      releaseRevision: release.state.releaseRevision,
+      windowGeneration: release.state.windowGeneration + 1,
     });
   });
 
@@ -696,7 +767,12 @@ describe('authoritative overlay reducer', () => {
         case 'SESSION_CHANGED':
           return { type, ...base, sessionEpoch: state.sessionEpoch + 1, releaseId: 'rel_synthetic_next' };
         case 'RELEASE_CHANGED':
-          return { type, ...base, releaseId: 'rel_synthetic_next' };
+          return {
+            type,
+            ...base,
+            releaseId: 'rel_synthetic_next',
+            releaseRevision: state.releaseRevision,
+          };
         case 'LAYOUT_REQUESTED':
           return {
             type,

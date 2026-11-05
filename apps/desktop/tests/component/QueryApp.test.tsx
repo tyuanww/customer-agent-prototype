@@ -479,6 +479,11 @@ describe('QueryApp', () => {
     expect(banner).toHaveClass('is-muted');
     expect(banner).not.toHaveClass('is-invalid');
     expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+    expect(reportOverlayEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'release-changed',
+      releaseId: 'rel_25',
+      releaseRevision: 0,
+    }));
     // 横幅可关：点「知道了」即已读并清掉。
     const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
     markRead.mockClear();
