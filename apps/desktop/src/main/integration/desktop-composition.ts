@@ -31,14 +31,18 @@ export function bindDashboardReleaseInvalidation(input: Readonly<{
 }>): (value: DashboardReleaseInvalidation) => void {
   const handled = new Set<string>();
   return (value) => {
-    if (handled.has(value.dedupeKey)) return;
-    handled.add(value.dedupeKey);
     const snapshot = input.getOverlaySnapshot();
     if (!snapshot) return;
+    if (value.sessionEpoch !== snapshot.contract.sessionEpoch) return;
+    if (handled.has(value.dedupeKey)) return;
+    // releaseId is durable identity, not an ordering value. A same-session
+    // event for a different release still invalidates the current content;
+    // the next authoritative query result owns the release identity update.
     const identity = { sessionEpoch: snapshot.contract.sessionEpoch, generation: snapshot.contract.generation };
     input.work.cancelQuery(identity);
     input.work.cancelCopy(identity);
     input.work.clearContent();
+    handled.add(value.dedupeKey);
   };
 }
 
