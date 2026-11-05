@@ -22,6 +22,7 @@ const CONTROLS: ReadonlyArray<readonly [OperationOrderingMode, string]> = [
   ['skip-authorization-check', 'accept_without_authorization'],
   ['accept-after-revocation', 'accept_after_revocation'],
   ['duplicate-effect', 'duplicate_committed_effect'],
+  ['expire-after-effect-without-resolution', 'unknown_expired_without_lookup'],
   ['ignore-epoch', 'sessionEpoch_mismatch_not_rejected'],
   ['ignore-request-hash', 'requestHash_mismatch_not_rejected'],
   ['skip-recovery-lookup', 'recovery_invented_success'],
@@ -123,6 +124,7 @@ describe('formal unified operation ordering', () => {
       duplicateAcceptedWithoutEffect: true,
       duplicateRunningWithoutEffect: true,
       duplicateUnknownWithoutEffect: true,
+      unknownExpiredAfterEffectLookup: true,
     });
     const acceptedThenRevoked = result.witnessPaths.acceptedBeforeRevocation ?? [];
     expect(acceptedThenRevoked.indexOf('acceptCommand')).toBeLessThan(
@@ -178,6 +180,23 @@ describe('formal unified operation ordering', () => {
     expect(result.path).toContain('duplicateSubmit');
     expect(result.path).toContain('duplicateWriteEffect');
     expect(result.state).toMatchObject({ effects: 2 });
+  });
+
+  it('expires an uncertain effect only after a status lookup found no terminal receipt', () => {
+    const broken = exploreOperationOrdering('expire-after-effect-without-resolution');
+    expect(broken.violation).toBe('unknown_expired_without_lookup');
+    expect(broken.path).toEqual([
+      'observeRequest',
+      'checkAuthorization',
+      'acceptCommand',
+      'startRunning',
+      'writeEffect',
+      'commitUnknownAfterEffect',
+      'expireUnknown',
+    ]);
+    const valid = exploreOperationOrdering().witnessPaths.unknownExpiredAfterEffectLookup ?? [];
+    expect(valid).toContain('readUnknownStatus');
+    expect(valid.at(-1)).toBe('expireUnknown');
   });
 
   it('fails closed when the receipt or a referenced source is missing', () => {

@@ -3,6 +3,7 @@ export type OperationOrderingMode =
   | 'skip-authorization-check'
   | 'accept-after-revocation'
   | 'duplicate-effect'
+  | 'expire-after-effect-without-resolution'
   | 'ignore-epoch'
   | 'ignore-request-hash'
   | 'skip-recovery-lookup';
@@ -24,6 +25,7 @@ export type OperationOrderingResult = Readonly<{
     duplicateAcceptedWithoutEffect: boolean;
     duplicateRunningWithoutEffect: boolean;
     duplicateUnknownWithoutEffect: boolean;
+    unknownExpiredAfterEffectLookup: boolean;
   }>;
   witnessPaths: Readonly<Record<keyof OperationOrderingResult['witnesses'], readonly string[] | null>>;
   path: readonly string[] | null;

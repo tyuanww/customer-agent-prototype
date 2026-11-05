@@ -238,12 +238,13 @@ function actions(mode, state) {
           receiptReturned: 'original-receipt',
         }));
       }
+      if (state.statusLookup) {
+        result.push(moveByContract('expireUnknown', state, 'expired', {
+          reported: 'expired',
+          receiptReturned: 'expired-receipt',
+        }));
+      }
     }
-    result.push(moveByContract('expireUnknown', state, 'expired', {
-      durable: 'expired',
-      reported: 'expired',
-      receiptReturned: 'expired-receipt',
-    }));
     if (!state.recoveryAttempted) {
       const shouldInventSuccess = mode === 'skip-recovery-lookup'
         && state.effects === 1
@@ -265,6 +266,16 @@ function actions(mode, state) {
         }, shouldInventSuccess ? 'recovery_invented_success' : null));
       }
     }
+  }
+  if (mode === 'expire-after-effect-without-resolution'
+    && state.operationState === 'unknown'
+    && state.effects === 1
+    && state.durable === 'none'
+    && !state.statusLookup) {
+    result.push(moveByContract('expireUnknown', state, 'expired', {
+      reported: 'expired',
+      receiptReturned: 'expired-receipt',
+    }, 'unknown_expired_without_lookup'));
   }
   for (const duplicateState of ['accepted', 'running', 'unknown']) {
     if (state.operationState === duplicateState && !state.duplicateReplay) {
@@ -313,6 +324,9 @@ function invariant(state) {
   }
   if (state.recoveryAttempted && state.reported === 'success'
     && state.durable !== 'committed') return 'recovery_invented_success';
+  if (state.operationState === 'expired' && !state.statusLookup) {
+    return 'unknown_expired_without_lookup';
+  }
   if (state.operationState === 'committed'
     && (state.durable !== 'committed' || state.effects !== 1)) return 'committed_without_effect';
   if (state.duplicateReplay && state.effects > 1) return 'duplicate_committed_effect';
@@ -356,6 +370,7 @@ export function exploreOperationOrdering(mode = 'correct') {
     duplicateAcceptedWithoutEffect: false,
     duplicateRunningWithoutEffect: false,
     duplicateUnknownWithoutEffect: false,
+    unknownExpiredAfterEffectLookup: false,
   };
   const witnessPaths = Object.fromEntries(
     Object.keys(witnesses).map(witness => [witness, null]),
@@ -412,6 +427,11 @@ export function exploreOperationOrdering(mode = 'correct') {
       current.state.duplicateReplay
       && current.state.operationState === 'unknown'
       && current.state.effects <= 1);
+    observeWitness('unknownExpiredAfterEffectLookup', current.path,
+      current.state.operationState === 'expired'
+      && current.state.effects === 1
+      && current.state.durable === 'none'
+      && current.state.statusLookup);
     validateReachableStatus(current.state);
     const broken = invariant(current.state);
     if (broken !== null) {

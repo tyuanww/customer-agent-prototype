@@ -17,7 +17,7 @@ pnpm test:unified-operation-ordering
 ```
 
 Exit code `0` means the exhaustive model found no violation, every terminal state was
-reachable, all six negative controls produced their expected counterexample, the exact unified
+reachable, all seven negative controls produced their expected counterexample, the exact unified
 and nested seat source manifests matched, the temporary BASEFIX+FOR identity replay passed
 38/38, and the receipt's source commit was an ancestor of the tested clean head. Exit code `2`
 means any required receipt/fixture/source is missing or undeclared, a source drifted, only
@@ -53,6 +53,7 @@ policy table.
 | A stale session epoch is rejected even with the same operation ID and idempotency key | `sessionEpoch_mismatch_not_rejected` |
 | Unknown commit stays unknown until a durable receipt or status lookup resolves it; this includes `running + effects=1 + durable=none` | `unresolved_unknown_reported_terminal` |
 | Recovery returns the original committed result or stays unknown, never inferring success from in-memory effects | `recovery_invented_success` |
+| Unknown expires only after a status lookup found no terminal receipt; a durable committed receipt can never expire | `unknown_expired_without_lookup` |
 | Accepted, running, committed, unknown, failed, cancelled, and expired are both reachable and terminal states have no outgoing contract edges | `MODEL_COVERAGE` plus contract validation |
 
 ## Negative controls
@@ -64,6 +65,7 @@ The checker mutates one decision at a time and requires a counterexample:
 | Accept without the authorization check | `accept_without_authorization` |
 | Accept after `checkAuthorization -> revokeAuthorization` | `accept_after_revocation` |
 | Let a duplicate submission attempt a second effect | `duplicate_committed_effect` |
+| Expire an uncertain post-effect operation without first looking up a receipt | `unknown_expired_without_lookup` |
 | Ignore session epoch during reuse classification | `sessionEpoch_mismatch_not_rejected` |
 | Ignore request-hash binding during reuse classification | `requestHash_mismatch_not_rejected` |
 | Report recovery success after a lost post-effect commit without a durable receipt | `recovery_invented_success` |

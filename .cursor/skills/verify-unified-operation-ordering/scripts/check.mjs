@@ -15,6 +15,7 @@ const expectedControls = Object.freeze({
   'skip-authorization-check': 'accept_without_authorization',
   'accept-after-revocation': 'accept_after_revocation',
   'duplicate-effect': 'duplicate_committed_effect',
+  'expire-after-effect-without-resolution': 'unknown_expired_without_lookup',
   'ignore-epoch': 'sessionEpoch_mismatch_not_rejected',
   'ignore-request-hash': 'requestHash_mismatch_not_rejected',
   'skip-recovery-lookup': 'recovery_invented_success',
@@ -400,6 +401,10 @@ export function runOperationVerifier({
     if (mode === 'duplicate-effect'
       && (!finding.path.includes('duplicateSubmit') || !finding.path.includes('duplicateWriteEffect'))) {
       throw new Error(`duplicate-effect did not cover a second write attempt: ${finding.path.join(' -> ')}`);
+    }
+    if (mode === 'expire-after-effect-without-resolution'
+      && (!finding.path.includes('commitUnknownAfterEffect') || finding.path.at(-1) !== 'expireUnknown')) {
+      throw new Error(`expire-after-effect-without-resolution did not cover the post-effect expiry path: ${finding.path.join(' -> ')}`);
     }
     if (mode === 'skip-recovery-lookup'
       && (!finding.path.includes('commitUnknownAfterEffect') || !finding.path.includes('recoverUnknown'))) {
