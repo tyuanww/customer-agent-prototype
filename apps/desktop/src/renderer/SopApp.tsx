@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import { useWindowDrag } from './lib/use-window-drag';
 import {
@@ -10,10 +10,14 @@ import {
   type SopProjectedScript,
   type SopProjection,
 } from '@shared/sop-window';
+import {
+  isSopPipelineProjection,
+  type SopPipelineProjection,
+} from '@shared/sop-pipeline';
 import './styles/sop.css';
 
 type SopAppProps = {
-  projection?: SopProjection;
+  projection?: SopProjection | SopPipelineProjection;
 };
 
 const RISK_COPY = {
@@ -38,6 +42,153 @@ function sopLayoutSignature(projection: SopProjection): string {
     projection.copied ? '1' : '0',
     projection.prompt,
   ].join('|');
+}
+
+function pipelineLayoutSignature(projection: SopPipelineProjection): string {
+  return [
+    projection.projectionVersion,
+    projection.sessionId,
+    projection.state,
+    projection.currentStepId,
+    projection.stepKind,
+    projection.stepText,
+    projection.media.map((media) => media.mediaId).join(','),
+    projection.branches.map((branch) => branch.branchId).join(','),
+    projection.canNext ? '1' : '0',
+    projection.terminal ? '1' : '0',
+    projection.copied ? '1' : '0',
+    projection.failCode ?? '',
+  ].join('|');
+}
+
+function pipelineFailureCopy(projection: SopPipelineProjection): string {
+  if (projection.failCode === 'SOP_MEDIA_MISSING') return '本步图片没有加载，不能只复制文字。';
+  if (projection.failCode === 'SOP_SESSION_CHANGED') return '登录状态已经变化，请重新查询。';
+  if (projection.failCode === 'SOP_RELEASE_CHANGED') return '流程版本已经变化，请重新查询。';
+  if (projection.failCode === 'SOP_REVOKED') return '当前流程权限已经撤销。';
+  if (projection.failCode === 'SOP_EXPIRED') return '当前流程使用期限已经结束。';
+  return '';
+}
+
+function SopPipelineView({
+  projection,
+  copying,
+  drag,
+  shellRef,
+  onCopy,
+  onChooseBranch,
+  onNext,
+  onEnd,
+}: {
+  projection: SopPipelineProjection;
+  copying: boolean;
+  drag: ReturnType<typeof useWindowDrag>;
+  shellRef: RefObject<HTMLDivElement>;
+  onCopy: () => void;
+  onChooseBranch: (branchId: string) => void;
+  onNext: () => void;
+  onEnd: () => void;
+}) {
+  const failed = projection.state !== 'ready';
+  const copyable = !failed && projection.stepKind !== 'decision' && projection.stepKind !== 'opening'
+    && projection.stepText.length > 0;
+  return (
+    <div
+      className="sop-shell query-shell"
+      data-testid="sop-pipeline-shell"
+      data-window-role="sop"
+      ref={shellRef}
+    >
+      <div className="glass-shell">
+        <div className="glass-surface" aria-hidden="true" />
+        <header className="sop-chrome" data-testid="sop-chrome" {...drag}>
+          <div className="sop-chrome-title">
+            <strong>{projection.title}</strong>
+            <span data-testid="sop-pipeline-sop">{projection.sopId}</span>
+          </div>
+          <div className="sop-chrome-tools">
+            <button
+              type="button"
+              className="sop-close"
+              data-testid="sop-close"
+              aria-label="收起流程，保留进度"
+              title="收起，保留进度"
+              onClick={() => {
+                void window.sopWindow?.close();
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </header>
+        <div className="sop-body" data-testid="sop-pipeline-body">
+          {failed ? (
+            <p className="status-banner is-error" data-testid="sop-pipeline-failure">
+              {pipelineFailureCopy(projection)}
+            </p>
+          ) : null}
+          {projection.stepText ? (
+            <p className="sop-prompt" data-testid="sop-pipeline-step-text">
+              {projection.stepText}
+            </p>
+          ) : null}
+          {projection.media.length > 0 ? (
+            <p className="sop-todo" data-testid="sop-pipeline-media">
+              本步绑定 {projection.media.length} 张图片，复制时与文字一起写入。
+            </p>
+          ) : null}
+          {copyable ? (
+            <button
+              type="button"
+              className={projection.copied ? 'copy-btn is-copied' : 'copy-btn'}
+              data-testid="sop-pipeline-copy"
+              disabled={copying}
+              onClick={onCopy}
+            >
+              {projection.copied ? COPY_SUCCESS_MESSAGE : '复制本步'}
+            </button>
+          ) : null}
+          {projection.branches.length > 0 ? (
+            <div className="sop-branches" data-testid="sop-pipeline-branches">
+              {projection.branches.map((branch) => (
+                <button
+                  key={branch.branchId}
+                  type="button"
+                  className="retry-btn"
+                  data-testid={`sop-pipeline-branch-${branch.branchId}`}
+                  onClick={() => onChooseBranch(branch.branchId)}
+                >
+                  {branch.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {projection.canNext ? (
+            <button
+              type="button"
+              className="retry-btn"
+              data-testid="sop-pipeline-next"
+              onClick={onNext}
+            >
+              下一步
+            </button>
+          ) : null}
+          {projection.terminal ? (
+            <p className="sop-terminal" data-testid="sop-terminal">{SOP_TERMINAL_MESSAGE}</p>
+          ) : null}
+          <button
+            type="button"
+            className="sop-end"
+            data-testid="sop-pipeline-end"
+            data-sop-end="true"
+            onClick={onEnd}
+          >
+            {SOP_END_FLOW_LABEL}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SopCopyCard({
@@ -88,7 +239,7 @@ function SopCopyCard({
 }
 
 export function SopApp({ projection: injected }: SopAppProps) {
-  const [projection, setProjection] = useState<SopProjection | null>(injected ?? null);
+  const [projection, setProjection] = useState<SopProjection | SopPipelineProjection | null>(injected ?? null);
   const [copying, setCopying] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
@@ -104,7 +255,11 @@ export function SopApp({ projection: injected }: SopAppProps) {
     });
   }, [injected]);
 
-  const layoutSignature = projection ? sopLayoutSignature(projection) : '';
+  const layoutSignature = projection
+    ? isSopPipelineProjection(projection)
+      ? pipelineLayoutSignature(projection)
+      : sopLayoutSignature(projection)
+    : '';
 
   const reportLayout = useCallback((desiredHeight: number) => {
     const api = window.sopWindow?.reportLayout;
@@ -169,7 +324,10 @@ export function SopApp({ projection: injected }: SopAppProps) {
       }
       if (
         event.key === '1'
-        && projection?.script
+        && projection
+        && (isSopPipelineProjection(projection)
+          ? projection.state === 'ready' && projection.stepText.length > 0 && projection.stepKind !== 'decision'
+          : Boolean(projection.script))
         && !event.repeat
         && !event.metaKey
         && !event.ctrlKey
@@ -181,10 +339,33 @@ export function SopApp({ projection: injected }: SopAppProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [copyCurrent, projection?.script]);
+  }, [copyCurrent, projection]);
 
   if (!projection) {
     return null;
+  }
+
+  if (isSopPipelineProjection(projection)) {
+    return (
+      <SopPipelineView
+        projection={projection}
+        copying={copying || projection.copied}
+        drag={drag}
+        shellRef={shellRef}
+        onCopy={() => {
+          void copyCurrent();
+        }}
+        onChooseBranch={(branchId) => {
+          void window.sopWindow?.chooseEdge(branchId);
+        }}
+        onNext={() => {
+          void window.sopWindow?.nextStep();
+        }}
+        onEnd={() => {
+          void window.sopWindow?.endFlow();
+        }}
+      />
+    );
   }
 
   const opening = projection.shellState === 'opening';
