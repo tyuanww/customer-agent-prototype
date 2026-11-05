@@ -1,0 +1,51 @@
+{
+  "syncCommit": "84aae3b7be2e95042d639c4c777362a50b1f3459",
+  "candidateState": "worktree candidate on the certified ARC-01 head",
+  "capturedAt": "2026-11-05T06:50:20Z",
+  "sourceReceipt": "3db79b28dd6f61a462b6bcf9333bfa34963d17ef1a86612f5bea5aa9a45aad82",
+  "modelStates": 614,
+  "modelEdges": 2295,
+  "environment": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "postgresql": "15.18",
+    "platform": "Darwin 25.5.0 arm64"
+  },
+  "commands": [
+    "pnpm test:unified-operation-ordering",
+    "CUSTOMER_AGENT_API_PG15_INTEGRATION=1 CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm --filter @customer-agent/api exec vitest run tests/authorization-reachability.integration.test.ts",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin node .agents/skills/verify-intake-parent-revocation/verify.mjs /tmp/customer-agent-parent-revocation.json",
+    "PATH=/Users/hutou/homebrew/opt/node@24/bin:$PATH CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run tests/manual-identity-grants.integration.test.ts tests/manual-identity-property.test.ts tests/project-roster-login.integration.test.ts tests/roster-authority.integration.test.ts tests/a6-permission-e2e.integration.test.ts tests/p0-live-lanes.integration.test.ts tests/feishu-login-link.integration.test.ts tests/seat-login-flow.integration.test.ts tests/seat-lifecycle.integration.test.ts",
+    "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:seat-administration-revocation",
+    "pnpm lint",
+    "pnpm typecheck",
+    "pnpm --filter @customer-agent/database test:integration",
+    "git diff --check"
+  ],
+  "files": {
+    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "36e645f1fc7a3ea3063909ae4fef7dc8864963be72437854ddf72a18cfb16387",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "fb96921b50af0ab5fa719614b23685085b522153c5f197a5479f1da4a6fbe11a",
+    ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "5d00ec4c8ec78395f08082adbe849fea781919faf74962a9f02a2589cddc4ed7",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "6caadc108a7476e9e0914dc22eb8c7dd67a80debf8e602595c7561cf3eaecd17",
+    ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
+    ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
+    ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
+    ".agents/skills/verify-intake-parent-revocation/SKILL.md": "87c94347fecd00d0136f85ee43325a7cd1b5bc0e6a709546be8ebb37c7696f33",
+    ".agents/skills/verify-intake-parent-revocation/verify.mjs": "963096533f250342f23d13b78910e582e6d4d3efb280cb425a34ddf736e97ca1",
+    ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
+    "apps/api/tests/unified-operation-ordering-formal.test.ts": "de6054571ad10c8792688b5794b6a1b1c4e7d50c431218b06adc411f6cb72f07",
+    "apps/api/tests/authorization-reachability.integration.test.ts": "cb32d063438afa687eb0694ea18f69d706142b5ae11b0325be5c9206bfb965ad",
+    "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
+    "apps/api/src/content-intake/transaction.ts": "2f932481533344022b85c6a9f077e35f1e5d003c80ceea7976b09b92687eede0",
+    "packages/database/overlays/0076_authorization_decision.sql": "208106b53b6f9d327ab85dded06bd2ada0dcfe45bbf460d5eb9bbb40da9be788",
+    "packages/unified-contracts/src/index.ts": "cf05fdb0523f947aacccbdcdf88c5eaa2e4ab19caaf4b3e83a68a0517678fcc6",
+    "packages/unified-contracts/tests/contracts.test.ts": "322546a77a8d46322e853fe3ed78250b589992ea198d6ab09051c35b823a6b39",
+    "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
+    "docs/reference-project-architecture.md": "da5f289a98e39ed730dd65e66f43af98fc28a634938c8262bb139e29a0423655"
+  },
+  "limitations": [
+    "The exhaustive model covers contract state and event order, not PostgreSQL MVCC or process death during COMMIT.",
+    "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
+    "PostgreSQL replays cover existing authorization, seat administration, receipts, and grant lifecycle code."
+  ]
+}

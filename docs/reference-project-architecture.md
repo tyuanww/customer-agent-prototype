@@ -243,6 +243,12 @@ v1.17 migrated PG15
 
 操作状态的 owner 保持在手写合同包内；API 后续实现负责持久化和恢复，必须遵守 accepted → running → committed/unknown 等显式转换与精确回执规则，`expired` 是显式终态。SOP branch 必须绑定 decision source；Scope、release index 身份和 content Top 3 的唯一排序/复制句柄也由本包验证。overlay 快照由桌面 adapter 按 epoch 和 generation 消费。本 PR 只验证合同边界和纯函数，不宣称下游 UI、API、数据库并发或真实业务数据已接线。
 
+### 5.2 统一操作顺序验证（FOR-01）
+
+`.cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs` 对 ARC-01 的手写操作合同做有限状态穷举。模型直接导入 `OPERATION_TRANSITIONS`、`classifyOperationReuse` 和 `parseOperationStatus`，只拥有事件交错与不变量，不维护第二份状态转换或复用策略。它覆盖授权检查、命令受理、撤权、写入、重复提交、未知提交、状态读取、恢复和全部终态，并要求源码/Actor/Command/RequestHash/SessionEpoch 绑定、至多一次已提交效果及原回执恢复。
+
+该模型证明的是有限合同状态机，不证明 PostgreSQL MVCC、网络分区、COMMIT 中途进程死亡、文件系统持久性、HTTP 或 IPC。真实 PostgreSQL 15 的请求时授权线性化由 `pnpm test:seat-administration-revocation` 验证：检查成功后撤权的已受理命令可以完成，撤权后开始的新命令必须被拒绝；授权生命周期另由 `authorization-reachability.integration.test.ts` 深度五的穷举回放验证。ARC-01 当前只有合同，没有产品 operation store，因此上述真实回放不冒充 envelope 已接入运行时。`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令、环境和状态数；改动受测源码后必须先重跑再更新。
+
 ```text
 unit          纯函数、协议、脚本和安全门
   ↓
