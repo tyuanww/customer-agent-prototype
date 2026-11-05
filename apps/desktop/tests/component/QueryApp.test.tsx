@@ -21,7 +21,7 @@ import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
 } from '../../src/shared/overlay-events';
-import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
+import { applyOverlayEvent, createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -419,6 +419,54 @@ describe('QueryApp', () => {
     expect(cancelSearch).toHaveBeenCalledWith({ sessionEpoch: 1, generation: 2 });
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+  });
+
+  it('reports clear-content through the authoritative overlay revision before the next result report', async () => {
+    const f = connectProduct();
+    let authoritative = {
+      ...createInitialOverlayState({ sessionEpoch: 1, generation: 2, windowGeneration: 1, releaseId: 'rel_synthetic' }),
+      phase: 'active' as const,
+      activeSurface: 'query' as const,
+      focusIntent: 'query' as const,
+      contentPhase: 'RESULTS' as const,
+      resultCount: 1 as const,
+      contentRevision: 1,
+      handoff: { ...createInitialOverlayState({ sessionEpoch: 1, generation: 2, windowGeneration: 1, releaseId: 'rel_synthetic' }).handoff, id: 1, sequence: 1, mode: 'none' as const },
+    };
+    reportUiPhase.mockImplementation((
+      phase: 'SEARCH_INPUT' | 'RESULTS' | 'EMPTY' | 'ERROR' | 'COPIED',
+      resultCount: 0 | 1 | 2 | 3,
+      identity: { sessionEpoch: number; generation: number; windowGeneration: number; contentRevision: number },
+    ) => {
+      const transition = applyOverlayEvent(authoritative, {
+        type: 'CONTENT_CHANGED',
+        ...identity,
+        contentPhase: phase,
+        resultCount,
+      });
+      if (transition.decision === 'applied') authoritative = transition.state;
+    });
+    render(<QueryApp />);
+    const snapshot = activeQuerySnapshot();
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: { ...snapshot, contentPhase: 'RESULTS', resultCount: 1, contentRevision: 1 } });
+      }
+    });
+    act(() => {
+      for (const listener of commandListeners) listener({ type: 'clear-content' });
+    });
+
+    expect(authoritative).toMatchObject({ contentPhase: 'SEARCH_INPUT', resultCount: 0, contentRevision: 2 });
+    expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0, expect.objectContaining({ contentRevision: 2 }));
+
+    await searchCleanser(userEvent.setup(), false);
+    expect(authoritative).toMatchObject({ contentPhase: 'RESULTS', resultCount: 1 });
+    expect(authoritative.contentRevision).toBeGreaterThan(2);
+    expect(reportUiPhase.mock.calls.some((call) => (
+      call[2]?.contentRevision === 3
+    ))).toBe(true);
+    expect(f.search).toHaveBeenCalled();
   });
 
   it('searches storewide after login without platform or product pickers', async () => {
