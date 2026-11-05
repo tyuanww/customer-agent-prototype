@@ -1,6 +1,7 @@
-import type {
-  EvaluationRecord,
-  QueryKind,
+import {
+  parseEvaluationRecord,
+  type EvaluationRecord,
+  type QueryKind,
 } from '@customer-agent/unified-contracts';
 import { ObservabilityError } from './errors.js';
 
@@ -13,6 +14,30 @@ export type EvaluationPair = Readonly<{
 }>;
 
 const MAX_SAMPLES = 1_000_000;
+
+function canonicalGroup(
+  records: readonly EvaluationRecord[],
+  expectedKind: QueryKind,
+): readonly EvaluationRecord[] {
+  return records.map((record, index) => {
+    let parsed: EvaluationRecord;
+    try {
+      parsed = parseEvaluationRecord(record);
+    } catch {
+      throw new ObservabilityError(
+        'EVALUATION_RECORD_INVALID',
+        `evaluation record at index ${index} does not match the frozen contract`,
+      );
+    }
+    if (parsed.kind !== expectedKind) {
+      throw new ObservabilityError(
+        'EVALUATION_KIND_MIXED',
+        'ordinary and SOP evaluations must remain in separate datasets',
+      );
+    }
+    return parsed;
+  });
+}
 
 function assertEvaluationBase(records: readonly EvaluationRecord[]): EvaluationRecord {
   const first = records[0];
@@ -55,11 +80,12 @@ function aggregateCounts(records: readonly EvaluationRecord[]): {
   return { samples, errors };
 }
 
-function aggregateOrdinary(records: readonly OrdinaryEvaluation[]): OrdinaryEvaluation {
-  const first = assertEvaluationBase(records);
-  const counts = aggregateCounts(records);
-  const topK = first.kind === 'ordinary' ? first.metrics.topK : null;
-  if (topK === null || records.some((record) => record.metrics.topK !== topK)) {
+function aggregateOrdinary(records: readonly EvaluationRecord[]): OrdinaryEvaluation {
+  const canonical = canonicalGroup(records, 'ordinary') as readonly OrdinaryEvaluation[];
+  const first = assertEvaluationBase(canonical) as OrdinaryEvaluation;
+  const counts = aggregateCounts(canonical);
+  const topK = first.metrics.topK;
+  if (canonical.some((record) => record.metrics.topK !== topK)) {
     throw new ObservabilityError(
       'EVALUATION_DATASET_MIXED',
       'ordinary evaluation group requires one topK',
@@ -68,7 +94,7 @@ function aggregateOrdinary(records: readonly OrdinaryEvaluation[]): OrdinaryEval
   let recallWeighted = 0;
   let noHitCount = 0;
   let responseValidationFailureCount = 0;
-  for (const record of records) {
+  for (const record of canonical) {
     recallWeighted += record.metrics.recallAtK * record.samples;
     noHitCount += record.metrics.noHitCount;
     responseValidationFailureCount += record.metrics.responseValidationFailureCount;
@@ -95,9 +121,10 @@ function aggregateOrdinary(records: readonly OrdinaryEvaluation[]): OrdinaryEval
   });
 }
 
-function aggregateSop(records: readonly SopEvaluation[]): SopEvaluation {
-  const first = assertEvaluationBase(records);
-  const counts = aggregateCounts(records);
+function aggregateSop(records: readonly EvaluationRecord[]): SopEvaluation {
+  const canonical = canonicalGroup(records, 'sop') as readonly SopEvaluation[];
+  const first = assertEvaluationBase(canonical) as SopEvaluation;
+  const counts = aggregateCounts(canonical);
   const metrics = {
     matchedCount: 0,
     validPathCount: 0,
@@ -105,7 +132,7 @@ function aggregateSop(records: readonly SopEvaluation[]): SopEvaluation {
     staleReleaseRejectedCount: 0,
     unauthorizedResourceRejectedCount: 0,
   };
-  for (const record of records) {
+  for (const record of canonical) {
     metrics.matchedCount += record.metrics.matchedCount;
     metrics.validPathCount += record.metrics.validPathCount;
     metrics.validBranchCount += record.metrics.validBranchCount;
@@ -133,21 +160,14 @@ export function aggregateEvaluationGroup(
   records: readonly EvaluationRecord[],
   expectedKind: QueryKind,
 ): EvaluationRecord {
-  if (records.some((record) => record.kind !== expectedKind)) {
-    throw new ObservabilityError(
-      'EVALUATION_KIND_MIXED',
-      'ordinary and SOP evaluations must remain in separate datasets',
-    );
-  }
-  if (expectedKind === 'ordinary') {
-    return aggregateOrdinary(records as readonly OrdinaryEvaluation[]);
-  }
-  return aggregateSop(records as readonly SopEvaluation[]);
+  return expectedKind === 'ordinary'
+    ? aggregateOrdinary(records)
+    : aggregateSop(records);
 }
 
 export function aggregateEvaluationPair(
-  ordinary: readonly OrdinaryEvaluation[],
-  sop: readonly SopEvaluation[],
+  ordinary: readonly EvaluationRecord[],
+  sop: readonly EvaluationRecord[],
 ): EvaluationPair {
   return Object.freeze({
     ordinary: aggregateOrdinary(ordinary),

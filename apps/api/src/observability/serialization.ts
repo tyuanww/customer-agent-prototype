@@ -1,14 +1,20 @@
-import type {
-  AlertRecord,
-  EvaluationRecord,
-  QueryTelemetryRecord,
-  StageRecord,
+import {
+  parseAlertRecord,
+  parseEvaluationRecord,
+  parseQueryTelemetryRecord,
+  parseStageRecord,
+  parseTraceIdentity,
+  type AlertRecord,
+  type EvaluationRecord,
+  type QueryTelemetryRecord,
+  type StageRecord,
 } from '@customer-agent/unified-contracts';
 import {
   redactAlertRecord,
   redactEvaluationRecord,
   redactQueryTelemetry,
   redactStageRecord,
+  redactTraceIdentity,
 } from './redaction.js';
 import type { AssembledTrace } from './trace.js';
 
@@ -17,29 +23,31 @@ function stringifyKnown(value: object): string {
 }
 
 export function serializeQueryTelemetry(record: QueryTelemetryRecord): string {
-  return stringifyKnown(redactQueryTelemetry(record));
+  return stringifyKnown(parseQueryTelemetryRecord(redactQueryTelemetry(record)));
 }
 
 export function serializeStageRecord(record: StageRecord): string {
-  return stringifyKnown(redactStageRecord(record));
+  return stringifyKnown(parseStageRecord(redactStageRecord(record)));
 }
 
 export function serializeEvaluationRecord(record: EvaluationRecord): string {
-  return stringifyKnown(redactEvaluationRecord(record));
+  return stringifyKnown(parseEvaluationRecord(redactEvaluationRecord(record)));
 }
 
 export function serializeAlertRecord(record: AlertRecord): string {
-  return stringifyKnown(redactAlertRecord(record));
+  return stringifyKnown(parseAlertRecord(redactAlertRecord(record)));
 }
 
-export function serializeAssembledTrace(trace: AssembledTrace): string {
+export function serializeAssembledTrace(assembled: AssembledTrace): string {
   return stringifyKnown({
-    trace: trace.trace,
-    query: redactQueryTelemetry(trace.query),
-    status: trace.status,
-    stages: trace.stages.map(redactStageRecord),
-    totalDurationMs: trace.totalDurationMs,
-    stageDurations: trace.stageDurations.map((stage) => ({
+    trace: parseTraceIdentity(redactTraceIdentity(assembled.trace)),
+    query: parseQueryTelemetryRecord(redactQueryTelemetry(assembled.query)),
+    status: assembled.status,
+    stages: assembled.stages.map((record) => (
+      parseStageRecord(redactStageRecord(record))
+    )),
+    totalDurationMs: assembled.totalDurationMs,
+    stageDurations: assembled.stageDurations.map((stage) => ({
       stage: stage.stage,
       durationMs: stage.durationMs,
       outcome: stage.outcome,

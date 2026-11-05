@@ -388,7 +388,7 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 ### OBS-01 观测机制
 
-`apps/api/src/observability/` 只拥有纯观测转换。`assembleTrace` 校验 ordinary 与 SOP 的阶段顺序、trace 关联、重复和迟到阶段，并汇总状态与时长。`summarizeLatency` 计算 p50、p95、p99、样本数、错误数和 warm/cold 标签。`buildAlertRecords` 只消费已经分类的预算、unknown operation、dead-letter、stale release 与 release-index 事实。`aggregateEvaluationPair` 按固定 dataset ID/version 聚合，并保持 ordinary 与 SOP 分离。脱敏与序列化器逐字段输出，未知字段不会进入序列化结果。
+`apps/api/src/observability/` 只拥有纯观测转换。`assembleTrace` 校验 ordinary 与 SOP 的阶段顺序、trace 关联、重复和迟到阶段，并汇总状态与时长。`summarizeLatency` 计算 p50、p95、p99、样本数、错误数和 warm/cold 标签。`buildAlertRecords` 只消费已经分类的预算、unknown operation、dead-letter、stale release 与 release-index 事实。`aggregateEvaluationPair` 先按冻结合同校验 ordinary 与 SOP 记录，再按固定 dataset ID/version 聚合。脱敏器移除未知字段，序列化器随后用合同 parser 重建 canonical 输出，因此未知字段不会进入序列化结果。
 
 `apps/desktop/src/main/observability/` 只把 copy、overlay 和 Dashboard 的稳定字段转换成合同 `StageRecord`。它不持有 Query、SOP、release、Dashboard 或授权状态。
 
