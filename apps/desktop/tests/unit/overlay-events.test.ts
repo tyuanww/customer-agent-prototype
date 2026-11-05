@@ -16,6 +16,7 @@ import {
   syncQueryAnchorCommand,
 } from '../../src/shared/overlay-events';
 import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
+import { overlayReportIdentityForSnapshot } from '../../src/shared/overlay-report';
 
 describe('overlay command boundary', () => {
   it('accepts only complete fox drag settle acknowledgements', () => {
@@ -277,7 +278,7 @@ describe('overlay command boundary', () => {
       windowGeneration: 3,
       generation: 4,
       contentRevision: 0,
-      releaseRevision: 0,
+      releaseSequence: 13,
     })).toBe(true);
     expect(isOverlayRendererEvent({
       type: 'release-changed',
@@ -287,5 +288,6 @@ describe('overlay command boundary', () => {
       generation: 4,
       contentRevision: 0,
     })).toBe(false);
+    expect(overlayReportIdentityForSnapshot(null, 0)).toBeNull();
   });
 });

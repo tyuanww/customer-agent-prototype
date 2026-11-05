@@ -54,7 +54,7 @@ export type OverlayState = {
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
   readonly contentRevision: number;
-  readonly releaseRevision: number;
+  readonly releaseSequence: number;
   readonly sessionEpoch: number;
   readonly generation: number;
   readonly windowGeneration: number;
@@ -128,7 +128,7 @@ export type OverlaySnapshotProjection = {
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
   readonly contentRevision: number;
-  readonly releaseRevision: number;
+  readonly releaseSequence: number;
   readonly windowGeneration: number;
   readonly focusIntent: OverlayFocusIntent;
   readonly handoff: OverlayState['handoff'];
@@ -179,7 +179,7 @@ export type OverlayEvent =
       contentRevision: number;
     } & EventGuard)
   | ({ type: 'SESSION_CHANGED'; releaseId: string } & EventGuard)
-  | ({ type: 'RELEASE_CHANGED'; releaseId: string; releaseRevision: number } & EventGuard)
+  | ({ type: 'RELEASE_CHANGED'; releaseId: string; releaseSequence: number } & EventGuard)
   | ({ type: 'WINDOW_RECREATED' } & EventGuard)
   | ({ type: 'WINDOW_CLOSED' } & EventGuard)
   | ({ type: 'QUERY_FOCUSED' } & EventGuard)
@@ -208,6 +208,13 @@ export type OverlayEvent =
       type: 'LAYOUT_TIMEOUT';
       handoffId: number;
       sequence: number;
+      contentRevision: number;
+    } & EventGuard)
+  | ({
+      type: 'LAYOUT_FALLBACK_APPLIED';
+      handoffId: number;
+      sequence: number;
+      height: number;
       contentRevision: number;
     } & EventGuard)
   | ({
@@ -318,6 +325,7 @@ export const OVERLAY_EVENT_TYPES = [
   'LAYOUT_REQUESTED',
   'QUERY_LAYOUT_ACK',
   'LAYOUT_TIMEOUT',
+  'LAYOUT_FALLBACK_APPLIED',
   'RESIZE_BEGIN',
   'RESIZE_UPDATE',
   'RESIZE_END',
@@ -489,7 +497,7 @@ export function createInitialOverlayState(input: {
   generation: number;
   windowGeneration: number;
   releaseId: string;
-  releaseRevision?: number;
+  releaseSequence?: number;
 }): OverlayState {
   return {
     phase: 'parked',
@@ -497,7 +505,7 @@ export function createInitialOverlayState(input: {
     contentPhase: 'SEARCH_INPUT',
     resultCount: 0,
     contentRevision: 0,
-    releaseRevision: input.releaseRevision ?? 0,
+    releaseSequence: input.releaseSequence ?? 0,
     sessionEpoch: input.sessionEpoch,
     generation: input.generation,
     windowGeneration: input.windowGeneration,
@@ -557,7 +565,7 @@ export function overlaySnapshot(state: OverlayState): OverlaySnapshotProjection 
     contentPhase: state.contentPhase,
     resultCount: state.resultCount,
     contentRevision: state.contentRevision,
-    releaseRevision: state.releaseRevision,
+    releaseSequence: state.releaseSequence,
     windowGeneration: state.windowGeneration,
     focusIntent: state.focusIntent,
     handoff: state.handoff,
@@ -577,7 +585,7 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
     'contentPhase',
     'resultCount',
     'contentRevision',
-    'releaseRevision',
+    'releaseSequence',
     'windowGeneration',
     'focusIntent',
     'handoff',
@@ -599,6 +607,73 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
   const resize = layout?.resize as Partial<NonNullable<OverlayState['layout']['resize']>> | null | undefined;
   const dragSession = drag?.session as Partial<NonNullable<OverlayState['drag']['session']>> | null | undefined;
   const dragSettle = drag?.settle as Partial<NonNullable<OverlayState['drag']['settle']>> | null | undefined;
+  if (
+    !handoff
+    || !hasExactKeys(handoff, [
+      'id',
+      'sequence',
+      'mode',
+      'anchor',
+      'generation',
+      'sessionEpoch',
+      'animate',
+      'prepareCommand',
+    ])
+    || !layout
+    || !hasExactKeys(layout, [
+      'sequence',
+      'ackSequence',
+      'handoffId',
+      'desiredHeight',
+      'appliedHeight',
+      'resizeEdge',
+      'resize',
+    ])
+    || (
+      resize !== null
+      && (
+        !resize
+        || !hasExactKeys(resize, ['handoffId', 'lastSequence', 'baselineHeight', 'edge'])
+      )
+    )
+    || !drag
+    || !hasExactKeys(drag, ['generation', 'session', 'settle', 'pendingOpen', 'queryAnchor'])
+    || (
+      dragSession !== null
+      && (
+        !dragSession
+        || !hasExactKeys(dragSession, [
+          'generation',
+          'windowGeneration',
+          'sessionEpoch',
+          'displayId',
+          'target',
+        ])
+      )
+    )
+    || (
+      dragSettle !== null
+      && (
+        !dragSettle
+        || !hasExactKeys(dragSettle, [
+          'id',
+          'generation',
+          'windowGeneration',
+          'sessionEpoch',
+          'displayId',
+          'target',
+          'bounds',
+          'edge',
+        ])
+      )
+    )
+    || !fox
+    || !hasExactKeys(fox, ['edge', 'peekEpoch', 'peekIntent'])
+    || !shortcut
+    || !hasExactKeys(shortcut, ['registered', 'accelerator', 'message'])
+  ) {
+    return false;
+  }
   return Boolean(
     contractValidation.ok
     && isOverlayContentPhase(snapshot.contentPhase)
@@ -608,8 +683,8 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
       || snapshot.resultCount === 3)
     && Number.isSafeInteger(snapshot.contentRevision)
     && (snapshot.contentRevision ?? -1) >= 0
-    && Number.isSafeInteger(snapshot.releaseRevision)
-    && (snapshot.releaseRevision ?? -1) >= 0
+    && Number.isSafeInteger(snapshot.releaseSequence)
+    && (snapshot.releaseSequence ?? -1) >= 0
     && isPositiveInteger(snapshot.windowGeneration)
     && (snapshot.focusIntent === 'fox'
       || snapshot.focusIntent === 'query'
@@ -764,6 +839,9 @@ function isRect(value: unknown): value is Rect {
   if (!value || typeof value !== 'object') {
     return false;
   }
+  if (!hasExactKeys(value, ['x', 'y', 'width', 'height'])) {
+    return false;
+  }
   const rect = value as Partial<Rect>;
   return [rect.x, rect.y, rect.width, rect.height].every(
     (entry) => typeof entry === 'number' && Number.isFinite(entry),
@@ -774,7 +852,25 @@ function isOpenPlanFields(value: unknown): value is OverlayOpenPlan {
   if (!value || typeof value !== 'object') {
     return false;
   }
-  const plan = value as Partial<OverlayOpenPlan>;
+  if (!hasExactKeys(value, [
+    'sessionEpoch',
+    'generation',
+    'windowGeneration',
+    'anchor',
+    'dockEdge',
+    'queryBounds',
+    'foxBounds',
+    'handoffCenterX',
+    'handoffCenterY',
+    'foxVisualTransform',
+    'animate',
+  ])) {
+    return false;
+  }
+  return hasValidOpenPlanFields(value as Partial<OverlayOpenPlan>);
+}
+
+function hasValidOpenPlanFields(plan: Partial<OverlayOpenPlan>): boolean {
   return (
     isPositiveInteger(plan.sessionEpoch)
     && isPositiveInteger(plan.generation)
@@ -791,7 +887,7 @@ function isOpenPlanFields(value: unknown): value is OverlayOpenPlan {
 }
 
 function isOpenPlan(event: Extract<OverlayEvent, { type: 'OPEN_REQUESTED' }>): boolean {
-  return isOpenPlanFields(event);
+  return hasValidOpenPlanFields(event);
 }
 
 function resetContent(state: OverlayState): OverlayState {
@@ -905,7 +1001,7 @@ export function applyOverlayEvent(
       generation: state.generation + 1,
       windowGeneration: event.windowGeneration,
       releaseId: state.releaseId,
-      releaseRevision: state.releaseRevision,
+      releaseSequence: state.releaseSequence,
     });
     return applied(next, [
       { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
@@ -1248,7 +1344,7 @@ export function applyOverlayEvent(
         sessionEpoch: event.sessionEpoch,
         generation: state.generation + 1,
         releaseId: event.releaseId,
-        releaseRevision: 0,
+        releaseSequence: 0,
         handoff: {
           ...state.handoff,
           generation: state.generation + 1,
@@ -1313,8 +1409,8 @@ export function applyOverlayEvent(
     case 'RELEASE_CHANGED':
       if (
         !event.releaseId
-        || !Number.isSafeInteger(event.releaseRevision)
-        || event.releaseRevision !== state.releaseRevision
+        || !Number.isSafeInteger(event.releaseSequence)
+        || event.releaseSequence <= state.releaseSequence
       ) {
         return rejected(state, 'stale-release');
       }
@@ -1323,7 +1419,7 @@ export function applyOverlayEvent(
         : applied({
             ...state,
             releaseId: event.releaseId,
-            releaseRevision: state.releaseRevision + 1,
+            releaseSequence: event.releaseSequence,
           });
 
     case 'WINDOW_CLOSED': {
@@ -1336,7 +1432,7 @@ export function applyOverlayEvent(
           generation: state.generation + 1,
           windowGeneration: state.windowGeneration,
           releaseId: state.releaseId,
-          releaseRevision: state.releaseRevision,
+          releaseSequence: state.releaseSequence,
         }),
         phase: 'closed',
         activeSurface: 'fox',
@@ -1446,6 +1542,39 @@ export function applyOverlayEvent(
             },
           ])
         : rejected(state, 'stale-layout');
+
+    case 'LAYOUT_FALLBACK_APPLIED':
+      if (
+        state.phase !== 'active'
+        || event.handoffId !== state.handoff.id
+        || event.sequence !== state.layout.sequence
+        || event.sequence <= state.layout.ackSequence
+        || !Number.isFinite(event.height)
+        || event.contentRevision !== state.contentRevision
+      ) {
+        return rejected(state, 'stale-layout');
+      }
+      return applied({
+        ...state,
+        layout: {
+          ...state.layout,
+          ackSequence: event.sequence,
+          appliedHeight: event.height,
+          resize: null,
+        },
+      }, [{
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'query',
+        command: {
+          type: 'query-layout-ack',
+          sessionId: event.handoffId,
+          sequence: event.sequence,
+          phase: state.contentPhase,
+          resultCount: state.resultCount,
+          height: event.height,
+          resizeEdge: state.layout.resizeEdge,
+        },
+      }]);
 
     case 'RESIZE_BEGIN': {
       if (
@@ -1558,6 +1687,13 @@ export function applyOverlayEvent(
         return rejected(state, 'stale-drag-session');
       }
       if (state.drag.session && state.drag.session.generation !== event.dragGeneration) {
+        return rejected(state, 'stale-drag-session');
+      }
+      if (
+        state.drag.session === null
+        && state.drag.settle === null
+        && event.dragGeneration <= state.drag.generation
+      ) {
         return rejected(state, 'stale-drag-session');
       }
       // A new pointer generation supersedes any uncommitted final frame. Its

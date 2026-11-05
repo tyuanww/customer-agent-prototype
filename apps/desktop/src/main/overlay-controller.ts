@@ -39,7 +39,6 @@ import {
   effectiveQuerySize,
   fallbackQuerySizeForPhase,
   isQueryContentLayoutPhase,
-  queryLayoutAckCommand,
   queryResizeDeltaForKey,
   rejectedQueryLayoutAck,
   resolveQueryResizeEdge,
@@ -335,6 +334,8 @@ export class OverlayController {
       this.scheduler.clear(this.postFoxDragTimer);
       this.postFoxDragTimer = null;
       this.clearTimeoutHandles();
+      this.scheduler.clear(this.displayReconcileTimer);
+      this.displayReconcileTimer = null;
       this.displayReconcilePending = false;
     }
     this.clearCommandObservations();
@@ -548,20 +549,16 @@ export class OverlayController {
           ) {
             break;
           }
-          this.applyFallbackQueryHeight();
-          if (
-            this.overlayState.handoff.id === effect.handoffId
-            && this.overlayState.layout.sequence === effect.sequence
-            && this.overlayState.layout.ackSequence === effect.sequence
-          ) {
-            this.sendToQuery(queryLayoutAckCommand(
-              effect.handoffId,
-              effect.sequence,
-              this.overlayState.contentPhase,
-              this.overlayState.resultCount,
-              this.currentQueryHeight(),
-              this.overlayState.layout.resizeEdge,
-            ));
+          const height = this.applyFallbackQueryHeight();
+          if (height !== null) {
+            this.dispatchOverlayEvent({
+              type: 'LAYOUT_FALLBACK_APPLIED',
+              ...this.overlayEventGuard(),
+              handoffId: effect.handoffId,
+              sequence: effect.sequence,
+              height,
+              contentRevision: this.overlayState.contentRevision,
+            });
           }
           break;
         }
@@ -992,7 +989,7 @@ export class OverlayController {
             type: 'RELEASE_CHANGED',
             ...identity,
             releaseId: event.releaseId,
-            releaseRevision: event.releaseRevision,
+            releaseSequence: event.releaseSequence,
           })
         : event.type === 'focus-changed'
           ? this.dispatchOverlayEvent({
@@ -1299,6 +1296,17 @@ export class OverlayController {
     let foxGeneration: number | null = null;
     if (target === this.fox) {
       foxGeneration = generation ?? this.legacyFoxDragGeneration(finished);
+      if (this.testHarness) {
+        const activeGeneration = this.overlayState.drag.session?.generation;
+        if (activeGeneration !== undefined) {
+          foxGeneration = activeGeneration;
+        } else if (
+          foxGeneration !== null
+          && foxGeneration <= this.overlayState.drag.generation
+        ) {
+          foxGeneration = this.overlayState.drag.generation + 1;
+        }
+      }
       if (foxGeneration === null) {
         return null;
       }
@@ -1777,9 +1785,13 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
+    const guard = this.overlayEventGuard();
     this.scheduler.clear(this.displayReconcileTimer);
     this.displayReconcileTimer = this.scheduler.schedule(() => {
       this.displayReconcileTimer = null;
+      if (!this.matchesReportOrigin(guard)) {
+        return;
+      }
       this.reconcileDisplayTopology();
     }, DISPLAY_RECONCILE_DELAY_MS);
   };
@@ -2002,9 +2014,9 @@ export class OverlayController {
     };
   }
 
-  private applyFallbackQueryHeight(): void {
+  private applyFallbackQueryHeight(): number | null {
     if (this.overlayState.layout.appliedHeight !== null || this.overlayState.layout.resize) {
-      return;
+      return null;
     }
     const workArea = this.currentWorkArea();
     const fallback = fallbackQuerySizeForPhase(
@@ -2017,11 +2029,7 @@ export class OverlayController {
       this.queryResizeEdgeForCurrent(workArea),
       true,
     );
-    this.commitNativeLayout(
-      result.height,
-      result.edge,
-      this.overlayState.layout.sequence,
-    );
+    return result.height;
   }
 
   private currentWorkArea(): Rect {
@@ -2106,10 +2114,14 @@ export class OverlayController {
     if (this.postFoxDragTimer !== null || this.isInactive()) {
       return;
     }
+    const guard = this.overlayEventGuard();
+    const dragGeneration = this.overlayState.drag.generation;
     this.postFoxDragTimer = this.scheduler.schedule(() => {
       this.postFoxDragTimer = null;
       if (
         this.isInactive()
+        || !this.matchesReportOrigin(guard)
+        || this.overlayState.drag.generation !== dragGeneration
         || this.foxDragTransaction
         || this.overlayState.drag.session
         || this.overlayState.drag.settle

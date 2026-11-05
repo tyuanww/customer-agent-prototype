@@ -38,7 +38,10 @@ import type {
   OverlayPhase,
   OverlaySnapshotProjection,
 } from '@shared/overlay-machine';
-import type { OverlayReportIdentity } from '@shared/overlay-report';
+import {
+  overlayReportIdentityForSnapshot,
+  type OverlayReportIdentity,
+} from '@shared/overlay-report';
 import { QueryAnnounceBanner } from './features/search/QueryAnnounceBanner';
 import { QueryCapsule } from './features/search/QueryCapsule';
 import { QueryResizeGrip } from './features/search/QueryResizeGrip';
@@ -297,20 +300,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const overlayReportIdentity = useCallback((
     contentRevision = contentRevisionRef.current,
   ): OverlayReportIdentity | null => {
-    const snapshot = overlaySnapshotRef.current;
-    return snapshot
-      ? {
-          sessionEpoch: snapshot.contract.sessionEpoch,
-          generation: snapshot.contract.generation,
-          windowGeneration: snapshot.windowGeneration,
-          contentRevision,
-        }
-      : {
-          sessionEpoch: 1,
-          generation: 1,
-          windowGeneration: 1,
-          contentRevision,
-        };
+    return overlayReportIdentityForSnapshot(
+      overlaySnapshotRef.current,
+      contentRevision,
+    );
   }, []);
 
   const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshotProjection | undefined) => {
@@ -332,20 +325,20 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           snapshot.windowGeneration === previous.windowGeneration
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation === previous.contract.generation
-          && snapshot.releaseRevision < previous.releaseRevision
+          && snapshot.releaseSequence < previous.releaseSequence
         )
         || (
           snapshot.windowGeneration === previous.windowGeneration
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation === previous.contract.generation
-          && snapshot.releaseRevision === previous.releaseRevision
+          && snapshot.releaseSequence === previous.releaseSequence
           && snapshot.contentRevision < previous.contentRevision
         )
         || (
           snapshot.windowGeneration === previous.windowGeneration
           && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
           && snapshot.contract.generation === previous.contract.generation
-          && snapshot.releaseRevision === previous.releaseRevision
+          && snapshot.releaseSequence === previous.releaseSequence
           && snapshot.contentRevision === previous.contentRevision
           && snapshot.handoff.id < previous.handoff.id
         )
@@ -679,7 +672,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       .then((context) => {
         if (
           context.snapshot
-          && context.snapshot.handoff.id > activeHandoffIdRef.current
+          && (
+            context.snapshot.handoff.id > activeHandoffIdRef.current
+            || (
+              activeHandoffIdRef.current === 0
+              && context.snapshot.handoff.id === 0
+            )
+          )
         ) {
           applyOverlaySnapshot(context.snapshot);
         }
@@ -1253,7 +1252,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       void reportOverlayEvent({
         type: 'release-changed',
         releaseId: result.releaseId,
-        releaseRevision: snapshot.releaseRevision,
+        releaseSequence: result.releaseSeq,
         ...identity,
       });
     }
@@ -1359,7 +1358,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         void reportOverlayEvent({
           type: 'release-changed',
           releaseId: value.releaseId,
-          releaseRevision: snapshot.releaseRevision,
+          releaseSequence: value.releaseSeq,
           ...identity,
         });
       }

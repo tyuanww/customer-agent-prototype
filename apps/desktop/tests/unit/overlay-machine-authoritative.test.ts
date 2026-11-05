@@ -77,6 +77,40 @@ describe('authoritative overlay reducer', () => {
         pendingOpen: {},
       },
     })).toBe(false);
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      handoff: {
+        ...projection.handoff,
+        injectedRendererState: true,
+      },
+    })).toBe(false);
+    const pendingOpen = {
+      sessionEpoch: 4,
+      generation: 10,
+      windowGeneration: 2,
+      anchor: 'right' as const,
+      dockEdge: 'none' as const,
+      queryBounds,
+      foxBounds,
+      handoffCenterX: 500,
+      handoffCenterY: 44,
+      foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+      animate: false,
+    };
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      drag: {
+        ...projection.drag,
+        pendingOpen,
+      },
+    })).toBe(true);
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      drag: {
+        ...projection.drag,
+        pendingOpen: { ...pendingOpen, injectedRendererState: true },
+      },
+    })).toBe(false);
   });
 
   it('owns lifecycle, surface, handoff, focus, layout, drag, session and window identities', () => {
@@ -154,18 +188,18 @@ describe('authoritative overlay reducer', () => {
     const release = applyOverlayEvent(opened.state, at(opened.state, {
       type: 'RELEASE_CHANGED',
       releaseId: 'rel_synthetic_11',
-      releaseRevision: opened.state.releaseRevision,
+      releaseSequence: 11,
     }));
     expect(release.decision).toBe('applied');
     expect(release.state).toMatchObject({
       releaseId: 'rel_synthetic_11',
-      releaseRevision: opened.state.releaseRevision + 1,
+      releaseSequence: 11,
     });
 
     const stale = applyOverlayEvent(release.state, at(release.state, {
       type: 'RELEASE_CHANGED',
       releaseId: 'rel_synthetic_10',
-      releaseRevision: opened.state.releaseRevision,
+      releaseSequence: 10,
     }));
     expect(stale.decision).toBe('rejected');
     expect(stale.reason).toBe('stale-release');
@@ -177,7 +211,7 @@ describe('authoritative overlay reducer', () => {
     expect(recreated.decision).toBe('applied');
     expect(recreated.state).toMatchObject({
       releaseId: 'rel_synthetic_11',
-      releaseRevision: release.state.releaseRevision,
+      releaseSequence: release.state.releaseSequence,
       windowGeneration: release.state.windowGeneration + 1,
     });
   });
@@ -365,6 +399,23 @@ describe('authoritative overlay reducer', () => {
     }));
     expect(staleDisplay.decision).toBe('rejected');
     expect(staleDisplay.reason).toBe('drag-settle-pending');
+
+    const committed = applyOverlayEvent(ended, at(ended, {
+      type: 'FOX_DRAG_SETTLE_COMMITTED',
+      settleId: 9,
+      dragGeneration: 7,
+    }));
+    expect(committed.decision).toBe('applied');
+    const lateMoveAfterCommit = applyOverlayEvent(committed.state, at(committed.state, {
+      type: 'FOX_DRAG_MOVED',
+      dragGeneration: 7,
+      dx: 4,
+      dy: 0,
+      nextBounds: { ...foxBounds, x: 1244 },
+    }));
+    expect(lateMoveAfterCommit.decision).toBe('rejected');
+    expect(lateMoveAfterCommit.reason).toBe('stale-drag-session');
+    expect(lateMoveAfterCommit.effects).toEqual([]);
   });
 
   it('enforces the previous content transition table with monotonic content revisions', () => {
@@ -545,6 +596,25 @@ describe('authoritative overlay reducer', () => {
         sequence: requested.state.layout.sequence,
       }),
     ]));
+    const fallbackApplied = applyOverlayEvent(timedOut.state, at(timedOut.state, {
+      type: 'LAYOUT_FALLBACK_APPLIED',
+      handoffId: timedOut.state.handoff.id,
+      sequence: timedOut.state.layout.sequence,
+      height: 420,
+      contentRevision: timedOut.state.contentRevision,
+    }));
+    expect(fallbackApplied.effects).toEqual([
+      expect.objectContaining({
+        type: 'SEND_RENDERER_COMMAND',
+        target: 'query',
+        command: expect.objectContaining({
+          type: 'query-layout-ack',
+          sessionId: timedOut.state.handoff.id,
+          sequence: timedOut.state.layout.sequence,
+          height: 420,
+        }),
+      }),
+    ]);
   });
 
   it('routes shortcut status to both overlay surfaces through typed effects', () => {
@@ -771,7 +841,7 @@ describe('authoritative overlay reducer', () => {
             type,
             ...base,
             releaseId: 'rel_synthetic_next',
-            releaseRevision: state.releaseRevision,
+            releaseSequence: state.releaseSequence + 1,
           };
         case 'LAYOUT_REQUESTED':
           return {
@@ -802,6 +872,15 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
+            contentRevision: state.contentRevision,
+          };
+        case 'LAYOUT_FALLBACK_APPLIED':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            height: 420,
             contentRevision: state.contentRevision,
           };
         case 'RESIZE_BEGIN':

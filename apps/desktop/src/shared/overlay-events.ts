@@ -140,7 +140,7 @@ export type OverlayRendererEvent =
       windowGeneration: number;
       generation: number;
       contentRevision: number;
-      releaseRevision: number;
+      releaseSequence: number;
     }
   | {
       type: 'focus-changed';
@@ -240,6 +240,9 @@ export function isHandoffMilestone(value: unknown): value is HandoffMilestone {
 
 export function isFoxVisualTransform(value: unknown): value is FoxVisualTransform {
   if (!value || typeof value !== 'object') {
+    return false;
+  }
+  if (Object.keys(value).length !== 6) {
     return false;
   }
   const matrix = value as Partial<FoxVisualTransform>;
@@ -384,15 +387,15 @@ export function isOverlayRendererEvent(value: unknown): value is OverlayRenderer
   if (event.type === 'session-changed' || event.type === 'release-changed') {
     const keys = event.type === 'session-changed'
       ? ['type', 'sessionEpoch', 'nextSessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision']
-      : ['type', 'sessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision', 'releaseRevision'];
+      : ['type', 'sessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision', 'releaseSequence'];
     return hasExactKeys(value, keys)
       && typeof event.releaseId === 'string'
       && event.releaseId.length > 0
       && (
         event.type !== 'release-changed'
         || (
-          Number.isSafeInteger(event.releaseRevision)
-          && (event.releaseRevision ?? -1) >= 0
+          Number.isSafeInteger(event.releaseSequence)
+          && (event.releaseSequence ?? -1) >= 0
         )
       )
       && (

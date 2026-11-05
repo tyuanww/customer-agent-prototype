@@ -22,7 +22,7 @@ export type ProductAnnounceInvalidation = {
  * `unreadDomains` 是相对该 session userId 的 last_seen 基线算出的未读域（固定顺序）。
  */
 export type ProductAnnounceContentUpdate = {
-  sessionEpoch: number; releaseId: string; summary: string | null; domainHashes: LibraryDomainHashes;
+  sessionEpoch: number; releaseId: string; releaseSeq: number; summary: string | null; domainHashes: LibraryDomainHashes;
   unreadDomains: readonly LibraryDomain[];
 };
 export type ProductAnnounceUnread = {
@@ -60,9 +60,10 @@ export function isProductAnnounceInvalidation(v: unknown): v is ProductAnnounceI
 export function isProductAnnounceContentUpdate(v: unknown): v is ProductAnnounceContentUpdate {
   if (!v || typeof v !== 'object') return false;
   const x = v as Record<string, unknown>;
-  if (!exactKeys(x, ['sessionEpoch', 'releaseId', 'summary', 'domainHashes', 'unreadDomains'])) return false;
+  if (!exactKeys(x, ['sessionEpoch', 'releaseId', 'releaseSeq', 'summary', 'domainHashes', 'unreadDomains'])) return false;
   if (!Number.isSafeInteger(x.sessionEpoch) || (x.sessionEpoch as number) < 0) return false;
   if (typeof x.releaseId !== 'string' || x.releaseId.length < 1 || x.releaseId.length > 128) return false;
+  if (!Number.isSafeInteger(x.releaseSeq) || (x.releaseSeq as number) < 1) return false;
   if (!(x.summary === null || typeof x.summary === 'string')) return false;
   if (!isLibraryDomainHashes(x.domainHashes)) return false;
   return Array.isArray(x.unreadDomains) && x.unreadDomains.length <= 4
