@@ -1,6 +1,12 @@
 import type { FastifyReply } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
 
+export type OperationFailureReason =
+  | 'SOP_UNAVAILABLE'
+  | 'SOP_SEVERITY_ORDER_REQUIRED'
+  | 'SOP_GATE_B_UNRESOLVED'
+  | 'SOP_FLOW_CONTRACT_UNAVAILABLE';
+
 const VALIDATION_ERROR_CODES = new Set([
   'FST_ERR_CTP_BODY_TOO_LARGE',
   'FST_ERR_CTP_EMPTY_JSON_BODY',
@@ -32,8 +38,26 @@ export function sendUnauthorized(reply: FastifyReply): FastifyReply {
   }));
 }
 
-export function sendOverloaded(reply: FastifyReply): FastifyReply {
+export function sendOverloaded(
+  reply: FastifyReply,
+  reason?: OperationFailureReason,
+): FastifyReply {
   reply.header('retry-after', '1');
+  if (reason !== undefined) {
+    // SearchResponse has no SOP flow field. Keep SOP outcomes fail closed through
+    // the existing overloaded envelope until dedicated transport is approved.
+    const payload = Object.freeze({
+      error: {
+        code: 'OVERLOADED' as const,
+        message: '服务暂不可用',
+        details: {
+          reason,
+          retry_after_sec: 1,
+        },
+      },
+    });
+    return reply.code(503).send(payload);
+  }
   return reply.code(503).send(parseContractSchema('OverloadedErrorEnvelope', {
     error: {
       code: 'OVERLOADED',

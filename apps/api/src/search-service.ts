@@ -14,6 +14,7 @@ import {
   isEntityFreeGenericSearchText,
   normalizeSearchText,
 } from './search-text.js';
+import type { OperationFailureReason } from './operation-result.js';
 
 type SearchCandidate = components['schemas']['SearchCandidate'];
 
@@ -35,7 +36,12 @@ export type SearchBackendResult =
     }>
   /** `notice` carries the source-set refusal sentence through unchanged. Without it the
    * route can only send the generic forbidden copy, which names the wrong cause. */
-  | Readonly<{ ok: false; code: 'SOURCE_GATE_NOT_READY' | DatabaseContractFailure; notice?: string }>;
+  | Readonly<{
+    ok: false;
+    code: 'SOURCE_GATE_NOT_READY' | DatabaseContractFailure;
+    notice?: string;
+    reason?: OperationFailureReason;
+  }>;
 
 export type SearchBackend = Readonly<{
   search: (request: SearchBackendRequest) => Promise<SearchBackendResult>;

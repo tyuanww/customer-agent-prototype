@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseId, Scope } from '@customer-agent/unified-contracts';
+import type { SopReleaseProjection } from '@customer-agent/content-intake';
 import { createApiApp } from '../../src/app.js';
 import { createMockAccessEvaluator } from '../../src/access/evaluator.js';
 import { unavailableContentImportRepository } from '../../src/content-import-repository.js';
@@ -10,6 +11,7 @@ import {
 } from '../../src/integration/query-runtime.js';
 import type { LoadedQueryRelease } from '../../src/integration/release.js';
 import type { ContentIndexItem } from '../../src/query/content-pipeline.js';
+import { SopPipeline } from '../../src/query/sop-pipeline.js';
 import { parseApiRuntimeConfig } from '../../src/runtime-config.js';
 import type { ServiceRepository } from '../../src/service-repository.js';
 
@@ -90,6 +92,62 @@ function loaded(): LoadedQueryRelease {
   };
 }
 
+function sopProjection(severityOrder: SopReleaseProjection['severityOrder']): SopReleaseProjection {
+  return {
+    schemaVersion: 'sop-release-v1',
+    releaseId,
+    indexHash: 'b'.repeat(64),
+    itemCount: 1,
+    severityOrder,
+    definitions: [{
+      sopId: 'synthetic-allergy',
+      sceneId: 'synthetic-allergy-scene',
+      groupId: 'allergy',
+      title: '合成过敏流程',
+      entryStepId: 'step1',
+      steps: [{
+        stepId: 'step1',
+        kind: 'instruction',
+        sequence: 1,
+        text: '合成流程话术',
+        media: [],
+      }],
+      branches: [],
+    }],
+    searchEntries: [{
+      entryId: 'classify-allergy',
+      sceneId: 'synthetic-allergy-scene',
+      stepId: 'step1',
+      purpose: 'classify',
+      text: '过敏流程',
+      normalizedText: '过敏流程',
+    }],
+  };
+}
+
+function loadedWithSop(
+  projection: SopReleaseProjection | null,
+  sopState: 'ready' | 'empty' = projection === null ? 'empty' : 'ready',
+): LoadedQueryRelease {
+  const base = loaded();
+  return {
+    ...base,
+    snapshot: {
+      ...base.snapshot,
+      sop: sopState === 'ready'
+        ? {
+          state: 'ready',
+          indexId: `sop:${releaseId}`,
+          indexVersion: 1,
+          itemCount: 1,
+          indexHash: 'b'.repeat(64),
+        }
+        : base.snapshot.sop,
+    },
+    sopProjection: projection,
+  };
+}
+
 function repository(): ServiceRepository {
   return {
     readiness: async () => ({
@@ -122,6 +180,29 @@ function eventPool() {
     pool: { connect: async () => ({ query, release: () => undefined }) },
     statements,
   };
+}
+
+function coordinatedApp(runtime: ReturnType<typeof createApiQueryRuntime>) {
+  const access = createMockAccessEvaluator(() => new Date('2026-11-05T00:30:00.000Z'));
+  const events = eventPool();
+  const eventRepository = createEventRepository(events.pool as never, 'int_api_http_test');
+  const app = createApiApp({
+    config: config(),
+    repository: repository(),
+    accessEvaluator: access,
+    queryRuntime: runtime,
+    searchDependencies: {
+      operation: {
+        execute: (request) => eventRepository.executeSearch(request, () => runtime.search(request)),
+      },
+      logHash: { version: 'hmac-log-v1', key: 'synthetic-search-route-key-000001' },
+      idempotencyHmac: {
+        currentVersion: 'hmac-idempotency-v1',
+        keys: { 'hmac-idempotency-v1': 'synthetic-idempotency-route-key-0001' },
+      },
+    },
+  });
+  return { app, events };
 }
 
 function config() {
@@ -201,5 +282,132 @@ describe('coordinated /v1/search composition', () => {
     expect(observations).toHaveLength(1);
     expect(JSON.stringify(observations[0])).not.toContain('什么时候发货');
     await app.close();
+  });
+});
+
+describe('coordinated /v1/search SOP failure contract', () => {
+  async function requestSop(
+    runtime: ReturnType<typeof createApiQueryRuntime>,
+  ) {
+    const { app, events } = coordinatedApp(runtime);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/search',
+      headers: {
+        'x-mock-user': 'usr_synthetic_agent',
+        'x-mock-role': 'agent',
+      },
+      payload: {
+        query_id: '4d690ef7-a98d-4a56-a9c4-92ae4c52168f',
+        parent_query_id: null,
+        interaction_reason: 'original',
+        query_text: '过敏流程',
+        collection_mode: 'synthetic',
+        detected_platform: 'qianniu',
+        platform: 'qianniu',
+        platform_source: 'foreground_process',
+        product_context_type: null,
+        product_context_ref: null,
+        top_k: 3,
+      },
+    });
+    await app.close();
+    return { response, events };
+  }
+
+  function expectSopFailure(
+    result: Awaited<ReturnType<typeof requestSop>>,
+    reason: string,
+  ): void {
+    expect(result.response.statusCode).toBe(503);
+    expect(result.response.headers['retry-after']).toBe('1');
+    expect(result.response.json()).toEqual({
+      error: {
+        code: 'OVERLOADED',
+        message: '服务暂不可用',
+        details: {
+          reason,
+          retry_after_sec: 1,
+        },
+      },
+    });
+    expect(result.response.body).not.toContain('candidates');
+    expect(result.events.statements.some((sql) => sql.includes('INSERT INTO public.query_events'))).toBe(false);
+    expect(result.events.statements.some((sql) => sql.includes('candidate_impressions'))).toBe(false);
+  }
+
+  it('distinguishes a ready SOP release whose pipeline is missing', async () => {
+    const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
+    const runtime = createApiQueryRuntime({
+      loader: async () => loadedWithSop(null, 'ready'),
+      access,
+      observer: { record: () => undefined },
+      now: () => new Date('2099-01-01T00:00:00.000Z'),
+    });
+    await runtime.initialize();
+
+    expectSopFailure(await requestSop(runtime), 'SOP_UNAVAILABLE');
+  });
+
+  it('preserves the missing severity-order gate', async () => {
+    const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
+    const runtime = createApiQueryRuntime({
+      loader: async () => loadedWithSop(sopProjection(null)),
+      access,
+      observer: { record: () => undefined },
+      now: () => new Date('2099-01-01T00:00:00.000Z'),
+    });
+    await runtime.initialize();
+
+    expectSopFailure(await requestSop(runtime), 'SOP_SEVERITY_ORDER_REQUIRED');
+  });
+
+  it('preserves the unresolved Gate-B node reason', async () => {
+    const query = vi.spyOn(SopPipeline.prototype, 'query').mockImplementation((input) => ({
+      kind: 'failure',
+      queryId: input.queryId as never,
+      failureCode: 'SOP_GATE_B_UNRESOLVED',
+      retryable: false,
+      message: 'SOP Gate B is unresolved',
+    }));
+    try {
+      const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
+      const runtime = createApiQueryRuntime({
+        loader: async () => loadedWithSop(sopProjection([
+          'allergy',
+          'acne',
+          'quality-after-sale',
+          'minor-error-broken',
+          'tax',
+        ])),
+        access,
+        observer: { record: () => undefined },
+        now: () => new Date('2099-01-01T00:00:00.000Z'),
+      });
+      await runtime.initialize();
+
+      expectSopFailure(await requestSop(runtime), 'SOP_GATE_B_UNRESOLVED');
+    } finally {
+      query.mockRestore();
+    }
+  });
+
+  it('reports a valid SOP flow as unavailable through the ordinary SearchResponse', async () => {
+    const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
+    const runtime = createApiQueryRuntime({
+      loader: async () => loadedWithSop(sopProjection([
+        'allergy',
+        'acne',
+        'quality-after-sale',
+        'minor-error-broken',
+        'tax',
+      ])),
+      access,
+      observer: { record: () => undefined },
+      now: () => new Date('2099-01-01T00:00:00.000Z'),
+    });
+    await runtime.initialize();
+
+    expectSopFailure(await requestSop(runtime), 'SOP_FLOW_CONTRACT_UNAVAILABLE');
   });
 });

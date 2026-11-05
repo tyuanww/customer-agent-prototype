@@ -223,15 +223,16 @@ describe('INT-API query runtime', () => {
   it('fails closed on an SOP match while the business severity gate is missing', async () => {
     const runtime = createApiQueryRuntime({
       loader: async () => loaded(sopProjection()),
-      access: createMockAccessEvaluator(() => new Date('2026-11-05T00:30:00.000Z')),
+      access: createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z')),
       observer: { record: () => undefined },
-      now: () => new Date('2026-11-05T00:30:00.000Z'),
+      now: () => new Date('2099-01-01T00:00:00.000Z'),
     });
 
     await runtime.initialize();
     await expect(runtime.search(searchRequest('过敏流程'))).resolves.toEqual({
       ok: false,
       code: 'OVERLOADED',
+      reason: 'SOP_SEVERITY_ORDER_REQUIRED',
     });
     expect(runtime.inspect().queryCount).toBe(0);
   });

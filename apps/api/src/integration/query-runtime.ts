@@ -109,6 +109,11 @@ function backendFailure(
   if (code === 'ACCESS_DENIED' || code === 'ACCESS_EXPIRED') return { ok: false, code: 'FORBIDDEN' };
   if (code === 'RELEASE_STALE' || code === 'RELEASE_LEASE_EXPIRED') return { ok: false, code: 'CONFLICT' };
   if (code === 'VALIDATION') return { ok: false, code: 'VALIDATION' };
+  if (code === 'SOP_UNAVAILABLE'
+    || code === 'SOP_SEVERITY_ORDER_REQUIRED'
+    || code === 'SOP_GATE_B_UNRESOLVED') {
+    return { ok: false, code: 'OVERLOADED', reason: code };
+  }
   return { ok: false, code: 'OVERLOADED' };
 }
 
@@ -259,7 +264,10 @@ export function createApiQueryRuntime(options: Readonly<{
     matches(text: string): boolean {
       const pipeline = active?.sop;
       const snapshot = active?.snapshot;
-      if (pipeline === null || pipeline === undefined || snapshot === null || snapshot === undefined) return false;
+      if (pipeline === null || pipeline === undefined) {
+        return snapshot?.sop.state === 'ready';
+      }
+      if (snapshot === null || snapshot === undefined) return false;
       try {
         const result = pipeline.query({
           queryId: opaqueToken('qry', `sop-probe:${text}`),
@@ -372,7 +380,13 @@ export function createApiQueryRuntime(options: Readonly<{
     loaded: ActiveQueryRelease | null,
   ): SearchBackendResult {
     if (outcome.kind === 'failure') return backendFailure(outcome.failureCode);
-    if (outcome.kind === 'sop') return { ok: false, code: 'OVERLOADED' };
+    if (outcome.kind === 'sop') {
+      return {
+        ok: false,
+        code: 'OVERLOADED',
+        reason: 'SOP_FLOW_CONTRACT_UNAVAILABLE',
+      };
+    }
     if (loaded === null) return { ok: false, code: 'OVERLOADED' };
     const candidates: SearchCandidate[] = [];
     if (outcome.kind === 'content') {

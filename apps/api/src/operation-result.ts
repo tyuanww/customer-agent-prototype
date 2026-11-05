@@ -8,7 +8,10 @@ import {
   sendOverloaded,
   sendSourceGateNotReady,
   sendValidationError,
+  type OperationFailureReason,
 } from './contract-http-errors.js';
+
+export type { OperationFailureReason } from './contract-http-errors.js';
 
 export type OperationFailureCode =
   | 'VALIDATION'
@@ -22,11 +25,21 @@ export type OperationFailureCode =
 
 export type OperationResult<T> =
   | Readonly<{ ok: true; response: T }>
-  | Readonly<{ ok: false; code: OperationFailureCode; notice?: string }>;
+  | Readonly<{
+    ok: false;
+    code: OperationFailureCode;
+    notice?: string;
+    reason?: OperationFailureReason;
+  }>;
 
 export function sendOperationFailure(
   reply: FastifyReply,
-  result: Readonly<{ ok: false; code: OperationFailureCode; notice?: string }>,
+  result: Readonly<{
+    ok: false;
+    code: OperationFailureCode;
+    notice?: string;
+    reason?: OperationFailureReason;
+  }>,
 ): FastifyReply {
   if (result.code === 'VALIDATION') return sendValidationError(reply);
   if ((result.code === 'FORBIDDEN' || result.code === 'POLICY_DENIED') && result.notice) {
@@ -42,6 +55,6 @@ export function sendOperationFailure(
   if (result.code === 'NOT_FOUND') return sendNotFound(reply);
   if (result.code === 'CONFLICT') return sendConflict(reply);
   if (result.code === 'SOURCE_GATE_NOT_READY') return sendSourceGateNotReady(reply);
-  if (result.code === 'OVERLOADED') return sendOverloaded(reply);
+  if (result.code === 'OVERLOADED') return sendOverloaded(reply, result.reason);
   return sendInternalError(reply);
 }

@@ -4,7 +4,7 @@ import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { AuthenticatedUser } from './auth-service.js';
 import { mapDatabaseContractError } from './database-contract-errors.js';
 import type { PreparedIdempotencyHashes } from './idempotency.js';
-import type { OperationResult } from './operation-result.js';
+import type { OperationFailureReason, OperationResult } from './operation-result.js';
 import {
   createApiRuntimeDiagnostic,
   type ApiRuntimeDiagnosticSink,
@@ -90,10 +90,17 @@ function noticeOf(error: unknown): string | undefined {
   return REFUSAL_SENTENCES.has(message) ? message : undefined;
 }
 
-function failure(code: FailureCode, notice?: string) {
-  return Object.freeze(notice === undefined
-    ? { ok: false as const, code }
-    : { ok: false as const, code, notice });
+function failure(
+  code: FailureCode,
+  notice?: string,
+  reason?: OperationFailureReason,
+) {
+  return Object.freeze({
+    ok: false as const,
+    code,
+    ...(notice === undefined ? {} : { notice }),
+    ...(reason === undefined ? {} : { reason }),
+  });
 }
 
 function isSourceGateFailure(error: unknown): boolean {
@@ -301,7 +308,7 @@ export function createEventRepository(
           } else {
             // A source-set refusal is not a gate denial: it says the caller may read nothing
             // here, and it keeps the sentence the database chose.
-            return failure(search.code, search.notice);
+            return failure(search.code, search.notice, search.reason);
           }
         } else {
           searchResponse = parseContractSchema('SearchResponse', {

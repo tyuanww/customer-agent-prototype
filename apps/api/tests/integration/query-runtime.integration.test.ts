@@ -254,6 +254,7 @@ describe.runIf(enabled).sequential('INT-API query runtime PostgreSQL 15', () => 
     await expect(runtime.search(request('过敏流程'))).resolves.toEqual({
       ok: false,
       code: 'OVERLOADED',
+      reason: 'SOP_SEVERITY_ORDER_REQUIRED',
     });
     expect(observationErrors).toEqual([]);
     expect(runtime.inspect().queryCount).toBe(0);
