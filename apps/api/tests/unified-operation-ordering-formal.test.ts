@@ -53,6 +53,7 @@ function receiptFixture(root: string, source = 'synthetic-source') {
     testedSourceCommit: '1'.repeat(40),
     sourceReceipt: sha256(`unified:source.txt:${sourceHash}`),
     files: { 'source.txt': sourceHash },
+    nestedReceipts: [],
   }));
   return skillRoot;
 }
