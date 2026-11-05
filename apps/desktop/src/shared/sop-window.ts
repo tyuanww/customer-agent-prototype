@@ -1,3 +1,5 @@
+import type { SopPipelineProjection } from './sop-pipeline';
+
 export type SopCopyResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -86,7 +88,7 @@ export type SopWindowApi = {
   moveBy(dx: number, dy: number, finished?: boolean): Promise<void>;
   reportLayout(request: SopLayoutRequest): Promise<SopLayoutAck>;
   copyCurrent(): Promise<SopCopyResult>;
-  onProjection(cb: (projection: SopProjection) => void): () => void;
+  onProjection(cb: (projection: SopProjection | SopPipelineProjection) => void): () => void;
 };
 
 export type QuerySopWindowApi = {
