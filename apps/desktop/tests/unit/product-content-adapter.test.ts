@@ -45,16 +45,20 @@ function decision(): AccessDecision {
   };
 }
 
-function contentOutcome(): Extract<QueryOutcome, { kind: 'content' }> {
+function contentOutcome(
+  id: QueryId = queryId,
+  copyHandle = 'copy:idx_synthetic:script_synthetic_001:1:aaaa',
+  body = '合成发货原文',
+): Extract<QueryOutcome, { kind: 'content' }> {
   return {
     kind: 'content',
-    queryId,
+    queryId: id,
     releaseId,
     candidates: [{
       candidateId: 'script_synthetic_001',
       title: '合成发货',
-      body: '合成发货原文',
-      copyHandle: 'copy:idx_synthetic:script_synthetic_001:1:aaaa',
+      body,
+      copyHandle,
       rank: 1,
     }],
   };
@@ -96,6 +100,33 @@ describe('connected product content adapter', () => {
       candidates: [{ copyHandle: 'copy:idx_synthetic:script_synthetic_001:1:aaaa' }],
     });
 
+    const noHit = new ProductContentAdapter(client({
+      kind: 'no-hit',
+      queryId,
+      reason: 'no_match',
+    }), {
+      allows: () => true,
+      subscribe: () => () => {},
+    }, vi.fn(), () => new Date('2026-11-05T00:30:00.000Z'));
+    await expect(noHit.search({ queryId, text: '合成无命中问句' })).resolves.toEqual({
+      kind: 'no-hit',
+      queryId,
+      reason: 'no_match',
+    });
+
+    const typedFailure = {
+      kind: 'failure' as const,
+      queryId,
+      failureCode: 'ACCESS_EXPIRED',
+      retryable: false,
+      message: '登录或权限已过期，请重新登录',
+    };
+    const failed = new ProductContentAdapter(client(typedFailure), {
+      allows: () => true,
+      subscribe: () => () => {},
+    }, vi.fn(), () => new Date('2026-11-05T00:30:00.000Z'));
+    await expect(failed.search({ queryId, text: '合成失败问句' })).resolves.toEqual(typedFailure);
+
     const sop = new ProductContentAdapter(client({
       kind: 'sop',
       queryId,
@@ -133,6 +164,65 @@ describe('connected product content adapter', () => {
     });
     await expect(adapter.copy({ copyHandle: handle })).resolves.toEqual({ ok: true, copied: true });
     expect(write).toHaveBeenCalledWith('合成发货原文');
+  });
+
+  it('propagates platform and product scope through the connected query seam', async () => {
+    const api = client();
+    const adapter = new ProductContentAdapter(api, {
+      allows: () => true,
+      subscribe: () => () => {},
+    }, vi.fn(), () => new Date('2026-11-05T00:30:00.000Z'));
+    await adapter.restore();
+
+    await expect(adapter.search({
+      queryId,
+      text: '合成问句',
+      platform: 'qianniu',
+      productContextType: 'sku',
+      productContextRef: 'sku_synthetic_current',
+    })).resolves.toMatchObject({ kind: 'content' });
+    expect(api.query).toHaveBeenCalledWith({
+      queryId,
+      text: '合成问句',
+      expectedReleaseId: releaseId,
+      platform: 'qianniu',
+      productContextType: 'sku',
+      productContextRef: 'sku_synthetic_current',
+    });
+  });
+
+  it('keeps Q2 current when an older Q1 finishes last', async () => {
+    const q1 = 'query_synthetic_001' as QueryId;
+    const q2 = 'query_synthetic_002' as QueryId;
+    let finishQ1!: (value: QueryOutcome) => void;
+    let finishQ2!: (value: QueryOutcome) => void;
+    const api: ConnectedQueryClient = {
+      restore: vi.fn(async () => ({ releaseId, decision: decision() })),
+      query: vi.fn(({ queryId: id }) => new Promise<QueryOutcome>((resolve) => {
+        if (id === q1) finishQ1 = resolve;
+        else finishQ2 = resolve;
+      })),
+    };
+    const write = vi.fn();
+    const adapter = new ProductContentAdapter(api, {
+      allows: () => true,
+      subscribe: () => () => {},
+    }, write, () => new Date('2026-11-05T00:30:00.000Z'));
+    await adapter.restore();
+
+    const first = adapter.search({ queryId: q1, text: '合成旧查询' });
+    const second = adapter.search({ queryId: q2, text: '合成新查询' });
+    finishQ2(contentOutcome(q2, 'copy:q2', '合成 Q2 原文'));
+    await expect(second).resolves.toMatchObject({ kind: 'content', queryId: q2 });
+    finishQ1(contentOutcome(q1, 'copy:q1', '合成 Q1 原文'));
+    await first;
+
+    await expect(adapter.copy({ copyHandle: 'copy:q2' })).resolves.toEqual({ ok: true, copied: true });
+    expect(write).toHaveBeenCalledWith('合成 Q2 原文');
+    await expect(adapter.copy({ copyHandle: 'copy:q1' })).resolves.toMatchObject({
+      ok: false,
+      failureCode: 'COPY_HANDLE_INVALID',
+    });
   });
 
   it('fails closed without a synthetic fallback after a connected API failure', async () => {

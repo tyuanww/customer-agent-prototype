@@ -69,11 +69,18 @@ export type BoundedEnrichment = Readonly<{
     input: Readonly<{
       queryId: QueryId;
       text: string;
-      deterministic: Extract<QueryOutcome, { kind: 'content' }>;
+      deterministic: Readonly<{
+        kind: 'content';
+        queryId: QueryId;
+        releaseId: ReleaseId;
+        candidates: readonly Readonly<ContentCandidate>[];
+      }>;
     }>,
     signal: AbortSignal,
   ) => Promise<void>;
 }>;
+
+export type EnrichmentScheduler = (callback: () => void) => void;
 
 type PreparedDocument = Readonly<{
   item: ContentIndexItem;
@@ -125,6 +132,11 @@ const STOP_BIGRAMS = Object.freeze([
 ]);
 const PLATFORMS = new Set(['qianniu', 'douyin']);
 const SCOPE_TYPES = new Set(['storewide', 'category', 'sku']);
+
+const scheduleMacrotask: EnrichmentScheduler = (callback) => {
+  const timer = setTimeout(callback, 0);
+  timer.unref?.();
+};
 
 function timestamp(value: string): number | null {
   const parsed = Date.parse(value);
@@ -305,6 +317,7 @@ function scheduleEnrichment(
   enrichment: BoundedEnrichment | undefined,
   query: ContentPipelineQuery,
   deterministic: Extract<QueryOutcome, { kind: 'content' }>,
+  schedule: EnrichmentScheduler,
 ): void {
   if (enrichment === undefined || query.signal?.aborted) return;
   const controller = new AbortController();
@@ -312,19 +325,42 @@ function scheduleEnrichment(
   query.signal?.addEventListener('abort', cancel, { once: true });
   const timer = setTimeout(cancel, enrichment.deadlineMs);
   timer.unref?.();
-  queueMicrotask(() => {
-    void Promise.resolve()
-      .then(() => enrichment.run({
-        queryId: query.queryId,
-        text: query.text,
-        deterministic,
-      }, controller.signal))
-      .catch(() => undefined)
-      .finally(() => {
-        clearTimeout(timer);
-        query.signal?.removeEventListener('abort', cancel);
-      });
+  const cleanup = (): void => {
+    clearTimeout(timer);
+    query.signal?.removeEventListener('abort', cancel);
+  };
+  const frozen = Object.freeze({
+    kind: 'content' as const,
+    queryId: deterministic.queryId,
+    releaseId: deterministic.releaseId,
+    candidates: Object.freeze(deterministic.candidates.map((candidate) => Object.freeze({
+      candidateId: candidate.candidateId,
+      title: candidate.title,
+      body: candidate.body,
+      copyHandle: candidate.copyHandle,
+      rank: candidate.rank,
+    }))),
   });
+  try {
+    schedule(() => {
+      if (controller.signal.aborted) {
+        cleanup();
+        return;
+      }
+      try {
+        const work = enrichment.run({
+          queryId: query.queryId,
+          text: query.text,
+          deterministic: frozen,
+        }, controller.signal);
+        void Promise.resolve(work).catch(() => undefined).finally(cleanup);
+      } catch {
+        cleanup();
+      }
+    });
+  } catch {
+    cleanup();
+  }
 }
 
 function preparedMatchesSnapshot(
@@ -352,6 +388,7 @@ export class ContentPipeline {
     private readonly options: Readonly<{
       now?: () => Date;
       enrichment?: BoundedEnrichment;
+      schedule?: EnrichmentScheduler;
     }> = {},
   ) {
     if (options.enrichment !== undefined
@@ -463,7 +500,12 @@ export class ContentPipeline {
     if (content.kind !== 'content') {
       throw new Error('content pipeline produced a non-content outcome');
     }
-    scheduleEnrichment(this.options.enrichment, input, content);
+    scheduleEnrichment(
+      this.options.enrichment,
+      input,
+      content,
+      this.options.schedule ?? scheduleMacrotask,
+    );
     return Object.freeze({ ok: true, content });
   }
 }

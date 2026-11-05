@@ -96,6 +96,15 @@ function validTime(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function hasLiveAccess(access: QueryAccessView, now: number): boolean {
+  return access.state === 'allowed'
+    && now < Date.parse(access.expiresAt)
+    && access.scopes.some(({ validUntil }) => {
+      const until = validTime(validUntil);
+      return until !== null && now < until;
+    });
+}
+
 function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal === undefined) return work;
   if (signal.aborted) return Promise.reject(new DOMException('Query cancelled', 'AbortError'));
@@ -187,15 +196,9 @@ export class QueryCoordinator {
           await raceAbort(this.dependencies.access.evaluate({ queryId: request.queryId }), request.signal),
         );
         const access = toQueryAccessView(decision);
-        const now = this.now();
         if (access.state !== 'allowed') {
           outcome = failure(request.queryId, 'ACCESS_DENIED', false, '没有查询权限');
-        } else if (now >= Date.parse(access.expiresAt)) {
-          outcome = failure(request.queryId, 'ACCESS_EXPIRED', false, '登录或权限已过期，请重新登录');
-        } else if (!access.scopes.some(({ validUntil }) => {
-          const until = validTime(validUntil);
-          return until !== null && now < until;
-        })) {
+        } else if (!hasLiveAccess(access, this.now())) {
           outcome = failure(request.queryId, 'ACCESS_EXPIRED', false, '登录或权限已过期，请重新登录');
         } else {
           const snapshot = await raceAbort(this.dependencies.releases.current(), request.signal);
@@ -206,11 +209,14 @@ export class QueryCoordinator {
             const leaseUntil = request.releaseLeaseExpiresAt === undefined
               ? null
               : validTime(request.releaseLeaseExpiresAt);
-            if (request.expectedReleaseId !== undefined && request.expectedReleaseId !== snapshot.releaseId) {
+            const postReadNow = this.now();
+            if (!hasLiveAccess(access, postReadNow)) {
+              outcome = failure(request.queryId, 'ACCESS_EXPIRED', false, '登录或权限已过期，请重新登录');
+            } else if (request.expectedReleaseId !== undefined && request.expectedReleaseId !== snapshot.releaseId) {
               outcome = failure(request.queryId, 'RELEASE_STALE', true, '内容版本已变化，请重新查询');
             } else if (request.releaseLeaseExpiresAt !== undefined && leaseUntil === null) {
               outcome = failure(request.queryId, 'VALIDATION', false, '内容版本租约无效');
-            } else if (leaseUntil !== null && now >= leaseUntil) {
+            } else if (leaseUntil !== null && postReadNow >= leaseUntil) {
               outcome = failure(request.queryId, 'RELEASE_LEASE_EXPIRED', true, '内容版本租约已过期，请重新查询');
             } else {
               const sopSelected = request.route === 'sop'
