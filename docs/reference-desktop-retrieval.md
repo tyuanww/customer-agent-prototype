@@ -31,6 +31,12 @@
 
 开关 OFF、缺 key、超时或解析失败：跳过规划与重排，BM25+RRF 直出。禁止把话术正文发给 MiniMax。
 
+## Overlay 与 session 失效
+
+Fox / Query 的窗口生命周期、handoff、焦点、layout、拖拽、release 和 session epoch 由 `apps/desktop/src/shared/overlay-machine.ts` 的单一 reducer 拥有；查询业务仍按上面的检索管道运行。每次 handoff、layout ACK、拖拽 settle、blur、release 和 session 变化都携带发起时的 window generation、session epoch、content revision 或服务端 release sequence、handoff/layout sequence、drag generation 或 settle identity，并由 Main 对当前权威状态复核；不匹配时转换被拒绝且不产生原生副作用。Query 订阅晚于打开命令时，Main 重放保存的原始 `prepare-search`，保持共享元素中心与 transform；初始 parked snapshot 即使在 handoff id 0 也必须被消费。
+
+Main 的 `OverlaySnapshotProjection` 只在 `contract` 内使用 ARC-01 `OverlaySnapshot`，其构造和校验都经过 `@customer-agent/unified-contracts` 的同一运行时合同；Query 只消费该快照的 authoritative lifecycle/handoff/layout 投影。Product session epoch 变化时，typed work port 实际取消旧查询与复制、清空内容，存活的 Query 恢复输入焦点；session、关闭或窗口重建会取消 handoff、layout、drag、display reconcile 和 post-drag timeout，layout timeout 只在 captured sequence 与 content revision 仍匹配时回到 reducer 执行 fallback，fallback ACK 由 reducer 生成。窗口重建保留当前 release 与 release sequence。关闭/重建后迟到的结果、ACK、timer、release 或旧 display bounds 不能重新打开窗口、回滚 release 或提交。检索失败仍按下面的失败表处理，不改变该状态边界。
+
 ## 公共表面
 
 | 名称 | 位置 | 默认 / 约束 |
@@ -59,7 +65,9 @@ API composition 已把这些规则接入真实 `/v1/search`。`QueryCoordinator`
 
 当前 API index 消费 `release_items`，与既有 SearchResponse、candidate impression 和复制身份保持一致。若当前 intake lineage 的 upsert 尚无对应 `release_items` 投影，API activation 以 `RELEASE_INDEX_ITEM_GAP` 失败关闭，避免只返回一部分已发布内容。把规范化 intake 条目映射到旧 SearchResponse 字段仍需单独合同或 migration，不由 API composition 猜测。
 
-桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。当前分支只提供 typed seam 和独立 Electron 验证，生产窗口与 preload 组合仍由 INT-DESKTOP 完成。
+桌面 Main 的 `apps/desktop/src/main/integration/query-api-adapter.ts` 在 API 边界解析 ordinary `SearchResponse`、HTTP 503 `OverloadedErrorEnvelope` 和 `retry-after`。只有 `SOURCE_GATE_NOT_READY` 同时携带四个批准的 `sop_reason` 之一时才保留 typed SOP-unavailable 结果；未知、缺失或 malformed reason 归一为稳定 generic error，绝不落成 ordinary candidates。现有 `ProductSearch` 仍拥有查询排序、候选 provenance、复制与事件语义。
+
+桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。`apps/desktop/src/main/integration/desktop-composition.ts` 只组合现有 Query session adapter、DSH control plane 和 OVL typed cancellation seam，不复制任一领域 reducer 或生命周期状态机。
 
 ## 失败
 

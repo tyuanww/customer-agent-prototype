@@ -273,6 +273,65 @@ it('still returns the release when post-publish hydrate refresh throws', async (
   expect(afterPublish).toHaveBeenCalledWith(1);
 });
 
+it('emits one durable release invalidation and replays the original Dashboard receipt', async () => {
+  const frame = { parent: null };
+  const dashboard = {
+    id: 10,
+    isDestroyed: () => false,
+    getURL: () => 'http://127.0.0.1:5173/?role=dashboard',
+    mainFrame: frame,
+    send: vi.fn(),
+  } as unknown as WebContents;
+  const owner = fakeSession('owner');
+  const access = {
+    status: 200,
+    value: {
+      state: 'open',
+      accessRevision: 12,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      grants: 'closed',
+      accounts: 'closed',
+      denyReason: null,
+    },
+  };
+  vi.mocked(owner.request)
+    .mockResolvedValueOnce(access)
+    .mockResolvedValueOnce({
+      status: 202,
+      value: { import_batch_id: 'imp_owner_replay', status: 'validating', source_binding_hash: 'a'.repeat(64) },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { import_batch_id: 'imp_owner_replay', status: 'staged' },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: { release_id: 'rel_owner_replay', release_seq: 4, announcement_id: 'ann_owner_replay' },
+    })
+    .mockResolvedValueOnce(access);
+  const afterPublish = vi.fn(async () => ({
+    presale: 1,
+    campaign: 1,
+    aftersale: 1,
+    product: 2,
+  } as const));
+  registerDashboardContentIpc(
+    owner as ProductSession,
+    () => dashboard,
+    () => 'http://127.0.0.1:5173/',
+    afterPublish,
+  );
+  const event = { sender: dashboard, senderFrame: frame } as IpcMainInvokeEvent;
+  const publish = handlers.get(IPC_CHANNELS.DASHBOARD_CONTENT_PUBLISH)!;
+  const request = publishPayload(csv, [productBinding]);
+  const first = await publish(event, request);
+  const second = await publish(event, request);
+  expect(first).toMatchObject({ ok: true, releaseId: 'rel_owner_replay' });
+  expect(second).toEqual(first);
+  expect(afterPublish).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(owner.request).mock.calls.filter((call) => call[1] === '/v1/content/publish')).toHaveLength(1);
+});
+
 it('stops an unresolved job before the request and does not say the owner-only sentence', async () => {
   const coach = fakeSession('coach');
   const result = await dashboardContentPublish(coach, publishPayload(csv, [productBinding]));

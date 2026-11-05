@@ -14,6 +14,8 @@ import {
   type QueryResizeRequest,
 } from '../../src/shared/query-layout';
 import type { RendererRole } from '../../src/shared/overlay-events';
+import { OVERLAY_EVENT_CHANNEL } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 type CapturedHandler = (event: IpcMainInvokeEvent, ...payload: unknown[]) => unknown;
 
@@ -32,6 +34,12 @@ vi.mock('electron', () => ({
 }));
 
 const DEV_SERVER_URL = 'http://127.0.0.1:5173/';
+const REPORT_IDENTITY = {
+  sessionEpoch: 1,
+  generation: 2,
+  windowGeneration: 1,
+  contentRevision: 0,
+} as const;
 
 type SenderFixture = {
   sender: WebContents;
@@ -95,6 +103,18 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
   const moveBy = vi.fn().mockReturnValue(null);
   const commitFoxDragSettle = vi.fn();
   const querySubscribed = vi.fn();
+  const reportSessionChange = vi.fn();
+  const reportReleaseChange = vi.fn();
+  const reportFocus = vi.fn();
+  const reportRendererFrame = vi.fn();
+  const reportRendererEvent = vi.fn(() => snapshot);
+  const snapshotState = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 2,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  });
+  const snapshot = overlaySnapshot(snapshotState);
   const controller = {
     accelerator: 'CommandOrControl+Shift+Space',
     phase: 'RESULTS',
@@ -110,6 +130,12 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     moveBy,
     commitFoxDragSettle,
     querySubscribed,
+    reportSessionChange,
+    reportReleaseChange,
+    reportFocus,
+    reportRendererFrame,
+    reportRendererEvent,
+    getOverlaySnapshot: () => snapshot,
   } as unknown as OverlayController;
 
   return {
@@ -123,6 +149,12 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     moveBy,
     commitFoxDragSettle,
     querySubscribed,
+    reportSessionChange,
+    reportReleaseChange,
+    reportFocus,
+    reportRendererFrame,
+    reportRendererEvent,
+    snapshot,
   };
 }
 
@@ -157,6 +189,59 @@ describe('overlay query layout IPC handlers', () => {
     expect(fixture.querySubscribed).toHaveBeenCalledOnce();
   });
 
+  it('routes only trusted main-frame overlay events to their narrow controller capability', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const receive = capturedHandler(OVERLAY_EVENT_CHANNEL);
+    const session = {
+      type: 'session-changed',
+      sessionEpoch: 1,
+      nextSessionEpoch: 5,
+      releaseId: 'rel_synthetic',
+      windowGeneration: 1,
+      generation: 2,
+      contentRevision: 0,
+    } as const;
+
+    expect(receive(fixture.fox.event, session)).toBeNull();
+    expect(fixture.reportSessionChange).not.toHaveBeenCalled();
+    expect(receive(createSender(7, 'query', { subframe: true }).event, session)).toBeNull();
+    expect(receive(fixture.query.event, session)).toEqual(fixture.snapshot);
+    expect(fixture.reportRendererEvent).toHaveBeenCalledWith(session);
+
+    receive(fixture.query.event, {
+      type: 'frame-observed',
+      commandId: 4,
+      commandType: 'handoff',
+      target: 'query',
+      sessionEpoch: 1,
+      windowGeneration: 1,
+      generation: 2,
+      contentRevision: 0,
+    });
+    expect(fixture.reportRendererEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it('forwards the originating renderer identity unchanged to Main', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const receive = capturedHandler(OVERLAY_EVENT_CHANNEL);
+    const session = {
+      type: 'session-changed',
+      sessionEpoch: 1,
+      nextSessionEpoch: 2,
+      releaseId: 'rel_synthetic',
+      windowGeneration: 1,
+      generation: 2,
+      contentRevision: 0,
+    } as const;
+
+    expect(receive(fixture.query.event, session)).toEqual(fixture.snapshot);
+    expect(fixture.reportRendererEvent).toHaveBeenCalledOnce();
+    expect(fixture.reportRendererEvent).toHaveBeenCalledWith(session);
+    expect(fixture.reportSessionChange).not.toHaveBeenCalled();
+  });
+
   it('returns the trusted renderer context with the runtime platform', () => {
     const fixture = createControllerFixture({ testHarness: true });
     registerOverlayIpc(() => fixture.controller);
@@ -170,6 +255,7 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '快捷键可用',
       },
+      snapshot: fixture.snapshot,
       testHarness: true,
     });
   });
@@ -188,6 +274,9 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '窗口上下文不可用',
       },
+      snapshot: expect.objectContaining({
+        contract: expect.objectContaining({ releaseId: 'rel_overlay_unbound' }),
+      }),
       testHarness: false,
     });
   });
@@ -205,6 +294,9 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '窗口上下文不可用',
       },
+      snapshot: expect.objectContaining({
+        contract: expect.objectContaining({ releaseId: 'rel_overlay_unbound' }),
+      }),
       testHarness: false,
     });
   });
@@ -242,9 +334,9 @@ describe('overlay query layout IPC handlers', () => {
     expect(handler(fixture.fox.event, 12, -4, false)).toBeNull();
     expect(fixture.moveBy).not.toHaveBeenCalled();
 
-    expect(handler(fixture.fox.event, 12, -4, false, 3)).toBeNull();
+    expect(handler(fixture.fox.event, 12, -4, false, 3, REPORT_IDENTITY)).toBeNull();
     expect(fixture.moveBy).toHaveBeenCalledOnce();
-    expect(fixture.moveBy).toHaveBeenCalledWith(12, -4, false, 3);
+    expect(fixture.moveBy).toHaveBeenCalledWith(12, -4, false, 3, REPORT_IDENTITY);
   });
 
   it('accepts a final settle commit only from the trusted Fox main frame', () => {
@@ -257,9 +349,9 @@ describe('overlay query layout IPC handlers', () => {
     handler(fixture.fox.event, 0);
     expect(fixture.commitFoxDragSettle).not.toHaveBeenCalled();
 
-    handler(fixture.fox.event, 4);
+    handler(fixture.fox.event, 4, REPORT_IDENTITY);
     expect(fixture.commitFoxDragSettle).toHaveBeenCalledOnce();
-    expect(fixture.commitFoxDragSettle).toHaveBeenCalledWith(4);
+    expect(fixture.commitFoxDragSettle).toHaveBeenCalledWith(4, REPORT_IDENTITY);
   });
 
   it.each([
@@ -311,6 +403,7 @@ describe('overlay query layout IPC handlers', () => {
       phase: 'RESULTS',
       resultCount: 3,
       desiredHeight: 344,
+      identity: REPORT_IDENTITY,
     };
 
     const result = capturedHandler(IPC_CHANNELS.REPORT_QUERY_LAYOUT)(
@@ -332,6 +425,7 @@ describe('overlay query layout IPC handlers', () => {
       sessionId: 11,
       sequence: 4,
       deltaY: 24,
+      identity: REPORT_IDENTITY,
     };
 
     const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
@@ -362,6 +456,7 @@ describe('overlay query layout IPC handlers', () => {
       phase: 'RESULTS',
       resultCount: 3,
       desiredHeight: 420,
+      identity: REPORT_IDENTITY,
     };
 
     const result = capturedHandler(IPC_CHANNELS.REPORT_QUERY_LAYOUT)(eventFor(fixture), request);
@@ -386,6 +481,7 @@ describe('overlay query layout IPC handlers', () => {
       type: 'begin',
       sessionId: 22,
       sequence: 9,
+      identity: REPORT_IDENTITY,
     };
 
     const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(eventFor(fixture), request);
@@ -408,6 +504,7 @@ describe('overlay query layout IPC handlers', () => {
           sessionId: 30,
           sequence: 11,
           deltaY,
+          identity: REPORT_IDENTITY,
         },
       );
       expect(accepted).toEqual(acceptedAck(30, 11, 360));
@@ -417,6 +514,7 @@ describe('overlay query layout IPC handlers', () => {
         sessionId: 30,
         sequence: 11,
         deltaY,
+        identity: REPORT_IDENTITY,
       });
     }
   });
@@ -462,11 +560,13 @@ describe('overlay query layout IPC handlers', () => {
       phase: 'RESULTS',
       resultCount: 3,
       desiredHeight: 360,
+        identity: REPORT_IDENTITY,
     });
     const resize = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(query.event, {
       type: 'begin',
       sessionId: 40,
       sequence: 13,
+      identity: REPORT_IDENTITY,
     });
 
     expectRejectedAck(layout, { sessionId: 0, sequence: 0 });

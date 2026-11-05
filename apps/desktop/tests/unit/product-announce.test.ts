@@ -421,7 +421,11 @@ describe('content-updated fan-out and unread', () => {
     expect(await f.announce.refresh(f.identity)).toMatchObject({ ok: true, releaseId: 'rel_25' });
     expect(updatedEvents).toHaveLength(1);
     expect(isProductAnnounceContentUpdate(updatedEvents[0])).toBe(true);
-    expect(updatedEvents[0]).toMatchObject({ releaseId: 'rel_25', summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用' });
+    expect(updatedEvents[0]).toMatchObject({
+      releaseId: 'rel_25',
+      releaseSeq: 13,
+      summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用',
+    });
     const unread = f.announce.unread();
     expect(unread.ok && unread.domains).toEqual(['presale']);
     f.announce.markRead(['presale']);

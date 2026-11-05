@@ -54,6 +54,10 @@ import { notifyDashboardOpenFailure } from './dashboard-open-failure';
 import { notifyStartupFailure } from './startup-failure-notice';
 import { createShutdownFence } from './shutdown-fence';
 import { resolveRendererDevServerUrl } from '../shared/renderer-url';
+import { IPC_CHANNELS } from '../shared/ipc-channels';
+import type { OverlayCommand } from '../shared/overlay-events';
+import { createDesktopComposition } from './integration/desktop-composition';
+import type { DesktopComposition } from './integration/desktop-composition';
 
 const DEV_CSP = [
   "default-src 'self'",
@@ -111,7 +115,16 @@ if (!gotLock) {
   let seatAccounts: ReturnType<typeof registerSeatAccountIpc> | null = null;
   let disposeIntakeCatalog: (() => void) | null = null;
   let disposeIntakeQuery: (() => void) | null = null;
+  let desktopComposition: DesktopComposition | null = null;
   let pendingSecondInstance = false;
+
+  const sendQueryCommand = (command: OverlayCommand): void => {
+    const current = controller;
+    if (!current) return;
+    const query = current.getWindows().find((window) => current.overlayRoleOf(window.webContents) === 'query');
+    if (!query || query.isDestroyed()) return;
+    query.webContents.send(IPC_CHANNELS.OVERLAY_COMMAND, command);
+  };
 
   const handleActivate = (): void => {
     // The Dock icon represents the full application surface. Keep the global
@@ -149,6 +162,7 @@ if (!gotLock) {
     seatAccounts?.dispose(); seatAccounts = null;
     disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
     disposeIntakeQuery?.(); disposeIntakeQuery = null;
+    desktopComposition?.dispose(); desktopComposition = null;
     void productSession?.shutdown();
     shuttingDown.begin();
     controllerReady = false;
@@ -262,6 +276,18 @@ if (!gotLock) {
       );
       await productSession.restore();
     }
+    if (productSession) {
+      desktopComposition = createDesktopComposition({
+        session: productSession,
+        userDataDirectory,
+        getOverlaySnapshot: () => controller?.getOverlaySnapshot() ?? null,
+        work: {
+          cancelQuery: (identity) => sendQueryCommand({ type: 'cancel-query', ...identity }),
+          cancelCopy: (identity) => sendQueryCommand({ type: 'cancel-copy', ...identity }),
+          clearContent: () => sendQueryCommand({ type: 'clear-content' }),
+        },
+      });
+    }
     registerProductIpc(productSession, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       () => [controller?.dashboardWebContents() ?? null]);
@@ -320,7 +346,7 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null,
       () => controller?.rendererDevServerUrl,
     );
-    registerProductSearchIpc(productSession, productAnnounce, () => controller?.trustedContents() ?? [],
+    registerProductSearchIpc(desktopComposition?.querySession ?? productSession, productAnnounce, () => controller?.trustedContents() ?? [],
       contents => controller?.overlayRoleOf(contents) ?? null, () => controller?.rendererDevServerUrl,
       identityOrigin ? { openEntry: () => openSyntheticHelp(identityOrigin) } : undefined,
       usageJournal);
