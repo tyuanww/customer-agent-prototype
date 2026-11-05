@@ -64,6 +64,8 @@ BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retriev
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
 
+`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器。当前检索链没有调用这些转换器，也没有把数据写入新 sink。QRY-01、SOP-01 和 INT-DESKTOP 接线前，既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是唯一实际桌面检索记录。
+
 ## 例子
 
 开发态在已有 `rel_6` 栈上查询「什么时候发货」，hydrate 命中后卡片标题来自发布快照，不经过 `judgeSearch`。关闭智能检索后，同一句只走 BM25，延迟应接近瞬时。
