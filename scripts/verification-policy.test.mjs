@@ -67,6 +67,8 @@ test('docs-only changes skip runtime, database, Electron and packaging lanes', (
     contracts: false,
     database: false,
     electron: false,
+    windows: false,
+    linux: false,
     packaging: false,
   });
   assert.deepEqual(ids(plan, 'precheck'), ['policy-tests', 'documentation']);
@@ -182,6 +184,59 @@ test('mixed changes union owners, checks, lanes and jobs', () => {
   assert.ok(plan.requiredJobs.includes('database'));
   assert.ok(plan.requiredJobs.includes('electron'));
   assert.ok(plan.fullFallbackReasons.length === 0);
+});
+
+test('packaging inputs select unsigned Windows and Linux package checks under the desktop owner', () => {
+  const packagingFiles = [
+    'apps/desktop/package.json',
+    'apps/desktop/build/entitlements.mac.plist',
+    'apps/desktop/scripts/package-windows.mjs',
+    'apps/desktop/scripts/verify-linux-package.mjs',
+    'apps/desktop/scripts/after-pack-macos.mjs',
+    'apps/desktop/scripts/finalize-mac-package.mjs',
+    'apps/desktop/scripts/assert-main-bundle.mjs',
+    'apps/desktop/scripts/generate-app-icons.mjs',
+    'apps/desktop/scripts/mac-package-paths.mjs',
+    'apps/desktop/scripts/node-system-ca.mjs',
+    'apps/desktop/scripts/verify-mac-release-env.mjs',
+    'apps/desktop/scripts/write-build-identity.mjs',
+  ];
+
+  for (const file of packagingFiles) {
+    const plan = verificationPlan([file], map);
+    assert.deepEqual(plan.owners, ['desktop'], file);
+    assert.equal(plan.jobs.packaging, true, file);
+    assert.equal(plan.jobs.windows, true, file);
+    assert.equal(plan.jobs.linux, true, file);
+    assert.deepEqual(ids(plan, 'windows'), ['windows-package'], file);
+    assert.deepEqual(ids(plan, 'linux'), ['linux-package'], file);
+    assert.ok(plan.requiredJobs.includes('windows'), file);
+    assert.ok(plan.requiredJobs.includes('linux'), file);
+    assert.deepEqual(plan.packagingLanes, ['windows-local-unsigned', 'linux-local-unsigned'], file);
+  }
+
+  assert.equal(map.owners.filter((owner) => owner.id === 'desktop').length, 1);
+});
+
+test('every source-code owner selects one deduplicated typecheck quick check', () => {
+  const sourceFiles = [
+    'packages/contracts/src/index.ts',
+    'packages/database/src/planner.ts',
+    'apps/api/src/app.ts',
+    'packages/retrieval-core/src/index.ts',
+    'packages/content-intake/src/sop.ts',
+    'apps/desktop/src/main/main.ts',
+    'packages/job-roster/src/index.ts',
+  ];
+
+  for (const file of sourceFiles) {
+    const plan = verificationPlan([file], map);
+    assert.deepEqual(ids(plan, 'quick').filter((id) => id === 'typecheck'), ['typecheck'], file);
+  }
+
+  const mixed = verificationPlan(sourceFiles, map);
+  assert.equal(ids(mixed, 'quick').filter((id) => id === 'typecheck').length, 1);
+  assert.equal(planLaneCommands(mixed, 'quick').filter((command) => command === 'pnpm typecheck').length, 1);
 });
 
 test('unknown, invalid, ambiguous and stale-generated paths fail closed to the full gate', () => {
@@ -390,6 +445,61 @@ test('review diffs use the merge base instead of unrelated base-branch movement'
     assert.deepEqual(changedFiles(git('rev-parse', 'main'), feature, cwd), ['docs/feature.md']);
     assert.deepEqual(changedFiles('main', 'feature', cwd), ['docs/feature.md']);
     assert.throws(() => changedFiles('--unsafe', undefined, cwd), /REF_INVALID/u);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('local worktree diffs use the merge base and keep every changed side', () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-local-range-'));
+  const git = (...args) => execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+  try {
+    mkdirSync(path.join(cwd, 'docs'));
+    mkdirSync(path.join(cwd, 'apps', 'desktop', 'src'), { recursive: true });
+    writeFileSync(path.join(cwd, 'docs', 'old.md'), '# old\n');
+    writeFileSync(path.join(cwd, 'docs', 'deleted.md'), '# delete\n');
+    writeFileSync(path.join(cwd, 'docs', 'tracked.md'), '# tracked\n');
+    git('init', '-b', 'main');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'synthetic fixture',
+    );
+
+    git('switch', '-c', 'feature');
+    git('switch', 'main');
+    writeFileSync(path.join(cwd, 'apps', 'desktop', 'src', 'main.ts'), 'export const main = true;\n');
+    git('add', '.');
+    git(
+      '-c', 'user.name=Synthetic',
+      '-c', 'user.email=synthetic@example.invalid',
+      '-c', 'core.hooksPath=/dev/null',
+      'commit', '-m', 'unrelated main movement',
+    );
+    const main = git('rev-parse', 'main');
+
+    git('switch', 'feature');
+    git('mv', 'docs/old.md', 'docs/moved.md');
+    rmSync(path.join(cwd, 'docs', 'deleted.md'));
+    writeFileSync(path.join(cwd, 'docs', 'tracked.md'), '# tracked local change\n');
+    mkdirSync(path.join(cwd, 'apps', 'desktop', 'src'), { recursive: true });
+    writeFileSync(path.join(cwd, 'apps', 'desktop', 'src', 'local.ts'), 'export const local = true;\n');
+    const files = changedFiles(main, undefined, cwd);
+
+    assert.deepEqual(files, [
+      'apps/desktop/src/local.ts',
+      'docs/deleted.md',
+      'docs/moved.md',
+      'docs/old.md',
+      'docs/tracked.md',
+    ]);
+    assert.ok(!files.includes('apps/desktop/src/main.ts'));
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

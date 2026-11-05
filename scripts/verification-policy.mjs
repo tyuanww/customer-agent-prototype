@@ -115,7 +115,15 @@ function emptyPlan(mode = 'focused') {
     mode,
     rules: false,
     owners: [],
-    jobs: { quick: false, contracts: false, database: false, electron: false, packaging: false },
+    jobs: {
+      quick: false,
+      contracts: false,
+      database: false,
+      electron: false,
+      windows: false,
+      linux: false,
+      packaging: false,
+    },
     requiredJobs: [],
     checks: Object.fromEntries(CHECK_LANES.map((lane) => [lane, []])),
     liveLanes: [],
@@ -129,7 +137,15 @@ function emptyPlan(mode = 'focused') {
 function fullPlan(reasons, map) {
   const plan = emptyPlan('full');
   plan.rules = true;
-  plan.jobs = { quick: true, contracts: true, database: true, electron: true, packaging: true };
+  plan.jobs = {
+    quick: true,
+    contracts: true,
+    database: true,
+    electron: true,
+    windows: true,
+    linux: true,
+    packaging: true,
+  };
   plan.requiredJobs = ['changes', ...JOB_ORDER];
   plan.fullFallbackReasons = reasons;
   if (map) {
@@ -196,7 +212,7 @@ export function verificationPlan(files, map = loadDependencyMap()) {
     const seen = new Set();
     plan.checks[lane] = plan.checks[lane].filter((check) => !seen.has(check.id) && seen.add(check.id));
   }
-  for (const job of ['quick', 'contracts', 'database', 'electron']) plan.jobs[job] = plan.checks[job].length > 0;
+  for (const job of JOB_ORDER) plan.jobs[job] = plan.checks[job].length > 0;
   plan.jobs.quick = true;
   plan.jobs.packaging = plan.packagingLanes.length > 0;
   if (routes.size === 0) return fullPlan([reason('unknown-route', 'no dependency route matched')], validated);
@@ -221,11 +237,24 @@ function resolveRevision(revision, cwd) {
 
 export function changedFiles(base, head, cwd = root) {
   const baseCommit = resolveRevision(base, cwd);
-  const headCommit = head === undefined ? undefined : resolveRevision(head, cwd);
+  const headCommit = resolveRevision(head ?? 'HEAD', cwd);
   const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).split('\0').filter(Boolean);
-  const revision = headCommit ? `${baseCommit}...${headCommit}` : baseCommit;
+  let revision;
+  if (head === undefined) {
+    try {
+      revision = execFileSync('git', ['merge-base', baseCommit, headCommit], {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    } catch {
+      throw new Error('MERGE_BASE_UNAVAILABLE');
+    }
+  } else {
+    revision = `${baseCommit}...${headCommit}`;
+  }
   const files = git(['diff', '--no-renames', '--name-only', '-z', revision, '--']);
-  if (!head) files.push(...git(['ls-files', '--others', '--exclude-standard', '-z']));
+  if (head === undefined) files.push(...git(['ls-files', '--others', '--exclude-standard', '-z']));
   return [...new Set(files)].sort();
 }
 
@@ -324,8 +353,8 @@ function writeOutputs(plan) {
     contracts: String(plan.jobs.contracts),
     database: String(plan.jobs.database),
     electron: String(plan.jobs.electron),
-    windows: String(plan.mode === 'full' || plan.jobs.packaging),
-    linux: String(plan.mode === 'full' || plan.jobs.packaging),
+    windows: String(plan.jobs.windows),
+    linux: String(plan.jobs.linux),
   };
   appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
 }
