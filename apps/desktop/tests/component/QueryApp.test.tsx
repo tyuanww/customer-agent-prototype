@@ -21,6 +21,7 @@ import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
 } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -229,6 +230,45 @@ describe('QueryApp', () => {
     expect(before).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(refresh.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it('projects authoritative snapshots and ignores an older one', async () => {
+    render(<QueryApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 3,
+      generation: 8,
+      windowGeneration: 2,
+      releaseId: 'rel_synthetic',
+    });
+    const newer = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      contentPhase: 'RESULTS',
+      resultCount: 3,
+      generation: 9,
+      handoff: { ...base.handoff, id: 2, sequence: 2, mode: 'none' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: newer });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
+
+    const stale = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      contentPhase: 'ERROR',
+      generation: 8,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: stale });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
   });
 
   it('searches storewide after login without platform or product pickers', async () => {

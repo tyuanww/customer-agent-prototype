@@ -31,6 +31,12 @@
 
 开关 OFF、缺 key、超时或解析失败：跳过规划与重排，BM25+RRF 直出。禁止把话术正文发给 MiniMax。
 
+## Overlay 与 session 失效
+
+Fox / Query 的窗口生命周期、handoff、焦点、layout、拖拽和 session epoch 由 `apps/desktop/src/shared/overlay-machine.ts` 的单一 reducer 拥有；查询业务仍按上面的检索管道运行。每次 handoff、layout ACK、拖拽 settle、blur 和 session 变化都必须匹配当前 window generation、session epoch、handoff/layout sequence 或 settle identity，否则转换被拒绝且不产生原生副作用。
+
+Main 通过一个 typed `OverlaySnapshot` 同步两个 renderer；Query 只消费其中的 authoritative lifecycle/handoff/layout 投影。Product session epoch 变化时，旧查询和复制工作被取消、结果清空，存活的 Query 恢复输入焦点；关闭/重建后迟到的结果、ACK 或旧 display bounds 不能重新打开窗口或提交。检索失败仍按下面的失败表处理，不改变该状态边界。
+
 ## 公共表面
 
 | 名称 | 位置 | 默认 / 约束 |

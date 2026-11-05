@@ -7,6 +7,7 @@ import {
   foxEdgeCommand,
   isFoxDragSettleAck,
   isFoxVisualTransform,
+  isOverlayRendererEvent,
   isOverlayCommand,
   prepareSearchCommand,
   selectAuthoritativeFoxDockSnapshot,
@@ -14,6 +15,7 @@ import {
   syncFoxEdgeCommand,
   syncQueryAnchorCommand,
 } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 describe('overlay command boundary', () => {
   it('accepts only complete fox drag settle acknowledgements', () => {
@@ -238,5 +240,31 @@ describe('overlay command boundary', () => {
     expect(isFoxVisualTransform({ a: 1, b: 0, c: 0, d: 1, e: 49, f: 0 })).toBe(false);
     expect(isFoxVisualTransform({ a: Number.NaN, b: 0, c: 0, d: 1, e: 0, f: 0 })).toBe(false);
     expect(isFoxVisualTransform({ a: 1, b: 0, c: 0, d: 1, e: 0 })).toBe(false);
+  });
+
+  it('accepts typed snapshots and exact renderer observations only', () => {
+    const snapshot = overlaySnapshot(createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 2,
+      windowGeneration: 3,
+      releaseId: 'rel_synthetic',
+    }));
+    expect(isOverlayCommand({ type: 'overlay-snapshot', snapshot })).toBe(true);
+    expect(isOverlayCommand({ type: 'overlay-snapshot', snapshot, extra: true })).toBe(false);
+    expect(isOverlayRendererEvent({
+      type: 'session-changed',
+      sessionEpoch: 2,
+      releaseId: 'rel_synthetic',
+      windowGeneration: 3,
+      generation: 4,
+    })).toBe(true);
+    expect(isOverlayRendererEvent({
+      type: 'session-changed',
+      sessionEpoch: 2,
+      releaseId: 'rel_synthetic',
+      windowGeneration: 3,
+      generation: 4,
+      extra: true,
+    })).toBe(false);
   });
 });

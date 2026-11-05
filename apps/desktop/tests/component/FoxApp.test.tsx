@@ -7,6 +7,7 @@ import { FOX_RETRACT_DURATION_MS } from '../../src/shared/fox-motion';
 import { FOX_SLEEP_AFTER_MS } from '../../src/shared/fox-presence';
 import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -116,6 +117,39 @@ describe('FoxApp', () => {
     expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'paused');
     expect(screen.getByTestId('fox-idle')).toHaveClass('is-halo-paused');
     expect(screen.getByTestId('shortcut-fallback-dot')).toBeInTheDocument();
+  });
+
+  it('applies the authoritative snapshot and ignores an older window generation', () => {
+    render(<FoxApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 2,
+      generation: 4,
+      windowGeneration: 3,
+      releaseId: 'rel_synthetic',
+    });
+    const newer = overlaySnapshot({
+      ...base,
+      fox: { edge: 'left', peekEpoch: 7, peekIntent: 'retract' },
+      generation: 5,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: newer });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'left');
+
+    const stale = overlaySnapshot({
+      ...base,
+      windowGeneration: 2,
+      fox: { ...base.fox, edge: 'right', peekEpoch: 8 },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: stale });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'left');
   });
 
   it('opens search on a click that is not a drag', async () => {

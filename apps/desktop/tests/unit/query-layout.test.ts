@@ -288,15 +288,16 @@ describe('main query layout policy', () => {
   );
 
   it('keeps natural layout off the resize gesture and advances fallback sequences', () => {
-    expect(controller).toContain('!isQueryContentLayoutPhase(this.phase)');
-    expect(controller).toContain('this.queryResizeSession !== null && !this.queryResizeSession.finished');
-    expect(controller).toContain('this.manualQueryHeight !== null || this.queryResizeSession');
-    expect(controller).toContain('this.lastQueryLayoutSequence += 1');
-    expect(controller).toContain('queryLayoutAckCommand(');
-    expect(controller).toContain('this.activeChromeHandoffId');
-    expect(controller).toContain('reportableOverlayPhase(this.phase)');
-    expect(controller).toContain('this.reportablePhase()');
-    expect(controller).toContain('this.resultCount');
+    expect(controller).toContain('applyOverlayEvent(this.overlayState');
+    expect(controller).toContain("type: 'LAYOUT_REQUESTED'");
+    expect(controller).toContain("type: 'RESIZE_BEGIN'");
+    expect(controller).toContain("type: 'RESIZE_UPDATE'");
+    expect(controller).toContain("type: 'RESIZE_END'");
+    expect(controller).toContain('this.overlayState.layout.resize');
+    expect(controller).toContain('this.overlayState.layout.desiredHeight');
+    expect(controller).toContain('commitNativeLayout');
+    expect(controller).not.toContain('this.lastQueryLayoutSequence');
+    expect(controller).not.toContain('this.queryResizeSession');
     expect(reportableOverlayPhase('FOX_IDLE')).toBe('SEARCH_INPUT');
     expect(reportableOverlayPhase('RESULTS')).toBe('RESULTS');
     expect(acceptedQueryLayoutAck(2, 4, 312, 'bottom', 'RESULTS', 3)).toEqual({
@@ -317,8 +318,8 @@ describe('main query layout policy', () => {
       height: 312,
       resizeEdge: 'bottom',
     });
-    expect(controller).toContain('this.settleQueryResizeSession(true)');
-    expect(controller).toContain('if (this.queryResizeSession && !this.queryResizeSession.finished)');
+    expect(controller).toContain('this.overlayState.layout.sequence');
+    expect(controller).toContain('commitNativeLayout');
     expect(isQueryLayoutRequest({
       sessionId: 2,
       sequence: 1,

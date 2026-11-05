@@ -357,7 +357,11 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       expect(before.find((item) => item.role === 'query')?.visibleOnAllWorkspaces).toBe(false);
     }
 
-    await fox.getByTestId('fox-button').click();
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { expand: () => void };
+      }).__demoTest.expand();
+    });
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
       return snap.some(
@@ -1695,6 +1699,293 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
     expect(reduced.afterEcho.transient).toBe('dragging');
     expect(reduced.afterEcho.session).toBe('left');
     expect(reduced.afterEcho.sessionX).toBe(reduced.afterMove.sessionX);
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float clears session work, returns through blur, and fences an old window generation', async () => {
+  const app = await launchApp();
+  try {
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: {
+          expand: () => void;
+          reportUiPhase: (phase: 'RESULTS', count: 3) => void;
+        };
+      }).__demoTest.expand();
+    });
+    await waitForInteractiveQuery(app, query);
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
+      }).__demoTest.reportUiPhase('RESULTS', 3);
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
+    const beforeSession = await query.evaluate(async () => {
+      const agent = window.customerAgent;
+      if (!agent) throw new Error('customerAgent missing');
+      const snapshot = (await agent.getWindowContext()).snapshot;
+      const handoffId = snapshot.handoff.id;
+      const sessionEpoch = snapshot.contract.sessionEpoch;
+      const windowGeneration = snapshot.windowGeneration;
+      await (agent as unknown as {
+        reportOverlayEvent: (event: {
+          type: 'session-changed';
+          sessionEpoch: number;
+          releaseId: string;
+          windowGeneration: number;
+          generation: number;
+        }) => Promise<unknown>;
+      }).reportOverlayEvent({
+        type: 'session-changed',
+        sessionEpoch: sessionEpoch + 1,
+        releaseId: 'rel_synthetic_next',
+        windowGeneration,
+        generation: snapshot.contract.generation,
+      });
+      return { handoffId, sessionEpoch, windowGeneration };
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { blurQuery: () => void };
+      }).__demoTest.blurQuery();
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { expand: () => void };
+      }).__demoTest.expand();
+    });
+    await waitForInteractiveQuery(app, query);
+
+    const recreated = await query.evaluate(async (previous) => {
+      const agent = window.customerAgent;
+      if (!agent) throw new Error('customerAgent missing');
+      const api = agent as unknown as {
+        reportOverlayEvent: (event: {
+          type: 'window-recreated';
+          sessionEpoch: number;
+          windowGeneration: number;
+          generation: number;
+        }) => Promise<{ windowGeneration: number } | null>;
+      };
+      const snapshot = (await agent.getWindowContext()).snapshot;
+      await api.reportOverlayEvent({
+        type: 'window-recreated',
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        windowGeneration: snapshot.windowGeneration,
+        generation: snapshot.contract.generation,
+      });
+      await agent.reportHandoffMilestone?.(previous.handoffId, 'open-finished');
+      const after = (await agent.getWindowContext()).snapshot;
+      return {
+        previousWindowGeneration: previous.windowGeneration,
+        windowGeneration: after.windowGeneration,
+        phase: after.contract.phase,
+      };
+    }, beforeSession);
+    expect(recreated.windowGeneration).toBeGreaterThan(recreated.previousWindowGeneration);
+    expect(recreated.phase).toBe('parked');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute(
+      'data-window-generation',
+      String(recreated.windowGeneration),
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float hands off on a second physical display without crossing work areas', async () => {
+  const app = await launchApp();
+  try {
+    const fox = await waitForRole(app, 'fox');
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    const displays = await app.evaluate(({ screen }) => screen.getAllDisplays().map((display) => ({
+      id: display.id,
+      workArea: display.workArea,
+      primary: display.id === screen.getPrimaryDisplay().id,
+    })));
+    test.skip(displays.length < 2, 'requires at least two physical displays');
+    const secondary = displays.find((display) => !display.primary) ?? displays[1];
+    if (!secondary) {
+      throw new Error('secondary display missing');
+    }
+    await app.evaluate(({ BrowserWindow }, target) => {
+      const win = BrowserWindow.getAllWindows().find((candidate) => (
+        candidate.webContents.getURL().includes('role=fox')
+      ));
+      if (!win) throw new Error('fox window missing');
+      win.setBounds({
+        x: target.workArea.x + 120,
+        y: target.workArea.y + 120,
+        width: 88,
+        height: 88,
+      });
+    }, secondary);
+    await expect.poll(async () => {
+      const snapshot = await windowSnapshot(app);
+      return snapshot.find((item) => item.role === 'fox')?.x ?? Number.NEGATIVE_INFINITY;
+    }).toBeGreaterThanOrEqual(secondary.workArea.x);
+    await fox.getByTestId('fox-button').click();
+    await waitForInteractiveQuery(app, query);
+    const bounds = await app.evaluate(({ BrowserWindow }) => {
+      const queryWindow = BrowserWindow.getAllWindows().find((candidate) => (
+        candidate.webContents.getURL().includes('role=query')
+      ));
+      if (!queryWindow) throw new Error('query window missing');
+      return queryWindow.getBounds();
+    });
+    expect(bounds.x).toBeGreaterThanOrEqual(secondary.workArea.x);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      secondary.workArea.x + secondary.workArea.width,
+    );
+    expect(bounds.y).toBeGreaterThanOrEqual(secondary.workArea.y);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+      secondary.workArea.y + secondary.workArea.height,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float reports reducer and native command-to-first-frame percentiles', async () => {
+  test.setTimeout(120_000);
+  const app = await launchApp();
+  try {
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    let errors = 0;
+    const errorMessages: string[] = [];
+    for (let cycle = 0; cycle < 50; cycle += 1) {
+      try {
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest: {
+              expand: () => void;
+              reportUiPhase: (phase: 'RESULTS', count: 3) => void;
+            };
+          }).__demoTest.expand();
+        });
+        await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+        await expect.poll(() => query.evaluate(async () => {
+          const agent = window.customerAgent;
+          return agent ? (await agent.getWindowContext()).snapshot.contract.phase : 'missing';
+        })).toBe('active');
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
+          }).__demoTest.reportUiPhase('RESULTS', 3);
+        });
+        await expect.poll(() => query.evaluate(async () => {
+          const agent = window.customerAgent;
+          return agent ? (await agent.getWindowContext()).snapshot.contentPhase : 'missing';
+        })).toBe('RESULTS');
+        await query.evaluate(async (index) => {
+          const agent = window.customerAgent;
+          if (!agent) throw new Error('customerAgent missing');
+          const snapshot = (await agent.getWindowContext()).snapshot;
+          const commandId = snapshot.layout.sequence + 1;
+          const started = performance.now();
+          const ack = await agent.reportQueryLayout?.({
+            sessionId: snapshot.handoff.id,
+            sequence: commandId,
+            phase: 'RESULTS',
+            resultCount: 3,
+            desiredHeight: 320 + (index % 8) * 8,
+          });
+          if (!ack?.ok) {
+            throw new Error('layout request rejected');
+          }
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          });
+          await (agent as unknown as {
+            reportOverlayEvent?: (event: {
+              type: 'frame-observed';
+              commandId: number;
+              target: 'query';
+              sessionEpoch: number;
+              windowGeneration: number;
+              generation: number;
+            }) => Promise<unknown>;
+          }).reportOverlayEvent?.({
+            type: 'frame-observed',
+            commandId,
+            target: 'query',
+            sessionEpoch: snapshot.contract.sessionEpoch,
+            windowGeneration: snapshot.windowGeneration,
+            generation: snapshot.contract.generation,
+          });
+          const boundary = await agent.getWindowContext();
+          if (boundary.snapshot.contract.generation < snapshot.contract.generation) {
+            throw new Error('snapshot generation regressed');
+          }
+          if (!Number.isFinite(performance.now() - started)) {
+            throw new Error('non-finite frame sample');
+          }
+        }, cycle);
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest: { dismiss: () => void };
+          }).__demoTest.dismiss();
+        });
+        await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+        await expect.poll(() => query.evaluate(async () => {
+          const agent = window.customerAgent;
+          return agent ? (await agent.getWindowContext()).snapshot.contract.phase : 'missing';
+        })).toBe('parked');
+      } catch (error) {
+        errors += 1;
+        errorMessages.push(error instanceof Error ? error.message : String(error));
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest?: { dismiss: () => void };
+          }).__demoTest?.dismiss();
+        });
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest?: { expand: () => void };
+          }).__demoTest?.expand();
+        });
+      }
+    }
+    const mainMetrics = await app.evaluate(() => (
+      globalThis as typeof globalThis & {
+        __demoTest: {
+          queryLayoutDebug: () => {
+            performance: {
+              count: number;
+              p50: number | null;
+              p95: number | null;
+              p99: number | null;
+              coldMs: number | null;
+              errors: number;
+            };
+          };
+        };
+      }
+    ).__demoTest.queryLayoutDebug().performance);
+    console.log(`OVL_FRAME_PERF ${JSON.stringify({
+      p50: mainMetrics.p50,
+      p95: mainMetrics.p95,
+      p99: mainMetrics.p99,
+      inputScale: mainMetrics.count,
+      environment: `${process.platform}/${process.arch}; Electron production build; arm64 host`,
+      errors,
+      errorMessages,
+      coldWarm: `first command ${mainMetrics.coldMs ?? 'unavailable'} ms; warm samples after bootstrap; 50 open/close/focus/resize cycles`,
+      limiter: 'renderer rAF plus Main IPC; no artificial delay; two online displays available',
+      mainCommandToFirstFrame: mainMetrics,
+    })}`);
+    expect(errors).toBe(0);
+    expect(mainMetrics.count).toBeGreaterThanOrEqual(150);
   } finally {
     await app.close();
   }

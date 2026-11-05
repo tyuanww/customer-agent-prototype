@@ -18,6 +18,7 @@ import {
   type QueryLayoutAck,
 } from '../shared/query-layout';
 import {
+  OVERLAY_EVENT_CHANNEL,
   canRequestFoxPeek,
   isFoxDragGeneration,
   isFoxDragSettleId,
@@ -25,15 +26,37 @@ import {
   isFoxVisualTransform,
   isHandoffId,
   isHandoffMilestone,
+  isOverlayRendererEvent,
   isReportablePhase,
   isResultCount,
   type WindowContext,
   type FoxDragSettleAck,
 } from '../shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../shared/overlay-machine';
 import type { OverlayController } from './overlay-controller';
 import { isTrustedMainFrameSender, isTrustedSender } from './sender-guard';
 
 export function registerOverlayIpc(getController: () => OverlayController | null): void {
+  const unavailableContext = (): WindowContext => {
+    const state = createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 1,
+      windowGeneration: 1,
+      releaseId: 'rel_overlay_unbound',
+    });
+    return {
+      role: 'query',
+      phase: 'FOX_IDLE',
+      platform: process.platform,
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '窗口上下文不可用',
+      },
+      snapshot: overlaySnapshot(state),
+      testHarness: false,
+    };
+  };
   const guard = (event: IpcMainInvokeEvent): OverlayController | null => {
     const controller = getController();
     if (!controller) {
@@ -54,17 +77,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
   ipcMain.handle(IPC_CHANNELS.GET_WINDOW_CONTEXT, (event): WindowContext => {
     const controller = guard(event);
     if (!controller) {
-      return {
-        role: 'query',
-        phase: 'FOX_IDLE',
-        platform: process.platform,
-        shortcut: {
-          registered: false,
-          accelerator: 'CommandOrControl+Shift+Space',
-          message: '窗口上下文不可用',
-        },
-        testHarness: false,
-      };
+      return unavailableContext();
     }
     return {
       role: controller.overlayRoleOf(event.sender) ?? 'query',
@@ -75,8 +88,50 @@ export function registerOverlayIpc(getController: () => OverlayController | null
         accelerator: controller.accelerator,
         message: controller.shortcutMessage,
       },
+      snapshot: controller.getOverlaySnapshot(),
       testHarness: controller.testHarness,
     };
+  });
+
+  ipcMain.handle(OVERLAY_EVENT_CHANNEL, (event, payload: unknown) => {
+    const controller = getController();
+    if (
+      !controller
+      || !isTrustedMainFrameSender(
+        event,
+        controller.trustedContents(),
+        controller.rendererDevServerUrl,
+      )
+      || !isOverlayRendererEvent(payload)
+    ) {
+      return null;
+    }
+    const role = controller.overlayRoleOf(event.sender);
+    if (!role) {
+      return null;
+    }
+    if (
+      (payload.type === 'session-changed' || payload.type === 'release-changed'
+        || payload.type === 'focus-changed')
+      && role !== 'query'
+    ) {
+      return null;
+    }
+    if (payload.type === 'frame-observed' && payload.target !== role) {
+      return null;
+    }
+    if (payload.type === 'session-changed') {
+      controller.reportSessionChange(payload.sessionEpoch, payload.releaseId);
+    } else if (payload.type === 'release-changed') {
+      controller.reportReleaseChange(payload.releaseId);
+    } else if (payload.type === 'focus-changed') {
+      controller.reportFocus(payload.focused);
+    } else if (payload.type === 'window-recreated') {
+      controller.reportWindowRecreated();
+    } else {
+      controller.reportRendererFrame(payload.commandId);
+    }
+    return controller.getOverlaySnapshot();
   });
 
   ipcMain.handle(IPC_CHANNELS.QUERY_SUBSCRIBED, (event): void => {

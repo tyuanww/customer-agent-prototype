@@ -16,6 +16,7 @@ import {
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
 import { intakeQuery } from './content-intake-query';
+import { isOverlaySnapshot } from '../shared/overlay-machine';
 import {
   IPC_CHANNELS,
   isOpenDashboardResult,
@@ -25,6 +26,7 @@ import {
   type OpenDashboardResult,
 } from '../shared/contracts';
 import {
+  OVERLAY_EVENT_CHANNEL,
   isFoxDragSettleAck,
   isFoxDragGeneration,
   isFoxDragSettleId,
@@ -34,8 +36,10 @@ import {
   isHandoffId,
   isHandoffMilestone,
   isOverlayCommand,
+  isOverlayRendererEvent,
   isReportablePhase,
   isResultCount,
+  type OverlayControlApi,
   type OverlayCommand,
   type WindowContext,
 } from '../shared/overlay-events';
@@ -144,7 +148,7 @@ function parseSopWindowOpenResult(value: unknown):
   }
   return null;
 }
-const api: CustomerAgentApi = {
+const api: CustomerAgentApi & OverlayControlApi = {
   intakeQuery,
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
@@ -249,6 +253,17 @@ const api: CustomerAgentApi = {
   },
   getWindowContext(): Promise<WindowContext> {
     return ipcRenderer.invoke(IPC_CHANNELS.GET_WINDOW_CONTEXT);
+  },
+  async reportOverlayEvent(event) {
+    if (!isOverlayRendererEvent(event)) {
+      return null;
+    }
+    try {
+      const value: unknown = await ipcRenderer.invoke(OVERLAY_EVENT_CHANNEL, event);
+      return isOverlaySnapshot(value) ? value : null;
+    } catch {
+      return null;
+    }
   },
   openSearch(visualTransform): Promise<void> {
     if (visualTransform !== undefined && !isFoxVisualTransform(visualTransform)) {
