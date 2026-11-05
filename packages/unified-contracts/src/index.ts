@@ -126,7 +126,12 @@ export type SopFlow = {
   title: string;
   entryStepId: string;
   steps: SopStep[];
-  branches: Array<{ branchId: string; label: string; targetStepId: string }>;
+  branches: Array<{
+    branchId: string;
+    sourceStepId: string;
+    label: string;
+    targetStepId: string;
+  }>;
 };
 
 export type QueryOutcome =
@@ -162,7 +167,8 @@ export type OperationState = keyof typeof OPERATION_TRANSITIONS;
 export type OperationReceipt =
   | { kind: 'committed'; committedAt: string; resultRef: string }
   | { kind: 'failed'; failedAt: string; failureCode: string }
-  | { kind: 'cancelled'; cancelledAt: string };
+  | { kind: 'cancelled'; cancelledAt: string }
+  | { kind: 'expired'; expiredAt: string };
 export type OperationStatus = {
   operationId: OperationId;
   userId: UserId;
@@ -205,6 +211,13 @@ export type PolicyConstraint = {
   requiresCurrentFacts: boolean;
   requiresDatabaseCheck: boolean;
 };
+export type RoleCeilingPolicy = {
+  role: AccessRole;
+  businessActions: readonly AccessAction[];
+  mayAllocate: boolean;
+  mayDelegate: boolean;
+  maySkipImportParent: boolean;
+};
 export type AuthorizationMatrixEntry = {
   role: AccessRole;
   action: AccessAction;
@@ -212,25 +225,58 @@ export type AuthorizationMatrixEntry = {
   constraints: PolicyConstraint;
 };
 
-const policy = (role: AccessRole, action: AccessAction, scopeKind: ScopeKind, requiresCurrentFacts = true): AuthorizationMatrixEntry => ({
+const policy = (role: AccessRole, action: AccessAction, scopeKind: ScopeKind, requiresCurrentFacts = true): AuthorizationMatrixEntry => Object.freeze({
   role, action, scopeKind,
-  constraints: { maxScope: scopeKind, requiresCurrentFacts, requiresDatabaseCheck: true },
+  constraints: Object.freeze({ maxScope: scopeKind, requiresCurrentFacts, requiresDatabaseCheck: true }),
 });
 
-export const AUTHORIZATION_MATRIX: readonly AuthorizationMatrixEntry[] = [
-  policy('agent', 'query', 'source'), policy('enabler', 'query', 'source'),
-  policy('supervisor', 'query', 'source'), policy('supervisor', 'dashboard-read', 'tenant'),
-  policy('supervisor', 'accounts-manage', 'tenant'),
-  policy('lead', 'query', 'source'), policy('lead', 'dashboard-read', 'tenant'), policy('lead', 'accounts-manage', 'tenant'),
-  policy('manager', 'query', 'source'), policy('manager', 'content-manage', 'source'), policy('manager', 'import', 'source'),
-  policy('manager', 'source-confirm', 'source'), policy('manager', 'review', 'source'), policy('manager', 'publish', 'source'),
-  policy('manager', 'candidate-cancel', 'source'), policy('manager', 'rollback', 'source'), policy('manager', 'dashboard-read', 'tenant'), policy('manager', 'grants-manage', 'source'),
-  policy('engineer', 'query', 'source'), policy('engineer', 'dashboard-read', 'tenant'), policy('engineer', 'accounts-manage', 'tenant'),
-  policy('director', 'query', 'source'), policy('director', 'content-manage', 'source'), policy('director', 'import', 'source'),
-  policy('director', 'source-confirm', 'source'), policy('director', 'review', 'source'), policy('director', 'publish', 'source'),
-  policy('director', 'candidate-cancel', 'source'), policy('director', 'rollback', 'source'), policy('director', 'dashboard-read', 'tenant'),
-  policy('director', 'grants-manage', 'source'), policy('director', 'accounts-manage', 'tenant'),
-];
+const businessActions = Object.freeze([
+  'query', 'content-manage', 'import', 'source-confirm',
+  'review', 'publish', 'candidate-cancel', 'rollback',
+] as const satisfies readonly AccessAction[]);
+const queryBusinessActions = Object.freeze(['query'] as const);
+const rolePolicy = (
+  role: AccessRole,
+  actions: readonly AccessAction[],
+  mayAllocate: boolean,
+  mayDelegate: boolean,
+  maySkipImportParent: boolean,
+): RoleCeilingPolicy => Object.freeze({
+  role,
+  businessActions: actions,
+  mayAllocate,
+  mayDelegate,
+  maySkipImportParent,
+});
+
+/**
+ * The canonical values mirror `content_intake.role_ceiling`. The database
+ * remains the runtime authority; this data only generates reviewable seed SQL
+ * and derives the local ACL shape used by contract validation.
+ */
+export const ROLE_CEILING_POLICY: readonly RoleCeilingPolicy[] = Object.freeze([
+  rolePolicy('agent', queryBusinessActions, false, false, false),
+  rolePolicy('director', businessActions, true, true, true),
+  rolePolicy('enabler', queryBusinessActions, false, false, false),
+  rolePolicy('engineer', businessActions, true, true, true),
+  rolePolicy('lead', businessActions, false, false, false),
+  rolePolicy('manager', businessActions, true, true, true),
+  rolePolicy('supervisor', businessActions, false, false, false),
+]);
+
+const dashboardReadRoles = new Set<AccessRole>([
+  'director', 'engineer', 'lead', 'manager', 'supervisor',
+]);
+
+export const AUTHORIZATION_MATRIX: readonly AuthorizationMatrixEntry[] = Object.freeze(ROLE_CEILING_POLICY.flatMap((entry) => {
+  const entries = entry.businessActions.map((action) => policy(entry.role, action, 'source'));
+  if (dashboardReadRoles.has(entry.role)) entries.push(policy(entry.role, 'dashboard-read', 'tenant'));
+  if (entry.mayAllocate) {
+    entries.push(policy(entry.role, 'grants-manage', 'source'));
+    entries.push(policy(entry.role, 'accounts-manage', 'tenant'));
+  }
+  return entries;
+}));
 
 export class ContractValidationError extends Error {
   readonly path: string;
@@ -244,7 +290,28 @@ const isRecord = (value: unknown): value is StringRecord => typeof value === 'ob
 const hasOnly = (value: StringRecord, keys: readonly string[]): boolean => Object.keys(value).every((key) => keys.includes(key));
 const stringAt = (value: unknown, path: string, nonEmpty = true): ValidationResult<string> => typeof value === 'string' && (!nonEmpty || value.length > 0) ? ok(value) : fail(path, 'expected non-empty string');
 const intAt = (value: unknown, path: string, minimum = 0): ValidationResult<number> => Number.isInteger(value) && (value as number) >= minimum ? ok(value as number) : fail(path, `expected integer >= ${minimum}`);
-const isoAt = (value: unknown, path: string): ValidationResult<string> => typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? ok(value) : fail(path, 'expected ISO date-time');
+const isoAt = (value: unknown, path: string): ValidationResult<string> => {
+  if (typeof value !== 'string') return fail(path, 'expected ISO date-time');
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/u);
+  if (!match) return fail(path, 'expected ISO date-time');
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, offsetHourText, offsetMinuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const offsetHour = offsetHourText === undefined ? 0 : Number(offsetHourText);
+  const offsetMinute = offsetMinuteText === undefined ? 0 : Number(offsetMinuteText);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth
+    || hour > 23 || minute > 59 || second > 59
+    || offsetHour > 23 || offsetMinute > 59
+    || Number.isNaN(Date.parse(value))) {
+    return fail(path, 'expected ISO date-time');
+  }
+  return ok(value);
+};
 const branded = <T>(value: string): T => value as T;
 const epoch = (value: number): SessionEpoch => value as SessionEpoch;
 const dateOrder = (a: string, b: string): boolean => Date.parse(a) < Date.parse(b);
@@ -253,10 +320,17 @@ const exactRecord = (value: unknown, path: string, keys: readonly string[]): Val
 
 function parseScope(value: unknown, path: string): ValidationResult<Scope> {
   if (!isRecord(value) || !SCOPE_KINDS.includes(value.kind as typeof SCOPE_KINDS[number])) return fail(path, 'invalid scope kind');
-  if (!hasOnly(value, ['kind', 'tenantId', 'appId', 'brandId', 'shopId', 'domain', 'sourceId'])) return fail(path, 'unknown scope field');
+  const kind = value.kind as ScopeKind;
+  const allowed: Record<ScopeKind, readonly string[]> = {
+    tenant: ['kind', 'tenantId', 'appId'],
+    brand: ['kind', 'tenantId', 'appId', 'brandId'],
+    shop: ['kind', 'tenantId', 'appId', 'brandId', 'shopId'],
+    source: ['kind', 'tenantId', 'appId', 'brandId', 'shopId', 'domain', 'sourceId'],
+  };
+  if (!hasOnly(value, allowed[kind])) return fail(path, 'field is not allowed for this scope kind');
   for (const key of ['tenantId', 'appId'] as const) if (typeof value[key] !== 'string' || value[key].length === 0) return fail(`${path}.${key}`, 'required');
   const required: Record<ScopeKind, string[]> = { tenant: [], brand: ['brandId'], shop: ['brandId', 'shopId'], source: ['brandId', 'shopId', 'domain', 'sourceId'] };
-  for (const key of required[value.kind as ScopeKind]) if (typeof value[key] !== 'string' || value[key].length === 0) return fail(`${path}.${key}`, 'required for scope kind');
+  for (const key of required[kind]) if (typeof value[key] !== 'string' || value[key].length === 0) return fail(`${path}.${key}`, 'required for scope kind');
   if (value.domain !== undefined && !['product', 'activity', 'after-sale', 'aftersale', 'general'].includes(value.domain as string)) return fail(`${path}.domain`, 'invalid domain');
   return ok(value as Scope);
 }
@@ -304,22 +378,21 @@ export const toAdminAccessView = (decision: AccessDecision): AdminAccessView => 
 
 function parseQueryId(value: unknown, path: string): ValidationResult<QueryId> { const parsed = stringAt(value, path); return parsed.ok ? ok(branded<QueryId>(parsed.value)) : parsed; }
 function parseReleaseId(value: unknown, path: string): ValidationResult<ReleaseId> { const parsed = stringAt(value, path); return parsed.ok ? ok(branded<ReleaseId>(parsed.value)) : parsed; }
-function parseCandidate(value: unknown, path: string): ValidationResult<ContentCandidate> { const s = exactRecord(value, path, ['candidateId', 'title', 'body', 'copyHandle', 'rank']); if (!s.ok) return s; for (const k of ['candidateId', 'title', 'body', 'copyHandle'] as const) { const v = stringAt(s.value[k], `${path}.${k}`); if (!v.ok) return v; } const rank = intAt(s.value.rank, `${path}.rank`, 1); if (!rank.ok) return rank; return ok(s.value as ContentCandidate); }
+function parseCandidate(value: unknown, path: string): ValidationResult<ContentCandidate> { const s = exactRecord(value, path, ['candidateId', 'title', 'body', 'copyHandle', 'rank']); if (!s.ok) return s; for (const k of ['candidateId', 'title', 'body', 'copyHandle'] as const) { const v = stringAt(s.value[k], `${path}.${k}`); if (!v.ok) return v; } const rank = intAt(s.value.rank, `${path}.rank`, 1); if (!rank.ok || rank.value > 3) return fail(`${path}.rank`, 'expected integer from 1 through 3'); return ok(s.value as ContentCandidate); }
 function parseFlow(value: unknown, path: string): ValidationResult<SopFlow> {
   const s = exactRecord(value, path, ['sopId', 'title', 'entryStepId', 'steps', 'branches']); if (!s.ok) return s;
-  const ids = new Set<string>();
-  for (const k of ['sopId', 'title', 'entryStepId'] as const) { const v = stringAt(s.value[k], `${path}.${k}`); if (!v.ok) return v; if (k === 'entryStepId') ids.add(v.value); }
+  for (const k of ['sopId', 'title', 'entryStepId'] as const) { const v = stringAt(s.value[k], `${path}.${k}`); if (!v.ok) return v; }
   if (!Array.isArray(s.value.steps) || s.value.steps.length === 0) return fail(`${path}.steps`, 'expected non-empty array');
-  const steps: SopStep[] = []; const stepIds = new Set<string>();
-  for (let i = 0; i < s.value.steps.length; i += 1) { const step = exactRecord(s.value.steps[i], `${path}.steps[${i}]`, ['stepId', 'kind', 'sequence', 'text', 'media']); if (!step.ok) return step; if (typeof step.value.stepId !== 'string' || step.value.stepId.length === 0 || stepIds.has(step.value.stepId)) return fail(`${path}.steps[${i}].stepId`, 'unique non-empty step id required'); if (!['instruction', 'decision', 'terminal'].includes(step.value.kind as string)) return fail(`${path}.steps[${i}].kind`, 'invalid step kind'); const seq = intAt(step.value.sequence, `${path}.steps[${i}].sequence`, 1); if (!seq.ok) return seq; const text = stringAt(step.value.text, `${path}.steps[${i}].text`); if (!text.ok) return text; if (!Array.isArray(step.value.media) || step.value.media.some((m) => typeof m !== 'string')) return fail(`${path}.steps[${i}].media`, 'expected string array'); stepIds.add(step.value.stepId); steps.push(step.value as SopStep); }
+  const steps: SopStep[] = []; const stepIds = new Set<string>(); const decisionStepIds = new Set<string>(); const sequences = new Set<number>();
+  for (let i = 0; i < s.value.steps.length; i += 1) { const step = exactRecord(s.value.steps[i], `${path}.steps[${i}]`, ['stepId', 'kind', 'sequence', 'text', 'media']); if (!step.ok) return step; if (typeof step.value.stepId !== 'string' || step.value.stepId.length === 0 || stepIds.has(step.value.stepId)) return fail(`${path}.steps[${i}].stepId`, 'unique non-empty step id required'); if (!['instruction', 'decision', 'terminal'].includes(step.value.kind as string)) return fail(`${path}.steps[${i}].kind`, 'invalid step kind'); const seq = intAt(step.value.sequence, `${path}.steps[${i}].sequence`, 1); if (!seq.ok) return seq; if (sequences.has(seq.value)) return fail(`${path}.steps[${i}].sequence`, 'step sequences must be unique'); const text = stringAt(step.value.text, `${path}.steps[${i}].text`); if (!text.ok) return text; if (!Array.isArray(step.value.media) || step.value.media.some((m) => typeof m !== 'string')) return fail(`${path}.steps[${i}].media`, 'expected string array'); stepIds.add(step.value.stepId); sequences.add(seq.value); if (step.value.kind === 'decision') decisionStepIds.add(step.value.stepId); steps.push(step.value as SopStep); }
   if (!stepIds.has(s.value.entryStepId as string)) return fail(`${path}.entryStepId`, 'must reference a step');
-  if (!Array.isArray(s.value.branches)) return fail(`${path}.branches`, 'expected array'); const branches = [] as SopFlow['branches'];
-  for (let i = 0; i < s.value.branches.length; i += 1) { const branch = exactRecord(s.value.branches[i], `${path}.branches[${i}]`, ['branchId', 'label', 'targetStepId']); if (!branch.ok) return branch; for (const k of ['branchId', 'label', 'targetStepId'] as const) { const v = stringAt(branch.value[k], `${path}.branches[${i}].${k}`); if (!v.ok) return v; } if (!stepIds.has(branch.value.targetStepId as string)) return fail(`${path}.branches[${i}].targetStepId`, 'must reference a step'); branches.push(branch.value as SopFlow['branches'][number]); }
+  if (!Array.isArray(s.value.branches)) return fail(`${path}.branches`, 'expected array'); const branches = [] as SopFlow['branches']; const branchIds = new Set<string>();
+  for (let i = 0; i < s.value.branches.length; i += 1) { const branch = exactRecord(s.value.branches[i], `${path}.branches[${i}]`, ['branchId', 'sourceStepId', 'label', 'targetStepId']); if (!branch.ok) return branch; for (const k of ['branchId', 'sourceStepId', 'label', 'targetStepId'] as const) { const v = stringAt(branch.value[k], `${path}.branches[${i}].${k}`); if (!v.ok) return v; } if (branchIds.has(branch.value.branchId as string)) return fail(`${path}.branches[${i}].branchId`, 'branch ids must be unique'); if (!decisionStepIds.has(branch.value.sourceStepId as string)) return fail(`${path}.branches[${i}].sourceStepId`, 'must reference a decision step'); if (!stepIds.has(branch.value.targetStepId as string)) return fail(`${path}.branches[${i}].targetStepId`, 'must reference a step'); branchIds.add(branch.value.branchId as string); branches.push(branch.value as SopFlow['branches'][number]); }
   return ok({ sopId: s.value.sopId as string, title: s.value.title as string, entryStepId: s.value.entryStepId as string, steps, branches });
 }
 export function validateQueryOutcome(value: unknown): ValidationResult<QueryOutcome> {
   if (!isRecord(value) || typeof value.kind !== 'string') return fail('$', 'query outcome needs a discriminator');
-  if (value.kind === 'content') { const s = exactRecord(value, '$', ['kind', 'queryId', 'releaseId', 'candidates']); if (!s.ok) return s; const q = parseQueryId(s.value.queryId, '$.queryId'); if (!q.ok) return q; const r = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!r.ok) return r; if (!Array.isArray(s.value.candidates) || s.value.candidates.length === 0) return fail('$.candidates', 'content needs candidates'); const candidates: ContentCandidate[] = []; for (let i = 0; i < s.value.candidates.length; i += 1) { const c = parseCandidate(s.value.candidates[i], `$.candidates[${i}]`); if (!c.ok) return c; candidates.push(c.value); } return ok({ kind: 'content', queryId: q.value, releaseId: r.value, candidates }); }
+  if (value.kind === 'content') { const s = exactRecord(value, '$', ['kind', 'queryId', 'releaseId', 'candidates']); if (!s.ok) return s; const q = parseQueryId(s.value.queryId, '$.queryId'); if (!q.ok) return q; const r = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!r.ok) return r; if (!Array.isArray(s.value.candidates) || s.value.candidates.length === 0 || s.value.candidates.length > 3) return fail('$.candidates', 'content needs one to three candidates'); const candidates: ContentCandidate[] = []; const ranks = new Set<number>(); const copyHandles = new Set<string>(); for (let i = 0; i < s.value.candidates.length; i += 1) { const c = parseCandidate(s.value.candidates[i], `$.candidates[${i}]`); if (!c.ok) return c; if (ranks.has(c.value.rank)) return fail(`$.candidates[${i}].rank`, 'ranks must be unique'); if (copyHandles.has(c.value.copyHandle)) return fail(`$.candidates[${i}].copyHandle`, 'copy handles must be unique'); ranks.add(c.value.rank); copyHandles.add(c.value.copyHandle); candidates.push(c.value); } return ok({ kind: 'content', queryId: q.value, releaseId: r.value, candidates }); }
   if (value.kind === 'sop') { const s = exactRecord(value, '$', ['kind', 'queryId', 'releaseId', 'flow']); if (!s.ok) return s; const q = parseQueryId(s.value.queryId, '$.queryId'); if (!q.ok) return q; const r = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!r.ok) return r; const f = parseFlow(s.value.flow, '$.flow'); if (!f.ok) return f; return ok({ kind: 'sop', queryId: q.value, releaseId: r.value, flow: f.value }); }
   if (value.kind === 'no-hit') { const s = exactRecord(value, '$', ['kind', 'queryId', 'reason']); if (!s.ok) return s; const q = parseQueryId(s.value.queryId, '$.queryId'); if (!q.ok) return q; const reason = stringAt(s.value.reason, '$.reason'); if (!reason.ok) return reason; return ok({ kind: 'no-hit', queryId: q.value, reason: reason.value }); }
   if (value.kind === 'failure') { const s = exactRecord(value, '$', ['kind', 'queryId', 'failureCode', 'retryable', 'message']); if (!s.ok) return s; const q = parseQueryId(s.value.queryId, '$.queryId'); if (!q.ok) return q; for (const k of ['failureCode', 'message'] as const) { const v = stringAt(s.value[k], `$.${k}`); if (!v.ok) return v; } if (typeof s.value.retryable !== 'boolean') return fail('$.retryable', 'expected boolean'); return ok({ kind: 'failure', queryId: q.value, failureCode: s.value.failureCode as string, retryable: s.value.retryable, message: s.value.message as string }); }
@@ -334,15 +407,111 @@ export const parseOperationEnvelope = (value: unknown): OperationEnvelope => res
 export type OperationReuse = 'new' | 'replay' | 'conflict' | 'stale-session';
 export function classifyOperationReuse(existing: OperationEnvelope | undefined, incoming: OperationEnvelope): OperationReuse { if (!existing) return 'new'; if (existing.actor.userId !== incoming.actor.userId || existing.command !== incoming.command || existing.requestHash !== incoming.requestHash) return 'conflict'; if (existing.actor.sessionEpoch !== incoming.actor.sessionEpoch) return 'stale-session'; return existing.operationId === incoming.operationId && existing.idempotencyKey === incoming.idempotencyKey ? 'replay' : 'conflict'; }
 
-function parseReceipt(value: unknown, state: OperationState, path: string): ValidationResult<OperationReceipt | null> { if (state === 'unknown') return value === null ? ok(null) : fail(path, 'unknown status cannot carry a receipt'); if (['accepted', 'running'].includes(state)) return value === null ? ok(null) : fail(path, 'non-terminal status cannot carry a receipt'); if (!isRecord(value)) return fail(path, 'terminal status requires a receipt'); const kind = state === 'committed' ? 'committed' : state === 'failed' ? 'failed' : 'cancelled'; if (value.kind !== kind) return fail(path, 'receipt kind must match terminal state'); if (kind === 'committed') return typeof value.committedAt === 'string' && typeof value.resultRef === 'string' && value.resultRef.length > 0 ? ok(value as OperationReceipt) : fail(path, 'invalid committed receipt'); if (kind === 'failed') return typeof value.failedAt === 'string' && typeof value.failureCode === 'string' && value.failureCode.length > 0 ? ok(value as OperationReceipt) : fail(path, 'invalid failed receipt'); return typeof value.cancelledAt === 'string' ? ok(value as OperationReceipt) : fail(path, 'invalid cancelled receipt'); }
-export function parseOperationStatus(value: unknown): OperationStatus { const s = exactRecord(value, '$', ['operationId', 'userId', 'sessionEpoch', 'command', 'state', 'updatedAt', 'recoveryDeadline', 'receipt']); if (!s.ok) throw s.error; const id = stringAt(s.value.operationId, '$.operationId'); if (!id.ok) throw id.error; const user = stringAt(s.value.userId, '$.userId'); if (!user.ok) throw user.error; const ep = intAt(s.value.sessionEpoch, '$.sessionEpoch', 1); if (!ep.ok) throw ep.error; if (!Object.hasOwn(OPERATION_TRANSITIONS, s.value.state as string)) throw new ContractValidationError('$.state', 'invalid state'); const command = s.value.command; if (!ACCESS_ACTIONS.includes(command as AccessAction) && !['query', 'settings-preview', 'settings-save'].includes(command as string)) throw new ContractValidationError('$.command', 'invalid command'); const updated = isoAt(s.value.updatedAt, '$.updatedAt'); if (!updated.ok) throw updated.error; const recovery = isoAt(s.value.recoveryDeadline, '$.recoveryDeadline'); if (!recovery.ok) throw recovery.error; const receipt = parseReceipt(s.value.receipt, s.value.state as OperationState, '$.receipt'); if (!receipt.ok) throw receipt.error; return { operationId: branded<OperationId>(id.value), userId: branded<UserId>(user.value), sessionEpoch: epoch(ep.value), command: command as OperationCommand, state: s.value.state as OperationState, updatedAt: updated.value, recoveryDeadline: recovery.value, receipt: receipt.value }; }
+function parseReceipt(
+  value: unknown,
+  state: OperationState,
+  updatedAt: string,
+  path: string,
+): ValidationResult<OperationReceipt | null> {
+  if (state === 'unknown') return value === null ? ok(null) : fail(path, 'unknown status cannot carry a receipt');
+  if (state === 'accepted' || state === 'running') return value === null ? ok(null) : fail(path, 'non-terminal status cannot carry a receipt');
+  const terminal: Record<Exclude<OperationState, 'accepted' | 'running' | 'unknown'>, {
+    keys: readonly string[];
+    timestamp: string;
+  }> = {
+    committed: { keys: ['kind', 'committedAt', 'resultRef'], timestamp: 'committedAt' },
+    failed: { keys: ['kind', 'failedAt', 'failureCode'], timestamp: 'failedAt' },
+    cancelled: { keys: ['kind', 'cancelledAt'], timestamp: 'cancelledAt' },
+    expired: { keys: ['kind', 'expiredAt'], timestamp: 'expiredAt' },
+  };
+  const expected = terminal[state];
+  const receipt = exactRecord(value, path, expected.keys);
+  if (!receipt.ok) return receipt;
+  if (receipt.value.kind !== state) return fail(path, 'receipt kind must match terminal state');
+  const at = isoAt(receipt.value[expected.timestamp], `${path}.${expected.timestamp}`);
+  if (!at.ok) return at;
+  if (Date.parse(at.value) > Date.parse(updatedAt)) return fail(path, 'receipt timestamp cannot follow updatedAt');
+  if (state === 'committed') {
+    const resultRef = stringAt(receipt.value.resultRef, `${path}.resultRef`);
+    if (!resultRef.ok) return resultRef;
+    return ok({ kind: 'committed', committedAt: at.value, resultRef: resultRef.value });
+  }
+  if (state === 'failed') {
+    const failureCode = stringAt(receipt.value.failureCode, `${path}.failureCode`);
+    if (!failureCode.ok) return failureCode;
+    return ok({ kind: 'failed', failedAt: at.value, failureCode: failureCode.value });
+  }
+  if (state === 'cancelled') return ok({ kind: 'cancelled', cancelledAt: at.value });
+  return ok({ kind: 'expired', expiredAt: at.value });
+}
+export function parseOperationStatus(value: unknown): OperationStatus {
+  const s = exactRecord(value, '$', ['operationId', 'userId', 'sessionEpoch', 'command', 'state', 'updatedAt', 'recoveryDeadline', 'receipt']);
+  if (!s.ok) throw s.error;
+  const id = stringAt(s.value.operationId, '$.operationId');
+  if (!id.ok) throw id.error;
+  const user = stringAt(s.value.userId, '$.userId');
+  if (!user.ok) throw user.error;
+  const ep = intAt(s.value.sessionEpoch, '$.sessionEpoch', 1);
+  if (!ep.ok) throw ep.error;
+  if (!Object.hasOwn(OPERATION_TRANSITIONS, s.value.state as string)) throw new ContractValidationError('$.state', 'invalid state');
+  const command = s.value.command;
+  if (!ACCESS_ACTIONS.includes(command as AccessAction) && !['query', 'settings-preview', 'settings-save'].includes(command as string)) throw new ContractValidationError('$.command', 'invalid command');
+  const updated = isoAt(s.value.updatedAt, '$.updatedAt');
+  if (!updated.ok) throw updated.error;
+  const recovery = isoAt(s.value.recoveryDeadline, '$.recoveryDeadline');
+  if (!recovery.ok) throw recovery.error;
+  if (Date.parse(recovery.value) < Date.parse(updated.value)) throw new ContractValidationError('$.recoveryDeadline', 'must not precede updatedAt');
+  const receipt = parseReceipt(s.value.receipt, s.value.state as OperationState, updated.value, '$.receipt');
+  if (!receipt.ok) throw receipt.error;
+  return { operationId: branded<OperationId>(id.value), userId: branded<UserId>(user.value), sessionEpoch: epoch(ep.value), command: command as OperationCommand, state: s.value.state as OperationState, updatedAt: updated.value, recoveryDeadline: recovery.value, receipt: receipt.value };
+}
 export function validateOperationStatus(value: unknown): ValidationResult<OperationStatus> { try { return ok(parseOperationStatus(value)); } catch (error) { return fail(error instanceof ContractValidationError ? error.path : '$', error instanceof Error ? error.message : 'invalid operation status'); } }
 
-function parseProjection(value: unknown, path: string): ValidationResult<ReleaseProjection> { const s = exactRecord(value, path, ['state', 'indexId', 'indexVersion', 'itemCount', 'indexHash']); if (!s.ok) return s; if (s.value.state !== 'ready' && s.value.state !== 'empty') return fail(`${path}.state`, 'invalid'); const count = intAt(s.value.itemCount, `${path}.itemCount`); if (!count.ok) return count; if (s.value.state === 'ready' && (typeof s.value.indexId !== 'string' || typeof s.value.indexHash !== 'string' || !Number.isInteger(s.value.indexVersion))) return fail(path, 'ready projection needs index identity'); if (s.value.state === 'empty' && (s.value.indexId !== null || s.value.indexVersion !== null || s.value.indexHash !== null || count.value !== 0)) return fail(path, 'empty projection must have no index'); return ok(s.value as ReleaseProjection); }
+function parseProjection(value: unknown, path: string): ValidationResult<ReleaseProjection> {
+  const s = exactRecord(value, path, ['state', 'indexId', 'indexVersion', 'itemCount', 'indexHash']);
+  if (!s.ok) return s;
+  if (s.value.state !== 'ready' && s.value.state !== 'empty') return fail(`${path}.state`, 'invalid');
+  const count = intAt(s.value.itemCount, `${path}.itemCount`);
+  if (!count.ok) return count;
+  if (s.value.state === 'ready') {
+    const indexId = stringAt(s.value.indexId, `${path}.indexId`);
+    if (!indexId.ok) return indexId;
+    const indexHash = stringAt(s.value.indexHash, `${path}.indexHash`);
+    if (!indexHash.ok) return indexHash;
+    const indexVersion = intAt(s.value.indexVersion, `${path}.indexVersion`, 1);
+    if (!indexVersion.ok) return indexVersion;
+    return ok({
+      state: 'ready',
+      indexId: indexId.value,
+      indexVersion: indexVersion.value,
+      itemCount: count.value,
+      indexHash: indexHash.value,
+    });
+  }
+  if (s.value.indexId !== null || s.value.indexVersion !== null || s.value.indexHash !== null || count.value !== 0) return fail(path, 'empty projection must have no index or items');
+  return ok({ state: 'empty', indexId: null, indexVersion: null, itemCount: 0, indexHash: null });
+}
 export function parseReleaseSnapshot(value: unknown): ReleaseSnapshot { const s = exactRecord(value, '$', ['releaseId', 'sequence', 'publishedAt', 'content', 'sop']); if (!s.ok) throw s.error; const id = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!id.ok) throw id.error; const seq = intAt(s.value.sequence, '$.sequence', 1); if (!seq.ok) throw seq.error; const pub = isoAt(s.value.publishedAt, '$.publishedAt'); if (!pub.ok) throw pub.error; const content = parseProjection(s.value.content, '$.content'); if (!content.ok) throw content.error; const sop = parseProjection(s.value.sop, '$.sop'); if (!sop.ok) throw sop.error; return { releaseId: id.value, sequence: seq.value, publishedAt: pub.value, content: content.value, sop: sop.value }; }
 export function validateReleaseSnapshot(value: unknown): ValidationResult<ReleaseSnapshot> { try { return ok(parseReleaseSnapshot(value)); } catch (error) { return fail(error instanceof ContractValidationError ? error.path : '$', error instanceof Error ? error.message : 'invalid release snapshot'); } }
 export function parseOverlaySnapshot(value: unknown): OverlaySnapshot { const s = exactRecord(value, '$', ['role', 'sessionEpoch', 'generation', 'phase', 'activeSurface', 'handoffSequence', 'layoutSequence', 'releaseId']); if (!s.ok) throw s.error; if (s.value.role !== 'fox' && s.value.role !== 'query') throw new ContractValidationError('$.role', 'invalid role'); const role = s.value.role as OverlaySnapshot['role']; const ep = intAt(s.value.sessionEpoch, '$.sessionEpoch', 1); if (!ep.ok) throw ep.error; for (const k of ['generation', 'handoffSequence', 'layoutSequence'] as const) { const v = intAt(s.value[k], `$.${k}`); if (!v.ok) throw v.error; } if (!['parked', 'opening', 'active', 'closing', 'closed'].includes(s.value.phase as string)) throw new ContractValidationError('$.phase', 'invalid phase'); if (s.value.activeSurface !== role) throw new ContractValidationError('$.activeSurface', 'must match role'); const id = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!id.ok) throw id.error; return { role, sessionEpoch: epoch(ep.value), generation: s.value.generation as number, phase: s.value.phase as OverlaySnapshot['phase'], activeSurface: role, handoffSequence: s.value.handoffSequence as number, layoutSequence: s.value.layoutSequence as number, releaseId: id.value }; }
 export function validateOverlaySnapshot(value: unknown): ValidationResult<OverlaySnapshot> { try { return ok(parseOverlaySnapshot(value)); } catch (error) { return fail(error instanceof ContractValidationError ? error.path : '$', error instanceof Error ? error.message : 'invalid overlay snapshot'); } }
 
-export function renderPolicyMatrixJson(): string { return `${JSON.stringify({ version: 1, runtimeAuthority: 'database', entries: AUTHORIZATION_MATRIX }, null, 2)}\n`; }
-export function renderRoleCeilingSeedSql(): string { const rows = AUTHORIZATION_MATRIX.filter((entry) => entry.action !== 'grants-manage' && entry.action !== 'accounts-manage').map((entry) => `  ('${entry.role}', '${entry.action}', '${entry.scopeKind}', ${entry.constraints.requiresCurrentFacts}, ${entry.constraints.requiresDatabaseCheck})`); return `-- GENERATED FILE. DO NOT EDIT. Source: packages/unified-contracts/src/index.ts\nINSERT INTO content_intake.role_ceiling (role, action, scope_kind, requires_current_facts, requires_database_check) VALUES\n${rows.join(',\n')}\nON CONFLICT (role, action, scope_kind) DO UPDATE SET requires_current_facts = EXCLUDED.requires_current_facts, requires_database_check = EXCLUDED.requires_database_check;\n`; }
+export function renderPolicyMatrixJson(): string {
+  return `${JSON.stringify({
+    version: 2,
+    runtimeAuthority: 'database',
+    roleCeiling: ROLE_CEILING_POLICY,
+    entries: AUTHORIZATION_MATRIX,
+  }, null, 2)}\n`;
+}
+export function renderRoleCeilingSeedSql(): string {
+  const rows = ROLE_CEILING_POLICY.map((entry) => {
+    const actions = entry.businessActions.map((action) => `'${action}'`).join(',');
+    return `  ('${entry.role}', ARRAY[${actions}], ${entry.mayAllocate}, ${entry.mayDelegate}, ${entry.maySkipImportParent})`;
+  });
+  return `-- GENERATED FILE. DO NOT EDIT. Source: packages/unified-contracts/src/index.ts
+INSERT INTO content_intake.role_ceiling (role, business_actions, may_allocate, may_delegate, may_skip_import_parent) VALUES
+${rows.join(',\n')}
+ON CONFLICT (role) DO UPDATE SET business_actions = EXCLUDED.business_actions, may_allocate = EXCLUDED.may_allocate, may_delegate = EXCLUDED.may_delegate, may_skip_import_parent = EXCLUDED.may_skip_import_parent;
+`;
+}

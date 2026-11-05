@@ -1,29 +1,10 @@
 -- GENERATED FILE. DO NOT EDIT. Source: packages/unified-contracts/src/index.ts
-INSERT INTO content_intake.role_ceiling (role, action, scope_kind, requires_current_facts, requires_database_check) VALUES
-  ('agent', 'query', 'source', true, true),
-  ('enabler', 'query', 'source', true, true),
-  ('supervisor', 'query', 'source', true, true),
-  ('supervisor', 'dashboard-read', 'tenant', true, true),
-  ('lead', 'query', 'source', true, true),
-  ('lead', 'dashboard-read', 'tenant', true, true),
-  ('manager', 'query', 'source', true, true),
-  ('manager', 'content-manage', 'source', true, true),
-  ('manager', 'import', 'source', true, true),
-  ('manager', 'source-confirm', 'source', true, true),
-  ('manager', 'review', 'source', true, true),
-  ('manager', 'publish', 'source', true, true),
-  ('manager', 'candidate-cancel', 'source', true, true),
-  ('manager', 'rollback', 'source', true, true),
-  ('manager', 'dashboard-read', 'tenant', true, true),
-  ('engineer', 'query', 'source', true, true),
-  ('engineer', 'dashboard-read', 'tenant', true, true),
-  ('director', 'query', 'source', true, true),
-  ('director', 'content-manage', 'source', true, true),
-  ('director', 'import', 'source', true, true),
-  ('director', 'source-confirm', 'source', true, true),
-  ('director', 'review', 'source', true, true),
-  ('director', 'publish', 'source', true, true),
-  ('director', 'candidate-cancel', 'source', true, true),
-  ('director', 'rollback', 'source', true, true),
-  ('director', 'dashboard-read', 'tenant', true, true)
-ON CONFLICT (role, action, scope_kind) DO UPDATE SET requires_current_facts = EXCLUDED.requires_current_facts, requires_database_check = EXCLUDED.requires_database_check;
+INSERT INTO content_intake.role_ceiling (role, business_actions, may_allocate, may_delegate, may_skip_import_parent) VALUES
+  ('agent', ARRAY['query'], false, false, false),
+  ('director', ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'], true, true, true),
+  ('enabler', ARRAY['query'], false, false, false),
+  ('engineer', ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'], true, true, true),
+  ('lead', ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'], false, false, false),
+  ('manager', ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'], true, true, true),
+  ('supervisor', ARRAY['query','content-manage','import','source-confirm','review','publish','candidate-cancel','rollback'], false, false, false)
+ON CONFLICT (role) DO UPDATE SET business_actions = EXCLUDED.business_actions, may_allocate = EXCLUDED.may_allocate, may_delegate = EXCLUDED.may_delegate, may_skip_import_parent = EXCLUDED.may_skip_import_parent;

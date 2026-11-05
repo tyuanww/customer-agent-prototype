@@ -6,7 +6,7 @@
 
 ## 做什么
 
-统一架构的查询结果合同由 `@customer-agent/unified-contracts` 拥有。Query adapter 只能把结果解析为 `content`、`sop`、`no-hit` 或 `failure` 四个互斥变体；content 和 SOP 不在 renderer 中拼接，混合或含糊 payload 在进入 UI 前由运行时 validator 拒绝。Query 的访问上下文只使用 `QueryAccessView`，不携带账号或授权管理字段。
+统一架构的查询结果合同由 `@customer-agent/unified-contracts` 拥有。Query adapter 只能把结果解析为 `content`、`sop`、`no-hit` 或 `failure` 四个互斥变体；content 和 SOP 不在 renderer 中拼接，混合或含糊 payload 在进入 UI 前由运行时 validator 拒绝。content 最多三条，rank 限于 1..3 且与 copy handle 分别唯一。SOP branch 必须带 `sourceStepId`，source 指向 decision step，target 指向已有 step，branch ID 与正 step sequence 均唯一。Query 的访问上下文只使用 `QueryAccessView`，不携带账号或授权管理字段。
 
 查询胶囊把顾客问句交给 Electron main。main 在本地索引上做字段加权 BM25 + RRF，可选地用 MiniMax 规划检索式并重排已有 `scriptId`，再用仓外 hydrate 快照填回原文 Top 3。Renderer 不持有话术正文以外的检索实现，也不调用 MiniMax。
 

@@ -95,7 +95,7 @@ function sopOutcome(overrides: Record<string, unknown> = {}): Record<string, unk
         },
       ],
       branches: [
-        { branchId: 'branch-a', label: '是', targetStepId: 'step-1' },
+        { branchId: 'branch-a', sourceStepId: 'step-1', label: '是', targetStepId: 'step-1' },
       ],
     },
     ...overrides,
@@ -187,10 +187,10 @@ describe('AccessDecision and minimal projections', () => {
     });
   });
 
-  it('keeps review administrators out of grant management', () => {
+  it('derives settings projections from the actions actually granted', () => {
     const decision = parseAccessDecision(accessDecision({
-      userId: 'user-supervisor',
-      role: 'supervisor',
+      userId: 'user-engineer',
+      role: 'engineer',
       allowedScopes: [{
         scope: { kind: 'tenant', tenantId: 'tenant-a', appId: 'app-a' },
         actions: ['accounts-manage'],
@@ -235,6 +235,43 @@ describe('AccessDecision and minimal projections', () => {
       expect(validateAccessDecision(accessDecision(change)).ok).toBe(false);
     }
   });
+
+  it('rejects fields hidden by the conditional scope kind', () => {
+    for (const scope of [
+      {
+        kind: 'tenant',
+        tenantId: 'tenant-a',
+        appId: 'app-a',
+        shopId: 'shop-a',
+        domain: 'aftersale',
+        sourceId: 'source-a',
+      },
+      {
+        kind: 'brand',
+        tenantId: 'tenant-a',
+        appId: 'app-a',
+        brandId: 'brand-a',
+        domain: 'aftersale',
+        sourceId: 'source-a',
+      },
+      {
+        kind: 'shop',
+        tenantId: 'tenant-a',
+        appId: 'app-a',
+        brandId: 'brand-a',
+        shopId: 'shop-a',
+        sourceId: 'source-a',
+      },
+    ]) {
+      expect(validateAccessDecision(accessDecision({
+        allowedScopes: [{
+          scope,
+          actions: ['query'],
+          validUntil: EXPIRES_AT,
+        }],
+      })).ok).toBe(false);
+    }
+  });
 });
 
 describe('QueryOutcome', () => {
@@ -262,7 +299,69 @@ describe('QueryOutcome', () => {
       sopOutcome({
         flow: {
           ...(sopOutcome().flow as Record<string, unknown>),
-          branches: [{ branchId: 'branch-a', label: '是', targetStepId: 'missing-step' }],
+          branches: [{
+            branchId: 'branch-a',
+            sourceStepId: 'step-1',
+            label: '是',
+            targetStepId: 'missing-step',
+          }],
+        },
+      }),
+    ]) {
+      expect(validateQueryOutcome(value).ok).toBe(false);
+    }
+  });
+
+  it('requires unique Top 3 ranks and copy handles', () => {
+    const first = (contentOutcome().candidates as Array<Record<string, unknown>>)[0];
+    for (const candidates of [
+      [first, { ...first, candidateId: 'script-2' }],
+      [first, { ...first, candidateId: 'script-2', rank: 2 }],
+      [first, { ...first, candidateId: 'script-2', copyHandle: 'copy-2', rank: 4 }],
+      [first, { ...first, candidateId: 'script-2', copyHandle: 'copy-2', rank: 2 },
+        { ...first, candidateId: 'script-3', copyHandle: 'copy-3', rank: 3 },
+        { ...first, candidateId: 'script-4', copyHandle: 'copy-4', rank: 4 }],
+    ]) {
+      expect(validateQueryOutcome(contentOutcome({ candidates })).ok).toBe(false);
+    }
+  });
+
+  it('binds each branch to a decision source and keeps branch and sequence identities unique', () => {
+    const flow = sopOutcome().flow as Record<string, unknown>;
+    const branches = flow.branches as Array<Record<string, unknown>>;
+    for (const value of [
+      sopOutcome({
+        flow: {
+          ...flow,
+          steps: [
+            ...(flow.steps as Array<Record<string, unknown>>),
+            { stepId: 'step-2', kind: 'instruction', sequence: 2, text: '补凭证。', media: [] },
+          ],
+          branches: [{ ...branches[0], sourceStepId: 'step-2' }],
+        },
+      }),
+      sopOutcome({
+        flow: {
+          ...flow,
+          branches: [
+            branches[0],
+            { ...branches[0], sourceStepId: 'step-1' },
+          ],
+        },
+      }),
+      sopOutcome({
+        flow: {
+          ...flow,
+          steps: [
+            ...(flow.steps as Array<Record<string, unknown>>),
+            { stepId: 'step-2', kind: 'terminal', sequence: 1, text: '结束。', media: [] },
+          ],
+        },
+      }),
+      sopOutcome({
+        flow: {
+          ...flow,
+          branches: [{ branchId: 'branch-a', label: '是', targetStepId: 'step-1' }],
         },
       }),
     ]) {
@@ -322,6 +421,31 @@ describe('OperationEnvelope and durable status', () => {
       { ...base, state: 'committed', receipt: null },
       { ...base, state: 'unknown', receipt: { kind: 'committed', committedAt: base.updatedAt, resultRef: null } },
       { ...base, state: 'failed', receipt: { kind: 'cancelled', cancelledAt: base.updatedAt } },
+      { ...base, state: 'committed', receipt: {
+        kind: 'committed',
+        committedAt: base.updatedAt,
+        resultRef: 'release-2',
+        extra: true,
+      } },
+      { ...base, state: 'cancelled', receipt: { kind: 'cancelled', cancelledAt: 'not-a-time' } },
+      { ...base, state: 'failed', receipt: { kind: 'failed', failedAt: base.updatedAt } },
+      { ...base, state: 'expired', receipt: { kind: 'cancelled', cancelledAt: base.updatedAt } },
+    ]) {
+      expect(() => parseOperationStatus(value)).toThrow(ContractValidationError);
+    }
+    expect(parseOperationStatus({
+      ...base,
+      state: 'expired',
+      receipt: { kind: 'expired', expiredAt: base.updatedAt },
+    }).state).toBe('expired');
+    for (const value of [
+      { ...base, state: 'unknown', updatedAt: '2026-02-30T08:00:00Z', receipt: null },
+      { ...base, state: 'unknown', recoveryDeadline: '2026-11-05T07:59:59Z', receipt: null },
+      { ...base, state: 'committed', receipt: {
+        kind: 'committed',
+        committedAt: '2026-11-05T08:00:02Z',
+        resultRef: 'release-2',
+      } },
     ]) {
       expect(() => parseOperationStatus(value)).toThrow(ContractValidationError);
     }
@@ -368,6 +492,44 @@ describe('ReleaseSnapshot and OverlaySnapshot', () => {
       sop: { ...release.content, state: 'ready' },
       content: { ...release.sop, state: 'empty' },
       contentReleaseId: 'other-release',
+    })).toThrow(ContractValidationError);
+  });
+
+  it('requires non-empty ready identity and strips all identity from an empty projection', () => {
+    const release = {
+      releaseId: 'release-2',
+      sequence: 2,
+      publishedAt: RESOLVED_AT,
+      content: {
+        state: 'ready',
+        indexId: 'content-index-2',
+        indexVersion: 1,
+        itemCount: 152,
+        indexHash: HASH_A,
+      },
+      sop: {
+        state: 'empty',
+        indexId: null,
+        indexVersion: null,
+        itemCount: 0,
+        indexHash: null,
+      },
+    };
+    for (const content of [
+      { ...release.content, indexId: '' },
+      { ...release.content, indexHash: '' },
+      { ...release.content, indexVersion: 0 },
+      { ...release.content, indexVersion: -1 },
+    ]) {
+      expect(() => parseReleaseSnapshot({ ...release, content })).toThrow(ContractValidationError);
+    }
+    expect(() => parseReleaseSnapshot({
+      ...release,
+      sop: { ...release.sop, itemCount: 1 },
+    })).toThrow(ContractValidationError);
+    expect(() => parseReleaseSnapshot({
+      ...release,
+      sop: { ...release.content, state: 'empty' },
     })).toThrow(ContractValidationError);
   });
 
