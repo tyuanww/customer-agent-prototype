@@ -56,6 +56,9 @@ importers:
       '@customer-agent/job-roster':
         specifier: workspace:*
         version: link:../../packages/job-roster
+      '@customer-agent/unified-contracts':
+        specifier: workspace:*
+        version: link:../../packages/unified-contracts
       fastify:
         specifier: 5.12.1
         version: 5.12.1
@@ -96,6 +99,9 @@ importers:
       '@customer-agent/retrieval-core':
         specifier: workspace:*
         version: link:../../packages/retrieval-core
+      '@customer-agent/unified-contracts':
+        specifier: workspace:*
+        version: link:../../packages/unified-contracts
       antd:
         specifier: ^6.6.6
         version: 6.6.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
