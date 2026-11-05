@@ -58,6 +58,7 @@ describe('authoritative reducer performance', () => {
       sessionEpoch: state.sessionEpoch,
       generation: state.generation,
       windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision + 1,
       contentPhase: 'RESULTS',
       resultCount: 3,
     });
@@ -70,6 +71,7 @@ describe('authoritative reducer performance', () => {
         sessionEpoch: state.sessionEpoch,
         generation: state.generation,
         windowGeneration: state.windowGeneration,
+        contentRevision: state.contentRevision + 1,
         contentPhase: index % 2 === 0 ? 'RESULTS' : 'EMPTY',
         resultCount: index % 2 === 0 ? 3 : 0,
       });
@@ -86,6 +88,7 @@ describe('authoritative reducer performance', () => {
           sessionEpoch: state.sessionEpoch,
           generation: state.generation,
           windowGeneration: state.windowGeneration,
+          contentRevision: state.contentRevision + 1,
           contentPhase: index % 3 === 0 ? 'RESULTS' : index % 3 === 1 ? 'EMPTY' : 'ERROR',
           resultCount: index % 3 === 0 ? 3 : 0,
         });

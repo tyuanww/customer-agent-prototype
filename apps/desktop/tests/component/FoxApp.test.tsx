@@ -77,6 +77,12 @@ describe('FoxApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '',
       },
+      snapshot: overlaySnapshot(createInitialOverlayState({
+        sessionEpoch: 1,
+        generation: 1,
+        windowGeneration: 1,
+        releaseId: 'rel_synthetic',
+      })),
       testHarness: false,
     });
     window.customerAgent = {
@@ -260,7 +266,7 @@ describe('FoxApp', () => {
       clientY: 36,
     });
     await waitFor(() => {
-      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true, 1);
+      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true, 1, expect.any(Object));
     });
     expect(splitDragDelta(38, 26)).toEqual([{ dx: 38, dy: 26 }]);
     expect(openSearch).not.toHaveBeenCalled();
@@ -288,7 +294,7 @@ describe('FoxApp', () => {
       clientY: 20,
     });
 
-    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false, 1);
+    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false, 1, expect.any(Object));
   });
 
   it('finishes a moved drag when a later pointermove reports buttons=0', () => {
@@ -322,7 +328,7 @@ describe('FoxApp', () => {
       clientY: 60,
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterRelease = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointermove', {
       button: 0,
@@ -356,7 +362,7 @@ describe('FoxApp', () => {
     });
     fireEvent.lostPointerCapture(fox, { pointerId: 8 });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterCaptureLoss = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -388,7 +394,7 @@ describe('FoxApp', () => {
       window.dispatchEvent(new Event('blur'));
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterBlur = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -473,7 +479,7 @@ describe('FoxApp', () => {
     expect(moveFoxBy).toHaveBeenCalled();
     const callsAfterMove = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointercancel', { pointerId: 27 });
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     expect(moveFoxBy.mock.calls.length).toBe(callsAfterMove + 1);
     expect(openSearch).not.toHaveBeenCalled();
     expect(idle).toHaveAttribute('data-fox-transient', 'none');
@@ -529,7 +535,7 @@ describe('FoxApp', () => {
         await Promise.resolve();
       });
       expect(idle).toHaveAttribute('data-dock-edge', 'right');
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(44);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(44, expect.any(Object));
       expect(openSearch).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -701,7 +707,7 @@ describe('FoxApp', () => {
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(idle).toHaveAttribute('data-dock-edge', 'left');
     expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
-    expect(commitFoxDragSettle).toHaveBeenCalledWith(71);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(71, expect.any(Object));
     expect(openSearch).not.toHaveBeenCalled();
   });
 
@@ -786,7 +792,7 @@ describe('FoxApp', () => {
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(idle).toHaveAttribute('data-dock-edge', 'right');
-    expect(commitFoxDragSettle).toHaveBeenCalledWith(20);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(20, expect.any(Object));
     expect(openSearch).not.toHaveBeenCalled();
   });
 
@@ -828,7 +834,7 @@ describe('FoxApp', () => {
     });
 
     await waitFor(() => {
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(30);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(30, expect.any(Object));
     });
     expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
     expect(idle).toHaveAttribute('data-dock-edge', 'right');
@@ -881,7 +887,7 @@ describe('FoxApp', () => {
     dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 38, screenX: 24, screenY: 20 });
     await waitFor(() => {
       expect(openSearch).toHaveBeenCalledTimes(1);
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(31);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(31, expect.any(Object));
     });
   });
 
@@ -1060,7 +1066,7 @@ describe('FoxApp', () => {
       });
       fireEvent.pointerEnter(fox);
       fireEvent.pointerEnter(fox);
-      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 1);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 1, expect.any(Object));
       expect(setFoxPeek).toHaveBeenCalledTimes(1);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-peeking', 'true');
 
@@ -1074,7 +1080,7 @@ describe('FoxApp', () => {
         vi.advanceTimersByTime(FOX_RETRACT_DURATION_MS + 80);
         await Promise.resolve();
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 1);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 1, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
 
       act(() => {
@@ -1110,7 +1116,7 @@ describe('FoxApp', () => {
       });
 
       expect(setFoxPeek).toHaveBeenCalledTimes(1);
-      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 10);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 10, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
     } finally {
       vi.useRealTimers();
@@ -1140,8 +1146,8 @@ describe('FoxApp', () => {
 
       expect(setFoxPeek).toHaveBeenCalledTimes(2);
       expect(setFoxPeek.mock.calls).toEqual([
-        ['peek', 12],
-        ['peek', 12],
+        ['peek', 12, expect.any(Object)],
+        ['peek', 12, expect.any(Object)],
       ]);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-peeking', 'true');
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
@@ -1164,15 +1170,15 @@ describe('FoxApp', () => {
           listener({ type: 'fox-edge', edge: 'right', epoch: 13 });
         }
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 13);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 13, expect.any(Object));
       setFoxPeek.mockClear();
 
       fireEvent.pointerEnter(fox);
       fireEvent.pointerLeave(fox);
 
       expect(setFoxPeek.mock.calls).toEqual([
-        ['peek', 13],
-        ['retract', 13],
+        ['peek', 13, expect.any(Object)],
+        ['retract', 13, expect.any(Object)],
       ]);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
     } finally {
@@ -1279,7 +1285,7 @@ describe('FoxApp', () => {
           'fox-retract-left',
         );
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 21);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 21, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'true');
 
       await act(async () => {
@@ -2120,7 +2126,7 @@ describe('FoxApp', () => {
       resolveFinished?.({ edge: 'left', epoch: 95, generation: 1, settleId: 95 });
     });
     await waitFor(() => {
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(95);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(95, expect.any(Object));
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(openSearch).not.toHaveBeenCalled();

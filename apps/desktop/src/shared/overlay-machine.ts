@@ -10,6 +10,11 @@ import type {
   ResultCount,
 } from './overlay-events';
 import type { Rect } from './overlay-geometry';
+import {
+  parseOverlaySnapshot,
+  validateOverlaySnapshot,
+  type OverlaySnapshot as OverlayContractSnapshot,
+} from '@customer-agent/unified-contracts';
 
 export const OVERLAY_CONTENT_PHASES = [
   'SEARCH_INPUT',
@@ -42,6 +47,7 @@ export type OverlayState = {
   readonly activeSurface: OverlaySurface;
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
+  readonly contentRevision: number;
   readonly sessionEpoch: number;
   readonly generation: number;
   readonly windowGeneration: number;
@@ -109,19 +115,11 @@ export type OverlayState = {
  * ARC-01 overlay shape; the remaining fields are the UI-only projection of the
  * same authoritative state and are never reconstructed independently.
  */
-export type OverlaySnapshot = {
-  readonly contract: {
-    readonly role: OverlaySurface;
-    readonly sessionEpoch: number;
-    readonly generation: number;
-    readonly phase: OverlayLifecyclePhase;
-    readonly activeSurface: OverlaySurface;
-    readonly handoffSequence: number;
-    readonly layoutSequence: number;
-    readonly releaseId: string;
-  };
+export type OverlaySnapshotProjection = {
+  readonly contract: OverlayContractSnapshot;
   readonly contentPhase: OverlayContentPhase;
   readonly resultCount: ResultCount;
+  readonly contentRevision: number;
   readonly windowGeneration: number;
   readonly focusIntent: OverlayFocusIntent;
   readonly handoff: OverlayState['handoff'];
@@ -168,6 +166,7 @@ export type OverlayEvent =
       type: 'CONTENT_CHANGED';
       contentPhase: ReportablePhase;
       resultCount: ResultCount;
+      contentRevision: number;
     } & EventGuard)
   | ({ type: 'SESSION_CHANGED'; releaseId: string } & EventGuard)
   | ({ type: 'RELEASE_CHANGED'; releaseId: string } & EventGuard)
@@ -183,6 +182,7 @@ export type OverlayEvent =
       desiredHeight: number;
       contentPhase: ReportablePhase;
       resultCount: ResultCount;
+      contentRevision: number;
     } & EventGuard)
   | ({
       type: 'QUERY_LAYOUT_ACK';
@@ -192,6 +192,7 @@ export type OverlayEvent =
       resizeEdge: QueryResizeEdge;
       contentPhase: ReportablePhase;
       resultCount: ResultCount;
+      contentRevision: number;
     } & EventGuard)
   | ({ type: 'LAYOUT_TIMEOUT'; handoffId: number; sequence: number } & EventGuard)
   | ({
@@ -200,6 +201,7 @@ export type OverlayEvent =
       sequence: number;
       baselineHeight: number;
       edge: QueryResizeEdge;
+      contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_UPDATE';
@@ -207,6 +209,7 @@ export type OverlayEvent =
       sequence: number;
       height: number;
       edge: QueryResizeEdge;
+      contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_END';
@@ -214,6 +217,7 @@ export type OverlayEvent =
       sequence: number;
       height: number;
       commit: boolean;
+      contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_KEYBOARD';
@@ -221,6 +225,7 @@ export type OverlayEvent =
       sequence: number;
       height: number;
       edge: QueryResizeEdge;
+      contentRevision: number;
     } & EventGuard)
   | ({
       type: 'FOX_DRAG_MOVED';
@@ -272,6 +277,7 @@ export type OverlayEvent =
       commandId: number;
       target: OverlaySurface;
       frame: HandoffMilestone | 'snapshot';
+      commandType: 'handoff' | 'layout' | 'settle';
     } & EventGuard);
 
 export const OVERLAY_EVENT_TYPES = [
@@ -390,10 +396,7 @@ export type NativeEffect =
       readonly edge: FoxDockEdge;
       readonly peekEpoch: number;
     }
-  | {
-      readonly type: 'PUBLISH_SNAPSHOT';
-      readonly snapshot: OverlaySnapshot;
-    };
+;
 
 export type OverlayDecision = 'applied' | 'ignored' | 'rejected';
 export type OverlayRejection =
@@ -401,6 +404,7 @@ export type OverlayRejection =
   | 'stale-session'
   | 'stale-generation'
   | 'stale-handoff'
+  | 'stale-content'
   | 'stale-layout'
   | 'stale-drag-session'
   | 'stale-drag-settle'
@@ -415,7 +419,7 @@ export type OverlayTransition = {
   readonly effects: readonly NativeEffect[];
   readonly decision: OverlayDecision;
   readonly reason?: OverlayRejection;
-  readonly snapshot: OverlaySnapshot;
+  readonly snapshot: OverlaySnapshotProjection;
 };
 
 const NO_EFFECTS: readonly NativeEffect[] = Object.freeze([]);
@@ -434,6 +438,7 @@ export function createInitialOverlayState(input: {
     activeSurface: 'fox',
     contentPhase: 'SEARCH_INPUT',
     resultCount: 0,
+    contentRevision: 0,
     sessionEpoch: input.sessionEpoch,
     generation: input.generation,
     windowGeneration: input.windowGeneration,
@@ -477,9 +482,9 @@ export function createInitialOverlayState(input: {
   };
 }
 
-export function overlaySnapshot(state: OverlayState): OverlaySnapshot {
+export function overlaySnapshot(state: OverlayState): OverlaySnapshotProjection {
   return {
-    contract: {
+    contract: parseOverlaySnapshot({
       role: state.activeSurface,
       sessionEpoch: state.sessionEpoch,
       generation: state.generation,
@@ -488,9 +493,10 @@ export function overlaySnapshot(state: OverlayState): OverlaySnapshot {
       handoffSequence: state.handoff.sequence,
       layoutSequence: state.layout.sequence,
       releaseId: state.releaseId,
-    },
+    }),
     contentPhase: state.contentPhase,
     resultCount: state.resultCount,
+    contentRevision: state.contentRevision,
     windowGeneration: state.windowGeneration,
     focusIntent: state.focusIntent,
     handoff: state.handoff,
@@ -501,12 +507,13 @@ export function overlaySnapshot(state: OverlayState): OverlaySnapshot {
   };
 }
 
-export function isOverlaySnapshot(value: unknown): value is OverlaySnapshot {
+export function isOverlaySnapshotProjection(value: unknown): value is OverlaySnapshotProjection {
   if (!value || typeof value !== 'object') {
     return false;
   }
-  const snapshot = value as Partial<OverlaySnapshot>;
+  const snapshot = value as Partial<OverlaySnapshotProjection>;
   const contract = snapshot.contract;
+  const contractValidation = validateOverlaySnapshot(contract);
   const handoff = snapshot.handoff as Partial<OverlayState['handoff']> | undefined;
   const layout = snapshot.layout as Partial<OverlayState['layout']> | undefined;
   const drag = snapshot.drag as Partial<OverlayState['drag']> | undefined;
@@ -516,25 +523,14 @@ export function isOverlaySnapshot(value: unknown): value is OverlaySnapshot {
   const dragSession = drag?.session as Partial<NonNullable<OverlayState['drag']['session']>> | null | undefined;
   const dragSettle = drag?.settle as Partial<NonNullable<OverlayState['drag']['settle']>> | null | undefined;
   return Boolean(
-    contract
-    && (contract.role === 'fox' || contract.role === 'query')
-    && contract.activeSurface === contract.role
-    && isPositiveInteger(contract.sessionEpoch)
-    && isPositiveInteger(contract.generation)
-    && (contract.phase === 'parked'
-      || contract.phase === 'opening'
-      || contract.phase === 'active'
-      || contract.phase === 'closing'
-      || contract.phase === 'closed')
-    && Number.isSafeInteger(contract.handoffSequence)
-    && Number.isSafeInteger(contract.layoutSequence)
-    && typeof contract.releaseId === 'string'
-    && contract.releaseId.length > 0
+    contractValidation.ok
     && isOverlayContentPhase(snapshot.contentPhase)
     && (snapshot.resultCount === 0
       || snapshot.resultCount === 1
       || snapshot.resultCount === 2
       || snapshot.resultCount === 3)
+    && Number.isSafeInteger(snapshot.contentRevision)
+    && (snapshot.contentRevision ?? -1) >= 0
     && isPositiveInteger(snapshot.windowGeneration)
     && (snapshot.focusIntent === 'fox'
       || snapshot.focusIntent === 'query'
@@ -653,10 +649,7 @@ function transition(
   reason?: OverlayRejection,
 ): OverlayTransition {
   const snapshot = overlaySnapshot(state);
-  const published = decision === 'applied'
-    ? [...effects, { type: 'PUBLISH_SNAPSHOT', snapshot } as const]
-    : effects;
-  return { state, effects: Object.freeze(published), decision, reason, snapshot };
+  return { state, effects: Object.freeze([...effects]), decision, reason, snapshot };
 }
 
 function applied(state: OverlayState, effects: readonly NativeEffect[] = NO_EFFECTS): OverlayTransition {
@@ -703,6 +696,7 @@ function resetContent(state: OverlayState): OverlayState {
     ...state,
     contentPhase: 'SEARCH_INPUT',
     resultCount: 0,
+    contentRevision: 0,
     layout: {
       ...state.layout,
       sequence: 0,
@@ -721,8 +715,9 @@ function startOpening(
   const generation = state.generation + 1;
   const sequence = state.handoff.sequence + 1;
   const handoffId = sequence;
+  const reset = resetContent(state);
   const next: OverlayState = {
-    ...resetContent(state),
+    ...reset,
     phase: 'opening',
     activeSurface: 'fox',
     focusIntent: 'query',
@@ -737,7 +732,7 @@ function startOpening(
       animate: plan.animate,
     },
     layout: {
-      ...state.layout,
+      ...reset.layout,
       handoffId,
       resizeEdge: 'bottom',
     },
@@ -779,6 +774,12 @@ export function applyOverlayEvent(
   }
 
   if (event.type === 'WINDOW_RECREATED') {
+    if (event.sessionEpoch !== state.sessionEpoch) {
+      return rejected(state, 'stale-session');
+    }
+    if (event.generation !== state.generation) {
+      return rejected(state, 'stale-generation');
+    }
     if (
       !isPositiveInteger(event.windowGeneration)
       || event.windowGeneration <= state.windowGeneration
@@ -839,8 +840,9 @@ export function applyOverlayEvent(
       const generation = state.generation + 1;
       const sequence = state.handoff.sequence + 1;
       const handoffId = sequence;
+      const reset = resetContent(state);
       const next: OverlayState = {
-        ...resetContent(state),
+        ...reset,
         phase: 'closing',
         activeSurface: 'query',
         generation,
@@ -855,11 +857,8 @@ export function applyOverlayEvent(
           animate: event.animate,
         },
         layout: {
-          ...state.layout,
+          ...reset.layout,
           handoffId,
-          sequence: 0,
-          ackSequence: 0,
-          resize: null,
         },
       };
       return applied(next, [
@@ -1028,7 +1027,11 @@ export function applyOverlayEvent(
     }
 
     case 'HANDOFF_CANCELLED': {
-      if (!isPositiveInteger(event.handoffId) || event.handoffId !== state.handoff.id) {
+      if (
+        state.handoff.mode === 'none'
+        || !isPositiveInteger(event.handoffId)
+        || event.handoffId !== state.handoff.id
+      ) {
         return rejected(state, 'stale-handoff');
       }
       const next: OverlayState = {
@@ -1047,18 +1050,25 @@ export function applyOverlayEvent(
     }
 
     case 'CONTENT_CHANGED': {
+      const nextContentRevision = state.contentRevision + 1;
       if (
         (state.phase !== 'active' && state.phase !== 'opening')
         || !isOverlayContentPhase(event.contentPhase)
         || !(event.resultCount === 0 || event.resultCount === 1 || event.resultCount === 2 || event.resultCount === 3)
+        || !Number.isSafeInteger(event.contentRevision)
+        || !Number.isSafeInteger(nextContentRevision)
+        || event.contentRevision !== nextContentRevision
       ) {
-        return ignored(state, 'invalid-phase');
+        return rejected(state, 'stale-content');
+      }
+      if (event.contentPhase === 'COPIED' && state.contentPhase !== 'RESULTS' && state.contentPhase !== 'COPIED') {
+        return rejected(state, 'invalid-phase');
       }
       return applied({
         ...state,
         contentPhase: event.contentPhase,
         resultCount: event.resultCount,
-        generation: state.generation + 1,
+        contentRevision: event.contentRevision,
       });
     }
 
@@ -1071,8 +1081,9 @@ export function applyOverlayEvent(
         { type: 'CANCEL_COPY', sessionEpoch: state.sessionEpoch, generation: state.generation },
         { type: 'CLEAR_CONTENT' },
       ] as const satisfies readonly NativeEffect[];
+      const reset = resetContent(state);
       const sessionChanged = {
-        ...resetContent(state),
+        ...reset,
         sessionEpoch: event.sessionEpoch,
         generation: state.generation + 1,
         releaseId: event.releaseId,
@@ -1082,10 +1093,8 @@ export function applyOverlayEvent(
           sessionEpoch: event.sessionEpoch,
         },
         layout: {
-          ...state.layout,
-          sequence: 0,
-          ackSequence: 0,
-          resize: null,
+          ...reset.layout,
+          handoffId: state.handoff.id,
         },
         drag: {
           ...state.drag,
@@ -1130,7 +1139,7 @@ export function applyOverlayEvent(
 
     case 'RELEASE_CHANGED':
       return event.releaseId
-        ? applied({ ...state, releaseId: event.releaseId, generation: state.generation + 1 })
+        ? applied({ ...state, releaseId: event.releaseId })
         : rejected(state, 'invalid-event');
 
     case 'WINDOW_CLOSED': {
@@ -1149,6 +1158,9 @@ export function applyOverlayEvent(
         focusIntent: 'none',
       };
       return applied(next, [
+        { type: 'CANCEL_QUERY', sessionEpoch: state.sessionEpoch, generation: state.generation },
+        { type: 'CANCEL_COPY', sessionEpoch: state.sessionEpoch, generation: state.generation },
+        { type: 'CLEAR_CONTENT' },
         { type: 'CANCEL_TIMEOUT', timer: 'handoff' },
         { type: 'CANCEL_TIMEOUT', timer: 'layout' },
         { type: 'CANCEL_TIMEOUT', timer: 'drag-settle' },
@@ -1181,6 +1193,9 @@ export function applyOverlayEvent(
         || !isPositiveInteger(event.sequence)
         || event.sequence <= state.layout.sequence
         || !Number.isFinite(event.desiredHeight)
+        || event.contentRevision !== state.contentRevision
+        || event.contentPhase !== state.contentPhase
+        || event.resultCount !== state.resultCount
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1194,8 +1209,8 @@ export function applyOverlayEvent(
         },
       };
       return applied(next, [
-        { type: 'APPLY_QUERY_LAYOUT', desiredHeight: event.desiredHeight },
         { type: 'SCHEDULE_TIMEOUT', timer: 'layout', handoffId: event.handoffId, delayMs: LAYOUT_TIMEOUT_MS },
+        { type: 'APPLY_QUERY_LAYOUT', desiredHeight: event.desiredHeight },
       ]);
     }
 
@@ -1203,10 +1218,13 @@ export function applyOverlayEvent(
       if (
         state.phase !== 'active'
         || event.handoffId !== state.handoff.id
-        || event.sequence < state.layout.sequence
+        || event.sequence !== state.layout.sequence
         || event.sequence <= state.layout.ackSequence
         || !Number.isFinite(event.height)
         || (event.resizeEdge !== 'top' && event.resizeEdge !== 'bottom')
+        || event.contentRevision !== state.contentRevision
+        || event.contentPhase !== state.contentPhase
+        || event.resultCount !== state.resultCount
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1222,7 +1240,10 @@ export function applyOverlayEvent(
     }
 
     case 'LAYOUT_TIMEOUT':
-      return state.phase === 'active' && event.handoffId === state.handoff.id
+      return state.phase === 'active'
+        && event.handoffId === state.handoff.id
+        && event.sequence === state.layout.sequence
+        && event.sequence > state.layout.ackSequence
         ? applied(state, [{ type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: event.handoffId }])
         : rejected(state, 'stale-layout');
 
@@ -1234,6 +1255,7 @@ export function applyOverlayEvent(
         || !isPositiveInteger(event.sequence)
         || event.sequence <= state.layout.sequence
         || !Number.isFinite(event.baselineHeight)
+        || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1261,6 +1283,7 @@ export function applyOverlayEvent(
         || event.handoffId !== state.handoff.id
         || event.sequence <= resize.lastSequence
         || !Number.isFinite(event.height)
+        || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1283,6 +1306,7 @@ export function applyOverlayEvent(
         || event.handoffId !== state.handoff.id
         || event.sequence <= resize.lastSequence
         || !Number.isFinite(event.height)
+        || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1308,6 +1332,7 @@ export function applyOverlayEvent(
         || !isPositiveInteger(event.sequence)
         || event.sequence <= state.layout.sequence
         || !Number.isFinite(event.height)
+        || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
       }
@@ -1326,6 +1351,12 @@ export function applyOverlayEvent(
       if (!isPositiveInteger(event.dragGeneration) || !isRect(event.nextBounds)) {
         return rejected(state, 'invalid-event');
       }
+      if (state.drag.settle?.generation === event.dragGeneration) {
+        return rejected(state, 'stale-drag-settle');
+      }
+      if (state.drag.settle && event.dragGeneration < state.drag.settle.generation) {
+        return rejected(state, 'stale-drag-session');
+      }
       if (state.drag.session && state.drag.session.generation !== event.dragGeneration) {
         return rejected(state, 'stale-drag-session');
       }
@@ -1336,9 +1367,9 @@ export function applyOverlayEvent(
         drag: {
           ...state.drag,
           generation: event.dragGeneration,
-          settle: state.drag.settle?.generation === event.dragGeneration
-            ? state.drag.settle
-            : null,
+          settle: state.drag.settle && event.dragGeneration > state.drag.settle.generation
+            ? null
+            : state.drag.settle,
           queryAnchor: event.target === 'query'
             ? state.drag.queryAnchor ?? event.queryAnchor ?? state.handoff.anchor
             : state.drag.queryAnchor,
@@ -1351,12 +1382,21 @@ export function applyOverlayEvent(
           },
         },
       };
-      return applied(next, [{
+      const effects: NativeEffect[] = [];
+      if (state.drag.settle && event.dragGeneration > state.drag.settle.generation) {
+        effects.push({
+          type: 'CANCEL_TIMEOUT',
+          timer: 'drag-settle',
+          handoffId: state.drag.settle.id,
+        });
+      }
+      effects.push({
         type: 'SET_WINDOW_BOUNDS',
         target: event.target ?? 'fox',
         bounds: event.nextBounds,
         windowGeneration: state.windowGeneration,
-      }]);
+      });
+      return applied(next, effects);
     }
 
     case 'FOX_DRAG_ENDED': {
@@ -1406,7 +1446,6 @@ export function applyOverlayEvent(
       }
       const next: OverlayState = {
         ...state,
-        generation: state.generation + 1,
         drag: {
           ...state.drag,
           session: null,
@@ -1594,4 +1633,5 @@ export function applyOverlayEvent(
     case 'RENDERER_FRAME_OBSERVED':
       return applied(state);
   }
+  return rejected(state, 'invalid-event');
 }

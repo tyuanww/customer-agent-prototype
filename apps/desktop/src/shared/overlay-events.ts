@@ -1,5 +1,9 @@
-import type { OverlayPhase, OverlaySnapshot } from './overlay-machine';
-import { isOverlaySnapshot } from './overlay-machine';
+import type { OverlayPhase, OverlaySnapshotProjection } from './overlay-machine';
+import { isOverlaySnapshotProjection } from './overlay-machine';
+import {
+  isOverlayReportIdentity,
+  isPositiveOverlayIdentityInteger,
+} from './overlay-report';
 import { isQueryLayoutAckCommand, type QueryLayoutAckCommand } from './query-layout';
 
 export type OverlayRole = 'fox' | 'query';
@@ -54,7 +58,18 @@ export type OverlayCommand =
   | { type: 'sync-fox-edge'; edge: FoxDockEdge; epoch: number }
   | ({ type: 'fox-drag-settled' } & FoxDragSettleAck)
   | { type: 'sync-query-anchor'; anchor: QueryAnchor }
-  | { type: 'overlay-snapshot'; snapshot: OverlaySnapshot }
+  | { type: 'overlay-snapshot'; snapshot: OverlaySnapshotProjection }
+  | {
+      type: 'cancel-query';
+      sessionEpoch: number;
+      generation: number;
+    }
+  | {
+      type: 'cancel-copy';
+      sessionEpoch: number;
+      generation: number;
+    }
+  | { type: 'clear-content' }
   | {
       type: 'shortcut-status';
       registered: boolean;
@@ -102,7 +117,7 @@ export type WindowContext = {
   phase: OverlayPhase;
   platform: string;
   shortcut: ShortcutStatus;
-  snapshot: OverlaySnapshot;
+  snapshot: OverlaySnapshotProjection;
   testHarness: boolean;
 };
 
@@ -112,9 +127,11 @@ export type OverlayRendererEvent =
   | {
       type: 'session-changed';
       sessionEpoch: number;
+      nextSessionEpoch: number;
       releaseId: string;
       windowGeneration: number;
       generation: number;
+      contentRevision: number;
     }
   | {
       type: 'release-changed';
@@ -122,6 +139,7 @@ export type OverlayRendererEvent =
       sessionEpoch: number;
       windowGeneration: number;
       generation: number;
+      contentRevision: number;
     }
   | {
       type: 'focus-changed';
@@ -129,24 +147,29 @@ export type OverlayRendererEvent =
       sessionEpoch: number;
       windowGeneration: number;
       generation: number;
+      contentRevision: number;
     }
   | {
       type: 'frame-observed';
       commandId: number;
+      commandType: 'handoff' | 'layout' | 'settle';
       target: OverlayRole;
       sessionEpoch: number;
       windowGeneration: number;
       generation: number;
+      contentRevision: number;
     }
   | {
       type: 'window-recreated';
       sessionEpoch: number;
       windowGeneration: number;
+      nextWindowGeneration: number;
       generation: number;
+      contentRevision: number;
     };
 
 export type OverlayControlApi = {
-  reportOverlayEvent: (event: OverlayRendererEvent) => Promise<OverlaySnapshot | null>;
+  reportOverlayEvent: (event: OverlayRendererEvent) => Promise<OverlaySnapshotProjection | null>;
 };
 
 export const REPORTABLE_PHASES = [
@@ -319,7 +342,16 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
   }
   if (record.type === 'overlay-snapshot') {
     return hasExactKeys(value, ['type', 'snapshot'])
-      && isOverlaySnapshot((value as { snapshot?: unknown }).snapshot);
+      && isOverlaySnapshotProjection((value as { snapshot?: unknown }).snapshot);
+  }
+  if (record.type === 'cancel-query' || record.type === 'cancel-copy') {
+    const command = value as { sessionEpoch?: unknown; generation?: unknown };
+    return hasExactKeys(value, ['type', 'sessionEpoch', 'generation'])
+      && isPositiveOverlayIdentityInteger(command.sessionEpoch)
+      && isPositiveOverlayIdentityInteger(command.generation);
+  }
+  if (record.type === 'clear-content') {
+    return hasExactKeys(value, ['type']);
   }
   if (record.type === 'shortcut-status') {
     const status = value as {
@@ -341,37 +373,50 @@ export function isOverlayRendererEvent(value: unknown): value is OverlayRenderer
     return false;
   }
   const event = value as Partial<OverlayRendererEvent>;
-  const common = Number.isSafeInteger(event.sessionEpoch)
-    && (event.sessionEpoch ?? 0) > 0
-    && Number.isSafeInteger(event.generation)
-    && (event.generation ?? 0) > 0
-    && Number.isSafeInteger(event.windowGeneration)
-    && (event.windowGeneration ?? 0) > 0;
-  if (!common) {
-    return false;
-  }
+  const identity = {
+    sessionEpoch: event.sessionEpoch,
+    generation: event.generation,
+    windowGeneration: event.windowGeneration,
+    contentRevision: event.contentRevision,
+  };
+  if (!isOverlayReportIdentity(identity)) return false;
   if (event.type === 'session-changed' || event.type === 'release-changed') {
-    return hasExactKeys(value, ['type', 'sessionEpoch', 'releaseId', 'windowGeneration', 'generation'])
+    const keys = event.type === 'session-changed'
+      ? ['type', 'sessionEpoch', 'nextSessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision']
+      : ['type', 'sessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision'];
+    return hasExactKeys(value, keys)
       && typeof event.releaseId === 'string'
-      && event.releaseId.length > 0;
+      && event.releaseId.length > 0
+      && (
+        event.type !== 'session-changed'
+        || (
+          isPositiveOverlayIdentityInteger(event.nextSessionEpoch)
+          && event.nextSessionEpoch > (event.sessionEpoch ?? 0)
+        )
+      );
   }
   if (event.type === 'focus-changed') {
-    return hasExactKeys(value, ['type', 'focused', 'sessionEpoch', 'windowGeneration', 'generation'])
+    return hasExactKeys(value, ['type', 'focused', 'sessionEpoch', 'windowGeneration', 'generation', 'contentRevision'])
       && typeof event.focused === 'boolean';
   }
   if (event.type === 'window-recreated') {
-    return hasExactKeys(value, ['type', 'sessionEpoch', 'windowGeneration', 'generation']);
+    return hasExactKeys(value, ['type', 'sessionEpoch', 'windowGeneration', 'nextWindowGeneration', 'generation', 'contentRevision'])
+      && isPositiveOverlayIdentityInteger(event.nextWindowGeneration)
+      && event.nextWindowGeneration > (event.windowGeneration ?? 0);
   }
   return event.type === 'frame-observed'
     && hasExactKeys(value, [
       'type',
       'commandId',
+      'commandType',
       'target',
       'sessionEpoch',
       'windowGeneration',
       'generation',
+      'contentRevision',
     ])
     && isHandoffId(event.commandId)
+    && (event.commandType === 'handoff' || event.commandType === 'layout' || event.commandType === 'settle')
     && (event.target === 'fox' || event.target === 'query');
 }
 

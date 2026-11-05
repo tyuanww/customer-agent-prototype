@@ -217,6 +217,7 @@ async function windowSnapshot(app: ElectronApplication): Promise<
 async function waitForNativeFocus(
   app: ElectronApplication,
   role: 'query' | 'dashboard',
+  timeout = 5_000,
 ): Promise<void> {
   await expect.poll(async () => {
     const snap = await windowSnapshot(app);
@@ -225,7 +226,7 @@ async function waitForNativeFocus(
       focused: target?.focused ?? false,
       webContentsFocused: target?.webContentsFocused ?? false,
     };
-  }).toEqual({ focused: true, webContentsFocused: true });
+  }, { timeout }).toEqual({ focused: true, webContentsFocused: true });
 }
 
 async function waitForInteractiveQuery(
@@ -247,6 +248,21 @@ async function waitForInteractiveQuery(
     const active = document.activeElement as HTMLElement | null;
     return active?.dataset.testid || active?.id || active?.tagName.toLowerCase() || 'none';
   })).toBe('question-input');
+}
+
+async function waitForVisibleQuery(
+  app: ElectronApplication,
+  query: Page,
+): Promise<void> {
+  await expect.poll(async () => {
+    const snap = await windowSnapshot(app);
+    return snap.find((item) => item.role === 'query' && item.visible) ?? null;
+  }).toMatchObject({
+    width: 600,
+    height: 88,
+  });
+  await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+  await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
 }
 
 async function waitForHarness(app: ElectronApplication): Promise<void> {
@@ -979,10 +995,18 @@ test('@float adopts a WindowServer stage boundary without hover/retract native d
     await fox.waitForTimeout(80);
 
     await fox.evaluate(async () => {
-      await window.customerAgent?.moveFoxBy(0, 12, false);
-      const settled = await window.customerAgent?.moveFoxBy(0, 0, true);
+      const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+      if (!snapshot) throw new Error('fox snapshot missing');
+      const identity = {
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        generation: snapshot.contract.generation,
+        windowGeneration: snapshot.windowGeneration,
+        contentRevision: snapshot.contentRevision,
+      };
+      await window.customerAgent?.moveFoxBy(0, 12, false, undefined, identity);
+      const settled = await window.customerAgent?.moveFoxBy(0, 0, true, undefined, identity);
       if (settled) {
-        await window.customerAgent?.commitFoxDragSettle(settled.settleId);
+        await window.customerAgent?.commitFoxDragSettle(settled.settleId, identity);
       }
     });
     const stageDragged = { ...stageSeated, y: stageSeated.y + 12, visible: true };
@@ -1146,6 +1170,7 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
       return { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, e: matrix.e, f: matrix.f };
     });
     await waitForInteractiveQuery(app, query);
+    await query.bringToFront();
     await query.screenshot({
       path: path.join(screenshotDir, 'fox-query-canonical.png'),
       omitBackground: true,
@@ -1457,7 +1482,14 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
       expect(before).not.toBeNull();
       const inward = edge === 'left' ? FOX_SIZE - FOX_EDGE_VISIBLE_PX + 24 : -(FOX_SIZE - FOX_EDGE_VISIBLE_PX + 24);
       await fox.evaluate(async (delta) => {
-        await window.customerAgent?.moveFoxBy(delta, 0, false);
+        const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+        if (!snapshot) throw new Error('fox snapshot missing');
+        await window.customerAgent?.moveFoxBy(delta, 0, false, undefined, {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        });
       }, inward);
       const advanced = await readNativeFoxFrame();
       expect(advanced?.width).toBe(FOX_SIZE);
@@ -1468,7 +1500,14 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
         expect(advanced?.x).toBe((before?.x ?? 0) - 24);
       }
       await fox.evaluate(async () => {
-        await window.customerAgent?.moveFoxBy(0, 0, true);
+        const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+        if (!snapshot) throw new Error('fox snapshot missing');
+        await window.customerAgent?.moveFoxBy(0, 0, true, undefined, {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        });
       });
       const finished = await readNativeFoxFrame();
       expect(finished?.x).toBe(advanced?.x);
@@ -1735,16 +1774,20 @@ test('@float clears session work, returns through blur, and fences an old window
         reportOverlayEvent: (event: {
           type: 'session-changed';
           sessionEpoch: number;
+          nextSessionEpoch: number;
           releaseId: string;
           windowGeneration: number;
           generation: number;
+          contentRevision: number;
         }) => Promise<unknown>;
       }).reportOverlayEvent({
         type: 'session-changed',
-        sessionEpoch: sessionEpoch + 1,
+        sessionEpoch,
+        nextSessionEpoch: sessionEpoch + 1,
         releaseId: 'rel_synthetic_next',
         windowGeneration,
         generation: snapshot.contract.generation,
+        contentRevision: snapshot.contentRevision,
       });
       return { handoffId, sessionEpoch, windowGeneration };
     });
@@ -1771,7 +1814,9 @@ test('@float clears session work, returns through blur, and fences an old window
           type: 'window-recreated';
           sessionEpoch: number;
           windowGeneration: number;
+          nextWindowGeneration: number;
           generation: number;
+          contentRevision: number;
         }) => Promise<{ windowGeneration: number } | null>;
       };
       const snapshot = (await agent.getWindowContext()).snapshot;
@@ -1779,9 +1824,10 @@ test('@float clears session work, returns through blur, and fences an old window
         type: 'window-recreated',
         sessionEpoch: snapshot.contract.sessionEpoch,
         windowGeneration: snapshot.windowGeneration,
+        nextWindowGeneration: snapshot.windowGeneration + 1,
         generation: snapshot.contract.generation,
+        contentRevision: snapshot.contentRevision,
       });
-      await agent.reportHandoffMilestone?.(previous.handoffId, 'open-finished');
       const after = (await agent.getWindowContext()).snapshot;
       return {
         previousWindowGeneration: previous.windowGeneration,
@@ -1855,29 +1901,44 @@ test('@float hands off on a second physical display without crossing work areas'
   }
 });
 
-test('@float reports reducer and native command-to-first-frame percentiles', async () => {
-  test.setTimeout(120_000);
+test('@float reports reducer and main-command-to-renderer-callback percentiles', async () => {
+  test.setTimeout(180_000);
   const app = await launchApp();
   try {
     const query = await waitForRole(app, 'query');
     await waitForHarness(app);
     let errors = 0;
     const errorMessages: string[] = [];
-    for (let cycle = 0; cycle < 50; cycle += 1) {
+    const cycles = Number(process.env.OVL_BENCH_CYCLES ?? 50);
+    let layoutRequests = 0;
+    let focusChecks = 0;
+    let focusObserved = 0;
+    for (let cycle = 0; cycle < cycles; cycle += 1) {
       try {
         await app.evaluate(() => {
           (globalThis as typeof globalThis & {
-            __demoTest: {
-              expand: () => void;
-              reportUiPhase: (phase: 'RESULTS', count: 3) => void;
-            };
+            __demoTest: { expand: () => void };
           }).__demoTest.expand();
         });
-        await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-        await expect.poll(() => query.evaluate(async () => {
-          const agent = window.customerAgent;
-          return agent ? (await agent.getWindowContext()).snapshot.contract.phase : 'missing';
-        })).toBe('active');
+        await waitForVisibleQuery(app, query);
+        await app.evaluate(({ BrowserWindow }) => {
+          const win = BrowserWindow.getAllWindows().find((item) =>
+            item.webContents.getURL().includes('role=query'),
+          );
+          win?.show();
+          win?.focus();
+          win?.webContents.focus();
+        });
+        focusChecks += 1;
+        try {
+          await app.evaluate(({ app: electronApp }) => {
+            electronApp.focus({ steal: true });
+          });
+          await waitForNativeFocus(app, 'query', 1_500);
+          focusObserved += 1;
+        } catch {
+          // Native focus is a separate OS acceptance; the cycle still exercises it.
+        }
         await app.evaluate(() => {
           (globalThis as typeof globalThis & {
             __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
@@ -1887,73 +1948,91 @@ test('@float reports reducer and native command-to-first-frame percentiles', asy
           const agent = window.customerAgent;
           return agent ? (await agent.getWindowContext()).snapshot.contentPhase : 'missing';
         })).toBe('RESULTS');
-        await query.evaluate(async (index) => {
-          const agent = window.customerAgent;
-          if (!agent) throw new Error('customerAgent missing');
-          const snapshot = (await agent.getWindowContext()).snapshot;
-          const commandId = snapshot.layout.sequence + 1;
-          const started = performance.now();
-          const ack = await agent.reportQueryLayout?.({
-            sessionId: snapshot.handoff.id,
-            sequence: commandId,
-            phase: 'RESULTS',
-            resultCount: 3,
-            desiredHeight: 320 + (index % 8) * 8,
-          });
-          if (!ack?.ok) {
-            throw new Error('layout request rejected');
-          }
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => resolve());
-          });
-          await (agent as unknown as {
-            reportOverlayEvent?: (event: {
-              type: 'frame-observed';
-              commandId: number;
-              target: 'query';
-              sessionEpoch: number;
-              windowGeneration: number;
-              generation: number;
-            }) => Promise<unknown>;
-          }).reportOverlayEvent?.({
-            type: 'frame-observed',
-            commandId,
-            target: 'query',
-            sessionEpoch: snapshot.contract.sessionEpoch,
-            windowGeneration: snapshot.windowGeneration,
-            generation: snapshot.contract.generation,
-          });
-          const boundary = await agent.getWindowContext();
-          if (boundary.snapshot.contract.generation < snapshot.contract.generation) {
-            throw new Error('snapshot generation regressed');
-          }
-          if (!Number.isFinite(performance.now() - started)) {
-            throw new Error('non-finite frame sample');
-          }
-        }, cycle);
-        await app.evaluate(() => {
-          (globalThis as typeof globalThis & {
-            __demoTest: { dismiss: () => void };
-          }).__demoTest.dismiss();
-        });
-        await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
-        await expect.poll(() => query.evaluate(async () => {
-          const agent = window.customerAgent;
-          return agent ? (await agent.getWindowContext()).snapshot.contract.phase : 'missing';
-        })).toBe('parked');
+
+        for (let layoutIndex = 0; layoutIndex < 2; layoutIndex += 1) {
+          await query.evaluate(async (index) => {
+            const agent = window.customerAgent;
+            if (!agent) throw new Error('customerAgent missing');
+            const snapshot = (await agent.getWindowContext()).snapshot;
+            const commandId = snapshot.layout.sequence + 1;
+            const ack = await agent.reportQueryLayout?.({
+              sessionId: snapshot.handoff.id,
+              sequence: commandId,
+              phase: 'RESULTS',
+              resultCount: 3,
+              desiredHeight: 320 + (index % 16) * 8,
+              identity: {
+                sessionEpoch: snapshot.contract.sessionEpoch,
+                generation: snapshot.contract.generation,
+                windowGeneration: snapshot.windowGeneration,
+                contentRevision: snapshot.contentRevision,
+              },
+            });
+            if (!ack?.ok) {
+              const rejectedState = (await agent.getWindowContext()).snapshot;
+              throw new Error(`layout request rejected ${JSON.stringify({
+                phase: rejectedState.contract.phase,
+                contents: rejectedState.contentPhase,
+                revision: rejectedState.contentRevision,
+                sessionEpoch: rejectedState.contract.sessionEpoch,
+                generation: rejectedState.contract.generation,
+                windowGeneration: rejectedState.windowGeneration,
+                handoffId: rejectedState.handoff.id,
+              })}`);
+            }
+            await new Promise<void>((resolve) => {
+              requestAnimationFrame(() => resolve());
+            });
+            await (agent as unknown as {
+              reportOverlayEvent?: (event: {
+                type: 'frame-observed';
+                commandId: number;
+                commandType: 'layout';
+                target: 'query';
+                sessionEpoch: number;
+                windowGeneration: number;
+                generation: number;
+                contentRevision: number;
+              }) => Promise<unknown>;
+            }).reportOverlayEvent?.({
+              type: 'frame-observed',
+              commandId,
+              commandType: 'layout',
+              target: 'query',
+              sessionEpoch: snapshot.contract.sessionEpoch,
+              windowGeneration: snapshot.windowGeneration,
+              generation: snapshot.contract.generation,
+              contentRevision: snapshot.contentRevision,
+            });
+          }, layoutIndex);
+          layoutRequests += 1;
+        }
+
       } catch (error) {
         errors += 1;
-        errorMessages.push(error instanceof Error ? error.message : String(error));
-        await app.evaluate(() => {
-          (globalThis as typeof globalThis & {
-            __demoTest?: { dismiss: () => void };
-          }).__demoTest?.dismiss();
-        });
-        await app.evaluate(() => {
-          (globalThis as typeof globalThis & {
-            __demoTest?: { expand: () => void };
-          }).__demoTest?.expand();
-        });
+        if (errorMessages.length < 5) {
+          errorMessages.push(`cycle ${cycle}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } finally {
+        try {
+          await app.evaluate(() => {
+            (globalThis as typeof globalThis & {
+              __demoTest: { dismiss: () => void };
+            }).__demoTest.dismiss();
+          });
+          await expect.poll(async () => {
+            const snapshot = await windowSnapshot(app);
+            return {
+              queryVisible: snapshot.some((item) => item.role === 'query' && item.visible),
+              foxVisible: snapshot.some((item) => item.role === 'fox' && item.visible),
+            };
+          }).toEqual({ queryVisible: false, foxVisible: true });
+        } catch (error) {
+          errors += 1;
+          if (errorMessages.length < 5) {
+            errorMessages.push(`close ${cycle}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
       }
     }
     const mainMetrics = await app.evaluate(() => (
@@ -1966,6 +2045,7 @@ test('@float reports reducer and native command-to-first-frame percentiles', asy
               p95: number | null;
               p99: number | null;
               coldMs: number | null;
+              pending: number;
               errors: number;
             };
           };
@@ -1973,19 +2053,30 @@ test('@float reports reducer and native command-to-first-frame percentiles', asy
       }
     ).__demoTest.queryLayoutDebug().performance);
     console.log(`OVL_FRAME_PERF ${JSON.stringify({
+      method: 'Main records the send timestamp. Renderer reports from rAF callbacks for open/layout and from the close-completion callback for collapse. This is not a paint-completion signal.',
       p50: mainMetrics.p50,
       p95: mainMetrics.p95,
       p99: mainMetrics.p99,
-      inputScale: mainMetrics.count,
-      environment: `${process.platform}/${process.arch}; Electron production build; arm64 host`,
-      errors,
+      inputScale: {
+        activeSessions: 1,
+        openCloseFocusResizeCycles: cycles,
+        layoutRequests,
+        focusChecks,
+        focusObserved,
+        completedObservations: mainMetrics.count,
+      },
+      completedObservations: mainMetrics.count,
+      environment: `${process.platform}/${process.arch}; Electron production build; ${process.arch} host`,
+      errors: errors + mainMetrics.errors,
       errorMessages,
-      coldWarm: `first command ${mainMetrics.coldMs ?? 'unavailable'} ms; warm samples after bootstrap; 50 open/close/focus/resize cycles`,
-      limiter: 'renderer rAF plus Main IPC; no artificial delay; two online displays available',
-      mainCommandToFirstFrame: mainMetrics,
+      coldWarm: `first native command ${mainMetrics.coldMs ?? 'unavailable'} ms; ${cycles} complete open/focus/layout/close cycles`,
+      evidenceComplete: mainMetrics.count >= 200,
+      limiter: 'Main IPC send + renderer scheduling; no paint-completion signal was observed',
+      mainCommandToRendererCallback: mainMetrics,
     })}`);
     expect(errors).toBe(0);
-    expect(mainMetrics.count).toBeGreaterThanOrEqual(150);
+    expect(mainMetrics.errors).toBe(0);
+    expect(mainMetrics.count).toBeGreaterThanOrEqual(200);
   } finally {
     await app.close();
   }

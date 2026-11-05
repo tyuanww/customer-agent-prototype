@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { parseOverlaySnapshot } from '@customer-agent/unified-contracts';
 import {
   OVERLAY_EVENT_TYPES,
   applyOverlayEvent,
   createInitialOverlayState,
+  isOverlaySnapshotProjection,
+  overlaySnapshot,
   type OverlayEvent,
   type OverlayState,
 } from '../../src/shared/overlay-machine';
@@ -54,6 +57,17 @@ function active(state = initial()): { state: OverlayState; handoffId: number } {
 }
 
 describe('authoritative overlay reducer', () => {
+  it('uses the ARC overlay contract and rejects a competing wire shape', () => {
+    const projection = overlaySnapshot(initial());
+
+    expect(parseOverlaySnapshot(projection.contract)).toEqual(projection.contract);
+    expect(isOverlaySnapshotProjection(projection)).toBe(true);
+    expect(isOverlaySnapshotProjection({
+      ...projection,
+      contract: { ...projection.contract, extra: true },
+    })).toBe(false);
+  });
+
   it('owns lifecycle, surface, handoff, focus, layout, drag, session and window identities', () => {
     const state = initial();
     expect(state).toMatchObject({
@@ -132,6 +146,7 @@ describe('authoritative overlay reducer', () => {
       type: 'CONTENT_CHANGED',
       contentPhase: 'RESULTS',
       resultCount: 3,
+      contentRevision: 1,
     })).state;
     const closing = applyOverlayEvent(withResults, at(withResults, {
       type: 'DISMISS_REQUESTED',
@@ -148,6 +163,7 @@ describe('authoritative overlay reducer', () => {
         type: 'CONTENT_CHANGED',
         contentPhase: 'RESULTS',
         resultCount: 3,
+        contentRevision: 1,
         generation: withResults.generation,
       }),
       at(closed, {
@@ -179,6 +195,7 @@ describe('authoritative overlay reducer', () => {
       type: 'CONTENT_CHANGED',
       contentPhase: 'ERROR',
       resultCount: 0,
+      contentRevision: 2,
       sessionEpoch: withResults.sessionEpoch - 1,
     }));
     expect(staleSession.decision).toBe('rejected');
@@ -192,6 +209,7 @@ describe('authoritative overlay reducer', () => {
       type: 'CONTENT_CHANGED',
       contentPhase: 'RESULTS',
       resultCount: 3,
+      contentRevision: 1,
     })).state;
     const transition = applyOverlayEvent(withResults, at(withResults, {
       type: 'SESSION_CHANGED',
@@ -259,16 +277,11 @@ describe('authoritative overlay reducer', () => {
       dy: 0,
       nextBounds: { ...foxBounds, x: 1244 },
     }));
-    const lateCommitAfterMove = applyOverlayEvent(lateSameGenerationMove.state, at(
-      lateSameGenerationMove.state,
-      {
-        type: 'FOX_DRAG_SETTLE_COMMITTED',
-        settleId: 9,
-        dragGeneration: 7,
-      },
-    ));
-    expect(lateCommitAfterMove.decision).toBe('rejected');
-    expect(lateCommitAfterMove.reason).toBe('stale-drag-session');
+    expect(lateSameGenerationMove.decision).toBe('rejected');
+    expect(lateSameGenerationMove.reason).toBe('stale-drag-settle');
+    expect(lateSameGenerationMove.effects).toEqual([]);
+    expect(lateSameGenerationMove.state.drag.session).toBeNull();
+    expect(lateSameGenerationMove.state.drag.settle).not.toBeNull();
 
     const staleDisplay = applyOverlayEvent(ended, at(ended, {
       type: 'DISPLAY_CHANGED',
@@ -278,6 +291,59 @@ describe('authoritative overlay reducer', () => {
     }));
     expect(staleDisplay.decision).toBe('rejected');
     expect(staleDisplay.reason).toBe('drag-settle-pending');
+  });
+
+  it('enforces the previous content transition table with monotonic content revisions', () => {
+    const opened = active();
+    const phases = ['SEARCH_INPUT', 'RESULTS', 'EMPTY', 'ERROR', 'COPIED'] as const;
+    const legal = new Set([
+      'RESULTS->COPIED',
+      'COPIED->COPIED',
+    ]);
+
+    for (const from of phases) {
+      const state: OverlayState = {
+        ...opened.state,
+        contentPhase: from,
+        resultCount: from === 'RESULTS' || from === 'COPIED' ? 3 : 0,
+        contentRevision: 9,
+      };
+      for (const to of phases) {
+        const transition = applyOverlayEvent(state, at(state, {
+          type: 'CONTENT_CHANGED',
+          contentPhase: to,
+          resultCount: to === 'RESULTS' || to === 'COPIED' ? 3 : 0,
+          contentRevision: state.contentRevision + 1,
+        }));
+        if (to !== 'COPIED' || legal.has(`${from}->${to}`)) {
+          expect(
+            transition.decision,
+            `${from}->${to} should stay legal`,
+          ).toBe('applied');
+        } else {
+          expect(
+            transition.decision,
+            `${from}->${to} must not overwrite content`,
+          ).toBe('rejected');
+          expect(transition.state.contentPhase).toBe(from);
+        }
+      }
+    }
+
+    const current = {
+      ...opened.state,
+      contentPhase: 'EMPTY' as const,
+      contentRevision: 12,
+    };
+    const late = applyOverlayEvent(current, at(current, {
+      type: 'CONTENT_CHANGED',
+      contentPhase: 'ERROR',
+      resultCount: 0,
+      contentRevision: 11,
+    }));
+    expect(late.decision).toBe('rejected');
+    expect(late.reason).toBe('stale-content');
+    expect(late.state.contentPhase).toBe('EMPTY');
   });
 
   it('invalidates all prior window work when a replacement window generation is created', () => {
@@ -306,33 +372,377 @@ describe('authoritative overlay reducer', () => {
     expect(stale.state.phase).toBe('parked');
   });
 
-  it('records an explicit decision for every event family', () => {
+  it('rejects window recreation when the reported generation or session is stale', () => {
+    const opened = active();
+
+    const staleGeneration = applyOverlayEvent(opened.state, at(opened.state, {
+      type: 'WINDOW_RECREATED',
+      generation: opened.state.generation - 1,
+      windowGeneration: opened.state.windowGeneration + 1,
+    }));
+    expect(staleGeneration.decision).toBe('rejected');
+    expect(staleGeneration.reason).toBe('stale-generation');
+    expect(staleGeneration.state).toBe(opened.state);
+    expect(staleGeneration.effects).toEqual([]);
+
+    const staleSession = applyOverlayEvent(opened.state, at(opened.state, {
+      type: 'WINDOW_RECREATED',
+      sessionEpoch: opened.state.sessionEpoch - 1,
+      windowGeneration: opened.state.windowGeneration + 1,
+    }));
+    expect(staleSession.decision).toBe('rejected');
+    expect(staleSession.reason).toBe('stale-session');
+    expect(staleSession.state).toBe(opened.state);
+    expect(staleSession.effects).toEqual([]);
+  });
+
+  it('has an exhaustive valid, stale and invalid outcome matrix', () => {
+    const parked = initial();
+    const opening = applyOverlayEvent(parked, at(parked)).state;
     const activeState = active().state;
     const closing = applyOverlayEvent(activeState, at(activeState, {
       type: 'DISMISS_REQUESTED',
       animate: false,
       restorePreviousApp: true,
     })).state;
-    const closed = applyOverlayEvent(closing, at(closing, {
+    const closed = applyOverlayEvent(activeState, at(activeState, {
       type: 'WINDOW_CLOSED',
     })).state;
     const states = [
-      initial(),
-      applyOverlayEvent(initial(), at(initial())).state,
+      parked,
+      opening,
       activeState,
       closing,
       closed,
     ];
-    expect(new Set(states.map((state) => state.phase))).toEqual(
-      new Set(['parked', 'opening', 'active', 'closing', 'closed']),
+    const appliedByPhase: Record<OverlayState['phase'], ReadonlySet<OverlayEvent['type']>> = {
+      parked: new Set([
+        'OPEN_REQUESTED',
+        'SESSION_CHANGED',
+        'RELEASE_CHANGED',
+        'WINDOW_RECREATED',
+        'WINDOW_CLOSED',
+        'FOX_DRAG_MOVED',
+        'DISPLAY_CHANGED',
+        'FOX_EDGE_SYNCED',
+        'FOX_PEEK_CHANGED',
+        'SHORTCUT_STATUS_CHANGED',
+        'RENDERER_FRAME_OBSERVED',
+      ]),
+      opening: new Set([
+        'DISMISS_REQUESTED',
+        'QUERY_SUBSCRIBED',
+        'HANDOFF_ARMED',
+        'HANDOFF_TIMEOUT',
+        'HANDOFF_CANCELLED',
+        'CONTENT_CHANGED',
+        'SESSION_CHANGED',
+        'RELEASE_CHANGED',
+        'WINDOW_RECREATED',
+        'WINDOW_CLOSED',
+        'QUERY_FOCUSED',
+        'QUERY_BLURRED',
+        'FOX_DRAG_MOVED',
+        'DISPLAY_CHANGED',
+        'FOX_EDGE_SYNCED',
+        'SHORTCUT_STATUS_CHANGED',
+        'RENDERER_FRAME_OBSERVED',
+      ]),
+      active: new Set([
+        'DISMISS_REQUESTED',
+        'CONTENT_CHANGED',
+        'SESSION_CHANGED',
+        'RELEASE_CHANGED',
+        'WINDOW_RECREATED',
+        'WINDOW_CLOSED',
+        'QUERY_FOCUSED',
+        'QUERY_BLURRED',
+        'LAYOUT_REQUESTED',
+        'RESIZE_BEGIN',
+        'RESIZE_KEYBOARD',
+        'FOX_DRAG_MOVED',
+        'DISPLAY_CHANGED',
+        'FOX_EDGE_SYNCED',
+        'SHORTCUT_STATUS_CHANGED',
+        'RENDERER_FRAME_OBSERVED',
+      ]),
+      closing: new Set([
+        'HANDOFF_CLOSED',
+        'HANDOFF_TIMEOUT',
+        'HANDOFF_CANCELLED',
+        'SESSION_CHANGED',
+        'RELEASE_CHANGED',
+        'WINDOW_RECREATED',
+        'WINDOW_CLOSED',
+        'FOCUS_RESTORED',
+        'FOX_DRAG_MOVED',
+        'DISPLAY_CHANGED',
+        'FOX_EDGE_SYNCED',
+        'SHORTCUT_STATUS_CHANGED',
+        'RENDERER_FRAME_OBSERVED',
+      ]),
+      closed: new Set([
+        'SESSION_CHANGED',
+        'RELEASE_CHANGED',
+        'WINDOW_RECREATED',
+        'FOX_DRAG_MOVED',
+        'DISPLAY_CHANGED',
+        'FOX_EDGE_SYNCED',
+        'SHORTCUT_STATUS_CHANGED',
+        'RENDERER_FRAME_OBSERVED',
+      ]),
+    };
+    const ignoredByPhase: Record<OverlayState['phase'], ReadonlySet<OverlayEvent['type']>> = {
+      parked: new Set([
+        'DISMISS_REQUESTED',
+        'TOGGLE_REQUESTED',
+        'QUERY_SUBSCRIBED',
+        'QUERY_FOCUSED',
+        'QUERY_BLURRED',
+        'FOCUS_RESTORED',
+        'QUERY_DRAG_CLEARED',
+      ]),
+      opening: new Set([
+        'OPEN_REQUESTED',
+        'TOGGLE_REQUESTED',
+        'FOCUS_RESTORED',
+        'QUERY_DRAG_CLEARED',
+        'FOX_PEEK_CHANGED',
+      ]),
+      active: new Set([
+        'OPEN_REQUESTED',
+        'TOGGLE_REQUESTED',
+        'QUERY_SUBSCRIBED',
+        'HANDOFF_TIMEOUT',
+        'FOCUS_RESTORED',
+        'QUERY_DRAG_CLEARED',
+        'FOX_PEEK_CHANGED',
+      ]),
+      closing: new Set([
+        'OPEN_REQUESTED',
+        'DISMISS_REQUESTED',
+        'TOGGLE_REQUESTED',
+        'QUERY_SUBSCRIBED',
+        'QUERY_FOCUSED',
+        'QUERY_BLURRED',
+        'QUERY_DRAG_CLEARED',
+        'FOX_PEEK_CHANGED',
+      ]),
+      closed: new Set([
+        'OPEN_REQUESTED',
+        'DISMISS_REQUESTED',
+        'TOGGLE_REQUESTED',
+        'QUERY_SUBSCRIBED',
+        'WINDOW_CLOSED',
+        'QUERY_FOCUSED',
+        'QUERY_BLURRED',
+        'FOCUS_RESTORED',
+        'QUERY_DRAG_CLEARED',
+        'FOX_PEEK_CHANGED',
+      ]),
+    };
+
+    function validEventFor(state: OverlayState, type: OverlayEvent['type']): OverlayEvent {
+      const base = {
+        sessionEpoch: state.sessionEpoch,
+        generation: state.generation,
+        windowGeneration: state.windowGeneration,
+      };
+      switch (type) {
+        case 'OPEN_REQUESTED':
+          return at(state);
+        case 'DISMISS_REQUESTED':
+          return { type, ...base, restorePreviousApp: true, animate: false, handoffCenterX: 44, handoffCenterY: 44 };
+        case 'TOGGLE_REQUESTED':
+        case 'QUERY_SUBSCRIBED':
+        case 'WINDOW_RECREATED':
+        case 'WINDOW_CLOSED':
+        case 'QUERY_FOCUSED':
+        case 'QUERY_BLURRED':
+        case 'FOCUS_RESTORED':
+        case 'QUERY_DRAG_CLEARED':
+          return type === 'WINDOW_RECREATED'
+            ? { type, ...base, windowGeneration: state.windowGeneration + 1 }
+            : { type, ...base };
+        case 'HANDOFF_ARMED':
+        case 'HANDOFF_OPENED':
+        case 'HANDOFF_CLOSED':
+        case 'HANDOFF_TIMEOUT':
+        case 'HANDOFF_CANCELLED':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id > 0 ? state.handoff.id : 1,
+          };
+        case 'CONTENT_CHANGED':
+          return {
+            type,
+            ...base,
+            contentRevision: state.contentRevision + 1,
+            contentPhase: 'RESULTS',
+            resultCount: 3,
+          };
+        case 'SESSION_CHANGED':
+          return { type, ...base, sessionEpoch: state.sessionEpoch + 1, releaseId: 'rel_synthetic_next' };
+        case 'RELEASE_CHANGED':
+          return { type, ...base, releaseId: 'rel_synthetic_next' };
+        case 'LAYOUT_REQUESTED':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            desiredHeight: 420,
+            contentPhase: state.contentPhase,
+            resultCount: state.resultCount,
+            contentRevision: state.contentRevision,
+          };
+        case 'QUERY_LAYOUT_ACK':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            height: 420,
+            resizeEdge: 'bottom',
+            contentPhase: state.contentPhase,
+            resultCount: state.resultCount,
+            contentRevision: state.contentRevision,
+          };
+        case 'LAYOUT_TIMEOUT':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+          };
+        case 'RESIZE_BEGIN':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            baselineHeight: 320,
+            edge: 'bottom',
+            contentRevision: state.contentRevision,
+          };
+        case 'RESIZE_UPDATE':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            height: 360,
+            edge: 'bottom',
+            contentRevision: state.contentRevision,
+          };
+        case 'RESIZE_END':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            height: 360,
+            commit: true,
+            contentRevision: state.contentRevision,
+          };
+        case 'RESIZE_KEYBOARD':
+          return {
+            type,
+            ...base,
+            handoffId: state.handoff.id,
+            sequence: state.layout.sequence + 1,
+            height: 360,
+            edge: 'bottom',
+            contentRevision: state.contentRevision,
+          };
+        case 'FOX_DRAG_MOVED':
+          return {
+            type,
+            ...base,
+            dragGeneration: 7,
+            target: 'fox',
+            dx: 4,
+            dy: 0,
+            nextBounds: foxBounds,
+            displayId: 1,
+          };
+        case 'FOX_DRAG_ENDED':
+          return {
+            type,
+            ...base,
+            dragGeneration: 7,
+            target: 'fox',
+            settledBounds: foxBounds,
+            edge: 'none',
+            settleId: 9,
+            displayId: 1,
+          };
+        case 'FOX_DRAG_SETTLE_COMMITTED':
+          return { type, ...base, dragGeneration: 7, settleId: 9 };
+        case 'FOX_DRAG_TIMEOUT':
+          return { type, ...base, dragGeneration: 7 };
+        case 'DISPLAY_CHANGED':
+          return { type, ...base, displayId: 1, edge: 'none', foxBounds };
+        case 'FOX_EDGE_SYNCED':
+          return { type, ...base, edge: state.fox.edge, peekEpoch: state.fox.peekEpoch + 1 };
+        case 'FOX_PEEK_CHANGED':
+          return {
+            type,
+            ...base,
+            intent: state.fox.peekIntent === 'peek' ? 'retract' : 'peek',
+            peekEpoch: state.fox.peekEpoch,
+          };
+        case 'SHORTCUT_STATUS_CHANGED':
+          return { type, ...base, registered: true, accelerator: 'CommandOrControl+Shift+Space', message: '' };
+        case 'RENDERER_FRAME_OBSERVED':
+          return { type, ...base, commandId: 1, target: 'query', frame: 'snapshot', commandType: 'handoff' };
+      }
+    }
+
+    function staleEventFor(state: OverlayState, event: OverlayEvent): OverlayEvent {
+      if (event.type === 'WINDOW_RECREATED') {
+        return { ...event, windowGeneration: state.windowGeneration };
+      }
+      if (event.type === 'SESSION_CHANGED') {
+        return { ...event, sessionEpoch: state.sessionEpoch };
+      }
+      return { ...event, generation: state.generation - 1 };
+    }
+
+    expect(states.map((state) => state.phase)).toEqual(
+      ['parked', 'opening', 'active', 'closing', 'closed'],
     );
     for (const state of states) {
       for (const type of OVERLAY_EVENT_TYPES) {
-        const event = at(state, { type } as Partial<OverlayEvent>);
-        const transition = applyOverlayEvent(state, event);
-        expect(['applied', 'ignored', 'rejected']).toContain(transition.decision);
-        expect(transition.snapshot.contract.sessionEpoch).toBe(transition.state.sessionEpoch);
-        expect(transition.snapshot.contract.generation).toBe(transition.state.generation);
+        const valid = validEventFor(state, type);
+        expect(valid.type, `${state.phase}:${type} fixture type`).toBe(type);
+        const validTransition = applyOverlayEvent(state, valid);
+        const expected = appliedByPhase[state.phase].has(type)
+          ? 'applied'
+          : ignoredByPhase[state.phase].has(type)
+            ? 'ignored'
+            : 'rejected';
+        expect(
+          validTransition.decision,
+          `${state.phase}:${type} expected ${expected}`,
+        ).toBe(expected);
+        expect(
+          Boolean(validTransition.state.drag.session && validTransition.state.drag.settle),
+          `${state.phase}:${type} drag ownership`,
+        ).toBe(false);
+
+        const stale = staleEventFor(state, valid);
+        expect(
+          applyOverlayEvent(state, stale).decision,
+          `${state.phase}:${type} stale outcome`,
+        ).toBe('rejected');
+
+        const invalid = { ...valid, type: 'NOT_AN_OVERLAY_EVENT' } as unknown as OverlayEvent;
+        expect(
+          applyOverlayEvent(state, invalid).decision,
+          `${state.phase}:${type} invalid outcome`,
+        ).toBe('rejected');
       }
     }
   });
