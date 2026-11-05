@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exploreOperationOrdering } from '../models/operation-ordering.mjs';
+import { runManualIdentityVerification } from './verify-manual-identity-with-basefix.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = path.resolve(scriptDirectory, '../../../..');
@@ -13,6 +14,7 @@ const defaultSkillRoot = path.resolve(scriptDirectory, '..');
 const expectedControls = Object.freeze({
   'skip-authorization-check': 'accept_without_authorization',
   'accept-after-revocation': 'accept_after_revocation',
+  'duplicate-effect': 'duplicate_committed_effect',
   'ignore-epoch': 'sessionEpoch_mismatch_not_rejected',
   'ignore-request-hash': 'requestHash_mismatch_not_rejected',
   'skip-recovery-lookup': 'recovery_invented_success',
@@ -34,6 +36,15 @@ const allowedAfterSourceCommit = Object.freeze([
 ]);
 
 const nestedSeatReceipt = '.cursor/skills/verify-seat-administration-revocation/receipts.json';
+const seatSourceFiles = Object.freeze([
+  'apps/api/src/content-intake/authority.ts',
+  'apps/api/src/content-intake/organization/facts-writer.ts',
+  'apps/api/src/content-intake/seat-password-file.ts',
+  'apps/api/src/content-intake/seats-http.ts',
+  'apps/api/src/content-intake/seats.ts',
+  'packages/database/migrations/0058_grant_steward_no_restore.sql',
+  'packages/database/migrations/0068_seat_lifecycle.sql',
+]);
 const sourceFiles = Object.freeze([
   '.agents/skills/verify-intake-parent-revocation/SKILL.md',
   '.agents/skills/verify-intake-parent-revocation/verify.mjs',
@@ -47,6 +58,8 @@ const sourceFiles = Object.freeze([
   '.cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs',
   '.cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts',
   '.cursor/skills/verify-unified-operation-ordering/scripts/check.mjs',
+  '.cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts',
+  '.cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs',
   'apps/api/src/auth-service.ts',
   'apps/api/src/content-intake/authority.ts',
   'apps/api/src/content-intake/role-ceiling.ts',
@@ -143,6 +156,16 @@ function verifyFiles(repositoryRoot, receipt, prefix) {
   });
 }
 
+function assertExactManifest(declared, required, label) {
+  const actual = [...new Set(declared)].sort();
+  const expected = [...new Set(required)].sort();
+  const missing = expected.filter(relative => !actual.includes(relative));
+  const unexpected = actual.filter(relative => !expected.includes(relative));
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(`${label} manifest drifted: missing=[${missing.join(', ')}], unexpected=[${unexpected.join(', ')}]`);
+  }
+}
+
 export function combineSourceEntries(entries) {
   return createHash('sha256')
     .update([...entries].sort((left, right) => left.id.localeCompare(right.id))
@@ -154,6 +177,9 @@ export function combineSourceEntries(entries) {
 export function verifyReceiptTree({
   repositoryRoot = defaultRepositoryRoot,
   skillRoot = defaultSkillRoot,
+  requiredFiles = sourceFiles,
+  requiredNestedReceipts = [nestedSeatReceipt],
+  requiredNestedFiles = { [nestedSeatReceipt]: seatSourceFiles },
 } = {}) {
   const receiptPath = path.join(skillRoot, 'receipts.json');
   const receipts = readJson(receiptPath, 'receipt');
@@ -164,8 +190,13 @@ export function verifyReceiptTree({
     throw new Error('receipt testedSourceCommit must equal syncCommit');
   }
 
+  assertExactManifest(Object.keys(receipts.files), requiredFiles, 'unified source');
   const entries = verifyFiles(repositoryRoot, receipts, 'unified');
-  for (const nestedRelative of receipts.nestedReceipts ?? []) {
+  if (!Array.isArray(receipts.nestedReceipts)) {
+    throw new Error('receipt nestedReceipts must be an explicit array');
+  }
+  assertExactManifest(receipts.nestedReceipts, requiredNestedReceipts, 'nested receipt');
+  for (const nestedRelative of requiredNestedReceipts) {
     assertRelativePath(nestedRelative);
     if (!Object.hasOwn(receipts.files, nestedRelative)) {
       throw new Error(`nested receipt is not bound by the parent source receipt: ${nestedRelative}`);
@@ -174,6 +205,11 @@ export function verifyReceiptTree({
     if (nested.syncCommit !== receipts.syncCommit) {
       throw new Error(`nested receipt ${nestedRelative} has a different syncCommit`);
     }
+    const nestedRequiredFiles = requiredNestedFiles[nestedRelative];
+    if (!Array.isArray(nestedRequiredFiles)) {
+      throw new Error(`no required source manifest is declared for nested receipt ${nestedRelative}`);
+    }
+    assertExactManifest(Object.keys(nested.files), nestedRequiredFiles, `nested source (${nestedRelative})`);
     entries.push(...verifyFiles(repositoryRoot, nested, `nested:${nestedRelative}`));
   }
 
@@ -356,6 +392,10 @@ export function runOperationVerifier({
       && finding.path.join('|') !== 'observeRequest|checkAuthorization|revokeAuthorization|acceptCommand') {
       throw new Error(`accept-after-revocation did not cover the required ordering: ${finding.path.join(' -> ')}`);
     }
+    if (mode === 'duplicate-effect'
+      && (!finding.path.includes('duplicateSubmit') || !finding.path.includes('duplicateWriteEffect'))) {
+      throw new Error(`duplicate-effect did not cover a second write attempt: ${finding.path.join(' -> ')}`);
+    }
     if (mode === 'skip-recovery-lookup'
       && (!finding.path.includes('commitUnknownAfterEffect') || !finding.path.includes('recoverUnknown'))) {
       throw new Error(`skip-recovery-lookup did not cover the uncertain post-effect path: ${finding.path.join(' -> ')}`);
@@ -367,6 +407,7 @@ export function runOperationVerifier({
       path: Object.freeze(finding.path),
     }));
   }
+  const basefixVerification = runManualIdentityVerification({ repositoryRoot });
 
   return Object.freeze({
     schemaVersion: 'for-operation-ordering-verifier-report/v1',
@@ -383,6 +424,7 @@ export function runOperationVerifier({
       witnessPaths: primary.witnessPaths,
     }),
     negativeControls: Object.freeze(mutations),
+    basefixVerification,
     verification: receiptEvidence.receipts.verification,
     sourceFiles: receiptEvidence.entries,
     errorCount: 0,

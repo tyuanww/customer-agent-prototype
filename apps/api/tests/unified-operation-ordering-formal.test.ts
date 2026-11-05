@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,10 +13,15 @@ import {
   verifyGitProvenance,
   verifyReceiptTree,
 } from '../../../.cursor/skills/verify-unified-operation-ordering/scripts/check.mjs';
+import {
+  assertManualIdentityResult,
+  resolveBaselineDependency,
+} from '../../../.cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs';
 
 const CONTROLS: ReadonlyArray<readonly [OperationOrderingMode, string]> = [
   ['skip-authorization-check', 'accept_without_authorization'],
   ['accept-after-revocation', 'accept_after_revocation'],
+  ['duplicate-effect', 'duplicate_committed_effect'],
   ['ignore-epoch', 'sessionEpoch_mismatch_not_rejected'],
   ['ignore-request-hash', 'requestHash_mismatch_not_rejected'],
   ['skip-recovery-lookup', 'recovery_invented_success'],
@@ -34,7 +39,7 @@ function temporaryRoot() {
   return root;
 }
 
-function sha256(value: string) {
+function sha256(value: string | Uint8Array) {
   return createHash('sha256').update(value).digest('hex');
 }
 
@@ -50,6 +55,16 @@ function receiptFixture(root: string, source = 'synthetic-source') {
     files: { 'source.txt': sourceHash },
   }));
   return skillRoot;
+}
+
+function fixtureReceiptOptions(root: string, skillRoot: string) {
+  return {
+    repositoryRoot: root,
+    skillRoot,
+    requiredFiles: ['source.txt'],
+    requiredNestedReceipts: [],
+    requiredNestedFiles: {},
+  };
 }
 
 function git(root: string, args: readonly string[]) {
@@ -104,6 +119,9 @@ describe('formal unified operation ordering', () => {
       replayReturnedOriginalReceipt: true,
       unknownAfterEffectWithoutDurability: true,
       recoveryStayedUnknownAfterEffect: true,
+      duplicateAcceptedWithoutEffect: true,
+      duplicateRunningWithoutEffect: true,
+      duplicateUnknownWithoutEffect: true,
     });
     const acceptedThenRevoked = result.witnessPaths.acceptedBeforeRevocation ?? [];
     expect(acceptedThenRevoked.indexOf('acceptCommand')).toBeLessThan(
@@ -153,6 +171,14 @@ describe('formal unified operation ordering', () => {
     });
   });
 
+  it('merges duplicate submissions while accepted, running, and unknown without a second effect', () => {
+    const result = exploreOperationOrdering('duplicate-effect');
+    expect(result.violation).toBe('duplicate_committed_effect');
+    expect(result.path).toContain('duplicateSubmit');
+    expect(result.path).toContain('duplicateWriteEffect');
+    expect(result.state).toMatchObject({ effects: 2 });
+  });
+
   it('fails closed when the receipt or a referenced source is missing', () => {
     const missingReceiptRoot = temporaryRoot();
     mkdirSync(path.join(missingReceiptRoot, '.cursor/skills/verify-unified-operation-ordering'), { recursive: true });
@@ -164,18 +190,71 @@ describe('formal unified operation ordering', () => {
     const missingSourceRoot = temporaryRoot();
     const skillRoot = receiptFixture(missingSourceRoot);
     rmSync(path.join(missingSourceRoot, 'source.txt'));
-    expect(() => verifyReceiptTree({
-      repositoryRoot: missingSourceRoot,
-      skillRoot,
-    })).toThrow('missing required source file');
+    expect(() => verifyReceiptTree(fixtureReceiptOptions(missingSourceRoot, skillRoot)))
+      .toThrow('missing required source file');
   });
 
   it('fails closed when a source drifts after its receipt was synchronized', () => {
     const root = temporaryRoot();
     const skillRoot = receiptFixture(root);
     writeFileSync(path.join(root, 'source.txt'), 'changed-source');
-    expect(() => verifyReceiptTree({ repositoryRoot: root, skillRoot }))
+    expect(() => verifyReceiptTree(fixtureReceiptOptions(root, skillRoot)))
       .toThrow('source.txt changed since unified was synchronized');
+  });
+
+  it('fails closed when required source or nested receipt declarations are removed', () => {
+    const root = temporaryRoot();
+    const skillRoot = receiptFixture(root);
+    const receiptPath = path.join(skillRoot, 'receipts.json');
+    const base = JSON.parse(readFileSync(receiptPath, 'utf8'));
+
+    writeFileSync(receiptPath, JSON.stringify({
+      ...base,
+      nestedReceipts: [],
+    }));
+    expect(() => verifyReceiptTree(fixtureReceiptOptions(root, skillRoot)))
+      .not.toThrow();
+    const nestedRelative = '.cursor/skills/verify-seat-administration-revocation/receipts.json';
+    expect(() => verifyReceiptTree({
+      ...fixtureReceiptOptions(root, skillRoot),
+      requiredFiles: ['source.txt'],
+      requiredNestedReceipts: [nestedRelative],
+      requiredNestedFiles: { [nestedRelative]: ['nested-source.txt'] },
+    })).toThrow('nested receipt manifest drifted');
+    expect(() => verifyReceiptTree({
+      ...fixtureReceiptOptions(root, skillRoot),
+      requiredFiles: ['source.txt', 'required-but-undeclared.txt'],
+    })).toThrow('required-but-undeclared.txt');
+
+    const nestedPath = path.join(root, nestedRelative);
+    mkdirSync(path.dirname(nestedPath), { recursive: true });
+    writeFileSync(nestedPath, JSON.stringify({
+      syncCommit: '1'.repeat(40),
+      files: {},
+    }));
+    const withNested = {
+      ...base,
+      nestedReceipts: [nestedRelative],
+      files: {
+        ...base.files,
+        [nestedRelative]: sha256(readFileSync(nestedPath)),
+      },
+    };
+    writeFileSync(receiptPath, JSON.stringify(withNested));
+    expect(() => verifyReceiptTree({
+      ...fixtureReceiptOptions(root, skillRoot),
+      requiredFiles: ['source.txt', nestedRelative],
+      requiredNestedReceipts: [nestedRelative],
+      requiredNestedFiles: { [nestedRelative]: ['nested-source.txt'] },
+    })).toThrow('nested source');
+
+    rmSync(nestedPath);
+    expect(() => verifyReceiptTree({
+      ...fixtureReceiptOptions(root, skillRoot),
+      requiredFiles: ['source.txt', nestedRelative],
+      requiredNestedReceipts: [nestedRelative],
+      requiredNestedFiles: { [nestedRelative]: ['nested-source.txt'] },
+    })).toThrow('missing required source file');
   });
 
   it('requires a readable ancestor and permits only evidence changes after the source commit', () => {
@@ -196,5 +275,24 @@ describe('formal unified operation ordering', () => {
       '.cursor/skills/verify-unified-operation-ordering/receipts.json',
       'source.txt',
     ])).toThrow('outside evidence files: source.txt');
+  });
+
+  it('validates the BASEFIX relationship and the exact 38-test command result', () => {
+    const baseline = resolveBaselineDependency();
+    expect(baseline.commit).toBe('1de1847bdc139fa1665ea36c51329a110460bd7b');
+    expect(baseline.changedPaths).toEqual(['apps/api/tests/seat-lifecycle.integration.test.ts']);
+    expect(baseline.relationship).toBe('not-ancestor');
+    expect(() => resolveBaselineDependency({ commit: 'f'.repeat(40) }))
+      .toThrow('BASEFIX commit is not readable');
+    expect(() => assertManualIdentityResult({
+      status: 1,
+      stdout: '',
+      stderr: 'synthetic failure',
+    })).toThrow('manual identity command failed');
+    expect(assertManualIdentityResult({
+      status: 0,
+      stdout: 'Test Files  9 passed (9)\nTests  38 passed (38)\n',
+      stderr: '',
+    })).toEqual({ testFiles: 9, tests: 38 });
   });
 });

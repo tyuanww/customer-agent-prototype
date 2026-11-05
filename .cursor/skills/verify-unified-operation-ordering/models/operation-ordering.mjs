@@ -165,10 +165,12 @@ function actions(mode, state) {
     result.push(moveByContract('failAccepted', state, 'failed', {
       durable: 'failed',
       reported: 'failure',
+      receiptReturned: 'failed-receipt',
     }));
     result.push(moveByContract('cancelAccepted', state, 'cancelled', {
       durable: 'cancelled',
       reported: 'cancelled',
+      receiptReturned: 'cancelled-receipt',
     }));
     result.push(moveByContract('unknownBeforeWrite', state, 'unknown', {
       reported: 'unknown',
@@ -202,10 +204,12 @@ function actions(mode, state) {
     result.push(moveByContract('failRunning', state, 'failed', {
       durable: 'failed',
       reported: 'failure',
+      receiptReturned: 'failed-receipt',
     }));
     result.push(moveByContract('cancelRunning', state, 'cancelled', {
       durable: 'cancelled',
       reported: 'cancelled',
+      receiptReturned: 'cancelled-receipt',
     }));
     result.push(moveByContract('commitUnknownWithoutReceipt', state, 'unknown', {
       durable: 'none',
@@ -223,6 +227,7 @@ function actions(mode, state) {
       result.push(moveByContract('readFailedReceipt', state, 'failed', {
         reported: 'failure',
         statusLookup: true,
+        receiptReturned: 'failed-receipt',
       }));
     } else {
       result.push(next('readUnknownStatus', { ...state, statusLookup: true }));
@@ -261,6 +266,11 @@ function actions(mode, state) {
       }
     }
   }
+  for (const duplicateState of ['accepted', 'running', 'unknown']) {
+    if (state.operationState === duplicateState && !state.duplicateReplay) {
+      result.push(next('duplicateSubmit', { ...state, duplicateReplay: true }));
+    }
+  }
   if (state.operationState === 'committed' && state.durable === 'committed' && !state.duplicateReplay) {
     const reuse = classifyOperationReuse(OPERATION_FIXTURES.original, OPERATION_FIXTURES.original);
     result.push(next('duplicateSubmit', {
@@ -268,6 +278,13 @@ function actions(mode, state) {
       duplicateReplay: true,
       receiptReturned: reuse === 'replay' ? 'original-receipt' : 'invented-receipt',
     }, reuse === 'replay' ? null : 'duplicate_not_replayed'));
+  }
+  if (mode === 'duplicate-effect' && state.duplicateReplay
+    && state.operationState === 'running' && state.effects === 1) {
+    result.push(next('duplicateWriteEffect', {
+      ...state,
+      effects: 2,
+    }, 'duplicate_committed_effect'));
   }
   if (state.operationState !== null) {
     for (const kind of ['actor', 'command', 'requestHash', 'sessionEpoch']) {
@@ -298,8 +315,16 @@ function invariant(state) {
     && state.durable !== 'committed') return 'recovery_invented_success';
   if (state.operationState === 'committed'
     && (state.durable !== 'committed' || state.effects !== 1)) return 'committed_without_effect';
+  if (state.duplicateReplay && state.effects > 1) return 'duplicate_committed_effect';
+  const duplicateReceipt = Object.freeze({
+    committed: 'original-receipt',
+    failed: 'failed-receipt',
+    cancelled: 'cancelled-receipt',
+    expired: 'expired-receipt',
+  });
   if (state.duplicateReplay
-    && (state.effects !== 1 || state.receiptReturned !== 'original-receipt')) {
+    && Object.hasOwn(duplicateReceipt, state.operationState)
+    && state.receiptReturned !== duplicateReceipt[state.operationState]) {
     return 'duplicate_effect_or_receipt_drift';
   }
   return null;
@@ -328,6 +353,9 @@ export function exploreOperationOrdering(mode = 'correct') {
     replayReturnedOriginalReceipt: false,
     unknownAfterEffectWithoutDurability: false,
     recoveryStayedUnknownAfterEffect: false,
+    duplicateAcceptedWithoutEffect: false,
+    duplicateRunningWithoutEffect: false,
+    duplicateUnknownWithoutEffect: false,
   };
   const witnessPaths = Object.fromEntries(
     Object.keys(witnesses).map(witness => [witness, null]),
@@ -372,6 +400,18 @@ export function exploreOperationOrdering(mode = 'correct') {
       && current.state.durable === 'none'
       && current.state.recoveryAttempted
       && current.state.reported === 'unknown');
+    observeWitness('duplicateAcceptedWithoutEffect', current.path,
+      current.state.duplicateReplay
+      && current.state.operationState === 'accepted'
+      && current.state.effects === 0);
+    observeWitness('duplicateRunningWithoutEffect', current.path,
+      current.state.duplicateReplay
+      && current.state.operationState === 'running'
+      && current.state.effects <= 1);
+    observeWitness('duplicateUnknownWithoutEffect', current.path,
+      current.state.duplicateReplay
+      && current.state.operationState === 'unknown'
+      && current.state.effects <= 1);
     validateReachableStatus(current.state);
     const broken = invariant(current.state);
     if (broken !== null) {

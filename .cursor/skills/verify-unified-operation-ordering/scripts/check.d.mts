@@ -10,6 +10,9 @@ export function combineSourceEntries(
 export function verifyReceiptTree(options?: Readonly<{
   repositoryRoot?: string;
   skillRoot?: string;
+  requiredFiles?: readonly string[];
+  requiredNestedReceipts?: readonly string[];
+  requiredNestedFiles?: Readonly<Record<string, readonly string[]>>;
 }>): ReceiptEvidence;
 export function assertEvidenceOnlyChanges(changedPaths: Iterable<string>): void;
 export function verifyGitProvenance(options: Readonly<{
