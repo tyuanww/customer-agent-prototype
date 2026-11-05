@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "mode": "synthetic-mechanism",
+  "observedAt": "2026-11-05T00:00:00.000Z",
+  "notice": "Synthetic fixtures exercise the observability mechanism. This is not production telemetry or a runtime latency measurement.",
+  "traceStatusCounts": {
+    "ordinary": {
+      "complete": 216,
+      "incomplete": 1,
+      "cancelled": 1,
+      "failed": 2,
+      "stale": 0,
+      "unknown": 0
+    },
+    "sop": {
+      "complete": 216,
+      "incomplete": 2,
+      "cancelled": 1,
+      "failed": 1,
+      "stale": 0,
+      "unknown": 0
+    }
+  },
+  "latency": [
+    {
+      "surface": "dashboard-acceptance",
+      "stage": "dashboard-operation",
+      "budgetClass": "interactive",
+      "temperature": "cold",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 20,
+      "errorCount": 0,
+      "p50Ms": 332,
+      "p95Ms": 346,
+      "p99Ms": 348
+    },
+    {
+      "surface": "dashboard-acceptance",
+      "stage": "dashboard-operation",
+      "budgetClass": "interactive",
+      "temperature": "warm",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 200,
+      "errorCount": 1,
+      "p50Ms": 256,
+      "p95Ms": 288,
+      "p99Ms": 315
+    },
+    {
+      "surface": "ordinary-query",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "cold",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 20,
+      "errorCount": 0,
+      "p50Ms": 538,
+      "p95Ms": 565,
+      "p99Ms": 568
+    },
+    {
+      "surface": "ordinary-query",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "warm",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 200,
+      "errorCount": 2,
+      "p50Ms": 392,
+      "p95Ms": 538,
+      "p99Ms": 582
+    },
+    {
+      "surface": "overlay-dispatch",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "cold",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 20,
+      "errorCount": 0,
+      "p50Ms": 46,
+      "p95Ms": 53,
+      "p99Ms": 54
+    },
+    {
+      "surface": "overlay-dispatch",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "warm",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 200,
+      "errorCount": 0,
+      "p50Ms": 30,
+      "p95Ms": 40,
+      "p99Ms": 41
+    },
+    {
+      "surface": "sop-query",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "cold",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 20,
+      "errorCount": 1,
+      "p50Ms": 245,
+      "p95Ms": 265,
+      "p99Ms": 265
+    },
+    {
+      "surface": "sop-query",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "temperature": "warm",
+      "limiter": "synthetic-fixture-v1",
+      "sampleCount": 200,
+      "errorCount": 0,
+      "p50Ms": 195,
+      "p95Ms": 225,
+      "p99Ms": 245
+    }
+  ],
+  "budgetChecks": [
+    {
+      "surface": "dashboard-acceptance",
+      "temperature": "cold",
+      "thresholdMs": 300,
+      "observedMs": 346,
+      "breached": true
+    },
+    {
+      "surface": "dashboard-acceptance",
+      "temperature": "warm",
+      "thresholdMs": 300,
+      "observedMs": 288,
+      "breached": false
+    },
+    {
+      "surface": "ordinary-query",
+      "temperature": "cold",
+      "thresholdMs": 500,
+      "observedMs": 565,
+      "breached": true
+    },
+    {
+      "surface": "ordinary-query",
+      "temperature": "warm",
+      "thresholdMs": 500,
+      "observedMs": 538,
+      "breached": true
+    },
+    {
+      "surface": "overlay-dispatch",
+      "temperature": "cold",
+      "thresholdMs": 50,
+      "observedMs": 53,
+      "breached": true
+    },
+    {
+      "surface": "overlay-dispatch",
+      "temperature": "warm",
+      "thresholdMs": 50,
+      "observedMs": 40,
+      "breached": false
+    },
+    {
+      "surface": "sop-query",
+      "temperature": "cold",
+      "thresholdMs": 250,
+      "observedMs": 265,
+      "breached": true
+    },
+    {
+      "surface": "sop-query",
+      "temperature": "warm",
+      "thresholdMs": 250,
+      "observedMs": 225,
+      "breached": false
+    }
+  ],
+  "alerts": [
+    {
+      "kind": "budget_breach",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "stage": "dashboard-operation",
+      "budgetClass": "interactive",
+      "percentile": "p95",
+      "thresholdMs": 300,
+      "observedMs": 346,
+      "sampleCount": 20
+    },
+    {
+      "kind": "budget_breach",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "percentile": "p95",
+      "thresholdMs": 250,
+      "observedMs": 265,
+      "sampleCount": 20
+    },
+    {
+      "kind": "budget_breach",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "percentile": "p95",
+      "thresholdMs": 50,
+      "observedMs": 53,
+      "sampleCount": 20
+    },
+    {
+      "kind": "budget_breach",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "percentile": "p95",
+      "thresholdMs": 500,
+      "observedMs": 538,
+      "sampleCount": 200
+    },
+    {
+      "kind": "budget_breach",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "stage": "transport",
+      "budgetClass": "interactive",
+      "percentile": "p95",
+      "thresholdMs": 500,
+      "observedMs": 565,
+      "sampleCount": 20
+    },
+    {
+      "kind": "unknown_operation",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "operationId": "op_unknown_synthetic",
+      "reasonCode": "UNKNOWN_OPERATION"
+    },
+    {
+      "kind": "dead_letter_growth",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "queue": "content-parse",
+      "previousDepth": 2,
+      "currentDepth": 5
+    },
+    {
+      "kind": "stale_release",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "trace": {
+        "requestId": "req-ordinary-query-warm-0",
+        "operationId": null,
+        "queryId": "query-ordinary-query-warm-0",
+        "parentQueryId": null,
+        "releaseId": "rel_obs_stale",
+        "kind": "ordinary",
+        "sessionEpoch": 1,
+        "generation": 0
+      },
+      "expectedReleaseId": "rel_obs_current"
+    },
+    {
+      "kind": "release_index_failure",
+      "observedAt": "2026-11-05T00:00:00.000Z",
+      "releaseId": "rel_obs_broken",
+      "projection": "sop",
+      "errorCode": "SYNTHETIC_INDEX_FAILURE"
+    }
+  ],
+  "evaluations": {
+    "ordinary": {
+      "datasetId": "ordinary-synthetic-obs-v1",
+      "datasetVersion": 1,
+      "samples": 200,
+      "errors": 1,
+      "limiter": "dataset-size",
+      "kind": "ordinary",
+      "metrics": {
+        "recallAtK": 0.926,
+        "topK": 3,
+        "noHitCount": 11,
+        "responseValidationFailureCount": 1
+      }
+    },
+    "sop": {
+      "datasetId": "sop-synthetic-obs-v1",
+      "datasetVersion": 1,
+      "samples": 200,
+      "errors": 1,
+      "limiter": "dataset-size",
+      "kind": "sop",
+      "metrics": {
+        "matchedCount": 190,
+        "validPathCount": 185,
+        "validBranchCount": 182,
+        "staleReleaseRejectedCount": 5,
+        "unauthorizedResourceRejectedCount": 3
+      }
+    }
+  }
+}
