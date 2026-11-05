@@ -29,7 +29,8 @@ describe.skipIf(!enabled)('Versioned SOP row deletion: actual PG15, restricted b
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_row');
     admin = await pg.connect(db.config);
-    const migrationCount = (await applyDatabaseMigrations(admin)).applied.length;
+    const migrationCount = 81;
+    expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
     await admin.query('CREATE ROLE sop_business LOGIN NOINHERIT; GRANT intake_business TO sop_business');
