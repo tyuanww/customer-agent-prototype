@@ -358,6 +358,20 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0080_bind_import_batch_tenant',
     requiresPredecessor: 'Required import tenant binding requires actor-bound import tenancy',
   },
+  {
+    index: 81,
+    minimumCatalogueLength: 82,
+    id: '0082_access_evaluator',
+    predecessorId: '0081_require_import_batch_principal',
+    requiresPredecessor: 'ACL projection requires the import batch identity boundary',
+  },
+  {
+    index: 82,
+    minimumCatalogueLength: 83,
+    id: '0083_sop_pipeline_projection',
+    predecessorId: '0082_access_evaluator',
+    requiresPredecessor: 'SOP release projection requires the ACL projection',
+  },
 ];
 
 function requiredSuccessorStep(
