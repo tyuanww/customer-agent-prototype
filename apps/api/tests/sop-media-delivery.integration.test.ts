@@ -48,7 +48,8 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     pg = new Pg15Harness(); pg.start();
     const db = pg.createDatabase('sop_media_delivery');
     admin = await pg.connect(db.config);
-    const migrationCount = (await applyDatabaseMigrations(admin)).applied.length;
+    const migrationCount = 81;
+    expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     // The intake read path and the legacy publisher both read authorization_sources now.
     await seedContentWriteAuthority(admin, {
