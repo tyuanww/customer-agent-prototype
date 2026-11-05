@@ -28,7 +28,7 @@ it('rejects permission reads and commands when only account administration is op
  const event={sender:dashboard,senderFrame:frame} as IpcMainInvokeEvent;
  const fixture=intakePermissionsData();
  const bound={
-  pageUse:{current:()=>({phase:'ready',epoch:1,settings:{grants:{state:'closed',recovery:null},accounts:'open'},sop:{state:'closed'}})},
+  pageUse:{current:()=>({phase:'ready',epoch:1,settings:{accessRevision:1,expiresAt:'2026-11-05T11:00:00Z',grants:{state:'closed',recovery:null},accounts:'open'},sop:{state:'closed'}})},
   permissions:{} as ContentIntakePermissions,
  } as unknown as {pageUse:PageUseReader;permissions:ContentIntakePermissions};
  const owned=registerContentIntakePermissionsIpc(fixture.session as unknown as ProductSession,()=>dashboard,()=> 'http://127.0.0.1:5173/',bound);

@@ -229,6 +229,8 @@ describe('DashboardApp', () => {
         phase: 'ready',
         epoch: 1,
         settings: {
+          accessRevision: 1,
+          expiresAt: '2026-11-05T11:00:00Z',
           grants: { state: 'closed', recovery: '没有权限，请找人开通。' },
           accounts: 'closed',
         },
@@ -265,6 +267,8 @@ describe('DashboardApp', () => {
         phase: 'ready',
         epoch: 2,
         settings: {
+          accessRevision: 2,
+          expiresAt: '2026-11-05T11:00:00Z',
           grants: { state: 'open', body: null },
           accounts: 'closed',
         },
@@ -335,6 +339,8 @@ describe('DashboardApp', () => {
         phase: 'ready',
         epoch: 1,
         settings: {
+          accessRevision: 3,
+          expiresAt: '2026-11-05T11:00:00Z',
           grants: { state: 'open', body: null },
           accounts: 'open',
         },

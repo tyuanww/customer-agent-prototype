@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { parseContractSchema, type ContractSchemaName, type components } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService, type AuthenticatedUser } from '../auth-service.js';
+import type { AuthService, AuthenticatedUser } from '../auth-service.js';
+import { requestActor } from '../access/context.js';
 import type { IntakeResult } from './transaction.js';
 
 declare module 'fastify' {
@@ -65,7 +66,7 @@ export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
   const actors = new WeakMap<FastifyRequest, AuthenticatedUser>();
   app.addHook('onRequest', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(auth, request.headers);
+    const actor = await requestActor(request, auth);
     if (!actor) return intakeFailure(reply, 'UNAUTHORIZED', request.routeOptions.url === '/v1/intake/shop-directory' ? 'SHOP_DIRECTORY_SESSION' : 'SCOPE_DENIED');
     if (request.method === 'GET' && !await emptyGetBody(request)) {
       if (request.raw.destroyed) return reply.hijack();

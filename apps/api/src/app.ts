@@ -51,6 +51,15 @@ import { createContentIntakeService } from './content-intake/service.js';
 import { syntheticPrincipalLabels } from './content-intake/synthetic-principal-labels.js';
 import type { ContentObjectStore } from './content-object-store.js';
 import type { IntakePurposePool } from './content-intake/runtime-pool.js';
+import { installAccessAdmission } from './access/admission.js';
+import { createBoundedDenialAudit, type AccessDenialAudit } from './access/audit.js';
+import { createDatabaseAccessEvaluator } from './access/database.js';
+import {
+  createMockAccessEvaluator,
+  createUnavailableAccessEvaluator,
+  type AccessEvaluator,
+} from './access/evaluator.js';
+import { registerAccessRoutes } from './access/routes.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -92,6 +101,9 @@ export type ApiAppOptions = Readonly<{
     worker: IntakePurposePool;
     store: ContentObjectStore;
   }> | undefined;
+  accessEvaluator?: AccessEvaluator | undefined;
+  accessDenialAudit?: AccessDenialAudit | undefined;
+  testPublicRoutes?: readonly string[] | undefined;
 }>;
 
 export function createApiApp(options: ApiAppOptions): FastifyInstance {
@@ -120,6 +132,15 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   const accessLog = options.accessLog;
   const noticeDependencies = options.noticeDependencies;
   const intakeDependencies = options.intakeDependencies;
+  if (options.testPublicRoutes !== undefined && config.profile !== 'test') {
+    throw new Error('Test-only public routes require the test profile');
+  }
+  const accessEvaluator = options.accessEvaluator
+    ?? (authServiceKind(options) === 'mock'
+      ? createMockAccessEvaluator()
+      : intakeDependencies === undefined
+        ? createUnavailableAccessEvaluator()
+        : createDatabaseAccessEvaluator(intakeDependencies.business));
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
   }
@@ -137,6 +158,18 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
     logger: false,
   });
 
+  const accessDenialAudit = options.accessDenialAudit ?? createBoundedDenialAudit({
+    maxEntries: 256,
+    windowMs: 30_000,
+    write: (entry) => {
+      console.info(JSON.stringify({
+        event: 'access_denied',
+        route: entry.route,
+        reason: entry.reason,
+        accessRevision: entry.accessRevision,
+      }));
+    },
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof IdentityFailure) return sendIdentityFailure(reply, error);
     if (isRequestBodyValidationError(error)) return sendValidationError(reply);
@@ -171,6 +204,17 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
       }));
     });
   }
+
+  installAccessAdmission(app, {
+    authService,
+    evaluator: accessEvaluator,
+    profile: authService.kind,
+    denialAudit: accessDenialAudit,
+    ...(options.testPublicRoutes === undefined ? {} : {
+      additionalPublicRoutes: options.testPublicRoutes,
+    }),
+  });
+  registerAccessRoutes(app, accessEvaluator, authService);
 
   app.addHook('onClose', async () => {
     const results = await Promise.allSettled([
@@ -281,4 +325,8 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   });
 
   return app;
+}
+
+function authServiceKind(options: ApiAppOptions): 'mock' | 'product' {
+  return options.authService?.kind ?? 'mock';
 }

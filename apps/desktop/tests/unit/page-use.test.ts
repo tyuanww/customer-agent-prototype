@@ -27,20 +27,35 @@ vi.mock('electron', () => ({
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 function ready(grants: PermissionsUse, accounts: AccountsUse, sop: SopUse): PageUseSnapshot {
-  return { phase: 'ready', epoch: 1, settings: { grants, accounts }, sop };
+  return {
+    phase: 'ready',
+    epoch: 1,
+    settings: { accessRevision: 1, expiresAt: '2026-11-05T11:00:00Z', grants, accounts },
+    sop,
+  };
 }
 
 it('rejects a closed catalog that still carries nodes', () => {
   expect(isPageUseSnapshot({
     phase: 'ready',
     epoch: 1,
-    settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
+    settings: {
+      accessRevision: 1,
+      expiresAt: '2026-11-05T11:00:00Z',
+      grants: { state: 'closed', recovery: null },
+      accounts: 'closed',
+    },
     sop: { state: 'closed', nodes: [{ nodeId: 'n1' }] },
   })).toBe(false);
   expect(isPageUseSnapshot({
     phase: 'ready',
     epoch: 1,
-    settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
+    settings: {
+      accessRevision: 1,
+      expiresAt: '2026-11-05T11:00:00Z',
+      grants: { state: 'closed', recovery: null },
+      accounts: 'closed',
+    },
     sop: { state: 'closed' },
   })).toBe(true);
 });
@@ -48,7 +63,12 @@ it('rejects a closed catalog that still carries nodes', () => {
 const closedReady = {
   phase: 'ready',
   epoch: 1,
-  settings: { grants: { state: 'closed', recovery: null }, accounts: 'closed' },
+  settings: {
+    accessRevision: 1,
+    expiresAt: '2026-11-05T11:00:00Z',
+    grants: { state: 'closed', recovery: null },
+    accounts: 'closed',
+  },
   sop: { state: 'closed' },
 };
 
@@ -184,7 +204,7 @@ it('does not write the previous person lists after the session epoch changes', a
   const fixture = intakePermissionsData(['query']);
   let epoch = 1;
   const signedIn = true;
-  let authorizationCount = 0;
+  let settingsCount = 0;
   let releaseHold: () => void = () => undefined;
   let hold = Promise.resolve();
   const listeners = new Set<() => void>();
@@ -197,9 +217,9 @@ it('does not write the previous person lists after the session epoch changes', a
     },
     request: async (requestEpoch: number, requestPath: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }) => {
       if (requestPath.startsWith('/v1/sop/catalog')) throw new ProductHttpError('FORBIDDEN');
-      if (requestPath.startsWith('/v1/intake/authorization')) {
-        authorizationCount += 1;
-        if (authorizationCount >= 5) await hold;
+      if (requestPath === '/v1/access/settings') {
+        settingsCount += 1;
+        if (settingsCount >= 3) await hold;
       }
       return original(requestEpoch, requestPath, options);
     },
@@ -232,7 +252,7 @@ it('does not write the previous person lists after the session epoch changes', a
     const refresh = reader.refreshPermissions(epoch);
     await vi.waitFor(() => {
       expect(permissions.view().people.some((person) => person.label === '合成坐席')).toBe(true);
-      expect(authorizationCount).toBeGreaterThanOrEqual(5);
+      expect(settingsCount).toBeGreaterThanOrEqual(3);
     });
     epoch += 1;
     for (const listener of listeners) listener();
@@ -250,7 +270,7 @@ it('does not write the previous person lists after the session epoch changes', a
 });
 
 it('opens account-only settings for a server-confirmed seat administrator without loading grant lists', async () => {
-  const fixture = intakePermissionsData(['review'], { canManageSeats: true });
+  const fixture = intakePermissionsData([], { canManageSeats: true });
   const permissions = new ContentIntakePermissions(fixture.session);
   const reader = new PageUseReader(fixture.session as unknown as ProductSession, permissions);
   try {
@@ -273,10 +293,93 @@ it('opens account-only settings for a server-confirmed seat administrator withou
     expect(canOpenSettings(current)).toBe(true);
     expect(canViewGrantSettings(current)).toBe(false);
     expect(canManageAccounts(current)).toBe(true);
-    expect(fixture.requests.map((request) => request.path)).toContain('/v1/intake/seats/administration');
+    expect(fixture.requests.map((request) => request.path)).toContain('/v1/access/settings');
     expect(fixture.requests.some((request) => request.path.startsWith('/v1/intake/sources?'))).toBe(false);
     expect(fixture.requests.some((request) => request.path.startsWith('/v1/intake/principals?'))).toBe(false);
   } finally {
     reader.dispose();
+  }
+});
+
+it('drops loaded grant lists when a second settings read advances access revision', async () => {
+  const fixture = intakePermissionsData(['query']);
+  let revision = 1;
+  const original = fixture.session.request.bind(fixture.session);
+  const session = {
+    ...fixture.session,
+    request: async (epoch: number, requestPath: string, options: Parameters<typeof original>[2]) => {
+      const response = await original(epoch, requestPath, options);
+      if (requestPath !== '/v1/access/settings') return response;
+      revision += 1;
+      return {
+        ...response,
+        value: { ...(response.value as Record<string, unknown>), accessRevision: revision },
+      };
+    },
+  };
+  const permissions = new ContentIntakePermissions(session);
+  const reader = new PageUseReader(session as unknown as ProductSession, permissions);
+  try {
+    await vi.waitFor(() => {
+      const current = reader.current();
+      if (current.phase !== 'ready' || current.settings.grants.state === 'pending') {
+        throw new Error('still warming');
+      }
+    });
+    const result = await reader.refreshPermissions(1);
+    expect(result.grants).toEqual({ state: 'open', body: null });
+    expect(result.accessRevision).toBe(4);
+    expect(permissions.view().people).toEqual([]);
+  } finally {
+    reader.dispose();
+  }
+});
+
+it('closes an expired settings projection before refreshing it', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-05T10:00:00Z'));
+  const fixture = intakePermissionsData(['query']);
+  let settingsReads = 0;
+  const original = fixture.session.request.bind(fixture.session);
+  const session = {
+    ...fixture.session,
+    request: async (epoch: number, requestPath: string, options: Parameters<typeof original>[2]) => {
+      const response = await original(epoch, requestPath, options);
+      if (requestPath !== '/v1/access/settings') return response;
+      settingsReads += 1;
+      return {
+        ...response,
+        value: {
+          ...(response.value as Record<string, unknown>),
+          expiresAt: new Date(Date.now() + (settingsReads === 1 ? 1_000 : 60_000)).toISOString(),
+        },
+      };
+    },
+  };
+  const permissions = new ContentIntakePermissions(session);
+  const reader = new PageUseReader(session as unknown as ProductSession, permissions);
+  const snapshots: PageUseSnapshot[] = [];
+  const unsubscribe = reader.subscribe((snapshot) => snapshots.push(snapshot));
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reader.current()).toMatchObject({
+      phase: 'ready',
+      settings: {
+        grants: { state: 'open', body: null },
+        accounts: 'closed',
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    expect(settingsReads).toBeGreaterThanOrEqual(2);
+    expect(snapshots.some((snapshot) =>
+      snapshot.phase === 'ready'
+      && snapshot.settings.grants.state === 'closed'
+      && snapshot.settings.grants.recovery === '权限已到期，请重新读取。'
+      && snapshot.settings.accounts === 'closed')).toBe(true);
+  } finally {
+    unsubscribe();
+    reader.dispose();
+    vi.useRealTimers();
   }
 });

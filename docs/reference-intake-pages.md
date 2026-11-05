@@ -26,7 +26,7 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 设置内用「权限」「账号」两个页签；成员详情逐条显示实际授权。新建账号收集姓名、登录名、密码、岗位。岗位只有下面两种，默认「客服」。
 
-设置导航不是岗位的附属开关。Main 并行读取授权分配资格与账号管理资格，并分别投影为 `settings.grants` 和 `settings.accounts`。权限资格为 `open` 时显示并允许「权限」，账号资格为 `open` 时显示并允许「账号」。只有恢复说明的 `closed` 授权仍保留数据模型中的文案，但不能单独让设置入口出现。仅审核管理员可管理账号却不能新增授权，仅查询管理员两个能力都关闭。
+设置导航不是岗位的附属开关。Main 从服务端 `/v1/access/settings` 读取一个 `DashboardSettingsView`。该投影只含 `grants`、`accounts` 两个独立开关，以及 `accessRevision`、`expiresAt` 和稳定的拒绝原因。权限资格为 `open` 时显示并允许「权限」，账号资格为 `open` 时显示并允许「账号」。只有恢复说明的 `closed` 授权仍保留数据模型中的文案，但不能单独让设置入口出现。仅审核管理员可管理账号却不能新增授权，仅查询管理员两个能力都关闭。`PageUseReader` 在 revision 前进时丢弃已加载的成员与授权列表，并在 `expiresAt` 到达后先关闭本机入口再重新读取。这个投影只决定窗口和按钮是否可见；每条授权、账号写命令仍由 API 和 PostgreSQL 在命令时重新检查当前会话、事实、来源、期限和父授权。
 
 坐席管理采用请求时授权。服务端 `seat_administration_allowed` 返回 `true` 时，命令完成授权线性化。管理员资格在此后撤销，不取消已经受理的命令；撤销提交之后才开始的新命令必须失败。Main 的 `settings.accounts` 只控制窗口入口，API 的资格检查才是授权边界。
 

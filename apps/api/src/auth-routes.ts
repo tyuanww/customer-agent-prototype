@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
 import {
-  authenticateRequestHeaders,
   bearerToken,
   type AuthenticatedUser,
   type AuthService,
 } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendUnauthorized,
   sendValidationError,
@@ -46,7 +46,7 @@ export function registerAuthRoutes(
 
   app.get('/v1/auth/me', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const user = await authenticateRequestHeaders(authService, request.headers);
+    const user = await requestActor(request, authService);
     if (user === null) return sendUnauthorized(reply);
 
     const payload = parseContractSchema('CurrentUserResponse', {
@@ -60,7 +60,7 @@ export function registerAuthRoutes(
 
   app.get('/v1/auth/job', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const user = await authenticateRequestHeaders(authService, request.headers);
+    const user = await requestActor(request, authService);
     if (user === null) return sendUnauthorized(reply);
     const token = bearerToken(request.headers.authorization);
     const snapshot = token ? jobForToken(token) : null;
