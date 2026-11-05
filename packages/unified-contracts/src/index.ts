@@ -12,6 +12,43 @@ export type SessionEpoch = Brand<number, 'SessionEpoch'>;
 export type ReleaseId = Brand<string, 'ReleaseId'>;
 export type OperationId = Brand<string, 'OperationId'>;
 export type QueryId = Brand<string, 'QueryId'>;
+export type RequestId = Brand<string, 'RequestId'>;
+export type DatasetId = Brand<string, 'DatasetId'>;
+export type KeyedQueryFingerprint = Brand<string, 'KeyedQueryFingerprint'>;
+
+export const QUERY_KINDS = ['ordinary', 'sop'] as const;
+export type QueryKind = (typeof QUERY_KINDS)[number];
+
+export const QUERY_INTENTS = [
+  'product', 'activity', 'after-sale', 'sop', 'general', 'unknown',
+] as const;
+export type QueryIntent = (typeof QUERY_INTENTS)[number];
+
+export const OBSERVABILITY_STAGES = [
+  'request', 'access', 'release-read', 'recall', 'fusion', 'rerank',
+  'response-validation', 'transport', 'sop-match', 'sop-path-expansion',
+  'sop-branch-selection', 'sop-response-validation', 'copy',
+  'dashboard-operation', 'content-parse', 'content-publish',
+  'release-invalidation',
+] as const;
+export type ObservabilityStage = (typeof OBSERVABILITY_STAGES)[number];
+
+export const STAGE_OUTCOMES = ['succeeded', 'failed', 'cancelled', 'stale', 'unknown'] as const;
+export type StageOutcome = (typeof STAGE_OUTCOMES)[number];
+
+export const BUDGET_CLASSES = ['interactive', 'background', 'maintenance'] as const;
+export type BudgetClass = (typeof BUDGET_CLASSES)[number];
+
+export const EVALUATION_LIMITERS = [
+  'none', 'dataset-size', 'concurrency', 'time-budget', 'external-model',
+] as const;
+export type EvaluationLimiter = (typeof EVALUATION_LIMITERS)[number];
+
+export const ALERT_KINDS = [
+  'budget_breach', 'unknown_operation', 'dead_letter_growth',
+  'stale_release', 'release_index_failure',
+] as const;
+export type AlertKind = (typeof ALERT_KINDS)[number];
 
 export type AccessRole = (typeof ACCESS_ROLES)[number];
 export type AccessAction = (typeof ACCESS_ACTIONS)[number];
@@ -206,6 +243,123 @@ export type OverlaySnapshot = {
   releaseId: ReleaseId;
 };
 
+type TraceSessionCorrelation =
+  | { sessionEpoch: SessionEpoch; generation: number }
+  | { sessionEpoch: null; generation: null };
+
+export type TraceIdentity = {
+  requestId: RequestId;
+  operationId: OperationId | null;
+  queryId: QueryId;
+  parentQueryId: QueryId | null;
+  releaseId: ReleaseId | null;
+  kind: QueryKind;
+} & TraceSessionCorrelation;
+
+type QueryTelemetryBase = {
+  trace: TraceIdentity | null;
+  releaseId: ReleaseId;
+  queryFingerprint: KeyedQueryFingerprint;
+  queryLength: number;
+};
+
+export type QueryTelemetryRecord =
+  | (QueryTelemetryBase & { kind: 'ordinary'; intent: Exclude<QueryIntent, 'sop'> })
+  | (QueryTelemetryBase & { kind: 'sop'; intent: 'sop' });
+
+type StageRecordBase = {
+  trace: TraceIdentity | null;
+  stage: ObservabilityStage;
+  startedAt: string;
+  durationMs: number;
+  budgetClass: BudgetClass;
+  external: boolean;
+};
+
+type StageErrorState =
+  | { outcome: 'failed'; errorCode: string }
+  | { outcome: 'succeeded'; errorCode: null }
+  | { outcome: 'cancelled' | 'stale' | 'unknown'; errorCode: string | null };
+
+export type StageRecord = StageRecordBase & StageErrorState;
+
+export type OrdinaryEvaluationMetrics = {
+  recallAtK: number;
+  topK: number;
+  noHitCount: number;
+  responseValidationFailureCount: number;
+};
+
+export type SopEvaluationMetrics = {
+  matchedCount: number;
+  validPathCount: number;
+  validBranchCount: number;
+  staleReleaseRejectedCount: number;
+  unauthorizedResourceRejectedCount: number;
+};
+
+type EvaluationBase = {
+  datasetId: DatasetId;
+  datasetVersion: number;
+  samples: number;
+  errors: number;
+  limiter: EvaluationLimiter;
+};
+
+export type EvaluationRecord =
+  | (EvaluationBase & { kind: 'ordinary'; metrics: OrdinaryEvaluationMetrics })
+  | (EvaluationBase & { kind: 'sop'; metrics: SopEvaluationMetrics });
+
+export type BudgetBreachAlert = {
+  kind: 'budget_breach';
+  observedAt: string;
+  stage: ObservabilityStage;
+  budgetClass: BudgetClass;
+  percentile: 'p50' | 'p95' | 'p99';
+  thresholdMs: number;
+  observedMs: number;
+  sampleCount: number;
+};
+
+export type UnknownOperationAlert = {
+  kind: 'unknown_operation';
+  observedAt: string;
+  operationId: OperationId;
+  reasonCode: string;
+};
+
+export type DeadLetterQueue = 'content-parse' | 'release-index' | 'dashboard-operation';
+
+export type DeadLetterGrowthAlert = {
+  kind: 'dead_letter_growth';
+  observedAt: string;
+  queue: DeadLetterQueue;
+  previousDepth: number;
+  currentDepth: number;
+};
+
+export type StaleReleaseAlert = {
+  kind: 'stale_release';
+  observedAt: string;
+  trace: TraceIdentity;
+  expectedReleaseId: ReleaseId;
+};
+
+export type ReleaseIndexFailureAlert = {
+  kind: 'release_index_failure';
+  observedAt: string;
+  releaseId: ReleaseId;
+  projection: 'content' | 'sop';
+  errorCode: string;
+};
+
+export type AlertRecord =
+  | BudgetBreachAlert
+  | UnknownOperationAlert
+  | DeadLetterGrowthAlert
+  | StaleReleaseAlert
+  | ReleaseIndexFailureAlert;
+
 export type PolicyConstraint = {
   maxScope: ScopeKind;
   requiresCurrentFacts: boolean;
@@ -290,8 +444,9 @@ const isRecord = (value: unknown): value is StringRecord => typeof value === 'ob
 const hasOnly = (value: StringRecord, keys: readonly string[]): boolean => Object.keys(value).every((key) => keys.includes(key));
 const stringAt = (value: unknown, path: string, nonEmpty = true): ValidationResult<string> => typeof value === 'string' && (!nonEmpty || value.length > 0) ? ok(value) : fail(path, 'expected non-empty string');
 const intAt = (value: unknown, path: string, minimum = 0): ValidationResult<number> => Number.isInteger(value) && (value as number) >= minimum ? ok(value as number) : fail(path, `expected integer >= ${minimum}`);
+const MAX_ISO_DATETIME_LENGTH = 64;
 const isoAt = (value: unknown, path: string): ValidationResult<string> => {
-  if (typeof value !== 'string') return fail(path, 'expected ISO date-time');
+  if (typeof value !== 'string' || value.length > MAX_ISO_DATETIME_LENGTH) return fail(path, 'expected ISO date-time');
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/u);
   if (!match) return fail(path, 'expected ISO date-time');
   const [, yearText, monthText, dayText, hourText, minuteText, secondText, offsetHourText, offsetMinuteText] = match;
@@ -495,6 +650,490 @@ export function parseReleaseSnapshot(value: unknown): ReleaseSnapshot { const s 
 export function validateReleaseSnapshot(value: unknown): ValidationResult<ReleaseSnapshot> { try { return ok(parseReleaseSnapshot(value)); } catch (error) { return fail(error instanceof ContractValidationError ? error.path : '$', error instanceof Error ? error.message : 'invalid release snapshot'); } }
 export function parseOverlaySnapshot(value: unknown): OverlaySnapshot { const s = exactRecord(value, '$', ['role', 'sessionEpoch', 'generation', 'phase', 'activeSurface', 'handoffSequence', 'layoutSequence', 'releaseId']); if (!s.ok) throw s.error; if (s.value.role !== 'fox' && s.value.role !== 'query') throw new ContractValidationError('$.role', 'invalid role'); const role = s.value.role as OverlaySnapshot['role']; const ep = intAt(s.value.sessionEpoch, '$.sessionEpoch', 1); if (!ep.ok) throw ep.error; for (const k of ['generation', 'handoffSequence', 'layoutSequence'] as const) { const v = intAt(s.value[k], `$.${k}`); if (!v.ok) throw v.error; } if (!['parked', 'opening', 'active', 'closing', 'closed'].includes(s.value.phase as string)) throw new ContractValidationError('$.phase', 'invalid phase'); if (s.value.activeSurface !== role) throw new ContractValidationError('$.activeSurface', 'must match role'); const id = parseReleaseId(s.value.releaseId, '$.releaseId'); if (!id.ok) throw id.error; return { role, sessionEpoch: epoch(ep.value), generation: s.value.generation as number, phase: s.value.phase as OverlaySnapshot['phase'], activeSurface: role, handoffSequence: s.value.handoffSequence as number, layoutSequence: s.value.layoutSequence as number, releaseId: id.value }; }
 export function validateOverlaySnapshot(value: unknown): ValidationResult<OverlaySnapshot> { try { return ok(parseOverlaySnapshot(value)); } catch (error) { return fail(error instanceof ContractValidationError ? error.path : '$', error instanceof Error ? error.message : 'invalid overlay snapshot'); } }
+
+const STABLE_TOKEN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/u;
+const KEYED_FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u;
+const MAX_DURATION_MS = 86_400_000;
+
+const tokenAt = (value: unknown, path: string, maximum = 128): ValidationResult<string> => {
+  const parsed = stringAt(value, path);
+  if (!parsed.ok) return parsed;
+  if (parsed.value.length > maximum || !STABLE_TOKEN_PATTERN.test(parsed.value)) {
+    return fail(path, `expected stable token with at most ${maximum} characters`);
+  }
+  return parsed;
+};
+
+const nullableTokenAt = (value: unknown, path: string, maximum = 128): ValidationResult<string | null> => (
+  value === null ? ok(null) : tokenAt(value, path, maximum)
+);
+
+const enumAt = <T extends readonly string[]>(
+  value: unknown,
+  path: string,
+  values: T,
+): ValidationResult<T[number]> => (
+  typeof value === 'string' && values.includes(value as T[number])
+    ? ok(value as T[number])
+    : fail(path, `expected one of ${values.join(', ')}`)
+);
+
+const finiteBetween = (
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+  minimumExclusive = false,
+): ValidationResult<number> => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fail(path, 'expected finite number');
+  const meetsMinimum = minimumExclusive ? value > minimum : value >= minimum;
+  return meetsMinimum && value <= maximum
+    ? ok(value)
+    : fail(path, `expected number between ${minimumExclusive ? '(' : '['}${minimum}, ${maximum}]`);
+};
+
+const integerBetween = (
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+): ValidationResult<number> => {
+  const parsed = intAt(value, path, minimum);
+  if (!parsed.ok) return parsed;
+  return parsed.value <= maximum ? parsed : fail(path, `expected integer from ${minimum} through ${maximum}`);
+};
+
+export function validateTraceIdentity(value: unknown): ValidationResult<TraceIdentity> {
+  const shape = exactRecord(value, '$', [
+    'requestId', 'operationId', 'queryId', 'parentQueryId', 'sessionEpoch',
+    'generation', 'releaseId', 'kind',
+  ]);
+  if (!shape.ok) return shape;
+
+  const requestId = tokenAt(shape.value.requestId, '$.requestId');
+  if (!requestId.ok) return requestId;
+  const operationId = nullableTokenAt(shape.value.operationId, '$.operationId');
+  if (!operationId.ok) return operationId;
+  const queryId = tokenAt(shape.value.queryId, '$.queryId');
+  if (!queryId.ok) return queryId;
+  const parentQueryId = nullableTokenAt(shape.value.parentQueryId, '$.parentQueryId');
+  if (!parentQueryId.ok) return parentQueryId;
+  if (parentQueryId.value !== null && parentQueryId.value === queryId.value) {
+    return fail('$.parentQueryId', 'must differ from queryId');
+  }
+
+  const hasSessionEpoch = shape.value.sessionEpoch !== null;
+  const hasGeneration = shape.value.generation !== null;
+  if (hasSessionEpoch !== hasGeneration) {
+    return fail('$', 'sessionEpoch and generation must both be present or both be null');
+  }
+  let sessionCorrelation: TraceSessionCorrelation;
+  if (hasSessionEpoch) {
+    const parsedEpoch = intAt(shape.value.sessionEpoch, '$.sessionEpoch', 1);
+    if (!parsedEpoch.ok) return parsedEpoch;
+    const parsedGeneration = intAt(shape.value.generation, '$.generation', 0);
+    if (!parsedGeneration.ok) return parsedGeneration;
+    sessionCorrelation = {
+      sessionEpoch: epoch(parsedEpoch.value),
+      generation: parsedGeneration.value,
+    };
+  } else {
+    sessionCorrelation = { sessionEpoch: null, generation: null };
+  }
+
+  const releaseId = nullableTokenAt(shape.value.releaseId, '$.releaseId');
+  if (!releaseId.ok) return releaseId;
+  const kind = enumAt(shape.value.kind, '$.kind', QUERY_KINDS);
+  if (!kind.ok) return kind;
+
+  return ok({
+    requestId: branded<RequestId>(requestId.value),
+    operationId: operationId.value === null ? null : branded<OperationId>(operationId.value),
+    queryId: branded<QueryId>(queryId.value),
+    parentQueryId: parentQueryId.value === null ? null : branded<QueryId>(parentQueryId.value),
+    releaseId: releaseId.value === null ? null : branded<ReleaseId>(releaseId.value),
+    kind: kind.value,
+    ...sessionCorrelation,
+  });
+}
+
+export const parseTraceIdentity = (value: unknown): TraceIdentity => resultOrThrow(validateTraceIdentity(value));
+
+export function validateQueryTelemetryRecord(value: unknown): ValidationResult<QueryTelemetryRecord> {
+  const shape = exactRecord(value, '$', [
+    'trace', 'kind', 'releaseId', 'queryFingerprint', 'queryLength', 'intent',
+  ]);
+  if (!shape.ok) return shape;
+
+  let trace: TraceIdentity | null = null;
+  if (shape.value.trace !== null) {
+    const parsedTrace = validateTraceIdentity(shape.value.trace);
+    if (!parsedTrace.ok) return parsedTrace;
+    trace = parsedTrace.value;
+  }
+  const kind = enumAt(shape.value.kind, '$.kind', QUERY_KINDS);
+  if (!kind.ok) return kind;
+  const releaseId = tokenAt(shape.value.releaseId, '$.releaseId');
+  if (!releaseId.ok) return releaseId;
+  if (typeof shape.value.queryFingerprint !== 'string'
+    || !KEYED_FINGERPRINT_PATTERN.test(shape.value.queryFingerprint)) {
+    return fail('$.queryFingerprint', 'expected lowercase HMAC-SHA-256 fingerprint');
+  }
+  const queryLength = integerBetween(shape.value.queryLength, '$.queryLength', 1, 10_000);
+  if (!queryLength.ok) return queryLength;
+  const intent = enumAt(shape.value.intent, '$.intent', QUERY_INTENTS);
+  if (!intent.ok) return intent;
+
+  if ((kind.value === 'sop') !== (intent.value === 'sop')) {
+    return fail('$.intent', 'SOP queries use intent sop; ordinary queries do not');
+  }
+  if (trace !== null) {
+    if (trace.kind !== kind.value) return fail('$.trace.kind', 'must match telemetry kind');
+    if (trace.releaseId !== null && trace.releaseId !== releaseId.value) {
+      return fail('$.trace.releaseId', 'must match telemetry releaseId');
+    }
+  }
+
+  const common = {
+    trace,
+    releaseId: branded<ReleaseId>(releaseId.value),
+    queryFingerprint: branded<KeyedQueryFingerprint>(shape.value.queryFingerprint),
+    queryLength: queryLength.value,
+  };
+  if (kind.value === 'ordinary') {
+    return ok({
+      ...common,
+      kind: 'ordinary',
+      intent: intent.value as Exclude<QueryIntent, 'sop'>,
+    });
+  }
+  return ok({ ...common, kind: 'sop', intent: 'sop' });
+}
+
+export const parseQueryTelemetryRecord = (value: unknown): QueryTelemetryRecord => (
+  resultOrThrow(validateQueryTelemetryRecord(value))
+);
+
+const ORDINARY_ONLY_STAGES = new Set<ObservabilityStage>([
+  'recall', 'fusion', 'rerank', 'response-validation',
+]);
+const SOP_ONLY_STAGES = new Set<ObservabilityStage>([
+  'sop-match', 'sop-path-expansion', 'sop-branch-selection', 'sop-response-validation',
+]);
+
+export function validateStageRecord(value: unknown): ValidationResult<StageRecord> {
+  const shape = exactRecord(value, '$', [
+    'trace', 'stage', 'startedAt', 'durationMs', 'outcome', 'errorCode',
+    'budgetClass', 'external',
+  ]);
+  if (!shape.ok) return shape;
+
+  let trace: TraceIdentity | null = null;
+  if (shape.value.trace !== null) {
+    const parsedTrace = validateTraceIdentity(shape.value.trace);
+    if (!parsedTrace.ok) return parsedTrace;
+    trace = parsedTrace.value;
+  }
+  const stage = enumAt(shape.value.stage, '$.stage', OBSERVABILITY_STAGES);
+  if (!stage.ok) return stage;
+  const startedAt = isoAt(shape.value.startedAt, '$.startedAt');
+  if (!startedAt.ok) return startedAt;
+  const durationMs = finiteBetween(
+    shape.value.durationMs,
+    '$.durationMs',
+    0,
+    MAX_DURATION_MS,
+  );
+  if (!durationMs.ok) return durationMs;
+  const outcome = enumAt(shape.value.outcome, '$.outcome', STAGE_OUTCOMES);
+  if (!outcome.ok) return outcome;
+  const errorCode = nullableTokenAt(shape.value.errorCode, '$.errorCode', 64);
+  if (!errorCode.ok) return errorCode;
+  const budgetClass = enumAt(shape.value.budgetClass, '$.budgetClass', BUDGET_CLASSES);
+  if (!budgetClass.ok) return budgetClass;
+  if (typeof shape.value.external !== 'boolean') return fail('$.external', 'expected boolean');
+
+  if (outcome.value === 'succeeded' && errorCode.value !== null) {
+    return fail('$.errorCode', 'successful stages cannot carry an error code');
+  }
+  if (outcome.value === 'failed' && errorCode.value === null) {
+    return fail('$.errorCode', 'failed stages require a stable error code');
+  }
+  if (trace?.kind === 'ordinary' && SOP_ONLY_STAGES.has(stage.value)) {
+    return fail('$.stage', 'SOP stage cannot use an ordinary trace');
+  }
+  if (trace?.kind === 'sop' && ORDINARY_ONLY_STAGES.has(stage.value)) {
+    return fail('$.stage', 'ordinary stage cannot use a SOP trace');
+  }
+
+  const common = {
+    trace,
+    stage: stage.value,
+    startedAt: startedAt.value,
+    durationMs: durationMs.value,
+    budgetClass: budgetClass.value,
+    external: shape.value.external,
+  };
+  if (outcome.value === 'failed') {
+    return ok({ ...common, outcome: 'failed', errorCode: errorCode.value as string });
+  }
+  if (outcome.value === 'succeeded') {
+    return ok({ ...common, outcome: 'succeeded', errorCode: null });
+  }
+  return ok({ ...common, outcome: outcome.value, errorCode: errorCode.value });
+}
+
+export const parseStageRecord = (value: unknown): StageRecord => resultOrThrow(validateStageRecord(value));
+
+function validateEvaluationBase(
+  shape: StringRecord,
+  path: string,
+  kind: QueryKind,
+): ValidationResult<EvaluationBase & { kind: QueryKind }> {
+  const datasetId = tokenAt(shape.datasetId, `${path}.datasetId`);
+  if (!datasetId.ok) return datasetId;
+  const datasetVersion = integerBetween(shape.datasetVersion, `${path}.datasetVersion`, 1, 1_000_000);
+  if (!datasetVersion.ok) return datasetVersion;
+  const samples = integerBetween(shape.samples, `${path}.samples`, 1, 1_000_000);
+  if (!samples.ok) return samples;
+  const errors = integerBetween(shape.errors, `${path}.errors`, 0, samples.value);
+  if (!errors.ok) return errors;
+  const limiter = enumAt(shape.limiter, `${path}.limiter`, EVALUATION_LIMITERS);
+  if (!limiter.ok) return limiter;
+  return ok({
+    kind,
+    datasetId: branded<DatasetId>(datasetId.value),
+    datasetVersion: datasetVersion.value,
+    samples: samples.value,
+    errors: errors.value,
+    limiter: limiter.value,
+  });
+}
+
+function validateOrdinaryMetrics(
+  value: unknown,
+  path: string,
+  samples: number,
+): ValidationResult<OrdinaryEvaluationMetrics> {
+  const shape = exactRecord(value, path, [
+    'recallAtK', 'topK', 'noHitCount', 'responseValidationFailureCount',
+  ]);
+  if (!shape.ok) return shape;
+  const recallAtK = finiteBetween(shape.value.recallAtK, `${path}.recallAtK`, 0, 1);
+  if (!recallAtK.ok) return recallAtK;
+  const topK = integerBetween(shape.value.topK, `${path}.topK`, 1, 100);
+  if (!topK.ok) return topK;
+  const noHitCount = integerBetween(shape.value.noHitCount, `${path}.noHitCount`, 0, samples);
+  if (!noHitCount.ok) return noHitCount;
+  const responseValidationFailureCount = integerBetween(
+    shape.value.responseValidationFailureCount,
+    `${path}.responseValidationFailureCount`,
+    0,
+    samples,
+  );
+  if (!responseValidationFailureCount.ok) return responseValidationFailureCount;
+  return ok({
+    recallAtK: recallAtK.value,
+    topK: topK.value,
+    noHitCount: noHitCount.value,
+    responseValidationFailureCount: responseValidationFailureCount.value,
+  });
+}
+
+function validateSopMetrics(
+  value: unknown,
+  path: string,
+  samples: number,
+): ValidationResult<SopEvaluationMetrics> {
+  const shape = exactRecord(value, path, [
+    'matchedCount', 'validPathCount', 'validBranchCount',
+    'staleReleaseRejectedCount', 'unauthorizedResourceRejectedCount',
+  ]);
+  if (!shape.ok) return shape;
+  const matchedCount = integerBetween(shape.value.matchedCount, `${path}.matchedCount`, 0, samples);
+  if (!matchedCount.ok) return matchedCount;
+  const validPathCount = integerBetween(shape.value.validPathCount, `${path}.validPathCount`, 0, samples);
+  if (!validPathCount.ok) return validPathCount;
+  const validBranchCount = integerBetween(shape.value.validBranchCount, `${path}.validBranchCount`, 0, samples);
+  if (!validBranchCount.ok) return validBranchCount;
+  const staleReleaseRejectedCount = integerBetween(
+    shape.value.staleReleaseRejectedCount,
+    `${path}.staleReleaseRejectedCount`,
+    0,
+    samples,
+  );
+  if (!staleReleaseRejectedCount.ok) return staleReleaseRejectedCount;
+  const unauthorizedResourceRejectedCount = integerBetween(
+    shape.value.unauthorizedResourceRejectedCount,
+    `${path}.unauthorizedResourceRejectedCount`,
+    0,
+    samples,
+  );
+  if (!unauthorizedResourceRejectedCount.ok) return unauthorizedResourceRejectedCount;
+  return ok({
+    matchedCount: matchedCount.value,
+    validPathCount: validPathCount.value,
+    validBranchCount: validBranchCount.value,
+    staleReleaseRejectedCount: staleReleaseRejectedCount.value,
+    unauthorizedResourceRejectedCount: unauthorizedResourceRejectedCount.value,
+  });
+}
+
+export function validateEvaluationRecord(value: unknown): ValidationResult<EvaluationRecord> {
+  if (!isRecord(value)) return fail('$', 'expected object');
+  const kind = enumAt(value.kind, '$.kind', QUERY_KINDS);
+  if (!kind.ok) return kind;
+  const shape = exactRecord(value, '$', [
+    'kind', 'datasetId', 'datasetVersion', 'samples', 'metrics', 'errors', 'limiter',
+  ]);
+  if (!shape.ok) return shape;
+  const base = validateEvaluationBase(shape.value, '$', kind.value);
+  if (!base.ok) return base;
+  if (kind.value === 'ordinary') {
+    const metrics = validateOrdinaryMetrics(shape.value.metrics, '$.metrics', base.value.samples);
+    if (!metrics.ok) return metrics;
+    return ok({ ...base.value, kind: 'ordinary', metrics: metrics.value });
+  }
+  const metrics = validateSopMetrics(shape.value.metrics, '$.metrics', base.value.samples);
+  if (!metrics.ok) return metrics;
+  return ok({ ...base.value, kind: 'sop', metrics: metrics.value });
+}
+
+export const parseEvaluationRecord = (value: unknown): EvaluationRecord => (
+  resultOrThrow(validateEvaluationRecord(value))
+);
+
+export function validateAlertRecord(value: unknown): ValidationResult<AlertRecord> {
+  if (!isRecord(value)) return fail('$', 'expected object');
+  const kind = enumAt(value.kind, '$.kind', ALERT_KINDS);
+  if (!kind.ok) return kind;
+
+  if (kind.value === 'budget_breach') {
+    const shape = exactRecord(value, '$', [
+      'kind', 'observedAt', 'stage', 'budgetClass', 'percentile',
+      'thresholdMs', 'observedMs', 'sampleCount',
+    ]);
+    if (!shape.ok) return shape;
+    const observedAt = isoAt(shape.value.observedAt, '$.observedAt');
+    if (!observedAt.ok) return observedAt;
+    const stage = enumAt(shape.value.stage, '$.stage', OBSERVABILITY_STAGES);
+    if (!stage.ok) return stage;
+    const budgetClass = enumAt(shape.value.budgetClass, '$.budgetClass', BUDGET_CLASSES);
+    if (!budgetClass.ok) return budgetClass;
+    const percentile = enumAt(shape.value.percentile, '$.percentile', ['p50', 'p95', 'p99'] as const);
+    if (!percentile.ok) return percentile;
+    const thresholdMs = finiteBetween(shape.value.thresholdMs, '$.thresholdMs', 0, MAX_DURATION_MS, true);
+    if (!thresholdMs.ok) return thresholdMs;
+    const observedMs = finiteBetween(shape.value.observedMs, '$.observedMs', 0, MAX_DURATION_MS, true);
+    if (!observedMs.ok) return observedMs;
+    if (observedMs.value <= thresholdMs.value) {
+      return fail('$.observedMs', 'budget breach requires observedMs above thresholdMs');
+    }
+    const sampleCount = integerBetween(shape.value.sampleCount, '$.sampleCount', 1, 1_000_000);
+    if (!sampleCount.ok) return sampleCount;
+    return ok({
+      kind: 'budget_breach',
+      observedAt: observedAt.value,
+      stage: stage.value,
+      budgetClass: budgetClass.value,
+      percentile: percentile.value,
+      thresholdMs: thresholdMs.value,
+      observedMs: observedMs.value,
+      sampleCount: sampleCount.value,
+    });
+  }
+
+  if (kind.value === 'unknown_operation') {
+    const shape = exactRecord(value, '$', ['kind', 'observedAt', 'operationId', 'reasonCode']);
+    if (!shape.ok) return shape;
+    const observedAt = isoAt(shape.value.observedAt, '$.observedAt');
+    if (!observedAt.ok) return observedAt;
+    const operationId = tokenAt(shape.value.operationId, '$.operationId');
+    if (!operationId.ok) return operationId;
+    const reasonCode = tokenAt(shape.value.reasonCode, '$.reasonCode', 64);
+    if (!reasonCode.ok) return reasonCode;
+    return ok({
+      kind: 'unknown_operation',
+      observedAt: observedAt.value,
+      operationId: branded<OperationId>(operationId.value),
+      reasonCode: reasonCode.value,
+    });
+  }
+
+  if (kind.value === 'dead_letter_growth') {
+    const shape = exactRecord(value, '$', [
+      'kind', 'observedAt', 'queue', 'previousDepth', 'currentDepth',
+    ]);
+    if (!shape.ok) return shape;
+    const observedAt = isoAt(shape.value.observedAt, '$.observedAt');
+    if (!observedAt.ok) return observedAt;
+    const queue = enumAt(
+      shape.value.queue,
+      '$.queue',
+      ['content-parse', 'release-index', 'dashboard-operation'] as const,
+    );
+    if (!queue.ok) return queue;
+    const previousDepth = integerBetween(shape.value.previousDepth, '$.previousDepth', 0, 1_000_000);
+    if (!previousDepth.ok) return previousDepth;
+    const currentDepth = integerBetween(shape.value.currentDepth, '$.currentDepth', 0, 1_000_000);
+    if (!currentDepth.ok) return currentDepth;
+    if (currentDepth.value <= previousDepth.value) {
+      return fail('$.currentDepth', 'dead-letter growth requires a larger current depth');
+    }
+    return ok({
+      kind: 'dead_letter_growth',
+      observedAt: observedAt.value,
+      queue: queue.value,
+      previousDepth: previousDepth.value,
+      currentDepth: currentDepth.value,
+    });
+  }
+
+  if (kind.value === 'stale_release') {
+    const shape = exactRecord(value, '$', [
+      'kind', 'observedAt', 'trace', 'expectedReleaseId',
+    ]);
+    if (!shape.ok) return shape;
+    const observedAt = isoAt(shape.value.observedAt, '$.observedAt');
+    if (!observedAt.ok) return observedAt;
+    const trace = validateTraceIdentity(shape.value.trace);
+    if (!trace.ok) return trace;
+    if (trace.value.releaseId === null) return fail('$.trace.releaseId', 'stale release requires a trace release');
+    const expectedReleaseId = tokenAt(shape.value.expectedReleaseId, '$.expectedReleaseId');
+    if (!expectedReleaseId.ok) return expectedReleaseId;
+    if (trace.value.releaseId === expectedReleaseId.value) {
+      return fail('$.expectedReleaseId', 'must differ from the stale trace release');
+    }
+    return ok({
+      kind: 'stale_release',
+      observedAt: observedAt.value,
+      trace: trace.value,
+      expectedReleaseId: branded<ReleaseId>(expectedReleaseId.value),
+    });
+  }
+
+  const shape = exactRecord(value, '$', [
+    'kind', 'observedAt', 'releaseId', 'projection', 'errorCode',
+  ]);
+  if (!shape.ok) return shape;
+  const observedAt = isoAt(shape.value.observedAt, '$.observedAt');
+  if (!observedAt.ok) return observedAt;
+  const releaseId = tokenAt(shape.value.releaseId, '$.releaseId');
+  if (!releaseId.ok) return releaseId;
+  const projection = enumAt(shape.value.projection, '$.projection', ['content', 'sop'] as const);
+  if (!projection.ok) return projection;
+  const errorCode = tokenAt(shape.value.errorCode, '$.errorCode', 64);
+  if (!errorCode.ok) return errorCode;
+  return ok({
+    kind: 'release_index_failure',
+    observedAt: observedAt.value,
+    releaseId: branded<ReleaseId>(releaseId.value),
+    projection: projection.value,
+    errorCode: errorCode.value,
+  });
+}
+
+export const parseAlertRecord = (value: unknown): AlertRecord => resultOrThrow(validateAlertRecord(value));
 
 export function renderPolicyMatrixJson(): string {
   return `${JSON.stringify({

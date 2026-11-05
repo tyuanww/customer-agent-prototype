@@ -66,7 +66,7 @@ function searchRequest(): PreparedSearchOperation {
 }
 
 function scriptedPool(options: Readonly<{
-  failAt: 'telemetry' | 'commit';
+  failAt: 'telemetry' | 'commit' | 'none';
   rollbackFails?: boolean;
 }>) {
   const release = vi.fn();
@@ -104,6 +104,36 @@ function scriptedPool(options: Readonly<{
 }
 
 describe('EventRepository transaction failure boundaries', () => {
+  it('uses the coordinated result after the idempotency claim and still records the canonical no-hit event', async () => {
+    const scripted = scriptedPool({ failAt: 'none' });
+    const repository = createEventRepository(scripted.pool as never, 'instance_synthetic_test');
+    const resolveSearch = vi.fn(async () => ({
+      ok: true as const,
+      releaseId: 'rel_int_api_001',
+      sourceBindingHash: 'b'.repeat(64),
+      decision: 'reject' as const,
+      candidates: [],
+    }));
+
+    await expect(repository.executeSearch(searchRequest(), resolveSearch)).resolves.toMatchObject({
+      ok: true,
+      response: {
+        hit_status: 'no_hit',
+        release_id: 'rel_int_api_001',
+        telemetry_status: 'recorded',
+      },
+    });
+    expect(resolveSearch).toHaveBeenCalledOnce();
+    const claimIndex = scripted.query.mock.calls.findIndex(
+      ([sql]) => String(sql).includes('idempotency_claim'),
+    );
+    const eventIndex = scripted.query.mock.calls.findIndex(
+      ([sql]) => String(sql).includes('INSERT INTO public.query_events'),
+    );
+    expect(claimIndex).toBeGreaterThanOrEqual(0);
+    expect(eventIndex).toBeGreaterThan(claimIndex);
+  });
+
   it('never labels an ambiguous COMMIT transport failure as a zero-write response', async () => {
     const scripted = scriptedPool({ failAt: 'commit' });
     const repository = createEventRepository(scripted.pool as never, 'instance_synthetic_test');

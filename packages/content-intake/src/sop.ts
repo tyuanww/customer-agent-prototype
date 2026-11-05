@@ -155,6 +155,10 @@ async function workbookBytesForExcel(bytes: Buffer): Promise<Buffer> {
   return repairedBytes;
 }
 
+/** The normalized authoring reader uses the same WPS shared-string repair as
+ * the legacy six-sheet reader, so both paths inspect identical ZIP bytes. */
+export const prepareSopWorkbookBytes = workbookBytesForExcel;
+
 function imageBuffer(image: ExcelJS.Image): Buffer | undefined {
   if (image.buffer) return Buffer.from(image.buffer);
   if (image.base64) return Buffer.from(image.base64.split(',', 2).at(-1) ?? '', 'base64');

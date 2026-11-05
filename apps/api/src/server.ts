@@ -34,6 +34,15 @@ import {
   sharedRuntimePool,
   type ServiceRepository,
 } from './service-repository.js';
+import {
+  createApiQueryRuntime,
+  createSerializedQueryObserver,
+} from './integration/query-runtime.js';
+import { createPostgresAccessEvaluator } from './integration/access.js';
+import {
+  createPostgresCurrentReleaseIdentityReader,
+  createPostgresQueryReleaseLoader,
+} from './integration/release.js';
 
 function intakeEnvPresent(): boolean {
   return Boolean(process.env.INTAKE_BUSINESS_DATABASE_URL
@@ -93,6 +102,8 @@ export async function startApi(
     async (config, repository, policyAdminRepository, bootstrap) => {
       let auth;
       let intake: ReturnType<typeof intakeRoutes> | undefined;
+      let queryRuntime: ReturnType<typeof createApiQueryRuntime> | undefined;
+      let accessEvaluator: ReturnType<typeof createPostgresAccessEvaluator> | undefined;
       if (config.sessionMode !== 'product' && intakeEnvPresent()) {
         throw new Error('Intake HTTP pools are incomplete');
       }
@@ -178,12 +189,29 @@ export async function startApi(
         const notice = runtimePool === undefined ? undefined : {
           service: createNoticeServiceForPool(runtimePool, false),
         };
+        if (intake !== undefined) {
+          accessEvaluator = createPostgresAccessEvaluator(intake.business);
+          queryRuntime = createApiQueryRuntime({
+            loader: createPostgresQueryReleaseLoader(intake.usage),
+            access: accessEvaluator,
+            observer: createSerializedQueryObserver(),
+            currentRelease: createPostgresCurrentReleaseIdentityReader(intake.usage),
+            onActivationFailure: () => {
+              reportApiRuntimeDiagnostic(createApiRuntimeDiagnostic('RELEASE_INDEX_FAILED'));
+            },
+          });
+          await queryRuntime.initialize();
+        }
         const app = createApiApp({
           config,
           repository,
           authService: auth,
           policyAdminRepository,
-          searchDependencies: { operation: { execute: (request) => repository.executeSearch(request) },
+          ...(accessEvaluator === undefined ? {} : { accessEvaluator }),
+          ...(queryRuntime === undefined ? {} : { queryRuntime }),
+          searchDependencies: { operation: { execute: (request) => queryRuntime === undefined
+            ? repository.executeSearch(request)
+            : repository.executeSearch(request, () => queryRuntime!.search(request)) },
             logHash: bootstrap.logHash, idempotencyHmac: bootstrap.idempotencyHmac,
             // Reads the acceptance proof on the same runtime pool the collection write
             // uses, so a user who accepted cannot be judged differently by two paths.
@@ -224,6 +252,7 @@ export async function startApi(
         }
         return app;
       } catch (error) {
+        await queryRuntime?.close().catch(() => undefined);
         await auth?.close();
         await intake?.business.end().catch(() => undefined);
         await intake?.usage.end().catch(() => undefined);
