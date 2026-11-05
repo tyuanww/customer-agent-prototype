@@ -235,6 +235,14 @@ v1.17 migrated PG15
 
 ## 5. 测试和验证层级
 
+### 5.1 统一架构手写合同（ARC-01）
+
+`packages/unified-contracts/src/index.ts` 是手写跨模块合同的唯一所有者，拥有 branded `UserId` / `SessionEpoch` / `ReleaseId` / `OperationId` / `QueryId`、`AccessDecision` 及其三个最小投影、`QueryOutcome`、`OperationEnvelope`、`ReleaseSnapshot` 和 `OverlaySnapshot`。`packages/contracts` 仍只拥有冻结上游 OpenAPI 的生成资产；两者之间的消费必须经过显式 adapter。
+
+`ROLE_CEILING_POLICY` 是 role、business actions、allocate、delegate 和 import-parent 上限的唯一策略源，形状与值镜像 `content_intake.role_ceiling`；`AUTHORIZATION_MATRIX` 从它展开，`grants-manage` 与 `accounts-manage` 也只在 `mayAllocate` 时派生。`packages/unified-contracts/scripts/generate-policy-artifacts.mjs` 生成 JSON 矩阵和数据库 role-ceiling seed，`check:generated` 以字节级比较拒绝手改漂移；静态测试读取 `0057_role_ceiling.sql`，同时校验实际列、`role` 主键和角色值。数据库仍是运行时授权权威，生成 seed 不代表已应用，也不授予 renderer、Query 或 Dashboard 额外能力。Query 只消费 `QueryAccessView`，Dashboard 设置只消费 `DashboardSettingsView`，管理员操作才消费 `AdminAccessView`。
+
+操作状态的 owner 保持在手写合同包内；API 后续实现负责持久化和恢复，必须遵守 accepted → running → committed/unknown 等显式转换与精确回执规则，`expired` 是显式终态。SOP branch 必须绑定 decision source；Scope、release index 身份和 content Top 3 的唯一排序/复制句柄也由本包验证。overlay 快照由桌面 adapter 按 epoch 和 generation 消费。本 PR 只验证合同边界和纯函数，不宣称下游 UI、API、数据库并发或真实业务数据已接线。
+
 ```text
 unit          纯函数、协议、脚本和安全门
   ↓

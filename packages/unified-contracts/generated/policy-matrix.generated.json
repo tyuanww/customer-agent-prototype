@@ -1,0 +1,636 @@
+{
+  "version": 2,
+  "runtimeAuthority": "database",
+  "roleCeiling": [
+    {
+      "role": "agent",
+      "businessActions": [
+        "query"
+      ],
+      "mayAllocate": false,
+      "mayDelegate": false,
+      "maySkipImportParent": false
+    },
+    {
+      "role": "director",
+      "businessActions": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ],
+      "mayAllocate": true,
+      "mayDelegate": true,
+      "maySkipImportParent": true
+    },
+    {
+      "role": "enabler",
+      "businessActions": [
+        "query"
+      ],
+      "mayAllocate": false,
+      "mayDelegate": false,
+      "maySkipImportParent": false
+    },
+    {
+      "role": "engineer",
+      "businessActions": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ],
+      "mayAllocate": true,
+      "mayDelegate": true,
+      "maySkipImportParent": true
+    },
+    {
+      "role": "lead",
+      "businessActions": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ],
+      "mayAllocate": false,
+      "mayDelegate": false,
+      "maySkipImportParent": false
+    },
+    {
+      "role": "manager",
+      "businessActions": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ],
+      "mayAllocate": true,
+      "mayDelegate": true,
+      "maySkipImportParent": true
+    },
+    {
+      "role": "supervisor",
+      "businessActions": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ],
+      "mayAllocate": false,
+      "mayDelegate": false,
+      "maySkipImportParent": false
+    }
+  ],
+  "entries": [
+    {
+      "role": "agent",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "content-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "import",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "source-confirm",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "review",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "publish",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "candidate-cancel",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "rollback",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "dashboard-read",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "grants-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "director",
+      "action": "accounts-manage",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "enabler",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "content-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "import",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "source-confirm",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "review",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "publish",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "candidate-cancel",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "rollback",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "dashboard-read",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "grants-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "engineer",
+      "action": "accounts-manage",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "content-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "import",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "source-confirm",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "review",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "publish",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "candidate-cancel",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "rollback",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "lead",
+      "action": "dashboard-read",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "content-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "import",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "source-confirm",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "review",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "publish",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "candidate-cancel",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "rollback",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "dashboard-read",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "grants-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "manager",
+      "action": "accounts-manage",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "query",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "content-manage",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "import",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "source-confirm",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "review",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "publish",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "candidate-cancel",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "rollback",
+      "scopeKind": "source",
+      "constraints": {
+        "maxScope": "source",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    },
+    {
+      "role": "supervisor",
+      "action": "dashboard-read",
+      "scopeKind": "tenant",
+      "constraints": {
+        "maxScope": "tenant",
+        "requiresCurrentFacts": true,
+        "requiresDatabaseCheck": true
+      }
+    }
+  ]
+}

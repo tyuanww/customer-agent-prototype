@@ -251,6 +251,18 @@ importers:
         specifier: 3.2.7
         version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(supports-color@10.2.2)(yaml@2.9.0)
 
+  packages/unified-contracts:
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(supports-color@10.2.2)(yaml@2.9.0)
+
 packages:
 
   '@adobe/css-tools@4.5.0':
