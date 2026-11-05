@@ -124,6 +124,27 @@ describe('ContentPipeline', () => {
     expect(pipeline.inspect()).toMatchObject({ activationCount: 1, queryCount: 1 });
   });
 
+  it('truncates to exactly three candidates when more than three are eligible', async () => {
+    const pipeline = new ContentPipeline();
+    pipeline.activate(snapshot(5), [item(5), item(4), item(3), item(2), item(1)]);
+
+    const result = await pipeline.query({
+      queryId,
+      text: '发货时效',
+      snapshot: snapshot(5),
+      access: queryAccess(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.content.candidates.map((candidate) => candidate.candidateId)).toEqual([
+      'script_synthetic_001',
+      'script_synthetic_002',
+      'script_synthetic_003',
+    ]);
+    expect(result.content.candidates.map((candidate) => candidate.rank)).toEqual([1, 2, 3]);
+  });
+
   it('filters access scope before ranking and never leaks an out-of-scope candidate', async () => {
     const pipeline = new ContentPipeline();
     pipeline.activate(snapshot(2), [
@@ -148,6 +169,31 @@ describe('ContentPipeline', () => {
     if (!result.ok) throw new Error(result.reason);
     expect(result.content.candidates.map((candidate) => candidate.candidateId)).toEqual([
       'script_synthetic_002',
+    ]);
+  });
+
+  it('filters platform and product scope before ranking', async () => {
+    const pipeline = new ContentPipeline();
+    pipeline.activate(snapshot(3), [
+      item(1, { platformScope: ['douyin'] }),
+      item(2, { productScopeType: 'sku', productScopeRefs: ['sku_synthetic_other'] }),
+      item(3, { productScopeType: 'sku', productScopeRefs: ['sku_synthetic_current'] }),
+    ]);
+
+    const result = await pipeline.query({
+      queryId,
+      text: '发货时效',
+      snapshot: snapshot(3),
+      access: queryAccess(),
+      platform: 'qianniu',
+      productContextType: 'sku',
+      productContextRef: 'sku_synthetic_current',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.content.candidates.map((candidate) => candidate.candidateId)).toEqual([
+      'script_synthetic_003',
     ]);
   });
 

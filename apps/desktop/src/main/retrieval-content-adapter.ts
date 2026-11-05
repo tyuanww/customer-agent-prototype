@@ -19,8 +19,19 @@ export type ConnectedQueryClient = Readonly<{
     queryId: QueryId;
     text: string;
     expectedReleaseId: ReleaseId;
-  }>) => Promise<unknown>;
+  } & ProductQueryContext>) => Promise<unknown>;
 }>;
+
+export type ProductQueryContext = Readonly<{
+  platform?: 'qianniu' | 'douyin';
+  productContextType?: 'category' | 'sku' | null;
+  productContextRef?: string | null;
+}>;
+
+export type ProductContentSearchInput = Readonly<{
+  queryId: QueryId;
+  text: string;
+} & ProductQueryContext>;
 
 export type ProductContentAdapterFailure = Extract<QueryOutcome, { kind: 'failure' }>;
 
@@ -65,6 +76,7 @@ export class ProductContentAdapter {
   }> | null = null;
   private lastContent: ContentOutcome | null = null;
   private copyBodies = new Map<string, string>();
+  private queryGeneration = 0;
 
   constructor(
     private readonly client: ConnectedQueryClient,
@@ -86,11 +98,20 @@ export class ProductContentAdapter {
   }
 
   async restore(): Promise<ProductContentRestoreResult> {
+    const generation = ++this.queryGeneration;
+    this.clearOutcome();
+    return this.restoreContext(generation);
+  }
+
+  private async restoreContext(generation: number): Promise<ProductContentRestoreResult> {
     const queryId = 'restore' as QueryId;
     try {
       const restored = await this.client.restore();
       const decision = parseAccessDecision(restored.decision);
       const access = toQueryAccessView(decision);
+      if (generation !== this.queryGeneration) {
+        return failure(queryId, 'QUERY_SUPERSEDED', true, '已有更新的查询');
+      }
       if (!hasLiveAccess(access, this.now().valueOf())) {
         this.clear();
         return failure(queryId, 'ACCESS_EXPIRED', false, '登录或权限已过期，请重新登录');
@@ -107,18 +128,20 @@ export class ProductContentAdapter {
       this.copyBodies.clear();
       return Object.freeze({ ok: true, releaseId: restored.releaseId });
     } catch {
-      this.clear();
+      if (generation === this.queryGeneration) this.clear();
       return failure(queryId, 'QUERY_UNAVAILABLE', true, '查询服务暂不可用，请重试');
     }
   }
 
-  async search(input: Readonly<{
-    queryId: QueryId;
-    text: string;
-  }>): Promise<QueryOutcome | ProductContentAdapterFailure> {
+  async search(input: ProductContentSearchInput): Promise<QueryOutcome | ProductContentAdapterFailure> {
+    const generation = ++this.queryGeneration;
+    this.clearOutcome();
     try {
       if (this.context === null) {
-        const restored = await this.restore();
+        const restored = await this.restoreContext(generation);
+        if (generation !== this.queryGeneration) {
+          return failure(input.queryId, 'QUERY_SUPERSEDED', true, '已有更新的查询');
+        }
         if ('kind' in restored && restored.kind === 'failure') {
           return failure(input.queryId, restored.failureCode, restored.retryable, restored.message);
         }
@@ -135,11 +158,22 @@ export class ProductContentAdapter {
         this.clear();
         return failure(input.queryId, 'RELEASE_STALE', true, '内容版本已变化，请重新查询');
       }
-      const parsed = parseQueryOutcome(await this.client.query({
+      const response = await this.client.query({
         queryId: input.queryId,
         text: input.text,
         expectedReleaseId: context.releaseId,
-      }));
+        ...(input.platform === undefined ? {} : { platform: input.platform }),
+        ...(input.productContextType === undefined
+          ? {}
+          : { productContextType: input.productContextType }),
+        ...(input.productContextRef === undefined
+          ? {}
+          : { productContextRef: input.productContextRef }),
+      });
+      if (generation !== this.queryGeneration) {
+        return failure(input.queryId, 'QUERY_SUPERSEDED', true, '已有更新的查询');
+      }
+      const parsed = parseQueryOutcome(response);
       if (parsed.kind === 'sop') {
         this.clearOutcome();
         return failure(input.queryId, 'SOP_ROUTE_REJECTED', false, '普通查询不能返回售后流程');
@@ -156,6 +190,9 @@ export class ProductContentAdapter {
       }
       return parsed;
     } catch {
+      if (generation !== this.queryGeneration) {
+        return failure(input.queryId, 'QUERY_SUPERSEDED', true, '已有更新的查询');
+      }
       this.clearOutcome();
       return failure(input.queryId, 'QUERY_UNAVAILABLE', true, '查询服务暂不可用，请重试');
     }

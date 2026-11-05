@@ -8,7 +8,11 @@ import type {
   Scope,
   SopFlow,
 } from '@customer-agent/unified-contracts';
-import { ContentPipeline, type ContentIndexItem } from '../../src/query/content-pipeline.js';
+import {
+  ContentPipeline,
+  type BoundedEnrichment,
+  type ContentIndexItem,
+} from '../../src/query/content-pipeline.js';
 import {
   QueryCoordinator,
   type QueryTelemetryEvent,
@@ -92,14 +96,19 @@ function access(overrides: Partial<AccessDecision> = {}): AccessDecision {
 
 function fixture(options: {
   decision?: AccessDecision;
-  current?: ReleaseSnapshot | null;
+  current?: ReleaseSnapshot | null | (() => Promise<ReleaseSnapshot | null>);
   contentQuery?: ReturnType<typeof vi.fn>;
   sop?: {
     matches?: (text: string) => boolean;
     query: (input: unknown) => Promise<Extract<QueryOutcome, { kind: 'sop' | 'no-hit' | 'failure' }>>;
   };
+  now?: () => Date;
 } = {}) {
-  const releaseRead = vi.fn(async () => options.current === undefined ? snapshot() : options.current);
+  const releaseRead = vi.fn(
+    typeof options.current === 'function'
+      ? options.current
+      : async () => options.current === undefined ? snapshot() : options.current,
+  );
   const contentPipeline = new ContentPipeline();
   contentPipeline.activate(snapshot(), [candidate(3), candidate(1), candidate(2)]);
   const query = options.contentQuery ?? vi.fn(contentPipeline.query.bind(contentPipeline));
@@ -110,7 +119,7 @@ function fixture(options: {
     content: { query: query as ContentPipeline['query'] },
     ...(options.sop === undefined ? {} : { sop: options.sop }),
     telemetry: { record: (event) => telemetry.push(event) },
-    now: () => new Date(now),
+    now: options.now ?? (() => new Date(now)),
   });
   return { coordinator, releaseRead, query, telemetry };
 }
@@ -165,6 +174,59 @@ describe('QueryCoordinator', () => {
       route: 'content',
     })).resolves.toMatchObject({ kind: 'failure', failureCode: 'ACCESS_EXPIRED' });
     expect(expired.query).not.toHaveBeenCalled();
+  });
+
+  it('revalidates access after the asynchronous release read', async () => {
+    let clock = Date.parse(now);
+    const expiringAccess = access({
+      expiresAt: '2026-11-05T00:35:00.000Z',
+      allowedScopes: [{
+        scope: sourceScope,
+        actions: ['query'],
+        validUntil: '2026-11-05T00:35:00.000Z',
+      }],
+    });
+    const f = fixture({
+      decision: expiringAccess,
+      now: () => new Date(clock),
+      current: async () => {
+        clock = Date.parse('2026-11-05T00:36:00.000Z');
+        return snapshot();
+      },
+    });
+
+    await expect(f.coordinator.query({
+      queryId,
+      text: '合成发货时效',
+      route: 'content',
+    })).resolves.toMatchObject({
+      kind: 'failure',
+      failureCode: 'ACCESS_EXPIRED',
+    });
+    expect(f.query).not.toHaveBeenCalled();
+  });
+
+  it('revalidates the release lease after the asynchronous release read', async () => {
+    let clock = Date.parse(now);
+    const f = fixture({
+      now: () => new Date(clock),
+      current: async () => {
+        clock = Date.parse('2026-11-05T00:36:00.000Z');
+        return snapshot();
+      },
+    });
+
+    await expect(f.coordinator.query({
+      queryId,
+      text: '合成发货时效',
+      route: 'content',
+      expectedReleaseId: releaseId,
+      releaseLeaseExpiresAt: '2026-11-05T00:35:00.000Z',
+    })).resolves.toMatchObject({
+      kind: 'failure',
+      failureCode: 'RELEASE_LEASE_EXPIRED',
+    });
+    expect(f.query).not.toHaveBeenCalled();
   });
 
   it('returns content, no-hit, cancellation, and stable failure variants', async () => {
@@ -317,7 +379,7 @@ describe('QueryCoordinator', () => {
     const f = fixture();
     await f.coordinator.query({
       queryId,
-      text: '顾客原始问句不应进入遥测',
+      text: '合成发货时效',
       route: 'content',
     });
     await f.coordinator.query({
@@ -330,9 +392,13 @@ describe('QueryCoordinator', () => {
       {
         queryId,
         releaseId,
-        outcomeKind: 'no-hit',
+        outcomeKind: 'content',
         failureCode: null,
-        candidates: [],
+        candidates: [
+          { candidateId: 'script_synthetic_001', rank: 1 },
+          { candidateId: 'script_synthetic_002', rank: 2 },
+          { candidateId: 'script_synthetic_003', rank: 3 },
+        ],
       },
       {
         queryId: 'query_synthetic_002',
@@ -342,7 +408,57 @@ describe('QueryCoordinator', () => {
         candidates: [],
       },
     ]);
-    expect(JSON.stringify(f.telemetry)).not.toContain('顾客原始问句');
+    expect(JSON.stringify(f.telemetry)).not.toContain('合成发货时效');
     expect(JSON.stringify(f.telemetry)).not.toContain('合成发货原文');
+    expect(JSON.stringify(f.telemetry)).not.toContain('什么时候发货');
+  });
+
+  it('runs enrichment after the coordinator response with an independent frozen snapshot', async () => {
+    const scheduled: Array<() => void> = [];
+    let runReturned = false;
+    const received: Array<Parameters<BoundedEnrichment['run']>[0]> = [];
+    const run: BoundedEnrichment['run'] = async (input) => {
+      const until = Date.now() + 20;
+      while (Date.now() < until) {
+        // Synchronous model work must not run before the deterministic result.
+      }
+      received.push(input);
+      runReturned = true;
+    };
+    const pipeline = new ContentPipeline({
+      enrichment: { deadlineMs: 100, run },
+      schedule: (callback) => { scheduled.push(callback); },
+    });
+    pipeline.activate(snapshot(), [candidate(1), candidate(2), candidate(3)]);
+    const coordinator = new QueryCoordinator({
+      access: { evaluate: async () => access() },
+      releases: createReleaseStore(async () => snapshot()),
+      content: pipeline,
+      now: () => new Date(now),
+    });
+
+    const result = await coordinator.query({
+      queryId,
+      text: '合成发货时效',
+      route: 'content',
+    });
+
+    expect(result.kind).toBe('content');
+    expect(runReturned).toBe(false);
+    expect(scheduled).toHaveLength(1);
+    scheduled.shift()?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runReturned).toBe(true);
+    const enriched = received[0];
+    if (enriched === undefined || result.kind !== 'content') throw new Error('enrichment did not run');
+    expect(enriched.deterministic).not.toBe(result);
+    expect(Object.isFrozen(enriched.deterministic)).toBe(true);
+    expect(Object.isFrozen(enriched.deterministic.candidates)).toBe(true);
+    expect(Object.isFrozen(enriched.deterministic.candidates[0])).toBe(true);
+    expect(() => {
+      (enriched.deterministic.candidates[0] as { body: string }).body = 'mutated by enrichment';
+    }).toThrow(TypeError);
+    expect(result.candidates[0]?.body).toBe('合成发货原文 1');
   });
 });
