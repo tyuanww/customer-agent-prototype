@@ -55,6 +55,10 @@ export function sendOperationFailure(
   if (result.code === 'NOT_FOUND') return sendNotFound(reply);
   if (result.code === 'CONFLICT') return sendConflict(reply);
   if (result.code === 'SOURCE_GATE_NOT_READY') return sendSourceGateNotReady(reply);
-  if (result.code === 'OVERLOADED') return sendOverloaded(reply, result.reason);
+  if (result.code === 'OVERLOADED') {
+    return sendOverloaded(reply, result.reason === undefined
+      ? { kind: 'generic' }
+      : { kind: 'sop', reason: result.reason });
+  }
   return sendInternalError(reply);
 }

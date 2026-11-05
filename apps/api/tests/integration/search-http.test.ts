@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseId, Scope } from '@customer-agent/unified-contracts';
 import type { SopReleaseProjection } from '@customer-agent/content-intake';
+import { parseContractSchema } from '@customer-agent/contracts';
 import { createApiApp } from '../../src/app.js';
 import { createMockAccessEvaluator } from '../../src/access/evaluator.js';
 import { unavailableContentImportRepository } from '../../src/content-import-repository.js';
@@ -10,6 +11,7 @@ import {
   type QueryObservation,
 } from '../../src/integration/query-runtime.js';
 import type { LoadedQueryRelease } from '../../src/integration/release.js';
+import type { OperationFailureReason } from '../../src/operation-result.js';
 import type { ContentIndexItem } from '../../src/query/content-pipeline.js';
 import { SopPipeline } from '../../src/query/sop-pipeline.js';
 import { parseApiRuntimeConfig } from '../../src/runtime-config.js';
@@ -317,20 +319,23 @@ describe('coordinated /v1/search SOP failure contract', () => {
 
   function expectSopFailure(
     result: Awaited<ReturnType<typeof requestSop>>,
-    reason: string,
+    sopReason: OperationFailureReason,
   ): void {
     expect(result.response.statusCode).toBe(503);
     expect(result.response.headers['retry-after']).toBe('1');
-    expect(result.response.json()).toEqual({
+    const body = result.response.json();
+    expect(body).toEqual({
       error: {
         code: 'OVERLOADED',
         message: '服务暂不可用',
         details: {
-          reason,
+          reason: 'SOURCE_GATE_NOT_READY',
           retry_after_sec: 1,
+          sop_reason: sopReason,
         },
       },
     });
+    expect(parseContractSchema('OverloadedErrorEnvelope', body)).toEqual(body);
     expect(result.response.body).not.toContain('candidates');
     expect(result.events.statements.some((sql) => sql.includes('INSERT INTO public.query_events'))).toBe(false);
     expect(result.events.statements.some((sql) => sql.includes('candidate_impressions'))).toBe(false);
