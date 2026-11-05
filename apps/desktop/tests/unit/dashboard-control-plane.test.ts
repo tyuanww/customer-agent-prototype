@@ -126,6 +126,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const running = control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       expectedVersion: 3,
       intent: { title: 'draft' },
       execute: async () => {
@@ -158,6 +159,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const failed = await failedPlane.submit({
       domain: 'permissions',
       command: 'grants-manage',
+      capability: 'permissions:grants-manage',
       intent: { grant: 'grant-1' },
       execute: async () => ({ kind: 'failed', failureCode: 'FORBIDDEN' }),
     });
@@ -167,6 +169,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const unknown = await unknownPlane.submit({
       domain: 'accounts',
       command: 'accounts-manage',
+      capability: 'accounts:accounts-manage',
       intent: { username: 'seat-a' },
       execute: async () => ({ kind: 'unknown' }),
     });
@@ -176,6 +179,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const cancelled = await cancelledPlane.submit({
       domain: 'materials',
       command: 'import',
+      capability: 'materials:import',
       intent: { file: 'synthetic.csv' },
       execute: async () => ({ kind: 'cancelled' }),
     });
@@ -192,6 +196,7 @@ describe('DashboardControlPlane lifecycle', () => {
     await expired.submit({
       domain: 'ops-loop',
       command: 'content-manage',
+      capability: 'ops-loop:content-manage',
       recoveryDeadline: '2026-11-05T08:10:00.000Z',
       intent: { task: 'synthetic-1' },
       execute: async () => ({ kind: 'unknown' }),
@@ -207,6 +212,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const input = {
       domain: 'release' as const,
       command: 'publish' as const,
+      capability: 'release:publish',
       expectedVersion: 2,
       intent: { title: 'same' },
       execute: async () => {
@@ -224,7 +230,6 @@ describe('DashboardControlPlane lifecycle', () => {
 
   it('reuses only the same access revision and capability identity', async () => {
     let revision = 11;
-    let capability = 'permissions:grant';
     let grants: 'open' | 'closed' = 'open';
     let effects = 0;
     const control = new DashboardControlPlane({
@@ -239,7 +244,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const input = {
       domain: 'permissions' as const,
       command: 'grants-manage' as const,
-      capability,
+      capability: 'permissions:grant',
       authorize: (view: DashboardAccessView) => view.grants === 'open',
       intent: { grant: 'same-grant' },
       execute: async () => {
@@ -251,9 +256,9 @@ describe('DashboardControlPlane lifecycle', () => {
     revision = 12;
     await expect(control.submit(input)).rejects.toMatchObject({ code: 'CONFLICT' });
     revision = 11;
-    capability = 'permissions:revoke';
+    input.capability = 'permissions:revoke';
     await expect(control.submit(input)).rejects.toMatchObject({ code: 'CONFLICT' });
-    capability = 'permissions:grant';
+    input.capability = 'permissions:grant';
     await expect(control.submit(input)).resolves.toMatchObject({ reused: true });
     expect(effects).toBe(1);
     grants = 'closed';
@@ -267,6 +272,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const submit = (candidateVersion: number) => control.submit({
       domain: 'materials',
       command: 'review',
+      capability: 'materials:review',
       scope: { candidateId: 'candidate-1', version: candidateVersion },
       intent: { action: 'freeze' },
       execute: async () => {
@@ -286,6 +292,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const input = {
       domain: 'release' as const,
       command: 'publish' as const,
+      capability: 'release:publish',
       intent: { title: 'same publish' },
       execute: async (context: DashboardOperationContext) => {
         effects += 1;
@@ -307,6 +314,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const submitted = await control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'network lost' },
       execute: async () => {
         throw new Error('socket closed after request');
@@ -343,6 +351,7 @@ describe('DashboardControlPlane lifecycle', () => {
     await first.submit({
       domain: 'materials',
       command: 'publish',
+      capability: 'materials:publish',
       intent: { candidate: 'candidate-1' },
       execute: async () => ({ kind: 'unknown' }),
     });
@@ -393,6 +402,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const running = first.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'interrupted' },
       execute: async () => {
         await gate;
@@ -446,6 +456,7 @@ describe('DashboardControlPlane lifecycle', () => {
       domain: 'release',
       operationId: 'operation-conflict' as OperationId,
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'one' },
       execute: async () => committed({ releaseId: 'rel-1' }, 'rel-1'),
     });
@@ -453,6 +464,7 @@ describe('DashboardControlPlane lifecycle', () => {
       domain: 'release',
       operationId: 'operation-conflict' as OperationId,
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'two' },
       execute: async () => committed({ releaseId: 'rel-2' }, 'rel-2'),
     })).rejects.toMatchObject({ code: 'CONFLICT' });
@@ -462,6 +474,7 @@ describe('DashboardControlPlane lifecycle', () => {
       domain: 'release',
       operationId: 'operation-conflict' as OperationId,
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'one' },
       execute: async () => committed({ releaseId: 'rel-3' }, 'rel-3'),
     })).rejects.toMatchObject({ code: 'STALE' });
@@ -471,6 +484,7 @@ describe('DashboardControlPlane lifecycle', () => {
       domain: 'release',
       operationId: 'operation-conflict' as OperationId,
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'one' },
       execute: async () => committed({ releaseId: 'rel-4' }, 'rel-4'),
     })).rejects.toMatchObject({ code: 'CONFLICT' });
@@ -492,6 +506,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const input = {
       domain: 'release' as const,
       command: 'publish' as const,
+      capability: 'release:publish',
       intent: { title: 'same after reconnect' },
       execute: async () => {
         effects += 1;
@@ -533,6 +548,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const accepted = control.submit({
       domain: 'permissions',
       command: 'grants-manage',
+      capability: 'permissions:grant',
       intent: { grant: 'g-1' },
       authorize: (view) => view.grants === 'open',
       execute: async () => {
@@ -545,6 +561,7 @@ describe('DashboardControlPlane lifecycle', () => {
     await expect(control.submit({
       domain: 'permissions',
       command: 'grants-manage',
+      capability: 'permissions:grant',
       intent: { grant: 'g-2' },
       authorize: (view) => view.grants === 'open',
       execute: async () => committed({ grant: 'g-2' }, 'g-2'),
@@ -560,6 +577,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const first = control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'first' },
       execute: async () => {
         await firstGate;
@@ -572,6 +590,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const second = control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'second' },
       execute: async () => {
         secondEffect();
@@ -588,6 +607,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const third = await control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'third' },
       execute: async (context) => {
         context.beginCommit();
@@ -627,6 +647,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const submitted = control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'cancel while persisting' },
       execute: async (context) => {
         if (context.signal.aborted) return { kind: 'cancelled' as const };
@@ -656,6 +677,7 @@ describe('DashboardControlPlane lifecycle', () => {
     const submitted = await control.submit({
       domain: 'release',
       command: 'publish',
+      capability: 'release:publish',
       intent: { title: 'network publish' },
       execute: async () => {
         effects += 1;
@@ -690,6 +712,7 @@ describe('DashboardControlPlane lifecycle', () => {
       await control.submit({
         domain: 'materials',
         command: 'publish',
+        capability: 'materials:publish',
         intent: { candidate: 'candidate-event' },
         execute: async () => ({
           kind: 'committed',

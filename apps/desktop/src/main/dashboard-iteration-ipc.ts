@@ -107,6 +107,7 @@ export function registerDashboardIterationIpc(
         const run = await plane.submit({
           domain: 'ops-loop',
           command: 'content-manage',
+          capability: 'iteration:start',
           expectedVersion: typeof request?.expectedVersion === 'number' ? request.expectedVersion : 0,
           intent: args[0],
           execute: async (operation) => {
@@ -142,6 +143,7 @@ export function registerDashboardIterationIpc(
         const run = await plane.submit({
           domain: 'ops-loop',
           command: 'content-manage',
+          capability: 'iteration:close',
           expectedVersion: typeof request?.expectedVersion === 'number' ? request.expectedVersion : 0,
           intent: args[0],
           execute: async (operation) => {

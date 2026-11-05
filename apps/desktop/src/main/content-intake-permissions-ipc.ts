@@ -100,6 +100,7 @@ export function registerContentIntakePermissionsIpc(
       const run = await plane.submit({
         domain: 'permissions',
         command: 'grants-manage',
+        capability: `permissions:${command.action}`,
         expectedVersion: 0,
         scope,
         intent: command,

@@ -6,7 +6,6 @@ import { isTrustedMainFrameSender } from './sender-guard';
 import { ContentIntakeQuery } from './content-intake-query';
 import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
 import { writeSystemClipboard } from './system-clipboard';
-import { subscribeDashboardReleaseInvalidation } from './dashboard-control-plane';
 
 /** The caller supplies a session only when its configured workbench enables intake.
  * A capability belongs to one trusted Query main frame and dies with its window. */
@@ -14,11 +13,6 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
   trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null,
   devUrl: () => string | undefined) {
   const windows = new Map<WebContents, ContentIntakeQuery>();
-  const stopReleaseInvalidation = subscribeDashboardReleaseInvalidation((value) => {
-    const current = session?.view();
-    if (!current?.signedIn || current.sessionEpoch !== value.sessionEpoch) return;
-    for (const query of windows.values()) query.cancel();
-  });
   const channels = [C.INTAKE_QUERY_MODE, C.INTAKE_QUERY_ACCESS, C.INTAKE_QUERY_SELECT,
     C.INTAKE_QUERY_CONDITIONS, C.INTAKE_QUERY_SEARCH, C.INTAKE_QUERY_COPY, C.INTAKE_QUERY_CANCEL];
   for (const channel of channels) ipcMain.handle(channel, async (event, ...args: unknown[]) => {
@@ -49,7 +43,6 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
     } catch (error) { return intakeQueryFailure(error instanceof IntakeUsageError ? error.code : 'UNAVAILABLE'); }
   });
   return () => {
-    stopReleaseInvalidation();
     for (const query of windows.values()) query.dispose(); windows.clear();
     for (const channel of channels) ipcMain.removeHandler(channel);
   };

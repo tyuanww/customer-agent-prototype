@@ -88,6 +88,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
       await plane.submit({
         domain: 'accounts',
         command: 'accounts-manage',
+        capability: 'accounts:reset',
         intent: { case: 'unknown' },
         execute: async () => ({ kind: 'unknown' }),
       });
@@ -125,6 +126,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
       void global.__dashboardOperationTest.plane.submit({
         domain: 'permissions',
         command: 'grants-manage',
+        capability: 'permissions:grant',
         intent: { case: 'running' },
         execute: async (context: { signal: AbortSignal }) => {
           await new Promise<void>((resolve) => {
@@ -153,12 +155,14 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
       await plane.submit({
         domain: 'materials',
         command: 'import',
+        capability: 'materials:import',
         intent: { case: 'failed' },
         execute: async () => ({ kind: 'failed', failureCode: 'VALIDATION' }),
       });
       await plane.submit({
         domain: 'ops-loop',
         command: 'content-manage',
+        capability: 'ops-loop:content-manage',
         intent: { case: 'committed' },
         execute: async () => ({ kind: 'committed', resultRef: 'task-1' }),
       });
@@ -180,6 +184,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
       await plane.submit({
         domain: 'release',
         command: 'publish',
+        capability: 'release:publish',
         intent: { case: 'release-update' },
         execute: async () => ({
           kind: 'committed',
@@ -222,6 +227,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
         domain: 'ops-loop',
         operationId: 'operation-stale-session',
         command: 'content-manage',
+        capability: 'ops-loop:content-manage',
         intent: { case: 'same-intent' },
         execute: async () => ({ kind: 'committed', resultRef: 'first' }),
       });
@@ -248,6 +254,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
           domain: 'ops-loop',
           operationId: 'operation-stale-session',
           command: 'content-manage',
+          capability: 'ops-loop:content-manage',
           intent: { case: 'same-intent' },
           execute: async () => ({ kind: 'committed', resultRef: 'second' }),
         });
@@ -278,6 +285,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
         await plane.submit({
           domain: 'permissions',
           command: 'grants-manage',
+          capability: 'permissions:grant',
           intent: { case: 'no-grant' },
           authorize: (view: { grants: string }) => view.grants === 'open',
           execute: async () => ({ kind: 'committed', resultRef: 'must-not-run' }),

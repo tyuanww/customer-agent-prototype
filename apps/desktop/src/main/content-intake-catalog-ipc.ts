@@ -18,9 +18,16 @@ const messages: Record<string, string> = {
 export function registerContentIntakeCatalogIpc(session: IntakeUsageSession | null,
   dashboard: () => WebContents | null, devUrl: () => string | undefined) {
   const owners = new Map<WebContents, ContentIntakeCatalog>();
+  const processedInvalidations = new Set<string>();
   const stopReleaseInvalidation = subscribeDashboardReleaseInvalidation((value) => {
     const current = session?.view();
     if (!current?.signedIn || current.sessionEpoch !== value.sessionEpoch) return;
+    if (processedInvalidations.has(value.dedupeKey)) return;
+    processedInvalidations.add(value.dedupeKey);
+    if (processedInvalidations.size > 100) {
+      const oldest = processedInvalidations.values().next().value;
+      if (oldest) processedInvalidations.delete(oldest);
+    }
     for (const owner of owners.values()) {
       void owner.command({ action: 'cancel' }).catch(() => undefined);
     }
