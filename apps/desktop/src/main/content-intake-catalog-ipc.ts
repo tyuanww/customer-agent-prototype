@@ -3,6 +3,7 @@ import { isIntakeCatalogCommand, type IntakeCatalogReply } from '../shared/conte
 import { ContentIntakeCatalog } from './content-intake-catalog';
 import { IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
 import { isTrustedMainFrameSender } from './sender-guard';
+import { subscribeDashboardReleaseInvalidation } from './dashboard-control-plane';
 const channels = ['dashboard:intake-catalog-current', 'dashboard:intake-catalog-command'] as const;
 const messages: Record<string, string> = {
   FORBIDDEN: '当前账号没有此范围的查询权限。', UNAUTHORIZED: '请重新登录后查看。',
@@ -17,6 +18,20 @@ const messages: Record<string, string> = {
 export function registerContentIntakeCatalogIpc(session: IntakeUsageSession | null,
   dashboard: () => WebContents | null, devUrl: () => string | undefined) {
   const owners = new Map<WebContents, ContentIntakeCatalog>();
+  const processedInvalidations = new Set<string>();
+  const stopReleaseInvalidation = subscribeDashboardReleaseInvalidation((value) => {
+    const current = session?.view();
+    if (!current?.signedIn || current.sessionEpoch !== value.sessionEpoch) return;
+    if (processedInvalidations.has(value.dedupeKey)) return;
+    processedInvalidations.add(value.dedupeKey);
+    if (processedInvalidations.size > 100) {
+      const oldest = processedInvalidations.values().next().value;
+      if (oldest) processedInvalidations.delete(oldest);
+    }
+    for (const owner of owners.values()) {
+      void owner.command({ action: 'cancel' }).catch(() => undefined);
+    }
+  });
   const failure = (code: string, owner?: ContentIntakeCatalog): IntakeCatalogReply =>
     ({ ok: false, code, message: messages[code] ?? messages.UNAVAILABLE!, view: owner?.view() ?? null });
   for (const channel of channels) ipcMain.handle(channel, async (event, ...args: unknown[]): Promise<IntakeCatalogReply> => {
@@ -35,5 +50,9 @@ export function registerContentIntakeCatalogIpc(session: IntakeUsageSession | nu
       return { ok: true, view: channel === channels[0] ? owner.view() : await owner.command(args[0] as Parameters<ContentIntakeCatalog['command']>[0]) };
     } catch (error) { return failure(error instanceof IntakeUsageError ? error.code : 'UNAVAILABLE', owner); }
   });
-  return () => { for (const owner of owners.values()) owner.dispose(); owners.clear(); for (const channel of channels) ipcMain.removeHandler(channel); };
+  return () => {
+    stopReleaseInvalidation();
+    for (const owner of owners.values()) owner.dispose(); owners.clear();
+    for (const channel of channels) ipcMain.removeHandler(channel);
+  };
 }

@@ -13,7 +13,8 @@ export function intakePermissionsData(
  let signedIn=true,epoch=1,unknown=false,omitPerson=false;
  const listeners=new Set<()=>void>(),requests:{path:string;method:string|undefined;body:unknown}[]=[];
  const grants:C['IntakeGrant'][]=[];const receipts=new Map<string,unknown>();
- const session:IntakeUsageSession={view:()=>({signedIn,sessionEpoch:epoch}),subscribe:fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};},
+ const session:IntakeUsageSession={view:()=>({ok:true,enabled:true,signedIn,sessionEpoch:epoch,
+   userId:signedIn?'registered-director':null,role:signedIn?'owner':null}),subscribe:fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};},
   request:async(_epoch,path,options)=>{
    requests.push({path,method:(options as {method?:string}).method,body:options.body});let value:unknown;
    if(path==='/v1/access/settings')value={state:mayAllocate.length||capabilityOptions.canManageSeats?'open':'closed',
