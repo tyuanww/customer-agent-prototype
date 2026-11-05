@@ -33,6 +33,10 @@ const controller = readFileSync(
   path.join(root, 'src/main/overlay-controller.ts'),
   'utf8',
 );
+const overlayMachine = readFileSync(
+  path.join(root, 'src/shared/overlay-machine.ts'),
+  'utf8',
+);
 const overlayPlatform = readFileSync(
   path.join(root, 'src/main/overlay-platform.ts'),
   'utf8',
@@ -305,12 +309,12 @@ describe('macOS runtime contract', () => {
     expect(controller).toContain('dismiss(restorePreviousApp = false)');
     expect(controller).toContain('resignPaletteActivation');
     expect(controller).toContain('fox.showInactive()');
-    expect(controller).toContain('restorePreviousAppOnIdle');
+    expect(controller).toContain("focusIntent === 'previous-app'");
     expect(controller).toContain('otherChromeWindowsVisible');
     expect(controller).toContain('isDevToolsWindow');
     expect(controller).toContain('setFoxFocusable(false)');
     expect(controller).toContain('this.platform.yieldPreviousApp');
-    expect(controller).toContain('if (this.chromeHandoffMode !== null)');
+    expect(controller).toContain("if (this.overlayState.handoff.mode !== 'none')");
     expect(controller).toContain('macPanel: false');
     expect(controller).not.toMatch(/app\.focus\([^)]*steal/);
     expect(overlayPlatform).toMatch(/app\.hide\(\)/);
@@ -326,7 +330,7 @@ describe('macOS runtime contract', () => {
       /setFoxPeek\(intent: FoxPeekIntent, epoch: number\): void \{([\s\S]*?)\n {2}\}\n\n {2}beginNativeContextMenu/,
     )?.[1] ?? '';
     expect(peekMethod).toContain('this.syncFoxOriginFromNativeBounds(fox)');
-    expect(peekMethod).toContain('this.foxPeekIntent = intent');
+    expect(peekMethod).toContain("type: 'FOX_PEEK_CHANGED'");
     expect(peekMethod).not.toContain('setBounds(');
     expect(controller).toContain("fox.on('move', sync)");
     expect(controller).toContain("fox.on('moved', sync)");
@@ -334,13 +338,15 @@ describe('macOS runtime contract', () => {
       /openSearch[\s\S]*if \(this\.isWindowVisible\(idleFox\)\) \{\s*this\.syncFoxOriginFromNativeBounds\(idleFox\)/,
     );
     expect(controller).toContain(
-      'foxVisualCenterForNativeRect(fullFoxRect, this.foxDockEdge, peekOffset)',
+      'foxVisualCenterForNativeRect(fullFoxRect, this.overlayState.fox.edge, peekOffset)',
     );
-    const closingMethod = controller.match(
-      /private finishClosingHandoff\(handoffId: number\): void \{([\s\S]*?)\n {2}\}\n\n {2}private focusQueryWindow/,
+    expect(controller).not.toContain('finishClosingHandoff');
+    const closingTransition = overlayMachine.match(
+      /case 'HANDOFF_CLOSED': \{([\s\S]*?)case 'HANDOFF_TIMEOUT'/,
     )?.[1] ?? '';
-    expect(closingMethod).toContain('fox.setBounds(foxRect)');
-    expect(closingMethod).not.toContain('dockFoxNativeRect');
-    expect(closingMethod).toContain('this.syncFoxOriginFromNativeBounds(fox)');
+    expect(closingTransition).toContain("type: 'SHOW_WINDOW', target: 'fox'");
+    expect(closingTransition).toContain("type: 'HIDE_WINDOW', target: 'query'");
+    expect(closingTransition.indexOf("type: 'SHOW_WINDOW', target: 'fox'"))
+      .toBeLessThan(closingTransition.indexOf("type: 'HIDE_WINDOW', target: 'query'"));
   });
 });

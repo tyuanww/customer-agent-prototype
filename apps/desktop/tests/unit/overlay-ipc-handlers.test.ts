@@ -14,6 +14,8 @@ import {
   type QueryResizeRequest,
 } from '../../src/shared/query-layout';
 import type { RendererRole } from '../../src/shared/overlay-events';
+import { OVERLAY_EVENT_CHANNEL } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 type CapturedHandler = (event: IpcMainInvokeEvent, ...payload: unknown[]) => unknown;
 
@@ -95,6 +97,17 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
   const moveBy = vi.fn().mockReturnValue(null);
   const commitFoxDragSettle = vi.fn();
   const querySubscribed = vi.fn();
+  const reportSessionChange = vi.fn();
+  const reportReleaseChange = vi.fn();
+  const reportFocus = vi.fn();
+  const reportRendererFrame = vi.fn();
+  const snapshotState = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 2,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  });
+  const snapshot = overlaySnapshot(snapshotState);
   const controller = {
     accelerator: 'CommandOrControl+Shift+Space',
     phase: 'RESULTS',
@@ -110,6 +123,11 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     moveBy,
     commitFoxDragSettle,
     querySubscribed,
+    reportSessionChange,
+    reportReleaseChange,
+    reportFocus,
+    reportRendererFrame,
+    getOverlaySnapshot: () => snapshot,
   } as unknown as OverlayController;
 
   return {
@@ -123,6 +141,11 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     moveBy,
     commitFoxDragSettle,
     querySubscribed,
+    reportSessionChange,
+    reportReleaseChange,
+    reportFocus,
+    reportRendererFrame,
+    snapshot,
   };
 }
 
@@ -157,6 +180,35 @@ describe('overlay query layout IPC handlers', () => {
     expect(fixture.querySubscribed).toHaveBeenCalledOnce();
   });
 
+  it('routes only trusted main-frame overlay events to their narrow controller capability', () => {
+    const fixture = createControllerFixture();
+    registerOverlayIpc(() => fixture.controller);
+    const receive = capturedHandler(OVERLAY_EVENT_CHANNEL);
+    const session = {
+      type: 'session-changed',
+      sessionEpoch: 5,
+      releaseId: 'rel_synthetic',
+      windowGeneration: 1,
+      generation: 2,
+    } as const;
+
+    expect(receive(fixture.fox.event, session)).toBeNull();
+    expect(fixture.reportSessionChange).not.toHaveBeenCalled();
+    expect(receive(createSender(7, 'query', { subframe: true }).event, session)).toBeNull();
+    expect(receive(fixture.query.event, session)).toEqual(fixture.snapshot);
+    expect(fixture.reportSessionChange).toHaveBeenCalledWith(5, 'rel_synthetic');
+
+    receive(fixture.query.event, {
+      type: 'frame-observed',
+      commandId: 4,
+      target: 'query',
+      sessionEpoch: 5,
+      windowGeneration: 1,
+      generation: 2,
+    });
+    expect(fixture.reportRendererFrame).toHaveBeenCalledWith(4);
+  });
+
   it('returns the trusted renderer context with the runtime platform', () => {
     const fixture = createControllerFixture({ testHarness: true });
     registerOverlayIpc(() => fixture.controller);
@@ -170,6 +222,7 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '快捷键可用',
       },
+      snapshot: fixture.snapshot,
       testHarness: true,
     });
   });
@@ -188,6 +241,9 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '窗口上下文不可用',
       },
+      snapshot: expect.objectContaining({
+        contract: expect.objectContaining({ releaseId: 'rel_overlay_unbound' }),
+      }),
       testHarness: false,
     });
   });
@@ -205,6 +261,9 @@ describe('overlay query layout IPC handlers', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '窗口上下文不可用',
       },
+      snapshot: expect.objectContaining({
+        contract: expect.objectContaining({ releaseId: 'rel_overlay_unbound' }),
+      }),
       testHarness: false,
     });
   });

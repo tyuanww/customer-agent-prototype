@@ -3,12 +3,14 @@ import { flushSync } from 'react-dom';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   isFoxVisualTransform,
+  type OverlayControlApi,
   type FoxDockEdge,
   type FoxDragSettleAck,
   selectAuthoritativeFoxDockSnapshot,
   type FoxPeekIntent,
   type FoxVisualTransform,
 } from '@shared/overlay-events';
+import type { OverlaySnapshot } from '@shared/overlay-machine';
 import {
   FOX_HALO_DURATION_MS,
   FOX_HALO_OPACITY_MAX,
@@ -134,6 +136,7 @@ export function FoxApp() {
   const lastCommittedSettleIdRef = useRef(0);
   const mountedRef = useRef(true);
   const rootRef = useRef<HTMLDivElement>(null);
+  const overlaySnapshotRef = useRef<OverlaySnapshot | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const openingSearchRef = useRef(false);
   const dragRafRef = useRef<number | null>(null);
@@ -296,6 +299,50 @@ export function FoxApp() {
     }
     setTransient(next);
   }, []);
+
+  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshot | undefined): void => {
+    if (!snapshot) {
+      return;
+    }
+    const previous = overlaySnapshotRef.current;
+    if (
+      previous
+      && (
+        snapshot.windowGeneration < previous.windowGeneration
+        || snapshot.contract.sessionEpoch < previous.contract.sessionEpoch
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation < previous.contract.generation
+        )
+      )
+    ) {
+      return;
+    }
+    overlaySnapshotRef.current = snapshot;
+    if (snapshot.fox.peekEpoch >= peekEpochRef.current) {
+      peekEpochRef.current = snapshot.fox.peekEpoch;
+      peekIntentRef.current = snapshot.fox.peekIntent;
+      dockEdgeRef.current = snapshot.fox.edge;
+      setDockEdge(snapshot.fox.edge);
+    }
+    const frozen = snapshot.contract.phase === 'opening'
+      || snapshot.contract.phase === 'closing';
+    setHandoffFrozen(frozen);
+    if (snapshot.contract.phase === 'active') {
+      openingSearchRef.current = false;
+    }
+  }, []);
+
+  const reportOverlayEvent = useCallback(
+    (event: Parameters<OverlayControlApi['reportOverlayEvent']>[0]) => {
+      const api = window.customerAgent as
+        | (typeof window.customerAgent & Partial<OverlayControlApi>)
+        | undefined;
+      return api?.reportOverlayEvent?.(event) ?? Promise.resolve(null);
+    },
+    [],
+  );
 
   const clearAnnoyedDragTimer = useCallback((): void => {
     if (annoyedDragTimerRef.current !== null) {
@@ -469,6 +516,7 @@ export function FoxApp() {
     void api
       .getWindowContext()
       .then((context) => {
+        applyOverlaySnapshot(context.snapshot);
         if (!context.shortcut.registered) {
           setShortcutFailed(true);
           setHint(context.shortcut.message || '全局快捷键不可用，请点击打开');
@@ -479,12 +527,29 @@ export function FoxApp() {
       });
 
     const unsubscribe = api.onOverlayCommand((command) => {
+      if (command.type === 'overlay-snapshot') {
+        applyOverlaySnapshot(command.snapshot);
+        return;
+      }
       if (command.type === 'shortcut-status' && !command.registered) {
         setShortcutFailed(true);
         setHint(command.message);
       }
       if (command.type === 'fox-drag-settled') {
         commitDragSettleAck(command);
+        const snapshot = overlaySnapshotRef.current;
+        if (snapshot) {
+          window.requestAnimationFrame(() => {
+            void reportOverlayEvent({
+              type: 'frame-observed',
+              commandId: command.settleId,
+              target: 'fox',
+              sessionEpoch: snapshot.contract.sessionEpoch,
+              windowGeneration: snapshot.windowGeneration,
+              generation: snapshot.contract.generation,
+            });
+          });
+        }
         return;
       }
       if (command.type === 'fox-edge' || command.type === 'sync-fox-edge') {
@@ -559,11 +624,13 @@ export function FoxApp() {
     };
   }, [
     cancelDragRaf,
+    applyOverlaySnapshot,
     clearAnnoyedDragTimer,
     clearRetractTimer,
     clearSettleWatchdog,
     commitDragSettleAck,
     publishTransient,
+    reportOverlayEvent,
     resetDragVars,
     resetFollow,
     suppressPeekUntilLeave,
@@ -938,6 +1005,7 @@ export function FoxApp() {
       }
       data-testid="fox-idle"
       data-window-role="fox"
+      data-window-generation={overlaySnapshotRef.current?.windowGeneration ?? 0}
       data-fox-pose={resolvedPose}
       data-fox-expression={expression}
       data-fox-headset-signal={headsetSignal ? 'true' : 'false'}

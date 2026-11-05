@@ -55,6 +55,7 @@ import { OverlayController } from '../../src/main/overlay-controller';
 import { app, BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from '../../src/shared/contracts';
 import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
+import { createInitialOverlayState } from '../../src/shared/overlay-machine';
 
 type FoxWindowFixture = BrowserWindow & {
   sent: OverlayCommand[];
@@ -112,10 +113,19 @@ function createFoxWindow(): FoxWindowFixture {
 function controllerWithDockedFox(): { controller: OverlayController; fox: FoxWindowFixture } {
   const controller = new OverlayController();
   const fox = createFoxWindow();
+  const parked = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 1,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  });
   Object.assign(controller as object, {
     fox,
-    foxDockEdge: 'left',
     foxOrigin: { x: 0, y: 100 },
+    overlayState: {
+      ...parked,
+      fox: { ...parked.fox, edge: 'left' },
+    },
   });
   return { controller, fox };
 }
@@ -165,8 +175,6 @@ describe('OverlayController fox drag settle transaction', () => {
   it('holds repeated shortcut intents until the exact final settle commit, then opens once', () => {
     const { controller, fox } = controllerWithDockedFox();
     controllers.push(controller);
-    const openSearch = vi.spyOn(controller, 'openSearch');
-
     expect(controller.moveBy(24, 0, false, 1)).toBeNull();
     controller.openSearch();
     controller.openSearch();
@@ -183,17 +191,14 @@ describe('OverlayController fox drag settle transaction', () => {
 
     controller.commitFoxDragSettle(settle.settleId);
     expect(controller.phase).toBe('SEARCH_INPUT');
-    expect(openSearch).toHaveBeenCalledTimes(4);
 
     controller.commitFoxDragSettle(settle.settleId);
-    expect(openSearch).toHaveBeenCalledTimes(4);
+    expect(controller.phase).toBe('SEARCH_INPUT');
   });
 
   it('keeps the open intent across a superseding generation and rejects old commits', () => {
     const { controller } = controllerWithDockedFox();
     controllers.push(controller);
-    const openSearch = vi.spyOn(controller, 'openSearch');
-
     const first = finishDrag(controller, 1);
     controller.openSearch();
     expect(controller.phase).toBe('FOX_IDLE');
@@ -210,7 +215,6 @@ describe('OverlayController fox drag settle transaction', () => {
 
     controller.commitFoxDragSettle(second.settleId);
     expect(controller.phase).toBe('SEARCH_INPUT');
-    expect(openSearch).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed for an out-of-order finish and leaves the active generation settleable', () => {
@@ -250,16 +254,22 @@ describe('OverlayController yield previous-app focus', () => {
     yieldOrKeepPalette.call(controller, fox);
   }
 
+  function requestPreviousAppFocus(controller: OverlayController): void {
+    const state = Reflect.get(controller, 'overlayState') as {
+      focusIntent: string;
+    };
+    Reflect.set(controller, 'overlayState', {
+      ...state,
+      focusIntent: 'previous-app',
+    });
+  }
+
   it('on darwin hides then shows the fox on the next scheduler tick, not synchronously', () => {
     vi.useFakeTimers();
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
     const { controller, fox } = controllerWithDockedFox();
     controllers.push(controller);
-    Object.assign(controller as object, {
-      restorePreviousAppOnIdle: true,
-      chromeHandoffMode: null,
-      phase: 'FOX_IDLE',
-    });
+    requestPreviousAppFocus(controller);
     fox.showInactive.mockClear();
 
     yieldPalette(controller, fox);
@@ -276,11 +286,7 @@ describe('OverlayController yield previous-app focus', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
     const { controller, fox } = controllerWithDockedFox();
     controllers.push(controller);
-    Object.assign(controller as object, {
-      restorePreviousAppOnIdle: true,
-      chromeHandoffMode: null,
-      phase: 'FOX_IDLE',
-    });
+    requestPreviousAppFocus(controller);
     fox.showInactive.mockClear();
     yieldPalette(controller, fox);
     const clearFoxYieldShow = Reflect.get(controller, 'clearFoxYieldShow') as () => void;
@@ -295,11 +301,7 @@ describe('OverlayController yield previous-app focus', () => {
     controllers.push(controller);
     const extra = { isDestroyed: () => false, isVisible: () => true } as unknown as BrowserWindow;
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([fox, extra]);
-    Object.assign(controller as object, {
-      restorePreviousAppOnIdle: true,
-      chromeHandoffMode: null,
-      phase: 'FOX_IDLE',
-    });
+    requestPreviousAppFocus(controller);
     fox.showInactive.mockClear();
     yieldPalette(controller, fox);
     expect(app.hide).not.toHaveBeenCalled();
@@ -321,11 +323,7 @@ describe('OverlayController yield previous-app focus', () => {
       },
     } as unknown as BrowserWindow;
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([fox, devtools]);
-    Object.assign(controller as object, {
-      restorePreviousAppOnIdle: true,
-      chromeHandoffMode: null,
-      phase: 'FOX_IDLE',
-    });
+    requestPreviousAppFocus(controller);
     fox.showInactive.mockClear();
     yieldPalette(controller, fox);
     expect(app.hide).toHaveBeenCalledOnce();
@@ -341,11 +339,7 @@ describe('OverlayController yield previous-app focus', () => {
     try {
       const { controller, fox } = controllerWithDockedFox();
       controllers.push(controller);
-      Object.assign(controller as object, {
-        restorePreviousAppOnIdle: true,
-        chromeHandoffMode: null,
-        phase: 'FOX_IDLE',
-      });
+      requestPreviousAppFocus(controller);
       fox.showInactive.mockClear();
       yieldPalette(controller, fox);
       expect(fox.setFocusable).toHaveBeenCalledWith(false);

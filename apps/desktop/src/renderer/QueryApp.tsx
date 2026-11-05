@@ -29,11 +29,15 @@ import {
 } from '@shared/query-layout';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
+  type OverlayControlApi,
   type FoxVisualTransform,
   type QueryAnchor,
   type ResultCount,
 } from '@shared/overlay-events';
-import { reduceOverlay, type OverlayPhase } from '@shared/overlay-machine';
+import type {
+  OverlayPhase,
+  OverlaySnapshot,
+} from '@shared/overlay-machine';
 import { QueryAnnounceBanner } from './features/search/QueryAnnounceBanner';
 import { QueryCapsule } from './features/search/QueryCapsule';
 import { QueryResizeGrip } from './features/search/QueryResizeGrip';
@@ -168,6 +172,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const collapseCleanupTimerRef = useRef<number | null>(null);
   const pendingCopyRef = useRef<QueryResult | null>(null);
   const activeHandoffIdRef = useRef(0);
+  const overlaySnapshotRef = useRef<OverlaySnapshot | null>(null);
   const queryInteractiveRef = useRef(false);
   const openingRef = useRef(false);
   const openingUserInteractionRef = useRef(false);
@@ -267,6 +272,84 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       applyFocus(selectExistingText && inputRef.current?.value === valueBeforeRetry);
     });
   }, [cancelScheduledInputFocus]);
+
+  const reportOverlayEvent = useCallback(
+    (event: Parameters<OverlayControlApi['reportOverlayEvent']>[0]) => {
+      const api = window.customerAgent as
+        | (typeof window.customerAgent & Partial<OverlayControlApi>)
+        | undefined;
+      return api?.reportOverlayEvent?.(event) ?? Promise.resolve(null);
+    },
+    [],
+  );
+
+  const applyOverlaySnapshot = useCallback((snapshot: OverlaySnapshot | undefined) => {
+    if (!snapshot) {
+      return;
+    }
+    const previous = overlaySnapshotRef.current;
+    if (
+      previous
+      && (
+        snapshot.windowGeneration < previous.windowGeneration
+        || snapshot.contract.sessionEpoch < previous.contract.sessionEpoch
+        || (
+          snapshot.windowGeneration === previous.windowGeneration
+          && snapshot.contract.sessionEpoch === previous.contract.sessionEpoch
+          && snapshot.contract.generation < previous.contract.generation
+        )
+      )
+    ) {
+      return;
+    }
+    overlaySnapshotRef.current = snapshot;
+    const sessionChanged = Boolean(
+      previous && previous.contract.sessionEpoch !== snapshot.contract.sessionEpoch,
+    );
+    if (sessionChanged) {
+      searchGenerationRef.current += 1;
+      copyGenerationRef.current += 1;
+      pendingCopyRef.current = null;
+      searchInFlightRef.current = false;
+      copyInFlightRef.current = false;
+      setResults([]);
+      setSearching(false);
+      setCopying(false);
+      setCopiedRank(null);
+      setErrorMessage('');
+    }
+    activeHandoffIdRef.current = snapshot.handoff.id;
+    const openingNow = snapshot.contract.phase === 'opening'
+      && snapshot.handoff.mode === 'opening';
+    openingRef.current = openingNow;
+    queryInteractiveRef.current = openingNow || snapshot.contract.phase === 'active';
+    layoutSequenceRef.current = snapshot.layout.sequence;
+    lastAppliedLayoutSequenceRef.current = snapshot.layout.ackSequence;
+    phaseRef.current = snapshot.contentPhase;
+    resultCountRef.current = snapshot.resultCount;
+    setPhase(snapshot.contentPhase);
+    setAnchor(snapshot.handoff.anchor);
+    setParked(snapshot.contract.phase === 'parked' || snapshot.contract.phase === 'closed');
+    setOpening(openingNow);
+    setClosing(snapshot.contract.phase === 'closing');
+    setResizeEdge(snapshot.layout.resizeEdge);
+    if (snapshot.layout.appliedHeight !== null) {
+      setQueryHeight(snapshot.layout.appliedHeight);
+    }
+    if (
+      snapshot.contract.phase === 'active'
+      || snapshot.contract.phase === 'parked'
+      || snapshot.contract.phase === 'closed'
+    ) {
+      setLayoutReady(true);
+    }
+    if (
+      sessionChanged
+      && (snapshot.contract.phase === 'active' || snapshot.contract.phase === 'opening')
+    ) {
+      window.requestAnimationFrame(() => focusQueryInput(false));
+    }
+  }, [focusQueryInput]);
 
   const reportHandoffMilestone = useCallback(
     (handoffId: number, milestone: 'open-armed' | 'open-finished' | 'close-finished') => {
@@ -391,8 +474,21 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setResizeEdge(ack.resizeEdge);
       setQueryHeight(ack.height);
       setLayoutReady(true);
+      window.requestAnimationFrame(() => {
+        const snapshot = overlaySnapshotRef.current;
+        if (snapshot) {
+          void reportOverlayEvent({
+            type: 'frame-observed',
+            commandId: ack.sequence,
+            target: 'query',
+            sessionEpoch: snapshot.contract.sessionEpoch,
+            windowGeneration: snapshot.windowGeneration,
+            generation: snapshot.contract.generation,
+          });
+        }
+      });
     }).catch(() => undefined);
-  }, [closing, opening]);
+  }, [closing, opening, reportOverlayEvent]);
 
   useEffect(() => {
     const api = window.customerAgent;
@@ -403,6 +499,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     void api
       .getWindowContext()
       .then((context) => {
+        applyOverlaySnapshot(context.snapshot);
         if (!context.shortcut.registered) {
           setShortcutFailed(true);
           setShortcutHint(context.shortcut.message);
@@ -416,6 +513,36 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       .catch(() => undefined);
 
     return api.onOverlayCommand((command) => {
+      if (command.type === 'overlay-snapshot') {
+        applyOverlaySnapshot(command.snapshot);
+        return;
+      }
+      if (
+        'handoffId' in command
+        && command.handoffId !== undefined
+        && command.handoffId < (overlaySnapshotRef.current?.handoff.id ?? 0)
+      ) {
+        return;
+      }
+      const commandId = 'handoffId' in command && command.handoffId !== undefined
+        ? command.handoffId
+        : 0;
+      if (commandId > 0) {
+        window.requestAnimationFrame(() => {
+          const snapshot = overlaySnapshotRef.current;
+          if (!snapshot) {
+            return;
+          }
+          void reportOverlayEvent({
+            type: 'frame-observed',
+            commandId,
+            target: 'query',
+            sessionEpoch: snapshot.contract.sessionEpoch,
+            windowGeneration: snapshot.windowGeneration,
+            generation: snapshot.contract.generation,
+          });
+        });
+      }
       if (command.type === 'prepare-search') {
         cancelScheduledOpening();
         cancelScheduledInputFocus();
@@ -598,6 +725,19 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         setResizeEdge(ack.resizeEdge);
         setQueryHeight(ack.height);
         setLayoutReady(true);
+        window.requestAnimationFrame(() => {
+          const snapshot = overlaySnapshotRef.current;
+          if (snapshot) {
+            void reportOverlayEvent({
+              type: 'frame-observed',
+              commandId: ack.sequence,
+              target: 'query',
+              sessionEpoch: snapshot.contract.sessionEpoch,
+              windowGeneration: snapshot.windowGeneration,
+              generation: snapshot.contract.generation,
+            });
+          }
+        });
         return;
       }
       if (command.type === 'shortcut-status' && !command.registered) {
@@ -607,6 +747,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     });
   }, [
     intake,
+    applyOverlaySnapshot,
     cancelScheduledCollapseContent,
     cancelScheduledInputFocus,
     cancelScheduledOpening,
@@ -615,6 +756,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     focusQueryInput,
     recordNoHitExit,
     reportHandoffMilestone,
+    reportOverlayEvent,
   ]);
 
   useLayoutEffect(() => {
@@ -693,15 +835,41 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   useEffect(() => {
     const restoreInputFocus = () => {
+      const snapshot = overlaySnapshotRef.current;
+      if (snapshot) {
+        void reportOverlayEvent({
+          type: 'focus-changed',
+          focused: true,
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          windowGeneration: snapshot.windowGeneration,
+          generation: snapshot.contract.generation,
+        });
+      }
       if (queryInteractiveRef.current) {
         // Reconcile native keyboard routing without selecting existing text;
         // otherwise returning from another app makes the next key overwrite it.
         focusQueryInput(false);
       }
     };
+    const reportBlur = () => {
+      const snapshot = overlaySnapshotRef.current;
+      if (snapshot) {
+        void reportOverlayEvent({
+          type: 'focus-changed',
+          focused: false,
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          windowGeneration: snapshot.windowGeneration,
+          generation: snapshot.contract.generation,
+        });
+      }
+    };
     window.addEventListener('focus', restoreInputFocus);
-    return () => window.removeEventListener('focus', restoreInputFocus);
-  }, [focusQueryInput]);
+    window.addEventListener('blur', reportBlur);
+    return () => {
+      window.removeEventListener('focus', restoreInputFocus);
+      window.removeEventListener('blur', reportBlur);
+    };
+  }, [focusQueryInput, reportOverlayEvent]);
 
   useEffect(
     () => () => {
@@ -805,6 +973,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setAnnounceInvalid(false);
       setErrorMessage(result.message); reportPhase('ERROR'); return result;
     }
+    const snapshot = overlaySnapshotRef.current;
+    if (snapshot && snapshot.contract.releaseId !== result.releaseId) {
+      void reportOverlayEvent({
+        type: 'release-changed',
+        releaseId: result.releaseId,
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        windowGeneration: snapshot.windowGeneration,
+        generation: snapshot.contract.generation,
+      });
+    }
     if (announceReleaseRef.current && announceReleaseRef.current !== result.releaseId) {
       // 软更新：换 rel_N 只换租约。**禁止** setResults([]) / cancelPendingSearch——
       // 坐席正在接待，Top 3 必须留在屏幕上。真失效走 onInvalidated 才抽空。
@@ -813,13 +991,23 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     announceReleaseRef.current = result.releaseId;
     setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
-  }, [reportPhase, intake]);
+  }, [reportOverlayEvent, reportPhase, intake]);
 
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
     if (value.sessionEpoch < productEpochRef.current) return;
     if (productEpochRef.current !== value.sessionEpoch) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setPlaceholderValues({}); setAnnounce(null);
       announceReleaseRef.current = null; lastProductQueryRef.current = null; setHelpStatus('待核实');
+      const snapshot = overlaySnapshotRef.current;
+      if (snapshot) {
+        void reportOverlayEvent({
+          type: 'session-changed',
+          sessionEpoch: Math.max(1, value.sessionEpoch),
+          releaseId: snapshot.contract.releaseId,
+          windowGeneration: snapshot.windowGeneration,
+          generation: snapshot.contract.generation,
+        });
+      }
     }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
@@ -844,7 +1032,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         void refreshAnnounce(value.sessionEpoch);
       }
     }
-  }, [cancelPendingSearch, cancelPendingCopy, refreshAnnounce, reportPhase]);
+  }, [
+    cancelPendingSearch,
+    cancelPendingCopy,
+    refreshAnnounce,
+    reportOverlayEvent,
+    reportPhase,
+  ]);
 
   useEffect(() => {
     const api = intake ? undefined : window.customerAgent?.productAnnounce;
@@ -881,8 +1075,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (value.sessionEpoch !== productEpochRef.current) return;
       announceReleaseRef.current = value.releaseId;
       setContentUpdatedDomains([...value.unreadDomains]);
+      const snapshot = overlaySnapshotRef.current;
+      if (snapshot && snapshot.contract.releaseId !== value.releaseId) {
+        void reportOverlayEvent({
+          type: 'release-changed',
+          releaseId: value.releaseId,
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          windowGeneration: snapshot.windowGeneration,
+          generation: snapshot.contract.generation,
+        });
+      }
     });
-  }, [intake]);
+  }, [intake, reportOverlayEvent]);
 
   // 已读：Query 窗可见（非 FOX_IDLE、未收起、非 document.hidden）且横幅停留 ≥1s。
   // 计时器随可见性变化重排：事件到达时窗口若不可见，展开/回到前台后会补排，不会卡住。
@@ -1097,7 +1301,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setResults([]);
       setCopiedRank(null);
       setInvalidMessage(EMPTY_QUERY_MESSAGE);
-      reportPhase(reduceOverlay(phase, { type: 'QUERY_BLANK' }));
+      reportPhase('SEARCH_INPUT');
       return;
     }
 
@@ -1105,7 +1309,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setResults([]);
       setCopiedRank(null);
       setInvalidMessage(QUERY_TOO_LONG_MESSAGE);
-      reportPhase(reduceOverlay(phase, { type: 'QUERY_BLANK' }));
+      reportPhase('SEARCH_INPUT');
       return;
     }
 
@@ -1156,7 +1360,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, phase, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
 
   const copyScript = useCallback(
     async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
@@ -1491,7 +1695,20 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
     setResizeEdge(ack.resizeEdge);
     setQueryHeight(ack.height);
-  }, []);
+    window.requestAnimationFrame(() => {
+      const snapshot = overlaySnapshotRef.current;
+      if (snapshot) {
+        void reportOverlayEvent({
+          type: 'frame-observed',
+          commandId: ack.sequence,
+          target: 'query',
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          windowGeneration: snapshot.windowGeneration,
+          generation: snapshot.contract.generation,
+        });
+      }
+    });
+  }, [reportOverlayEvent]);
 
   const releaseQueryResizeCapture = useCallback((pointerId: number | null) => {
     const grip = resizeGripRef.current;
@@ -1693,6 +1910,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       data-open-duration-ms={QUERY_OPEN_DURATION_MS}
       data-close-duration-ms={QUERY_CLOSE_DURATION_MS}
       data-handoff-id={activeHandoffIdRef.current}
+      data-window-generation={overlaySnapshotRef.current?.windowGeneration ?? 0}
       aria-busy={searching}
       onPointerDownCapture={() => {
         if (openingRef.current) {
