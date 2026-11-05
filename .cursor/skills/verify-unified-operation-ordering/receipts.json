@@ -1,7 +1,7 @@
 {
-  "syncCommit": "84aae3b7be2e95042d639c4c777362a50b1f3459",
-  "candidateState": "worktree candidate on the certified ARC-01 head",
-  "capturedAt": "2026-11-05T06:50:20Z",
+  "syncCommit": "d00fd2ed408dac628033dc3b1a7061e51c4c8868",
+  "candidateState": "verified source commit on the certified ARC-01 base",
+  "capturedAt": "2026-11-05T06:55:37Z",
   "sourceReceipt": "3db79b28dd6f61a462b6bcf9333bfa34963d17ef1a86612f5bea5aa9a45aad82",
   "modelStates": 614,
   "modelEdges": 2295,
