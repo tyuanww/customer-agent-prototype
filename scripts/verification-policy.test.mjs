@@ -484,6 +484,10 @@ test('workflow and package gates consume the dependency-map runner', () => {
     assert.equal(typeof packageJson.scripts[name], 'string', `${name} must exist`);
   }
   assert.match(packageJson.scripts['verify:changed'], /verification-policy\.mjs run/u);
+  assert.match(
+    map.checks['workflow-tests'].command,
+    /@customer-agent\/database build && pnpm test:workflow/u,
+  );
 
   const prWorkflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
   for (const lane of ['quick', 'contracts', 'database', 'electron', 'windows', 'linux']) {

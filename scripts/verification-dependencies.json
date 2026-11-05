@@ -79,7 +79,7 @@
     "documentation": { "job": "precheck", "command": "node scripts/check-documentation.mjs" },
     "lint": { "job": "quick", "command": "pnpm lint" },
     "workspace-check": { "job": "quick", "command": "pnpm workspace:check" },
-    "workflow-tests": { "job": "quick", "command": "pnpm test:workflow" },
+    "workflow-tests": { "job": "quick", "command": "pnpm --filter @customer-agent/database build && pnpm test:workflow" },
     "desktop-tests": { "job": "quick", "command": "pnpm --filter @customer-agent/desktop test" },
     "overlay-unit": { "job": "quick", "command": "pnpm --filter @customer-agent/desktop test -- overlay" },
     "api-tests": { "job": "quick", "command": "pnpm test:api" },
