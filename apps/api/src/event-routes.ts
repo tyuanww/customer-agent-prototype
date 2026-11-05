@@ -4,7 +4,8 @@ import {
   type components,
 } from '@customer-agent/contracts';
 import type { FastifyInstance } from 'fastify';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import { sendOverloaded, sendUnauthorized, sendValidationError } from './contract-http-errors.js';
 import type {
   EventRepository,
@@ -48,7 +49,7 @@ export function registerEventRoutes(
   dependencies?: EventRouteDependencies,
 ): void {
   app.post('/v1/events/adoption', async (request, reply) => {
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
     if (key === null) return sendValidationError(reply);
@@ -72,7 +73,7 @@ export function registerEventRoutes(
   });
 
   app.post('/v1/events/escalate', async (request, reply) => {
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
     if (key === null) return sendValidationError(reply);

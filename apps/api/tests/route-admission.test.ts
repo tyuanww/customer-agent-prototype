@@ -5,21 +5,7 @@ import type { ProductAuthService } from '../src/auth-service.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceReadinessChecks, ServicePolicyFlags, ServiceRepository } from '../src/service-repository.js';
-
-/** Routes reachable without a session. Each entry is `METHOD path`; anything not listed
- *  here must refuse an anonymous caller. Keep this list literal: a wildcard would let a
- *  newly added public route pass unnoticed, which is the failure this check exists for. */
-const BASE_PUBLIC = ['GET /health', 'GET /ready'];
-/** Mock auth exists only in test profiles. */
-const MOCK_PUBLIC = Object.freeze([...BASE_PUBLIC, 'POST /v1/auth/mock-login']);
-/** The product login handshake is reachable without a session by construction: it is how a
- *  session is created. Each one refuses a malformed body with 400 rather than 401. */
-const PRODUCT_PUBLIC = Object.freeze([
-  ...BASE_PUBLIC,
-  'POST /v1/auth/login-requests',
-  'POST /v1/auth/login-requests/:login_id/exchange',
-  'GET /v1/auth/callback',
-]);
+import { ACCESS_PUBLIC_ROUTES, assertRouteCoverage } from '../src/access/policy.js';
 
 /** The only public routes allowed to write, per profile. Naming them keeps the list honest:
  *  any other mutating public route fails rather than joining a wildcard. */
@@ -132,8 +118,8 @@ describe('route admission', () => {
   });
 
   it.each([
-    { profile: 'mock' as const, allowlist: MOCK_PUBLIC, intakeRoutes: false },
-    { profile: 'product' as const, allowlist: PRODUCT_PUBLIC, intakeRoutes: true },
+    { profile: 'mock' as const, allowlist: ACCESS_PUBLIC_ROUTES.mock, intakeRoutes: false },
+    { profile: 'product' as const, allowlist: ACCESS_PUBLIC_ROUTES.product, intakeRoutes: true },
   ])('refuses an anonymous caller on every route that is not explicitly public ($profile profile)', async ({ profile, allowlist, intakeRoutes }) => {
     const product = profile === 'product';
     const app = createApiApp({
@@ -152,6 +138,7 @@ describe('route admission', () => {
     await app.ready();
 
     const routes = registeredRoutes(app);
+    expect(() => assertRouteCoverage(routes, profile)).not.toThrow();
     // A parser or registration regression must not turn this check into a no-op.
     expect(routes.length).toBeGreaterThan(20);
     // The intake routes are the sensitive half. This count was 38 when the sweep learned to
@@ -185,8 +172,8 @@ describe('route admission', () => {
   });
 
   it.each([
-    { profile: 'mock' as const, allowlist: MOCK_PUBLIC },
-    { profile: 'product' as const, allowlist: PRODUCT_PUBLIC },
+    { profile: 'mock' as const, allowlist: ACCESS_PUBLIC_ROUTES.mock },
+    { profile: 'product' as const, allowlist: ACCESS_PUBLIC_ROUTES.product },
   ])('keeps the public allowlist free of anything that mutates state ($profile profile)', ({ profile, allowlist }) => {
     const mutating = allowlist.filter(entry => !entry.startsWith('GET '));
     expect([...mutating].sort()).toEqual([...PUBLIC_WRITES[profile]].sort());

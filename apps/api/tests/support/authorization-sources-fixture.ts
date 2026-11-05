@@ -31,6 +31,7 @@ const LOG_HASH = Object.freeze({ version: 'hmac-log-v1', key: 'synthetic-fixture
  * is thrown away on close. */
 export type AuthorizationFixture = Readonly<{
   admin: Client;
+  database: ReturnType<Pg15Harness['createDatabase']>;
   close: () => Promise<void>;
   /** Rows of the set function for one principal and action, ordered for stable comparison. */
   sources: (principalId: string, action: string) => Promise<{ source_id: string; valid_until: Date; policy_version: string | null }[]>;
@@ -108,12 +109,13 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
         ('tenant-menokin','app-customer-agent','dept-a','job-director',1,'director'),
         ('tenant-menokin','app-customer-agent','dept-a','job-agent',1,'agent')`);
     await admin.query(`INSERT INTO content_intake.grants(
-        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action, starts_at, expires_at, reason)
+        grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, action,
+        starts_at, expires_at, reason, steward_id)
       VALUES
         ('grant-alloc-query','allocation','signer','signer','tenant-menokin','app-customer-agent','scope-product','query',
-          clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配查询。'),
+          clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配查询。','signer'),
         ('grant-alloc-publish','allocation','signer','signer','tenant-menokin','app-customer-agent','scope-product','publish',
-          clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配发布。')`);
+          clock_timestamp()-interval '2 minutes', clock_timestamp()+interval '2 days', '分配发布。','signer')`);
     await admin.query(`INSERT INTO content_intake.grants(
         grant_id, kind, issuer_id, recipient_id, tenant_id, app_id, scope_id, source_id, action,
         starts_at, expires_at, reason, parent_grant_id, policy_version, store_set_version, steward_id)
@@ -340,6 +342,7 @@ export async function createAuthorizationFixture(databaseName = 'authorization_s
 
   return Object.freeze({
     admin,
+    database,
     close: async () => { await admin.end(); harness.stop(); },
     sources,
     publishMessage,
