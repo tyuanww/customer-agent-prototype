@@ -21,7 +21,7 @@ import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
 } from '../../src/shared/overlay-events';
-import { applyOverlayEvent, createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
+import { applyOverlayEvent, createInitialOverlayState, overlaySnapshot, type OverlayState } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -423,7 +423,7 @@ describe('QueryApp', () => {
 
   it('reports clear-content through the authoritative overlay revision before the next result report', async () => {
     const f = connectProduct();
-    let authoritative = {
+    let authoritative: OverlayState = {
       ...createInitialOverlayState({ sessionEpoch: 1, generation: 2, windowGeneration: 1, releaseId: 'rel_synthetic' }),
       phase: 'active' as const,
       activeSurface: 'query' as const,
