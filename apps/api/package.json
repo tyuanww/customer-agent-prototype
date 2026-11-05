@@ -42,6 +42,7 @@
     "@customer-agent/content-intake": "workspace:*",
     "@customer-agent/contracts": "workspace:*",
     "@customer-agent/job-roster": "workspace:*",
+    "@customer-agent/retrieval-core": "workspace:*",
     "@customer-agent/unified-contracts": "workspace:*",
     "fastify": "5.12.1",
     "pg": "8.23.0"

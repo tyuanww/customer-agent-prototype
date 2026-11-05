@@ -56,6 +56,9 @@ importers:
       '@customer-agent/job-roster':
         specifier: workspace:*
         version: link:../../packages/job-roster
+      '@customer-agent/retrieval-core':
+        specifier: workspace:*
+        version: link:../../packages/retrieval-core
       '@customer-agent/unified-contracts':
         specifier: workspace:*
         version: link:../../packages/unified-contracts
