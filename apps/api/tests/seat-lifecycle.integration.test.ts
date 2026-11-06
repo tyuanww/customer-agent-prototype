@@ -208,6 +208,8 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
         '0079_directory_identity_activity',
         '0080_bind_import_batch_tenant',
         '0081_require_import_batch_principal',
+        '0082_access_evaluator',
+        '0083_sop_pipeline_projection',
       ]);
       expect((await snapshot()).rows).toEqual(before);
       expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
