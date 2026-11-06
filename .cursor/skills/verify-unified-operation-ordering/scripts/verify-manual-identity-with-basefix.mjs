@@ -57,9 +57,7 @@ export function resolveBaselineDependency({
   const baselineAncestor = spawnSync('git', [
     '-C', repositoryRoot, 'merge-base', '--is-ancestor', commit, testedHead,
   ]).status === 0;
-  if (baselineAncestor) {
-    throw new Error(`BASEFIX ${commit} is already an ancestor of tested head ${testedHead}`);
-  }
+  const relationship = baselineAncestor ? 'ancestor' : 'not-ancestor';
   const changedPaths = git(repositoryRoot, ['diff', '--name-only', parent, commit])
     .trim().split('\n').filter(Boolean);
   if (changedPaths.length !== 1 || changedPaths[0] !== seatLifecyclePath) {
@@ -70,7 +68,7 @@ export function resolveBaselineDependency({
     commit,
     parent,
     testedHead,
-    relationship: 'not-ancestor',
+    relationship,
     changedPaths: Object.freeze(changedPaths),
     fileSha256: createHash('sha256').update(content).digest('hex'),
     content,
@@ -168,7 +166,9 @@ export function runManualIdentityVerification({
       relationship: baseline.relationship,
       changedPaths: baseline.changedPaths,
       patchedFileSha256: baseline.fileSha256,
-      integrationTree: 'temporary git archive; only BASEFIX blob replaced',
+      integrationTree: baseline.relationship === 'ancestor'
+        ? 'tested head already contains BASEFIX'
+        : 'temporary git archive; only BASEFIX blob replaced',
       command: `${process.execPath} ${vitest} run ${manualIdentityTests.join(' ')}`,
       testFiles: counts.testFiles,
       tests: counts.tests,
