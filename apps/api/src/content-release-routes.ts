@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import type { ContentReleaseFailure, ContentReleaseService } from './content-release-service.js';
 import {
   sendConflict,
@@ -75,7 +76,7 @@ export function registerContentReleaseRoutes(
 
   app.post('/v1/content/publish', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('publish', 5)) return sendRateLimited(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
@@ -89,7 +90,7 @@ export function registerContentReleaseRoutes(
 
   app.post('/v1/content/rollback', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('rollback', 5)) return sendRateLimited(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);
@@ -107,7 +108,7 @@ export function registerContentReleaseRoutes(
   // header contract for this route is a required idempotency key only.
   app.post('/v1/content/rollback-previous', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('rollback', 5)) return sendRateLimited(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);

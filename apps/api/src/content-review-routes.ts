@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, bearerToken, type AuthService } from './auth-service.js';
+import { bearerToken, type AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import { sendIdentityFailure } from './product-auth-routes.js';
 import { IdentityFailure } from './product-auth-service.js';
 import { ContentReviewFailure, type ContentReviewService } from './content-review-service.js';
@@ -37,7 +38,7 @@ export function registerContentReviewRoutes(
 
     scope.get('/v1/admin/content/reviews', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -50,7 +51,7 @@ export function registerContentReviewRoutes(
 
     scope.get('/v1/admin/content/reviews/:batch_id', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -73,7 +74,7 @@ export function registerContentReviewRoutes(
 
     scope.post('/v1/admin/content/reviews/:batch_id/decisions', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -91,7 +92,7 @@ export function registerContentReviewRoutes(
 
     scope.post('/v1/admin/content/reviews/:batch_id/quality-evidence', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -109,7 +110,7 @@ export function registerContentReviewRoutes(
 
     scope.post('/v1/admin/content/reviews/:batch_id/resume', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');
@@ -124,7 +125,7 @@ export function registerContentReviewRoutes(
 
     scope.post('/v1/admin/content/reviews/:batch_id/cancel', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      if (await authenticateRequestHeaders(authService, request.headers) === null) {
+      if (await requestActor(request, authService) === null) {
         return sendUnauthorized(reply);
       }
       if (!dependencies) throw new IdentityFailure('DEPENDENCY_UNAVAILABLE');

@@ -29,6 +29,8 @@ export type PermissionsUse =
 export type AccountsUse = 'pending' | 'unavailable' | 'closed' | 'open';
 
 export type SettingsUse = Readonly<{
+  accessRevision: number | null;
+  expiresAt: string | null;
   grants: PermissionsUse;
   accounts: AccountsUse;
 }>;
@@ -111,7 +113,10 @@ function isAccountsUse(value: unknown): value is AccountsUse {
 
 function isSettingsUse(value: unknown): value is SettingsUse {
   return isRecord(value)
-    && onlyKeys(value, ['grants', 'accounts'])
+    && onlyKeys(value, ['accessRevision', 'expiresAt', 'grants', 'accounts'])
+    && (value.accessRevision === null
+      || (typeof value.accessRevision === 'number' && Number.isSafeInteger(value.accessRevision) && value.accessRevision >= 0))
+    && (value.expiresAt === null || typeof value.expiresAt === 'string')
     && isPermissionsUse(value.grants)
     && isAccountsUse(value.accounts);
 }

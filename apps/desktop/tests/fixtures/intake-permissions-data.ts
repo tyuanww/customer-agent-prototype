@@ -16,7 +16,10 @@ export function intakePermissionsData(
  const session:IntakeUsageSession={view:()=>({signedIn,sessionEpoch:epoch}),subscribe:fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};},
   request:async(_epoch,path,options)=>{
    requests.push({path,method:(options as {method?:string}).method,body:options.body});let value:unknown;
-   if(path.startsWith('/v1/intake/authorization'))value={factsVersion:1,revocationGeneration:0,policyVersion:1,validUntil:until,
+   if(path==='/v1/access/settings')value={state:mayAllocate.length||capabilityOptions.canManageSeats?'open':'closed',
+    grants:mayAllocate.length?'open':'closed',accounts:capabilityOptions.canManageSeats?'open':'closed',
+    accessRevision:1,expiresAt:until,denyReason:mayAllocate.length||capabilityOptions.canManageSeats?null:'POLICY_DENIED'};
+   else if(path.startsWith('/v1/intake/authorization'))value={factsVersion:1,revocationGeneration:0,policyVersion:1,validUntil:until,
     capabilities:[{scope,actions:[],mayAllocate:[...mayAllocate],mayDelegate:[],validUntil:until}],nextCursor:null};
    else if(path==='/v1/intake/seats/administration')value={canManage:capabilityOptions.canManageSeats===true};
    else if(path.startsWith('/v1/intake/sources?'))value={items:[source],nextCursor:null};

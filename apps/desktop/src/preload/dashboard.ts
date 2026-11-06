@@ -569,7 +569,12 @@ function accountsPayload(value: unknown): boolean {
 }
 
 function settingsPayload(settings: Record<string, unknown>): boolean {
-  return onlyKeys(settings, ['grants', 'accounts'])
+  return onlyKeys(settings, ['accessRevision', 'expiresAt', 'grants', 'accounts'])
+    && (settings.accessRevision === null
+      || (typeof settings.accessRevision === 'number'
+        && Number.isSafeInteger(settings.accessRevision)
+        && settings.accessRevision >= 0))
+    && (settings.expiresAt === null || typeof settings.expiresAt === 'string')
     && isRecord(settings.grants)
     && grantsPayload(settings.grants)
     && accountsPayload(settings.accounts);

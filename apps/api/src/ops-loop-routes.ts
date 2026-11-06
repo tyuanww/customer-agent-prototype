@@ -5,7 +5,8 @@ import {
   validateContractSchema,
   type components,
 } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendForbiddenOrPolicyDenied,
   sendOverloaded,
@@ -130,7 +131,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/metrics/inaccuracy-outcomes', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -143,7 +144,7 @@ export function registerOpsLoopRoutes(
 
   app.post('/v1/inaccuracy-reports', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'agent' && actor.role !== 'coach' && actor.role !== 'owner') {
       return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
@@ -179,7 +180,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/sop/catalog', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -196,7 +197,7 @@ export function registerOpsLoopRoutes(
     });
     scope.post('/v1/sop/import', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      const actor = await authenticateRequestHeaders(authService, request.headers);
+      const actor = await requestActor(request, authService);
       if (actor === null) return sendUnauthorized(reply);
       if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
       if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -228,7 +229,7 @@ export function registerOpsLoopRoutes(
 
   app.patch('/v1/sop/nodes/:node_id', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -269,7 +270,7 @@ export function registerOpsLoopRoutes(
 
   app.delete('/v1/sop/nodes/:node_id', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -297,7 +298,7 @@ export function registerOpsLoopRoutes(
 
   app.patch('/v1/content/scripts/:script_id', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -338,7 +339,7 @@ export function registerOpsLoopRoutes(
 
   app.delete('/v1/content/scripts/:script_id', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -371,7 +372,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/metrics/retrieval', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -388,7 +389,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/metrics/question', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -408,7 +409,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/events/usage', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
     if (!limit('own-usage', actor.user_id, 60)) return sendRateLimited(reply);
@@ -419,7 +420,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/software/releases', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (dependencies === undefined) return sendOverloaded(reply);
@@ -431,7 +432,7 @@ export function registerOpsLoopRoutes(
 
   app.get('/v1/software/releases/current', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (actor.role !== 'owner') return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (dependencies === undefined) return sendOverloaded(reply);

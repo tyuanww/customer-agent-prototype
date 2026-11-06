@@ -4,7 +4,8 @@ import {
   validateContractSchema,
   type components,
 } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendForbiddenOrPolicyDenied,
   sendOverloaded,
@@ -123,7 +124,7 @@ export function registerIterationTaskRoutes(
 
   app.get('/v1/metrics/iteration-tasks', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -171,7 +172,7 @@ export function registerIterationTaskRoutes(
 
   app.post('/v1/events/iteration-tasks/:task_id/start', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);
@@ -199,7 +200,7 @@ export function registerIterationTaskRoutes(
 
   app.post('/v1/events/iteration-tasks/:task_id/close', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!isCoachOrOwner(actor.role)) return sendForbiddenOrPolicyDenied(reply, 'FORBIDDEN');
     if (!allowUnscopedLegacyOps) return sendOverloaded(reply);

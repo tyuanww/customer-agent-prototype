@@ -247,6 +247,7 @@ describe('Application API bootstrap', () => {
     const app = createApiApp({
       config: testConfig(), repository: stubRepository(ALL_READY),
       accessLog: { logHash: { version: 'hmac-log-v1', key: 'routine-diagnosis-material-000000000001' }, sink: line => lines.push(line) },
+      testPublicRoutes: ['GET /synthetic/:id'],
     });
     app.get('/synthetic/:id', async () => ({ ok: true }));
     openApps.push(app);
@@ -387,6 +388,7 @@ describe('Application API bootstrap', () => {
       config: testConfig(),
       repository: stubRepository(),
       diagnosticSink: diagnostics,
+      testPublicRoutes: ['GET /_synthetic-request-failure'],
     });
     openApps.push(app);
     app.get('/_synthetic-request-failure', async () => {

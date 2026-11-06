@@ -53,6 +53,7 @@ test('a director with query but no allocation cannot grant permissions', async (
     await query.waitForFunction(() => Boolean(window.customerAgent?.product));
     await app.evaluate(({ app: electronApp }) => electronApp.focus({ steal: true }));
     await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
     await query.getByRole('button', { name: '登录', exact: true }).click();
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
     await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();

@@ -5,10 +5,10 @@ import {
 } from '@customer-agent/contracts';
 import type { FastifyInstance } from 'fastify';
 import {
-  authenticateRequestHeaders,
   type AuthenticatedUser,
   type AuthService,
 } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendForbiddenOrPolicyDenied,
   sendOverloaded,
@@ -104,7 +104,7 @@ export function registerSearchRoute(
   dependencies?: SearchRouteDependencies,
 ): void {
   app.post('/v1/search', async (request, reply) => {
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
 
     const rawQueryText = request.body !== null && typeof request.body === 'object'
