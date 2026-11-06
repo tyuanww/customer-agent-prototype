@@ -90,6 +90,7 @@
     "test:search-decision:proof": "pnpm --filter @customer-agent/api test:search-decision:proof",
     "test:g1a:comparison:package": "pnpm --filter @customer-agent/api test:g1a:comparison:package",
     "test:content-intake:p1": "pnpm --filter @customer-agent/content-intake test && pnpm --filter @customer-agent/api exec vitest run tests/content-intake-p1.test.ts",
+    "test:unified-operation-ordering": "pnpm --filter @customer-agent/unified-contracts build:runtime && pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts && node .cursor/skills/verify-unified-operation-ordering/scripts/check.mjs",
     "content:intake:probe": "pnpm --filter @customer-agent/content-intake probe",
     "test:repair-intake": "node --test scripts/repair-contract-intake.test.mjs",
     "test:backup:integration": "pnpm --filter @customer-agent/database build:runtime && CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION=1 node --test scripts/ops/backup-set-pg15.test.mjs",
