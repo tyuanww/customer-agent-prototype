@@ -1,8 +1,8 @@
 {
-  "syncCommit": "b1d54f1a5a86adba16f8786e0d510d8d0449b4c8",
+  "syncCommit": "8b13b05379e15c6966dc3fd39a9cd590545c7579",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-06T06:17:07.242Z",
-  "sourceReceipt": "b51ea8907d919e9d12ff6f1fa0d69072ad11469134ce6cc0951841d9858c592e",
+  "capturedAt": "2026-11-06T07:04:50.845Z",
+  "sourceReceipt": "4cbe40b4d6d031f058f7427e71da0fa1c3d36e33b3d3704465fa11f92ad52c2d",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,7 +29,7 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "55c711a6d9493c385e6ac393cc7a42d604343c9440177363f5d417ccef66b7a2",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "9607e6659303b0963b794851ea35634f2c7ae71a00c69ae6877b7c5fc64debbb",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "ba501f04fe2279a0a2bc326191242ef0412ecfda832eb21e80c91f15ec9bee01",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
@@ -90,7 +90,7 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "b1d54f1a5a86adba16f8786e0d510d8d0449b4c8",
+  "testedSourceCommit": "8b13b05379e15c6966dc3fd39a9cd590545c7579",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
@@ -99,13 +99,13 @@
       "id": "unified-model",
       "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:unified-operation-ordering",
       "status": "PASS",
-      "result": "20/20 tests; 1222 states; 5318 transitions; 7/7 negative controls; final combined BASEFIX, unreadable blob, summary spoofing, and receipt ownership checks passed"
+      "result": "20/20 tests; 1222 states; 5318 transitions; 7/7 negative controls; combined BASEFIX, unreadable blob, summary spoofing, and receipt ownership checks passed"
     },
     {
       "id": "root-tests",
       "command": "pnpm test",
       "status": "PASS",
-      "result": "API 862 passed / 595 skipped; Desktop 1863 passed / 12 skipped; workflow 238 passed / 5 skipped"
+      "result": "API 863 passed / 595 skipped; Desktop 1863 passed / 12 skipped; workflow 238 passed / 5 skipped"
     },
     {
       "id": "typecheck",
@@ -114,7 +114,7 @@
       "result": "all workspace builds and TypeScript checks passed at the final source head"
     },
     {
-      "id": "format-build-docs-architecture-workspace",
+      "id": "lint-build-docs-architecture-workspace",
       "command": "pnpm lint && pnpm build && pnpm docs:check && pnpm check:architecture && pnpm workspace:check",
       "status": "PASS",
       "result": "lint and production build passed; docs checked 356 Markdown files; architecture checked 583 files with zero violations; workspace budgets passed"
