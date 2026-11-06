@@ -109,7 +109,7 @@ function fixture(options: {
       ? options.current
       : async () => options.current === undefined ? snapshot() : options.current,
   );
-  const contentPipeline = new ContentPipeline();
+  const contentPipeline = new ContentPipeline({ now: options.now ?? (() => new Date(now)) });
   contentPipeline.activate(snapshot(), [candidate(3), candidate(1), candidate(2)]);
   const query = options.contentQuery ?? vi.fn(contentPipeline.query.bind(contentPipeline));
   const telemetry: QueryTelemetryEvent[] = [];
@@ -426,6 +426,7 @@ describe('QueryCoordinator', () => {
       runReturned = true;
     };
     const pipeline = new ContentPipeline({
+      now: () => new Date(now),
       enrichment: { deadlineMs: 100, run },
       schedule: (callback) => { scheduled.push(callback); },
     });

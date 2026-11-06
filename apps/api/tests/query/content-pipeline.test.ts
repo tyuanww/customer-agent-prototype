@@ -13,6 +13,7 @@ import {
 } from '../../src/query/content-pipeline.js';
 
 const releaseId = 'rel_synthetic_qry_001' as ReleaseId;
+const fixedNow = () => new Date('2026-11-05T00:30:00.000Z');
 const sourceScope = {
   kind: 'source',
   tenantId: 'tenant_synthetic',
@@ -88,7 +89,7 @@ const queryId = 'query_synthetic_001' as QueryId;
 
 describe('ContentPipeline', () => {
   it('builds once at activation and returns exact Top 3 copy provenance', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     const prepared = pipeline.activate(snapshot(), [item(3), item(1), item(2)]);
 
     expect(pipeline.inspect()).toMatchObject({
@@ -125,7 +126,7 @@ describe('ContentPipeline', () => {
   });
 
   it('truncates to exactly three candidates when more than three are eligible', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     pipeline.activate(snapshot(5), [item(5), item(4), item(3), item(2), item(1)]);
 
     const result = await pipeline.query({
@@ -146,7 +147,7 @@ describe('ContentPipeline', () => {
   });
 
   it('filters access scope before ranking and never leaks an out-of-scope candidate', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     pipeline.activate(snapshot(2), [
       item(1, {
         scope: {
@@ -173,7 +174,7 @@ describe('ContentPipeline', () => {
   });
 
   it('filters platform and product scope before ranking', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     pipeline.activate(snapshot(3), [
       item(1, { platformScope: ['douyin'] }),
       item(2, { productScopeType: 'sku', productScopeRefs: ['sku_synthetic_other'] }),
@@ -198,7 +199,7 @@ describe('ContentPipeline', () => {
   });
 
   it('distinguishes weak body-only hits, no match, out-of-scope, and stale indexes', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     pipeline.activate(snapshot(1), [
       item(1, {
         title: '合成收纳说明',
@@ -220,7 +221,7 @@ describe('ContentPipeline', () => {
       access: queryAccess(),
     })).resolves.toEqual({ ok: false, reason: 'no_match' });
 
-    const outOfScope = new ContentPipeline();
+    const outOfScope = new ContentPipeline({ now: fixedNow });
     outOfScope.activate(snapshot(1), [item(1, {
       scope: { ...sourceScope, sourceId: 'source_other' } as Scope,
     })]);
@@ -240,7 +241,7 @@ describe('ContentPipeline', () => {
   });
 
   it('rejects a stale candidate at activation and does not mutate the prepared index on query', async () => {
-    const pipeline = new ContentPipeline();
+    const pipeline = new ContentPipeline({ now: fixedNow });
     expect(() => pipeline.activate(snapshot(1), [
       item(1, { releaseId: 'rel_synthetic_qry_old' as ReleaseId }),
     ])).toThrow(/release/u);
@@ -271,6 +272,7 @@ describe('ContentPipeline', () => {
       await new Promise<void>((resolve) => { releaseEnrichment = resolve; });
     });
     const pipeline = new ContentPipeline({
+      now: fixedNow,
       enrichment: { deadlineMs: 5_000, run },
     });
     pipeline.activate(snapshot(1), [item(1)]);
@@ -302,7 +304,7 @@ describe('ContentPipeline', () => {
 
   it('does not launch external enrichment after cancellation', async () => {
     const run = vi.fn(async () => undefined);
-    const pipeline = new ContentPipeline({ enrichment: { deadlineMs: 100, run } });
+    const pipeline = new ContentPipeline({ now: fixedNow, enrichment: { deadlineMs: 100, run } });
     pipeline.activate(snapshot(1), [item(1)]);
     const controller = new AbortController();
     controller.abort();
