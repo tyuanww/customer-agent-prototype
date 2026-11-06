@@ -444,6 +444,18 @@ describe('formal unified operation ordering', () => {
     })).toThrow(`unified source must not own BASEFIX file: ${BASEFIX_DEPENDENCY.file.path}`);
   });
 
+  it('fails closed when a tested BASEFIX path exists but its blob is unreadable', () => {
+    const fixture = baselineTopologyFixture('ancestor');
+    const blob = git(fixture.root, [
+      'rev-parse', `HEAD:${BASEFIX_DEPENDENCY.file.path}`,
+    ]);
+    rmSync(path.join(fixture.root, '.git/objects', blob.slice(0, 2), blob.slice(2)));
+    expect(() => resolveBaselineDependency({
+      repositoryRoot: fixture.root,
+      dependency: fixture.dependency,
+    })).toThrow('cannot read tested BASEFIX path');
+  });
+
   it('validates the production BASEFIX policy and the exact 38-test command result', () => {
     const baseline = resolveBaselineDependency();
     expect(baseline.commit).toBe(BASEFIX_DEPENDENCY.commit);
@@ -476,5 +488,29 @@ describe('formal unified operation ordering', () => {
       stdout: 'Test Files  9 passed (9)\nTests  37 passed (37)\n',
       stderr: '',
     })).toThrow('did not report 9 files / 38 tests');
+    expect(() => assertManualIdentityResult({
+      status: 0,
+      stdout: [
+        'Test Files  9 passed (9)',
+        'Tests  38 passed (38)',
+        'Test Files  1 failed (1)',
+        'Tests  1 failed (1)',
+      ].join('\n'),
+      stderr: '',
+    })).toThrow('did not report 9 files / 38 tests');
+    expect(() => assertManualIdentityResult({
+      status: 0,
+      stdout: [
+        'Test Files  9 passed (9)',
+        'Tests  38 passed (38)',
+        'Test Files  1 passed (1)',
+        'Tests  1 passed (1)',
+      ].join('\n'),
+      stderr: '',
+    })).toThrow('did not report 9 files / 38 tests');
+    const currentTested = readFileSync(
+      path.join(process.cwd(), '../..', BASEFIX_DEPENDENCY.file.path),
+    );
+    expect(baseline.testedFileSha256).toBe(sha256(currentTested));
   });
 });

@@ -81,13 +81,25 @@ export function resolveBaselineDependency({
   if (fileSha256 !== dependency.file.sha256) {
     throw new Error(`BASEFIX file hash does not match ${dependency.id}`);
   }
-  const testedFileSha256 = relationship === 'ancestor'
-    ? createHash('sha256').update(git(
-      repositoryRoot,
-      ['show', `${testedHead}:${dependency.file.path}`],
-      { encoding: 'buffer' },
-    )).digest('hex')
-    : null;
+  const testedTreeEntry = git(repositoryRoot, [
+    'ls-tree', '-z', '--full-tree', testedHead, '--', dependency.file.path,
+  ]);
+  let testedFileSha256 = null;
+  if (testedTreeEntry !== '') {
+    const testedFile = spawnSync('git', [
+      '-C', repositoryRoot, 'show', `${testedHead}:${dependency.file.path}`,
+    ], {
+      encoding: 'buffer',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const stderr = Buffer.isBuffer(testedFile.stderr)
+      ? testedFile.stderr.toString('utf8')
+      : String(testedFile.stderr ?? '');
+    if (testedFile.error || testedFile.status !== 0) {
+      throw new Error(`cannot read tested BASEFIX path: ${testedFile.error?.message ?? stderr}`);
+    }
+    testedFileSha256 = createHash('sha256').update(testedFile.stdout).digest('hex');
+  }
   return Object.freeze({
     dependency,
     commit,
@@ -166,9 +178,20 @@ export function assertManualIdentityResult(
   if (result.status !== 0 || result.error) {
     throw new Error(`manual identity command failed${result.error ? `: ${result.error.message}` : ''}\n${stderr || stdout}`);
   }
-  const files = stdout.match(new RegExp(`Test Files\\s+${expected.testFiles} passed \\(${expected.testFiles}\\)`, 'u'));
-  const tests = stdout.match(new RegExp(`Tests\\s+${expected.tests} passed \\(${expected.tests}\\)`, 'u'));
-  if (!files || !tests) {
+  const summaryLines = stdout
+    .split(/\r?\n/u)
+    .filter(line => /^\s*(?:Test Files|Tests)\b/u.test(line));
+  const exactFiles = new RegExp(
+    `^\\s*Test Files\\s+${expected.testFiles} passed \\(${expected.testFiles}\\)\\s*$`,
+    'u',
+  );
+  const exactTests = new RegExp(
+    `^\\s*Tests\\s+${expected.tests} passed \\(${expected.tests}\\)\\s*$`,
+    'u',
+  );
+  const fileSummaries = summaryLines.filter(line => exactFiles.test(line));
+  const testSummaries = summaryLines.filter(line => exactTests.test(line));
+  if (summaryLines.length !== 2 || fileSummaries.length !== 1 || testSummaries.length !== 1) {
     throw new Error(
       `manual identity command did not report ${expected.testFiles} files / ${expected.tests} tests\n${stdout || stderr}`,
     );
