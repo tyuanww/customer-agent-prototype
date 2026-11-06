@@ -71,7 +71,7 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
       const query = controller
         .getWindows()
         .find((win) => win.webContents.getURL().includes('role=query'));
-      query?.emit('blur');
+      query?.blur();
     },
     getPhase: () => controller.phase,
     shortcutRegistered: () => controller.shortcutRegistered,
@@ -108,6 +108,12 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
           controller.moveBy(remaining, 0, false);
         }
       };
+      // A fresh test window can start with its native edge already at the
+      // requested display edge while the overlay is still `none`. Start the
+      // synthetic drag inward so finishing it exercises a real dock transition.
+      if (Math.abs(targetX - fox.getBounds().x) <= 1) {
+        controller.moveBy(edge === 'left' ? 48 : -48, 0, false);
+      }
       walk(targetX - fox.getBounds().x);
       const firstSettle = controller.moveBy(0, 0, true);
       if (firstSettle) {
@@ -141,6 +147,7 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
       }
       focused.close();
     },
+    getOverlaySnapshot: () => controller.getOverlaySnapshot(),
     queryLayoutDebug: () => controller.queryLayoutDebugState(),
     resizeQueryHeight: (request: QueryResizeRequest) => {
       const snapshot = controller.getOverlaySnapshot();

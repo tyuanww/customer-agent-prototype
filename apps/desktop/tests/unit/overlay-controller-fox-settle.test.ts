@@ -373,6 +373,20 @@ describe('OverlayController fox drag settle transaction', () => {
     expect(Reflect.get(controller, 'pendingQueryBlur')).toBe(true);
     expect(Reflect.get(controller, 'blurRecheckTimer')).not.toBeNull();
   });
+
+  it('keeps a blur that arrives while the query window is still opening', () => {
+    vi.useFakeTimers();
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    const state = { ...activeState(), phase: 'opening' as const };
+    Object.assign(controller as object, { query, overlayState: state });
+    controllers.push(controller);
+    Reflect.get(controller, 'armBlurGrace').call(controller);
+    Reflect.get(controller, 'handleQueryBlur').call(controller);
+
+    expect(Reflect.get(controller, 'pendingQueryBlur')).toBe(true);
+    expect(Reflect.get(controller, 'blurRecheckTimer')).not.toBeNull();
+  });
 });
 
 describe('OverlayController renderer work ownership', () => {

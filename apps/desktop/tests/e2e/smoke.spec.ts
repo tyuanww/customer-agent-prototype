@@ -389,6 +389,8 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await expect(query.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
     await expect(query.getByTestId('question-input')).toBeFocused();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await waitForNativeFocus(app, 'query');
 
     const questionInput = query.getByTestId('question-input');
     await questionInput.fill(CLEANSER_QUERY);
@@ -472,8 +474,21 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await query.keyboard.press('Escape');
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
-      return snap.some((item) => item.role === 'query' && item.visible);
-    }).toBe(false);
+      const diagnostics = await app.evaluate(({ BrowserWindow }) => {
+        const harness = (globalThis as { __demoTest?: { getPhase: () => string } }).__demoTest;
+        const focused = BrowserWindow.getFocusedWindow();
+        return {
+          phase: harness?.getPhase() ?? 'missing',
+          focusedRole: focused?.webContents.getURL() ?? 'none',
+        };
+      });
+      return {
+        queryVisible: snap.some((item) => item.role === 'query' && item.visible),
+        queryFocused: snap.find((item) => item.role === 'query')?.focused ?? false,
+        phase: diagnostics.phase,
+        focusedRole: diagnostics.focusedRole,
+      };
+    }).toMatchObject({ queryVisible: false });
 
     const harnessPhase = await app.evaluate(() => {
       const harness = (globalThis as { __demoTest?: { expand: () => void; getPhase: () => string } })
@@ -492,6 +507,7 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       );
     }).toBe(true);
 
+    await waitForNativeFocus(app, 'query');
     await query.getByTestId('question-input').fill('收起后不应保留的临时问题');
     await app.evaluate(() => {
       const harness = (
@@ -508,6 +524,9 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       const snap = await windowSnapshot(app);
       return snap.some((item) => item.role === 'query' && item.visible);
     }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
 
     await app.evaluate(() => {
       const harness = (
@@ -523,13 +542,14 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await expect(query.getByTestId('question-input')).toHaveValue('');
 
     await query.keyboard.press('Escape');
-    await app.evaluate(() => {
-      const harness = (globalThis as { __demoTest?: { expand: () => void } }).__demoTest;
-      if (!harness) {
-        throw new Error('DEMO_E2E harness missing');
-      }
-      harness.expand();
-    });
+    await expect.poll(async () => {
+      const snap = await windowSnapshot(app);
+      return snap.some((item) => item.role === 'query' && item.visible);
+    }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await fox.getByTestId('fox-button').click();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'true');
     const shellRevealAnimation = await query.locator('.glass-shell').evaluate((shell) => {
       const animation = shell.getAnimations().find((candidate) => {
@@ -676,15 +696,15 @@ test('documents that globalShortcut is exercised via the same main harness, not 
       harness.expand();
       const opened = harness.getPhase();
       harness.dismiss();
-      const closed = harness.getPhase();
       return {
         opened,
-        closed,
         shortcutRegistered: harness.shortcutRegistered(),
       };
     });
     expect(info.opened).toBe('SEARCH_INPUT');
-    expect(info.closed).toBe('FOX_IDLE');
+    await expect.poll(() => app.evaluate(() => (
+      globalThis as { __demoTest?: { getPhase: () => string } }
+    ).__demoTest?.getPhase())).toBe('FOX_IDLE');
     await expect.poll(async () => {
       const windows = await windowSnapshot(app);
       return {
@@ -808,6 +828,8 @@ test('resizes the query window by result count in one session', async () => {
     }).toMatchObject({ width: 600, height: 88, focused: true, webContentsFocused: true });
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await expect(query.getByTestId('question-input')).toBeFocused();
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await waitForNativeFocus(app, 'query');
 
     const searchAndMeasure = async (text: string, cardCount: number) => {
       const input = query.getByTestId('question-input');
@@ -965,6 +987,7 @@ test('@float adopts a WindowServer stage boundary without hover/retract native d
     const fox = await waitForRole(app, 'fox');
     const query = await waitForRole(app, 'query');
     await waitForHarness(app);
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
     await app.evaluate(() => {
       const harness = (
         globalThis as { __demoTest?: { dockFox: (edge: 'left' | 'right') => void } }
@@ -1449,7 +1472,16 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
   try {
     const fox = await waitForRole(app, 'fox');
     await waitForHarness(app);
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
     const dockFox = async (targetEdge: 'left' | 'right') => {
+      await expect.poll(() => app.evaluate(() => {
+        const harness = (globalThis as {
+          __demoTest?: { getOverlaySnapshot: () => { drag: { session: unknown; settle: unknown } } };
+        }).__demoTest;
+        if (!harness) throw new Error('DEMO_E2E harness missing');
+        const { drag } = harness.getOverlaySnapshot();
+        return { dragging: drag.session !== null, settling: drag.settle !== null };
+      })).toEqual({ dragging: false, settling: false });
       await app.evaluate((_electron, edge) => {
         const harness = (
           globalThis as { __demoTest?: { dockFox: (edge: 'left' | 'right') => void } }

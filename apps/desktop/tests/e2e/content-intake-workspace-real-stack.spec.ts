@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication } from '@playwright/test';
+import { waitForFocusedWindow } from '../support/electron-focus';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
 const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
+
 for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, string][]) {
   test(`unified workspace reads the qualified ${domain} publication without legacy content adapters or Query selection coupling`, async () => {
     test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit synthetic PG15/Electron gate');
@@ -55,6 +57,7 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+      await waitForFocusedWindow(app, 'query');
       await query.getByRole('button', { name: '登录', exact: true }).click();
       await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
       await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();

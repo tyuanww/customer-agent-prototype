@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
 import { intakeQueryData } from '../fixtures/intake-query-data';
+import { waitForFocusedWindow } from '../support/electron-focus';
 import { closeOwnedElectron } from '../support/owned-electron';
 
 /** Actual Electron / preload / Main / HTTP / clipboard. The loopback service is
@@ -55,10 +56,16 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
+    await app.evaluate(({ app: electronApp }) => electronApp.focus({ steal: true }));
     await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await waitForFocusedWindow(app, 'query');
+    const loginWindowOpened = app.waitForEvent('window', { timeout: 30_000 });
     await query.getByRole('button', { name: '登录', exact: true }).click();
-    await expect.poll(() => app!.windows().some(w => w.url().includes('role=login'))).toBe(true);
-    await app.windows().find(w => w.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
+    const login = await loginWindowOpened;
+    await expect.poll(() => login.url()).toContain('role=login');
+    await login.getByRole('button', { name: '飞书登录' }).click();
     await query.getByRole('button', { name: '筛选', exact: true }).click();
     const shop = query.getByRole('combobox', { name: '当前店铺' });
     await expect.poll(async () => {

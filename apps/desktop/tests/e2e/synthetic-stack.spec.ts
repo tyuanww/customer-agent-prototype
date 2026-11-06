@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { waitForFocusedWindow } from '../support/electron-focus';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const repositoryRoot = fileURLToPath(new URL('../../../..', import.meta.url));
@@ -52,14 +53,16 @@ test('desktop client queries the running synthetic stack and copies a candidate'
       { timeout: 30_000 },
     ).toBe(true);
     const query = app.windows().find((window) => window.url().includes('role=query'))!;
+    await app.evaluate(({ app: electronApp }) => electronApp.focus({ steal: true }));
     await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await waitForFocusedWindow(app, 'query');
 
+    const loginWindowOpened = app.waitForEvent('window', { timeout: 30_000 });
     await query.getByRole('button', { name: '登录' }).click();
-    await expect.poll(
-      () => app!.windows().some((window) => window.url().includes('role=login')),
-      { timeout: 30_000 },
-    ).toBe(true);
-    const login = app.windows().find((window) => window.url().includes('role=login'))!;
+    const login = await loginWindowOpened;
+    await expect.poll(() => login.url()).toContain('role=login');
     await login.getByRole('button', { name: '飞书登录' }).click();
     await expect(query.getByRole('button', { name: /退出/ })).toBeVisible({ timeout: 30_000 });
     // Closing the login window can park the query overlay; reopen it before

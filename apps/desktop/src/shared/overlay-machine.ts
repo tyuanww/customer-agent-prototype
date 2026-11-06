@@ -1030,7 +1030,7 @@ export function applyOverlayEvent(
       if (!isOpenPlan(event)) {
         return rejected(state, 'invalid-event');
       }
-      if (state.phase !== 'parked') {
+      if (state.phase !== 'parked' && state.phase !== 'closing') {
         return ignored(state, 'no-transition');
       }
       if (state.drag.session || state.drag.settle) {
@@ -1315,14 +1315,32 @@ export function applyOverlayEvent(
       if (event.contentPhase === 'COPIED' && state.contentPhase !== 'RESULTS' && state.contentPhase !== 'COPIED') {
         return rejected(state, 'invalid-phase');
       }
+      const cancelledResize = event.contentPhase === 'COPIED' ? state.layout.resize : null;
       return applied(
         {
           ...state,
           contentPhase: event.contentPhase,
           resultCount: event.resultCount,
           contentRevision: event.contentRevision,
+          layout: cancelledResize
+            ? {
+                ...state.layout,
+                ackSequence: cancelledResize.lastSequence,
+                appliedHeight: cancelledResize.baselineHeight,
+                resize: null,
+              }
+            : state.layout,
         },
-        [{ type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: state.handoff.id }],
+        [
+          { type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: state.handoff.id },
+          ...(cancelledResize
+            ? [{
+                type: 'APPLY_RESIZE' as const,
+                height: cancelledResize.baselineHeight,
+                edge: cancelledResize.edge,
+              }]
+            : []),
+        ],
       );
     }
 
