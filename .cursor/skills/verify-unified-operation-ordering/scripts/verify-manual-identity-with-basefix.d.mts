@@ -5,7 +5,7 @@ export function resolveBaselineDependency(options?: Readonly<{
   commit: string;
   parent: string;
   testedHead: string;
-  relationship: 'not-ancestor';
+  relationship: 'ancestor' | 'not-ancestor';
   changedPaths: readonly string[];
   fileSha256: string;
   content: Buffer;

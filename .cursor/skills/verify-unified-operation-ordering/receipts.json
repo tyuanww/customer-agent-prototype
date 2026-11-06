@@ -1,8 +1,8 @@
 {
-  "syncCommit": "f8fd9fc3a16c4f88db106497c96d140b85b1a95e",
+  "syncCommit": "a49b272325b686ee50ae8c0c4992ebb2810eb943",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-05T09:02:45.562Z",
-  "sourceReceipt": "ae98f04bd3d25b9aba65a4ec6616d8aa5afe3d9e992da2e89502aa1442357857",
+  "capturedAt": "2026-11-06T05:03:58Z",
+  "sourceReceipt": "f1278ad1eb99ac3f39198e999b21b420a759c0d1095e45781542f4f94e4c637b",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,15 +29,15 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "ed63435bfe27a89fa90dde94981c3e27fed390ea29f8564ac85cdecd3cd193a4",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "74dd233a7cd479991591caf94e24e448227e9b4873295f8d0b0bfe40b3209acb",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "f309829841b127c6dd7a7f2d7b12a8477ae69903bff893b6cd69ba2e6bc18e93",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "dc844c2feee03d193a6b6606179110480e7e1301cbf3fb12df25119dd4329d54",
     ".cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts": "fcdfa52c01f2dd95b4ee758efc6d9100cc921b3ce611c3a0443b25204392e84a",
     ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "26e831b6adbab76b3b76971f5adac9b45b32c13719ad15890341641030307f8e",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts": "9a444747371e9b331d9e01c72b944fa9981d436c986d77dd3a973e4f8d8a8da9",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs": "9809e1bafaa567eb5ce619e05822b557322f2c11eb966e55db30e00c7d74bc2c",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts": "569e2712d95d0f6eac9fa57b8824fbb35a3be0d116a35d64b70f1cd5ec2dac38",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs": "7398352b06fedb7ca98140884a751d7e73c0a9eb355fe85f07f508c1a67714f9",
     "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
     "apps/api/src/content-intake/role-ceiling.ts": "8b8e472d4908f0f1283958a0f0e183577a85e9a11aa34bd0b4b9e93607733f74",
@@ -66,7 +66,7 @@
     "apps/api/tests/seat-login-flow.integration.test.ts": "88627a1f85c4e52e33e8c85dff429b2b9169d469b73aa86547754f9a5ec12d75",
     "apps/api/tests/support/authorization-sources-fixture.ts": "a6b0fea9c891a4b40f033eb9387906ebfdc43f36758d1e1e293b928a2a916246",
     "apps/api/tests/support/roster-library.ts": "e7e9254c80761c07bcc00034e8090ccfe2ddceadeeb0cb32e6ce024d2e8b973b",
-    "apps/api/tests/unified-operation-ordering-formal.test.ts": "1a44150d12e226f62926f4cbd640c100e40ec5ca3bef0cd7845864b118474902",
+    "apps/api/tests/unified-operation-ordering-formal.test.ts": "112c9c1e9393e189a885718c7f039defca04743f3aa8cfd63a7eaa4230eb5fac",
     "docs/reference-project-architecture.md": "cae88776465aa4f0758ba4b9f8f87bb7ea04c78cee47cd309388ee3f688ef839",
     "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
     "packages/database/migrations/0076_authorization_decision.sql": "a12f5ca4b05c394c3545788bf3cce8b2c6e5bcac0eeba17994e239a1d0dbc2d4",
@@ -91,7 +91,7 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "f8fd9fc3a16c4f88db106497c96d140b85b1a95e",
+  "testedSourceCommit": "a49b272325b686ee50ae8c0c4992ebb2810eb943",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
