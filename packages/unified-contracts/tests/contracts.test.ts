@@ -4,17 +4,28 @@ import {
   OPERATION_TRANSITIONS,
   classifyOperationReuse,
   parseAccessDecision,
+  parseAlertRecord,
+  parseEvaluationRecord,
   parseOperationEnvelope,
   parseOperationStatus,
   parseOverlaySnapshot,
   parseQueryOutcome,
+  parseQueryTelemetryRecord,
   parseReleaseSnapshot,
+  parseStageRecord,
+  parseTraceIdentity,
   toAdminAccessView,
   toDashboardSettingsView,
   toQueryAccessView,
   validateAccessDecision,
+  validateAlertRecord,
+  validateEvaluationRecord,
+  validateQueryTelemetryRecord,
   validateQueryOutcome,
+  validateStageRecord,
+  validateTraceIdentity,
 } from '../src/index.js';
+import type { QueryTelemetryRecord, StageRecord, TraceIdentity } from '../src/index.js';
 
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
@@ -554,5 +565,342 @@ describe('ReleaseSnapshot and OverlaySnapshot', () => {
     ]) {
       expect(() => parseOverlaySnapshot(value)).toThrow(ContractValidationError);
     }
+  });
+});
+
+function traceIdentity(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    requestId: 'request-1',
+    operationId: null,
+    queryId: 'query-1',
+    parentQueryId: null,
+    sessionEpoch: 7,
+    generation: 3,
+    releaseId: 'release-2',
+    kind: 'ordinary',
+    ...overrides,
+  };
+}
+
+function queryTelemetry(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    trace: traceIdentity(),
+    kind: 'ordinary',
+    releaseId: 'release-2',
+    queryFingerprint: HASH_A,
+    queryLength: 18,
+    intent: 'product',
+    ...overrides,
+  };
+}
+
+function stageRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    trace: traceIdentity(),
+    stage: 'recall',
+    startedAt: '2026-11-05T08:00:00Z',
+    durationMs: 12.5,
+    outcome: 'succeeded',
+    errorCode: null,
+    budgetClass: 'interactive',
+    external: false,
+    ...overrides,
+  };
+}
+
+function ordinaryEvaluation(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    kind: 'ordinary',
+    datasetId: 'synthetic-ordinary-eval',
+    datasetVersion: 3,
+    samples: 50,
+    metrics: {
+      recallAtK: 0.84,
+      topK: 3,
+      noHitCount: 8,
+      responseValidationFailureCount: 2,
+    },
+    errors: 1,
+    limiter: 'none',
+    ...overrides,
+  };
+}
+
+function sopEvaluation(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    kind: 'sop',
+    datasetId: 'synthetic-sop-eval',
+    datasetVersion: 2,
+    samples: 40,
+    metrics: {
+      matchedCount: 38,
+      validPathCount: 37,
+      validBranchCount: 36,
+      staleReleaseRejectedCount: 4,
+      unauthorizedResourceRejectedCount: 3,
+    },
+    errors: 0,
+    limiter: 'dataset-size',
+    ...overrides,
+  };
+}
+
+describe('Observability contracts', () => {
+  it('rejects impossible combinations in the static contract types', () => {
+    const trace = parseTraceIdentity(traceIdentity());
+    const query = parseQueryTelemetryRecord(queryTelemetry());
+    const stage = parseStageRecord(stageRecord({ outcome: 'cancelled' }));
+    // @ts-expect-error sessionEpoch and generation are a required pair.
+    const unpairedTrace: TraceIdentity = { ...trace, generation: null };
+    // @ts-expect-error SOP intent requires the SOP query variant.
+    const invalidIntent: QueryTelemetryRecord = { ...query, intent: 'sop' };
+    // @ts-expect-error successful stages cannot carry an error code.
+    const invalidStage: StageRecord = {
+      ...stage,
+      outcome: 'succeeded',
+      errorCode: 'RETRIEVAL_TIMEOUT',
+    };
+
+    expect([unpairedTrace, invalidIntent, invalidStage]).toHaveLength(3);
+  });
+
+  it('parses correlated ordinary and SOP traces without exposing user identity', () => {
+    const ordinary = traceIdentity();
+    const sop = traceIdentity({
+      requestId: 'request-2',
+      operationId: 'operation-2',
+      queryId: 'query-2',
+      parentQueryId: 'query-1',
+      releaseId: 'release-3',
+      kind: 'sop',
+    });
+
+    expect(parseTraceIdentity(ordinary)).toEqual(ordinary);
+    expect(parseTraceIdentity(sop)).toEqual(sop);
+    expect(parseQueryTelemetryRecord(queryTelemetry())).toEqual(queryTelemetry());
+    expect(parseQueryTelemetryRecord(queryTelemetry({
+      trace: sop,
+      kind: 'sop',
+      releaseId: 'release-3',
+      intent: 'sop',
+    }))).toMatchObject({ kind: 'sop', intent: 'sop' });
+    expect(parseStageRecord(stageRecord())).toEqual(stageRecord());
+    expect(parseStageRecord(stageRecord({
+      trace: sop,
+      stage: 'sop-path-expansion',
+    }))).toMatchObject({ stage: 'sop-path-expansion' });
+  });
+
+  it('rejects unknown keys and impossible trace identity combinations', () => {
+    for (const value of [
+      traceIdentity({ question: 'raw customer question' }),
+      { ...traceIdentity(), requestId: undefined },
+      traceIdentity({ operationId: 7 }),
+      traceIdentity({ parentQueryId: 'query-1' }),
+      traceIdentity({ sessionEpoch: 7, generation: null }),
+      traceIdentity({ sessionEpoch: null, generation: 3 }),
+      traceIdentity({ sessionEpoch: 0 }),
+      traceIdentity({ generation: -1 }),
+      traceIdentity({ requestId: 'x'.repeat(129) }),
+      traceIdentity({ kind: 'retrieval' }),
+    ]) {
+      expect(validateTraceIdentity(value).ok).toBe(false);
+    }
+  });
+
+  it('accepts only keyed query metadata and rejects every raw payload field', () => {
+    expect(parseQueryTelemetryRecord(queryTelemetry({
+      trace: traceIdentity({ releaseId: null }),
+    })).releaseId).toBe('release-2');
+
+    for (const value of [
+      queryTelemetry({ question: '什么时候发货' }),
+      queryTelemetry({ answer: '明天发货' }),
+      queryTelemetry({ candidateBody: 'raw candidate' }),
+      queryTelemetry({ sopMessage: 'raw SOP message' }),
+      queryTelemetry({ filePath: '/tmp/customer.csv' }),
+      queryTelemetry({ userId: 'user-1' }),
+      queryTelemetry({ orderId: 'order-1' }),
+      queryTelemetry({ placeholderValue: '张三' }),
+      queryTelemetry({ queryFingerprint: '问句原文' }),
+      queryTelemetry({ queryLength: 0 }),
+      queryTelemetry({ queryLength: 10_001 }),
+      queryTelemetry({ intent: 'free text' }),
+      queryTelemetry({ trace: traceIdentity({ kind: 'sop' }), kind: 'ordinary' }),
+      queryTelemetry({ releaseId: 'release-other' }),
+      queryTelemetry({ trace: traceIdentity({ kind: 'sop' }), kind: 'sop', intent: 'product' }),
+    ]) {
+      expect(validateQueryTelemetryRecord(value).ok).toBe(false);
+    }
+
+    const serialized = JSON.stringify([
+      parseQueryTelemetryRecord(queryTelemetry()),
+      parseQueryTelemetryRecord(queryTelemetry({
+        trace: traceIdentity({
+          requestId: 'request-sop',
+          queryId: 'query-sop',
+          kind: 'sop',
+        }),
+        kind: 'sop',
+        intent: 'sop',
+      })),
+    ]);
+    expect(serialized).not.toMatch(
+      /question|answer|candidateBody|sopMessage|filePath|userId|orderId|placeholderValue/u,
+    );
+  });
+
+  it('requires bounded finite stage timing and a consistent outcome', () => {
+    expect(parseStageRecord(stageRecord({ durationMs: 0 }))).toMatchObject({ durationMs: 0 });
+    expect(parseStageRecord(stageRecord({
+      outcome: 'failed',
+      errorCode: 'RETRIEVAL_TIMEOUT',
+      budgetClass: 'background',
+      external: true,
+    }))).toMatchObject({ outcome: 'failed', errorCode: 'RETRIEVAL_TIMEOUT' });
+
+    for (const value of [
+      stageRecord({ durationMs: -1 }),
+      stageRecord({ durationMs: Number.NaN }),
+      stageRecord({ durationMs: Number.POSITIVE_INFINITY }),
+      stageRecord({ durationMs: Number.NEGATIVE_INFINITY }),
+      stageRecord({ durationMs: 86_400_001 }),
+      stageRecord({ stage: 'unknown-stage' }),
+      stageRecord({ outcome: 'partial' }),
+      stageRecord({ budgetClass: 'unbounded' }),
+      stageRecord({ startedAt: 'not-a-time' }),
+      stageRecord({ startedAt: `2026-11-05T08:00:00.${'1'.repeat(64)}Z` }),
+      stageRecord({ errorCode: 'x'.repeat(65) }),
+      stageRecord({ outcome: 'succeeded', errorCode: 'RETRIEVAL_TIMEOUT' }),
+      stageRecord({ outcome: 'failed', errorCode: null }),
+      stageRecord({ trace: traceIdentity({ kind: 'sop' }), stage: 'recall' }),
+      stageRecord({ trace: traceIdentity(), stage: 'sop-match' }),
+      stageRecord({ payload: { raw: 'customer text' } }),
+    ]) {
+      expect(validateStageRecord(value).ok).toBe(false);
+    }
+  });
+
+  it('validates ordinary and SOP evaluation metrics against their dataset', () => {
+    expect(parseEvaluationRecord(ordinaryEvaluation())).toEqual(ordinaryEvaluation());
+    expect(parseEvaluationRecord(sopEvaluation())).toEqual(sopEvaluation());
+
+    for (const value of [
+      ordinaryEvaluation({ datasetId: '' }),
+      ordinaryEvaluation({ datasetVersion: 0 }),
+      ordinaryEvaluation({ samples: 0 }),
+      ordinaryEvaluation({ errors: 51 }),
+      ordinaryEvaluation({ limiter: 'free text' }),
+      ordinaryEvaluation({ metrics: {
+        recallAtK: 1.1,
+        topK: 3,
+        noHitCount: 8,
+        responseValidationFailureCount: 2,
+      } }),
+      ordinaryEvaluation({ metrics: {
+        recallAtK: Number.NaN,
+        topK: 3,
+        noHitCount: 8,
+        responseValidationFailureCount: 2,
+      } }),
+      ordinaryEvaluation({ metrics: {
+        recallAtK: 0.8,
+        topK: 3,
+        noHitCount: 51,
+        responseValidationFailureCount: 2,
+      } }),
+      ordinaryEvaluation({ metrics: sopEvaluation().metrics }),
+      sopEvaluation({ metrics: ordinaryEvaluation().metrics }),
+      sopEvaluation({ metrics: {
+        matchedCount: 38,
+        validPathCount: 37,
+        validBranchCount: 36,
+        staleReleaseRejectedCount: 4,
+      } }),
+      sopEvaluation({ rawAnswer: 'do not retain me' }),
+    ]) {
+      expect(validateEvaluationRecord(value).ok).toBe(false);
+    }
+  });
+
+  it('validates every alert variant and rejects contradictory alert shapes', () => {
+    const alerts = [
+      {
+        kind: 'budget_breach',
+        observedAt: '2026-11-05T08:00:00Z',
+        stage: 'rerank',
+        budgetClass: 'interactive',
+        percentile: 'p95',
+        thresholdMs: 100,
+        observedMs: 140.5,
+        sampleCount: 200,
+      },
+      {
+        kind: 'unknown_operation',
+        observedAt: '2026-11-05T08:00:00Z',
+        operationId: 'operation-unknown',
+        reasonCode: 'UNREGISTERED',
+      },
+      {
+        kind: 'dead_letter_growth',
+        observedAt: '2026-11-05T08:00:00Z',
+        queue: 'content-parse',
+        previousDepth: 2,
+        currentDepth: 5,
+      },
+      {
+        kind: 'stale_release',
+        observedAt: '2026-11-05T08:00:00Z',
+        trace: traceIdentity(),
+        expectedReleaseId: 'release-3',
+      },
+      {
+        kind: 'release_index_failure',
+        observedAt: '2026-11-05T08:00:00Z',
+        releaseId: 'release-2',
+        projection: 'content',
+        errorCode: 'INDEX_BUILD_FAILED',
+      },
+    ];
+    for (const alert of alerts) expect(parseAlertRecord(alert)).toEqual(alert);
+
+    for (const value of [
+      { ...alerts[0], observedMs: 99, thresholdMs: 100 },
+      { ...alerts[0], thresholdMs: Number.NaN },
+      { ...alerts[0], observedMs: Number.POSITIVE_INFINITY },
+      { ...alerts[0], thresholdMs: -1 },
+      { ...alerts[0], percentile: 'average' },
+      { ...alerts[0], observedAt: `2026-11-05T08:00:00.${'1'.repeat(64)}Z` },
+      { ...alerts[1], reasonCode: 'free text reason' },
+      { ...alerts[1], userId: 'user-1' },
+      { ...alerts[2], currentDepth: 2 },
+      { ...alerts[2], previousDepth: -1 },
+      { ...alerts[3], trace: traceIdentity({ releaseId: null }) },
+      { ...alerts[3], expectedReleaseId: 'release-2' },
+      { ...alerts[4], projection: 'overlay' },
+      { kind: 'unknown_alert', observedAt: '2026-11-05T08:00:00Z' },
+    ]) {
+      expect(validateAlertRecord(value).ok).toBe(false);
+    }
+  });
+
+  it('serializes every parsed observability record without raw payload keys', () => {
+    const records = [
+      parseQueryTelemetryRecord(queryTelemetry()),
+      parseStageRecord(stageRecord()),
+      parseEvaluationRecord(ordinaryEvaluation()),
+      parseEvaluationRecord(sopEvaluation()),
+      parseAlertRecord({
+        kind: 'unknown_operation',
+        observedAt: '2026-11-05T08:00:00Z',
+        operationId: 'operation-unknown',
+        reasonCode: 'UNREGISTERED',
+      }),
+    ];
+    const serialized = JSON.stringify(records);
+
+    expect(serialized).not.toMatch(
+      /question|answer|candidateBody|sopMessage|filePath|userId|orderId|placeholderValue/u,
+    );
   });
 });
