@@ -1,8 +1,8 @@
 {
-  "syncCommit": "84602e780298cc655d9a5c4139da026c5d992d13",
+  "syncCommit": "9e62397888a89a7edfdcf57fd71dca2b41e4bae3",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-06T05:28:40.447Z",
-  "sourceReceipt": "7f00db4580b4cbfbf340d460b0f44800911012ba0e7d8dc41d04f4705c74612f",
+  "capturedAt": "2026-11-06T05:39:23.991Z",
+  "sourceReceipt": "3714c26da0c2a8d53b736a52346492ba841cc64f819fb47e53d0e778292ca383",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,15 +29,15 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "c7f8378ea624378e4d87622e7c667edfd05920b754874a5b5610348a25b00799",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "690401372060b93843c95ba2f57f8473cff3df7befe646fb7b011eb4b277ca88",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
-    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "9094a0687e63489dff277dc35297e1870fc36a16ff73976b112aa5e0a0f513e3",
+    ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "ba501f04fe2279a0a2bc326191242ef0412ecfda832eb21e80c91f15ec9bee01",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs": "dc844c2feee03d193a6b6606179110480e7e1301cbf3fb12df25119dd4329d54",
     ".cursor/skills/verify-unified-operation-ordering/scripts/check.d.mts": "fcdfa52c01f2dd95b4ee758efc6d9100cc921b3ce611c3a0443b25204392e84a",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "867f8ceb17f36c94ff3b10621c1f3152648757f8aaca5973f4834f5f345c4e67",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts": "231006f70e354fb0612660fe419e249a441fc1dac1fb8f3f03024a294ee8bd37",
-    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs": "cda02776bf9f310bacaeef1635d47d41c04f0844ffdd59f732978acdceb5f524",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/check.mjs": "0ddc248130d3d46db978afbda691735a781f1c5622658dad0883bf1e55a6286c",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.d.mts": "b86e5c187e0cd3d661d4d2cac1f55f578d8b896ed5852927ab4e013cf4faf9c1",
+    ".cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs": "ae533ebe0a80b488a7e1a36c4a02b14be419862f811d2910f73dfdc545b951c7",
     "apps/api/src/auth-service.ts": "bab918fef86eb5598e31ba6dbced67a2d2ab60cdc5b3a80d054a3beeb2d30c89",
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
     "apps/api/src/content-intake/role-ceiling.ts": "8b8e472d4908f0f1283958a0f0e183577a85e9a11aa34bd0b4b9e93607733f74",
@@ -65,8 +65,8 @@
     "apps/api/tests/seat-login-flow.integration.test.ts": "88627a1f85c4e52e33e8c85dff429b2b9169d469b73aa86547754f9a5ec12d75",
     "apps/api/tests/support/authorization-sources-fixture.ts": "a6b0fea9c891a4b40f033eb9387906ebfdc43f36758d1e1e293b928a2a916246",
     "apps/api/tests/support/roster-library.ts": "e7e9254c80761c07bcc00034e8090ccfe2ddceadeeb0cb32e6ce024d2e8b973b",
-    "apps/api/tests/unified-operation-ordering-formal.test.ts": "f17a95c36d823f1e50450db6343c87a3963f00419d914732150fef3294c4b7b3",
-    "docs/reference-project-architecture.md": "716cef556f53dd2fcf30b84bd42b09ea6739506e52c16bf0b0125440b9e5e23d",
+    "apps/api/tests/unified-operation-ordering-formal.test.ts": "634cb8b27d7117cf2b4ba6105ef53073b08c69b0c7206197e41d5fd78eb4595f",
+    "docs/reference-project-architecture.md": "47d76e0b387b144cbd817dae0515a01b43db0acbdd6e8eaf4e6ca055dc7b88d7",
     "package.json": "4576aed834917541f4fc5524cb373c9bb97fc202b467e3d26f0bc768e3bdab20",
     "packages/database/migrations/0076_authorization_decision.sql": "a12f5ca4b05c394c3545788bf3cce8b2c6e5bcac0eeba17994e239a1d0dbc2d4",
     "packages/database/migrations/0077_manual_identity_grants.sql": "58585d257a3e164f3b8d6d3610792aad84b509543d476aa7d26a2bbe596ec35d",
@@ -90,21 +90,21 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "84602e780298cc655d9a5c4139da026c5d992d13",
+  "testedSourceCommit": "9e62397888a89a7edfdcf57fd71dca2b41e4bae3",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
   "verification": [
     {
-      "id": "ownership-regressions-before-fix",
+      "id": "combined-history-premise-check",
       "status": "FAIL_AS_EXPECTED_ON_BLOCKED_HEAD",
-      "result": "The combined tree at 52eba048 failed receipt verification because the unified manifest owned the BASEFIX test blob"
+      "result": "The combined tree at b799b25b failed because an ancestor BASEFIX file was reused after INT-SCHEMA added 0082 and 0083"
     },
     {
       "id": "unified-model",
       "command": "pnpm --filter @customer-agent/api exec vitest run tests/unified-operation-ordering-formal.test.ts",
       "status": "PASS",
-      "result": "20/20 tests; 1222 states; 5318 transitions; all 12 witnesses; 7/7 negative controls; standalone not-ancestor and combined ancestor ownership pass"
+      "result": "19/19 tests; 1222 states; 5318 transitions; all 12 witnesses; 7/7 negative controls; standalone overlay and combined tested-head modes pass"
     },
     {
       "id": "authorization-reachability",
@@ -125,12 +125,6 @@
       "result": "request-time model and real create/reset/disable replay passed; both mutations detected; password concurrency boundaries passed"
     },
     {
-      "id": "manual-identity-with-basefix",
-      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:unified-operation-ordering",
-      "status": "PASS",
-      "result": "standalone BASEFIX overlay passed 9 files and 38 tests; the checker bound the BASEFIX blob and exact count"
-    },
-    {
       "id": "api-integration",
       "command": "pnpm --filter @customer-agent/api test:integration",
       "status": "PASS",
@@ -146,7 +140,7 @@
       "id": "lint-typecheck-diff",
       "command": "pnpm lint && pnpm typecheck && git diff --check",
       "status": "PASS",
-      "result": "all three completed with exit 0 for source commit 84602e78 before evidence synchronization"
+      "result": "all three completed with exit 0 for source commit 9e623978 before evidence synchronization"
     }
   ]
 }
