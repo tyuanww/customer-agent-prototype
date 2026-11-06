@@ -21,6 +21,7 @@ import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
 } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -29,6 +30,7 @@ const openDashboard = vi.fn();
 const dismiss = vi.fn();
 const reportUiPhase = vi.fn();
 const reportHandoffMilestone = vi.fn();
+const reportOverlayEvent = vi.fn();
 const reportQueryLayout = vi.fn();
 const resizeQueryHeight = vi.fn();
 const moveFoxBy = vi.fn();
@@ -66,7 +68,38 @@ function activateQueryIfParked() {
   }
 }
 
-async function searchCleanser(user: ReturnType<typeof userEvent.setup>) {
+async function waitForInitialSnapshot() {
+  await waitFor(() => {
+    expect(screen.getByTestId('query-shell')).not.toHaveAttribute(
+      'data-window-generation',
+      '0',
+    );
+  });
+}
+
+function activeQuerySnapshot() {
+  const initial = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 2,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  });
+  return overlaySnapshot({
+    ...initial,
+    phase: 'active',
+    activeSurface: 'query',
+    focusIntent: 'query',
+    handoff: { ...initial.handoff, id: 1, sequence: 1, mode: 'none' },
+  });
+}
+
+async function searchCleanser(
+  user: ReturnType<typeof userEvent.setup>,
+  requireSnapshot = true,
+) {
+  if (requireSnapshot) {
+    await waitForInitialSnapshot();
+  }
   activateQueryIfParked();
   await user.type(screen.getByTestId('question-input'), '澄芽氨基酸洁面怎么用');
   await user.click(screen.getByTestId('search-button'));
@@ -82,6 +115,7 @@ describe('QueryApp', () => {
     dismiss.mockReset();
     reportUiPhase.mockReset();
     reportHandoffMilestone.mockReset();
+    reportOverlayEvent.mockReset();
     reportQueryLayout.mockReset();
     resizeQueryHeight.mockReset();
     moveFoxBy.mockReset();
@@ -93,6 +127,7 @@ describe('QueryApp', () => {
     sopEntryAvailable.mockResolvedValue(true);
     sopResumeAvailable.mockResolvedValue(false);
     reportHandoffMilestone.mockResolvedValue(undefined);
+    reportOverlayEvent.mockResolvedValue(null);
     reportQueryLayout.mockImplementation(async (request: {
       sessionId: number;
       sequence: number;
@@ -128,6 +163,21 @@ describe('QueryApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '',
       },
+      snapshot: overlaySnapshot((() => {
+        const initial = createInitialOverlayState({
+          sessionEpoch: 1,
+          generation: 2,
+          windowGeneration: 1,
+          releaseId: 'rel_synthetic',
+        });
+        return {
+          ...initial,
+          phase: 'active' as const,
+          activeSurface: 'query' as const,
+          focusIntent: 'query' as const,
+          handoff: { ...initial.handoff, id: 1, sequence: 1, mode: 'none' as const },
+        };
+      })()),
       testHarness: false,
     });
     window.customerAgent = {
@@ -138,6 +188,7 @@ describe('QueryApp', () => {
       dismiss,
       reportUiPhase,
       reportHandoffMilestone,
+      reportOverlayEvent,
       reportQueryLayout,
       resizeQueryHeight,
       moveFoxBy,
@@ -154,7 +205,7 @@ describe('QueryApp', () => {
           commandListeners.delete(handler);
         };
       },
-    };
+    } as typeof window.customerAgent;
   });
 
   function connectProduct(options: { noHit?: boolean; searchAllowed?: boolean } = {}) {
@@ -229,6 +280,145 @@ describe('QueryApp', () => {
     expect(before).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(refresh.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it('projects authoritative snapshots and ignores an older one', async () => {
+    render(<QueryApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 3,
+      generation: 8,
+      windowGeneration: 2,
+      releaseId: 'rel_synthetic',
+    });
+    const newer = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      contentPhase: 'RESULTS',
+      resultCount: 3,
+      generation: 9,
+      handoff: { ...base.handoff, id: 2, sequence: 2, mode: 'none' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: newer });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
+
+    const stale = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      contentPhase: 'ERROR',
+      generation: 8,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: stale });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
+  });
+
+  it('consumes the initial parked snapshot even when its handoff id is zero', async () => {
+    const parked = createInitialOverlayState({
+      sessionEpoch: 9,
+      generation: 10,
+      windowGeneration: 2,
+      releaseId: 'rel_synthetic',
+    });
+    getWindowContext.mockResolvedValue({
+      role: 'query',
+      phase: 'EMPTY',
+      platform: 'darwin',
+      shortcut: {
+        registered: true,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '',
+      },
+      snapshot: overlaySnapshot({
+        ...parked,
+        contentPhase: 'EMPTY',
+      }),
+      testHarness: false,
+    });
+
+    render(<QueryApp />);
+    await waitFor(() => {
+      expect(screen.getByTestId('query-shell')).toHaveAttribute('data-window-generation', '2');
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-handoff-id', '0');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'EMPTY');
+  });
+
+  it('clears stale height and layout readiness when a new opening has no applied layout', () => {
+    render(<QueryApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 3,
+      generation: 8,
+      windowGeneration: 2,
+      releaseId: 'rel_synthetic',
+    });
+    const activeWithHeight = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      contentPhase: 'RESULTS',
+      resultCount: 3,
+      contentRevision: 1,
+      generation: 9,
+      handoff: { ...base.handoff, id: 2, sequence: 2, mode: 'none' },
+      layout: {
+        ...base.layout,
+        sequence: 1,
+        ackSequence: 1,
+        handoffId: 2,
+        desiredHeight: 420,
+        appliedHeight: 420,
+      },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: activeWithHeight });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-query-height', '420');
+
+    const reopened = overlaySnapshot({
+      ...base,
+      phase: 'opening',
+      activeSurface: 'fox',
+      contentPhase: 'SEARCH_INPUT',
+      resultCount: 0,
+      contentRevision: 0,
+      generation: 10,
+      handoff: { ...base.handoff, id: 3, sequence: 3, mode: 'preparing-open' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: reopened });
+      }
+    });
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-query-height', '88');
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'false');
+  });
+
+  it('applies Main cancellation commands instead of treating session invalidation as display-only', () => {
+    connectProduct();
+    render(<QueryApp />);
+    const cancelSearch = window.customerAgent!.productSearch!.cancelSearch;
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'cancel-query', sessionEpoch: 1, generation: 2 });
+        listener({ type: 'cancel-copy', sessionEpoch: 1, generation: 2 });
+        listener({ type: 'clear-content' });
+      }
+    });
+
+    expect(cancelSearch).toHaveBeenCalledWith({ sessionEpoch: 1, generation: 2 });
+    expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
   });
 
   it('searches storewide after login without platform or product pickers', async () => {
@@ -338,6 +528,7 @@ describe('QueryApp', () => {
       f.contentUpdated.forEach(listener => listener({
         sessionEpoch: 10,
         releaseId: 'rel_25',
+        releaseSeq: 25,
         summary: '售前已更新（75 条）· 活动沿用 · 产品沿用 · 售后沿用',
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: ['presale'],
@@ -351,6 +542,11 @@ describe('QueryApp', () => {
     expect(banner).toHaveClass('is-muted');
     expect(banner).not.toHaveClass('is-invalid');
     expect(screen.queryByTestId('announce-banner')).not.toBeInTheDocument();
+    expect(reportOverlayEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'release-changed',
+      releaseId: 'rel_25',
+      releaseSequence: 25,
+    }));
     // 横幅可关：点「知道了」即已读并清掉。
     const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
     markRead.mockClear();
@@ -368,7 +564,7 @@ describe('QueryApp', () => {
     const markRead = window.customerAgent!.productAnnounce!.markRead as ReturnType<typeof vi.fn>;
     const fire = (domains: readonly string[]) => act(() => {
       f.contentUpdated.forEach(listener => listener({
-        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: domains as import('../../src/shared/library-delta').LibraryDomain[],
       }));
@@ -414,7 +610,7 @@ describe('QueryApp', () => {
       markRead.mockClear();
       act(() => {
         f.contentUpdated.forEach((listener) => listener({
-          sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+          sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
           domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
           unreadDomains: ['presale'],
         }));
@@ -437,7 +633,7 @@ describe('QueryApp', () => {
     await screen.findByRole('button', { name: /· 退出$/ });
     act(() => {
       f.contentUpdated.forEach(listener => listener({
-        sessionEpoch: 10, releaseId: 'rel_25', summary: null,
+        sessionEpoch: 10, releaseId: 'rel_25', releaseSeq: 25, summary: null,
         domainHashes: { product: 'p', campaign: 'c', presale: 's2', aftersale: 'a' },
         unreadDomains: ['presale'],
       }));
@@ -863,6 +1059,24 @@ describe('QueryApp', () => {
   it('arms the hidden shared-element frame before opening and accepts typing after a close/reopen', async () => {
     const user = userEvent.setup();
     render(<QueryApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 2,
+      windowGeneration: 1,
+      releaseId: 'rel_synthetic',
+    });
+    const beforeOpening = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      focusIntent: 'query',
+      handoff: { ...base.handoff, id: 10, sequence: 10, mode: 'none' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: beforeOpening });
+      }
+    });
     const shell = screen.getByTestId('query-shell');
     const input = screen.getByTestId('question-input');
     const clickedTransform = { a: 1.04, b: 0.08, c: -0.08, d: 1.04, e: 3, f: -4 };
@@ -879,6 +1093,18 @@ describe('QueryApp', () => {
         });
       }
     });
+    const opening11 = overlaySnapshot({
+      ...base,
+      phase: 'opening',
+      generation: 3,
+      contentPhase: 'SEARCH_INPUT',
+      handoff: { ...base.handoff, id: 11, sequence: 11, mode: 'preparing-open' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: opening11 });
+      }
+    });
     expect(shell).toHaveAttribute('data-parked', 'true');
     expect(shell).toHaveAttribute('data-opening', 'false');
     expect(shell.style.getPropertyValue('--query-handoff-fox-a')).toBe('1.04');
@@ -886,7 +1112,7 @@ describe('QueryApp', () => {
     expect(shell.style.getPropertyValue('--query-handoff-fox-e')).toBe('3');
     expect(shell.style.getPropertyValue('--query-handoff-fox-f')).toBe('-4');
     await waitFor(() =>
-      expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-armed'),
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-armed', expect.any(Object)),
     );
 
     act(() => {
@@ -898,7 +1124,7 @@ describe('QueryApp', () => {
     expect(shell).toHaveAttribute('data-opening', 'true');
     await waitFor(() => expect(input).toHaveFocus());
     dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-unfold');
-    expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-finished');
+    expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-finished', expect.any(Object));
 
     act(() => {
       for (const listener of commandListeners) {
@@ -913,10 +1139,25 @@ describe('QueryApp', () => {
         });
       }
     });
+    const closing12 = overlaySnapshot({
+      ...base,
+      phase: 'closing',
+      generation: 4,
+      activeSurface: 'query',
+      contentPhase: 'SEARCH_INPUT',
+      handoff: { ...base.handoff, id: 12, sequence: 12, mode: 'closing' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: closing12 });
+      }
+    });
     expect(input).not.toHaveFocus();
     dispatchAnimationEnd(document.querySelector('.glass-shell') as Element, 'query-shell-fold');
     expect(shell).toHaveAttribute('data-parked', 'true');
-    expect(reportHandoffMilestone).toHaveBeenCalledWith(12, 'close-finished');
+    await waitFor(() =>
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(12, 'close-finished', expect.any(Object)),
+    );
 
     act(() => {
       for (const listener of commandListeners) {
@@ -930,8 +1171,20 @@ describe('QueryApp', () => {
         });
       }
     });
+    const opening13 = overlaySnapshot({
+      ...base,
+      phase: 'opening',
+      generation: 5,
+      contentPhase: 'SEARCH_INPUT',
+      handoff: { ...base.handoff, id: 13, sequence: 13, mode: 'preparing-open' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: opening13 });
+      }
+    });
     await waitFor(() =>
-      expect(reportHandoffMilestone).toHaveBeenCalledWith(13, 'open-armed'),
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(13, 'open-armed', expect.any(Object)),
     );
     act(() => {
       for (const listener of commandListeners) {
@@ -941,6 +1194,73 @@ describe('QueryApp', () => {
     await waitFor(() => expect(input).toHaveFocus());
     await user.keyboard('重开立即输入');
     expect(input).toHaveValue('重开立即输入');
+  });
+
+  it('reports a queued handoff frame with the identity that matches the handoff', async () => {
+    render(<QueryApp />);
+    await waitFor(() => expect(getWindowContext).toHaveBeenCalledOnce());
+
+    const base = createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 2,
+      windowGeneration: 1,
+      releaseId: 'rel_synthetic',
+    });
+    const before = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      focusIntent: 'query',
+      handoff: { ...base.handoff, id: 10, sequence: 10, mode: 'none' },
+    });
+    const after = overlaySnapshot({
+      ...base,
+      phase: 'opening',
+      generation: 3,
+      handoff: { ...base.handoff, id: 11, sequence: 11, mode: 'preparing-open' },
+    });
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+
+    try {
+      act(() => {
+        for (const listener of commandListeners) {
+          listener({ type: 'overlay-snapshot', snapshot: before });
+          listener({
+            type: 'prepare-search',
+            handoffId: 11,
+            anchor: 'right',
+            handoffCenterX: 600,
+            handoffCenterY: 44,
+            foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
+          });
+          listener({ type: 'overlay-snapshot', snapshot: after });
+          listener({
+            type: 'activate-search',
+            handoffId: 11,
+            anchor: 'right',
+            animate: true,
+          });
+        }
+      });
+
+      act(() => {
+        for (const frame of frames.splice(0)) frame(performance.now());
+      });
+
+      const observed = reportOverlayEvent.mock.calls
+        .map(([event]) => event as { type: string; commandId?: number; generation?: number })
+        .find((event) => event.type === 'frame-observed' && event.commandId === 11);
+      expect(observed).toMatchObject({ generation: 3 });
+      expect(reportHandoffMilestone).toHaveBeenCalledWith(11, 'open-armed', expect.objectContaining({
+        generation: 3,
+      }));
+    } finally {
+      raf.mockRestore();
+    }
   });
 
   it('collapses when the capsule fox is clicked, but keeps drag as movement only', async () => {
@@ -1008,7 +1328,7 @@ describe('QueryApp', () => {
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('validation-error')).toHaveTextContent(EMPTY_QUERY_MESSAGE);
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
-    expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0);
+    expect(reportUiPhase).toHaveBeenCalledWith('SEARCH_INPUT', 0, expect.any(Object));
   });
 
   it('defaults smart retrieval ON and can turn it off without hiding the input', async () => {
@@ -1164,7 +1484,7 @@ describe('QueryApp', () => {
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-1')).toBeVisible();
     expect(screen.queryByTestId('script-card-2')).not.toBeInTheDocument();
-    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 1);
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 1, expect.any(Object));
 
     fireEvent.change(screen.getByTestId('question-input'), {
       target: { value: '澄芽洁面和雾屿精华能一起用吗' },
@@ -1172,14 +1492,14 @@ describe('QueryApp', () => {
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-2')).toBeVisible();
     expect(screen.queryByTestId('script-card-3')).not.toBeInTheDocument();
-    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 2);
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 2, expect.any(Object));
 
     fireEvent.change(screen.getByTestId('question-input'), {
       target: { value: '澄芽氨基酸洁面怎么用' },
     });
     await user.click(screen.getByTestId('search-button'));
     expect(await screen.findByTestId('script-card-3')).toBeVisible();
-    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 3);
+    expect(reportUiPhase).toHaveBeenCalledWith('RESULTS', 3, expect.any(Object));
     await waitFor(() => expect(reportQueryLayout).toHaveBeenCalled());
     const layoutRequest = reportQueryLayout.mock.calls.at(-1)?.[0] as {
       desiredHeight: number;
@@ -1307,6 +1627,7 @@ describe('QueryApp', () => {
 
   it('uses a synchronous single-flight guard for same-tick duplicate search submissions', async () => {
     render(<QueryApp />);
+    await waitForInitialSnapshot();
     const input = screen.getByTestId('question-input');
     fireEvent.change(input, { target: { value: '澄芽氨基酸洁面怎么用' } });
 
@@ -1376,7 +1697,11 @@ describe('QueryApp', () => {
     expect(input).toHaveValue('澄芽氨基酸洁面怎么用1');
     expect(screen.queryByTestId('result-list')).not.toBeInTheDocument();
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
-    expect(reportUiPhase).toHaveBeenLastCalledWith('SEARCH_INPUT', 0);
+    expect(reportUiPhase).toHaveBeenLastCalledWith(
+      'SEARCH_INPUT',
+      0,
+      expect.any(Object),
+    );
   });
 
   it('supports Numpad selection while blocking repeat, modifiers, and IME key events', async () => {
@@ -1466,7 +1791,7 @@ describe('QueryApp', () => {
     expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
     expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
-    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3);
+    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3, expect.any(Object));
   });
 
   it('shows a hairline 话术不准 control on query results', async () => {
@@ -1501,7 +1826,11 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(copyText).not.toHaveBeenCalled();
     expect(dismiss).not.toHaveBeenCalled();
-    expect(reportUiPhase).not.toHaveBeenCalledWith('COPIED', expect.anything());
+    expect(reportUiPhase).not.toHaveBeenCalledWith(
+      'COPIED',
+      expect.anything(),
+      expect.anything(),
+    );
     for (const phrase of FORBIDDEN_INACCURACY_STATUS_PHRASES) {
       expect(lead.textContent).not.toContain(phrase);
     }
@@ -1527,7 +1856,7 @@ describe('QueryApp', () => {
     expect(screen.queryByText('已发送')).not.toBeInTheDocument();
     expect(screen.queryByText('已采纳')).not.toBeInTheDocument();
     expect(screen.queryByText('已处理')).not.toBeInTheDocument();
-    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3);
+    expect(reportUiPhase).toHaveBeenCalledWith('COPIED', 3, expect.any(Object));
   });
 
   it('does not call copyAdopt when recording a local inaccuracy report', async () => {
@@ -1904,6 +2233,7 @@ describe('QueryApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '全局快捷键注册失败',
       },
+      snapshot: activeQuerySnapshot(),
       testHarness: false,
     });
     const offsetHeight = vi
@@ -1964,9 +2294,10 @@ describe('QueryApp', () => {
     render(<QueryApp />);
     await waitFor(() => expect(getWindowContext).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('shortcut-fallback')).not.toBeInTheDocument();
-    await searchCleanser(user);
+    await searchCleanser(user, false);
     expect(screen.getByTestId('copy-button-1')).toBeInTheDocument();
     expect(screen.getByTestId('question-input')).toBeEnabled();
+    expect(reportUiPhase).not.toHaveBeenCalled();
   });
 
   it('measures shortcut and ERROR banners as independent layout owners', async () => {
@@ -1979,6 +2310,7 @@ describe('QueryApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '全局快捷键注册失败',
       },
+      snapshot: activeQuerySnapshot(),
       testHarness: false,
     });
     copyText.mockResolvedValue({ ok: false, message: '复制失败，请重试' });
@@ -2202,8 +2534,22 @@ describe('QueryApp', () => {
   });
 
   function openQuerySession(handoffId: number) {
+    const base = createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 2,
+      windowGeneration: 1,
+      releaseId: 'rel_synthetic',
+    });
+    const snapshot = overlaySnapshot({
+      ...base,
+      phase: 'active',
+      activeSurface: 'query',
+      focusIntent: 'query',
+      handoff: { ...base.handoff, id: handoffId, sequence: handoffId, mode: 'none' },
+    });
     act(() => {
       for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot });
         listener({
           type: 'prepare-search',
           handoffId,

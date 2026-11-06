@@ -12,12 +12,12 @@ export default defineConfig({
     // not need a separate dist build before electron-vite.
     // dayjs subpath imports omit the .js extension. Electron's ESM loader
     // rejects them when the main bundle leaves dayjs external.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', '@customer-agent/job-roster', 'dayjs'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/contracts', '@customer-agent/content-intake', '@customer-agent/retrieval-core', '@customer-agent/job-roster', '@customer-agent/unified-contracts', 'dayjs'] })],
     resolve: {
       conditions: ['source'],
     },
     ssr: {
-      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake', '@customer-agent/job-roster'],
+      noExternal: ['@customer-agent/retrieval-core', '@customer-agent/content-intake', '@customer-agent/job-roster', '@customer-agent/unified-contracts'],
       resolve: {
         conditions: ['source'],
       },
@@ -34,12 +34,12 @@ export default defineConfig({
     // product-session pulls the roster through workbench-job. Bundle it.
     // A bare require fails in the unsigned package, and the query window
     // then never receives the open command.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster', '@customer-agent/unified-contracts'] })],
     resolve: {
       conditions: ['source'],
     },
     ssr: {
-      noExternal: ['@customer-agent/job-roster'],
+      noExternal: ['@customer-agent/job-roster', '@customer-agent/unified-contracts'],
       resolve: {
         conditions: ['source'],
       },

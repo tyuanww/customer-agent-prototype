@@ -7,6 +7,7 @@ import { FOX_RETRACT_DURATION_MS } from '../../src/shared/fox-motion';
 import { FOX_SLEEP_AFTER_MS } from '../../src/shared/fox-presence';
 import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const copyText = vi.fn();
 const getWindowContext = vi.fn();
@@ -51,6 +52,22 @@ function dispatchAnimationEnd(target: Element, animationName: string): void {
   fireEvent(target, event);
 }
 
+function renderFoxWithSnapshot() {
+  const view = render(<FoxApp />);
+  const snapshot = overlaySnapshot(createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 1,
+    windowGeneration: 1,
+    releaseId: 'rel_synthetic',
+  }));
+  act(() => {
+    for (const listener of commandListeners) {
+      listener({ type: 'overlay-snapshot', snapshot });
+    }
+  });
+  return view;
+}
+
 describe('FoxApp', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -76,6 +93,12 @@ describe('FoxApp', () => {
         accelerator: 'CommandOrControl+Shift+Space',
         message: '',
       },
+      snapshot: overlaySnapshot(createInitialOverlayState({
+        sessionEpoch: 1,
+        generation: 1,
+        windowGeneration: 1,
+        releaseId: 'rel_synthetic',
+      })),
       testHarness: false,
     });
     window.customerAgent = {
@@ -116,6 +139,170 @@ describe('FoxApp', () => {
     expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'paused');
     expect(screen.getByTestId('fox-idle')).toHaveClass('is-halo-paused');
     expect(screen.getByTestId('shortcut-fallback-dot')).toBeInTheDocument();
+  });
+
+  it('applies the authoritative snapshot and ignores an older window generation', () => {
+    render(<FoxApp />);
+    const base = createInitialOverlayState({
+      sessionEpoch: 2,
+      generation: 4,
+      windowGeneration: 3,
+      releaseId: 'rel_synthetic',
+    });
+    const newer = overlaySnapshot({
+      ...base,
+      fox: { edge: 'left', peekEpoch: 7, peekIntent: 'retract' },
+      generation: 5,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: newer });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'left');
+
+    const stale = overlaySnapshot({
+      ...base,
+      windowGeneration: 2,
+      fox: { ...base.fox, edge: 'right', peekEpoch: 8 },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: stale });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-dock-edge', 'left');
+  });
+
+  it('reports only with the originating authoritative snapshot identity', async () => {
+    getWindowContext.mockReturnValue(new Promise(() => {}));
+    render(<FoxApp />);
+    const fox = screen.getByTestId('fox-button');
+
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'fox-edge', edge: 'left', epoch: 1 });
+      }
+    });
+    fireEvent.pointerEnter(fox);
+    expect(setFoxPeek).not.toHaveBeenCalled();
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 41,
+      screenX: 10,
+      screenY: 10,
+      clientX: 10,
+      clientY: 10,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 41,
+      screenX: 48,
+      screenY: 36,
+      clientX: 48,
+      clientY: 36,
+    });
+    dispatchPointer(fox, 'pointerup', {
+      button: 0,
+      pointerId: 41,
+      screenX: 48,
+      screenY: 36,
+      clientX: 48,
+      clientY: 36,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-settling', 'false');
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'fox-drag-settled',
+          edge: 'left',
+          epoch: 2,
+          generation: 1,
+          settleId: 1,
+        });
+      }
+    });
+    expect(moveFoxBy).not.toHaveBeenCalled();
+    expect(commitFoxDragSettle).not.toHaveBeenCalled();
+
+    const authoritative = overlaySnapshot({
+      ...createInitialOverlayState({
+        sessionEpoch: 7,
+        generation: 11,
+        windowGeneration: 5,
+        releaseId: 'rel_synthetic',
+      }),
+      contentRevision: 6,
+      fox: { edge: 'left', peekEpoch: 9, peekIntent: 'retract' },
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'overlay-snapshot', snapshot: authoritative });
+      }
+    });
+    setFoxPeek.mockClear();
+    moveFoxBy.mockClear();
+
+    const authoritativeIdentity = {
+      sessionEpoch: 7,
+      generation: 11,
+      windowGeneration: 5,
+      contentRevision: 6,
+    };
+    fireEvent.pointerLeave(fox);
+    expect(setFoxPeek).toHaveBeenCalledWith('retract', 9, authoritativeIdentity);
+
+    dispatchPointer(fox, 'pointerdown', {
+      button: 0,
+      buttons: 1,
+      pointerId: 42,
+      screenX: 10,
+      screenY: 10,
+      clientX: 10,
+      clientY: 10,
+    });
+    dispatchPointer(fox, 'pointermove', {
+      button: 0,
+      buttons: 1,
+      pointerId: 42,
+      screenX: 48,
+      screenY: 36,
+      clientX: 48,
+      clientY: 36,
+    });
+    expect(moveFoxBy).toHaveBeenCalledWith(
+      38,
+      26,
+      false,
+      expect.any(Number),
+      authoritativeIdentity,
+    );
+    dispatchPointer(fox, 'pointerup', {
+      button: 0,
+      pointerId: 42,
+      screenX: 48,
+      screenY: 36,
+      clientX: 48,
+      clientY: 36,
+    });
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({
+          type: 'fox-drag-settled',
+          edge: 'left',
+          epoch: 10,
+          generation: 2,
+          settleId: 2,
+        });
+      }
+    });
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(2, authoritativeIdentity);
   });
 
   it('opens search on a click that is not a drag', async () => {
@@ -197,7 +384,7 @@ describe('FoxApp', () => {
   });
 
   it('drags the fox without opening search', async () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     fireEvent.pointerDown(fox, {
       button: 0,
@@ -226,14 +413,14 @@ describe('FoxApp', () => {
       clientY: 36,
     });
     await waitFor(() => {
-      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true, 1);
+      expect(moveFoxBy).toHaveBeenCalledWith(0, 0, true, 1, expect.any(Object));
     });
     expect(splitDragDelta(38, 26)).toEqual([{ dx: 38, dy: 26 }]);
     expect(openSearch).not.toHaveBeenCalled();
   });
 
   it('keeps screen coordinates continuous when dragging from physical x zero', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     dispatchPointer(fox, 'pointerdown', {
       button: 0,
@@ -254,11 +441,11 @@ describe('FoxApp', () => {
       clientY: 20,
     });
 
-    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false, 1);
+    expect(moveFoxBy).toHaveBeenCalledWith(6, 0, false, 1, expect.any(Object));
   });
 
   it('finishes a moved drag when a later pointermove reports buttons=0', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     dispatchPointer(fox, 'pointerdown', {
       button: 0,
@@ -288,7 +475,7 @@ describe('FoxApp', () => {
       clientY: 60,
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterRelease = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointermove', {
       button: 0,
@@ -305,7 +492,7 @@ describe('FoxApp', () => {
   });
 
   it('finishes a moved drag on lostpointercapture and ignores later moves', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     fireEvent.pointerDown(fox, {
       button: 0,
@@ -322,7 +509,7 @@ describe('FoxApp', () => {
     });
     fireEvent.lostPointerCapture(fox, { pointerId: 8 });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterCaptureLoss = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -335,7 +522,7 @@ describe('FoxApp', () => {
   });
 
   it('finishes a moved drag when the renderer window blurs', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     fireEvent.pointerDown(fox, {
       button: 0,
@@ -354,7 +541,7 @@ describe('FoxApp', () => {
       window.dispatchEvent(new Event('blur'));
     });
 
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     const callsAfterBlur = moveFoxBy.mock.calls.length;
     fireEvent.pointerMove(fox, {
       buttons: 1,
@@ -418,7 +605,7 @@ describe('FoxApp', () => {
   );
 
   it('finishes exactly once on pointercancel after the drag threshold and does not open search', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     dispatchPointer(fox, 'pointerdown', {
@@ -439,7 +626,7 @@ describe('FoxApp', () => {
     expect(moveFoxBy).toHaveBeenCalled();
     const callsAfterMove = moveFoxBy.mock.calls.length;
     dispatchPointer(fox, 'pointercancel', { pointerId: 27 });
-    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1);
+    expect(moveFoxBy).toHaveBeenLastCalledWith(0, 0, true, 1, expect.any(Object));
     expect(moveFoxBy.mock.calls.length).toBe(callsAfterMove + 1);
     expect(openSearch).not.toHaveBeenCalled();
     expect(idle).toHaveAttribute('data-fox-transient', 'none');
@@ -465,7 +652,7 @@ describe('FoxApp', () => {
       });
     });
     try {
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
       const idle = screen.getByTestId('fox-idle');
       dispatchPointer(fox, 'pointerdown', {
@@ -495,7 +682,7 @@ describe('FoxApp', () => {
         await Promise.resolve();
       });
       expect(idle).toHaveAttribute('data-dock-edge', 'right');
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(44);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(44, expect.any(Object));
       expect(openSearch).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -608,7 +795,7 @@ describe('FoxApp', () => {
         finishedResolvers.push(resolve);
       });
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
 
@@ -667,7 +854,7 @@ describe('FoxApp', () => {
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(idle).toHaveAttribute('data-dock-edge', 'left');
     expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
-    expect(commitFoxDragSettle).toHaveBeenCalledWith(71);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(71, expect.any(Object));
     expect(openSearch).not.toHaveBeenCalled();
   });
 
@@ -679,7 +866,7 @@ describe('FoxApp', () => {
         resolveAck = resolve;
       });
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     dispatchPointer(fox, 'pointerdown', {
@@ -720,7 +907,7 @@ describe('FoxApp', () => {
         resolveAck = resolve;
       });
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     dispatchPointer(fox, 'pointerdown', {
@@ -752,7 +939,7 @@ describe('FoxApp', () => {
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(idle).toHaveAttribute('data-dock-edge', 'right');
-    expect(commitFoxDragSettle).toHaveBeenCalledWith(20);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(20, expect.any(Object));
     expect(openSearch).not.toHaveBeenCalled();
   });
 
@@ -761,7 +948,7 @@ describe('FoxApp', () => {
       if (!finished) return Promise.resolve(null);
       return new Promise<FoxDragSettleAck | null>(() => undefined);
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     dispatchPointer(fox, 'pointerdown', {
@@ -794,7 +981,7 @@ describe('FoxApp', () => {
     });
 
     await waitFor(() => {
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(30);
+    expect(commitFoxDragSettle).toHaveBeenCalledWith(30, expect.any(Object));
     });
     expect(commitFoxDragSettle).toHaveBeenCalledTimes(1);
     expect(idle).toHaveAttribute('data-dock-edge', 'right');
@@ -806,7 +993,7 @@ describe('FoxApp', () => {
       if (!finished) return Promise.resolve(null);
       return new Promise<FoxDragSettleAck | null>(() => undefined);
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     dispatchPointer(fox, 'pointerdown', {
       button: 0,
@@ -847,7 +1034,7 @@ describe('FoxApp', () => {
     dispatchPointer(fox, 'pointerup', { button: 0, pointerId: 38, screenX: 24, screenY: 20 });
     await waitFor(() => {
       expect(openSearch).toHaveBeenCalledTimes(1);
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(31);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(31, expect.any(Object));
     });
   });
 
@@ -1013,7 +1200,7 @@ describe('FoxApp', () => {
   it('peeks on the first intentional edge entry and retracts after its exit motion', async () => {
     vi.useFakeTimers();
     try {
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
 
       fireEvent.pointerEnter(fox);
@@ -1026,7 +1213,7 @@ describe('FoxApp', () => {
       });
       fireEvent.pointerEnter(fox);
       fireEvent.pointerEnter(fox);
-      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 1);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 1, expect.any(Object));
       expect(setFoxPeek).toHaveBeenCalledTimes(1);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-peeking', 'true');
 
@@ -1040,7 +1227,7 @@ describe('FoxApp', () => {
         vi.advanceTimersByTime(FOX_RETRACT_DURATION_MS + 80);
         await Promise.resolve();
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 1);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 1, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
 
       act(() => {
@@ -1058,7 +1245,7 @@ describe('FoxApp', () => {
   it('cancels a delayed retract when a newer fox epoch arrives', () => {
     vi.useFakeTimers();
     try {
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
       act(() => {
         for (const listener of commandListeners) {
@@ -1076,7 +1263,7 @@ describe('FoxApp', () => {
       });
 
       expect(setFoxPeek).toHaveBeenCalledTimes(1);
-      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 10);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('peek', 10, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
     } finally {
       vi.useRealTimers();
@@ -1086,7 +1273,7 @@ describe('FoxApp', () => {
   it('cancels the retract timer when the pointer re-enters during the glide-back', () => {
     vi.useFakeTimers();
     try {
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
       act(() => {
         for (const listener of commandListeners) {
@@ -1106,8 +1293,8 @@ describe('FoxApp', () => {
 
       expect(setFoxPeek).toHaveBeenCalledTimes(2);
       expect(setFoxPeek.mock.calls).toEqual([
-        ['peek', 12],
-        ['peek', 12],
+        ['peek', 12, expect.any(Object)],
+        ['peek', 12, expect.any(Object)],
       ]);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-peeking', 'true');
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
@@ -1123,22 +1310,22 @@ describe('FoxApp', () => {
       value: vi.fn().mockReturnValue({ matches: true }),
     });
     try {
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
       act(() => {
         for (const listener of commandListeners) {
           listener({ type: 'fox-edge', edge: 'right', epoch: 13 });
         }
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 13);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 13, expect.any(Object));
       setFoxPeek.mockClear();
 
       fireEvent.pointerEnter(fox);
       fireEvent.pointerLeave(fox);
 
       expect(setFoxPeek.mock.calls).toEqual([
-        ['peek', 13],
-        ['retract', 13],
+        ['peek', 13, expect.any(Object)],
+        ['retract', 13, expect.any(Object)],
       ]);
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'false');
     } finally {
@@ -1229,7 +1416,7 @@ describe('FoxApp', () => {
             resolveRetract = resolve;
           }),
         );
-      render(<FoxApp />);
+      renderFoxWithSnapshot();
       const fox = screen.getByTestId('fox-button');
       act(() => {
         for (const listener of commandListeners) {
@@ -1245,7 +1432,7 @@ describe('FoxApp', () => {
           'fox-retract-left',
         );
       });
-      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 21);
+      expect(setFoxPeek).toHaveBeenLastCalledWith('retract', 21, expect.any(Object));
       expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-retracting', 'true');
 
       await act(async () => {
@@ -1822,7 +2009,7 @@ describe('FoxApp', () => {
   });
 
   it('starts a docked session from pointerdown and keeps net-outward gestures docked', () => {
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     act(() => {
@@ -1912,7 +2099,7 @@ describe('FoxApp', () => {
       Promise.resolve(finished
         ? { edge: 'left', epoch: 83, generation: 1, settleId: 83 }
         : null));
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     act(() => {
@@ -1983,7 +2170,7 @@ describe('FoxApp', () => {
         resolveFinished = resolve;
       });
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     const ring = screen.getByTestId('fox-focus-ring');
@@ -2052,7 +2239,7 @@ describe('FoxApp', () => {
         resolveFinished = resolve;
       });
     });
-    render(<FoxApp />);
+    renderFoxWithSnapshot();
     const fox = screen.getByTestId('fox-button');
     const idle = screen.getByTestId('fox-idle');
     act(() => {
@@ -2086,7 +2273,7 @@ describe('FoxApp', () => {
       resolveFinished?.({ edge: 'left', epoch: 95, generation: 1, settleId: 95 });
     });
     await waitFor(() => {
-      expect(commitFoxDragSettle).toHaveBeenCalledWith(95);
+      expect(commitFoxDragSettle).toHaveBeenCalledWith(95, expect.any(Object));
     });
     expect(idle).toHaveAttribute('data-fox-settling', 'false');
     expect(openSearch).not.toHaveBeenCalled();

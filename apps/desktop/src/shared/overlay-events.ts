@@ -1,4 +1,9 @@
-import { isOverlayPhase, type OverlayPhase } from './overlay-machine';
+import type { OverlayPhase, OverlaySnapshotProjection } from './overlay-machine';
+import { isOverlaySnapshotProjection } from './overlay-machine';
+import {
+  isOverlayReportIdentity,
+  isPositiveOverlayIdentityInteger,
+} from './overlay-report';
 import { isQueryLayoutAckCommand, type QueryLayoutAckCommand } from './query-layout';
 
 export type OverlayRole = 'fox' | 'query';
@@ -53,6 +58,18 @@ export type OverlayCommand =
   | { type: 'sync-fox-edge'; edge: FoxDockEdge; epoch: number }
   | ({ type: 'fox-drag-settled' } & FoxDragSettleAck)
   | { type: 'sync-query-anchor'; anchor: QueryAnchor }
+  | { type: 'overlay-snapshot'; snapshot: OverlaySnapshotProjection }
+  | {
+      type: 'cancel-query';
+      sessionEpoch: number;
+      generation: number;
+    }
+  | {
+      type: 'cancel-copy';
+      sessionEpoch: number;
+      generation: number;
+    }
+  | { type: 'clear-content' }
   | {
       type: 'shortcut-status';
       registered: boolean;
@@ -100,7 +117,60 @@ export type WindowContext = {
   phase: OverlayPhase;
   platform: string;
   shortcut: ShortcutStatus;
+  snapshot: OverlaySnapshotProjection;
   testHarness: boolean;
+};
+
+export const OVERLAY_EVENT_CHANNEL = 'overlay:event' as const;
+
+export type OverlayRendererEvent =
+  | {
+      type: 'session-changed';
+      sessionEpoch: number;
+      nextSessionEpoch: number;
+      releaseId: string;
+      windowGeneration: number;
+      generation: number;
+      contentRevision: number;
+    }
+  | {
+      type: 'release-changed';
+      releaseId: string;
+      sessionEpoch: number;
+      windowGeneration: number;
+      generation: number;
+      contentRevision: number;
+      releaseSequence: number;
+    }
+  | {
+      type: 'focus-changed';
+      focused: boolean;
+      sessionEpoch: number;
+      windowGeneration: number;
+      generation: number;
+      contentRevision: number;
+    }
+  | {
+      type: 'frame-observed';
+      commandId: number;
+      commandType: 'handoff' | 'layout' | 'settle';
+      target: OverlayRole;
+      sessionEpoch: number;
+      windowGeneration: number;
+      generation: number;
+      contentRevision: number;
+    }
+  | {
+      type: 'window-recreated';
+      sessionEpoch: number;
+      windowGeneration: number;
+      nextWindowGeneration: number;
+      generation: number;
+      contentRevision: number;
+    };
+
+export type OverlayControlApi = {
+  reportOverlayEvent: (event: OverlayRendererEvent) => Promise<OverlaySnapshotProjection | null>;
 };
 
 export const REPORTABLE_PHASES = [
@@ -120,7 +190,11 @@ export function isRendererRole(value: unknown): value is RendererRole {
 }
 
 export function isReportablePhase(value: unknown): value is ReportablePhase {
-  return isOverlayPhase(value) && value !== 'FOX_IDLE';
+  return value === 'SEARCH_INPUT'
+    || value === 'RESULTS'
+    || value === 'EMPTY'
+    || value === 'ERROR'
+    || value === 'COPIED';
 }
 
 export function isResultCount(value: unknown): value is ResultCount {
@@ -166,6 +240,9 @@ export function isHandoffMilestone(value: unknown): value is HandoffMilestone {
 
 export function isFoxVisualTransform(value: unknown): value is FoxVisualTransform {
   if (!value || typeof value !== 'object') {
+    return false;
+  }
+  if (Object.keys(value).length !== 6) {
     return false;
   }
   const matrix = value as Partial<FoxVisualTransform>;
@@ -267,6 +344,19 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
     const command = value as { anchor?: unknown };
     return command.anchor === 'left' || command.anchor === 'right';
   }
+  if (record.type === 'overlay-snapshot') {
+    return hasExactKeys(value, ['type', 'snapshot'])
+      && isOverlaySnapshotProjection((value as { snapshot?: unknown }).snapshot);
+  }
+  if (record.type === 'cancel-query' || record.type === 'cancel-copy') {
+    const command = value as { sessionEpoch?: unknown; generation?: unknown };
+    return hasExactKeys(value, ['type', 'sessionEpoch', 'generation'])
+      && isPositiveOverlayIdentityInteger(command.sessionEpoch)
+      && isPositiveOverlayIdentityInteger(command.generation);
+  }
+  if (record.type === 'clear-content') {
+    return hasExactKeys(value, ['type']);
+  }
   if (record.type === 'shortcut-status') {
     const status = value as {
       registered?: unknown;
@@ -280,6 +370,70 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
     );
   }
   return false;
+}
+
+export function isOverlayRendererEvent(value: unknown): value is OverlayRendererEvent {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const event = value as Partial<OverlayRendererEvent>;
+  const identity = {
+    sessionEpoch: event.sessionEpoch,
+    generation: event.generation,
+    windowGeneration: event.windowGeneration,
+    contentRevision: event.contentRevision,
+  };
+  if (!isOverlayReportIdentity(identity)) return false;
+  if (event.type === 'session-changed' || event.type === 'release-changed') {
+    const keys = event.type === 'session-changed'
+      ? ['type', 'sessionEpoch', 'nextSessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision']
+      : ['type', 'sessionEpoch', 'releaseId', 'windowGeneration', 'generation', 'contentRevision', 'releaseSequence'];
+    return hasExactKeys(value, keys)
+      && typeof event.releaseId === 'string'
+      && event.releaseId.length > 0
+      && (
+        event.type !== 'release-changed'
+        || (
+          Number.isSafeInteger(event.releaseSequence)
+          && (event.releaseSequence ?? -1) >= 0
+        )
+      )
+      && (
+        event.type !== 'session-changed'
+        || (
+          isPositiveOverlayIdentityInteger(event.nextSessionEpoch)
+          && event.nextSessionEpoch > (event.sessionEpoch ?? 0)
+        )
+      );
+  }
+  if (event.type === 'focus-changed') {
+    return hasExactKeys(value, ['type', 'focused', 'sessionEpoch', 'windowGeneration', 'generation', 'contentRevision'])
+      && typeof event.focused === 'boolean';
+  }
+  if (event.type === 'window-recreated') {
+    return hasExactKeys(value, ['type', 'sessionEpoch', 'windowGeneration', 'nextWindowGeneration', 'generation', 'contentRevision'])
+      && isPositiveOverlayIdentityInteger(event.nextWindowGeneration)
+      && event.nextWindowGeneration > (event.windowGeneration ?? 0);
+  }
+  return event.type === 'frame-observed'
+    && hasExactKeys(value, [
+      'type',
+      'commandId',
+      'commandType',
+      'target',
+      'sessionEpoch',
+      'windowGeneration',
+      'generation',
+      'contentRevision',
+    ])
+    && isHandoffId(event.commandId)
+    && (event.commandType === 'handoff' || event.commandType === 'layout' || event.commandType === 'settle')
+    && (event.target === 'fox' || event.target === 'query');
+}
+
+function hasExactKeys(value: object, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => actual.includes(key));
 }
 
 export function prepareSearchCommand(input: {

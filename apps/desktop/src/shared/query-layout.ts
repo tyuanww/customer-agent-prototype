@@ -1,6 +1,10 @@
 import type { ReportablePhase, ResultCount } from './overlay-events';
 import type { OverlayPhase } from './overlay-machine';
 import {
+  isOverlayReportIdentity,
+  type OverlayReportIdentity,
+} from './overlay-report';
+import {
   QUERY_INPUT_HEIGHT,
   QUERY_PANEL_MAX_HEIGHT,
   QUERY_PANEL_MIN_HEIGHT,
@@ -19,7 +23,7 @@ export const QUERY_RESIZE_STEP_LARGE = 24;
 export const QUERY_CONTENT_BLANK_TOLERANCE_PX = 12;
 export const QUERY_LAYOUT_FALLBACK_MS = 160;
 
-const QUERY_LAYOUT_KEYS = ['sessionId', 'sequence', 'phase', 'resultCount', 'desiredHeight'] as const;
+const QUERY_LAYOUT_KEYS = ['sessionId', 'sequence', 'phase', 'resultCount', 'desiredHeight', 'identity'] as const;
 const QUERY_LAYOUT_ACK_KEYS = [
   'ok',
   'sessionId',
@@ -38,9 +42,9 @@ const QUERY_LAYOUT_ACK_COMMAND_KEYS = [
   'height',
   'resizeEdge',
 ] as const;
-const QUERY_RESIZE_BEGIN_KEYS = ['type', 'sessionId', 'sequence'] as const;
-const QUERY_RESIZE_UPDATE_KEYS = ['type', 'sessionId', 'sequence', 'deltaY'] as const;
-const QUERY_RESIZE_KEYBOARD_KEYS = ['type', 'sessionId', 'sequence', 'key', 'shiftKey'] as const;
+const QUERY_RESIZE_BEGIN_KEYS = ['type', 'sessionId', 'sequence', 'identity'] as const;
+const QUERY_RESIZE_UPDATE_KEYS = ['type', 'sessionId', 'sequence', 'deltaY', 'identity'] as const;
+const QUERY_RESIZE_KEYBOARD_KEYS = ['type', 'sessionId', 'sequence', 'key', 'shiftKey', 'identity'] as const;
 
 function hasExactKeys(value: object, keys: readonly string[]): boolean {
   const actual = Object.keys(value);
@@ -57,6 +61,7 @@ export type QueryLayoutRequest = {
   phase: ReportablePhase;
   resultCount: ResultCount;
   desiredHeight: number;
+  identity: OverlayReportIdentity;
 };
 
 type QueryLayoutAckFields = {
@@ -87,17 +92,20 @@ export type QueryResizeRequest =
       type: 'begin';
       sessionId: number;
       sequence: number;
+      identity: OverlayReportIdentity;
     }
   | {
       type: 'update';
       sessionId: number;
       sequence: number;
       deltaY: number;
+      identity: OverlayReportIdentity;
     }
   | {
       type: 'end' | 'cancel';
       sessionId: number;
       sequence: number;
+      identity: OverlayReportIdentity;
     }
   | {
       type: 'keyboard';
@@ -105,6 +113,7 @@ export type QueryResizeRequest =
       sequence: number;
       key: QueryResizeKey;
       shiftKey: boolean;
+      identity: OverlayReportIdentity;
     };
 
 export function isQueryResizeEdge(value: unknown): value is QueryResizeEdge {
@@ -143,7 +152,8 @@ export function isQueryLayoutRequest(value: unknown): value is QueryLayoutReques
       record.resultCount === 1 ||
       record.resultCount === 2 ||
       record.resultCount === 3) &&
-    isFiniteQueryInteger(record.desiredHeight)
+    isFiniteQueryInteger(record.desiredHeight) &&
+    isOverlayReportIdentity(record.identity)
   );
 }
 
@@ -157,21 +167,28 @@ export function isQueryResizeRequest(value: unknown): value is QueryResizeReques
     record.type === 'end' ||
     record.type === 'cancel'
   ) {
-    const request = value as { sessionId?: unknown; sequence?: unknown };
+    const request = value as { sessionId?: unknown; sequence?: unknown; identity?: unknown };
     return (
       hasExactKeys(value, QUERY_RESIZE_BEGIN_KEYS) &&
       isQueryLayoutSessionId(request.sessionId) &&
-      isQueryLayoutSequence(request.sequence)
+      isQueryLayoutSequence(request.sequence) &&
+      isOverlayReportIdentity(request.identity)
     );
   }
   if (record.type === 'update') {
-    const request = value as { sessionId?: unknown; sequence?: unknown; deltaY?: unknown };
+    const request = value as {
+      sessionId?: unknown;
+      sequence?: unknown;
+      deltaY?: unknown;
+      identity?: unknown;
+    };
     return (
       hasExactKeys(value, QUERY_RESIZE_UPDATE_KEYS) &&
       isQueryLayoutSessionId(request.sessionId) &&
       isQueryLayoutSequence(request.sequence) &&
       isFiniteQueryInteger(request.deltaY) &&
-      Math.abs(request.deltaY) <= 4096
+      Math.abs(request.deltaY) <= 4096 &&
+      isOverlayReportIdentity(request.identity)
     );
   }
   if (record.type === 'keyboard') {
@@ -180,6 +197,7 @@ export function isQueryResizeRequest(value: unknown): value is QueryResizeReques
       sequence?: unknown;
       key?: unknown;
       shiftKey?: unknown;
+      identity?: unknown;
     };
     return (
       hasExactKeys(value, QUERY_RESIZE_KEYBOARD_KEYS) &&
@@ -189,7 +207,8 @@ export function isQueryResizeRequest(value: unknown): value is QueryResizeReques
         request.key === 'ArrowDown' ||
         request.key === 'Home' ||
         request.key === 'End') &&
-      typeof request.shiftKey === 'boolean'
+      typeof request.shiftKey === 'boolean' &&
+      isOverlayReportIdentity(request.identity)
     );
   }
   return false;
