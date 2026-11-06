@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "writeBoundary": [
+    "scripts/verification-policy.mjs",
+    "scripts/verification-policy.test.mjs",
+    "scripts/verification-dependencies.json",
+    "package.json",
+    ".github/workflows/ci-pr.yml",
+    ".github/workflows/ci.yml",
+    "docs/reference-engineering-workflow.md"
+  ],
+  "owners": [
+    {
+      "id": "repository-docs",
+      "paths": [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "README.md",
+        "PROJECT_CHARTER.md",
+        "CHANGELOG.md",
+        "TODOS.md",
+        "DESIGN.md",
+        "DEVELOPMENT_BRIEF.md",
+        "docs/**/*.md",
+        "evidence/**/*.md"
+      ],
+      "description": "Repository documentation and process references."
+    },
+    {
+      "id": "verification-tooling",
+      "paths": [
+        "scripts/verification-policy.mjs",
+        "scripts/verification-policy.test.mjs",
+        "scripts/verification-dependencies.json",
+        "package.json",
+        ".github/workflows/ci-pr.yml",
+        ".github/workflows/ci.yml"
+      ],
+      "description": "Verification policy, its tests, and workflow consumers."
+    },
+    {
+      "id": "contracts",
+      "paths": ["packages/contracts/**", "contracts/upstream/**"],
+      "description": "Contract sources, generated validators, and frozen inputs."
+    },
+    {
+      "id": "database",
+      "paths": ["packages/database/**"],
+      "description": "Database schema, migrations, and database test consumers."
+    },
+    {
+      "id": "api",
+      "paths": ["apps/api/**"],
+      "description": "Application API and its runtime consumers."
+    },
+    {
+      "id": "query",
+      "paths": ["packages/retrieval-core/**"],
+      "description": "Deterministic query and retrieval path."
+    },
+    {
+      "id": "sop",
+      "paths": ["packages/content-intake/**"],
+      "description": "SOP parsing and query path."
+    },
+    {
+      "id": "desktop",
+      "paths": ["apps/desktop/**"],
+      "description": "Desktop renderer, preload, main, and component tests."
+    },
+    {
+      "id": "job-roster",
+      "paths": ["packages/job-roster/**"],
+      "description": "Shared job roster consumed by API and desktop identity projections."
+    }
+  ],
+  "checks": {
+    "policy-tests": { "job": "precheck", "command": [["node","--test","scripts/verification-policy.test.mjs"]] },
+    "documentation": { "job": "precheck", "command": [["node","scripts/check-documentation.mjs"]] },
+    "lint": { "job": "quick", "command": [["pnpm","lint"]] },
+    "typecheck": { "job": "quick", "command": [["pnpm","typecheck"]] },
+    "architecture": { "job": "quick", "command": [["pnpm","check:architecture"]] },
+    "workspace-check": { "job": "quick", "command": [["pnpm","workspace:check"]] },
+    "workflow-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/database","build"],["pnpm","test:workflow"]] },
+    "desktop-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test"]] },
+    "overlay-unit": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test","--","overlay"]] },
+    "api-tests": { "job": "quick", "command": [["pnpm","test:api"]] },
+    "retrieval-core-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/retrieval-core","test"]] },
+    "query-api-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/api","test:search-decision"]] },
+    "sop-content-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/content-intake","test"]] },
+    "sop-api-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/api","exec","vitest","run","tests/content-intake-p1.test.ts"]] },
+    "sop-desktop-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test"]] },
+    "contracts-intake": { "job": "contracts", "command": [["pnpm","contracts:verify"]] },
+    "contracts-drift": { "job": "contracts", "command": [["pnpm","contracts:codegen:check"]] },
+    "contracts-tests": { "job": "contracts", "command": [["pnpm","test:contract"]] },
+    "contracts-consumer-api": { "job": "contracts", "command": [["pnpm","test:api"]] },
+    "contracts-consumer-desktop": { "job": "contracts", "command": [["pnpm","--filter","@customer-agent/desktop","test"]] },
+    "database-migrations": { "job": "database", "command": [["pnpm","db:migrations:check"]] },
+    "database-unit": { "job": "database", "command": [["pnpm","--filter","@customer-agent/database","test"]] },
+    "database-pg15": { "job": "database", "command": [["pnpm","test:db:integration"]] },
+    "database-backup-pg15": { "job": "database", "command": [["pnpm","test:backup:integration"]] },
+    "api-database-integration": { "job": "database", "command": [["pnpm","--filter","@customer-agent/api","test:integration"]] },
+    "identity-database-integration": { "job": "database", "command": [["pnpm","test:identity:integration"]] },
+    "api-database-e2e": { "job": "database", "command": [["pnpm","--filter","@customer-agent/api","test:e2e:backend"]] },
+    "overlay-electron": { "job": "electron", "command": [["pnpm","test:e2e:float"]] },
+    "windows-package": { "job": "windows", "command": [["pnpm","package:win"]] },
+    "linux-package": { "job": "linux", "command": [["pnpm","package:linux"]] }
+  },
+  "routes": [
+    {
+      "id": "repository-documents",
+      "owner": "repository-docs",
+      "paths": ["AGENTS.md", "CONTRIBUTING.md", "README.md", "PROJECT_CHARTER.md", "CHANGELOG.md", "TODOS.md", "DESIGN.md", "DEVELOPMENT_BRIEF.md", "docs/**/*.md", "evidence/**/*.md"],
+      "rules": true,
+      "checks": { "precheck": ["policy-tests", "documentation"] },
+      "liveLanes": [],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "verification-tooling",
+      "owner": "verification-tooling",
+      "paths": ["scripts/verification-policy.mjs", "scripts/verification-policy.test.mjs", "scripts/verification-dependencies.json", "package.json", ".github/workflows/ci-pr.yml", ".github/workflows/ci.yml"],
+      "rules": true,
+      "checks": { "precheck": ["policy-tests"], "quick": ["lint", "architecture", "workspace-check", "workflow-tests"] },
+      "liveLanes": ["workflow-consumer"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "contract-sources",
+      "owner": "contracts",
+      "paths": ["packages/contracts/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture"], "contracts": ["contracts-intake", "contracts-drift", "contracts-tests", "contracts-consumer-api", "contracts-consumer-desktop"] },
+      "liveLanes": ["contract-generation"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "contract-frozen-inputs",
+      "owner": "contracts",
+      "paths": ["contracts/upstream/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture"], "contracts": ["contracts-intake", "contracts-drift", "contracts-tests", "contracts-consumer-api", "contracts-consumer-desktop"] },
+      "liveLanes": ["contract-generation"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": [],
+      "fullFallbackReasons": [
+        { "code": "stale-contract-generated", "detail": "frozen contract input requires regeneration proof" },
+        { "code": "stale-database-generated", "detail": "contract input may change database consumers" }
+      ]
+    },
+    {
+      "id": "database-sources",
+      "owner": "database",
+      "paths": ["packages/database/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture"], "database": ["database-migrations", "database-unit", "database-pg15", "database-backup-pg15", "api-database-integration", "identity-database-integration", "api-database-e2e"] },
+      "liveLanes": [],
+      "databaseLanes": ["migration-generation", "postgres-15", "backup-restore", "api-integration", "backend-e2e"],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "api-sources",
+      "owner": "api",
+      "paths": ["apps/api/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture", "api-tests"] },
+      "liveLanes": ["api-runtime"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "query-sources",
+      "owner": "query",
+      "paths": ["packages/retrieval-core/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture", "retrieval-core-tests", "query-api-tests"] },
+      "liveLanes": ["query-content"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "sop-sources",
+      "owner": "sop",
+      "paths": ["packages/content-intake/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture", "sop-content-tests", "sop-api-tests", "sop-desktop-tests"] },
+      "liveLanes": ["sop-path"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "desktop-sources",
+      "owner": "desktop",
+      "paths": ["apps/desktop/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture", "desktop-tests"], "electron": ["overlay-electron"] },
+      "liveLanes": ["desktop-renderer"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "desktop-packaging",
+      "owner": "desktop",
+      "paths": [
+        "apps/desktop/package.json",
+        "apps/desktop/build/**",
+        "apps/desktop/scripts/package-*",
+        "apps/desktop/scripts/verify-*.mjs",
+        "apps/desktop/scripts/after-pack*",
+        "apps/desktop/scripts/finalize-*",
+        "apps/desktop/scripts/assert-main-bundle.mjs",
+        "apps/desktop/scripts/generate-app-icons.mjs",
+        "apps/desktop/scripts/mac-*.mjs",
+        "apps/desktop/scripts/node-system-ca.mjs",
+        "apps/desktop/scripts/write-build-identity.mjs"
+      ],
+      "checks": {
+        "quick": ["lint", "typecheck", "architecture", "desktop-tests"],
+        "windows": ["windows-package"],
+        "linux": ["linux-package"]
+      },
+      "liveLanes": [],
+      "databaseLanes": [],
+      "packagingLanes": ["windows-local-unsigned", "linux-local-unsigned"],
+      "generatedInputs": []
+    },
+    {
+      "id": "desktop-overlay",
+      "owner": "desktop",
+      "paths": ["apps/desktop/src/main/overlay-controller.ts", "apps/desktop/src/shared/overlay-machine.ts", "apps/desktop/src/main/overlay-chrome-window.ts"],
+      "checks": { "quick": ["architecture", "overlay-unit"], "electron": ["overlay-electron"] },
+      "liveLanes": ["overlay-native"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "job-roster-sources",
+      "owner": "job-roster",
+      "paths": ["packages/job-roster/**"],
+      "checks": { "quick": ["lint", "typecheck", "architecture", "api-tests", "desktop-tests"] },
+      "liveLanes": ["job-roster-consumers"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "contract-generated-output",
+      "owner": "contracts",
+      "paths": ["packages/contracts/openapi/bundle.generated.yaml", "packages/contracts/src/generated/**"],
+      "checks": { "quick": ["architecture"], "contracts": ["contracts-intake", "contracts-drift", "contracts-tests", "contracts-consumer-api", "contracts-consumer-desktop"] },
+      "liveLanes": ["contract-generation"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": ["contracts/upstream/**", "packages/contracts/scripts/generate-contracts.mjs", "packages/contracts/package.json"]
+    },
+    {
+      "id": "database-generated-output",
+      "owner": "database",
+      "paths": ["packages/database/migrations/manifest.generated.json", "packages/database/src/generated/**"],
+      "checks": { "quick": ["architecture"], "database": ["database-migrations", "database-unit", "database-pg15", "database-backup-pg15", "api-database-integration", "identity-database-integration", "api-database-e2e"] },
+      "liveLanes": [],
+      "databaseLanes": ["migration-generation", "postgres-15", "backup-restore", "api-integration", "backend-e2e"],
+      "packagingLanes": [],
+      "generatedInputs": ["contracts/upstream/**", "packages/database/scripts/generate-migrations.mjs", "packages/database/migrations/*.sql", "packages/database/overlays/**", "packages/database/rollbacks/**", "packages/database/seeds/**"]
+    },
+    {
+      "id": "api-generated-output",
+      "owner": "api",
+      "paths": ["apps/api/dist/**"],
+      "checks": { "quick": ["workspace-check", "architecture"] },
+      "liveLanes": ["api-runtime"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": ["apps/api/src/**", "apps/api/package.json", "apps/api/tsconfig.json", "apps/api/tsconfig.build.json"]
+    },
+    {
+      "id": "desktop-generated-output",
+      "owner": "desktop",
+      "paths": ["apps/desktop/out/**"],
+      "checks": { "quick": ["workspace-check", "architecture"] },
+      "liveLanes": ["desktop-renderer"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": ["apps/desktop/src/**", "apps/desktop/electron.vite.config.ts", "apps/desktop/package.json", "apps/desktop/tsconfig.json"]
+    }
+  ]
+}
