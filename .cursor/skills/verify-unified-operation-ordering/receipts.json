@@ -1,8 +1,8 @@
 {
-  "syncCommit": "5bfe8aa3d1fbb611f2301d153bbda8a8f188e1b8",
+  "syncCommit": "b1d54f1a5a86adba16f8786e0d510d8d0449b4c8",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-06T06:07:16.838Z",
-  "sourceReceipt": "926594d7b79df0c5dc157bd5f9f087093f197c8636a33a8cc471f4d63695f083",
+  "capturedAt": "2026-11-06T06:17:07.242Z",
+  "sourceReceipt": "b51ea8907d919e9d12ff6f1fa0d69072ad11469134ce6cc0951841d9858c592e",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,7 +29,7 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "41e8e0c5c87233445b751dd6f9e5e1c1e7d53b7c1a585bf313c9497c59cc9759",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "55c711a6d9493c385e6ac393cc7a42d604343c9440177363f5d417ccef66b7a2",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "ba501f04fe2279a0a2bc326191242ef0412ecfda832eb21e80c91f15ec9bee01",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
@@ -90,7 +90,7 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "5bfe8aa3d1fbb611f2301d153bbda8a8f188e1b8",
+  "testedSourceCommit": "b1d54f1a5a86adba16f8786e0d510d8d0449b4c8",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
@@ -129,7 +129,7 @@
       "id": "intake-desktop",
       "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test <eight real-stack spec files>",
       "status": "PASS",
-      "result": "11/11 passed with real Electron, HTTP and PostgreSQL 15; native query focus now gates every intake login click"
+      "result": "11/11 passed with real Electron, HTTP and PostgreSQL 15; native query focus gates every intake login click"
     },
     {
       "id": "electron-e2e",
