@@ -409,6 +409,16 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
+### OBS-01 观测机制
+
+`apps/api/src/observability/` 只拥有纯观测转换。`assembleTrace` 校验 ordinary 与 SOP 的阶段顺序、trace 关联、重复和迟到阶段，并汇总状态与时长。`summarizeLatency` 计算 p50、p95、p99、样本数、错误数和 warm/cold 标签。`buildAlertRecords` 只消费已经分类的预算、unknown operation、dead-letter、stale release 与 release-index 事实。`aggregateEvaluationPair` 先按冻结合同校验 ordinary 与 SOP 记录，再按固定 dataset ID/version 聚合。脱敏器移除未知字段，序列化器随后用合同 parser 重建 canonical 输出，因此未知字段不会进入序列化结果。
+
+`apps/desktop/src/main/observability/` 只把 copy、overlay 和 Dashboard 的稳定字段转换成合同 `StageRecord`。它不持有 Query、SOP、release、Dashboard 或授权状态。
+
+API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
+
+当前没有业务接线。INT-API 负责 request ID 和 API stage hooks，QRY-01 与 SOP-01 负责各自 pipeline stages，DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+
 ### 精确修复后继的版本接收（2026-10-12）
 
 治理 `export_customer_agent_repair_successor.mjs` 拥有批准记录、六件不可变冻结字节及 v6 八件导出包；累计 schema 只作参考，实际安装消费 upgrade。产品 `customer-agent-contract-set.mjs` 验证同一 Git 来源的批准/全部成员、39段前序及独立 `repair-contract-set.lock.json`，原主锁不变。合同生成器选择已验证 repair 快照；数据库生成器先重建并逐件比较原39段，再追加0040。runner 在0040事务内做前后物理校验及回执记账，COMMIT_UNKNOWN保留待恢复语义。治理来源提交379b793已正式导出，产品已接收独立repair锁与0040，生成合同的内容、ID、来源SHA及摘要统一取同一后继快照。接收状态VERIFIED_NOT_ACTIVATED；正式 HTTP/Main 和持久图片生产装配仍未开放。
