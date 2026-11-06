@@ -53,6 +53,10 @@
 
 BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retrieval-core/README.md)。桌面常量仍在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75`，标题权重 3、问法权重 2.5、正文权重 1，RRF `k=60`。分词用该包的单字+相邻二字，由适配层注入。查询分析槽在 `query-analyze.ts`，只扩展检索式，不映射某条标题。弃权停用词和 `1/(60+20)` 门槛留在 `retrieval-quality.ts`。
 
+SOP 查询使用独立 `SopPipeline`，不进入上面的内容 Top 3 管道。发布时冻结的场景分类词先判定 SOP 归属。命中后只按发布中唯一的严重性顺序处理冲突，并返回 ARC `SopFlow`。普通内容检索与 SOP 结果是互斥的 `QueryOutcome` 变体，不取并集。SOP 搜索投影已在发布事务内生成，查询不重建索引。缺少完整严重性顺序时返回显式 failure。决策节点等待坐席选择分支，系统不自动选择业务路径。
+
+桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。当前分支只提供 typed seam 和独立 Electron 验证，生产窗口与 preload 组合仍由 INT-DESKTOP 完成。
+
 ## 失败
 
 | 情况 | 坐席看到 |

@@ -1,9 +1,10 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts';
+import type { SopReleaseFacts } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { candidateContext, cancellationReceipt } from './candidate.js';
 import { assertSnapshotPageable } from './material.js';
-import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type Reason } from './transaction.js';
+import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type IntakeTransaction, type Reason } from './transaction.js';
 import { adoptPreviews } from './linked-preview.js';
 
 type C = components['schemas'];
@@ -18,6 +19,47 @@ function projectPublishedPreviews(value: C['IntakeOperationReceipt']): void {
   if (value.action === 'publish' && value.state === 'published' && value.releaseId) {
     adoptPreviews(value.key.candidateId, value.releaseId);
   }
+}
+
+export type SopReleasePublication = Readonly<{
+  releaseId: string;
+  factsHash: string;
+  indexHash: string;
+  itemCount: number;
+  state: 'inserted' | 'replayed';
+}>;
+
+/** This function must run in the same IntakeTransaction as content publication.
+ * The SQL function writes entity rows and the immutable projection in that
+ * transaction; a repeat with identical facts returns the original result. */
+export async function publishSopReleaseFacts(
+  client: Pick<IntakeTransaction, 'query'>,
+  facts: SopReleaseFacts,
+): Promise<SopReleasePublication> {
+  const { rows } = await client.query<{ value: unknown }>(
+    'SELECT content_intake.publish_sop_release_facts($1,$2::jsonb,$3::jsonb) AS value',
+    [facts.releaseId, JSON.stringify(facts), JSON.stringify(facts.projection)],
+  );
+  const value = rows[0]?.value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new IntakeRejection('MATERIAL_CHANGED');
+  }
+  const result = value as Record<string, unknown>;
+  if (result.releaseId !== facts.releaseId
+    || typeof result.factsHash !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(result.factsHash)
+    || result.indexHash !== facts.projection.indexHash
+    || result.itemCount !== facts.projection.itemCount
+    || (result.state !== 'inserted' && result.state !== 'replayed')) {
+    throw new IntakeRejection('MATERIAL_CHANGED');
+  }
+  return {
+    releaseId: facts.releaseId,
+    factsHash: result.factsHash,
+    indexHash: facts.projection.indexHash,
+    itemCount: facts.projection.itemCount,
+    state: result.state,
+  };
 }
 
 /** The private DB publisher reports only existing typed rejection reasons. Other
