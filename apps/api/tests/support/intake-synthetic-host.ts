@@ -65,6 +65,10 @@ type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['In
 type SyntheticProfile = 'existing' | 'purpose-runtime';
 type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean };
 
+export function requiresAccessEvaluatorOverlay(migrations: readonly Readonly<{ id: string }>[]): boolean {
+  return !migrations.some(({ id }) => id === '0082_access_evaluator');
+}
+
 type AdjacentLoopbackPortReservation = Readonly<{
   apiPort: number;
   identityPort: number;
@@ -229,17 +233,20 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin);
-    await admin.query('BEGIN');
-    try {
-      await admin.query(readFileSync(fileURLToPath(new URL(
-        '../../../../packages/database/overlays/0082_access_evaluator.sql',
-        import.meta.url,
-      )), 'utf8'));
-      await admin.query('COMMIT');
-    } catch (error) {
-      await admin.query('ROLLBACK');
-      throw error;
+    admin = await pg.connect(database.config);
+    const migrations = await applyDatabaseMigrations(admin);
+    if (requiresAccessEvaluatorOverlay(migrations.after.applied)) {
+      await admin.query('BEGIN');
+      try {
+        await admin.query(readFileSync(fileURLToPath(new URL(
+          '../../../../packages/database/overlays/0082_access_evaluator.sql',
+          import.meta.url,
+        )), 'utf8'));
+        await admin.query('COMMIT');
+      } catch (error) {
+        await admin.query('ROLLBACK');
+        throw error;
+      }
     }
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
