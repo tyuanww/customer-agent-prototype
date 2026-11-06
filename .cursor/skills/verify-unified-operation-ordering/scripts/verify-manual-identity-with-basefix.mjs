@@ -9,19 +9,29 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = path.resolve(scriptDirectory, '../../../..');
-const defaultBaselineCommit = '1de1847bdc139fa1665ea36c51329a110460bd7b';
-const seatLifecyclePath = 'apps/api/tests/seat-lifecycle.integration.test.ts';
-const manualIdentityTests = Object.freeze([
-  'tests/manual-identity-grants.integration.test.ts',
-  'tests/manual-identity-property.test.ts',
-  'tests/project-roster-login.integration.test.ts',
-  'tests/roster-authority.integration.test.ts',
-  'tests/a6-permission-e2e.integration.test.ts',
-  'tests/p0-live-lanes.integration.test.ts',
-  'tests/feishu-login-link.integration.test.ts',
-  'tests/seat-login-flow.integration.test.ts',
-  'tests/seat-lifecycle.integration.test.ts',
-]);
+
+export const BASEFIX_DEPENDENCY = Object.freeze({
+  id: 'BASEFIX-01',
+  commit: '1de1847bdc139fa1665ea36c51329a110460bd7b',
+  file: Object.freeze({
+    path: 'apps/api/tests/seat-lifecycle.integration.test.ts',
+    sha256: 'd2f59d9829cf25a741e1017264a3ef75ffbc7fc14aaef7e1316b4a0ae50c2ab8',
+  }),
+  manualIdentity: Object.freeze({
+    testFiles: Object.freeze([
+      'tests/manual-identity-grants.integration.test.ts',
+      'tests/manual-identity-property.test.ts',
+      'tests/project-roster-login.integration.test.ts',
+      'tests/roster-authority.integration.test.ts',
+      'tests/a6-permission-e2e.integration.test.ts',
+      'tests/p0-live-lanes.integration.test.ts',
+      'tests/feishu-login-link.integration.test.ts',
+      'tests/seat-login-flow.integration.test.ts',
+      'tests/seat-lifecycle.integration.test.ts',
+    ]),
+    expected: Object.freeze({ testFiles: 9, tests: 38 }),
+  }),
+});
 
 function git(repositoryRoot, args, options = {}) {
   return execFileSync('git', ['-C', repositoryRoot, ...args], {
@@ -39,14 +49,17 @@ function commandFailure(label, result) {
 
 export function resolveBaselineDependency({
   repositoryRoot = defaultRepositoryRoot,
-  commit = defaultBaselineCommit,
+  dependency = BASEFIX_DEPENDENCY,
+  testedHead: suppliedTestedHead = null,
 } = {}) {
+  const { commit } = dependency;
   try {
     git(repositoryRoot, ['cat-file', '-e', `${commit}^{commit}`]);
   } catch {
     throw new Error(`BASEFIX commit is not readable: ${commit}`);
   }
-  const testedHead = git(repositoryRoot, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
+  const testedHead = suppliedTestedHead
+    ?? git(repositoryRoot, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
   const parent = git(repositoryRoot, ['rev-parse', '--verify', `${commit}^`]).trim();
   const parentAncestor = spawnSync('git', [
     '-C', repositoryRoot, 'merge-base', '--is-ancestor', parent, testedHead,
@@ -60,19 +73,42 @@ export function resolveBaselineDependency({
   const relationship = baselineAncestor ? 'ancestor' : 'not-ancestor';
   const changedPaths = git(repositoryRoot, ['diff', '--name-only', parent, commit])
     .trim().split('\n').filter(Boolean);
-  if (changedPaths.length !== 1 || changedPaths[0] !== seatLifecyclePath) {
-    throw new Error(`BASEFIX must change only ${seatLifecyclePath}, actual: ${changedPaths.join(', ')}`);
+  if (changedPaths.length !== 1 || changedPaths[0] !== dependency.file.path) {
+    throw new Error(`BASEFIX must change only ${dependency.file.path}, actual: ${changedPaths.join(', ')}`);
   }
-  const content = git(repositoryRoot, ['show', `${commit}:${seatLifecyclePath}`], { encoding: 'buffer' });
+  const content = git(repositoryRoot, ['show', `${commit}:${dependency.file.path}`], { encoding: 'buffer' });
+  const fileSha256 = createHash('sha256').update(content).digest('hex');
+  if (fileSha256 !== dependency.file.sha256) {
+    throw new Error(`BASEFIX file hash does not match ${dependency.id}`);
+  }
+  if (relationship === 'ancestor') {
+    const testedContent = git(repositoryRoot, ['show', `${testedHead}:${dependency.file.path}`], {
+      encoding: 'buffer',
+    });
+    const testedFileSha256 = createHash('sha256').update(testedContent).digest('hex');
+    if (testedFileSha256 !== dependency.file.sha256) {
+      throw new Error(`${dependency.file.path} changed after ${dependency.id}`);
+    }
+  }
   return Object.freeze({
+    dependency,
     commit,
     parent,
     testedHead,
     relationship,
     changedPaths: Object.freeze(changedPaths),
-    fileSha256: createHash('sha256').update(content).digest('hex'),
+    fileSha256,
     content,
   });
+}
+
+export function assertBaselineOwnedFileExcluded(
+  sourceFiles,
+  dependency = BASEFIX_DEPENDENCY,
+) {
+  if (sourceFiles.includes(dependency.file.path)) {
+    throw new Error(`unified source must not own BASEFIX file: ${dependency.file.path}`);
+  }
 }
 
 function workspaceNodeModules(repositoryRoot) {
@@ -109,7 +145,7 @@ export function createIntegrationTree({
       mkdirSync(path.dirname(destination), { recursive: true });
       symlinkSync(path.join(repositoryRoot, relative), destination, 'dir');
     }
-    writeFileSync(path.join(root, seatLifecyclePath), baseline.content);
+    writeFileSync(path.join(root, baseline.dependency.file.path), baseline.content);
     return root;
   } catch (error) {
     rmSync(root, { recursive: true, force: true });
@@ -117,26 +153,32 @@ export function createIntegrationTree({
   }
 }
 
-export function assertManualIdentityResult(result) {
+export function assertManualIdentityResult(
+  result,
+  expected = BASEFIX_DEPENDENCY.manualIdentity.expected,
+) {
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout.toString('utf8') : String(result.stdout ?? '');
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr.toString('utf8') : String(result.stderr ?? '');
   if (result.status !== 0 || result.error) {
     throw new Error(`manual identity command failed${result.error ? `: ${result.error.message}` : ''}\n${stderr || stdout}`);
   }
-  const files = stdout.match(/Test Files\s+9 passed \(9\)/u);
-  const tests = stdout.match(/Tests\s+38 passed \(38\)/u);
+  const files = stdout.match(new RegExp(`Test Files\\s+${expected.testFiles} passed \\(${expected.testFiles}\\)`, 'u'));
+  const tests = stdout.match(new RegExp(`Tests\\s+${expected.tests} passed \\(${expected.tests}\\)`, 'u'));
   if (!files || !tests) {
-    throw new Error(`manual identity command did not report 9 files / 38 tests\n${stdout || stderr}`);
+    throw new Error(
+      `manual identity command did not report ${expected.testFiles} files / ${expected.tests} tests\n${stdout || stderr}`,
+    );
   }
-  return Object.freeze({ testFiles: 9, tests: 38 });
+  return Object.freeze({ testFiles: expected.testFiles, tests: expected.tests });
 }
 
 export function runManualIdentityVerification({
   repositoryRoot = defaultRepositoryRoot,
-  baselineCommit = defaultBaselineCommit,
+  dependency = BASEFIX_DEPENDENCY,
+  testedHead = null,
   commandRunner = spawnSync,
 } = {}) {
-  const baseline = resolveBaselineDependency({ repositoryRoot, commit: baselineCommit });
+  const baseline = resolveBaselineDependency({ repositoryRoot, dependency, testedHead });
   const integrationRoot = createIntegrationTree({ repositoryRoot, baseline });
   const startedAt = Date.now();
   try {
@@ -149,7 +191,7 @@ export function runManualIdentityVerification({
     };
     const vitest = path.join(repositoryRoot, 'apps/api/node_modules/vitest/vitest.mjs');
     const result = commandRunner(process.execPath, [
-      vitest, 'run', ...manualIdentityTests,
+      vitest, 'run', ...dependency.manualIdentity.testFiles,
     ], {
       cwd: path.join(integrationRoot, 'apps/api'),
       env: environment,
@@ -157,9 +199,9 @@ export function runManualIdentityVerification({
       maxBuffer: 32 * 1024 * 1024,
       timeout: 180_000,
     });
-    const counts = assertManualIdentityResult(result);
+    const counts = assertManualIdentityResult(result, dependency.manualIdentity.expected);
     return Object.freeze({
-      schemaVersion: 'for-manual-identity-basefix-evidence/v1',
+      schemaVersion: 'for-manual-identity-basefix-evidence/v2',
       testedHead: baseline.testedHead,
       baselineCommit: baseline.commit,
       baselineParent: baseline.parent,
@@ -167,9 +209,9 @@ export function runManualIdentityVerification({
       changedPaths: baseline.changedPaths,
       patchedFileSha256: baseline.fileSha256,
       integrationTree: baseline.relationship === 'ancestor'
-        ? 'tested head already contains BASEFIX'
-        : 'temporary git archive; only BASEFIX blob replaced',
-      command: `${process.execPath} ${vitest} run ${manualIdentityTests.join(' ')}`,
+        ? 'reuse-ancestor'
+        : 'overlay-baseline',
+      command: `${process.execPath} ${vitest} run ${dependency.manualIdentity.testFiles.join(' ')}`,
       testFiles: counts.testFiles,
       tests: counts.tests,
       durationMs: Date.now() - startedAt,
