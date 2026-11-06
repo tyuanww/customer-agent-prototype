@@ -171,6 +171,9 @@ const POLICY_RESTAMP_TRIGGER_ENTRIES = 115;
 const POLICY_RESTAMP_TRIGGER_SHA256 = 'e0ada9745e2ec896720284fdc415176aa2e3162dcdd335538dbbe787d642302b';
 const CURRENT_IMPORT_BATCH_TRIGGER_SHA256 = '92be2db46447f1ed44d1ceefd2820d5a8132e3544be46b03d30f9d019f498cfd';
 const CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = '5adc531fbc48161b54528d999affab3085f5343584a4b11f4c30db2fb7c651c9';
+const SOP_TRIGGER_ENTRIES = 124;
+const SOP_TRIGGER_SHA256 = '8b647176cc37c9832288f38a462c3553824309dec122bfb894b3354177059c9b';
+const SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = 'd60a11a6928e9c1d8fc063503bbeec9ae4c0a2323c4799792a3abed581eeca34';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
   'public.import_batches|import_batches_restore_snapshots|public.trg_restore_snapshots_on_import_failed()|17|',
@@ -930,6 +933,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === 116
     && expectedTriggerSha === CURRENT_IMPORT_BATCH_TRIGGER_SHA256
+  ) || (
+    expectedTriggerEntries === SOP_TRIGGER_ENTRIES
+    && expectedTriggerSha === SOP_TRIGGER_SHA256
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -952,8 +958,11 @@ async function verifyCatalogueState(
       && trigger.entries === expectedTriggerEntries
       && explained.disabledTriggers.length > 0
       && (explained.sha256 === expectedTriggerSha
-        || (catalogue.migrations.length === 80
-          && triggerSha === CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
+        || (catalogue.migrations.length >= 80
+          && catalogue.migrations.length <= 82
+          && triggerSha === CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256)
+        || (catalogue.migrations.length === 83
+          && triggerSha === SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
@@ -1151,6 +1160,8 @@ const READINESS_SUFFIX = [
   { length: 79, index: 78, id: '0079_directory_identity_activity' },
   { length: 80, index: 79, id: '0080_bind_import_batch_tenant' },
   { length: 81, index: 80, id: '0081_require_import_batch_principal' },
+  { length: 82, index: 81, id: '0082_access_evaluator' },
+  { length: 83, index: 82, id: '0083_sop_pipeline_projection' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1227,6 +1238,8 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   79: { tables: 111, functions: 300, objectEntries: 3444, objectSha256: '43b61731970b249e58fcb03a1e64cd05cc030df93e5d38b918a158dbf3175c6d', functionEntries: 300, functionSha256: '1040ddfdfd2d0c093c28532fff035c0f1ce20467d0328bcf95bc1e0353de5b2d', triggerEntries: POLICY_RESTAMP_TRIGGER_ENTRIES, triggerSha256: POLICY_RESTAMP_TRIGGER_SHA256 },
   80: { tables: 111, functions: 301, objectEntries: 3445, objectSha256: '34b9f8ce333fa221c9e8d15635212e0203ca8069523e2adc58b028e69a005762', functionEntries: 301, functionSha256: 'f387f4ea6a63ffe5095162779b0e89a48504710de09978b9d560894859e15d05', triggerEntries: 116, triggerSha256: CURRENT_IMPORT_BATCH_TRIGGER_SHA256 },
   81: { tables: 111, functions: 301, objectEntries: 3445, objectSha256: '34b9f8ce333fa221c9e8d15635212e0203ca8069523e2adc58b028e69a005762', functionEntries: 301, functionSha256: 'a012a586409577d87c543a1fe3011c43e899e155d587efa9007cd7e7d425c723', triggerEntries: 116, triggerSha256: CURRENT_IMPORT_BATCH_TRIGGER_SHA256 },
+  82: { tables: 111, functions: 302, objectEntries: 3446, objectSha256: '4f81eb71a39c591d55474114203747c7322dcc988c8310797eb5d2d888d9d261', functionEntries: 302, functionSha256: '03f03d32c109accd93b63cbdbe82befd935df10e9632399524dcc338ea8a0d33', triggerEntries: 116, triggerSha256: CURRENT_IMPORT_BATCH_TRIGGER_SHA256 },
+  83: { tables: 119, functions: 305, objectEntries: 3612, objectSha256: '9fefcdc96471091c98ea00aee520a2aa25ab7f26ad749212623cef57dc974b13', functionEntries: 305, functionSha256: '71db2fe2bf55f5a6faffd60c8bfa5a3c653dbcb83052ff335a5751814d9347c3', triggerEntries: SOP_TRIGGER_ENTRIES, triggerSha256: SOP_TRIGGER_SHA256 },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1280,6 +1293,8 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   79: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
   80: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
   81: { entries: 655, sha256: '97cd7b215949a09b3d8266c85707db04719854e487165ce198de709aae3b48d0' },
+  82: { entries: 656, sha256: 'fb9a07a15bc13c79334f2043978e551ceee3b2d560dc4fe921d007ece09b3250' },
+  83: { entries: 658, sha256: '35f50f0f6aa864b86cedfaf170e31f083af146ef3b6366e6a384af25a8d4672c' },
 };
 
 export async function verifyReadinessSuccessor(
