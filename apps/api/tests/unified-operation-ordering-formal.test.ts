@@ -125,6 +125,11 @@ function baselineTopologyFixture(relationship: 'ancestor' | 'not-ancestor') {
     git(root, ['checkout', '-q', parent]);
   }
   writeFileSync(path.join(root, 'candidate.txt'), `${relationship}\n`);
+  if (relationship === 'ancestor') {
+    writeFileSync(baselinePath, 'combined-content\n');
+  } else {
+    rmSync(baselinePath);
+  }
   git(root, ['add', '.']);
   git(root, ['commit', '-q', '-m', relationship]);
 
@@ -140,7 +145,13 @@ function baselineTopologyFixture(relationship: 'ancestor' | 'not-ancestor') {
       testFiles: Object.freeze(Array.from({ length: 9 }, (_, index) => `tests/fixture-${index + 1}.test.ts`)),
     }),
   });
-  return { root, baselineContent, dependency };
+  return {
+    root,
+    baselineContent,
+    testedContent: relationship === 'ancestor' ? 'combined-content\n' : null,
+    executedContent: relationship === 'ancestor' ? 'combined-content\n' : baselineContent,
+    dependency,
+  };
 }
 
 describe('formal unified operation ordering', () => {
@@ -341,7 +352,7 @@ describe('formal unified operation ordering', () => {
     ])).toThrow('outside evidence files: source.txt');
   });
 
-  it('runs the BASEFIX blob from standalone and combined histories', () => {
+  it('overlays BASEFIX before it lands and runs the tested file after it lands', () => {
     for (const expectedRelationship of ['not-ancestor', 'ancestor'] as const) {
       const fixture = baselineTopologyFixture(expectedRelationship);
       const baseline = resolveBaselineDependency({
@@ -351,6 +362,9 @@ describe('formal unified operation ordering', () => {
       expect(baseline.relationship).toBe(expectedRelationship);
       expect(baseline.changedPaths).toEqual([BASEFIX_DEPENDENCY.file.path]);
       expect(baseline.fileSha256).toBe(sha256(fixture.baselineContent));
+      expect(baseline.testedFileSha256).toBe(
+        fixture.testedContent === null ? null : sha256(fixture.testedContent),
+      );
 
       let observed = '';
       let observedArgs: readonly string[] = [];
@@ -371,28 +385,19 @@ describe('formal unified operation ordering', () => {
           };
         },
       });
-      expect(observed).toBe(fixture.baselineContent);
+      expect(observed).toBe(fixture.executedContent);
       expect(observedArgs.slice(2)).toEqual(fixture.dependency.manualIdentity.testFiles);
       expect(report).toMatchObject({
         relationship: expectedRelationship,
-        patchedFileSha256: sha256(fixture.baselineContent),
+        basefixFileSha256: sha256(fixture.baselineContent),
+        testedFileSha256: fixture.testedContent === null ? null : sha256(fixture.testedContent),
+        executedFileSha256: sha256(fixture.executedContent),
         integrationTree: expectedRelationship === 'ancestor' ? 'reuse-ancestor' : 'overlay-baseline',
         testFiles: 9,
         tests: 38,
         passed: true,
       });
     }
-  });
-
-  it('rejects combined history that changes the BASEFIX-owned file', () => {
-    const fixture = baselineTopologyFixture('ancestor');
-    writeFileSync(path.join(fixture.root, BASEFIX_DEPENDENCY.file.path), 'changed-later\n');
-    git(fixture.root, ['add', '.']);
-    git(fixture.root, ['commit', '-q', '-m', 'change-baseline-owned-file']);
-    expect(() => resolveBaselineDependency({
-      repositoryRoot: fixture.root,
-      dependency: fixture.dependency,
-    })).toThrow(`${BASEFIX_DEPENDENCY.file.path} changed after BASEFIX-01`);
   });
 
   it('rejects BASEFIX ownership from the unified source manifest', () => {
@@ -414,6 +419,29 @@ describe('formal unified operation ordering', () => {
     }));
     expect(() => verifyReceiptTree(fixtureReceiptOptions(root, skillRoot)))
       .toThrow(`unified source must not own BASEFIX file: ${BASEFIX_DEPENDENCY.file.path}`);
+
+    const nestedRelative = '.cursor/skills/verify-seat-administration-revocation/receipts.json';
+    const nestedPath = path.join(root, nestedRelative);
+    mkdirSync(path.dirname(nestedPath), { recursive: true });
+    writeFileSync(nestedPath, JSON.stringify({
+      syncCommit: receipt.syncCommit,
+      files: {},
+    }));
+    const nestedReceipt = {
+      ...receipt,
+      nestedReceipts: [nestedRelative],
+      files: {
+        ...receipt.files,
+        [nestedRelative]: sha256(readFileSync(nestedPath)),
+      },
+    };
+    writeFileSync(receiptPath, JSON.stringify(nestedReceipt));
+    expect(() => verifyReceiptTree({
+      ...fixtureReceiptOptions(root, skillRoot),
+      requiredFiles: ['source.txt', nestedRelative],
+      requiredNestedReceipts: [nestedRelative],
+      requiredNestedFiles: { [nestedRelative]: [BASEFIX_DEPENDENCY.file.path] },
+    })).toThrow(`unified source must not own BASEFIX file: ${BASEFIX_DEPENDENCY.file.path}`);
   });
 
   it('validates the production BASEFIX policy and the exact 38-test command result', () => {

@@ -214,7 +214,9 @@ export function verifyReceiptTree({
     if (!Array.isArray(nestedRequiredFiles)) {
       throw new Error(`no required source manifest is declared for nested receipt ${nestedRelative}`);
     }
+    assertBaselineOwnedFileExcluded(nestedRequiredFiles);
     assertExactManifest(Object.keys(nested.files), nestedRequiredFiles, `nested source (${nestedRelative})`);
+    assertBaselineOwnedFileExcluded(Object.keys(nested.files ?? {}));
     entries.push(...verifyFiles(repositoryRoot, nested, `nested:${nestedRelative}`));
   }
 
@@ -244,6 +246,7 @@ export function syncReceipts({ repositoryRoot = defaultRepositoryRoot } = {}) {
 
   const seatReceiptPath = path.join(repositoryRoot, nestedSeatReceipt);
   const seatReceipt = readJson(seatReceiptPath, 'seat receipt');
+  assertBaselineOwnedFileExcluded(Object.keys(seatReceipt.files ?? {}));
   const seatFiles = Object.fromEntries(Object.keys(seatReceipt.files).sort()
     .map(relative => [relative, fileHash(path.join(repositoryRoot, relative))]));
   const nextSeatReceipt = {

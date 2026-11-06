@@ -42,6 +42,7 @@ export function resolveBaselineDependency(options?: Readonly<{
   relationship: 'ancestor' | 'not-ancestor';
   changedPaths: readonly string[];
   fileSha256: string;
+  testedFileSha256: string | null;
   content: Buffer;
 }>;
 export function assertBaselineOwnedFileExcluded(
@@ -58,13 +59,15 @@ export function runManualIdentityVerification(options?: Readonly<{
   testedHead?: string | null;
   commandRunner?: ManualIdentityCommandRunner;
 }>): Readonly<{
-  schemaVersion: 'for-manual-identity-basefix-evidence/v2';
+  schemaVersion: 'for-manual-identity-basefix-evidence/v3';
   testedHead: string;
   baselineCommit: string;
   baselineParent: string;
   relationship: 'ancestor' | 'not-ancestor';
   changedPaths: readonly string[];
-  patchedFileSha256: string;
+  basefixFileSha256: string;
+  testedFileSha256: string | null;
+  executedFileSha256: string;
   integrationTree: 'reuse-ancestor' | 'overlay-baseline';
   command: string;
   testFiles: 9;
