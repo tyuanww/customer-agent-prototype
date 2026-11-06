@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { waitForFocusedWindow } from '../support/electron-focus';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
@@ -84,6 +85,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+      await waitForFocusedWindow(app!, 'query');
     }
     async function login() {
       await openQuery();
