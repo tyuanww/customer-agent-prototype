@@ -90,12 +90,15 @@ and password-file code. The reachability replay drives the real grant lifecycle 
 five. The manual identity command covers the seat/identity admission boundary and always checks
 the fixed BASEFIX test correction. The formal checker constructs a
 fresh `git archive` of the tested head, verifies BASEFIX's parent ancestry and exact one-file
-patch and blob hash, replaces only that test blob, and runs the nine-file identity command. The
-supporting module owns the BASEFIX commit, file hash, test manifest, and 9/38 expectation. The
+patch and blob hash, then runs the nine-file identity command. Before BASEFIX is an ancestor, the
+checker replaces only that test blob. After BASEFIX becomes an ancestor, it runs the tested head
+file so later migrations test their real combined behavior. The supporting module owns the
+BASEFIX commit, file hash, test manifest, and 9/38 expectation. The
 unified source manifest deliberately excludes this file. Any missing commit, incorrect
-relationship, later change to an ancestor BASEFIX file, ownership overlap, or non-38/38 result
-fails closed. Neither replay pretends the ARC-01 operation envelope is already persisted in
-product runtime.
+relationship, ownership overlap, or non-38/38 result fails closed. When BASEFIX is not an
+ancestor, the checker overlays its immutable blob. When it is an ancestor, the checker runs the
+tested head file, so later migrations test their real combined behavior. Neither replay pretends
+the ARC-01 operation envelope is already persisted in product runtime.
 
 `receipts.json` binds the model, focused test, ARC-01 predicates, authorization and identity
 consumers, real replay sources, migration inputs, commands/results, environment, and reported

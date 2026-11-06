@@ -81,15 +81,13 @@ export function resolveBaselineDependency({
   if (fileSha256 !== dependency.file.sha256) {
     throw new Error(`BASEFIX file hash does not match ${dependency.id}`);
   }
-  if (relationship === 'ancestor') {
-    const testedContent = git(repositoryRoot, ['show', `${testedHead}:${dependency.file.path}`], {
-      encoding: 'buffer',
-    });
-    const testedFileSha256 = createHash('sha256').update(testedContent).digest('hex');
-    if (testedFileSha256 !== dependency.file.sha256) {
-      throw new Error(`${dependency.file.path} changed after ${dependency.id}`);
-    }
-  }
+  const testedFileSha256 = relationship === 'ancestor'
+    ? createHash('sha256').update(git(
+      repositoryRoot,
+      ['show', `${testedHead}:${dependency.file.path}`],
+      { encoding: 'buffer' },
+    )).digest('hex')
+    : null;
   return Object.freeze({
     dependency,
     commit,
@@ -98,6 +96,7 @@ export function resolveBaselineDependency({
     relationship,
     changedPaths: Object.freeze(changedPaths),
     fileSha256,
+    testedFileSha256,
     content,
   });
 }
@@ -133,6 +132,7 @@ export function createIntegrationTree({
   baseline,
 } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'for-01-manual-identity-'));
+  const mode = baseline.relationship === 'ancestor' ? 'reuse-ancestor' : 'overlay-baseline';
   try {
     const archive = git(repositoryRoot, ['archive', '--format=tar', baseline.testedHead], { encoding: 'buffer' });
     const extracted = spawnSync('tar', ['-x', '-C', root], {
@@ -145,8 +145,12 @@ export function createIntegrationTree({
       mkdirSync(path.dirname(destination), { recursive: true });
       symlinkSync(path.join(repositoryRoot, relative), destination, 'dir');
     }
-    writeFileSync(path.join(root, baseline.dependency.file.path), baseline.content);
-    return root;
+    if (mode === 'overlay-baseline') {
+      const baselinePath = path.join(root, baseline.dependency.file.path);
+      mkdirSync(path.dirname(baselinePath), { recursive: true });
+      writeFileSync(baselinePath, baseline.content);
+    }
+    return Object.freeze({ root, mode });
   } catch (error) {
     rmSync(root, { recursive: true, force: true });
     throw error;
@@ -179,7 +183,7 @@ export function runManualIdentityVerification({
   commandRunner = spawnSync,
 } = {}) {
   const baseline = resolveBaselineDependency({ repositoryRoot, dependency, testedHead });
-  const integrationRoot = createIntegrationTree({ repositoryRoot, baseline });
+  const integration = createIntegrationTree({ repositoryRoot, baseline });
   const startedAt = Date.now();
   try {
     const environment = {
@@ -193,7 +197,7 @@ export function runManualIdentityVerification({
     const result = commandRunner(process.execPath, [
       vitest, 'run', ...dependency.manualIdentity.testFiles,
     ], {
-      cwd: path.join(integrationRoot, 'apps/api'),
+      cwd: path.join(integration.root, 'apps/api'),
       env: environment,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
@@ -201,16 +205,18 @@ export function runManualIdentityVerification({
     });
     const counts = assertManualIdentityResult(result, dependency.manualIdentity.expected);
     return Object.freeze({
-      schemaVersion: 'for-manual-identity-basefix-evidence/v2',
+      schemaVersion: 'for-manual-identity-basefix-evidence/v3',
       testedHead: baseline.testedHead,
       baselineCommit: baseline.commit,
       baselineParent: baseline.parent,
       relationship: baseline.relationship,
       changedPaths: baseline.changedPaths,
-      patchedFileSha256: baseline.fileSha256,
-      integrationTree: baseline.relationship === 'ancestor'
-        ? 'reuse-ancestor'
-        : 'overlay-baseline',
+      basefixFileSha256: baseline.fileSha256,
+      testedFileSha256: baseline.testedFileSha256,
+      executedFileSha256: integration.mode === 'reuse-ancestor'
+        ? baseline.testedFileSha256
+        : baseline.fileSha256,
+      integrationTree: integration.mode,
       command: `${process.execPath} ${vitest} run ${dependency.manualIdentity.testFiles.join(' ')}`,
       testFiles: counts.testFiles,
       tests: counts.tests,
@@ -219,7 +225,7 @@ export function runManualIdentityVerification({
       passed: true,
     });
   } finally {
-    rmSync(integrationRoot, { recursive: true, force: true });
+    rmSync(integration.root, { recursive: true, force: true });
   }
 }
 
