@@ -59,6 +59,14 @@ Main 的 `OverlaySnapshotProjection` 只在 `contract` 内使用 ARC-01 `Overlay
 
 BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retrieval-core/README.md)。桌面常量仍在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75`，标题权重 3、问法权重 2.5、正文权重 1，RRF `k=60`。分词用该包的单字+相邻二字，由适配层注入。查询分析槽在 `query-analyze.ts`，只扩展检索式，不映射某条标题。弃权停用词和 `1/(60+20)` 门槛留在 `retrieval-quality.ts`。
 
+SOP 查询使用独立 `SopPipeline`，不进入上面的内容 Top 3 管道。发布时冻结的场景分类词先判定 SOP 归属。命中后只按发布中唯一的严重性顺序处理冲突，并返回 ARC `SopFlow`。普通内容检索与 SOP 结果是互斥的 `QueryOutcome` 变体，不取并集。SOP 搜索投影已在发布事务内生成，查询不重建索引。缺少完整严重性顺序时返回显式 failure。决策节点等待坐席选择分支，系统不自动选择业务路径。
+
+API composition 已把这些规则接入真实 `/v1/search`。`QueryCoordinator` 在 ranking 前读取同一个 ACL decision 和 active release；ordinary content 由发布时激活的 BM25 索引返回，SOP 命中不会退化成 content Top 3。当前 SearchResponse 合同没有 SOP flow 字段，因此 SOP 路径在 API 上保持 fail closed，独立 SOP 响应入口仍待后续合同与 INT-DESKTOP 接线。请求会校验当前 release identity，发现外部版本移动时不返回旧索引。OBS trace 只记录稳定 ID、脱敏 fingerprint、阶段和错误码，不记录问句或答案正文。
+
+当前 API index 消费 `release_items`，与既有 SearchResponse、candidate impression 和复制身份保持一致。若当前 intake lineage 的 upsert 尚无对应 `release_items` 投影，API activation 以 `RELEASE_INDEX_ITEM_GAP` 失败关闭，避免只返回一部分已发布内容。把规范化 intake 条目映射到旧 SearchResponse 字段仍需单独合同或 migration，不由 API composition 猜测。
+
+桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。当前分支只提供 typed seam 和独立 Electron 验证，生产窗口与 preload 组合仍由 INT-DESKTOP 完成。
+
 ## 失败
 
 | 情况 | 坐席看到 |
@@ -70,7 +78,7 @@ BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retriev
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
 
-`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器，并直接使用 `@customer-agent/unified-contracts` 的共享类型。当前检索链没有调用这些转换器，也没有把数据写入新 sink。QRY-01、SOP-01 和 INT-DESKTOP 接线前，既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是唯一实际桌面检索记录。
+`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器，并直接使用 `@customer-agent/unified-contracts` 的共享类型。API `/v1/search` 已通过 OBS observer port 记录 trace，但桌面 copy、overlay 和 Dashboard 仍未接线；桌面侧既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是实际桌面检索记录。INT-DESKTOP 需要把同一 trace identity 扩展到桌面搜索和复制事件。
 
 ## 例子
 

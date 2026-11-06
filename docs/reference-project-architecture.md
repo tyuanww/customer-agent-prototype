@@ -407,6 +407,16 @@ SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用�
 
 SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件与独占文件锁，`experiments/sop-row-deletion/media-lifecycle.ts` 拥有同任务稳定预约、持锁重核、写入登记及失败清理，治理候选窄函数复用原 objects/object_reservations 容量账本。文件锁不随 DB 断连释放；所有附件写入及通用回收共用它，锁作用域结束前等待真实 I/O 完成。未知提交、锁竞争及崩溃残锁保守保留计费，不做自动 TTL 清理。`persistent-media.ts` 只读取绑定会话／租约的行级图片元数据及单张已授权文件；`usage.ts` 继续唯一拥有会话、当前权限、租约、适用性与最终截止核验，先过滤行再对可见图片去重。图片读取分为授权选取、锁外读文件、返回前重新选取三步，第二个短事务核对同一图片及最早授权截止，避免持有全局内容锁等待磁盘。内部 payload ID 不进 HTTP，列表不携带字节，文件坏损不能回退内存缓存。生产 factory 不注入这个实验 reader；旧调用默认内存 reader。
 
+### SOP pipeline source and release projection
+
+`packages/content-intake/src/sop-authoring.ts` owns the normalized authoring workbook model, graph validation, authoring preview metadata, and release-fact materialization. `sop-wps-image.ts` owns WPS `DISPIMG` extraction. It accepts only safe internal PNG, JPEG, or GIF relationships, applies archive and media budgets, and returns no partial images after an error. The six normalized sheets own scene, step, branch, message, resource, and search-entry facts. Gate-B node IDs stay unclassified until the workbook supplies an explicit node type.
+
+`packages/database/migrations/0083_sop_pipeline_projection.sql` is the SOP source migration. `publish_sop_release_facts` writes the normalized release tables and immutable `sop-release-v1` projection in the caller's transaction. The shared migration manifest and catalogue stay with INT-SCHEMA, so this branch does not generate them.
+
+`apps/api/src/query/sop-pipeline.ts` consumes only that immutable projection. It classifies SOP ownership before ranking, requires the complete order in `sop_release_severity`, returns the ARC SOP outcome shape, and never mixes ordinary content candidates into an SOP result. `apps/api/src/content-intake/sop-source.ts` parses the persisted projection at the database boundary. `publication.ts` exposes the same-transaction publication seam.
+
+`apps/desktop/src/shared/sop-pipeline.ts` owns the typed minimal projection, sales-agent branch choice, release, session, and revocation invalidation, and the one native clipboard payload. Image-bearing steps fail when metadata or bytes are missing. `SopPipelinePresenter` owns Main-side copy authority and checks the lease and selected step both before and after asynchronous media reads. INT-DESKTOP still owns production window and IPC composition. The current `main.ts` fixture path remains until CLEAN-01.
+
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
 ### OBS-01 观测机制
@@ -417,7 +427,23 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
 
-当前没有业务接线。INT-API 负责 request ID 和 API stage hooks，QRY-01 与 SOP-01 负责各自 pipeline stages，DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+INT-API 已把 API request ID、QueryCoordinator 的 access、release-read、recall 或 SOP stage，以及 response validation 接到 typed observer port。默认序列化 sink 使用 OBS runtime 的 canonical serializer；observer 或 sink 失败不会改变查询结果。QRY-01 与 SOP-01 仍拥有各自的 pipeline 行为。DSH 与 INT-DESKTOP 负责 Dashboard audit 和 copy、overlay 事件，这些路径尚未接线。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+
+### INT-API unified query composition
+
+`apps/api/src/integration/access.ts` owns the database-to-ARC access adapter. `integration/release.ts` reads the source-gated current release through the `intake_usage` capability and maps content and SOP projections into typed index inputs. `integration/query-runtime.ts` owns the lifecycle that shares one `AccessEvaluator`, one `QueryCoordinator`, one `ContentPipeline`, one mutable active `SopPipeline`, and one OBS observer port per API process. The content index is built at activation time and is not rebuilt inside a query.
+
+`server.ts` creates the runtime from the configured intake pools, initializes it before listening, and passes the same evaluator to route admission and query evaluation. The integration adapter maps legacy intake domains (`presale`, `campaign`, `aftersale`) to ARC scope domains at the database boundary. It expands shopless source grants against the active release's source scopes; it does not convert a renderer projection into authority.
+
+`/v1/search` still enters the existing search route and event transaction. The event repository claims idempotency first, then requests the coordinated `SearchBackendResult` from the runtime, and continues to own `query_events`, `candidate_impressions`, source-denial audit and response mapping. It does not expose SOP flows through the ordinary SearchResponse contract. A selected SOP that cannot produce a valid flow fails closed without ordinary candidates.
+
+While the dedicated SOP response contract remains open, `/v1/search` returns HTTP 503 with the existing `OVERLOADED` error code. SOP failures use the frozen `OverloadedErrorEnvelope` shape with `details.reason=SOURCE_GATE_NOT_READY` and carry the stable domain distinction in the allowed extension field `details.sop_reason`. The four values are `SOP_UNAVAILABLE`, `SOP_SEVERITY_ORDER_REQUIRED`, `SOP_GATE_B_UNRESOLVED`, and `SOP_FLOW_CONTRACT_UNAVAILABLE`. These failures roll back the query event and impression transaction. Actual SOP flow transport belongs to the separate SOP contract and INT-DESKTOP integration after `SOP-CONTENT-A/B` close.
+
+Successful content publish and rollback responses trigger a single-flight reload through the app lifecycle hook. Startup uses the same activation path. Each query rechecks the current release identity with one lightweight read; if it moved out of band, the request returns the stable unavailable failure, the old index is not served, and a reload is requested. Runtime shutdown waits for an in-flight activation and makes later queries fail closed.
+
+The API default OBS sink receives no raw question or answer. It receives stable request/query tokens, the existing redacted query fingerprint, stable failure codes and measured stage durations. The final exact-head verifier and the desktop INT-DESKTOP adapter are still required before this composition is treated as a complete product runtime.
+
+The current index projection reads the source-gated `release_items` that back the existing `SearchResponse` and `candidate_impressions` foreign keys. If the current intake lineage contains an upsert that has no corresponding `release_items` row, activation fails with `RELEASE_INDEX_ITEM_GAP` instead of serving a partial index. Mapping normalized intake entries into the ordinary SearchResponse and event candidate identity still needs an approved contract or migration change; INT-API does not invent those fields.
 
 ### 精确修复后继的版本接收（2026-10-12）
 
