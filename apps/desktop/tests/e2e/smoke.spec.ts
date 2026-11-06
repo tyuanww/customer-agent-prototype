@@ -472,8 +472,21 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await query.keyboard.press('Escape');
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
-      return snap.some((item) => item.role === 'query' && item.visible);
-    }).toBe(false);
+      const diagnostics = await app.evaluate(({ BrowserWindow }) => {
+        const harness = (globalThis as { __demoTest?: { getPhase: () => string } }).__demoTest;
+        const focused = BrowserWindow.getFocusedWindow();
+        return {
+          phase: harness?.getPhase() ?? 'missing',
+          focusedRole: focused?.webContents.getURL() ?? 'none',
+        };
+      });
+      return {
+        queryVisible: snap.some((item) => item.role === 'query' && item.visible),
+        queryFocused: snap.find((item) => item.role === 'query')?.focused ?? false,
+        phase: diagnostics.phase,
+        focusedRole: diagnostics.focusedRole,
+      };
+    }).toMatchObject({ queryVisible: false });
 
     const harnessPhase = await app.evaluate(() => {
       const harness = (globalThis as { __demoTest?: { expand: () => void; getPhase: () => string } })
@@ -492,6 +505,7 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       );
     }).toBe(true);
 
+    await waitForNativeFocus(app, 'query');
     await query.getByTestId('question-input').fill('收起后不应保留的临时问题');
     await app.evaluate(() => {
       const harness = (
@@ -508,6 +522,9 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       const snap = await windowSnapshot(app);
       return snap.some((item) => item.role === 'query' && item.visible);
     }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
 
     await app.evaluate(() => {
       const harness = (
@@ -523,13 +540,14 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await expect(query.getByTestId('question-input')).toHaveValue('');
 
     await query.keyboard.press('Escape');
-    await app.evaluate(() => {
-      const harness = (globalThis as { __demoTest?: { expand: () => void } }).__demoTest;
-      if (!harness) {
-        throw new Error('DEMO_E2E harness missing');
-      }
-      harness.expand();
-    });
+    await expect.poll(async () => {
+      const snap = await windowSnapshot(app);
+      return snap.some((item) => item.role === 'query' && item.visible);
+    }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await fox.getByTestId('fox-button').click();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'true');
     const shellRevealAnimation = await query.locator('.glass-shell').evaluate((shell) => {
       const animation = shell.getAnimations().find((candidate) => {
@@ -676,15 +694,15 @@ test('documents that globalShortcut is exercised via the same main harness, not 
       harness.expand();
       const opened = harness.getPhase();
       harness.dismiss();
-      const closed = harness.getPhase();
       return {
         opened,
-        closed,
         shortcutRegistered: harness.shortcutRegistered(),
       };
     });
     expect(info.opened).toBe('SEARCH_INPUT');
-    expect(info.closed).toBe('FOX_IDLE');
+    await expect.poll(() => app.evaluate(() => (
+      globalThis as { __demoTest?: { getPhase: () => string } }
+    ).__demoTest?.getPhase())).toBe('FOX_IDLE');
     await expect.poll(async () => {
       const windows = await windowSnapshot(app);
       return {

@@ -2163,7 +2163,7 @@ export class OverlayController {
   private handleQueryBlur(): void {
     if (
       this.isInactive()
-      || this.overlayState.phase !== 'active'
+      || (this.overlayState.phase !== 'opening' && this.overlayState.phase !== 'active')
       || !this.isWindowVisible(this.query)
     ) {
       this.clearPendingQueryBlur();

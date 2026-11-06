@@ -471,6 +471,53 @@ describe('authoritative overlay reducer', () => {
     expect(late.state.contentPhase).toBe('EMPTY');
   });
 
+  it('cancels an active resize at its baseline when results become COPIED', () => {
+    const opened = active();
+    const results: OverlayState = {
+      ...opened.state,
+      contentPhase: 'RESULTS',
+      resultCount: 3,
+      contentRevision: 5,
+    };
+    const begun = applyOverlayEvent(results, at(results, {
+      type: 'RESIZE_BEGIN',
+      handoffId: results.handoff.id,
+      sequence: results.layout.sequence + 1,
+      baselineHeight: 320,
+      edge: 'bottom',
+      contentRevision: results.contentRevision,
+    }));
+    expect(begun.decision).toBe('applied');
+    expect(begun.state.layout.resize).not.toBeNull();
+
+    const copied = applyOverlayEvent(begun.state, at(begun.state, {
+      type: 'CONTENT_CHANGED',
+      contentPhase: 'COPIED',
+      resultCount: 3,
+      contentRevision: begun.state.contentRevision + 1,
+    }));
+    expect(copied.decision).toBe('applied');
+    expect(copied.state.layout).toMatchObject({
+      appliedHeight: 320,
+      resize: null,
+    });
+    expect(copied.effects).toContainEqual({
+      type: 'APPLY_RESIZE',
+      height: 320,
+      edge: 'bottom',
+    });
+
+    const lateEnd = applyOverlayEvent(copied.state, at(copied.state, {
+      type: 'RESIZE_END',
+      handoffId: copied.state.handoff.id,
+      sequence: copied.state.layout.sequence + 1,
+      height: 360,
+      commit: true,
+      contentRevision: copied.state.contentRevision,
+    }));
+    expect(lateEnd.decision).toBe('rejected');
+  });
+
   it('invalidates all prior window work when a replacement window generation is created', () => {
     const opened = active();
     const replacement = applyOverlayEvent(opened.state, at(opened.state, {
@@ -713,6 +760,7 @@ describe('authoritative overlay reducer', () => {
         'RENDERER_FRAME_OBSERVED',
       ]),
       closing: new Set([
+        'OPEN_REQUESTED',
         'HANDOFF_CLOSED',
         'HANDOFF_TIMEOUT',
         'HANDOFF_CANCELLED',
@@ -767,7 +815,6 @@ describe('authoritative overlay reducer', () => {
         'FOX_PEEK_CHANGED',
       ]),
       closing: new Set([
-        'OPEN_REQUESTED',
         'DISMISS_REQUESTED',
         'TOGGLE_REQUESTED',
         'QUERY_SUBSCRIBED',
