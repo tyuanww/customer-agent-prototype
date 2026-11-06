@@ -71,7 +71,7 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
       const query = controller
         .getWindows()
         .find((win) => win.webContents.getURL().includes('role=query'));
-      query?.emit('blur');
+      query?.blur();
     },
     getPhase: () => controller.phase,
     shortcutRegistered: () => controller.shortcutRegistered,
