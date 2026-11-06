@@ -1,7 +1,7 @@
 {
-  "syncCommit": "131cb1dd6006794a7b03f68dfe95e56acce2c0fd",
+  "syncCommit": "6a295594dabe3108cb7ef08c33f734d98515a656",
   "workingTree": "covered sources clean at syncCommit",
-  "capturedAt": "2026-11-06T05:50:46.254Z",
+  "capturedAt": "2026-11-06T05:59:26.502Z",
   "files": {
     "apps/api/src/content-intake/authority.ts": "486bac1ddd26ef3bff4925b2d935a509f68d44f4bc67ff481a34daf9e887fe20",
     "apps/api/src/content-intake/organization/facts-writer.ts": "0aa7cc516c97f7bc4553ca6e553fb3b4924a7474544872217d441527dcffcd5b",

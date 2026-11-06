@@ -1,8 +1,8 @@
 {
-  "syncCommit": "131cb1dd6006794a7b03f68dfe95e56acce2c0fd",
+  "syncCommit": "6a295594dabe3108cb7ef08c33f734d98515a656",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-06T05:50:46.270Z",
-  "sourceReceipt": "b88e30e723fcec4df0c1dc4bebd0f9e2727995a1e953b81232e6e85be1d96753",
+  "capturedAt": "2026-11-06T05:59:26.513Z",
+  "sourceReceipt": "aaf3536dc462a053e564ccd7f6b8ff340328a9ae2dd4d5d18d0744542a527387",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,7 +29,7 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "6fed23a8bb89be05b80e5a1ed3f2fea9ca3ff819dcc001561b2b24a12868b5c1",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "314d37d6bad9b906eaa0b2a69716112b1949b9d1355cb03ed6d81da534ee35b7",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "ba501f04fe2279a0a2bc326191242ef0412ecfda832eb21e80c91f15ec9bee01",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
@@ -90,7 +90,7 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "131cb1dd6006794a7b03f68dfe95e56acce2c0fd",
+  "testedSourceCommit": "6a295594dabe3108cb7ef08c33f734d98515a656",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
