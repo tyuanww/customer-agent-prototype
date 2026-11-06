@@ -250,7 +250,7 @@ v1.17 migrated PG15
 
 该模型证明的是有限合同状态机，不证明 PostgreSQL MVCC、网络分区、COMMIT 中途进程死亡、文件系统持久性、HTTP 或 IPC。真实 PostgreSQL 15 的请求时授权线性化由 `pnpm test:seat-administration-revocation` 验证：检查成功后撤权的已受理命令可以完成，撤权后开始的新命令必须被拒绝；授权生命周期另由 `authorization-reachability.integration.test.ts` 深度五的穷举回放验证。ARC-01 当前只有合同，没有产品 operation store，因此上述真实回放不冒充 envelope 已接入运行时。
 
-`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令结果、环境和状态数，并对 unified 与 seat 回执执行精确来源清单，递归核验其来源哈希。检查器对缺失或删除声明的回执、来源漂移 fail-closed；它要求 `syncCommit` 是受测 head 的祖先，且该提交之后只允许两个回执文件变化。正式入口还从 tested head 创建临时归档，只替换 BASEFIX 声明的单个测试 blob 并执行九文件身份命令，缺提交、错误祖先关系或少于 38 项都失败。运行时可生成机器可读报告，绑定精确 tested head、witness 路径、七个负向控制、BASEFIX 实测与错误数。改动受测源码后必须先重跑再更新证据；FORM 本身不修改陈旧测试。
+`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令结果、环境和状态数，并对 unified 与 seat 回执执行精确来源清单，递归核验其来源哈希。`verify-manual-identity-with-basefix.mjs` 是 BASEFIX 文件的唯一所有者，持有固定 commit、文件 SHA-256、单文件范围和九文件 38 测试预期；unified 来源清单明确排除该文件，发现重复所有权时 fail-closed。检查器对缺失或删除声明的回执、来源漂移 fail-closed；它要求 `syncCommit` 是受测 head 的祖先，且该提交之后只允许两个回执文件变化。正式入口从 tested head 创建临时归档，只替换 BASEFIX 声明的单个测试 blob 并执行九文件身份命令，缺提交、错误祖先关系、BASEFIX 后又被修改或结果不是精确 9 文件 38 测试都失败。运行时可生成机器可读报告，绑定精确 tested head、witness 路径、七个负向控制、BASEFIX 实测与错误数。改动受测源码后必须先重跑再更新证据；FORM 本身不修改陈旧测试。
 
 ### 5.3 桌面 overlay 单一状态所有者（OVL-01）
 

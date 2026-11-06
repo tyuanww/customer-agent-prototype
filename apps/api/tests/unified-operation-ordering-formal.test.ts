@@ -14,8 +14,11 @@ import {
   verifyReceiptTree,
 } from '../../../.cursor/skills/verify-unified-operation-ordering/scripts/check.mjs';
 import {
+  BASEFIX_DEPENDENCY,
+  assertBaselineOwnedFileExcluded,
   assertManualIdentityResult,
   resolveBaselineDependency,
+  runManualIdentityVerification,
 } from '../../../.cursor/skills/verify-unified-operation-ordering/scripts/verify-manual-identity-with-basefix.mjs';
 
 const CONTROLS: ReadonlyArray<readonly [OperationOrderingMode, string]> = [
@@ -97,6 +100,47 @@ function gitFixture() {
   git(root, ['add', '.']);
   git(root, ['commit', '-q', '-m', 'evidence']);
   return { root, sourceCommit, unrelatedCommit };
+}
+
+function baselineTopologyFixture(relationship: 'ancestor' | 'not-ancestor') {
+  const root = temporaryRoot();
+  const baselineContent = 'baseline-content\n';
+  const baselinePath = path.join(root, BASEFIX_DEPENDENCY.file.path);
+  git(root, ['init', '-q', '-b', 'main']);
+  git(root, ['config', 'user.email', 'synthetic@example.invalid']);
+  git(root, ['config', 'user.name', 'Synthetic Verifier']);
+  mkdirSync(path.dirname(baselinePath), { recursive: true });
+  writeFileSync(baselinePath, 'parent-content\n');
+  git(root, ['add', '.']);
+  git(root, ['commit', '-q', '-m', 'parent']);
+  const parent = git(root, ['rev-parse', 'HEAD']);
+
+  git(root, ['checkout', '-q', '-b', 'basefix']);
+  writeFileSync(baselinePath, baselineContent);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-q', '-m', 'basefix']);
+  const baselineCommit = git(root, ['rev-parse', 'HEAD']);
+
+  if (relationship === 'not-ancestor') {
+    git(root, ['checkout', '-q', parent]);
+  }
+  writeFileSync(path.join(root, 'candidate.txt'), `${relationship}\n`);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-q', '-m', relationship]);
+
+  const dependency = Object.freeze({
+    ...BASEFIX_DEPENDENCY,
+    commit: baselineCommit,
+    file: Object.freeze({
+      ...BASEFIX_DEPENDENCY.file,
+      sha256: sha256(baselineContent),
+    }),
+    manualIdentity: Object.freeze({
+      ...BASEFIX_DEPENDENCY.manualIdentity,
+      testFiles: Object.freeze(Array.from({ length: 9 }, (_, index) => `tests/fixture-${index + 1}.test.ts`)),
+    }),
+  });
+  return { root, baselineContent, dependency };
 }
 
 describe('formal unified operation ordering', () => {
@@ -297,12 +341,92 @@ describe('formal unified operation ordering', () => {
     ])).toThrow('outside evidence files: source.txt');
   });
 
-  it('validates the BASEFIX relationship and the exact 38-test command result', () => {
+  it('runs the BASEFIX blob from standalone and combined histories', () => {
+    for (const expectedRelationship of ['not-ancestor', 'ancestor'] as const) {
+      const fixture = baselineTopologyFixture(expectedRelationship);
+      const baseline = resolveBaselineDependency({
+        repositoryRoot: fixture.root,
+        dependency: fixture.dependency,
+      });
+      expect(baseline.relationship).toBe(expectedRelationship);
+      expect(baseline.changedPaths).toEqual([BASEFIX_DEPENDENCY.file.path]);
+      expect(baseline.fileSha256).toBe(sha256(fixture.baselineContent));
+
+      let observed = '';
+      let observedArgs: readonly string[] = [];
+      const report = runManualIdentityVerification({
+        repositoryRoot: fixture.root,
+        dependency: fixture.dependency,
+        commandRunner: (_command, args, options) => {
+          observedArgs = args;
+          const relativeToApi = path.relative(
+            path.join(fixture.root, 'apps/api'),
+            path.join(fixture.root, BASEFIX_DEPENDENCY.file.path),
+          );
+          observed = readFileSync(path.join(String(options.cwd), relativeToApi), 'utf8');
+          return {
+            status: 0,
+            stdout: 'Test Files  9 passed (9)\nTests  38 passed (38)\n',
+            stderr: '',
+          };
+        },
+      });
+      expect(observed).toBe(fixture.baselineContent);
+      expect(observedArgs.slice(2)).toEqual(fixture.dependency.manualIdentity.testFiles);
+      expect(report).toMatchObject({
+        relationship: expectedRelationship,
+        patchedFileSha256: sha256(fixture.baselineContent),
+        integrationTree: expectedRelationship === 'ancestor' ? 'reuse-ancestor' : 'overlay-baseline',
+        testFiles: 9,
+        tests: 38,
+        passed: true,
+      });
+    }
+  });
+
+  it('rejects combined history that changes the BASEFIX-owned file', () => {
+    const fixture = baselineTopologyFixture('ancestor');
+    writeFileSync(path.join(fixture.root, BASEFIX_DEPENDENCY.file.path), 'changed-later\n');
+    git(fixture.root, ['add', '.']);
+    git(fixture.root, ['commit', '-q', '-m', 'change-baseline-owned-file']);
+    expect(() => resolveBaselineDependency({
+      repositoryRoot: fixture.root,
+      dependency: fixture.dependency,
+    })).toThrow(`${BASEFIX_DEPENDENCY.file.path} changed after BASEFIX-01`);
+  });
+
+  it('rejects BASEFIX ownership from the unified source manifest', () => {
+    expect(() => assertBaselineOwnedFileExcluded([BASEFIX_DEPENDENCY.file.path]))
+      .toThrow(`unified source must not own BASEFIX file: ${BASEFIX_DEPENDENCY.file.path}`);
+
+    const root = temporaryRoot();
+    const skillRoot = receiptFixture(root);
+    const receiptPath = path.join(skillRoot, 'receipts.json');
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+    mkdirSync(path.dirname(path.join(root, BASEFIX_DEPENDENCY.file.path)), { recursive: true });
+    writeFileSync(path.join(root, BASEFIX_DEPENDENCY.file.path), 'baseline\n');
+    writeFileSync(receiptPath, JSON.stringify({
+      ...receipt,
+      files: {
+        ...receipt.files,
+        [BASEFIX_DEPENDENCY.file.path]: sha256('baseline\n'),
+      },
+    }));
+    expect(() => verifyReceiptTree(fixtureReceiptOptions(root, skillRoot)))
+      .toThrow(`unified source must not own BASEFIX file: ${BASEFIX_DEPENDENCY.file.path}`);
+  });
+
+  it('validates the production BASEFIX policy and the exact 38-test command result', () => {
     const baseline = resolveBaselineDependency();
-    expect(baseline.commit).toBe('1de1847bdc139fa1665ea36c51329a110460bd7b');
+    expect(baseline.commit).toBe(BASEFIX_DEPENDENCY.commit);
     expect(baseline.changedPaths).toEqual(['apps/api/tests/seat-lifecycle.integration.test.ts']);
     expect(['ancestor', 'not-ancestor']).toContain(baseline.relationship);
-    expect(() => resolveBaselineDependency({ commit: 'f'.repeat(40) }))
+    expect(() => resolveBaselineDependency({
+      dependency: {
+        ...BASEFIX_DEPENDENCY,
+        commit: 'f'.repeat(40),
+      },
+    }))
       .toThrow('BASEFIX commit is not readable');
     expect(() => assertManualIdentityResult({
       status: 1,
@@ -314,5 +438,15 @@ describe('formal unified operation ordering', () => {
       stdout: 'Test Files  9 passed (9)\nTests  38 passed (38)\n',
       stderr: '',
     })).toEqual({ testFiles: 9, tests: 38 });
+    expect(() => assertManualIdentityResult({
+      status: 0,
+      stdout: 'Test Files  8 passed (8)\nTests  38 passed (38)\n',
+      stderr: '',
+    })).toThrow('did not report 9 files / 38 tests');
+    expect(() => assertManualIdentityResult({
+      status: 0,
+      stdout: 'Test Files  9 passed (9)\nTests  37 passed (37)\n',
+      stderr: '',
+    })).toThrow('did not report 9 files / 38 tests');
   });
 });

@@ -18,12 +18,12 @@ pnpm test:unified-operation-ordering
 
 Exit code `0` means the exhaustive model found no violation, every terminal state was
 reachable, all seven negative controls produced their expected counterexample, the exact unified
-and nested seat source manifests matched, the temporary BASEFIX+FOR identity replay passed
-38/38, and the receipt's source commit was an ancestor of the tested clean head. Exit code `2`
-means any required receipt/fixture/source is missing or undeclared, a source drifted, only
-declared receipt/evidence files did not change after the source commit, the model lost required
-coverage, or a deliberately broken control failed to fail. There is no missing-receipt
-bootstrap mode.
+and nested seat source manifests matched, the BASEFIX dependency owned its single test source,
+the BASEFIX+FOR identity replay passed 38/38, and the receipt's source commit was an ancestor of
+the tested clean head. Exit code `2` means any required receipt/fixture/source is missing or
+undeclared, a source drifted, the unified manifest claimed a BASEFIX-owned file, only declared
+receipt/evidence files did not change after the source commit, the model lost required coverage,
+or a deliberately broken control failed to fail. There is no missing-receipt bootstrap mode.
 
 To emit a machine-readable report bound to the exact tested head:
 
@@ -87,12 +87,15 @@ pnpm --filter @customer-agent/api exec vitest run \
 The seat replay proves an already admitted command may finish after revocation and a command
 checked after revocation is denied, using real authorization, identity-write, grant-revocation,
 and password-file code. The reachability replay drives the real grant lifecycle up to depth
-five. The manual identity command covers the seat/identity admission boundary and requires the
-separate BASEFIX test correction until that dependency lands. The formal checker constructs a
+five. The manual identity command covers the seat/identity admission boundary and always checks
+the fixed BASEFIX test correction. The formal checker constructs a
 fresh `git archive` of the tested head, verifies BASEFIX's parent ancestry and exact one-file
-patch, replaces only that test blob, and runs the nine-file identity command; any missing
-commit, incorrect relationship, or non-38/38 result fails closed. Neither replay pretends the
-ARC-01 operation envelope is already persisted in product runtime.
+patch and blob hash, replaces only that test blob, and runs the nine-file identity command. The
+supporting module owns the BASEFIX commit, file hash, test manifest, and 9/38 expectation. The
+unified source manifest deliberately excludes this file. Any missing commit, incorrect
+relationship, later change to an ancestor BASEFIX file, ownership overlap, or non-38/38 result
+fails closed. Neither replay pretends the ARC-01 operation envelope is already persisted in
+product runtime.
 
 `receipts.json` binds the model, focused test, ARC-01 predicates, authorization and identity
 consumers, real replay sources, migration inputs, commands/results, environment, and reported

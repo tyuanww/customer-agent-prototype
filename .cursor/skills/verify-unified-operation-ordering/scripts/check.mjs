@@ -5,7 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exploreOperationOrdering } from '../models/operation-ordering.mjs';
-import { runManualIdentityVerification } from './verify-manual-identity-with-basefix.mjs';
+import {
+  assertBaselineOwnedFileExcluded,
+  runManualIdentityVerification,
+} from './verify-manual-identity-with-basefix.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = path.resolve(scriptDirectory, '../../../..');
@@ -85,7 +88,6 @@ const sourceFiles = Object.freeze([
   'apps/api/tests/p0-live-lanes.integration.test.ts',
   'apps/api/tests/project-roster-login.integration.test.ts',
   'apps/api/tests/roster-authority.integration.test.ts',
-  'apps/api/tests/seat-lifecycle.integration.test.ts',
   'apps/api/tests/seat-login-flow.integration.test.ts',
   'apps/api/tests/support/authorization-sources-fixture.ts',
   'apps/api/tests/support/roster-library.ts',
@@ -190,6 +192,8 @@ export function verifyReceiptTree({
   if (receipts.testedSourceCommit !== receipts.syncCommit) {
     throw new Error('receipt testedSourceCommit must equal syncCommit');
   }
+  assertBaselineOwnedFileExcluded(requiredFiles);
+  assertBaselineOwnedFileExcluded(Object.keys(receipts.files ?? {}));
 
   assertExactManifest(Object.keys(receipts.files), requiredFiles, 'unified source');
   const entries = verifyFiles(repositoryRoot, receipts, 'unified');
@@ -236,6 +240,7 @@ export function syncReceipts({ repositoryRoot = defaultRepositoryRoot } = {}) {
   const syncCommit = git(repositoryRoot, ['rev-parse', '--verify', 'HEAD^{commit}']);
   const primary = exploreOperationOrdering('correct');
   if (primary.violation !== null) throw new Error(`primary model failed before receipt sync: ${primary.violation}`);
+  assertBaselineOwnedFileExcluded(sourceFiles);
 
   const seatReceiptPath = path.join(repositoryRoot, nestedSeatReceipt);
   const seatReceipt = readJson(seatReceiptPath, 'seat receipt');
@@ -263,6 +268,7 @@ export function syncReceipts({ repositoryRoot = defaultRepositoryRoot } = {}) {
   const sourceReceipt = combineSourceEntries([...mainEntries, ...nestedEntries]);
   const currentPath = path.join(defaultSkillRoot, 'receipts.json');
   const current = readJson(currentPath, 'receipt');
+  delete current.baselineDependency;
   const next = {
     ...current,
     syncCommit,
@@ -417,7 +423,10 @@ export function runOperationVerifier({
       path: Object.freeze(finding.path),
     }));
   }
-  const basefixVerification = runManualIdentityVerification({ repositoryRoot });
+  const basefixVerification = runManualIdentityVerification({
+    repositoryRoot,
+    testedHead: provenance.testedHead,
+  });
 
   return Object.freeze({
     schemaVersion: 'for-operation-ordering-verifier-report/v1',
