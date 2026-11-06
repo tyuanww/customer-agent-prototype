@@ -1,8 +1,8 @@
 {
-  "syncCommit": "6a295594dabe3108cb7ef08c33f734d98515a656",
+  "syncCommit": "5bfe8aa3d1fbb611f2301d153bbda8a8f188e1b8",
   "candidateState": "verified FOR-01 source commit on the certified ARC-01 base",
-  "capturedAt": "2026-11-06T05:59:26.513Z",
-  "sourceReceipt": "aaf3536dc462a053e564ccd7f6b8ff340328a9ae2dd4d5d18d0744542a527387",
+  "capturedAt": "2026-11-06T06:07:16.838Z",
+  "sourceReceipt": "926594d7b79df0c5dc157bd5f9f087093f197c8636a33a8cc471f4d63695f083",
   "modelStates": 1222,
   "modelEdges": 5318,
   "environment": {
@@ -29,7 +29,7 @@
     ".agents/skills/verify-manual-identity-grants/SKILL.md": "b4793d548568ce200fb9368aabddea632f84ff07cfa347cad6a3af5c88b64d84",
     ".cursor/skills/verify-seat-administration-revocation/SKILL.md": "36c39c5acb2bcf916c46320112d1ce312e903820f493ae2cbebba489003450d9",
     ".cursor/skills/verify-seat-administration-revocation/models/seat-revocation.mjs": "a5d5001aa1df0204478b186c5d13d97590c39edaa3f049df98e77520a78e57d5",
-    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "314d37d6bad9b906eaa0b2a69716112b1949b9d1355cb03ed6d81da534ee35b7",
+    ".cursor/skills/verify-seat-administration-revocation/receipts.json": "41e8e0c5c87233445b751dd6f9e5e1c1e7d53b7c1a585bf313c9497c59cc9759",
     ".cursor/skills/verify-seat-administration-revocation/scripts/check.mjs": "e29d841ba01e7abf146be89e863f85972aa6433935f9fd19a73f8997d4c6eb5d",
     ".cursor/skills/verify-unified-operation-ordering/SKILL.md": "ba501f04fe2279a0a2bc326191242ef0412ecfda832eb21e80c91f15ec9bee01",
     ".cursor/skills/verify-unified-operation-ordering/models/operation-ordering.d.mts": "749f735b875144fbe068a4a68ea1f7e65e768ceb52742f336538f850bbf8ce85",
@@ -90,9 +90,58 @@
     "ARC-01 has no product operation store; no runtime envelope persistence is claimed.",
     "PostgreSQL replays cover existing authorization, seat administration, receipts, and identity grant lifecycle code."
   ],
-  "testedSourceCommit": "6a295594dabe3108cb7ef08c33f734d98515a656",
+  "testedSourceCommit": "5bfe8aa3d1fbb611f2301d153bbda8a8f188e1b8",
   "nestedReceipts": [
     ".cursor/skills/verify-seat-administration-revocation/receipts.json"
   ],
-  "verification": []
+  "verification": [
+    {
+      "id": "unified-model",
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:unified-operation-ordering",
+      "status": "PASS",
+      "result": "20/20 tests; 1222 states; 5318 transitions; 7/7 negative controls; final combined BASEFIX, unreadable blob, summary spoofing, and receipt ownership checks passed"
+    },
+    {
+      "id": "root-tests",
+      "command": "pnpm test",
+      "status": "PASS",
+      "result": "API 862 passed / 595 skipped; Desktop 1863 passed / 12 skipped; workflow 238 passed / 5 skipped"
+    },
+    {
+      "id": "typecheck",
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "result": "all workspace builds and TypeScript checks passed at the final source head"
+    },
+    {
+      "id": "format-build-docs-architecture-workspace",
+      "command": "pnpm lint && pnpm build && pnpm docs:check && pnpm check:architecture && pnpm workspace:check",
+      "status": "PASS",
+      "result": "lint and production build passed; docs checked 356 Markdown files; architecture checked 583 files with zero violations; workspace budgets passed"
+    },
+    {
+      "id": "seat-administration-revocation",
+      "command": "CUSTOMER_AGENT_PG15_BIN=/Users/hutou/homebrew/opt/postgresql@15/bin pnpm test:seat-administration-revocation",
+      "status": "PASS",
+      "result": "request-time policy passed; real create/reset/disable revocations, duplicate create, password failure, two-administrator and serialized password writes passed"
+    },
+    {
+      "id": "intake-desktop",
+      "command": "CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test <eight real-stack spec files>",
+      "status": "PASS",
+      "result": "11/11 passed with real Electron, HTTP and PostgreSQL 15; native query focus now gates every intake login click"
+    },
+    {
+      "id": "electron-e2e",
+      "command": "CUSTOMER_AGENT_STACK_ROOT=/tmp/customer-agent-e2e-stack.D0Ctx7/stack CUSTOMER_AGENT_DESKTOP_USERDATA=/tmp/customer-agent-e2e-desktop.q1DohC pnpm test:e2e",
+      "status": "PASS",
+      "result": "25 passed and 15 skipped against the running synthetic stack; synthetic login, search and native copy passed"
+    },
+    {
+      "id": "api-database-integration",
+      "command": "pnpm --filter @customer-agent/api test:integration && pnpm --filter @customer-agent/database test:integration",
+      "status": "PASS",
+      "result": "Prior evidence: 20 API files / 172 tests and 5 database files / 104 tests passed on PostgreSQL 15; final real-stack suites cover the integrated migration and intake paths"
+    }
+  ]
 }
