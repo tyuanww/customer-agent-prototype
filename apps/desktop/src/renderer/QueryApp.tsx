@@ -736,9 +736,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         setErrorMessage('');
         setHelpStatus('待核实');
         lastProductQueryRef.current = null;
-        setPhase('SEARCH_INPUT');
-        contentRevisionRef.current = 0;
-        resultCountRef.current = 0;
+        // OVL owns the monotonic content revision for every invalidation.
+        reportPhase('SEARCH_INPUT', 0);
         return;
       }
       if (
@@ -1034,6 +1033,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     reportCloseFrameAndMilestone,
     reportHandoffMilestone,
     reportOverlayEvent,
+    reportPhase,
   ]);
 
   useLayoutEffect(() => {

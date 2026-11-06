@@ -19,7 +19,38 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
   test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
   test.setTimeout(180_000);
   const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'existing', inputFormat: 'csv' });
+  const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
+  const host = await createIntakeSyntheticHost({ profile: 'purpose-runtime', inputFormat: 'csv' });
+  if (!host.candidate || !host.object) throw new Error('Synthetic publication fixture was not prepared');
+  const key = host.candidate.key;
+  const contentUrl = `/v1/intake/candidates/${key.candidateId}/versions/${key.version}`;
+  const post = async (suffix: string, body: unknown) => {
+    const response = await host.requestAs('enabler', `${contentUrl}/${suffix}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const value: unknown = await response.json();
+    expect(response.ok, JSON.stringify(value)).toBe(true);
+    return value;
+  };
+  await post('source-confirmation', {
+    operationId: 'operation-source-confirmation', key, expectedEvidenceVersion: 0,
+    confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-operation-export',
+    acquisition: 'controlled-synthetic-export', objectSha256: host.object.sha256,
+    reason: '合成 operation release fixture',
+  });
+  await post('quality/freeze', { operationId: 'operation-quality-freeze', key });
+  const quality = parseContractSchema('IntakeQualityStatus', await (await host.requestAs('enabler', `${contentUrl}/quality?digest=${key.digest}`)).json());
+  const samples = parseContractSchema('IntakeQualitySamplePage', await (await host.requestAs('enabler', `${contentUrl}/quality/samples?${new URLSearchParams({ digest: key.digest, viewHash: quality.viewHash, phase: 'initial', limit: '100' })}`)).json());
+  await post('quality/checks', {
+    operationId: 'operation-quality-checks', key, phase: 'initial',
+    checks: samples.items.map(row => ({ scriptId: row.scriptId, contentHash: row.contentHash, defect: false, reason: '' })),
+  });
+  const receipt = parseContractSchema('IntakeReceipt', await post('publish', {
+    operationId: 'operation-publish', key, baseReleaseId: 'rel_native_base', sourceEvidenceVersion: 1, confirmed: true,
+    title: '合成 operation release', summary: 'release invalidation',
+  }));
+  expect(receipt.state).toBe('published');
+  host.selectIdentity('agent');
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const directory = mkdtempSync(path.join(tmpdir(), 'dashboard-operation-electron-'));
   const evidence = path.resolve(desktopRoot, '../../.gstack/dashboard-operation-control', new Date().toISOString().replace(/[:.]/g, '-'));
@@ -35,10 +66,12 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
     });
     await expect.poll(() => app!.windows().some(page => page.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(page => page.url().includes('role=query'))!;
+    await query.waitForFunction(() => Boolean(window.customerAgent));
     async function openQuery() {
       await app!.evaluate(({ app }) => app.focus({ steal: true }));
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+      await query.bringToFront();
     }
     async function login() {
       await openQuery();
@@ -72,8 +105,57 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
       return reply.views;
     }
     await login();
+    async function searchCurrentContent() {
+      await openQuery();
+      const filters = query.getByRole('button', { name: '筛选', exact: true });
+      if (await filters.count()) {
+        await filters.click();
+        const shops = query.getByRole('combobox', { name: '当前店铺' });
+        await expect(shops).toBeVisible();
+        await shops.selectOption('shop-a');
+      }
+      await query.getByTestId('question-input').fill('洁面');
+      await query.getByTestId('search-button').click();
+      await expect(query.getByTestId('answer-text-1')).toBeVisible();
+    }
+
+    await searchCurrentContent();
+    await app.evaluate(async () => {
+      const plane = (globalThis as unknown as {
+        __dashboardOperationTest: { plane: { submit(input: Record<string, unknown>): Promise<unknown> } };
+      }).__dashboardOperationTest.plane;
+      await plane.submit({
+        domain: 'release',
+        command: 'publish',
+        capability: 'release:publish',
+        intent: { case: 'release-invalidation-content' },
+        execute: async () => ({ kind: 'committed', resultRef: 'rel-content', releaseId: 'rel-content' }),
+      });
+    });
+    await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+    await query.evaluate(() => window.customerAgent!.dismiss());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await openQuery();
+    await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
+    await searchCurrentContent();
     let dashboard = await dashboardPage();
-    expect(await current(dashboard)).toEqual([]);
+    expect((await current(dashboard)).some(view => view.domain === 'release' && view.state === 'committed')).toBe(true);
+    const security = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .map(window => {
+        const role = new URL(window.webContents.getURL()).searchParams.get('role');
+        const preferences = (window.webContents as unknown as {
+          getLastWebPreferences(): { sandbox: boolean; nodeIntegration: boolean; contextIsolation: boolean };
+        }).getLastWebPreferences();
+        return { role, sandbox: preferences.sandbox, nodeIntegration: preferences.nodeIntegration, contextIsolation: preferences.contextIsolation };
+      })
+      .filter((window): window is { role: string; sandbox: boolean; nodeIntegration: boolean; contextIsolation: boolean } => window.role !== null)
+      .sort((left, right) => left.role.localeCompare(right.role)));
+    expect(security).toEqual([
+      { role: 'dashboard', sandbox: true, nodeIntegration: false, contextIsolation: true },
+      { role: 'fox', sandbox: true, nodeIntegration: false, contextIsolation: true },
+      { role: 'query', sandbox: true, nodeIntegration: false, contextIsolation: true },
+    ]);
 
     await app.evaluate(async () => {
       const plane = (globalThis as unknown as {
