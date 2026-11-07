@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { validateContractSchema } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendConflict,
   sendInternalError,
@@ -36,7 +37,7 @@ export function registerNoticeRoutes(
 ): void {
   app.get('/v1/notices/current', async (request: FastifyRequest, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
     const result = await dependencies.service.current(actor);
@@ -48,7 +49,7 @@ export function registerNoticeRoutes(
 
   app.post('/v1/notices/:version/decision', async (request: FastifyRequest, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!hasExactKeys(request.body, ['decision'])) return sendValidationError(reply);
     const parsed = validateContractSchema('NoticeDecisionRequest', request.body);

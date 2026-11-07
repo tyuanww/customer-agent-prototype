@@ -9,6 +9,7 @@ import {
   type SopProjection,
   type SopWindowApi,
 } from '../shared/sop-window';
+import { isSopPipelineProjection, type SopPipelineProjection } from '../shared/sop-pipeline';
 
 // Keep these literals aligned with IPC_CHANNELS. Do not import ipc-channels.ts:
 // a second preload entry would split a shared chunk that sandboxed overlay
@@ -23,10 +24,10 @@ const REPORT_LAYOUT = 'sop-window:report-layout';
 const COPY_CURRENT = 'sop-window:copy-current';
 const PROJECTION = 'sop-window:projection';
 
-const projectionListeners = new Set<(projection: SopProjection) => void>();
+const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection) => void>();
 
 ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
-  if (!isSopProjection(payload)) {
+  if (!isSopProjection(payload) && !isSopPipelineProjection(payload)) {
     return;
   }
   for (const listener of projectionListeners) {

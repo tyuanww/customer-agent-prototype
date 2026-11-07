@@ -18,6 +18,7 @@ import {
   type QueryLayoutAck,
 } from '../shared/query-layout';
 import {
+  OVERLAY_EVENT_CHANNEL,
   canRequestFoxPeek,
   isFoxDragGeneration,
   isFoxDragSettleId,
@@ -25,15 +26,38 @@ import {
   isFoxVisualTransform,
   isHandoffId,
   isHandoffMilestone,
+  isOverlayRendererEvent,
   isReportablePhase,
   isResultCount,
   type WindowContext,
   type FoxDragSettleAck,
 } from '../shared/overlay-events';
+import { isOverlayReportIdentity } from '../shared/overlay-report';
+import { createInitialOverlayState, overlaySnapshot } from '../shared/overlay-machine';
 import type { OverlayController } from './overlay-controller';
 import { isTrustedMainFrameSender, isTrustedSender } from './sender-guard';
 
 export function registerOverlayIpc(getController: () => OverlayController | null): void {
+  const unavailableContext = (): WindowContext => {
+    const state = createInitialOverlayState({
+      sessionEpoch: 1,
+      generation: 1,
+      windowGeneration: 1,
+      releaseId: 'rel_overlay_unbound',
+    });
+    return {
+      role: 'query',
+      phase: 'FOX_IDLE',
+      platform: process.platform,
+      shortcut: {
+        registered: false,
+        accelerator: 'CommandOrControl+Shift+Space',
+        message: '窗口上下文不可用',
+      },
+      snapshot: overlaySnapshot(state),
+      testHarness: false,
+    };
+  };
   const guard = (event: IpcMainInvokeEvent): OverlayController | null => {
     const controller = getController();
     if (!controller) {
@@ -54,17 +78,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
   ipcMain.handle(IPC_CHANNELS.GET_WINDOW_CONTEXT, (event): WindowContext => {
     const controller = guard(event);
     if (!controller) {
-      return {
-        role: 'query',
-        phase: 'FOX_IDLE',
-        platform: process.platform,
-        shortcut: {
-          registered: false,
-          accelerator: 'CommandOrControl+Shift+Space',
-          message: '窗口上下文不可用',
-        },
-        testHarness: false,
-      };
+      return unavailableContext();
     }
     return {
       role: controller.overlayRoleOf(event.sender) ?? 'query',
@@ -75,8 +89,39 @@ export function registerOverlayIpc(getController: () => OverlayController | null
         accelerator: controller.accelerator,
         message: controller.shortcutMessage,
       },
+      snapshot: controller.getOverlaySnapshot(),
       testHarness: controller.testHarness,
     };
+  });
+
+  ipcMain.handle(OVERLAY_EVENT_CHANNEL, (event, payload: unknown) => {
+    const controller = getController();
+    if (
+      !controller
+      || !isTrustedMainFrameSender(
+        event,
+        controller.trustedContents(),
+        controller.rendererDevServerUrl,
+      )
+      || !isOverlayRendererEvent(payload)
+    ) {
+      return null;
+    }
+    const role = controller.overlayRoleOf(event.sender);
+    if (!role) {
+      return null;
+    }
+    if (
+      (payload.type === 'session-changed' || payload.type === 'release-changed'
+        || payload.type === 'focus-changed')
+      && role !== 'query'
+    ) {
+      return null;
+    }
+    if (payload.type === 'frame-observed' && payload.target !== role) {
+      return null;
+    }
+    return controller.reportRendererEvent(payload);
   });
 
   ipcMain.handle(IPC_CHANNELS.QUERY_SUBSCRIBED, (event): void => {
@@ -140,7 +185,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
 
   ipcMain.handle(
     IPC_CHANNELS.REPORT_UI_PHASE,
-    (event, phase: unknown, resultCount: unknown): void => {
+    (event, phase: unknown, resultCount: unknown, identity: unknown): void => {
       const controller = getController();
       if (!controller) {
         return;
@@ -154,11 +199,12 @@ export function registerOverlayIpc(getController: () => OverlayController | null
       if (
         !canReportUiPhase({ trusted, role }) ||
         !isReportablePhase(phase) ||
-        !isResultCount(resultCount)
+        !isResultCount(resultCount) ||
+        !isOverlayReportIdentity(identity)
       ) {
         return;
       }
-      controller.reportUiPhase(phase, resultCount);
+      controller.reportUiPhase(phase, resultCount, identity);
     },
   );
 
@@ -210,17 +256,18 @@ export function registerOverlayIpc(getController: () => OverlayController | null
 
   ipcMain.handle(
     IPC_CHANNELS.REPORT_HANDOFF_MILESTONE,
-    (event, handoffId: unknown, milestone: unknown): void => {
+    (event, handoffId: unknown, milestone: unknown, identity: unknown): void => {
       const controller = guard(event);
       if (
         !controller ||
         controller.overlayRoleOf(event.sender) !== 'query' ||
         !isHandoffId(handoffId) ||
-        !isHandoffMilestone(milestone)
+        !isHandoffMilestone(milestone) ||
+        !isOverlayReportIdentity(identity)
       ) {
         return;
       }
-      controller.reportHandoffMilestone(handoffId, milestone);
+      controller.reportHandoffMilestone(handoffId, milestone, identity);
     },
   );
 
@@ -232,8 +279,9 @@ export function registerOverlayIpc(getController: () => OverlayController | null
       dy: unknown,
       finished: unknown,
       generation: unknown,
+      identity: unknown,
     ): FoxDragSettleAck | null => {
-      if (typeof finished !== 'boolean') {
+      if (typeof finished !== 'boolean' || !isOverlayReportIdentity(identity)) {
         return null;
       }
       const controller = guard(event);
@@ -250,18 +298,19 @@ export function registerOverlayIpc(getController: () => OverlayController | null
           dy,
           finished,
           isFoxDragGeneration(generation) ? generation : undefined,
+          identity,
         );
       }
       if (role !== 'query') {
         return null;
       }
-      return controller.moveBy(dx, dy, finished);
+      return controller.moveBy(dx, dy, finished, undefined, identity);
     },
   );
 
   ipcMain.handle(
     IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE,
-    (event, settleId: unknown): void => {
+    (event, settleId: unknown, identity: unknown): void => {
       const controller = getController();
       if (!controller) {
         return;
@@ -275,14 +324,20 @@ export function registerOverlayIpc(getController: () => OverlayController | null
         !trusted
         || controller.overlayRoleOf(event.sender) !== 'fox'
         || !isFoxDragSettleId(settleId)
+        || !isOverlayReportIdentity(identity)
       ) {
         return;
       }
-      controller.commitFoxDragSettle(settleId);
+      controller.commitFoxDragSettle(settleId, identity);
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.SET_FOX_PEEK, (event, intent: unknown, epoch: unknown): void => {
+  ipcMain.handle(IPC_CHANNELS.SET_FOX_PEEK, (
+    event,
+    intent: unknown,
+    epoch: unknown,
+    identity: unknown,
+  ): void => {
     const controller = getController();
     if (!controller) {
       return;
@@ -293,9 +348,13 @@ export function registerOverlayIpc(getController: () => OverlayController | null
       controller.rendererDevServerUrl,
     );
     const role = controller.overlayRoleOf(event.sender);
-    if (!canRequestFoxPeek(trusted, role, intent) || !isFoxPeekEpoch(epoch)) {
+    if (
+      !canRequestFoxPeek(trusted, role, intent)
+      || !isFoxPeekEpoch(epoch)
+      || !isOverlayReportIdentity(identity)
+    ) {
       return;
     }
-    controller.setFoxPeek(intent, epoch);
+    controller.setFoxPeek(intent, epoch, identity);
   });
 }

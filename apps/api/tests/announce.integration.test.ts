@@ -9,6 +9,7 @@ import { applyDatabaseMigrations } from '@customer-agent/database';
 import { seedContentWriteAuthority } from './support/write-authority.js';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createAnnounceServiceForPool } from '../src/announce-service.js';
+import { createMockAccessEvaluator } from '../src/access/evaluator.js';
 import { createApiApp } from '../src/app.js';
 import { createContentImportService } from '../src/content-import-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
@@ -143,6 +144,7 @@ describe.skipIf(!enabled)('announce current snapshot ack and readiness', () => {
         CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
         CUSTOMER_AGENT_API_PORT: '0', CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t5',
       }),
+      accessEvaluator: createMockAccessEvaluator(),
       repository,
       authService: auth,
       searchDependencies: {

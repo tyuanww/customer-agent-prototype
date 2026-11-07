@@ -10,6 +10,7 @@ import type {
   ResultCount,
   WindowContext,
 } from './overlay-events';
+import type { OverlayReportIdentity } from './overlay-report';
 import type {
   QueryLayoutAck,
   QueryLayoutRequest,
@@ -42,18 +43,34 @@ export type CustomerAgentApi = {
   openSearch: (visualTransform?: FoxVisualTransform) => Promise<void>;
   openDashboard: () => Promise<OpenDashboardResult>;
   dismiss: (restorePreviousApp?: boolean) => Promise<void>;
-  reportUiPhase: (phase: ReportablePhase, resultCount?: ResultCount) => Promise<void>;
-  reportHandoffMilestone?: (handoffId: number, milestone: HandoffMilestone) => Promise<void>;
+  reportUiPhase: (
+    phase: ReportablePhase,
+    resultCount: ResultCount,
+    identity: OverlayReportIdentity,
+  ) => Promise<void>;
+  reportHandoffMilestone?: (
+    handoffId: number,
+    milestone: HandoffMilestone,
+    identity: OverlayReportIdentity,
+  ) => Promise<void>;
   reportQueryLayout?: (request: QueryLayoutRequest) => Promise<QueryLayoutAck>;
   resizeQueryHeight?: (request: QueryResizeRequest) => Promise<QueryLayoutAck>;
   moveFoxBy: (
     deltaX: number,
     deltaY: number,
-    finished?: boolean,
-    generation?: number,
+    finished: boolean,
+    generation: number | undefined,
+    identity: OverlayReportIdentity,
   ) => Promise<FoxDragSettleAck | null>;
-  commitFoxDragSettle: (settleId: number) => Promise<void>;
-  setFoxPeek: (intent: FoxPeekIntent, epoch: number) => Promise<void>;
+  commitFoxDragSettle: (
+    settleId: number,
+    identity: OverlayReportIdentity,
+  ) => Promise<void>;
+  setFoxPeek: (
+    intent: FoxPeekIntent,
+    epoch: number,
+    identity: OverlayReportIdentity,
+  ) => Promise<void>;
   onOverlayCommand: (handler: (command: OverlayCommand) => void) => () => void;
   sopWindow?: QuerySopWindowApi;
 };

@@ -19,6 +19,10 @@ type WorkflowOperation =
   | { action: 'cancel'; body: C['IntakeCancel'] }
   | { action: 'publish'; body: C['IntakePublish'] | LegacyPublish };
 type Request = (path: string, body?: unknown) => Promise<unknown>;
+type OperationBoundary = Readonly<{
+  signal: AbortSignal;
+  beginCommit(): void;
+}>;
 /** Main freezes these display facts before showing the native publication dialog.
  * This is human intent only, never a substitute for server authorization. */
 export type IntakePublicationPrompt = { kind: 'candidate'; title: string; sourceId: string; candidateVersion: number }
@@ -144,7 +148,7 @@ export class ContentIntakeManagement {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.invalidate(), Math.max(0, Date.parse(access.validUntil) - Date.now()));
   }
-  async command(c: IntakeManagementCommand): Promise<IntakeManagementView> {
+  async command(c: IntakeManagementCommand, operation?: OperationBoundary): Promise<IntakeManagementView> {
     if (!isIntakeManagementCommand(c)) return reject('VALIDATION');
     if (this.disposed || !this.session.view().signedIn) throw new ProductHttpError('UNAUTHORIZED');
     // Stopping a read/write wait must work while the original IPC is pending.
@@ -162,6 +166,9 @@ export class ContentIntakeManagement {
     // revoking import can hide a revision without discarding its target.
     if (c.action === 'select' && this.upload.closeRisk()) return reject('CONFLICT');
     const controller = new AbortController(), epoch = this.epoch;
+    const abortFromOperation = () => controller.abort(operation?.signal.reason);
+    if (operation?.signal.aborted) abortFromOperation();
+    else operation?.signal.addEventListener('abort', abortFromOperation, { once: true });
     this.active = controller;
     if (isIntakeUploadCommand(c)) this.activeUpload = controller;
     const assertActive = () => {
@@ -176,6 +183,7 @@ export class ContentIntakeManagement {
         if (this.unresolved() || this.quality.hasDraft() || this.upload.closeRisk()) return reject('CONFLICT');
         const recovery = ['rollback-recover','rollback-retry','rollback-discard'].includes(c.action);
         if (!recovery && !this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }
+        if (c.action === 'rollback-execute') operation?.beginCommit();
         await this.rollback.command(c, request, () => this.validAccess(), async plan => {
           const confirmed = await this.confirmPublication({ kind: 'rollback', baseReleaseId: plan.baseReleaseId,
             targetReleaseId: plan.targetReleaseId, scopes: plan.scopes }, controller.signal);
@@ -188,6 +196,7 @@ export class ContentIntakeManagement {
         // Reset only abandons local preparation. It must work offline after
         // access expiry; Upload still rejects pending writes and parsing jobs.
         if (c.action !== 'upload-reset' && !this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }
+        if (['upload-submit','upload-retry'].includes(c.action)) operation?.beginCommit();
         const candidate = await this.upload.command(c, this.validAccess(), controller.signal); assertActive();
         if (candidate) {
           if (!this.can('content-manage', candidate.sourceId)) return reject('FORBIDDEN');
@@ -289,6 +298,7 @@ export class ContentIntakeManagement {
               this.workflowPending = { action: 'publish', body };
             }
             this.workflowResult = null; this.review = null;
+            operation?.beginCommit();
             await this.transmitWorkflow(request, true);
             // A successful response or historical replay is not a current status.
             if (!this.workflowPending) await this.readCandidate(request);
@@ -311,7 +321,11 @@ export class ContentIntakeManagement {
               await this.quality.refresh(c.phase); this.offset = 0;
             } else if (c.action === 'quality-page') { this.quality.page(c.offset); this.offset = c.offset; }
             else if (c.action === 'check') this.quality.setCheck(c.scriptId, c.defect, c.reason);
-            else { this.receipt = await this.quality[c.action](); this.offset = 0; }
+            else {
+              if (c.action === 'freeze' || c.action === 'submit') operation?.beginCommit();
+              this.receipt = await this.quality[c.action]();
+              this.offset = 0;
+            }
           }
         }
       }
@@ -321,7 +335,11 @@ export class ContentIntakeManagement {
       // failures revoke displayed materials; uncertain bodies remain recoverable.
       if (this.active === controller && !(error instanceof ProductHttpError && ['VALIDATION','CONFLICT'].includes(error.code))) this.invalidate();
       throw error;
-    } finally { if (this.active === controller) this.active = null; if (this.activeUpload === controller) this.activeUpload = null; }
+    } finally {
+      operation?.signal.removeEventListener('abort', abortFromOperation);
+      if (this.active === controller) this.active = null;
+      if (this.activeUpload === controller) this.activeUpload = null;
+    }
   }
   private async readCandidate(request: Request) {
     const selected = this.selected;

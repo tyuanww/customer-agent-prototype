@@ -51,6 +51,16 @@ import { createContentIntakeService } from './content-intake/service.js';
 import { syntheticPrincipalLabels } from './content-intake/synthetic-principal-labels.js';
 import type { ContentObjectStore } from './content-object-store.js';
 import type { IntakePurposePool } from './content-intake/runtime-pool.js';
+import { installAccessAdmission } from './access/admission.js';
+import { createBoundedDenialAudit, type AccessDenialAudit } from './access/audit.js';
+import { createDatabaseAccessEvaluator } from './access/database.js';
+import {
+  createMockAccessEvaluator,
+  createUnavailableAccessEvaluator,
+  type AccessEvaluator,
+} from './access/evaluator.js';
+import { registerAccessRoutes } from './access/routes.js';
+import type { ApiQueryRuntime } from './integration/query-runtime.js';
 
 const NOT_READY_CHECKS = Object.freeze({
   database: 'not_ready',
@@ -92,6 +102,10 @@ export type ApiAppOptions = Readonly<{
     worker: IntakePurposePool;
     store: ContentObjectStore;
   }> | undefined;
+  accessEvaluator?: AccessEvaluator | undefined;
+  accessDenialAudit?: AccessDenialAudit | undefined;
+  queryRuntime?: Pick<ApiQueryRuntime, 'afterReleaseMutation' | 'readiness' | 'close'> | undefined;
+  testPublicRoutes?: readonly string[] | undefined;
 }>;
 
 export function createApiApp(options: ApiAppOptions): FastifyInstance {
@@ -120,6 +134,15 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   const accessLog = options.accessLog;
   const noticeDependencies = options.noticeDependencies;
   const intakeDependencies = options.intakeDependencies;
+  if (options.testPublicRoutes !== undefined && config.profile !== 'test') {
+    throw new Error('Test-only public routes require the test profile');
+  }
+  const accessEvaluator = options.accessEvaluator
+    ?? (authServiceKind(options) === 'mock'
+      ? createMockAccessEvaluator()
+      : intakeDependencies === undefined
+        ? createUnavailableAccessEvaluator()
+        : createDatabaseAccessEvaluator(intakeDependencies.business));
   if (config.sessionMode === 'product' && providedAuthService?.kind !== 'product') {
     throw new Error('Product session mode requires explicit identity service');
   }
@@ -137,6 +160,18 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
     logger: false,
   });
 
+  const accessDenialAudit = options.accessDenialAudit ?? createBoundedDenialAudit({
+    maxEntries: 256,
+    windowMs: 30_000,
+    write: (entry) => {
+      console.info(JSON.stringify({
+        event: 'access_denied',
+        route: entry.route,
+        reason: entry.reason,
+        accessRevision: entry.accessRevision,
+      }));
+    },
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof IdentityFailure) return sendIdentityFailure(reply, error);
     if (isRequestBodyValidationError(error)) return sendValidationError(reply);
@@ -172,8 +207,33 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
     });
   }
 
+  installAccessAdmission(app, {
+    authService,
+    evaluator: accessEvaluator,
+    profile: authService.kind,
+    denialAudit: accessDenialAudit,
+    ...(options.testPublicRoutes === undefined ? {} : {
+      additionalPublicRoutes: options.testPublicRoutes,
+    }),
+  });
+  registerAccessRoutes(app, accessEvaluator, authService);
+
+  if (options.queryRuntime !== undefined) {
+    const queryRuntime = options.queryRuntime;
+    app.addHook('onResponse', async (request, reply) => {
+      if (!isSuccessfulReleaseMutation(request.method, request.routeOptions.url, reply.statusCode)) return;
+      try {
+        await queryRuntime.afterReleaseMutation();
+      } catch {
+        // The release mutation already committed. Query runtime failures make
+        // the active release unavailable instead of changing the HTTP result.
+      }
+    });
+  }
+
   app.addHook('onClose', async () => {
     const results = await Promise.allSettled([
+      () => options.queryRuntime?.close(),
       () => authService.close(), () => repository.close(), () => policyAdminRepository.close(),
       () => contentReviewDependencies?.service.close(),
       () => contentReleaseDependencies?.service.close(),
@@ -257,9 +317,13 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
     const storage = contentImportDependencies === undefined
       ? checks.storage
       : await contentImportDependencies.service.readiness().catch(() => 'not_ready' as const);
-    const content = announceDependencies === undefined
+    const announcedContent = announceDependencies === undefined
       ? checks.content
       : await announceDependencies.service.readiness().catch(() => 'not_ready' as const);
+    const content = announcedContent === 'ok'
+      && (options.queryRuntime?.readiness() ?? 'ok') === 'ok'
+      ? 'ok'
+      : 'not_ready';
     const composedChecks = Object.freeze({
       database: checks.database,
       schema: checks.schema,
@@ -281,4 +345,17 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   });
 
   return app;
+}
+
+function isSuccessfulReleaseMutation(method: string, route: string | undefined, statusCode: number): boolean {
+  if (method.toUpperCase() !== 'POST' || statusCode < 200 || statusCode >= 300 || route === undefined) return false;
+  return route === '/v1/content/publish'
+    || route === '/v1/content/rollback'
+    || route === '/v1/content/rollback-previous'
+    || route === '/v1/intake/candidates/:candidateId/versions/:version/publish'
+    || route === '/v1/intake/rollback';
+}
+
+function authServiceKind(options: ApiAppOptions): 'mock' | 'product' {
+  return options.authService?.kind ?? 'mock';
 }

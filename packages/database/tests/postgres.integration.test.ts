@@ -9,7 +9,11 @@ import type {
   ExecutableDatabaseMigration,
   ExecutableMigrationCatalogue,
 } from '../src/types.js';
-import { verifyDatabaseMigrations, verifyMigrationPrefix } from '../src/verifier.js';
+import {
+  verifyDatabaseMigrations,
+  verifyMigrationPrefix,
+  verifyReadinessSuccessor,
+} from '../src/verifier.js';
 import { Pg15Harness } from '../src/testkit/index.js';
 import { familyCatalog, type FamilyEntry } from './support/family-catalog.js';
 
@@ -57,6 +61,8 @@ const SOP_REPAIR_SUFFIX = [
   '0079_directory_identity_activity',
   '0080_bind_import_batch_tenant',
   '0081_require_import_batch_principal',
+  '0082_access_evaluator',
+  '0083_sop_pipeline_projection',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -210,6 +216,8 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0079_directory_identity_activity',
         '0080_bind_import_batch_tenant',
         '0081_require_import_batch_principal',
+        '0082_access_evaluator',
+        '0083_sop_pipeline_projection',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
@@ -777,7 +785,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(report).toMatchObject({
         status: 'PASS',
         migrationCount: generatedMigrationCatalogue.migrations.length,
-        inventory: { tables: 111, views: 7, functions: 301 },
+        inventory: { tables: 119, views: 7, functions: 305 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
@@ -858,6 +866,83 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       await client.end();
     }
   }, 180_000);
+
+  it('applies ACL before SOP and keeps each suffix authority boundary exact', async () => {
+    const database = harness.createDatabase('acl_sop_suffix');
+    const client = await harness.connect(database.config);
+    const aclCatalogue = Object.freeze({
+      ...generatedMigrationCatalogue,
+      migrations: Object.freeze(generatedMigrationCatalogue.migrations.slice(0, 82)),
+    });
+    try {
+      await applyMigrationCatalogue(client, aclCatalogue);
+      const aclReport = await verifyReadinessSuccessor(client, aclCatalogue);
+      expect(aclReport).toMatchObject({
+        status: 'PASS',
+        migrationCount: 82,
+        inventory: { tables: 111, views: 7, functions: 302 },
+      });
+
+      const sop = await applyDatabaseMigrations(client);
+      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection']);
+      expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
+
+      const privileges = await client.query<{
+        access_business: boolean;
+        access_usage: boolean;
+        publish_business: boolean;
+        publish_public: boolean;
+        read_usage: boolean;
+        read_public: boolean;
+      }>(`
+        SELECT
+          pg_catalog.has_function_privilege('intake_business',
+            'content_intake.access_snapshot(text,timestamptz,text[])', 'EXECUTE') AS access_business,
+          pg_catalog.has_function_privilege('intake_usage',
+            'content_intake.access_snapshot(text,timestamptz,text[])', 'EXECUTE') AS access_usage,
+          pg_catalog.has_function_privilege('intake_business',
+            'content_intake.publish_sop_release_facts(text,jsonb,jsonb)', 'EXECUTE') AS publish_business,
+          pg_catalog.has_function_privilege('public',
+            'content_intake.publish_sop_release_facts(text,jsonb,jsonb)', 'EXECUTE') AS publish_public,
+          pg_catalog.has_function_privilege('intake_usage',
+            'content_intake.read_sop_release_projection(text)', 'EXECUTE') AS read_usage,
+          pg_catalog.has_function_privilege('public',
+            'content_intake.read_sop_release_projection(text)', 'EXECUTE') AS read_public
+      `);
+      expect(privileges.rows).toEqual([{
+        access_business: true,
+        access_usage: false,
+        publish_business: true,
+        publish_public: false,
+        read_usage: true,
+        read_public: false,
+      }]);
+      expect((await client.query(`
+        SELECT relation.relname, owner.rolname AS tableowner
+        FROM pg_catalog.pg_class relation
+        JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+        JOIN pg_catalog.pg_roles owner ON owner.oid = relation.relowner
+        WHERE namespace.nspname = 'content_intake'
+          AND relname IN (
+            'sop_release_scenes', 'sop_release_steps', 'sop_release_branches',
+            'sop_release_messages', 'sop_release_resources', 'sop_release_search_entries',
+            'sop_release_severity', 'sop_release_projections'
+          )
+        ORDER BY relname
+      `)).rows).toEqual([
+        { relname: 'sop_release_branches', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_messages', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_projections', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_resources', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_scenes', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_search_entries', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_severity', tableowner: 'intake_runtime_fn_owner' },
+        { relname: 'sop_release_steps', tableowner: 'intake_runtime_fn_owner' },
+      ]);
+    } finally {
+      await client.end();
+    }
+  }, 120_000);
 
   it.each([
     { version: 'usage', contractSetId: 'cs-ai-c11-openapi-1.17.0-schema-1.21-53906e302288', sourceGitSha: '53906e302288fe0fb70e58b24a40088ecbbd3ef6' },

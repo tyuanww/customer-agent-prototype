@@ -5,6 +5,7 @@ import {
   isTestHarnessEnabled,
   type OverlayTestHarnessHost,
 } from '../../src/main/overlay-test-harness';
+import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
 const electronMocks = vi.hoisted(() => ({
   getFocusedWindow: vi.fn(() => null),
@@ -62,6 +63,7 @@ describe('attachTestHarness without a Fox window', () => {
       toggle: vi.fn(),
       getWindows: vi.fn(() => [] as BrowserWindow[]),
       moveBy,
+      commitFoxDragSettle: vi.fn(),
       openDashboard: vi.fn(),
       closeDashboard: vi.fn(),
       dashboardSnapshot: vi.fn(() => null),
@@ -69,6 +71,12 @@ describe('attachTestHarness without a Fox window', () => {
       queryLayoutDebugState: vi.fn(() => null),
       resizeQueryHeight: vi.fn(),
       reportUiPhase: vi.fn(),
+      getOverlaySnapshot: vi.fn(() => overlaySnapshot(createInitialOverlayState({
+        sessionEpoch: 1,
+        generation: 1,
+        windowGeneration: 1,
+        releaseId: 'rel_synthetic',
+      }))),
     } satisfies OverlayTestHarnessHost;
 
     attachTestHarness(controller);

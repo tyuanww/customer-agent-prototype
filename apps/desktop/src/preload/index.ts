@@ -16,6 +16,11 @@ import {
 import { DEFAULT_RETRIEVAL_PREFERENCE, parseRetrievalPreference } from '../shared/retrieval-preference';
 import { contextBridge, ipcRenderer } from 'electron';
 import { intakeQuery } from './content-intake-query';
+import { isOverlaySnapshotProjection } from '../shared/overlay-machine';
+import {
+  isOverlayReportIdentity,
+  type OverlayReportIdentity,
+} from '../shared/overlay-report';
 import {
   IPC_CHANNELS,
   isOpenDashboardResult,
@@ -25,6 +30,7 @@ import {
   type OpenDashboardResult,
 } from '../shared/contracts';
 import {
+  OVERLAY_EVENT_CHANNEL,
   isFoxDragSettleAck,
   isFoxDragGeneration,
   isFoxDragSettleId,
@@ -34,8 +40,10 @@ import {
   isHandoffId,
   isHandoffMilestone,
   isOverlayCommand,
+  isOverlayRendererEvent,
   isReportablePhase,
   isResultCount,
+  type OverlayControlApi,
   type OverlayCommand,
   type WindowContext,
 } from '../shared/overlay-events';
@@ -144,7 +152,7 @@ function parseSopWindowOpenResult(value: unknown):
   }
   return null;
 }
-const api: CustomerAgentApi = {
+const api: CustomerAgentApi & OverlayControlApi = {
   intakeQuery,
   productSearch: {
     search: request => queryInvoke(IPC_CHANNELS.PRODUCT_SEARCH, request) as Promise<ProductSearchResult>,
@@ -250,6 +258,17 @@ const api: CustomerAgentApi = {
   getWindowContext(): Promise<WindowContext> {
     return ipcRenderer.invoke(IPC_CHANNELS.GET_WINDOW_CONTEXT);
   },
+  async reportOverlayEvent(event) {
+    if (!isOverlayRendererEvent(event)) {
+      return null;
+    }
+    try {
+      const value: unknown = await ipcRenderer.invoke(OVERLAY_EVENT_CHANNEL, event);
+      return isOverlaySnapshotProjection(value) ? value : null;
+    } catch {
+      return null;
+    }
+  },
   openSearch(visualTransform): Promise<void> {
     if (visualTransform !== undefined && !isFoxVisualTransform(visualTransform)) {
       return Promise.resolve();
@@ -264,17 +283,17 @@ const api: CustomerAgentApi = {
   dismiss(restorePreviousApp?: boolean): Promise<void> {
     return ipcRenderer.invoke(IPC_CHANNELS.DISMISS, restorePreviousApp === true);
   },
-  reportUiPhase(phase, resultCount = 0): Promise<void> {
-    if (!isReportablePhase(phase) || !isResultCount(resultCount)) {
+  reportUiPhase(phase, resultCount = 0, identity): Promise<void> {
+    if (!isReportablePhase(phase) || !isResultCount(resultCount) || !isOverlayReportIdentity(identity)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_UI_PHASE, phase, resultCount);
+    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_UI_PHASE, phase, resultCount, identity);
   },
-  reportHandoffMilestone(handoffId, milestone): Promise<void> {
-    if (!isHandoffId(handoffId) || !isHandoffMilestone(milestone)) {
+  reportHandoffMilestone(handoffId, milestone, identity): Promise<void> {
+    if (!isHandoffId(handoffId) || !isHandoffMilestone(milestone) || !isOverlayReportIdentity(identity)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_HANDOFF_MILESTONE, handoffId, milestone);
+    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_HANDOFF_MILESTONE, handoffId, milestone, identity);
   },
   reportQueryLayout(request) {
     if (!isQueryLayoutRequest(request)) {
@@ -288,30 +307,37 @@ const api: CustomerAgentApi = {
     }
     return ipcRenderer.invoke(IPC_CHANNELS.RESIZE_QUERY_HEIGHT, request);
   },
-  moveFoxBy(deltaX: number, deltaY: number, finished = false, generation?: number) {
+  moveFoxBy(
+    deltaX: number,
+    deltaY: number,
+    finished: boolean,
+    generation: number | undefined,
+    identity: OverlayReportIdentity,
+  ) {
     if (
       typeof deltaX !== 'number' ||
       typeof deltaY !== 'number' ||
       typeof finished !== 'boolean' ||
-      (generation !== undefined && !isFoxDragGeneration(generation))
+      (generation !== undefined && !isFoxDragGeneration(generation)) ||
+      !isOverlayReportIdentity(identity)
     ) {
       return Promise.resolve(null);
     }
     return ipcRenderer
-      .invoke(IPC_CHANNELS.MOVE_FOX_BY, deltaX, deltaY, finished, generation)
+      .invoke(IPC_CHANNELS.MOVE_FOX_BY, deltaX, deltaY, finished, generation, identity)
       .then((value: unknown) => (isFoxDragSettleAck(value) ? value : null));
   },
-  commitFoxDragSettle(settleId: number): Promise<void> {
-    if (!isFoxDragSettleId(settleId)) {
+  commitFoxDragSettle(settleId: number, identity): Promise<void> {
+    if (!isFoxDragSettleId(settleId) || !isOverlayReportIdentity(identity)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE, settleId);
+    return ipcRenderer.invoke(IPC_CHANNELS.COMMIT_FOX_DRAG_SETTLE, settleId, identity);
   },
-  setFoxPeek(intent, epoch): Promise<void> {
-    if (!isFoxPeekIntent(intent) || !isFoxPeekEpoch(epoch)) {
+  setFoxPeek(intent, epoch, identity): Promise<void> {
+    if (!isFoxPeekIntent(intent) || !isFoxPeekEpoch(epoch) || !isOverlayReportIdentity(identity)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.SET_FOX_PEEK, intent, epoch);
+    return ipcRenderer.invoke(IPC_CHANNELS.SET_FOX_PEEK, intent, epoch, identity);
   },
   onOverlayCommand(handler) {
     overlayListeners.add(handler);

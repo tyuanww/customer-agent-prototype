@@ -217,6 +217,7 @@ async function windowSnapshot(app: ElectronApplication): Promise<
 async function waitForNativeFocus(
   app: ElectronApplication,
   role: 'query' | 'dashboard',
+  timeout = 5_000,
 ): Promise<void> {
   await expect.poll(async () => {
     const snap = await windowSnapshot(app);
@@ -225,7 +226,7 @@ async function waitForNativeFocus(
       focused: target?.focused ?? false,
       webContentsFocused: target?.webContentsFocused ?? false,
     };
-  }).toEqual({ focused: true, webContentsFocused: true });
+  }, { timeout }).toEqual({ focused: true, webContentsFocused: true });
 }
 
 async function waitForInteractiveQuery(
@@ -247,6 +248,21 @@ async function waitForInteractiveQuery(
     const active = document.activeElement as HTMLElement | null;
     return active?.dataset.testid || active?.id || active?.tagName.toLowerCase() || 'none';
   })).toBe('question-input');
+}
+
+async function waitForVisibleQuery(
+  app: ElectronApplication,
+  query: Page,
+): Promise<void> {
+  await expect.poll(async () => {
+    const snap = await windowSnapshot(app);
+    return snap.find((item) => item.role === 'query' && item.visible) ?? null;
+  }).toMatchObject({
+    width: 600,
+    height: 88,
+  });
+  await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+  await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
 }
 
 async function waitForHarness(app: ElectronApplication): Promise<void> {
@@ -357,7 +373,11 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       expect(before.find((item) => item.role === 'query')?.visibleOnAllWorkspaces).toBe(false);
     }
 
-    await fox.getByTestId('fox-button').click();
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { expand: () => void };
+      }).__demoTest.expand();
+    });
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
       return snap.some(
@@ -369,6 +389,8 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await expect(query.getByTestId('question-input')).toHaveAttribute('placeholder', '登录后查询话术');
     await expect(query.getByTestId('question-input')).toBeFocused();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await waitForNativeFocus(app, 'query');
 
     const questionInput = query.getByTestId('question-input');
     await questionInput.fill(CLEANSER_QUERY);
@@ -452,8 +474,21 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await query.keyboard.press('Escape');
     await expect.poll(async () => {
       const snap = await windowSnapshot(app);
-      return snap.some((item) => item.role === 'query' && item.visible);
-    }).toBe(false);
+      const diagnostics = await app.evaluate(({ BrowserWindow }) => {
+        const harness = (globalThis as { __demoTest?: { getPhase: () => string } }).__demoTest;
+        const focused = BrowserWindow.getFocusedWindow();
+        return {
+          phase: harness?.getPhase() ?? 'missing',
+          focusedRole: focused?.webContents.getURL() ?? 'none',
+        };
+      });
+      return {
+        queryVisible: snap.some((item) => item.role === 'query' && item.visible),
+        queryFocused: snap.find((item) => item.role === 'query')?.focused ?? false,
+        phase: diagnostics.phase,
+        focusedRole: diagnostics.focusedRole,
+      };
+    }).toMatchObject({ queryVisible: false });
 
     const harnessPhase = await app.evaluate(() => {
       const harness = (globalThis as { __demoTest?: { expand: () => void; getPhase: () => string } })
@@ -472,6 +507,7 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       );
     }).toBe(true);
 
+    await waitForNativeFocus(app, 'query');
     await query.getByTestId('question-input').fill('收起后不应保留的临时问题');
     await app.evaluate(() => {
       const harness = (
@@ -488,6 +524,9 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
       const snap = await windowSnapshot(app);
       return snap.some((item) => item.role === 'query' && item.visible);
     }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
 
     await app.evaluate(() => {
       const harness = (
@@ -503,13 +542,14 @@ test('starts as a fox floater, searches, copies verbatim text, and never claims 
     await expect(query.getByTestId('question-input')).toHaveValue('');
 
     await query.keyboard.press('Escape');
-    await app.evaluate(() => {
-      const harness = (globalThis as { __demoTest?: { expand: () => void } }).__demoTest;
-      if (!harness) {
-        throw new Error('DEMO_E2E harness missing');
-      }
-      harness.expand();
-    });
+    await expect.poll(async () => {
+      const snap = await windowSnapshot(app);
+      return snap.some((item) => item.role === 'query' && item.visible);
+    }).toBe(false);
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await fox.getByTestId('fox-button').click();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'true');
     const shellRevealAnimation = await query.locator('.glass-shell').evaluate((shell) => {
       const animation = shell.getAnimations().find((candidate) => {
@@ -656,15 +696,15 @@ test('documents that globalShortcut is exercised via the same main harness, not 
       harness.expand();
       const opened = harness.getPhase();
       harness.dismiss();
-      const closed = harness.getPhase();
       return {
         opened,
-        closed,
         shortcutRegistered: harness.shortcutRegistered(),
       };
     });
     expect(info.opened).toBe('SEARCH_INPUT');
-    expect(info.closed).toBe('FOX_IDLE');
+    await expect.poll(() => app.evaluate(() => (
+      globalThis as { __demoTest?: { getPhase: () => string } }
+    ).__demoTest?.getPhase())).toBe('FOX_IDLE');
     await expect.poll(async () => {
       const windows = await windowSnapshot(app);
       return {
@@ -788,6 +828,8 @@ test('resizes the query window by result count in one session', async () => {
     }).toMatchObject({ width: 600, height: 88, focused: true, webContentsFocused: true });
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await expect(query.getByTestId('question-input')).toBeFocused();
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await waitForNativeFocus(app, 'query');
 
     const searchAndMeasure = async (text: string, cardCount: number) => {
       const input = query.getByTestId('question-input');
@@ -945,6 +987,7 @@ test('@float adopts a WindowServer stage boundary without hover/retract native d
     const fox = await waitForRole(app, 'fox');
     const query = await waitForRole(app, 'query');
     await waitForHarness(app);
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
     await app.evaluate(() => {
       const harness = (
         globalThis as { __demoTest?: { dockFox: (edge: 'left' | 'right') => void } }
@@ -975,10 +1018,18 @@ test('@float adopts a WindowServer stage boundary without hover/retract native d
     await fox.waitForTimeout(80);
 
     await fox.evaluate(async () => {
-      await window.customerAgent?.moveFoxBy(0, 12, false);
-      const settled = await window.customerAgent?.moveFoxBy(0, 0, true);
+      const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+      if (!snapshot) throw new Error('fox snapshot missing');
+      const identity = {
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        generation: snapshot.contract.generation,
+        windowGeneration: snapshot.windowGeneration,
+        contentRevision: snapshot.contentRevision,
+      };
+      await window.customerAgent?.moveFoxBy(0, 12, false, undefined, identity);
+      const settled = await window.customerAgent?.moveFoxBy(0, 0, true, undefined, identity);
       if (settled) {
-        await window.customerAgent?.commitFoxDragSettle(settled.settleId);
+        await window.customerAgent?.commitFoxDragSettle(settled.settleId, identity);
       }
     });
     const stageDragged = { ...stageSeated, y: stageSeated.y + 12, visible: true };
@@ -1142,6 +1193,7 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
       return { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, e: matrix.e, f: matrix.f };
     });
     await waitForInteractiveQuery(app, query);
+    await query.bringToFront();
     await query.screenshot({
       path: path.join(screenshotDir, 'fox-query-canonical.png'),
       omitBackground: true,
@@ -1361,6 +1413,7 @@ test('@float keeps a visible idle halo and programmatic Dock identity evidence',
   const app = await launchApp();
   try {
     const fox = await waitForRole(app, 'fox');
+    await parkFoxPointerOutside(app, fox);
     // Declare this test's media contract explicitly. The preceding test opts
     // into reduced motion, and a halo animation assertion must not inherit
     // either that CDP override or the host's accessibility preference.
@@ -1420,7 +1473,16 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
   try {
     const fox = await waitForRole(app, 'fox');
     await waitForHarness(app);
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
     const dockFox = async (targetEdge: 'left' | 'right') => {
+      await expect.poll(() => app.evaluate(() => {
+        const harness = (globalThis as {
+          __demoTest?: { getOverlaySnapshot: () => { drag: { session: unknown; settle: unknown } } };
+        }).__demoTest;
+        if (!harness) throw new Error('DEMO_E2E harness missing');
+        const { drag } = harness.getOverlaySnapshot();
+        return { dragging: drag.session !== null, settling: drag.settle !== null };
+      })).toEqual({ dragging: false, settling: false });
       await app.evaluate((_electron, edge) => {
         const harness = (
           globalThis as { __demoTest?: { dockFox: (edge: 'left' | 'right') => void } }
@@ -1453,7 +1515,14 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
       expect(before).not.toBeNull();
       const inward = edge === 'left' ? FOX_SIZE - FOX_EDGE_VISIBLE_PX + 24 : -(FOX_SIZE - FOX_EDGE_VISIBLE_PX + 24);
       await fox.evaluate(async (delta) => {
-        await window.customerAgent?.moveFoxBy(delta, 0, false);
+        const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+        if (!snapshot) throw new Error('fox snapshot missing');
+        await window.customerAgent?.moveFoxBy(delta, 0, false, undefined, {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        });
       }, inward);
       const advanced = await readNativeFoxFrame();
       expect(advanced?.width).toBe(FOX_SIZE);
@@ -1464,7 +1533,14 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
         expect(advanced?.x).toBe((before?.x ?? 0) - 24);
       }
       await fox.evaluate(async () => {
-        await window.customerAgent?.moveFoxBy(0, 0, true);
+        const snapshot = (await window.customerAgent?.getWindowContext())?.snapshot;
+        if (!snapshot) throw new Error('fox snapshot missing');
+        await window.customerAgent?.moveFoxBy(0, 0, true, undefined, {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        });
       });
       const finished = await readNativeFoxFrame();
       expect(finished?.x).toBe(advanced?.x);
@@ -1638,6 +1714,11 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
     await fox.emulateMedia({ forcedColors: 'active' });
     await fox.keyboard.press('Tab');
     await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-fox-keyboard-focus', 'true');
+    await expect.poll(async () => (
+      await fox.getByTestId('fox-focus-ring').evaluate(
+        (ring) => Number(getComputedStyle(ring).opacity),
+      )
+    )).toBe(1);
     const forced = await fox.getByTestId('fox-button').evaluate((button) => {
       const ring = button.querySelector<HTMLElement>('[data-testid="fox-focus-ring"]');
       const style = ring ? getComputedStyle(ring) : null;
@@ -1695,6 +1776,346 @@ test('@float keeps dock session, release, focus ring, and visor visibility contr
     expect(reduced.afterEcho.transient).toBe('dragging');
     expect(reduced.afterEcho.session).toBe('left');
     expect(reduced.afterEcho.sessionX).toBe(reduced.afterMove.sessionX);
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float clears session work, returns through blur, and fences an old window generation', async () => {
+  const app = await launchApp();
+  try {
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: {
+          expand: () => void;
+          reportUiPhase: (phase: 'RESULTS', count: 3) => void;
+        };
+      }).__demoTest.expand();
+    });
+    await waitForInteractiveQuery(app, query);
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
+      }).__demoTest.reportUiPhase('RESULTS', 3);
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-phase', 'RESULTS');
+    const beforeSession = await query.evaluate(async () => {
+      const agent = window.customerAgent;
+      if (!agent) throw new Error('customerAgent missing');
+      const snapshot = (await agent.getWindowContext()).snapshot;
+      const handoffId = snapshot.handoff.id;
+      const sessionEpoch = snapshot.contract.sessionEpoch;
+      const windowGeneration = snapshot.windowGeneration;
+      await (agent as unknown as {
+        reportOverlayEvent: (event: {
+          type: 'session-changed';
+          sessionEpoch: number;
+          nextSessionEpoch: number;
+          releaseId: string;
+          windowGeneration: number;
+          generation: number;
+          contentRevision: number;
+        }) => Promise<unknown>;
+      }).reportOverlayEvent({
+        type: 'session-changed',
+        sessionEpoch,
+        nextSessionEpoch: sessionEpoch + 1,
+        releaseId: 'rel_synthetic_next',
+        windowGeneration,
+        generation: snapshot.contract.generation,
+        contentRevision: snapshot.contentRevision,
+      });
+      return { handoffId, sessionEpoch, windowGeneration };
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { blurQuery: () => void };
+      }).__demoTest.blurQuery();
+    });
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await app.evaluate(() => {
+      (globalThis as typeof globalThis & {
+        __demoTest: { expand: () => void };
+      }).__demoTest.expand();
+    });
+    await waitForInteractiveQuery(app, query);
+
+    const recreated = await query.evaluate(async (previous) => {
+      const agent = window.customerAgent;
+      if (!agent) throw new Error('customerAgent missing');
+      const api = agent as unknown as {
+        reportOverlayEvent: (event: {
+          type: 'window-recreated';
+          sessionEpoch: number;
+          windowGeneration: number;
+          nextWindowGeneration: number;
+          generation: number;
+          contentRevision: number;
+        }) => Promise<{ windowGeneration: number } | null>;
+      };
+      const snapshot = (await agent.getWindowContext()).snapshot;
+      await api.reportOverlayEvent({
+        type: 'window-recreated',
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        windowGeneration: snapshot.windowGeneration,
+        nextWindowGeneration: snapshot.windowGeneration + 1,
+        generation: snapshot.contract.generation,
+        contentRevision: snapshot.contentRevision,
+      });
+      const after = (await agent.getWindowContext()).snapshot;
+      return {
+        previousWindowGeneration: previous.windowGeneration,
+        windowGeneration: after.windowGeneration,
+        phase: after.contract.phase,
+      };
+    }, beforeSession);
+    expect(recreated.windowGeneration).toBeGreaterThan(recreated.previousWindowGeneration);
+    expect(recreated.phase).toBe('parked');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute(
+      'data-window-generation',
+      String(recreated.windowGeneration),
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float hands off on a second physical display without crossing work areas', async () => {
+  const app = await launchApp();
+  try {
+    const fox = await waitForRole(app, 'fox');
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    const displays = await app.evaluate(({ screen }) => screen.getAllDisplays().map((display) => ({
+      id: display.id,
+      workArea: display.workArea,
+      primary: display.id === screen.getPrimaryDisplay().id,
+    })));
+    test.skip(displays.length < 2, 'requires at least two physical displays');
+    const secondary = displays.find((display) => !display.primary) ?? displays[1];
+    if (!secondary) {
+      throw new Error('secondary display missing');
+    }
+    await app.evaluate(({ BrowserWindow }, target) => {
+      const win = BrowserWindow.getAllWindows().find((candidate) => (
+        candidate.webContents.getURL().includes('role=fox')
+      ));
+      if (!win) throw new Error('fox window missing');
+      win.setBounds({
+        x: target.workArea.x + 120,
+        y: target.workArea.y + 120,
+        width: 88,
+        height: 88,
+      });
+    }, secondary);
+    await expect.poll(async () => {
+      const snapshot = await windowSnapshot(app);
+      return snapshot.find((item) => item.role === 'fox')?.x ?? Number.NEGATIVE_INFINITY;
+    }).toBeGreaterThanOrEqual(secondary.workArea.x);
+    await fox.getByTestId('fox-button').click();
+    await waitForInteractiveQuery(app, query);
+    const bounds = await app.evaluate(({ BrowserWindow }) => {
+      const queryWindow = BrowserWindow.getAllWindows().find((candidate) => (
+        candidate.webContents.getURL().includes('role=query')
+      ));
+      if (!queryWindow) throw new Error('query window missing');
+      return queryWindow.getBounds();
+    });
+    expect(bounds.x).toBeGreaterThanOrEqual(secondary.workArea.x);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      secondary.workArea.x + secondary.workArea.width,
+    );
+    expect(bounds.y).toBeGreaterThanOrEqual(secondary.workArea.y);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+      secondary.workArea.y + secondary.workArea.height,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test('@float reports reducer and main-command-to-renderer-callback percentiles', async () => {
+  test.setTimeout(180_000);
+  const app = await launchApp();
+  try {
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    let errors = 0;
+    const errorMessages: string[] = [];
+    const cycles = Number(process.env.OVL_BENCH_CYCLES ?? 50);
+    let layoutRequests = 0;
+    let focusChecks = 0;
+    let focusObserved = 0;
+    for (let cycle = 0; cycle < cycles; cycle += 1) {
+      try {
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest: { expand: () => void };
+          }).__demoTest.expand();
+        });
+        await waitForVisibleQuery(app, query);
+        await app.evaluate(({ BrowserWindow }) => {
+          const win = BrowserWindow.getAllWindows().find((item) =>
+            item.webContents.getURL().includes('role=query'),
+          );
+          win?.show();
+          win?.focus();
+          win?.webContents.focus();
+        });
+        focusChecks += 1;
+        try {
+          await app.evaluate(({ app: electronApp }) => {
+            electronApp.focus({ steal: true });
+          });
+          await waitForNativeFocus(app, 'query', 1_500);
+          focusObserved += 1;
+        } catch {
+          // Native focus is a separate OS acceptance; the cycle still exercises it.
+        }
+        await app.evaluate(() => {
+          (globalThis as typeof globalThis & {
+            __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
+          }).__demoTest.reportUiPhase('RESULTS', 3);
+        });
+        await expect.poll(() => query.evaluate(async () => {
+          const agent = window.customerAgent;
+          return agent ? (await agent.getWindowContext()).snapshot.contentPhase : 'missing';
+        })).toBe('RESULTS');
+
+        for (let layoutIndex = 0; layoutIndex < 2; layoutIndex += 1) {
+          await query.evaluate(async (index) => {
+            const agent = window.customerAgent;
+            if (!agent) throw new Error('customerAgent missing');
+            const snapshot = (await agent.getWindowContext()).snapshot;
+            const commandId = snapshot.layout.sequence + 1;
+            const ack = await agent.reportQueryLayout?.({
+              sessionId: snapshot.handoff.id,
+              sequence: commandId,
+              phase: 'RESULTS',
+              resultCount: 3,
+              desiredHeight: 320 + (index % 16) * 8,
+              identity: {
+                sessionEpoch: snapshot.contract.sessionEpoch,
+                generation: snapshot.contract.generation,
+                windowGeneration: snapshot.windowGeneration,
+                contentRevision: snapshot.contentRevision,
+              },
+            });
+            if (!ack?.ok) {
+              const rejectedState = (await agent.getWindowContext()).snapshot;
+              throw new Error(`layout request rejected ${JSON.stringify({
+                phase: rejectedState.contract.phase,
+                contents: rejectedState.contentPhase,
+                revision: rejectedState.contentRevision,
+                sessionEpoch: rejectedState.contract.sessionEpoch,
+                generation: rejectedState.contract.generation,
+                windowGeneration: rejectedState.windowGeneration,
+                handoffId: rejectedState.handoff.id,
+              })}`);
+            }
+            await new Promise<void>((resolve) => {
+              requestAnimationFrame(() => resolve());
+            });
+            await (agent as unknown as {
+              reportOverlayEvent?: (event: {
+                type: 'frame-observed';
+                commandId: number;
+                commandType: 'layout';
+                target: 'query';
+                sessionEpoch: number;
+                windowGeneration: number;
+                generation: number;
+                contentRevision: number;
+              }) => Promise<unknown>;
+            }).reportOverlayEvent?.({
+              type: 'frame-observed',
+              commandId,
+              commandType: 'layout',
+              target: 'query',
+              sessionEpoch: snapshot.contract.sessionEpoch,
+              windowGeneration: snapshot.windowGeneration,
+              generation: snapshot.contract.generation,
+              contentRevision: snapshot.contentRevision,
+            });
+          }, layoutIndex);
+          layoutRequests += 1;
+        }
+
+      } catch (error) {
+        errors += 1;
+        if (errorMessages.length < 5) {
+          errorMessages.push(`cycle ${cycle}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } finally {
+        try {
+          await app.evaluate(() => {
+            (globalThis as typeof globalThis & {
+              __demoTest: { dismiss: () => void };
+            }).__demoTest.dismiss();
+          });
+          await expect.poll(async () => {
+            const snapshot = await windowSnapshot(app);
+            return {
+              queryVisible: snapshot.some((item) => item.role === 'query' && item.visible),
+              foxVisible: snapshot.some((item) => item.role === 'fox' && item.visible),
+            };
+          }).toEqual({ queryVisible: false, foxVisible: true });
+        } catch (error) {
+          errors += 1;
+          if (errorMessages.length < 5) {
+            errorMessages.push(`close ${cycle}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      }
+    }
+    const mainMetrics = await app.evaluate(() => (
+      globalThis as typeof globalThis & {
+        __demoTest: {
+          queryLayoutDebug: () => {
+            performance: {
+              count: number;
+              p50: number | null;
+              p95: number | null;
+              p99: number | null;
+              coldMs: number | null;
+              coldSemantics: 'first-completed-observation';
+              pending: number;
+              errors: number;
+            };
+          };
+        };
+      }
+    ).__demoTest.queryLayoutDebug().performance);
+    console.log(`OVL_FRAME_PERF ${JSON.stringify({
+      method: 'Main records the send timestamp. Renderer reports from rAF callbacks for open/layout and from the close-completion callback for collapse. This is not a paint-completion signal.',
+      p50: mainMetrics.p50,
+      p95: mainMetrics.p95,
+      p99: mainMetrics.p99,
+      inputScale: {
+        activeSessions: 1,
+        openCloseFocusResizeCycles: cycles,
+        layoutRequests,
+        focusChecks,
+        focusObserved,
+        completedObservations: mainMetrics.count,
+      },
+      completedObservations: mainMetrics.count,
+      environment: `${process.platform}/${process.arch}; Electron production build; ${process.arch} host`,
+      errors: errors + mainMetrics.errors,
+      errorMessages,
+      coldWarm: `first completed renderer callback ${mainMetrics.coldMs ?? 'unavailable'} ms from the first observed command; ${cycles} complete open/focus/layout/close cycles`,
+      evidenceComplete: mainMetrics.count >= 200,
+      limiter: 'Main IPC send + renderer scheduling; no paint-completion signal was observed',
+      mainCommandToRendererCallback: mainMetrics,
+    })}`);
+    expect(errors).toBe(0);
+    expect(mainMetrics.errors).toBe(0);
+    expect(mainMetrics.count).toBeGreaterThanOrEqual(200);
   } finally {
     await app.close();
   }

@@ -32,7 +32,6 @@ import {
   type Rect,
 } from '../shared/overlay-geometry';
 import {
-  acceptQueryLayoutSequence,
   acceptedQueryLayoutAck,
   applyQueryVerticalResize,
   clampQueryDesiredHeight,
@@ -40,52 +39,47 @@ import {
   effectiveQuerySize,
   fallbackQuerySizeForPhase,
   isQueryContentLayoutPhase,
-  queryHandoffCenterFromBounds,
-  queryLayoutAckCommand,
   queryResizeDeltaForKey,
-  QUERY_LAYOUT_FALLBACK_MS,
   rejectedQueryLayoutAck,
-  reportableOverlayPhase,
   resolveQueryResizeEdge,
-  shouldIgnoreQueryLayout,
   type QueryLayoutAck,
   type QueryLayoutRequest,
   type QueryResizeEdge,
   type QueryResizeRequest,
 } from '../shared/query-layout';
 import {
-  isOpenPhase,
-  reduceOverlay,
+  applyOverlayEvent,
+  createInitialOverlayState,
+  overlaySnapshot,
+  type NativeEffect,
   type OverlayEvent,
   type OverlayPhase,
+  type OverlayState,
 } from '../shared/overlay-machine';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
-  activateSearchCommand,
-  collapseQueryCommand,
   foxDragSettledCommand,
   foxEdgeCommand,
-  prepareSearchCommand,
-  shortcutStatusCommand,
-  syncFoxEdgeCommand,
-  syncQueryAnchorCommand,
   type FoxDockEdge,
   type FoxDragSettleAck,
   type FoxPeekIntent,
   type FoxVisualTransform,
   type HandoffMilestone,
   type OverlayCommand,
+  type OverlayRendererEvent,
   type OverlayRole,
   type QueryAnchor,
   type ReportablePhase,
   type ResultCount,
 } from '../shared/overlay-events';
 import {
+  type OverlayReportIdentity,
+} from '../shared/overlay-report';
+import {
   openDashboardUnavailable,
   type OpenDashboardResult,
 } from '../shared/dashboard-access';
 import { bindGlobalShortcut, DEFAULT_GLOBAL_ACCELERATOR } from '../shared/shortcut';
-import { QUERY_CLOSE_DURATION_MS, QUERY_OPEN_DURATION_MS } from '../shared/fox-motion';
 import {
   createDashboardBrowserWindow,
   readDashboardWindowSnapshot,
@@ -107,9 +101,26 @@ import { loadRenderer } from './overlay-renderer-loader';
 import { attachTestHarness, isTestHarnessEnabled } from './overlay-test-harness';
 
 const BLUR_GRACE_MS = 240;
-const HANDOFF_PREPARE_TIMEOUT_MS = 180;
-const HANDOFF_FALLBACK_BUFFER_MS = 100;
 const DISPLAY_RECONCILE_DELAY_MS = 100;
+const MAX_COMMAND_OBSERVATIONS = 256;
+
+export type OverlayWorkPort = {
+  cancelQuery(identity: Pick<OverlayReportIdentity, 'sessionEpoch' | 'generation'>): void;
+  cancelCopy(identity: Pick<OverlayReportIdentity, 'sessionEpoch' | 'generation'>): void;
+  clearContent(): void;
+};
+
+type FoxDragTransaction = {
+  geometry: FoxDockDragSession;
+  sessionEpoch: number;
+  windowGeneration: number;
+  generation: number;
+};
+
+type OverlayReportOrigin = Pick<
+  OverlayReportIdentity,
+  'sessionEpoch' | 'generation' | 'windowGeneration'
+>;
 
 export type OverlayControllerOptions = {
   dashboardEnabled?: boolean;
@@ -121,59 +132,47 @@ export type OverlayControllerOptions = {
   onDispose?: () => void;
   onDashboardShown?: () => void;
   runningPoint?: RunningPoint;
+  overlayWork?: OverlayWorkPort;
 };
 
 export class OverlayController {
-  phase: OverlayPhase = 'FOX_IDLE';
   shortcutRegistered = false;
   shortcutMessage = '';
-  resultCount: ResultCount = 0;
   readonly accelerator: string;
   readonly testHarness: boolean;
 
+  private overlayState: OverlayState = createInitialOverlayState({
+    sessionEpoch: 1,
+    generation: 1,
+    windowGeneration: 1,
+    releaseId: 'rel_overlay_unbound',
+  });
+  private readonly timeoutHandles = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly commandFrameStartedAt = new Map<string, number>();
+  private readonly commandCallbackDurations: number[] = [];
+  private coldCallbackMs: number | null = null;
+  private droppedCommandObservations = 0;
+  private staleRendererReports = 0;
+  private lastStaleRendererReport: string | null = null;
+  private effectExecutionDepth = 0;
+  private snapshotDirty = false;
   private fox: BrowserWindow | null = null;
   private query: BrowserWindow | null = null;
   private dashboard: BrowserWindow | null = null;
   private foxOrigin = { x: 80, y: 80 };
-  private foxDockEdge: FoxDockEdge = 'none';
-  private queryDragAnchor: QueryAnchor | null = null;
-  private foxPeekIntent: FoxPeekIntent = 'retract';
-  private foxPeekEpoch = 0;
-  private foxDragSession: FoxDockDragSession | null = null;
-  private foxDragGeneration: number | null = null;
+  private foxDragTransaction: FoxDragTransaction | null = null;
   private legacyFoxDragGenerationSequence = 0;
   private foxDragSettleSequence = 0;
-  private awaitingFoxDragSettle: FoxDragSettleAck | null = null;
   private displayReconcilePending = false;
-  private pendingOpenAfterFoxDrag = false;
   private postFoxDragTimer: ReturnType<typeof setTimeout> | null = null;
   private ignoreBlurUntil = 0;
   private pendingQueryBlur = false;
   private blurRecheckTimer: ReturnType<typeof setTimeout> | null = null;
-  private chromeHandoffTimer: ReturnType<typeof setTimeout> | null = null;
+  private blurRecheckIdentity: OverlayReportOrigin | null = null;
   private queryFocusRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private displayReconcileTimer: ReturnType<typeof setTimeout> | null = null;
   private displayLifecycleBound = false;
-  private chromeHandoffMode: 'preparing-open' | 'opening' | 'closing' | null = null;
-  private chromeHandoffSequence = 0;
-  private activeChromeHandoffId = 0;
-  private chromeHandoffAnchor: 'left' | 'right' = 'left';
-  private pendingFoxVisualTransform: FoxVisualTransform = IDENTITY_FOX_VISUAL_TRANSFORM;
-  private lastQueryContentHeight: number | null = null;
-  private manualQueryHeight: number | null = null;
-  private lastQueryLayoutSequence = 0;
-  private queryResizeEdge: QueryResizeEdge = 'bottom';
-  private queryResizeSession: {
-    sessionId: number;
-    baseline: Rect;
-    edge: QueryResizeEdge;
-    finished: boolean;
-    lastSequence: number;
-    previousManualHeight: number | null;
-  } | null = null;
-  private queryLayoutFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private dashboardOpening: Promise<OpenDashboardResult> | null = null;
-  private restorePreviousAppOnIdle = false;
 
   private disposed = false;
   private readonly fence: ShutdownFence;
@@ -185,6 +184,17 @@ export class OverlayController {
   readonly dashboardEnabled: boolean;
   readonly rendererDevServerUrl: string | undefined;
   private readonly runningLine: string;
+  private readonly overlayWork: OverlayWorkPort;
+
+  get phase(): OverlayPhase {
+    return this.overlayState.phase === 'parked' || this.overlayState.phase === 'closed'
+      ? 'FOX_IDLE'
+      : this.overlayState.contentPhase;
+  }
+
+  get resultCount(): ResultCount {
+    return this.overlayState.resultCount;
+  }
 
   constructor(options: OverlayControllerOptions = {}) {
     this.runningLine = readRunningLine(options.runningPoint ?? 'unknown');
@@ -196,6 +206,17 @@ export class OverlayController {
     this.rendererDevServerUrl = options.rendererDevServerUrl;
     this.onDispose = options.onDispose;
     this.onDashboardShown = options.onDashboardShown;
+    this.overlayWork = options.overlayWork ?? {
+      cancelQuery: (identity) => {
+        this.sendToQuery({ type: 'cancel-query', ...identity });
+      },
+      cancelCopy: (identity) => {
+        this.sendToQuery({ type: 'cancel-copy', ...identity });
+      },
+      clearContent: () => {
+        this.sendToQuery({ type: 'clear-content' });
+      },
+    };
   }
 
   isDisposed(): boolean {
@@ -239,6 +260,385 @@ export class OverlayController {
     return this.query.getBounds();
   }
 
+  getOverlaySnapshot() {
+    return overlaySnapshot(this.overlayState);
+  }
+
+  private overlayEventGuard() {
+    return {
+      sessionEpoch: this.overlayState.sessionEpoch,
+      generation: this.overlayState.generation,
+      windowGeneration: this.overlayState.windowGeneration,
+    };
+  }
+
+  private currentReportOrigin(): OverlayReportOrigin {
+    return {
+      sessionEpoch: this.overlayState.sessionEpoch,
+      generation: this.overlayState.generation,
+      windowGeneration: this.overlayState.windowGeneration,
+    };
+  }
+
+  private currentReportIdentity(): OverlayReportIdentity {
+    return {
+      ...this.currentReportOrigin(),
+      contentRevision: this.overlayState.contentRevision,
+    };
+  }
+
+  private matchesReportOrigin(identity: OverlayReportOrigin): boolean {
+    return this.overlayState.sessionEpoch === identity.sessionEpoch
+      && this.overlayState.generation === identity.generation
+      && this.overlayState.windowGeneration === identity.windowGeneration;
+  }
+
+  private matchesReportIdentity(identity: OverlayReportIdentity): boolean {
+    return this.matchesReportOrigin(identity)
+      && this.overlayState.contentRevision === identity.contentRevision;
+  }
+
+  private dispatchOverlayEvent(event: OverlayEvent) {
+    if (this.isInactive()) {
+      return null;
+    }
+    const transition = applyOverlayEvent(this.overlayState, event);
+    if (transition.decision === 'rejected') {
+      return transition;
+    }
+    const previous = this.overlayState;
+    this.overlayState = transition.state;
+    this.reconcileControllerOwnership(previous, transition.state);
+    if (transition.decision === 'applied') {
+      this.snapshotDirty = true;
+      this.executeNativeEffects(transition.effects);
+    }
+    return transition;
+  }
+
+  private reconcileControllerOwnership(previous: OverlayState, next: OverlayState): void {
+    const lifecycleChanged = previous.sessionEpoch !== next.sessionEpoch
+      || previous.windowGeneration !== next.windowGeneration
+      || previous.generation !== next.generation
+      || next.phase === 'closed';
+    const observationIdentityChanged = lifecycleChanged
+      || previous.contentRevision !== next.contentRevision;
+    if (!observationIdentityChanged) {
+      return;
+    }
+    if (lifecycleChanged) {
+      this.foxDragTransaction = null;
+      this.ignoreBlurUntil = 0;
+      this.clearPendingQueryBlur();
+      this.clearQueryFocusRetry();
+      this.scheduler.clear(this.postFoxDragTimer);
+      this.postFoxDragTimer = null;
+      this.clearTimeoutHandles();
+      this.scheduler.clear(this.displayReconcileTimer);
+      this.displayReconcileTimer = null;
+      this.displayReconcilePending = false;
+    }
+    this.clearCommandObservations();
+  }
+
+  private clearCommandObservations(): void {
+    this.droppedCommandObservations += this.commandFrameStartedAt.size;
+    this.commandFrameStartedAt.clear();
+  }
+
+  private clearTimeoutHandles(): void {
+    for (const handle of this.timeoutHandles.values()) {
+      this.scheduler.clear(handle);
+    }
+    this.timeoutHandles.clear();
+  }
+
+  private timeoutKey(timer: NativeEffect & { type: 'SCHEDULE_TIMEOUT' }): string {
+    return `${timer.timer}:${timer.handoffId}`;
+  }
+
+  private clearTimeoutEffect(
+    timer: Extract<NativeEffect, { type: 'CANCEL_TIMEOUT' }>,
+  ): void {
+    if (timer.handoffId !== undefined) {
+      const key = `${timer.timer}:${timer.handoffId}`;
+      const handle = this.timeoutHandles.get(key);
+      if (handle !== undefined) {
+        this.scheduler.clear(handle);
+        this.timeoutHandles.delete(key);
+      }
+      return;
+    }
+    for (const [key, handle] of this.timeoutHandles) {
+      if (key.startsWith(`${timer.timer}:`)) {
+        this.scheduler.clear(handle);
+        this.timeoutHandles.delete(key);
+      }
+    }
+  }
+
+  private executeNativeEffects(effects: readonly NativeEffect[]): void {
+    this.effectExecutionDepth += 1;
+    try {
+      for (const effect of effects) {
+        switch (effect.type) {
+        case 'SEND_RENDERER_COMMAND': {
+          if (effect.target === 'query') {
+            if (effect.commandId !== undefined && effect.command.type !== 'prepare-search') {
+              this.startCommandObservation(
+                'handoff',
+                effect.commandId,
+                this.currentReportIdentity(),
+              );
+            }
+            this.sendToQuery(effect.command);
+          } else {
+            this.sendToFox(effect.command);
+          }
+          break;
+        }
+        case 'SET_WINDOW_BOUNDS': {
+          if (effect.windowGeneration !== this.overlayState.windowGeneration) {
+            break;
+          }
+          const target = effect.target === 'fox' ? this.fox : this.query;
+          if (this.live(target)) {
+            target.setBounds(effect.bounds);
+            if (effect.target === 'fox') {
+              this.foxOrigin = { x: effect.bounds.x, y: effect.bounds.y };
+            }
+          }
+          break;
+        }
+        case 'SHOW_WINDOW': {
+          if (effect.windowGeneration !== this.overlayState.windowGeneration) {
+            break;
+          }
+          if (effect.target === 'query' && this.live(this.query)) {
+            const prepared = this.query.getBounds();
+            this.setQueryFocusable(true);
+            this.query.webContents.invalidate();
+            this.query.show();
+            this.query.setBounds(prepared);
+          } else if (effect.target === 'fox' && this.live(this.fox)) {
+            this.fox.showInactive();
+          }
+          break;
+        }
+        case 'HIDE_WINDOW': {
+          if (effect.windowGeneration !== this.overlayState.windowGeneration) {
+            break;
+          }
+          const target = effect.target === 'fox' ? this.fox : this.query;
+          if (this.live(target) && target.isVisible()) {
+            target.hide();
+          }
+          break;
+        }
+        case 'FOCUS_WINDOW': {
+          if (
+            effect.windowGeneration !== this.overlayState.windowGeneration
+            || effect.sessionEpoch !== this.overlayState.sessionEpoch
+          ) {
+            break;
+          }
+          if (effect.target === 'query') {
+            this.focusQueryWindow();
+            this.scheduleQueryFocusRetry();
+          } else if (this.live(this.fox)) {
+            this.fox.focus();
+          }
+          break;
+        }
+        case 'RESTORE_PREVIOUS_APP': {
+          if (
+            effect.windowGeneration !== this.overlayState.windowGeneration
+            || effect.sessionEpoch !== this.overlayState.sessionEpoch
+          ) {
+            break;
+          }
+          const fox = this.fox;
+          if (this.live(fox)) {
+            this.yieldOrKeepPalette(fox);
+          }
+          break;
+        }
+        case 'SET_FOCUSABLE':
+          if (effect.target === 'fox') {
+            this.setFoxFocusable(effect.focusable);
+          } else {
+            this.setQueryFocusable(effect.focusable);
+          }
+          break;
+        case 'SCHEDULE_TIMEOUT': {
+          this.clearTimeoutEffect({ type: 'CANCEL_TIMEOUT', timer: effect.timer, handoffId: effect.handoffId });
+          const handle = this.scheduler.schedule(() => {
+            this.timeoutHandles.delete(this.timeoutKey(effect));
+            if (this.isInactive()) {
+              return;
+            }
+            if (effect.timer === 'handoff') {
+              this.dispatchOverlayEvent({
+                type: 'HANDOFF_TIMEOUT',
+                ...effect.guard,
+                handoffId: effect.handoffId,
+              });
+            } else if (effect.timer === 'layout') {
+              this.dispatchOverlayEvent({
+                type: 'LAYOUT_TIMEOUT',
+                ...effect.guard,
+                handoffId: effect.handoffId,
+                sequence: effect.sequence,
+                contentRevision: effect.guard.contentRevision,
+              });
+            } else if (effect.timer === 'drag-settle') {
+              this.dispatchOverlayEvent({
+                type: 'FOX_DRAG_TIMEOUT',
+                ...effect.guard,
+                dragGeneration: effect.dragGeneration,
+              });
+            }
+          }, effect.delayMs);
+          if (handle !== null) {
+            this.timeoutHandles.set(this.timeoutKey(effect), handle);
+          }
+          break;
+        }
+        case 'CANCEL_TIMEOUT':
+          this.clearTimeoutEffect(effect);
+          break;
+        case 'CANCEL_QUERY':
+          this.overlayWork.cancelQuery({
+            sessionEpoch: effect.sessionEpoch,
+            generation: effect.generation,
+          });
+          break;
+        case 'CANCEL_COPY':
+          this.overlayWork.cancelCopy({
+            sessionEpoch: effect.sessionEpoch,
+            generation: effect.generation,
+          });
+          break;
+        case 'CLEAR_CONTENT':
+          this.overlayWork.clearContent();
+          break;
+        case 'APPLY_QUERY_LAYOUT': {
+          const workArea = this.currentWorkArea();
+          const natural = clampQueryDesiredHeight(
+            effect.desiredHeight,
+            this.availableQueryHeight(workArea),
+          );
+          if (this.overlayState.layout.resize === null) {
+            const result = this.applyQueryHeight(
+              natural,
+              this.overlayState.layout.resizeEdge,
+              true,
+            );
+            this.commitNativeLayout(
+              result.height,
+              result.edge,
+              this.overlayState.layout.sequence,
+            );
+          }
+          break;
+        }
+        case 'APPLY_QUERY_LAYOUT_FALLBACK': {
+          if (
+            this.overlayState.handoff.id !== effect.handoffId
+            || this.overlayState.layout.sequence !== effect.sequence
+          ) {
+            break;
+          }
+          const height = this.applyFallbackQueryHeight();
+          if (height !== null) {
+            this.dispatchOverlayEvent({
+              type: 'LAYOUT_FALLBACK_APPLIED',
+              ...this.overlayEventGuard(),
+              handoffId: effect.handoffId,
+              sequence: effect.sequence,
+              height,
+              contentRevision: this.overlayState.contentRevision,
+            });
+          }
+          break;
+        }
+        case 'APPLY_RESIZE': {
+          const result = this.applyQueryHeight(effect.height, effect.edge);
+          this.commitNativeLayout(
+            result.height,
+            result.edge,
+            this.overlayState.layout.sequence,
+          );
+          break;
+        }
+        case 'REFRESH_QUERY_SHADOW':
+          if (this.live(this.query)) {
+            this.platform.refreshTransparentShadow(this.query);
+          }
+          break;
+        case 'FOX_DRAG_SETTLED':
+          this.startCommandObservation(
+            'settle',
+            effect.ack.settleId,
+            this.currentReportIdentity(),
+          );
+          this.sendToFox(foxDragSettledCommand(effect.ack));
+          break;
+        case 'SYNC_FOX_EDGE':
+          this.sendToFox(foxEdgeCommand(effect.edge, effect.peekEpoch));
+          break;
+        }
+      }
+    } finally {
+      this.effectExecutionDepth -= 1;
+      if (this.effectExecutionDepth === 0 && this.snapshotDirty) {
+        this.snapshotDirty = false;
+        this.publishOverlaySnapshot();
+      }
+    }
+  }
+
+  private publishOverlaySnapshot(): void {
+    const command: OverlayCommand = {
+      type: 'overlay-snapshot',
+      snapshot: overlaySnapshot(this.overlayState),
+    };
+    this.sendToFox(command);
+    this.sendToQuery(command);
+  }
+
+  private commitNativeLayout(height: number, edge: QueryResizeEdge, sequence: number): void {
+    if (sequence <= 0 || this.overlayState.phase !== 'active') {
+      return;
+    }
+    const transition = applyOverlayEvent(this.overlayState, {
+      type: 'QUERY_LAYOUT_ACK',
+      ...this.overlayEventGuard(),
+      handoffId: this.overlayState.handoff.id,
+      sequence,
+      height,
+      resizeEdge: edge,
+      contentPhase: this.overlayState.contentPhase,
+      resultCount: this.overlayState.resultCount,
+      contentRevision: this.overlayState.contentRevision,
+    });
+    this.commitAppliedTransition(transition);
+  }
+
+  private commitAppliedTransition(
+    transition: ReturnType<typeof applyOverlayEvent>,
+  ): boolean {
+    if (transition.decision !== 'applied') {
+      return false;
+    }
+    const previous = this.overlayState;
+    this.overlayState = transition.state;
+    this.reconcileControllerOwnership(previous, transition.state);
+    this.snapshotDirty = true;
+    this.executeNativeEffects(transition.effects);
+    return true;
+  }
+
   async start(): Promise<void> {
     if (this.isInactive()) {
       return;
@@ -269,7 +669,8 @@ export class OverlayController {
       this.clearQueryFocusRetry();
       if (!this.queryAcceptsKeyboard() || !this.live(this.query)) {
         this.resignQueryKeyboard({
-          hide: this.phase === 'FOX_IDLE' && this.chromeHandoffMode !== 'closing',
+          hide: this.overlayState.phase === 'parked'
+            && this.overlayState.handoff.mode !== 'closing',
         });
         return;
       }
@@ -311,20 +712,8 @@ export class OverlayController {
       return;
     }
     this.clearFoxYieldShow();
-    if (isOpenPhase(this.phase)) {
+    if (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active') {
       this.activateExisting();
-      return;
-    }
-    // A global shortcut can arrive while the pointer still owns a dock-drag
-    // transaction. Finish the native settle first so the shared-element handoff
-    // starts from the same visual frame the renderer is still displaying.
-    if (
-      this.foxDragSession
-      || this.foxDragGeneration !== null
-      || this.awaitingFoxDragSettle !== null
-    ) {
-      this.pendingOpenAfterFoxDrag = true;
-      this.pendingFoxVisualTransform = visualTransform;
       return;
     }
     this.advanceFoxPeekEpoch();
@@ -332,16 +721,42 @@ export class OverlayController {
     if (this.isWindowVisible(idleFox)) {
       this.syncFoxOriginFromNativeBounds(idleFox);
     }
-    this.pendingFoxVisualTransform = visualTransform;
-    this.restorePreviousAppOnIdle = false;
-    this.applyEvent({ type: 'OPEN' });
+    const workArea = this.currentWorkArea();
+    const size = this.currentQuerySize(workArea);
+    const foxBounds = this.live(idleFox) ? idleFox.getBounds() : {
+      x: this.foxOrigin.x,
+      y: this.foxOrigin.y,
+      width: FOX_SIZE,
+      height: FOX_SIZE,
+    };
+    const queryBounds = placeQueryAnchoredToFox(
+      foxBounds,
+      size,
+      workArea,
+      this.overlayState.fox.edge,
+      this.overlayState.drag.queryAnchor ?? undefined,
+    );
+    const foxVisualCenter = this.currentFoxVisualCenter();
+    this.dispatchOverlayEvent({
+      type: 'OPEN_REQUESTED',
+      ...this.overlayEventGuard(),
+      anchor: this.sessionQueryAnchor(queryAnchorForFox(foxBounds, workArea)),
+      dockEdge: this.overlayState.fox.edge,
+      queryBounds,
+      foxBounds,
+      handoffCenterX: foxVisualCenter.x - queryBounds.x,
+      handoffCenterY: foxVisualCenter.y - queryBounds.y,
+      foxVisualTransform: visualTransform,
+      animate: !this.prefersReducedMotion(),
+    });
   }
 
   querySubscribed(): void {
-    // A profile lookup can delay Query's first subscription past native open.
-    // Re-arm from Main's current intent; a late receiver must not undo dismiss.
-    if (!this.isInactive() && isOpenPhase(this.phase)) {
-      this.applyEvent({ type: 'OPEN' });
+    if (!this.isInactive() && this.overlayState.phase === 'opening') {
+      this.dispatchOverlayEvent({
+        type: 'QUERY_SUBSCRIBED',
+        ...this.overlayEventGuard(),
+      });
     }
   }
 
@@ -349,16 +764,33 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
-    this.restorePreviousAppOnIdle = restorePreviousApp === true;
     this.finishOrClearQueryDrag();
-    this.applyEvent({ type: 'DISMISS' });
+    if (this.overlayState.phase !== 'opening' && this.overlayState.phase !== 'active') {
+      return;
+    }
+    const queryBounds = this.live(this.query) ? this.query.getBounds() : null;
+    const foxVisualCenter = this.currentFoxVisualCenter({ includePeek: false });
+    const animate = Boolean(
+      queryBounds
+      && this.isWindowVisible(this.query)
+      && this.overlayState.handoff.mode === 'none'
+      && !this.prefersReducedMotion(),
+    );
+    this.dispatchOverlayEvent({
+      type: 'DISMISS_REQUESTED',
+      ...this.overlayEventGuard(),
+      restorePreviousApp: restorePreviousApp === true,
+      animate,
+      handoffCenterX: queryBounds ? foxVisualCenter.x - queryBounds.x : 44,
+      handoffCenterY: queryBounds ? foxVisualCenter.y - queryBounds.y : 44,
+    });
   }
 
   toggle(): void {
     if (this.isInactive()) {
       return;
     }
-    if (isOpenPhase(this.phase)) {
+    if (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active') {
       this.dismiss(true);
       return;
     }
@@ -369,19 +801,23 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
-    if (isOpenPhase(this.phase)) {
+    if (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active') {
       this.armBlurGrace();
-      if (this.isWindowVisible(this.query)) {
-        this.focusQueryWindow();
-        this.scheduleQueryFocusRetry();
-        if (this.live(this.fox)) {
-          this.fox.hide();
+      if (this.overlayState.handoff.mode !== 'none') {
+        if (this.isWindowVisible(this.query)) {
+          this.focusQueryWindow();
+          this.scheduleQueryFocusRetry();
+          if (this.live(this.fox)) {
+            this.fox.hide();
+          }
         }
-      }
-      if (this.chromeHandoffMode !== null) {
         return;
       }
-      this.sendToQuery(activateSearchCommand(this.sessionQueryAnchor(), false));
+      this.dispatchOverlayEvent({
+        type: 'QUERY_REACTIVATED',
+        ...this.overlayEventGuard(),
+        anchor: this.sessionQueryAnchor(),
+      });
       return;
     }
     this.openSearch();
@@ -504,137 +940,195 @@ export class OverlayController {
     return this.trustedContents().some((contents) => contents.id === this.dashboard?.webContents.id);
   }
 
-  reportUiPhase(phase: ReportablePhase, resultCount: ResultCount): void {
-    if (this.isInactive() || !isOpenPhase(this.phase)) {
+  reportRendererEvent(event: OverlayRendererEvent) {
+    if (this.isInactive()) {
+      return null;
+    }
+    if (!this.matchesReportOrigin({
+      sessionEpoch: event.sessionEpoch,
+      generation: event.generation,
+      windowGeneration: event.windowGeneration,
+    })) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = event.type === 'frame-observed'
+        ? `${event.type}:${event.commandType}:${event.commandId}:identity`
+        : event.type;
+      return null;
+    }
+    if (event.type === 'frame-observed') {
+      const observed = this.recordRendererFrame(
+        event.commandType,
+        event.commandId,
+        {
+          sessionEpoch: event.sessionEpoch,
+          generation: event.generation,
+          windowGeneration: event.windowGeneration,
+          contentRevision: event.contentRevision,
+        },
+      );
+      if (!observed) {
+        this.staleRendererReports += 1;
+        this.lastStaleRendererReport = `frame-observed:${event.commandType}:${event.commandId}`;
+      }
+      return observed ? overlaySnapshot(this.overlayState) : null;
+    }
+    const identity = {
+      sessionEpoch: event.sessionEpoch,
+      generation: event.generation,
+      windowGeneration: event.windowGeneration,
+    };
+    const transition = event.type === 'session-changed'
+      ? this.dispatchOverlayEvent({
+          type: 'SESSION_CHANGED',
+          ...identity,
+          sessionEpoch: event.nextSessionEpoch,
+          releaseId: event.releaseId || 'rel_overlay_unbound',
+        })
+      : event.type === 'release-changed'
+        ? this.dispatchOverlayEvent({
+            type: 'RELEASE_CHANGED',
+            ...identity,
+            releaseId: event.releaseId,
+            releaseSequence: event.releaseSequence,
+          })
+        : event.type === 'focus-changed'
+          ? this.dispatchOverlayEvent({
+              type: event.focused ? 'QUERY_FOCUSED' : 'QUERY_BLURRED',
+              ...identity,
+            })
+          : this.dispatchOverlayEvent({
+              type: 'WINDOW_RECREATED',
+              ...identity,
+              windowGeneration: event.nextWindowGeneration,
+            });
+    return transition?.decision === 'applied'
+      ? overlaySnapshot(this.overlayState)
+      : null;
+  }
+
+  reportUiPhase(
+    phase: ReportablePhase,
+    resultCount: ResultCount,
+    identity: OverlayReportIdentity,
+  ): void {
+    if (this.isInactive()) {
       return;
     }
-    this.phase = phase;
-    this.resultCount = resultCount;
-    if (phase === 'SEARCH_INPUT') {
-      this.clearQueryHeightOverride();
-      this.syncWindows({ activate: false });
+    if (!this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `content-changed:${phase}`;
       return;
     }
-    if (phase === 'COPIED') {
-      this.settleQueryResizeSession(true);
-      this.clearQueryLayoutFallback();
-      return;
+    const transition = this.dispatchOverlayEvent({
+      type: 'CONTENT_CHANGED',
+      sessionEpoch: identity.sessionEpoch,
+      generation: identity.generation,
+      windowGeneration: identity.windowGeneration,
+      contentRevision: identity.contentRevision,
+      contentPhase: phase,
+      resultCount,
+    });
+    if (transition?.decision !== 'applied') {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `content-changed:${phase}`;
     }
-    if (!isQueryContentLayoutPhase(phase)) {
-      this.settleQueryResizeSession(true);
-    }
-    this.scheduleQueryLayoutFallback();
   }
 
   reportQueryLayout(request: QueryLayoutRequest): QueryLayoutAck {
     if (this.isInactive()) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
+    if (!this.matchesReportIdentity(request.identity)) {
+      this.staleRendererReports += 1;
+      return this.rejectedLayoutAck(request.sessionId, request.sequence);
+    }
     if (
-      shouldIgnoreQueryLayout(this.chromeHandoffMode, this.phase) ||
-      !isOpenPhase(this.phase) ||
-      !isQueryContentLayoutPhase(this.phase) ||
-      request.sessionId !== this.activeChromeHandoffId ||
-      !acceptQueryLayoutSequence(this.lastQueryLayoutSequence, request.sequence)
+      !isQueryContentLayoutPhase(this.overlayState.contentPhase)
+      || request.phase !== this.overlayState.contentPhase
+      || request.resultCount !== this.resultCount
     ) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    if (request.phase !== this.phase || request.resultCount !== this.resultCount) {
-      this.applyFallbackQueryHeight();
+    const transition = applyOverlayEvent(this.overlayState, {
+      type: 'LAYOUT_REQUESTED',
+      sessionEpoch: request.identity.sessionEpoch,
+      generation: request.identity.generation,
+      windowGeneration: request.identity.windowGeneration,
+      contentRevision: request.identity.contentRevision,
+      handoffId: request.sessionId,
+      sequence: request.sequence,
+      desiredHeight: request.desiredHeight,
+      contentPhase: request.phase,
+      resultCount: request.resultCount,
+    });
+    if (transition.decision !== 'applied') {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-
-    const workArea = this.currentWorkArea();
-    const natural = clampQueryDesiredHeight(
-      request.desiredHeight,
-      this.availableQueryHeight(workArea),
-    );
-    this.lastQueryLayoutSequence = request.sequence;
-    this.lastQueryContentHeight = natural;
-    this.clearQueryLayoutFallback();
-    const resizing = this.queryResizeSession !== null && !this.queryResizeSession.finished;
-    const applied = this.manualQueryHeight ?? this.currentQueryHeight();
-    if (!resizing && this.manualQueryHeight === null) {
-      this.applyQueryHeight(natural, this.queryResizeEdgeForCurrent(workArea), true);
-      return this.acceptedLayoutAck(request.sessionId, request.sequence);
-    }
-    return this.acceptedLayoutAck(request.sessionId, request.sequence, applied);
+    this.startCommandObservation('layout', request.sequence, request.identity);
+    this.commitAppliedTransition(transition);
+    return this.acceptedLayoutAck(request.sessionId, request.sequence);
   }
 
   resizeQueryHeight(request: QueryResizeRequest): QueryLayoutAck {
     if (this.isInactive()) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    if (
-      request.sessionId !== this.activeChromeHandoffId ||
-      !acceptQueryLayoutSequence(this.lastQueryLayoutSequence, request.sequence)
-    ) {
+    if (!this.matchesReportIdentity(request.identity)) {
+      this.staleRendererReports += 1;
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-
     if (request.type === 'end' || request.type === 'cancel') {
-      const session = this.queryResizeSession;
-      if (
-        !session ||
-        session.finished ||
-        session.sessionId !== request.sessionId ||
-        !acceptQueryLayoutSequence(session.lastSequence, request.sequence)
-      ) {
+      const transition = applyOverlayEvent(this.overlayState, {
+        type: 'RESIZE_END',
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
+        handoffId: request.sessionId,
+        sequence: request.sequence,
+        height: this.currentQueryHeight(),
+        commit: request.type === 'end',
+      });
+      if (transition.decision !== 'applied') {
         return this.rejectedLayoutAck(request.sessionId, request.sequence);
       }
-      session.lastSequence = request.sequence;
-      this.lastQueryLayoutSequence = request.sequence;
-      session.finished = true;
-      this.queryResizeSession = null;
-      if (request.type === 'cancel') {
-        this.applyQueryHeight(session.baseline.height, session.edge);
-        this.manualQueryHeight = session.previousManualHeight;
-      } else {
-        this.manualQueryHeight = this.currentQueryHeight();
-      }
+      this.startCommandObservation('layout', request.sequence, request.identity);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence);
     }
 
-    if (
-      shouldIgnoreQueryLayout(this.chromeHandoffMode, this.phase) ||
-      !isOpenPhase(this.phase) ||
-      !isQueryContentLayoutPhase(this.phase)
-    ) {
-      return this.rejectedLayoutAck(request.sessionId, request.sequence);
-    }
-
     if (request.type === 'begin') {
-      if (this.queryResizeSession && !this.queryResizeSession.finished) {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
-      }
       const query = this.query;
       if (!this.live(query)) {
         return this.rejectedLayoutAck(request.sessionId, request.sequence);
       }
       const bounds = query.getBounds();
       const edge = this.queryResizeEdgeForCurrent(this.currentWorkArea());
-      this.lastQueryLayoutSequence = request.sequence;
-      this.queryResizeSession = {
-        sessionId: request.sessionId,
-        baseline: bounds,
+      const transition = applyOverlayEvent(this.overlayState, {
+        type: 'RESIZE_BEGIN',
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
+        handoffId: request.sessionId,
+        sequence: request.sequence,
+        baselineHeight: bounds.height,
         edge,
-        finished: false,
-        lastSequence: request.sequence,
-        previousManualHeight: this.manualQueryHeight,
-      };
+      });
+      if (transition.decision !== 'applied') {
+        return this.rejectedLayoutAck(request.sessionId, request.sequence);
+      }
+      this.startCommandObservation('layout', request.sequence, request.identity);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence, bounds.height, edge);
     }
 
     if (request.type === 'keyboard') {
-      if (this.queryResizeSession && !this.queryResizeSession.finished) {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
-      }
-      this.lastQueryLayoutSequence = request.sequence;
       const workArea = this.currentWorkArea();
       const delta = queryResizeDeltaForKey(request.key, request.shiftKey);
       const currentHeight = this.currentQueryHeight();
-      const natural = this.lastQueryContentHeight ?? fallbackQuerySizeForPhase(
-        this.phase,
+      const natural = this.overlayState.layout.desiredHeight ?? fallbackQuerySizeForPhase(
+        this.overlayState.contentPhase,
         this.resultCount,
         workArea,
       ).height;
@@ -644,50 +1138,134 @@ export class OverlayController {
           : delta === 'max'
             ? this.availableQueryHeight(workArea)
             : currentHeight + delta;
-      this.manualQueryHeight = this.applyQueryHeight(
-        nextHeight,
-        this.queryResizeEdgeForCurrent(workArea),
-      );
+      const transition = applyOverlayEvent(this.overlayState, {
+        type: 'RESIZE_KEYBOARD',
+        sessionEpoch: request.identity.sessionEpoch,
+        generation: request.identity.generation,
+        windowGeneration: request.identity.windowGeneration,
+        contentRevision: request.identity.contentRevision,
+        handoffId: request.sessionId,
+        sequence: request.sequence,
+        height: nextHeight,
+        edge: this.queryResizeEdgeForCurrent(workArea),
+      });
+      if (transition.decision !== 'applied') {
+        return this.rejectedLayoutAck(request.sessionId, request.sequence);
+      }
+      this.startCommandObservation('layout', request.sequence, request.identity);
+      this.commitAppliedTransition(transition);
       return this.acceptedLayoutAck(request.sessionId, request.sequence);
     }
 
-    const session = this.queryResizeSession;
-    if (
-      !session ||
-      session.finished ||
-      session.sessionId !== request.sessionId ||
-      !acceptQueryLayoutSequence(session.lastSequence, request.sequence)
-    ) {
+    if (request.type !== 'update') {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    session.lastSequence = request.sequence;
-    this.lastQueryLayoutSequence = request.sequence;
-
-    if (request.type === 'update') {
-      const signed = session.edge === 'top' ? -request.deltaY : request.deltaY;
-      const nextHeight = session.baseline.height + signed;
-      this.applyQueryHeight(nextHeight, session.edge);
-      return this.acceptedLayoutAck(request.sessionId, request.sequence, this.currentQueryHeight(), session.edge);
+    const edge = this.overlayState.layout.resize?.edge ?? this.queryResizeEdgeForCurrent(this.currentWorkArea());
+    const baseline = this.overlayState.layout.resize?.baselineHeight ?? this.currentQueryHeight();
+    const signed = edge === 'top' ? -request.deltaY : request.deltaY;
+    const transition = applyOverlayEvent(this.overlayState, {
+      type: 'RESIZE_UPDATE',
+      sessionEpoch: request.identity.sessionEpoch,
+      generation: request.identity.generation,
+      windowGeneration: request.identity.windowGeneration,
+      contentRevision: request.identity.contentRevision,
+      handoffId: request.sessionId,
+      sequence: request.sequence,
+      height: baseline + signed,
+      edge,
+    });
+    if (transition.decision !== 'applied') {
+      return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-
-    return this.rejectedLayoutAck(request.sessionId, request.sequence);
+    this.startCommandObservation('layout', request.sequence, request.identity);
+    this.commitAppliedTransition(transition);
+    return this.acceptedLayoutAck(request.sessionId, request.sequence, this.currentQueryHeight(), edge);
   }
 
-  reportHandoffMilestone(handoffId: number, milestone: HandoffMilestone): void {
-    if (this.isInactive() || handoffId !== this.activeChromeHandoffId) {
+  reportHandoffMilestone(
+    handoffId: number,
+    milestone: HandoffMilestone,
+    identity: OverlayReportIdentity,
+  ): void {
+    if (this.isInactive()) {
       return;
     }
-    if (milestone === 'open-armed' && this.chromeHandoffMode === 'preparing-open') {
-      this.startPreparedOpen(handoffId, true);
+    if (!this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
+      this.lastStaleRendererReport = `handoff:${milestone}:${handoffId}`;
       return;
     }
-    if (milestone === 'open-finished' && this.chromeHandoffMode === 'opening') {
-      this.finishOpeningHandoff(handoffId);
-      return;
+    const type = milestone === 'open-armed'
+      ? 'HANDOFF_ARMED'
+      : milestone === 'open-finished'
+        ? 'HANDOFF_OPENED'
+        : 'HANDOFF_CLOSED';
+    this.dispatchOverlayEvent({
+      type,
+      sessionEpoch: identity.sessionEpoch,
+      generation: identity.generation,
+      windowGeneration: identity.windowGeneration,
+      handoffId,
+    } as OverlayEvent);
+  }
+
+  private commandObservationKey(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+    identity: OverlayReportIdentity,
+  ): string {
+    return [
+      identity.sessionEpoch,
+      identity.generation,
+      identity.windowGeneration,
+      identity.contentRevision,
+      commandType,
+      commandId,
+    ].join(':');
+  }
+
+  private startCommandObservation(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+    identity: OverlayReportIdentity,
+  ): void {
+    const key = this.commandObservationKey(commandType, commandId, identity);
+    const startedAt = performance.now();
+    if (this.commandFrameStartedAt.has(key)) {
+      this.droppedCommandObservations += 1;
     }
-    if (milestone === 'close-finished' && this.chromeHandoffMode === 'closing') {
-      this.finishClosingHandoff(handoffId);
+    if (this.commandFrameStartedAt.size >= MAX_COMMAND_OBSERVATIONS) {
+      const oldest = this.commandFrameStartedAt.keys().next().value;
+      if (oldest !== undefined) {
+        this.commandFrameStartedAt.delete(oldest);
+        this.droppedCommandObservations += 1;
+      }
     }
+    this.commandFrameStartedAt.set(key, startedAt);
+  }
+
+  private recordRendererFrame(
+    commandType: 'handoff' | 'layout' | 'settle',
+    commandId: number,
+    identity: OverlayReportIdentity,
+  ): boolean {
+    const key = this.commandObservationKey(commandType, commandId, identity);
+    const startedAt = this.commandFrameStartedAt.get(key);
+    if (startedAt === undefined) {
+      return false;
+    }
+    this.commandFrameStartedAt.delete(key);
+    const completedAt = performance.now();
+    const duration = Math.max(0, completedAt - startedAt);
+    this.coldCallbackMs ??= duration;
+    this.commandCallbackDurations.push(duration);
+    if (this.commandCallbackDurations.length > 4_096) {
+      this.commandCallbackDurations.splice(
+        0,
+        this.commandCallbackDurations.length - 4_096,
+      );
+    }
+    return true;
   }
 
   moveBy(
@@ -695,8 +1273,13 @@ export class OverlayController {
     dy: unknown,
     finished = false,
     generation?: number,
+    identity?: OverlayReportIdentity,
   ): FoxDragSettleAck | null {
     if (this.isInactive()) {
+      return null;
+    }
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return null;
     }
     const delta = sanitizeDragDelta(dx, dy);
@@ -713,23 +1296,28 @@ export class OverlayController {
     let foxGeneration: number | null = null;
     if (target === this.fox) {
       foxGeneration = generation ?? this.legacyFoxDragGeneration(finished);
+      if (this.testHarness) {
+        const activeGeneration = this.overlayState.drag.session?.generation;
+        if (activeGeneration !== undefined) {
+          foxGeneration = activeGeneration;
+        } else if (
+          foxGeneration !== null
+          && foxGeneration <= this.overlayState.drag.generation
+        ) {
+          foxGeneration = this.overlayState.drag.generation + 1;
+        }
+      }
       if (foxGeneration === null) {
         return null;
       }
-      if (!finished) {
-        if (this.foxDragGeneration === null) {
-          this.foxDragGeneration = foxGeneration;
-          // A real move from a newer renderer generation supersedes any final
-          // frame that the previous generation never committed. Clear this
-          // unconditionally because a renderer reload may restart generation
-          // numbering at 1 while Main's settleId remains monotonic.
-          this.awaitingFoxDragSettle = null;
-        } else if (this.foxDragGeneration !== foxGeneration) {
-          return null;
-        }
-      } else if (this.foxDragGeneration !== foxGeneration) {
-        // A finished message without the matching native session is stale or
-        // out of order. Never manufacture a settle ACK for it.
+      if (this.overlayState.drag.settle?.generation === foxGeneration) {
+        return null;
+      }
+      const activeGeneration = this.overlayState.drag.session?.generation;
+      if (
+        (finished && activeGeneration !== foxGeneration)
+        || (!finished && activeGeneration !== undefined && activeGeneration !== foxGeneration)
+      ) {
         return null;
       }
     }
@@ -742,31 +1330,59 @@ export class OverlayController {
       : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     if (target === this.fox && !finished) {
       if (
-        !this.foxDragSession
-        && (this.foxDockEdge === 'left' || this.foxDockEdge === 'right')
+        !this.foxDragTransaction
+        && (this.overlayState.fox.edge === 'left' || this.overlayState.fox.edge === 'right')
       ) {
-        this.foxDragSession = createFoxDockDragSession(
-          this.foxDockEdge,
-          this.foxPeekIntent === 'peek',
-          nativeBounds,
-        );
+        this.foxDragTransaction = {
+          geometry: createFoxDockDragSession(
+            this.overlayState.fox.edge,
+            this.overlayState.fox.peekIntent === 'peek',
+            nativeBounds,
+          ),
+          generation: foxGeneration ?? 1,
+          sessionEpoch: this.overlayState.sessionEpoch,
+          windowGeneration: this.overlayState.windowGeneration,
+        };
       }
-      if (this.foxDragSession) {
+      if (
+        this.foxDragTransaction
+        && (
+          this.foxDragTransaction.generation !== foxGeneration
+          || this.foxDragTransaction.sessionEpoch !== this.overlayState.sessionEpoch
+          || this.foxDragTransaction.windowGeneration !== this.overlayState.windowGeneration
+        )
+      ) {
+        this.foxDragTransaction = null;
+      }
+      if (this.foxDragTransaction) {
         const stepped = advanceFoxDockDragSession(
-          this.foxDragSession,
+          this.foxDragTransaction.geometry,
           delta.dx,
           delta.dy,
           sessionWorkArea,
         );
-        this.foxDragSession = stepped.session;
-        target.setBounds(stepped.nativeRect);
-        this.clearQueryDragGesture();
-        this.foxOrigin = { x: stepped.nativeRect.x, y: stepped.nativeRect.y };
+        this.foxDragTransaction = {
+          ...this.foxDragTransaction,
+          geometry: stepped.session,
+        };
+        const transition = this.dispatchOverlayEvent({
+          type: 'FOX_DRAG_MOVED',
+          ...this.overlayEventGuard(),
+          dragGeneration: foxGeneration ?? 1,
+          target: 'fox',
+          dx: delta.dx,
+          dy: delta.dy,
+          nextBounds: stepped.nativeRect,
+          displayId: screen.getDisplayMatching(stepped.nativeRect).id,
+        });
+        if (transition?.decision !== 'applied') {
+          this.foxDragTransaction = null;
+          return null;
+        }
         if (
           foxDockDragSessionVisuallyUndocked(stepped.session)
-          && this.foxDockEdge !== 'none'
+          && this.overlayState.fox.edge !== 'none'
         ) {
-          this.foxDockEdge = 'none';
           this.resetFoxPeekLifecycle('none');
         }
         return null;
@@ -788,25 +1404,11 @@ export class OverlayController {
       workArea,
       target === this.fox ? 0 : undefined,
     );
-    target.setBounds(next);
-    if (target === this.fox) {
-      this.clearQueryDragGesture();
-      this.foxOrigin = { x: next.x, y: next.y };
-    } else if (this.phase !== 'FOX_IDLE' && this.chromeHandoffMode !== 'closing' && this.chromeHandoffMode !== 'preparing-open') {
-      if (this.queryDragAnchor === null) {
-        this.queryDragAnchor = this.currentQueryAnchor();
-      }
-      const inferredFox = inferFoxRectFromQuery(next, workArea, this.queryDragAnchor);
-      this.foxOrigin = { x: inferredFox.x, y: inferredFox.y };
-    } else {
-      this.clearQueryDragGesture();
-    }
     if (finished) {
       if (target === this.fox) {
-        const session = this.foxDragSession;
-        this.foxDragSession = null;
-        const settledGeneration = this.foxDragGeneration;
-        this.foxDragGeneration = null;
+        const transaction = this.foxDragTransaction;
+        this.foxDragTransaction = null;
+        const settledGeneration = this.overlayState.drag.session?.generation ?? null;
         if (settledGeneration === null) {
           return null;
         }
@@ -817,8 +1419,8 @@ export class OverlayController {
           height: FOX_SIZE,
         };
         const foxWorkArea = screen.getDisplayMatching(inferredFox).workArea;
-        const settled = session
-          ? finishFoxDockDragSession(session, foxWorkArea)
+        const settled = transaction
+          ? finishFoxDockDragSession(transaction.geometry, foxWorkArea)
           : {
               rect: dockFoxNativeRect(
                 inferredFox,
@@ -827,60 +1429,131 @@ export class OverlayController {
               ),
               edge: resolveFoxDockAfterDrag(inferredFox, foxWorkArea),
             };
-        this.foxDockEdge = settled.edge;
-        this.fox.setBounds(settled.rect);
         this.foxOrigin = { x: settled.rect.x, y: settled.rect.y };
-        const epoch = this.resetFoxPeekLifecycle(settled.edge);
-        const settle: FoxDragSettleAck = {
+        const settleId = ++this.foxDragSettleSequence;
+        const transition = this.dispatchOverlayEvent({
+          type: 'FOX_DRAG_ENDED',
+          ...this.overlayEventGuard(),
+          dragGeneration: settledGeneration,
+          target: 'fox',
+          settledBounds: settled.rect,
           edge: settled.edge,
-          epoch,
-          generation: settledGeneration,
-          settleId: ++this.foxDragSettleSequence,
-        };
-        this.awaitingFoxDragSettle = settle;
-        this.sendToFox(foxDragSettledCommand(settle));
-        this.clearQueryDragGesture();
+          settleId,
+          displayId: screen.getDisplayMatching(settled.rect).id,
+        });
+        if (transition?.decision !== 'applied') {
+          return null;
+        }
         this.schedulePostFoxDragWork();
-        return settle;
+        const active = this.overlayState.drag.settle;
+        return active?.id === settleId
+          ? {
+              edge: active.edge,
+              epoch: this.overlayState.fox.peekEpoch,
+              generation: active.generation,
+              settleId: active.id,
+            }
+          : null;
       } else {
+        const anchor = this.currentQueryAnchor();
+        const moved = this.dispatchOverlayEvent({
+          type: 'FOX_DRAG_MOVED',
+          ...this.overlayEventGuard(),
+          dragGeneration: Math.max(1, this.overlayState.drag.generation),
+          target: 'query',
+          dx: delta.dx,
+          dy: delta.dy,
+          nextBounds: next,
+          displayId: targetDisplay.id,
+          queryAnchor: anchor,
+        });
+        if (moved?.decision !== 'applied') {
+          return null;
+        }
+        const ended = this.dispatchOverlayEvent({
+          type: 'FOX_DRAG_ENDED',
+          ...this.overlayEventGuard(),
+          dragGeneration: Math.max(1, this.overlayState.drag.generation),
+          target: 'query',
+          settledBounds: next,
+          edge: resolveFoxDockAfterDrag(
+            inferFoxRectFromQuery(next, workArea, anchor),
+            workArea,
+          ),
+          settleId: ++this.foxDragSettleSequence,
+          displayId: targetDisplay.id,
+        });
+        if (ended?.decision !== 'applied') {
+          return null;
+        }
         this.settlePinnedQueryDrag(next, workArea);
+      }
+    } else {
+      const transition = this.dispatchOverlayEvent({
+        type: 'FOX_DRAG_MOVED',
+        ...this.overlayEventGuard(),
+        dragGeneration: foxGeneration ?? Math.max(1, this.overlayState.drag.generation),
+        target: target === this.fox ? 'fox' : 'query',
+        dx: delta.dx,
+        dy: delta.dy,
+        nextBounds: next,
+        displayId: targetDisplay.id,
+        queryAnchor: target === this.query
+          ? this.overlayState.drag.queryAnchor ?? this.currentQueryAnchor()
+          : undefined,
+      });
+      if (transition?.decision !== 'applied') {
+        return null;
+      }
+      if (target === this.fox) {
+        this.foxOrigin = { x: next.x, y: next.y };
+      } else {
+        const anchor = this.overlayState.drag.queryAnchor ?? this.currentQueryAnchor();
+        const inferredFox = inferFoxRectFromQuery(next, workArea, anchor);
+        this.foxOrigin = { x: inferredFox.x, y: inferredFox.y };
       }
     }
     return null;
   }
 
-  commitFoxDragSettle(settleId: number): void {
+  commitFoxDragSettle(settleId: number, identity?: OverlayReportIdentity): void {
     if (this.isInactive()) {
       return;
     }
-    const awaiting = this.awaitingFoxDragSettle;
-    if (!awaiting || awaiting.settleId !== settleId) {
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return;
     }
-    this.awaitingFoxDragSettle = null;
-    if (this.foxDragSession || this.foxDragGeneration !== null) {
+    const settle = this.overlayState.drag.settle;
+    if (!settle || settle.id !== settleId) {
       return;
     }
-    if (!this.pendingOpenAfterFoxDrag) {
-      return;
-    }
-    const visualTransform = this.pendingFoxVisualTransform;
-    this.pendingOpenAfterFoxDrag = false;
-    // Main owns this transition: clearing the final settle fence and starting
-    // the Query handoff happen in the same event-loop turn.
-    this.openSearch(visualTransform);
+    this.dispatchOverlayEvent({
+      type: 'FOX_DRAG_SETTLE_COMMITTED',
+      ...this.overlayEventGuard(),
+      dragGeneration: settle.generation,
+      settleId,
+    });
   }
 
-  setFoxPeek(intent: FoxPeekIntent, epoch: number): void {
+  setFoxPeek(
+    intent: FoxPeekIntent,
+    epoch: number,
+    identity?: OverlayReportIdentity,
+  ): void {
     const fox = this.fox;
     if (
       this.isInactive() ||
       !this.live(fox) ||
       !fox.isVisible() ||
-      this.phase !== 'FOX_IDLE' ||
-      this.foxDockEdge === 'none' ||
-      epoch !== this.foxPeekEpoch
+      this.overlayState.phase !== 'parked' ||
+      this.overlayState.fox.edge === 'none' ||
+      epoch !== this.overlayState.fox.peekEpoch
     ) {
+      return;
+    }
+    if (identity && !this.matchesReportOrigin(identity)) {
+      this.staleRendererReports += 1;
       return;
     }
     // Peek/retract is a renderer-only crop. Read the frame that WindowServer
@@ -888,10 +1561,15 @@ export class OverlayController {
     // This avoids a Stage Manager loop where x=0 is repeatedly requested and
     // macOS repeatedly seats the background overlay at its active-stage edge.
     this.syncFoxOriginFromNativeBounds(fox);
-    if (intent === this.foxPeekIntent) {
+    if (intent === this.overlayState.fox.peekIntent) {
       return;
     }
-    this.foxPeekIntent = intent;
+    this.dispatchOverlayEvent({
+      type: 'FOX_PEEK_CHANGED',
+      ...this.overlayEventGuard(),
+      intent,
+      peekEpoch: epoch,
+    });
   }
 
   beginNativeContextMenu(win: BrowserWindow): () => void {
@@ -922,255 +1600,36 @@ export class OverlayController {
     this.clearPendingQueryBlur();
     this.clearQueryFocusRetry();
     this.clearFoxYieldShow();
-    this.cancelChromeHandoff();
-    this.clearQueryLayoutFallback();
     this.displayReconcilePending = false;
-    this.pendingOpenAfterFoxDrag = false;
-    this.foxDragSession = null;
-    this.foxDragGeneration = null;
-    this.awaitingFoxDragSettle = null;
+    this.foxDragTransaction = null;
     this.scheduler.clear(this.postFoxDragTimer);
     this.postFoxDragTimer = null;
-    this.queryResizeSession = null;
+    for (const handle of this.timeoutHandles.values()) {
+      this.scheduler.clear(handle);
+    }
+    this.timeoutHandles.clear();
     this.scheduler.dispose();
     globalShortcut.unregisterAll();
     this.onDispose?.();
   }
 
-  private applyEvent(event: OverlayEvent): void {
-    if (this.isInactive()) {
-      return;
-    }
-    const next = reduceOverlay(this.phase, event);
-    if (next === this.phase && event.type !== 'OPEN') {
-      if (event.type === 'TOGGLE' || event.type === 'DISMISS') {
-        return;
-      }
-    }
-    this.phase = next;
-    if (next === 'FOX_IDLE' || next === 'SEARCH_INPUT') {
-      this.resultCount = 0;
-      this.clearQueryHeightOverride();
-    }
-    this.syncWindows({ activate: next === 'SEARCH_INPUT' && event.type !== 'DISMISS' });
-  }
-
-  private syncWindows(options: { activate?: boolean } = {}): void {
-    const fox = this.fox;
-    const query = this.query;
-    if (!this.live(fox) || !this.live(query)) {
-      return;
-    }
-
-    if (this.phase === 'FOX_IDLE') {
-      this.finishOrClearQueryDrag();
-      this.clearPendingQueryBlur();
-      const workArea = this.currentWorkArea();
-      const foxRect = clampRectToWorkArea(
-        {
-          x: this.foxOrigin.x,
-          y: this.foxOrigin.y,
-          width: FOX_SIZE,
-          height: FOX_SIZE,
-        },
-        workArea,
-        0,
-      );
-      this.armBlurGrace();
-      const shouldAnimate =
-        this.isWindowVisible(query) &&
-        this.chromeHandoffMode !== 'preparing-open' &&
-        !this.prefersReducedMotion();
-      this.cancelChromeHandoff();
-      const handoffId = this.nextChromeHandoffId();
-      this.chromeHandoffAnchor = this.sessionQueryAnchor(queryAnchorForFox(foxRect, workArea));
-      this.chromeHandoffMode = shouldAnimate ? 'closing' : null;
-      const queryBounds = query.getBounds();
-      const foxVisualCenter = this.currentFoxVisualCenter({ includePeek: false });
-      const handoffCenter = queryHandoffCenterFromBounds(foxVisualCenter, queryBounds);
-      this.sendToQuery(collapseQueryCommand({
-        handoffId,
-        anchor: this.chromeHandoffAnchor,
-        dockEdge: this.foxDockEdge,
-        animate: shouldAnimate,
-        handoffCenterX: handoffCenter.x,
-        handoffCenterY: handoffCenter.y,
-      }));
-      this.resetFoxPeekLifecycle(this.foxDockEdge);
-      if (!shouldAnimate) {
-        this.finishClosingHandoff(handoffId);
-        return;
-      }
-      this.chromeHandoffTimer = this.scheduler.schedule(() => {
-        this.chromeHandoffTimer = null;
-        this.finishClosingHandoff(handoffId);
-      }, QUERY_CLOSE_DURATION_MS + HANDOFF_FALLBACK_BUFFER_MS);
-      return;
-    }
-
-    const workArea = this.currentWorkArea();
-    const size = this.currentQuerySize(workArea);
-    const fullFoxRect: Rect = {
-      x: this.foxOrigin.x,
-      y: this.foxOrigin.y,
-      width: FOX_SIZE,
-      height: FOX_SIZE,
-    };
-    const placed = placeQueryAnchoredToFox(
-      fullFoxRect,
-      size,
-      workArea,
-      this.foxDockEdge,
-      this.queryDragAnchor ?? undefined,
-    );
-    if (options.activate) {
-      this.clearPendingQueryBlur();
-    }
-    this.armBlurGrace();
-    query.setBounds(placed);
-    const acceptedQueryBounds = query.getBounds();
-    if (options.activate) {
-      this.cancelChromeHandoff();
-      const handoffId = this.nextChromeHandoffId();
-      const anchor = this.sessionQueryAnchor(queryAnchorForFox(fullFoxRect, workArea));
-      const foxVisualCenter = this.currentFoxVisualCenter();
-      this.chromeHandoffMode = 'preparing-open';
-      this.chromeHandoffAnchor = anchor;
-      this.sendToQuery(prepareSearchCommand({
-        handoffId,
-        anchor,
-        handoffCenterX: foxVisualCenter.x - acceptedQueryBounds.x,
-        handoffCenterY: foxVisualCenter.y - acceptedQueryBounds.y,
-        foxVisualTransform: this.pendingFoxVisualTransform,
-      }));
-      this.pendingFoxVisualTransform = IDENTITY_FOX_VISUAL_TRANSFORM;
-      this.chromeHandoffTimer = this.scheduler.schedule(() => {
-        this.chromeHandoffTimer = null;
-        this.startPreparedOpen(handoffId, false);
-      }, HANDOFF_PREPARE_TIMEOUT_MS);
-      return;
-    }
-    if (this.chromeHandoffMode === null && this.isWindowVisible(fox)) {
-      fox.hide();
-    }
-  }
-
-  private startPreparedOpen(handoffId: number, rendererArmed: boolean): void {
-    const fox = this.fox;
-    const query = this.query;
-    if (
-      this.isInactive() ||
-      handoffId !== this.activeChromeHandoffId ||
-      this.chromeHandoffMode !== 'preparing-open' ||
-      !isOpenPhase(this.phase) ||
-      !this.live(fox) ||
-      !this.live(query)
-    ) {
-      return;
-    }
-    this.clearChromeHandoffTimer();
-    // Electron 39/macOS can reapply the native cascade position when a hidden
-    // transparent BrowserWindow is shown for the first time. Preserve the
-    // prepared frame and restore it immediately after show so the proxy fox and
-    // the native fox share one screen-space center during the handoff.
-    const preparedBounds = query.getBounds();
-    query.webContents.invalidate();
-    this.setQueryFocusable(true);
-    query.show();
-    query.setBounds(preparedBounds);
-    fox.hide();
-    // Hide the previously focused fox before the final focus handoff. On macOS
-    // WindowServer can process a later fox.hide() as an app deactivation and
-    // revoke focus that was just assigned to Query.
-    this.focusQueryWindow();
-    this.scheduleQueryFocusRetry();
-    const animate = rendererArmed && !this.prefersReducedMotion();
-    this.chromeHandoffMode = 'opening';
-    this.sendToQuery(activateSearchCommand(this.chromeHandoffAnchor, animate, handoffId));
-    if (!animate) {
-      this.finishOpeningHandoff(handoffId);
-      return;
-    }
-    this.chromeHandoffTimer = this.scheduler.schedule(() => {
-      this.chromeHandoffTimer = null;
-      this.finishOpeningHandoff(handoffId);
-    }, QUERY_OPEN_DURATION_MS + HANDOFF_FALLBACK_BUFFER_MS);
-  }
-
-  private finishOpeningHandoff(handoffId: number): void {
-    if (
-      this.isInactive() ||
-      handoffId !== this.activeChromeHandoffId ||
-      (this.chromeHandoffMode !== 'opening' && this.chromeHandoffMode !== 'preparing-open')
-    ) {
-      return;
-    }
-    this.clearChromeHandoffTimer();
-    this.chromeHandoffMode = null;
-    if (this.live(this.fox)) {
-      this.fox.hide();
-    }
-    if (this.live(this.query)) {
-      this.platform.refreshTransparentShadow(this.query);
-    }
-  }
-
-  private finishClosingHandoff(handoffId: number): void {
-    if (
-      this.isInactive() ||
-      handoffId !== this.activeChromeHandoffId ||
-      (this.chromeHandoffMode !== 'closing' && this.phase !== 'FOX_IDLE')
-    ) {
-      return;
-    }
-    const fox = this.fox;
-    const query = this.query;
-    if (!this.live(fox) || !this.live(query)) {
-      this.clearQueryDragGesture();
-      return;
-    }
-    this.clearChromeHandoffTimer();
-    this.chromeHandoffMode = null;
-    this.clearQueryDragGesture();
-    const workArea = this.currentWorkArea();
-    const foxRect = clampRectToWorkArea(
-      { x: this.foxOrigin.x, y: this.foxOrigin.y, width: FOX_SIZE, height: FOX_SIZE },
-      workArea,
-      0,
-    );
-    const currentBounds = fox.getBounds();
-    if (
-      currentBounds.x !== foxRect.x ||
-      currentBounds.y !== foxRect.y ||
-      currentBounds.width !== foxRect.width ||
-      currentBounds.height !== foxRect.height
-    ) {
-      fox.setBounds(foxRect);
-    }
-    // Reuse the last accepted native frame when remapping the Fox. If macOS
-    // applies another stage boundary after show, the move/moved readback below
-    // adopts that frame without issuing a compensating setBounds call.
-    fox.showInactive();
-    this.syncFoxOriginFromNativeBounds(fox);
-    this.platform.refreshTransparentShadow(query);
-    this.resignQueryKeyboard({ hide: true });
-    this.yieldOrKeepPalette(fox);
-  }
-
   private yieldOrKeepPalette(fox: BrowserWindow): void {
-    const yieldFocus = this.restorePreviousAppOnIdle;
-    this.restorePreviousAppOnIdle = false;
+    const yieldFocus = this.overlayState.focusIntent === 'previous-app';
     this.setFoxFocusable(false);
     // Idle fox must not become the key window, or Grok Build / 千牛 keep
     // looking focused while keystrokes go nowhere until the user clicks.
     if (!yieldFocus || this.otherChromeWindowsVisible()) {
       this.resignPaletteActivation(fox);
+      this.dispatchOverlayEvent({
+        type: 'FOCUS_RESTORED',
+        ...this.overlayEventGuard(),
+      });
       return;
     }
     const yielded = this.platform.yieldPreviousApp(fox, {
       canShow: () => (
-        this.phase === 'FOX_IDLE'
-        && this.chromeHandoffMode === null
+        this.overlayState.phase === 'parked'
+        && this.overlayState.handoff.mode === 'none'
         && this.live(fox)
       ),
       onShown: (shown) => {
@@ -1180,6 +1639,10 @@ export class OverlayController {
     if (!yielded) {
       this.resignPaletteActivation(fox);
     }
+    this.dispatchOverlayEvent({
+      type: 'FOCUS_RESTORED',
+      ...this.overlayEventGuard(),
+    });
   }
 
   private otherChromeWindowsVisible(): boolean {
@@ -1221,8 +1684,8 @@ export class OverlayController {
 
   private queryAcceptsKeyboard(): boolean {
     return (
-      isOpenPhase(this.phase)
-      && this.chromeHandoffMode !== 'closing'
+      (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active')
+      && this.overlayState.handoff.mode !== 'closing'
       && this.isWindowVisible(this.query)
     );
   }
@@ -1282,7 +1745,10 @@ export class OverlayController {
     // renderer rAF focus alone cannot route physical keyboard events.
     this.queryFocusRetryTimer = this.scheduler.schedule(() => {
       this.queryFocusRetryTimer = null;
-      if (isOpenPhase(this.phase) && this.isWindowVisible(this.query)) {
+      if (
+        (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active')
+        && this.isWindowVisible(this.query)
+      ) {
         this.focusQueryWindow();
       }
     }, 34);
@@ -1319,9 +1785,13 @@ export class OverlayController {
     if (this.isInactive()) {
       return;
     }
+    const guard = this.overlayEventGuard();
     this.scheduler.clear(this.displayReconcileTimer);
     this.displayReconcileTimer = this.scheduler.schedule(() => {
       this.displayReconcileTimer = null;
+      if (!this.matchesReportOrigin(guard)) {
+        return;
+      }
       this.reconcileDisplayTopology();
     }, DISPLAY_RECONCILE_DELAY_MS);
   };
@@ -1334,7 +1804,7 @@ export class OverlayController {
     }
     // Let the shared-element transaction finish before changing either native
     // frame. Otherwise an unplugged display could interrupt a prepared handoff.
-    if (this.chromeHandoffMode !== null) {
+    if (this.overlayState.handoff.mode !== 'none') {
       this.scheduleDisplayReconcile();
       return;
     }
@@ -1342,7 +1812,7 @@ export class OverlayController {
     // Display topology is authoritative, but interrupting an in-flight dock
     // drag would split Main's native frame from the renderer's crop offset.
     // Defer one reconcile until the finished drag acknowledgement is produced.
-    if (this.foxDragSession || this.foxDragGeneration !== null) {
+    if (this.foxDragTransaction || this.overlayState.drag.session || this.overlayState.drag.settle) {
       this.displayReconcilePending = true;
       return;
     }
@@ -1354,10 +1824,10 @@ export class OverlayController {
       y: Math.round(this.foxOrigin.y + FOX_SIZE / 2),
     };
     const workArea = screen.getDisplayNearestPoint(point).workArea;
-    this.foxDockEdge = reconcileFoxDockEdgeForWorkArea(
+    const edge = reconcileFoxDockEdgeForWorkArea(
       point.x,
       workArea,
-      this.foxDockEdge,
+      this.overlayState.fox.edge,
     );
     const clampedFox = clampRectToWorkArea(
       {
@@ -1368,41 +1838,43 @@ export class OverlayController {
       },
       workArea,
     );
-    if (this.foxDockEdge === 'left') {
+    if (edge === 'left') {
       clampedFox.x = workArea.x;
-    } else if (this.foxDockEdge === 'right') {
+    } else if (edge === 'right') {
       clampedFox.x = workArea.x + workArea.width - FOX_SIZE;
     }
     this.foxOrigin = { x: clampedFox.x, y: clampedFox.y };
-    this.foxPeekIntent = 'retract';
-    this.sendToFox(syncFoxEdgeCommand(this.foxDockEdge, this.advanceFoxPeekEpoch()));
-
-    if (this.phase === 'FOX_IDLE') {
-      fox.setBounds(dockFoxNativeRect(clampedFox, workArea, this.foxDockEdge));
-      return;
-    }
-
-    const size = this.currentQuerySize(workArea);
-    const anchor = this.sessionQueryAnchor(queryAnchorForFox(clampedFox, workArea));
-    query.setBounds(
-      placeQueryAnchoredToFox(
-        clampedFox,
-        size,
-        workArea,
-        this.foxDockEdge,
-        this.queryDragAnchor ?? undefined,
-      ),
-    );
-    this.sendToQuery(syncQueryAnchorCommand(anchor));
+    const foxBounds = dockFoxNativeRect(clampedFox, workArea, edge);
+    const queryBounds = this.overlayState.phase === 'parked'
+      ? undefined
+      : placeQueryAnchoredToFox(
+          clampedFox,
+          this.currentQuerySize(workArea),
+          workArea,
+          edge,
+          this.overlayState.drag.queryAnchor ?? undefined,
+        );
+    const queryAnchor = queryBounds
+      ? queryAnchorForFox(clampedFox, workArea)
+      : undefined;
+    this.dispatchOverlayEvent({
+      type: 'DISPLAY_CHANGED',
+      ...this.overlayEventGuard(),
+      displayId: screen.getDisplayNearestPoint(point).id,
+      edge,
+      foxBounds,
+      queryBounds,
+      queryAnchor,
+    });
   }
 
   private currentQuerySize(workArea: Rect) {
     return effectiveQuerySize({
-      phase: this.phase,
+      phase: this.overlayState.contentPhase,
       resultCount: this.resultCount,
       workArea,
-      measuredHeight: this.lastQueryContentHeight,
-      manualHeight: this.manualQueryHeight,
+      measuredHeight: this.overlayState.layout.desiredHeight,
+      manualHeight: this.overlayState.layout.appliedHeight,
     });
   }
 
@@ -1418,20 +1890,19 @@ export class OverlayController {
   }
 
   private queryResizeEdgeForCurrent(workArea: Rect): QueryResizeEdge {
-    if (this.live(this.query)) {
-      this.queryResizeEdge = resolveQueryResizeEdge(this.query.getBounds(), workArea);
-    }
-    return this.queryResizeEdge;
+    return this.live(this.query)
+      ? resolveQueryResizeEdge(this.query.getBounds(), workArea)
+      : this.overlayState.layout.resizeEdge;
   }
 
   private applyQueryHeight(
     nextHeight: number,
     edge: QueryResizeEdge,
     allowFlip = false,
-  ): number {
+  ): { height: number; edge: QueryResizeEdge } {
     const query = this.query;
     if (!this.live(query)) {
-      return nextHeight;
+      return { height: nextHeight, edge };
     }
     const workArea = this.currentWorkArea();
     const current = query.getBounds();
@@ -1439,71 +1910,19 @@ export class OverlayController {
       ? pickQueryResizeEdgeForHeight(current, nextHeight, workArea, edge)
       : edge;
     const next = applyQueryVerticalResize(current, nextHeight, chosen, workArea);
-    this.queryResizeEdge = chosen;
     query.setBounds(next);
-    return next.height;
-  }
-
-  private clearQueryHeightOverride(): void {
-    this.lastQueryContentHeight = null;
-    this.manualQueryHeight = null;
-    this.queryResizeSession = null;
-    this.queryResizeEdge = 'bottom';
-    this.clearQueryLayoutFallback();
-  }
-
-  private scheduleQueryLayoutFallback(): void {
-    this.clearQueryLayoutFallback();
-    this.queryLayoutFallbackTimer = this.scheduler.schedule(() => {
-      this.queryLayoutFallbackTimer = null;
-      if (this.isInactive()) {
-        return;
-      }
-      this.applyFallbackQueryHeight();
-      if (this.activeChromeHandoffId <= 0) {
-        return;
-      }
-      this.lastQueryLayoutSequence += 1;
-      this.sendToQuery(queryLayoutAckCommand(
-        this.activeChromeHandoffId,
-        this.lastQueryLayoutSequence,
-        reportableOverlayPhase(this.phase),
-        this.resultCount,
-        this.currentQueryHeight(),
-        this.queryResizeEdge,
-      ));
-    }, QUERY_LAYOUT_FALLBACK_MS);
-  }
-
-  private clearQueryLayoutFallback(): void {
-    this.scheduler.clear(this.queryLayoutFallbackTimer);
-    this.queryLayoutFallbackTimer = null;
-  }
-
-  private settleQueryResizeSession(commit: boolean): void {
-    const session = this.queryResizeSession;
-    if (!session || session.finished) {
-      return;
-    }
-    session.finished = true;
-    this.queryResizeSession = null;
-    if (commit) {
-      this.manualQueryHeight = this.currentQueryHeight();
-      return;
-    }
-    this.applyQueryHeight(session.baseline.height, session.edge);
-    this.manualQueryHeight = session.previousManualHeight;
+    return { height: next.height, edge: chosen };
   }
 
   private reportablePhase(): ReportablePhase {
-    return reportableOverlayPhase(this.phase);
+    return this.overlayState.contentPhase;
   }
 
   private acceptedLayoutAck(
     sessionId: number,
     sequence: number,
     height = this.currentQueryHeight(),
-    resizeEdge = this.queryResizeEdge,
+    resizeEdge = this.overlayState.layout.resizeEdge,
   ): QueryLayoutAck {
     return acceptedQueryLayoutAck(
       sessionId,
@@ -1520,7 +1939,7 @@ export class OverlayController {
       sessionId,
       sequence,
       this.currentQueryHeight(),
-      this.queryResizeEdge,
+      this.overlayState.layout.resizeEdge,
       this.reportablePhase(),
       this.resultCount,
     );
@@ -1530,31 +1949,87 @@ export class OverlayController {
     handoffId: number;
     lastSequence: number;
     phase: OverlayPhase;
+    lifecycle: OverlayState['phase'];
+    handoffMode: OverlayState['handoff']['mode'];
     resultCount: ResultCount;
     resizeSession: { sessionId: number; finished: boolean; lastSequence: number } | null;
+    performance: ReturnType<OverlayController['performanceSnapshot']>;
   } {
+    const resize = this.overlayState.layout.resize;
     return {
-      handoffId: this.activeChromeHandoffId,
-      lastSequence: this.lastQueryLayoutSequence,
+      handoffId: this.overlayState.handoff.id,
+      lastSequence: this.overlayState.layout.sequence,
       phase: this.phase,
+      lifecycle: this.overlayState.phase,
+      handoffMode: this.overlayState.handoff.mode,
       resultCount: this.resultCount,
-      resizeSession: this.queryResizeSession
+      resizeSession: resize
         ? {
-            sessionId: this.queryResizeSession.sessionId,
-            finished: this.queryResizeSession.finished,
-            lastSequence: this.queryResizeSession.lastSequence,
+            sessionId: resize.handoffId,
+            finished: false,
+            lastSequence: resize.lastSequence,
           }
         : null,
+      performance: this.performanceSnapshot(),
     };
   }
 
-  private applyFallbackQueryHeight(): void {
-    if (this.manualQueryHeight !== null || this.queryResizeSession) {
-      return;
+  performanceSnapshot(): {
+    count: number;
+    pending: number;
+    pendingKeys: string[];
+    p50: number | null;
+    p95: number | null;
+    p99: number | null;
+    coldMs: number | null;
+    coldSemantics: 'first-completed-observation';
+    errors: number;
+    droppedObservations: number;
+    staleReports: number;
+    lastStaleReport: string | null;
+    signal: 'renderer-callback';
+    paintObserved: false;
+  } {
+    const sorted = [...this.commandCallbackDurations].sort((a, b) => a - b);
+    const percentile = (p: number): number | null => {
+      if (sorted.length === 0) return null;
+      const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1);
+      return sorted[Math.max(0, index)] ?? null;
+    };
+    return {
+      count: sorted.length,
+      pending: this.commandFrameStartedAt.size,
+      pendingKeys: [...this.commandFrameStartedAt.keys()].slice(0, 16),
+      p50: percentile(0.5),
+      p95: percentile(0.95),
+      p99: percentile(0.99),
+      coldMs: this.coldCallbackMs,
+      coldSemantics: 'first-completed-observation',
+      errors: this.droppedCommandObservations + this.staleRendererReports,
+      droppedObservations: this.droppedCommandObservations,
+      staleReports: this.staleRendererReports,
+      lastStaleReport: this.lastStaleRendererReport,
+      signal: 'renderer-callback',
+      paintObserved: false,
+    };
+  }
+
+  private applyFallbackQueryHeight(): number | null {
+    if (this.overlayState.layout.appliedHeight !== null || this.overlayState.layout.resize) {
+      return null;
     }
     const workArea = this.currentWorkArea();
-    const fallback = fallbackQuerySizeForPhase(this.phase, this.resultCount, workArea);
-    this.applyQueryHeight(fallback.height, this.queryResizeEdgeForCurrent(workArea), true);
+    const fallback = fallbackQuerySizeForPhase(
+      this.overlayState.contentPhase,
+      this.resultCount,
+      workArea,
+    );
+    const result = this.applyQueryHeight(
+      fallback.height,
+      this.queryResizeEdgeForCurrent(workArea),
+      true,
+    );
+    return result.height;
   }
 
   private currentWorkArea(): Rect {
@@ -1575,10 +2050,10 @@ export class OverlayController {
       height: FOX_SIZE,
     };
     const peekOffset =
-      options.includePeek !== false && this.foxPeekIntent === 'peek'
+      options.includePeek !== false && this.overlayState.fox.peekIntent === 'peek'
         ? FOX_EDGE_PEEK_TRAVEL_PX
         : 0;
-    return foxVisualCenterForNativeRect(fullFoxRect, this.foxDockEdge, peekOffset);
+    return foxVisualCenterForNativeRect(fullFoxRect, this.overlayState.fox.edge, peekOffset);
   }
 
   private registerShortcut(): void {
@@ -1595,16 +2070,13 @@ export class OverlayController {
   }
 
   private broadcastShortcutStatus(): void {
-    const command: OverlayCommand = shortcutStatusCommand({
+    this.dispatchOverlayEvent({
+      type: 'SHORTCUT_STATUS_CHANGED',
+      ...this.overlayEventGuard(),
       registered: this.shortcutRegistered,
       accelerator: this.accelerator,
       message: this.shortcutMessage,
     });
-    for (const win of this.getWindows()) {
-      if (this.live(win) && !win.webContents.isDestroyed()) {
-        win.webContents.send(IPC_CHANNELS.OVERLAY_COMMAND, command);
-      }
-    }
   }
 
   private sendToFox(command: OverlayCommand): void {
@@ -1614,14 +2086,27 @@ export class OverlayController {
   }
 
   private advanceFoxPeekEpoch(): number {
-    this.foxPeekEpoch += 1;
-    return this.foxPeekEpoch;
+    const peekEpoch = this.overlayState.fox.peekEpoch + 1;
+    this.dispatchOverlayEvent({
+      type: 'FOX_EDGE_SYNCED',
+      ...this.overlayEventGuard(),
+      edge: this.overlayState.fox.edge,
+      peekEpoch,
+    });
+    return peekEpoch;
   }
 
   private resetFoxPeekLifecycle(edge: FoxDockEdge): number {
-    this.foxPeekIntent = 'retract';
     const epoch = this.advanceFoxPeekEpoch();
-    this.sendToFox(foxEdgeCommand(edge, epoch));
+    if (edge !== this.overlayState.fox.edge) {
+      this.dispatchOverlayEvent({
+        type: 'FOX_EDGE_SYNCED',
+        ...this.overlayEventGuard(),
+        edge,
+        peekEpoch: epoch + 1,
+      });
+      return epoch + 1;
+    }
     return epoch;
   }
 
@@ -1629,9 +2114,18 @@ export class OverlayController {
     if (this.postFoxDragTimer !== null || this.isInactive()) {
       return;
     }
+    const guard = this.overlayEventGuard();
+    const dragGeneration = this.overlayState.drag.generation;
     this.postFoxDragTimer = this.scheduler.schedule(() => {
       this.postFoxDragTimer = null;
-      if (this.isInactive() || this.foxDragSession || this.foxDragGeneration !== null) {
+      if (
+        this.isInactive()
+        || !this.matchesReportOrigin(guard)
+        || this.overlayState.drag.generation !== dragGeneration
+        || this.foxDragTransaction
+        || this.overlayState.drag.session
+        || this.overlayState.drag.settle
+      ) {
         return;
       }
       if (this.displayReconcilePending) {
@@ -1651,9 +2145,8 @@ export class OverlayController {
     if (!this.testHarness) {
       return null;
     }
-    if (this.foxDragGeneration !== null) {
-      return this.foxDragGeneration;
-    }
+    const active = this.overlayState.drag.session?.generation;
+    if (active !== undefined) return active;
     if (finished) {
       return null;
     }
@@ -1663,11 +2156,16 @@ export class OverlayController {
 
   private armBlurGrace(): void {
     this.ignoreBlurUntil = Date.now() + BLUR_GRACE_MS;
+    this.blurRecheckIdentity = this.currentReportOrigin();
     this.schedulePendingBlurRecheck();
   }
 
   private handleQueryBlur(): void {
-    if (this.isInactive() || this.phase === 'FOX_IDLE' || !this.isWindowVisible(this.query)) {
+    if (
+      this.isInactive()
+      || (this.overlayState.phase !== 'opening' && this.overlayState.phase !== 'active')
+      || !this.isWindowVisible(this.query)
+    ) {
       this.clearPendingQueryBlur();
       return;
     }
@@ -1676,6 +2174,7 @@ export class OverlayController {
       this.clearPendingQueryBlur();
       return;
     }
+    this.blurRecheckIdentity = this.currentReportOrigin();
     this.pendingQueryBlur = true;
     this.schedulePendingBlurRecheck();
   }
@@ -1683,7 +2182,13 @@ export class OverlayController {
   private schedulePendingBlurRecheck(): void {
     this.scheduler.clear(this.blurRecheckTimer);
     this.blurRecheckTimer = null;
-    if (this.isInactive() || !this.pendingQueryBlur) {
+    if (
+      this.isInactive()
+      || !this.pendingQueryBlur
+      || !this.blurRecheckIdentity
+      || !this.matchesReportOrigin(this.blurRecheckIdentity)
+    ) {
+      this.clearPendingQueryBlur();
       return;
     }
     const remaining = this.ignoreBlurUntil - Date.now();
@@ -1698,34 +2203,20 @@ export class OverlayController {
       return;
     }
     this.pendingQueryBlur = false;
-    if (this.phase !== 'FOX_IDLE' && this.isWindowVisible(this.query)) {
+    this.blurRecheckIdentity = null;
+    if (
+      (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active')
+      && this.isWindowVisible(this.query)
+    ) {
       this.dismiss(true);
     }
   }
 
   private clearPendingQueryBlur(): void {
     this.pendingQueryBlur = false;
+    this.blurRecheckIdentity = null;
     this.scheduler.clear(this.blurRecheckTimer);
     this.blurRecheckTimer = null;
-  }
-
-  private cancelChromeHandoff(): void {
-    this.clearChromeHandoffTimer();
-    this.clearQueryFocusRetry();
-    this.chromeHandoffMode = null;
-    this.activeChromeHandoffId = 0;
-  }
-
-  private clearChromeHandoffTimer(): void {
-    this.scheduler.clear(this.chromeHandoffTimer);
-    this.chromeHandoffTimer = null;
-  }
-
-  private nextChromeHandoffId(): number {
-    this.chromeHandoffSequence += 1;
-    this.activeChromeHandoffId = this.chromeHandoffSequence;
-    this.lastQueryLayoutSequence = 0;
-    return this.activeChromeHandoffId;
   }
 
   private prefersReducedMotion(): boolean {
@@ -1741,15 +2232,20 @@ export class OverlayController {
   }
 
   private sessionQueryAnchor(computed: QueryAnchor = this.currentQueryAnchor()): QueryAnchor {
-    return resolveSessionQueryAnchor(this.queryDragAnchor, computed);
+    return resolveSessionQueryAnchor(this.overlayState.drag.queryAnchor, computed);
   }
 
   private clearQueryDragGesture(): void {
-    this.queryDragAnchor = null;
+    if (this.overlayState.drag.queryAnchor !== null) {
+      this.dispatchOverlayEvent({
+        type: 'QUERY_DRAG_CLEARED',
+        ...this.overlayEventGuard(),
+      });
+    }
   }
 
   private finishOrClearQueryDrag(): void {
-    if (this.queryDragAnchor === null) {
+    if (this.overlayState.drag.queryAnchor === null) {
       return;
     }
     const query = this.query;
@@ -1761,12 +2257,12 @@ export class OverlayController {
   }
 
   private settlePinnedQueryDrag(queryRect: Rect, workArea: Rect): void {
-    if (this.queryDragAnchor === null) {
+    const queryAnchor = this.overlayState.drag.queryAnchor;
+    if (queryAnchor === null) {
       return;
     }
-    const settled = settleQueryDragGesture(queryRect, workArea, this.queryDragAnchor);
+    const settled = settleQueryDragGesture(queryRect, workArea, queryAnchor);
     this.foxOrigin = { x: settled.fox.x, y: settled.fox.y };
-    this.foxDockEdge = settled.dockEdge;
     this.resetFoxPeekLifecycle(settled.dockEdge);
   }
 

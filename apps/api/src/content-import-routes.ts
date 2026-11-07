@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
 import type { Readable } from 'node:stream';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import type { ContentImportService } from './content-import-service.js';
 import { CONTENT_UPLOAD_MAX_BYTES } from './content-object-store.js';
 import {
@@ -83,7 +84,7 @@ export function registerContentImportRoutes(
 
     scope.post('/v1/content/import', async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      const actor = await authenticateRequestHeaders(authService, request.headers);
+      const actor = await requestActor(request, authService);
       if (actor === null) return sendUnauthorized(reply);
       if (!limit('import', 20)) return sendRateLimited(reply);
       const key = idempotencyKey(request.headers['idempotency-key']);
@@ -105,7 +106,7 @@ export function registerContentImportRoutes(
 
   app.get('/v1/content/import/:import_batch_id', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('status', 120)) return sendRateLimited(reply);
     if (dependencies === undefined) return sendOverloaded(reply);
@@ -118,7 +119,7 @@ export function registerContentImportRoutes(
 
   app.post('/v1/content/import/:import_batch_id/cancel', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('cancel', 40)) return sendRateLimited(reply);
     const key = idempotencyKey(request.headers['idempotency-key']);

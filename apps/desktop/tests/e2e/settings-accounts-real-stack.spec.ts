@@ -83,7 +83,7 @@ test('review-only administrator manages accounts from Settings without grant con
     const grantCommand = await dashboard.evaluate(() => window.dashboardPermissions!.command({ action: 'refresh' }));
     expect(grantCommand).toMatchObject({ ok: false, message: '没有权限，请找人开通。', view: null });
     const requests = (await host.status()).requests;
-    expect(requests).toContain('/v1/intake/seats/administration');
+    expect(requests).toContain('/v1/access/settings');
     expect(requests).toContain('/v1/intake/seats');
     expect(requests.some(path => path.startsWith('/v1/intake/sources?'))).toBe(false);
     expect(requests.some(path => path.startsWith('/v1/intake/principals?'))).toBe(false);

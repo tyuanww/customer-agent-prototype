@@ -703,6 +703,36 @@ const PRIOR_CSV = Object.freeze({
   sourceSchemaSha256: CSV_DATABASE_SHA256,
   migrationCount: 34,
 });
+const VERIFIED_PRODUCT_MIGRATIONS = Object.freeze([
+  Object.freeze({
+    position: 82,
+    id: '0082_access_evaluator',
+    sourcePath: 'packages/database/overlays/0082_access_evaluator.sql',
+    sourceSha256: '5db1a1883a053c384d7d9eaad1f4784a0ca426ca0cb32269d987a298292c9df0',
+    version: 'verified ACL authorization projection source',
+  }),
+  Object.freeze({
+    position: 83,
+    id: '0083_sop_pipeline_projection',
+    sourcePath: 'packages/database/overlays/0083_sop_pipeline_projection.sql',
+    sourceSha256: '79e81732e716558e286f31fd8efcd3fa8737666324e8aed78e9df73be5f525e2',
+    version: 'verified SOP release projection source',
+  }),
+]);
+
+function renderVerifiedProductMigration(projectRoot, snapshot, descriptor) {
+  const source = readFileSync(path.join(projectRoot, descriptor.sourcePath), 'utf8');
+  if (sha256(source) !== descriptor.sourceSha256) {
+    throw new Error(`Verified product migration source drifted: ${descriptor.sourcePath}`);
+  }
+  return renderUpgradeMigration({
+    position: descriptor.position,
+    id: descriptor.id,
+    version: descriptor.version,
+    ranges: [],
+    sourceBody: source.trimEnd(),
+  }, snapshot);
+}
 
 export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (snapshot?.manifest?.database?.sha256 !== LEGACY_CHECK_DATABASE_SHA256) {
@@ -842,11 +872,14 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
     [81, '0081_require_import_batch_principal'],
   ];
   const productTail = readiness ? productOverlays.map(([position, id]) => renderIntakeOverlay(projectRoot, snapshot, position, id)) : [];
+  const verifiedProductMigrations = readiness
+    ? VERIFIED_PRODUCT_MIGRATIONS.map(descriptor => renderVerifiedProductMigration(projectRoot, snapshot, descriptor))
+    : [];
   const occupiedMigration = productTail[0] ?? null;
   if (occupiedMigration && occupiedMigration.sha256 !== FROZEN_OCCUPIED_SHA256) {
     throw new Error('Frozen occupied-domain migration 0042 drifted');
   }
-  const publishedMigrations = Object.freeze([...migrations, ...productTail]);
+  const publishedMigrations = Object.freeze([...migrations, ...productTail, ...verifiedProductMigrations]);
   const compatibleUpgrades = [...COMPATIBLE_UPGRADES, PRIOR_DIRECT, PRIOR_RUNTIME, PRIOR_CSV];
   const manifest = Object.freeze({
     ...prior.manifest,
@@ -876,6 +909,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (sopDomainMigration) outputs.set(`packages/database/migrations/${sopDomainMigration.file}`, sopDomainMigration.sql);
   if (readinessMigration) outputs.set(`packages/database/migrations/${readinessMigration.file}`, readinessMigration.sql);
   for (const overlay of productTail) outputs.set(`packages/database/migrations/${overlay.file}`, overlay.sql);
+  for (const migration of verifiedProductMigrations) outputs.set(`packages/database/migrations/${migration.file}`, migration.sql);
   if (repairMigration) outputs.set(`packages/database/migrations/${repairMigration.file}`, repairMigration.sql);
   if (sopStageMigration) outputs.set(`packages/database/migrations/${sopStageMigration.file}`, sopStageMigration.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

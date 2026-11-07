@@ -3,6 +3,18 @@ import type { IntakePermissionApi, IntakePermissionCommand } from '../shared/con
 import type { SeatAccountApi, SeatAccountIntent } from '../shared/seat-account-intent';
 import type { IntakeManagementApi, IntakeManagementCommand } from '../shared/content-intake-management';
 import { contextBridge, ipcRenderer } from 'electron';
+import type { OperationCommand, OperationState } from '../../../../packages/unified-contracts/src/index.ts';
+
+// The Dashboard preload validates the Main projection only. Keep these small
+// runtime sets local so the sandboxed entry does not load a shared preload
+// chunk; Main remains the owner of operation transitions and authorization.
+const DASHBOARD_ACCESS_ACTIONS = [
+  'query', 'content-manage', 'import', 'source-confirm', 'review', 'publish',
+  'candidate-cancel', 'rollback', 'dashboard-read', 'grants-manage', 'accounts-manage',
+] as const;
+const DASHBOARD_OPERATION_STATES = new Set<OperationState>([
+  'accepted', 'running', 'unknown', 'committed', 'failed', 'cancelled', 'expired',
+]);
 
 // Keep these literals aligned with IPC_CHANNELS. Do not import shared modules:
 // a second preload entry that shares overlay session helpers would split a
@@ -30,6 +42,104 @@ const OPS_SOFTWARE_OPEN = 'dashboard:ops-software-open';
 const PRODUCT_SESSION_CHANGED = 'product:session-changed';
 const PAGE_USE_CURRENT = 'dashboard:page-use-current';
 const PAGE_USE_CHANGED = 'dashboard:page-use-changed';
+const OPERATION_CURRENT = 'dashboard:operation-current';
+const OPERATION_COMMAND = 'dashboard:operation-command';
+const OPERATION_CHANGED = 'dashboard:operation-changed';
+
+export type DashboardViewOperationDomain =
+  | 'release'
+  | 'permissions'
+  | 'accounts'
+  | 'materials'
+  | 'rollback'
+  | 'ops-loop';
+export type DashboardViewOperation = Readonly<{
+  domain: DashboardViewOperationDomain;
+  operationId: string;
+  command: OperationCommand;
+  state: OperationState;
+  updatedAt: string;
+  recoveryDeadline: string;
+  canCancel: boolean;
+  canRecover: boolean;
+  releaseInvalidationPending: boolean;
+}>;
+export type DashboardOperationsReply =
+  | Readonly<{ ok: true; view: DashboardViewOperation | null; views: readonly DashboardViewOperation[] }>
+  | Readonly<{ ok: false; code: string; message: string; views: readonly DashboardViewOperation[] }>;
+export type DashboardOperationsApi = Readonly<{
+  current(): Promise<DashboardOperationsReply>;
+  command(command: Readonly<{ action: 'cancel' | 'recover'; domain: DashboardViewOperationDomain }>): Promise<DashboardOperationsReply>;
+  onChanged(listener: () => void): () => void;
+}>;
+
+const OPERATION_DOMAINS = new Set<DashboardViewOperationDomain>([
+  'release',
+  'permissions',
+  'accounts',
+  'materials',
+  'rollback',
+  'ops-loop',
+]);
+const OPERATION_COMMANDS = new Set<string>([
+  ...DASHBOARD_ACCESS_ACTIONS,
+  'query',
+  'settings-preview',
+  'settings-save',
+]);
+
+function isIsoText(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
+function isOperationView(value: unknown): value is DashboardViewOperation {
+  if (!isRecord(value) || !exactKeys(value, [
+    'domain',
+    'operationId',
+    'command',
+    'state',
+    'updatedAt',
+    'recoveryDeadline',
+    'canCancel',
+    'canRecover',
+    'releaseInvalidationPending',
+  ])) return false;
+  return typeof value.domain === 'string'
+    && OPERATION_DOMAINS.has(value.domain as DashboardViewOperationDomain)
+    && typeof value.operationId === 'string'
+    && value.operationId.length > 0
+    && value.operationId.length <= 128
+    && typeof value.command === 'string'
+    && OPERATION_COMMANDS.has(value.command)
+    && typeof value.state === 'string'
+    && DASHBOARD_OPERATION_STATES.has(value.state as OperationState)
+    && isIsoText(value.updatedAt)
+    && isIsoText(value.recoveryDeadline)
+    && Date.parse(value.recoveryDeadline) >= Date.parse(value.updatedAt)
+    && typeof value.canCancel === 'boolean'
+    && typeof value.canRecover === 'boolean'
+    && typeof value.releaseInvalidationPending === 'boolean';
+}
+
+function isOperationReply(value: unknown): value is DashboardOperationsReply {
+  if (!isRecord(value) || !Array.isArray(value.views) || !value.views.every(isOperationView)) return false;
+  if (value.ok === true) {
+    return exactKeys(value, ['ok', 'view', 'views'])
+      && (value.view === null || isOperationView(value.view));
+  }
+  return value.ok === false
+    && exactKeys(value, ['ok', 'code', 'message', 'views'])
+    && typeof value.code === 'string'
+    && typeof value.message === 'string'
+    && value.message.length > 0;
+}
+
+const OPERATION_FAILURE: DashboardOperationsReply = {
+  ok: false,
+  code: 'UNAVAILABLE',
+  message: '操作记录暂不可用。',
+  views: [],
+};
 
 const CONTENT_FAILURE_CODES = [
   'UNAUTHORIZED',
@@ -569,7 +679,12 @@ function accountsPayload(value: unknown): boolean {
 }
 
 function settingsPayload(settings: Record<string, unknown>): boolean {
-  return onlyKeys(settings, ['grants', 'accounts'])
+  return onlyKeys(settings, ['accessRevision', 'expiresAt', 'grants', 'accounts'])
+    && (settings.accessRevision === null
+      || (typeof settings.accessRevision === 'number'
+        && Number.isSafeInteger(settings.accessRevision)
+        && settings.accessRevision >= 0))
+    && (settings.expiresAt === null || typeof settings.expiresAt === 'string')
     && isRecord(settings.grants)
     && grantsPayload(settings.grants)
     && accountsPayload(settings.accounts);
@@ -628,3 +743,37 @@ contextBridge.exposeInMainWorld('dashboardIntakeCatalog', {
     return () => { ipcRenderer.removeListener('dashboard:intake-catalog-invalidated', handler); };
   },
 } satisfies IntakeCatalogApi);
+
+contextBridge.exposeInMainWorld('dashboardOperations', {
+  async current() {
+    try {
+      const value: unknown = await ipcRenderer.invoke(OPERATION_CURRENT);
+      return isOperationReply(value) ? value : OPERATION_FAILURE;
+    } catch {
+      return OPERATION_FAILURE;
+    }
+  },
+  async command(command: Readonly<{ action: 'cancel' | 'recover'; domain: DashboardViewOperationDomain }>) {
+    if (!isRecord(command)
+      || !exactKeys(command, ['action', 'domain'])
+      || (command.action !== 'cancel' && command.action !== 'recover')
+      || typeof command.domain !== 'string'
+      || !OPERATION_DOMAINS.has(command.domain as DashboardViewOperationDomain)) {
+      return { ...OPERATION_FAILURE, message: '操作输入无效。' };
+    }
+    try {
+      const value: unknown = await ipcRenderer.invoke(OPERATION_COMMAND, {
+        action: command.action,
+        domain: command.domain,
+      });
+      return isOperationReply(value) ? value : OPERATION_FAILURE;
+    } catch {
+      return OPERATION_FAILURE;
+    }
+  },
+  onChanged(listener: () => void) {
+    const handler = () => listener();
+    ipcRenderer.on(OPERATION_CHANGED, handler);
+    return () => { ipcRenderer.removeListener(OPERATION_CHANGED, handler); };
+  },
+} satisfies DashboardOperationsApi);

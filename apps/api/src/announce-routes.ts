@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { parseContractSchema, validateContractSchema } from '@customer-agent/contracts';
-import { authenticateRequestHeaders, type AuthService } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import type { AnnounceFailure, AnnounceService } from './announce-service.js';
 import {
   sendConflict,
@@ -74,7 +75,7 @@ export function registerAnnounceRoutes(
 
   app.get('/v1/announce/current', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('current', 60)) return sendRateLimited(reply);
     const snapshotClientId = clientId(headerValue(request.headers['x-client-id']));
@@ -105,7 +106,7 @@ export function registerAnnounceRoutes(
 
   app.get('/v1/announce/snapshot', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('snapshot', 60)) return sendRateLimited(reply);
     const snapshotClientId = clientId(headerValue(request.headers['x-client-id']));
@@ -139,7 +140,7 @@ export function registerAnnounceRoutes(
 
   app.post('/v1/announce/ack', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
     if (!limit('ack', 20)) return sendRateLimited(reply);
     const body = validateContractSchema('AnnouncementAckRequest', request.body);

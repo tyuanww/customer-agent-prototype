@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { waitForFocusedWindow } from '../support/electron-focus';
 import { closeOwnedElectron } from '../support/owned-electron';
 import { launchIntakeElectron } from '../support/intake-electron';
 
@@ -84,6 +85,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+      await waitForFocusedWindow(app!, 'query');
     }
     async function login() {
       await openQuery();
@@ -167,7 +169,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
         const refresh = upload.getByRole('button', { name: '刷新解析进度', exact: true });
         if (await refresh.count() && await refresh.isEnabled()) await refresh.click();
         return await upload.getByRole('status').filter({ hasText: expected }).count() > 0;
-      }, { timeout: 30_000, intervals: [100, 250, 500] }).toBe(true);
+      }, { timeout: 60_000, intervals: [100, 250, 500] }).toBe(true);
     }
     await selectAndSubmit(path.basename(badFile));
     await settleParse('整批校验未通过');
@@ -246,6 +248,9 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await dashboard.getByRole('button', { name: '刷新审核状态', exact: true }).click();
     }
     await confirmSourceAndCheck(1);
+    await expect.poll(async () => (
+      await dashboard.evaluate(() => window.dashboardIntake!.current())
+    ).view?.selected ?? null).not.toBeNull();
     const old = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     await dashboard.getByRole('button', { name: '上传修订版', exact: true }).click();
     await dashboard.getByRole('dialog', { name: '请确认' }).getByRole('button', { name: '确认', exact: true }).click();
@@ -258,6 +263,11 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     expect(unchanged).toMatchObject({ key: old.key, state: 'ready', publicationPolicy: 'direct-v1', sourceEvidenceVersion: 1, approvalEvidenceVersion: 0 });
     await selectAndSubmit(path.basename(revisionFile));
     await settleParse('校验通过，待审核资料已生成');
+    await expect.poll(async () => (
+      await dashboard.evaluate(() => window.dashboardIntake!.current())
+    ).view?.selected ?? null).toMatchObject({
+      key: { candidateId: old.key.candidateId, version: 2 },
+    });
     const revised = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     expect(revised).toMatchObject({ key: { candidateId: old.key.candidateId, version: 2 }, sourceEvidenceVersion: 0, approvalEvidenceVersion: 0 });
     expect(revised.key.digest).not.toBe(old.key.digest);

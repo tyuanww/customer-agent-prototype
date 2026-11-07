@@ -12,6 +12,13 @@ import {
 import { ALLERGY_SOP_TREE } from '../../src/shared/synthetic-sops';
 import { SOP_COPY_FEEDBACK_MS } from '../../src/shared/sop-geometry';
 import { SOP_HIGH_RISK_BANNER, SOP_OPENING_MESSAGE, SOP_TERMINAL_MESSAGE } from '../../src/shared/sop-window';
+import {
+  advanceSopPipeline,
+  projectSopPipeline,
+  startSopPipelineSession,
+  updateSopPipelineLease,
+  type SopPipelineFlow,
+} from '../../src/shared/sop-pipeline';
 
 const sopSource = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/renderer/SopApp.tsx'),
@@ -170,5 +177,78 @@ describe('SopApp injected projection', () => {
     const done = projectionFor(['no-photo']);
     render(<SopApp projection={done} />);
     expect(screen.getByTestId('sop-terminal')).toHaveTextContent(SOP_TERMINAL_MESSAGE);
+  });
+
+  it('renders the typed pipeline projection and blocks copy after release invalidation', () => {
+    const flow: SopPipelineFlow = {
+      sopId: 'synthetic-pipeline',
+      title: '合成图文流程',
+      entryStepId: 'step1',
+      steps: [
+        { stepId: 'step1', kind: 'instruction', sequence: 1, text: '文字和图片一起复制', media: ['med-a1'] },
+        { stepId: 'A', kind: 'decision', sequence: 2, text: '请坐席选择', media: [] },
+        { stepId: 'A1', kind: 'terminal', sequence: 3, text: '分支完成', media: [] },
+      ],
+      branches: [{ branchId: 'branch-a', sourceStepId: 'A', label: '选择 A', targetStepId: 'A1' }],
+    };
+    const lease = {
+      releaseId: 'rel-synthetic',
+      sessionEpoch: 1,
+      revoked: false,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    };
+    const mediaMetadata = [{ mediaId: 'med-a1', mime: 'image/png' as const }];
+    const chooseEdge = vi.fn(async () => ({ ok: true as const }));
+    window.sopWindow = {
+      close: vi.fn(async () => undefined),
+      endFlow: vi.fn(async () => undefined),
+      restart: vi.fn(async () => undefined),
+      chooseEdge,
+      nextStep: vi.fn(async () => ({ ok: true as const })),
+      moveBy: vi.fn(async () => undefined),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      copyCurrent: vi.fn(async () => ({ ok: true as const })),
+      onProjection: () => () => undefined,
+    };
+    const { rerender } = render(<SopApp projection={projectSopPipeline(
+      startSopPipelineSession(flow, lease, mediaMetadata),
+      1,
+    )} />);
+    expect(screen.getByTestId('sop-pipeline-media')).toHaveTextContent('复制时与文字一起写入');
+    expect(screen.getByTestId('sop-pipeline-copy')).toHaveTextContent('复制本步');
+
+    const decision = advanceSopPipeline(startSopPipelineSession(flow, lease, mediaMetadata))!;
+    rerender(<SopApp projection={projectSopPipeline(decision, 1)} />);
+    expect(screen.getByTestId('sop-pipeline-branch-branch-a')).toHaveTextContent('选择 A');
+    fireEvent.click(screen.getByTestId('sop-pipeline-branch-branch-a'));
+    expect(chooseEdge).toHaveBeenCalledWith('branch-a');
+
+    const invalidated = updateSopPipelineLease(
+      startSopPipelineSession(flow, lease, mediaMetadata),
+      { ...lease, releaseId: 'rel-new' },
+    );
+    rerender(<SopApp projection={projectSopPipeline(invalidated, 1)} />);
+    expect(screen.getByTestId('sop-pipeline-failure')).toHaveTextContent('流程版本已经变化');
+    expect(screen.queryByTestId('sop-pipeline-copy')).not.toBeInTheDocument();
+  });
+
+  it('does not offer a copy card or keyboard copy for unpublished SOP text', () => {
+    const copyCurrent = vi.fn(async () => ({ ok: true as const }));
+    window.sopWindow = {
+      close: vi.fn(async () => undefined),
+      endFlow: vi.fn(async () => undefined),
+      restart: vi.fn(async () => undefined),
+      chooseEdge: vi.fn(async () => ({ ok: true as const })),
+      nextStep: vi.fn(async () => ({ ok: true as const })),
+      moveBy: vi.fn(async () => undefined),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      copyCurrent,
+      onProjection: () => () => undefined,
+    };
+    render(<SopApp projection={{ ...projectionFor([]), unpublished: true }} />);
+    expect(screen.queryByTestId('script-card-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sop-unpublished')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: '1' });
+    expect(copyCurrent).not.toHaveBeenCalled();
   });
 });

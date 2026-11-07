@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createApiApp, createSyntheticTestApiApp } from '../src/app.js';
+import { createMockAccessEvaluator } from '../src/access/evaluator.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import { createIterationTaskRepository } from '../src/iteration-task-repository.js';
 import { createOpsLoopRepository } from '../src/ops-loop-repository.js';
@@ -98,6 +99,7 @@ describe.skipIf(!enabled)('unscoped legacy profile boundary over HTTP and Postgr
     const app = assemble({
       config,
       authService: auth,
+      accessEvaluator: createMockAccessEvaluator(),
       repository: serviceRepository(),
       opsLoopDependencies: { repository: createOpsLoopRepository(observedPool), idempotencyHmac: keyRing },
       iterationTaskDependencies: { repository: createIterationTaskRepository(observedPool), idempotencyHmac: keyRing },

@@ -1,8 +1,13 @@
 import { BrowserWindow, screen } from 'electron';
 import type { OpenDashboardResult } from '../shared/dashboard-access';
-import type { OverlayPhase } from '../shared/overlay-machine';
+import type { OverlayPhase, OverlaySnapshotProjection } from '../shared/overlay-machine';
 import type { QueryResizeRequest } from '../shared/query-layout';
-import type { ReportablePhase, ResultCount } from '../shared/overlay-events';
+import type {
+  FoxDragSettleAck,
+  ReportablePhase,
+  ResultCount,
+} from '../shared/overlay-events';
+import type { OverlayReportIdentity } from '../shared/overlay-report';
 
 export function isTestHarnessEnabled(): boolean {
   return process.env.DEMO_E2E === '1' || process.argv.includes('--demo-e2e');
@@ -15,14 +20,20 @@ export type OverlayTestHarnessHost = {
   dismiss(): void;
   toggle(): void;
   getWindows(): BrowserWindow[];
-  moveBy(dx: number, dy: number, finished: boolean): void;
+  moveBy(dx: number, dy: number, finished: boolean): FoxDragSettleAck | null;
+  commitFoxDragSettle(settleId: number): void;
   openDashboard(): Promise<OpenDashboardResult> | OpenDashboardResult;
   closeDashboard(): void;
   dashboardSnapshot(): unknown;
   isDashboardTrusted(): boolean;
   queryLayoutDebugState(): unknown;
   resizeQueryHeight(request: QueryResizeRequest): unknown;
-  reportUiPhase(phase: ReportablePhase, resultCount: ResultCount): void;
+  reportUiPhase(
+    phase: ReportablePhase,
+    resultCount: ResultCount,
+    identity: OverlayReportIdentity,
+  ): void;
+  getOverlaySnapshot(): OverlaySnapshotProjection;
 };
 
 export function attachTestHarness(controller: OverlayTestHarnessHost): void {
@@ -60,7 +71,7 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
       const query = controller
         .getWindows()
         .find((win) => win.webContents.getURL().includes('role=query'));
-      query?.emit('blur');
+      query?.blur();
     },
     getPhase: () => controller.phase,
     shortcutRegistered: () => controller.shortcutRegistered,
@@ -97,12 +108,24 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
           controller.moveBy(remaining, 0, false);
         }
       };
+      // A fresh test window can start with its native edge already at the
+      // requested display edge while the overlay is still `none`. Start the
+      // synthetic drag inward so finishing it exercises a real dock transition.
+      if (Math.abs(targetX - fox.getBounds().x) <= 1) {
+        controller.moveBy(edge === 'left' ? 48 : -48, 0, false);
+      }
       walk(targetX - fox.getBounds().x);
-      controller.moveBy(0, 0, true);
+      const firstSettle = controller.moveBy(0, 0, true);
+      if (firstSettle) {
+        controller.commitFoxDragSettle(firstSettle.settleId);
+      }
       const leftover = targetX - fox.getBounds().x;
       if (leftover !== 0) {
         walk(leftover);
-        controller.moveBy(0, 0, true);
+        const finalSettle = controller.moveBy(0, 0, true);
+        if (finalSettle) {
+          controller.commitFoxDragSettle(finalSettle.settleId);
+        }
       }
     },
     openDashboard: () => controller.openDashboard(),
@@ -124,10 +147,28 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
       }
       focused.close();
     },
+    getOverlaySnapshot: () => controller.getOverlaySnapshot(),
     queryLayoutDebug: () => controller.queryLayoutDebugState(),
-    resizeQueryHeight: (request: QueryResizeRequest) => controller.resizeQueryHeight(request),
+    resizeQueryHeight: (request: QueryResizeRequest) => {
+      const snapshot = controller.getOverlaySnapshot();
+      return controller.resizeQueryHeight({
+        ...request,
+        identity: {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        },
+      });
+    },
     reportUiPhase: (phase: ReportablePhase, resultCount: ResultCount) => {
-      controller.reportUiPhase(phase, resultCount);
+      const snapshot = controller.getOverlaySnapshot();
+      controller.reportUiPhase(phase, resultCount, {
+        sessionEpoch: snapshot.contract.sessionEpoch,
+        generation: snapshot.contract.generation,
+        windowGeneration: snapshot.windowGeneration,
+        contentRevision: snapshot.contentRevision + 1,
+      });
     },
   };
   Object.defineProperty(globalThis, '__demoTest', {

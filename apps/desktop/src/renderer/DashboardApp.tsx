@@ -31,6 +31,7 @@ import {
 import { DashboardBrandFox } from './components/DashboardBrandFox';
 import { DashboardChromeIcon, DashboardNavIcon, type DashboardNavIconId } from './features/dashboard/DashboardIcons';
 import { DashboardThemeMenu } from './features/dashboard/DashboardThemeMenu';
+import { DashboardOperationStatus } from './features/dashboard/DashboardOperationStatus';
 import { DASHBOARD_FONT_FAMILY, IntakeAntdTheme } from './features/dashboard/intake-antd';
 import {
   DASHBOARD_WINDOW_TITLE,
@@ -855,6 +856,7 @@ function DashboardWorkspace() {
           data-testid="dashboard-content"
           data-active-module={active}
         >
+          <DashboardOperationStatus />
           {renderIntakeDestinations({
             active,
             canViewGrantSettings: grantAllowed,

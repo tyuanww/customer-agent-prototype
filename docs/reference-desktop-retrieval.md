@@ -6,6 +6,8 @@
 
 ## 做什么
 
+统一架构的查询结果合同由 `@customer-agent/unified-contracts` 拥有。Query adapter 只能把结果解析为 `content`、`sop`、`no-hit` 或 `failure` 四个互斥变体；content 和 SOP 不在 renderer 中拼接，混合或含糊 payload 在进入 UI 前由运行时 validator 拒绝。content 最多三条，rank 限于 1..3 且与 copy handle 分别唯一。SOP branch 必须带 `sourceStepId`，source 指向 decision step，target 指向已有 step，branch ID 与正 step sequence 均唯一。Query 的访问上下文只使用 `QueryAccessView`，不携带账号或授权管理字段。
+
 查询胶囊把顾客问句交给 Electron main。main 在本地索引上做字段加权 BM25 + RRF，可选地用 MiniMax 规划检索式并重排已有 `scriptId`，再用仓外 hydrate 快照填回原文 Top 3。Renderer 不持有话术正文以外的检索实现，也不调用 MiniMax。
 
 有 hydrate 快照时，不再把问句或命中标题转发给 leftover `/v1/search`。没有 hydrate 时，仍走 D1–D5 的合成 HTTP 搜索（测试与未接索引的 profile）。
@@ -29,6 +31,12 @@
 
 开关 OFF、缺 key、超时或解析失败：跳过规划与重排，BM25+RRF 直出。禁止把话术正文发给 MiniMax。
 
+## Overlay 与 session 失效
+
+Fox / Query 的窗口生命周期、handoff、焦点、layout、拖拽、release 和 session epoch 由 `apps/desktop/src/shared/overlay-machine.ts` 的单一 reducer 拥有；查询业务仍按上面的检索管道运行。每次 handoff、layout ACK、拖拽 settle、blur、release 和 session 变化都携带发起时的 window generation、session epoch、content revision 或服务端 release sequence、handoff/layout sequence、drag generation 或 settle identity，并由 Main 对当前权威状态复核；不匹配时转换被拒绝且不产生原生副作用。Query 订阅晚于打开命令时，Main 重放保存的原始 `prepare-search`，保持共享元素中心与 transform；初始 parked snapshot 即使在 handoff id 0 也必须被消费。
+
+Main 的 `OverlaySnapshotProjection` 只在 `contract` 内使用 ARC-01 `OverlaySnapshot`，其构造和校验都经过 `@customer-agent/unified-contracts` 的同一运行时合同；Query 只消费该快照的 authoritative lifecycle/handoff/layout 投影。Product session epoch 变化时，typed work port 实际取消旧查询与复制、清空内容，存活的 Query 恢复输入焦点；session、关闭或窗口重建会取消 handoff、layout、drag、display reconcile 和 post-drag timeout，layout timeout 只在 captured sequence 与 content revision 仍匹配时回到 reducer 执行 fallback，fallback ACK 由 reducer 生成。窗口重建保留当前 release 与 release sequence。关闭/重建后迟到的结果、ACK、timer、release 或旧 display bounds 不能重新打开窗口、回滚 release 或提交。检索失败仍按下面的失败表处理，不改变该状态边界。
+
 ## 公共表面
 
 | 名称 | 位置 | 默认 / 约束 |
@@ -51,6 +59,16 @@
 
 BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retrieval-core/README.md)。桌面常量仍在 `apps/desktop/src/shared/hybrid-retrieve.ts`：`k1=1.2`，`b=0.75`，标题权重 3、问法权重 2.5、正文权重 1，RRF `k=60`。分词用该包的单字+相邻二字，由适配层注入。查询分析槽在 `query-analyze.ts`，只扩展检索式，不映射某条标题。弃权停用词和 `1/(60+20)` 门槛留在 `retrieval-quality.ts`。
 
+SOP 查询使用独立 `SopPipeline`，不进入上面的内容 Top 3 管道。发布时冻结的场景分类词先判定 SOP 归属。命中后只按发布中唯一的严重性顺序处理冲突，并返回 ARC `SopFlow`。普通内容检索与 SOP 结果是互斥的 `QueryOutcome` 变体，不取并集。SOP 搜索投影已在发布事务内生成，查询不重建索引。缺少完整严重性顺序时返回显式 failure。决策节点等待坐席选择分支，系统不自动选择业务路径。
+
+API composition 已把这些规则接入真实 `/v1/search`。`QueryCoordinator` 在 ranking 前读取同一个 ACL decision 和 active release；ordinary content 由发布时激活的 BM25 索引返回，SOP 命中不会退化成 content Top 3。当前 SearchResponse 合同没有 SOP flow 字段，因此 SOP 路径在 API 上保持 fail closed，独立 SOP 响应入口仍待后续合同与 INT-DESKTOP 接线。请求会校验当前 release identity，发现外部版本移动时不返回旧索引。OBS trace 只记录稳定 ID、脱敏 fingerprint、阶段和错误码，不记录问句或答案正文。
+
+当前 API index 消费 `release_items`，与既有 SearchResponse、candidate impression 和复制身份保持一致。若当前 intake lineage 的 upsert 尚无对应 `release_items` 投影，API activation 以 `RELEASE_INDEX_ITEM_GAP` 失败关闭，避免只返回一部分已发布内容。把规范化 intake 条目映射到旧 SearchResponse 字段仍需单独合同或 migration，不由 API composition 猜测。
+
+桌面 Main 的 `apps/desktop/src/main/integration/query-api-adapter.ts` 在 API 边界解析 ordinary `SearchResponse`、HTTP 503 `OverloadedErrorEnvelope` 和 `retry-after`。只有 `SOURCE_GATE_NOT_READY` 同时携带四个批准的 `sop_reason` 之一时才保留 typed SOP-unavailable 结果；未知、缺失或 malformed reason 归一为稳定 generic error，绝不落成 ordinary candidates。现有 `ProductSearch` 仍拥有查询排序、候选 provenance、复制与事件语义。
+
+桌面 SOP 的图文复制使用同一个原生剪贴板写入，文本和图片一起提交。缺少资源元数据或图片字节时复制失败，不回退为纯文字。`apps/desktop/src/main/integration/desktop-composition.ts` 只组合现有 Query session adapter、DSH control plane 和 OVL typed cancellation seam，不复制任一领域 reducer 或生命周期状态机。
+
 ## 失败
 
 | 情况 | 坐席看到 |
@@ -61,6 +79,8 @@ BM25、RRF 和余弦的公式在 [`packages/retrieval-core`](../packages/retriev
 | hydrate 检索 | API 仍是 `collection_disabled`（合同里 query_events 只由 `/v1/search` 写入）。曝光记在仓外 telemetry，用 `pnpm retrieval:never-hit` 看从未命中 |
 | MiniMax 超时 / 非 2xx / JSON 非法 | 日志 fallback，卡片仍是 BM25 顺序 |
 | 开关 SET 失败 | preload 回读磁盘，不假装已写入 |
+
+`apps/desktop/src/main/observability/` 提供 copy、overlay 和 Dashboard 的纯 `StageRecord` 转换器，并直接使用 `@customer-agent/unified-contracts` 的共享类型。API `/v1/search` 已通过 OBS observer port 记录 trace，但桌面 copy、overlay 和 Dashboard 仍未接线；桌面侧既有 `CUSTOMER_AGENT_RETRIEVAL_TELEMETRY` 仍是实际桌面检索记录。INT-DESKTOP 需要把同一 trace identity 扩展到桌面搜索和复制事件。
 
 ## 例子
 

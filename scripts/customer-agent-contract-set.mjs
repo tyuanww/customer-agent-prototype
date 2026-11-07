@@ -696,7 +696,9 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
+  if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
   if (actual.migrations.length >= 81 && actual.migrations[80]?.id !== '0081_require_import_batch_principal') throw new Error('Unrecognized required import tenant binding');
   if (actual.migrations.length >= 80 && actual.migrations[79]?.id !== '0080_bind_import_batch_tenant') throw new Error('Unrecognized import tenant projection');
   if (actual.migrations.length >= 79 && actual.migrations[78]?.id !== '0079_directory_identity_activity') throw new Error('Unrecognized directory identity activity projection');
@@ -775,7 +777,9 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
+  if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
   if (actual.migrations.length >= 81 && actual.migrations[80]?.id !== '0081_require_import_batch_principal') throw new Error('Unrecognized required import tenant binding');
   if (actual.migrations.length >= 80 && actual.migrations[79]?.id !== '0080_bind_import_batch_tenant') throw new Error('Unrecognized import tenant projection');
   if (actual.migrations.length >= 79 && actual.migrations[78]?.id !== '0079_directory_identity_activity') throw new Error('Unrecognized directory identity activity projection');
