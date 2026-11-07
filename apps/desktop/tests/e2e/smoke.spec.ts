@@ -1413,6 +1413,7 @@ test('@float keeps a visible idle halo and programmatic Dock identity evidence',
   const app = await launchApp();
   try {
     const fox = await waitForRole(app, 'fox');
+    await parkFoxPointerOutside(app, fox);
     // Declare this test's media contract explicitly. The preceding test opts
     // into reduced motion, and a halo animation assertion must not inherit
     // either that CDP override or the host's accessibility preference.
