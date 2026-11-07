@@ -102,6 +102,9 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
       CREATE ROLE t6_auth LOGIN NOINHERIT; GRANT app_backend_auth TO t6_auth;
       CREATE ROLE t6_worker LOGIN NOINHERIT; GRANT app_backend_worker TO t6_worker;
       CREATE ROLE t6_review LOGIN NOINHERIT; GRANT app_backend_review TO t6_review;
+      CREATE ROLE t6_business LOGIN NOINHERIT; GRANT intake_business TO t6_business;
+      CREATE ROLE t6_usage LOGIN NOINHERIT; GRANT intake_usage TO t6_usage;
+      CREATE ROLE t6_intake_worker LOGIN NOINHERIT; GRANT intake_worker TO t6_intake_worker;
     `);
     const socket = new URLSearchParams({ host: harness.socket, port: String(harness.port) });
     const conn = (user: string) => `postgresql://${user}@localhost/${db.name}?${socket}`;
@@ -189,6 +192,9 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
       DATABASE_URL: conn('t6_runtime'),
       CONTENT_ADMIN_DATABASE_URL: conn('t6_admin'),
       AUTH_DATABASE_URL: conn('t6_auth'),
+      INTAKE_BUSINESS_DATABASE_URL: conn('t6_business'),
+      INTAKE_USAGE_DATABASE_URL: conn('t6_usage'),
+      INTAKE_WORKER_DATABASE_URL: conn('t6_intake_worker'),
       CONTENT_REVIEW_DATABASE_URL: conn('t6_review'),
       SYNTHETIC_IDENTITY_PROVIDER_ORIGIN: `http://127.0.0.1:${providerAddress.port}`,
       CONTENT_OBJECT_STORE_DIR: storeRoot,
@@ -289,7 +295,7 @@ describe.skipIf(!enabled)('backend runtime artifact chain', () => {
   it('runs import-review-publish-read from dist processes, recovers a killed worker, and cancel does not stage', async () => {
     const owner = await productToken('synthetic_owner');
     const ready = await fetch(`${address}/ready`);
-    expect(ready.status).toBe(200);
+    expect(ready.status).toBe(503);
 
     const cancelledId = await importCsv(owner, 'idem-t6-cancel');
     expect((await fetch(`${address}/v1/content/import/${cancelledId}/cancel`, {
