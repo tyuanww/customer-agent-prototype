@@ -150,10 +150,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:services
+      - name: Install Xvfb and Electron runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+          pnpm --filter @customer-agent/desktop exec playwright install-deps
       - env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane electron
+        run: xvfb-run --auto-servernum node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane electron
 
   windows:
     needs: changes
