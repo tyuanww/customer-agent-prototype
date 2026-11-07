@@ -39,7 +39,7 @@ function session() {
       userId: 'user-owner',
       role: 'owner',
       authMode: 'mock',
-      expiresAt: '2026-11-06T12:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
       displayName: 'Synthetic',
       job: null,
     }),
@@ -48,7 +48,7 @@ function session() {
       value: {
         state: 'open',
         accessRevision: 9,
-        expiresAt: '2026-11-06T12:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
         grants: 'open',
         accounts: 'open',
         denyReason: null,

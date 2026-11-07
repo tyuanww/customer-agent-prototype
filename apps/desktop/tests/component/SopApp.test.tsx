@@ -231,4 +231,24 @@ describe('SopApp injected projection', () => {
     expect(screen.getByTestId('sop-pipeline-failure')).toHaveTextContent('流程版本已经变化');
     expect(screen.queryByTestId('sop-pipeline-copy')).not.toBeInTheDocument();
   });
+
+  it('does not offer a copy card or keyboard copy for unpublished SOP text', () => {
+    const copyCurrent = vi.fn(async () => ({ ok: true as const }));
+    window.sopWindow = {
+      close: vi.fn(async () => undefined),
+      endFlow: vi.fn(async () => undefined),
+      restart: vi.fn(async () => undefined),
+      chooseEdge: vi.fn(async () => ({ ok: true as const })),
+      nextStep: vi.fn(async () => ({ ok: true as const })),
+      moveBy: vi.fn(async () => undefined),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      copyCurrent,
+      onProjection: () => () => undefined,
+    };
+    render(<SopApp projection={{ ...projectionFor([]), unpublished: true }} />);
+    expect(screen.queryByTestId('script-card-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sop-unpublished')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: '1' });
+    expect(copyCurrent).not.toHaveBeenCalled();
+  });
 });

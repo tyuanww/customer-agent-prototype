@@ -327,7 +327,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
         && projection
         && (isSopPipelineProjection(projection)
           ? projection.state === 'ready' && projection.stepText.length > 0 && projection.stepKind !== 'decision'
-          : Boolean(projection.script))
+          : Boolean(projection.script) && !projection.unpublished)
         && !event.repeat
         && !event.metaKey
         && !event.ctrlKey
@@ -433,7 +433,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
                   <span>{projection.internalNote}</span>
                 </div>
               ) : null}
-              {projection.script ? (
+              {projection.script && !projection.unpublished ? (
                 <SopCopyCard
                   script={projection.script}
                   copying={copying || projection.copied}

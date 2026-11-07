@@ -21,6 +21,7 @@ import {
 } from '../shared/sop-geometry';
 import {
   advanceSopNext,
+  canCopySopNode,
   chooseSopEdge,
   currentSopNode,
   projectSop,
@@ -289,7 +290,10 @@ export class SopWindowController {
       return { ok: false, message: '没有可复制的话术内容' };
     }
     const node = currentSopNode(this.tree, this.progress);
-    if (node?.kind !== 'copyable') {
+    if (!node || !canCopySopNode(node, this.publishedScriptIds())) {
+      if (node?.kind === 'copyable') {
+        return { ok: false, message: '当前话术尚未发布，不能复制' };
+      }
       return { ok: false, message: '没有可复制的话术内容' };
     }
     const resolved = resolveClipboardWrite(node.answerText);

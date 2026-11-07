@@ -117,7 +117,8 @@ function richTextParts(value: { richText?: readonly { text?: unknown }[] }): str
   return value.richText.map((part) => part.text as string).join('');
 }
 
-function cellText(value: ExcelJS.CellValue): string | undefined {
+/** Read display-only SOP text without evaluating formula or hyperlink targets. */
+export function readSopCellText(value: ExcelJS.CellValue): string | undefined {
   if (value === null || value === undefined || value === '') return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
@@ -331,17 +332,17 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
       const sheet = book.getWorksheet(name)!;
       let codeColumn = 0;
       for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
-        if (cellText(sheet.getCell(1, column).value) === SOP_ENTRY_CODE_HEADER) { codeColumn = column; break; }
+        if (readSopCellText(sheet.getCell(1, column).value) === SOP_ENTRY_CODE_HEADER) { codeColumn = column; break; }
       }
       if (!codeColumn) {
         issue('MISSING_ENTRY_CODE_HEADER', name, 1, 'A', '第一行表头必须包含「条目编码」列，为每行填写稳定编码');
         continue;
       }
       for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
-        const header = cellText(sheet.getCell(1, column).value);
+        const header = readSopCellText(sheet.getCell(1, column).value);
         if (header !== '版本' && header !== '版本号') continue;
         for (let row = 2; row <= sheet.actualRowCount; row++) {
-          const candidate = cellText(sheet.getCell(row, column).value);
+          const candidate = readSopCellText(sheet.getCell(row, column).value);
           if (candidate === undefined) {
             issue('NON_TEXT_CELL', name, row, columnName(column), '版本字段必须是纯文本');
           } else if (candidate.trim()) {
@@ -357,7 +358,7 @@ export async function parseSopWorkbook(bytes: Buffer, context: SopParseContext):
         const values: string[] = [];
         let code = '';
         for (let column = 1; column <= Math.min(sheet.columnCount, P.columns); column++) {
-          const value = cellText(row.getCell(column).value);
+          const value = readSopCellText(row.getCell(column).value);
           if (value === undefined) {
             issue('NON_TEXT_CELL', name, rowNumber, columnName(column), 'SOP 文字必须是纯文本或富文本；移除公式、日期和数值单元格');
             continue;
