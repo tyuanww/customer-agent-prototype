@@ -7,10 +7,9 @@ import test from 'node:test';
 import { ingestContractSet, verifyIngestedContractSet } from './customer-agent-contract-set.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const upstreamRoot = '/private/tmp/menokin-sop-contract-draft-v2';
 const sourceBundle = path.join(
-  upstreamRoot,
-  'output/customer-agent-sop-query-contract-sets/cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b',
+  repositoryRoot,
+  'contracts/upstream/customer-agent/cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b',
 );
 
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
