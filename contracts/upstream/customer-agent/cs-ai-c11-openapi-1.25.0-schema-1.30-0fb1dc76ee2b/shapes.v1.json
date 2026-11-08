@@ -1,0 +1,817 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:customer-agent:sop-graph-design-input:v1",
+  "title": "SOP contract delta proposal",
+  "$comment": "Approved design input. Candidate shape source; relational and transaction obligations are specified in rules.source.json. No runtime activation.",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "Version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "Hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Terms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "\\S"
+      },
+      "minItems": 0,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "FlowKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "flowId",
+        "flowVersion"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/Id"
+        },
+        "flowId": {
+          "$ref": "#/$defs/Id"
+        },
+        "flowVersion": {
+          "$ref": "#/$defs/Version"
+        }
+      }
+    },
+    "EntryRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "businessEntryId",
+        "scriptVersion"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/Id"
+        },
+        "businessEntryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "scriptVersion": {
+          "$ref": "#/$defs/Version"
+        }
+      }
+    },
+    "FlowHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "title",
+        "anchorEntry",
+        "entryTerms",
+        "startNodeId",
+        "operation"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FlowKey"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "anchorEntry": {
+          "$ref": "#/$defs/EntryRef"
+        },
+        "entryTerms": {
+          "$ref": "#/$defs/Terms"
+        },
+        "startNodeId": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "enum": [
+            "upsert",
+            "disable"
+          ]
+        }
+      }
+    },
+    "Node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "id",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FlowKey"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "body": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "entry"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "message"
+                },
+                "entry": {
+                  "$ref": "#/$defs/EntryRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "text"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "decision",
+                    "internal",
+                    "end"
+                  ]
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096,
+                  "pattern": "\\S"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "id",
+        "from",
+        "to",
+        "action"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FlowKey"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "from": {
+          "$ref": "#/$defs/Id"
+        },
+        "to": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "next"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "label",
+                "ordinal",
+                "matchTerms"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "choice"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "\\S"
+                },
+                "ordinal": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                },
+                "matchTerms": {
+                  "$ref": "#/$defs/Terms"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "FlowDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "header",
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "header": {
+          "$ref": "#/$defs/FlowHeader"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 512,
+          "items": {
+            "$ref": "#/$defs/Edge"
+          }
+        }
+      }
+    },
+    "PublishedFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "header",
+        "graphDigest"
+      ],
+      "properties": {
+        "header": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/FlowHeader"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "upsert"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "graphDigest": {
+          "$ref": "#/$defs/Hash"
+        }
+      }
+    },
+    "Media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "objectId",
+        "sha256",
+        "mime",
+        "bytes",
+        "ordinal",
+        "alt",
+        "required"
+      ],
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/EntryRef"
+        },
+        "objectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "mime": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5242880
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "\\S"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "FlowDifference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "flowId",
+        "change",
+        "previousVersion",
+        "nextVersion",
+        "beforeDigest",
+        "afterDigest"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/Id"
+        },
+        "flowId": {
+          "$ref": "#/$defs/Id"
+        },
+        "change": {
+          "enum": [
+            "add",
+            "modify",
+            "disable",
+            "reenable"
+          ]
+        },
+        "previousVersion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nextVersion": {
+          "$ref": "#/$defs/Version"
+        },
+        "beforeDigest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterDigest": {
+          "$ref": "#/$defs/Hash"
+        }
+      }
+    },
+    "MaterialDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalEncodingVersion",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "selectedSheets",
+        "sopFlows",
+        "sopDifferences",
+        "media"
+      ],
+      "properties": {
+        "canonicalEncodingVersion": {
+          "const": "candidate-sop-graph-v1"
+        },
+        "templateVersion": {
+          "const": "sop-graph-xlsx-v1"
+        },
+        "ruleVersion": {
+          "const": "sop-graph-v1"
+        },
+        "mappingVersion": {
+          "const": "sop-graph-columns-v1"
+        },
+        "selectedSheets": {
+          "const": [
+            "来源",
+            "FAQ",
+            "相似问法",
+            "流程",
+            "节点",
+            "分支",
+            "媒体绑定"
+          ]
+        },
+        "sopFlows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/FlowDefinition"
+          }
+        },
+        "sopDifferences": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/FlowDifference"
+          }
+        },
+        "media": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/Media"
+          }
+        }
+      }
+    },
+    "Totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "faq",
+        "vocabulary",
+        "sopFlows",
+        "sopNodes",
+        "sopEdges",
+        "media"
+      ],
+      "properties": {
+        "faq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "vocabulary": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "sopFlows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "sopNodes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12800
+        },
+        "sopEdges": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 51200
+        },
+        "media": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "SnapshotDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshotDigest",
+        "pageIndex",
+        "pageCount",
+        "totals",
+        "sopFlows",
+        "sopNodes",
+        "sopEdges",
+        "media"
+      ],
+      "properties": {
+        "snapshotDigest": {
+          "$ref": "#/$defs/Hash"
+        },
+        "pageIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1023
+        },
+        "pageCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "totals": {
+          "$ref": "#/$defs/Totals"
+        },
+        "sopFlows": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/PublishedFlow"
+          }
+        },
+        "sopNodes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "sopEdges": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/Edge"
+          }
+        },
+        "media": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/Media"
+          }
+        }
+      }
+    },
+    "FlowCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "graphDigest",
+        "defect",
+        "reason"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/FlowKey"
+        },
+        "graphDigest": {
+          "$ref": "#/$defs/Hash"
+        },
+        "defect": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "if": {
+        "properties": {
+          "defect": {
+            "const": true
+          }
+        },
+        "required": [
+          "defect"
+        ]
+      },
+      "then": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "SopQualityPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "materialDigest",
+        "targets"
+      ],
+      "properties": {
+        "policyVersion": {
+          "const": "sop-graph-quality-v1"
+        },
+        "materialDigest": {
+          "$ref": "#/$defs/Hash"
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "graphDigest"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "#/$defs/FlowKey"
+              },
+              "graphDigest": {
+                "$ref": "#/$defs/Hash"
+              }
+            }
+          }
+        }
+      }
+    },
+    "QualityDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "materialDigest",
+        "sopChecks"
+      ],
+      "properties": {
+        "materialDigest": {
+          "$ref": "#/$defs/Hash"
+        },
+        "sopChecks": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/FlowCheck"
+          }
+        }
+      }
+    },
+    "ActionCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entitlementId",
+        "releaseId",
+        "contextGeneration",
+        "key",
+        "graphDigest",
+        "nodeId",
+        "action",
+        "edgeId"
+      ],
+      "properties": {
+        "entitlementId": {
+          "$ref": "#/$defs/Id"
+        },
+        "releaseId": {
+          "$ref": "#/$defs/Id"
+        },
+        "contextGeneration": {
+          "$ref": "#/$defs/Version"
+        },
+        "key": {
+          "$ref": "#/$defs/FlowKey"
+        },
+        "graphDigest": {
+          "$ref": "#/$defs/Hash"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/Id"
+        },
+        "action": {
+          "enum": [
+            "open",
+            "observe",
+            "next",
+            "choose",
+            "back",
+            "restart",
+            "copy"
+          ]
+        },
+        "edgeId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "next",
+              "choose"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "edgeId": {
+            "$ref": "#/$defs/Id"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "edgeId": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "ErrorReason": {
+      "enum": [
+        "SOP_MAPPING_REQUIRED",
+        "SOP_GRAPH_INVALID",
+        "SOP_DEPENDENCY_INVALID",
+        "SOP_RELEASE_CHANGED",
+        "SOP_SNAPSHOT_INVALID",
+        "CONTRACT_UPGRADE_REQUIRED",
+        "SOP_MEDIA_UNAVAILABLE"
+      ]
+    },
+    "MediaPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "entitlementId",
+        "objectId",
+        "sha256",
+        "mime",
+        "bytes",
+        "base64"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/$defs/Id"
+        },
+        "entitlementId": {
+          "$ref": "#/$defs/Id"
+        },
+        "objectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "mime": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5242880
+        },
+        "base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 6990508,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    }
+  }
+}

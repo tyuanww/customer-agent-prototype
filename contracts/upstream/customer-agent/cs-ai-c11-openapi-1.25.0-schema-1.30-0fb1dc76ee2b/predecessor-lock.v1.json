@@ -1,0 +1,14 @@
+{
+  "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+  "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+  "artifacts": {
+    "openapi.v1.yaml": {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-readiness-successor-v1/openapi.v1.yaml",
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5"
+    },
+    "schema-v1.29.sql": {
+      "path": "business-docs/01-\u5ba2\u670dAgent\u9879\u76ee/30-\u5f00\u53d1-\u8fdb\u884c\u4e2d/content-intake-readiness-successor-v1/schema-v1.29.sql",
+      "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771"
+    }
+  }
+}

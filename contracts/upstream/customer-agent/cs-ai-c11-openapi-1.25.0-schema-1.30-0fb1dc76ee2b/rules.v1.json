@@ -1,0 +1,178 @@
+{
+  "schema": "customer-agent-sop-graph-semantics/v1",
+  "format": {
+    "templateVersion": "sop-graph-xlsx-v1",
+    "ruleVersion": "sop-graph-v1",
+    "mappingVersion": "sop-graph-columns-v1",
+    "canonicalEncodingVersion": "candidate-sop-graph-v1",
+    "sheets": {
+      "来源": "Existing FAQ source columns",
+      "FAQ": "Existing FAQ entry columns",
+      "相似问法": "Existing FAQ alias columns",
+      "流程": [
+        "flowId",
+        "title",
+        "anchorEntryId",
+        "entryTerms",
+        "startNodeId",
+        "operation"
+      ],
+      "节点": [
+        "flowId",
+        "nodeId",
+        "kind",
+        "businessEntryId",
+        "text"
+      ],
+      "分支": [
+        "flowId",
+        "edgeId",
+        "fromNodeId",
+        "toNodeId",
+        "kind",
+        "label",
+        "ordinal",
+        "matchTerms"
+      ],
+      "媒体绑定": [
+        "businessEntryId",
+        "sheetName",
+        "imageAnchor",
+        "ordinal",
+        "alt",
+        "required"
+      ]
+    },
+    "rules": [
+      "Reject unknown or duplicate columns, duplicate IDs, external image links and missing/ambiguous media binding. imageAnchor is the top-left A1 cell. Terms are JSON string arrays; required is true/false.",
+      "Legacy six-sheet files require a separately confirmed mapping preview. Missing explicit edges is SOP_MAPPING_REQUIRED; natural-language edges are never inferred.",
+      "Source registration fixes this format; existing FAQ remains unchanged. No new authorization domain.",
+      "message has only businessEntryId; decision/internal/end have only text. next has no label/ordinal/matchTerms; choice has all three."
+    ]
+  },
+  "graph": {
+    "keys": [
+      "sourceId,flowId,flowVersion",
+      "FlowKey,nodeId",
+      "FlowKey,edgeId",
+      "sourceId,businessEntryId,scriptVersion"
+    ],
+    "rules": [
+      "All keys and entry references use the same source. Every node and edge has the exact FlowKey. IDs are unique within that graph.",
+      "One designated start; every node reachable from it; acyclic. Every message/internal has exactly one next; each decision has 2..4 choice edges and consecutive ordinals 1..N; end has no edges.",
+      "Message references a present enabled entry at the exact version; anchorEntry is also an exact dependency. Reject missing, disabled, cross-source or wrong-version dependencies.",
+      "Existing safety rules apply, including allergy body containing both stop and confirmation instructions.",
+      "Missing flow rows inherit; changes replace a complete graph; disable is a tombstone for an existing flow. Every changed dependency or media descriptor increments flowVersion, starting at 1.",
+      "Submitted entry media is a complete replacement. Empty removes all; ordinal starts at 1 without gaps; objectId binds once. Show removals in review differences."
+    ]
+  },
+  "canonical": {
+    "encoding": "UTF-8 canonical JSON; preserve body text without Unicode normalization. Object keys ASCII ascending; IDs ASCII, versions and ordinals numeric.",
+    "materialDigest": "SHA256(canonical(complete material excluding its own digest)); includes graph, media, differences and mapping.",
+    "graphDigest": "SHA256(canonical({definition,entries,media})); definition is FlowDefinition; entries are exact IntakePublishedEntry source wrappers for anchor and message references, deduplicated and sorted by EntryRef; media descriptors sorted by EntryRef,ordinal,objectId. A disabled graph may include disabled dependency tombstones.",
+    "sort": {
+      "flows": "FlowKey",
+      "nodes": "FlowKey,id",
+      "edges": "FlowKey,id",
+      "entries": "EntryRef",
+      "media": "EntryRef,ordinal,objectId",
+      "vocabulary": "kind,id,displayVersion"
+    },
+    "sizeLimits": {
+      "flowsPerMaterial": 100,
+      "nodesPerFlow": 128,
+      "edgesPerFlow": 512,
+      "imagesPerEntry": 100,
+      "mediaPerMaterial": 500,
+      "materialUtf8Bytes": 33554432,
+      "snapshotUtf8Bytes": 33554432,
+      "pageUtf8Bytes": 1048576,
+      "pageRecords": 100,
+      "pageCount": 1024
+    },
+    "overflow": "FILE_LIMIT; preserve stricter upload/unzip limits. No truncation."
+  },
+  "quality": {
+    "rules": [
+      "sopDifferences covers every add/modify/disable/reenable. Source confirmation and review evidence bind the full materialDigest.",
+      "sopPlan binds materialDigest plus every changed FlowKey/graphDigest. Full-graph checks cover every branch and required image; no node sampling.",
+      "sopChecks set exactly matches the frozen plan, with no duplicates. Any graph defect prevents passing; client cannot submit passed state.",
+      "Expansion preserves old checks; unchanged graph may reuse only evidence with identical graphDigest and attribution. Revision invalidates confirmation and checks.",
+      "Status, freeze/check receipt and report expose the same sopPlan; rounds/report retain checks. History does not confer live permission."
+    ]
+  },
+  "publication": {
+    "rules": [
+      "Freeze material, complete graph and media descriptors atomically after verifying stored bytes hashes.",
+      "Under existing content lock recheck baseReleaseId, source mode/version, current authorization, approval, quality and exact dependency versions.",
+      "Write complete entry/graph/media release lineage and existing public.content_current in one transaction. Any failure rolls back all; unknown commit is recovered by the same operationId.",
+      "Only upsert graphs enter release lineage; do not drop inherited flows. Missing dependent entry changes require a graph revision before publication.",
+      "Rollback creates a new release by copying the entire chosen catalog and all lineage, with fresh authorization/source/object validation. Never independently rewind a SOP pointer.",
+      "Backup includes graph candidate/quality/lineage tables and every referenced media object, preserving ownership and ACL."
+    ]
+  },
+  "snapshot": {
+    "description": "Each page revalidates the current authenticated session, entitlement, source authority and selection. A flow is included only if its anchor and every message dependency pass the same entitlement/selection/time filters. Media binds only to entries included in the complete snapshot. Order collections faq,vocabulary,sopFlows,sopNodes,sopEdges,media; within collections use canonical sort. Pages may contain only graph/media. pageIndex starts at zero and is consecutive; empty snapshot is one page; last nextCursor is null. Each page repeats the same releaseId, entitlementId, contextGeneration, totals, pageCount and snapshotDigest. Cursor binds session, entitlement, release, selection, digest and next index; replay returns the same page or fails if invalidated.",
+    "digest": "SHA256(canonical({releaseId,entitlementId,contextGeneration,faq,vocabulary,sopFlows,sopNodes,sopEdges,media})) over full sorted collections.",
+    "clientValidation": [
+      "Collect before execution; verify graphDigest, snapshotDigest, totals and page count.",
+      "Reject duplicate keys, mixed release, wrong/duplicate page, cyclic cursor, missing dependencies, unexpected final cursor or oversized item/page/collection."
+    ]
+  },
+  "media": {
+    "description": "Authenticate before resolving resources. Require entitlementId bound to session and release; recheck current publication, source query authority and exact entry-version/object binding. Return MediaPayload with no-store, never storage paths or permanent URLs. Main verifies decoded bytes length, MIME signature and SHA256, then exposes an opaque handle. Required media failure blocks advancement and copy; optional media may retry.",
+    "maxImageBytes": 5242880,
+    "mime": [
+      "image/png",
+      "image/jpeg",
+      "image/gif"
+    ]
+  },
+  "actionCheck": {
+    "description": "Read-only action check. Authenticate first; require exact current release, live entitlement, context generation, authorized full graph and graphDigest. Recheck source and all entry/media dependencies. open/restart only at startNodeId; next/choose require the specified outgoing edge of matching kind; copy only at message. back/observe require a node in the graph; Main additionally validates its actual stack. Return 204/no-store without persisting progress or renewing entitlement. New release returns409 SOP_RELEASE_CHANGED. No automatic sending or advancement.",
+    "actions": [
+      "open",
+      "observe",
+      "next",
+      "choose",
+      "back",
+      "restart",
+      "copy"
+    ],
+    "maxActionElapsedMs": 5000,
+    "observeIntervalMs": 30000,
+    "displayDeadline": "earlier of entitlement deadline and last successful check request-start monotonic time + 30 seconds",
+    "invalidation": [
+      "Known revoke/logout/shop/selection change immediately clears progress, handles, content and generation; discard late responses.",
+      "Offline stops new actions; deadline clears displayed content. Collapsing does not pause expiry. Process restart/finish clears progress.",
+      "Clipboard and server check are not atomic. Copy only the current original message answer after check/media/generation validation; cannot retract prior copies."
+    ]
+  },
+  "recognition": {
+    "algorithm": "deterministic-terms-v1",
+    "rules": [
+      "Only explicitly entered text; NFKC, Unicode case fold, trim, then nonempty substring matching.",
+      "Recommend only authorized flow entryTerms or current legal choice matchTerms. Display matching terms; order by FlowKey/ordinal.",
+      "Zero, one and multiple hits all require a human choice. No automatic transition, chat reading, screenshots or external model."
+    ]
+  },
+  "errors": {
+    "SOP_MAPPING_REQUIRED": 422,
+    "SOP_GRAPH_INVALID": 422,
+    "SOP_DEPENDENCY_INVALID": 422,
+    "SOP_RELEASE_CHANGED": 409,
+    "SOP_SNAPSHOT_INVALID": 409,
+    "CONTRACT_UPGRADE_REQUIRED": 409,
+    "SOP_MEDIA_UNAVAILABLE": 503
+  },
+  "installation": [
+    "Use the product migration runner and exact actual predecessor receipts; do not label this storage delta as migration 0078 or assume 0041 is the live predecessor.",
+    "Install storage delta with explicit grants only through existing restricted definer functions, fixed search_path, and no PUBLIC execute. Tables stay immutable.",
+    "Replace canonical_encoding/format guards for the graph discriminator; preserve the existing FAQ constraints and six-sheet historical reader. Never globally lift empty-array checks.",
+    "Extend parser/freeze to enforce every shape and relational invariant, dependency projection and canonical digest; store graph projections and media in the same transaction as material.",
+    "Extend quality freeze/check/read/report and existing publish/rollback to enforce exact target sets, inheritance and lineage; gate current pointer commit on complete graph/media lineage.",
+    "Use normalized graph lineage for graph-format snapshots; legacy release_catalogs SOP arrays stay empty. Do not create a second snapshot source or independent current pointer.",
+    "Implement entitlement-only reads and action check, bounded paging, MIME/hash preview and main-process progression; no SQL bypass from renderer.",
+    "Complete PG15 install/upgrade/ACL, graph mutation/quality/atomicity/rollback tests, HTTP/Main/Electron tests and backup restore before declaring consumer readiness."
+  ]
+}

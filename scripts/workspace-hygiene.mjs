@@ -42,7 +42,9 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
 export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.1 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
-  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 16 * 1024 * 1024 }),
+  // Approved 2026-11-08: the immutable Menokin SOP query candidate adds its
+  // ten-file v8 package beside the existing v1-v7 contract snapshots.
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 19.5 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.3 * 1024 * 1024 }),
 ]);

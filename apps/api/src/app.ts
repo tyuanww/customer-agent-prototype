@@ -38,6 +38,7 @@ import type {
   ServiceRepository,
 } from './service-repository.js';
 import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
+import { registerSopQueryRoute, type SopQueryRouteDependencies } from './sop-query-routes.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
 import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
 import { registerContentReviewRoutes, type ContentReviewRouteDependencies } from './content-review-routes.js';
@@ -84,6 +85,7 @@ export type ApiAppOptions = Readonly<{
   authService?: AuthService | undefined;
   policyAdminRepository?: PolicyAdminRepository | undefined;
   searchDependencies?: SearchRouteDependencies | undefined;
+  sopQueryDependencies?: SopQueryRouteDependencies | undefined;
   eventDependencies?: EventRouteDependencies | undefined;
   contentImportDependencies?: ContentImportRouteDependencies | undefined;
   contentReviewDependencies?: ContentReviewRouteDependencies | undefined;
@@ -124,6 +126,7 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   const providedAuthService = options.authService;
   const policyAdminRepository = options.policyAdminRepository ?? createUnavailablePolicyAdminRepository();
   const searchDependencies = options.searchDependencies;
+  const sopQueryDependencies = options.sopQueryDependencies;
   const eventDependencies = options.eventDependencies;
   const contentImportDependencies = options.contentImportDependencies;
   const contentReviewDependencies = options.contentReviewDependencies;
@@ -257,6 +260,7 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   registerPolicyReadRoute(app, config, repository, authService);
   registerPolicyWriteRoute(app, policyAdminRepository, authService);
   registerSearchRoute(app, authService, searchDependencies);
+  registerSopQueryRoute(app, authService, sopQueryDependencies);
   registerEventRoutes(app, authService, eventDependencies);
   registerContentImportRoutes(app, authService, contentImportDependencies);
   registerContentReviewRoutes(app, authService, contentReviewDependencies);

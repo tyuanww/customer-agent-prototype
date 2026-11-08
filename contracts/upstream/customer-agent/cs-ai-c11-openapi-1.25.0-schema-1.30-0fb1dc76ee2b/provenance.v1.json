@@ -1,0 +1,42 @@
+{
+  "schema": "customer-agent-sop-query-contract-candidate/v1",
+  "status": "EXPORTED_CANDIDATE",
+  "proposedVersions": {
+    "openapi": "1.25.0",
+    "database": "schema.v1.30",
+    "profile": "content-intake-sop-query-v1"
+  },
+  "formalVersionAssigned": true,
+  "sourceGitSha": null,
+  "predecessorGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+  "designApproved": true,
+  "productImplementationApproved": true,
+  "freezeCompleted": true,
+  "exportCompleted": true,
+  "runtimeActivated": false,
+  "businessMappingApproved": false,
+  "businessAlias": "menokin-sop-query-v1",
+  "graphCandidateManifestSha256": "e03b07321a65eb7768b8fa2fc21bf3fcd9193c8ebc834a5988711f41072913a8",
+  "querySources": {
+    "openapi": "business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/openapi.fragment.json",
+    "storage": "business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/storage.fragment.sql"
+  },
+  "artifacts": {
+    "openapi.candidate.yaml": {
+      "sha256": "9f8b09c7577f17df25a17854d99cbd50f055b8cfcde4810276cf1a8f8fab5cc1",
+      "bytes": 1187022
+    },
+    "schema.candidate.sql": {
+      "sha256": "29af409df12f6ea511261812591d449deb2a1b11f9777af11c8a3a4800c167b8",
+      "bytes": 856043
+    },
+    "storage.candidate.sql": {
+      "sha256": "623202dc1248ee9d3be1bbf6f7f6ebf43438c07ff65094bcd7365e4c9c2016fe",
+      "bytes": 15425
+    }
+  },
+  "exportBlockers": [
+    "Formal export records the exact committed source and remains separate from product intake and runtime activation.",
+    "Business mapping, Gate B, product implementation and real acceptance remain independent gates."
+  ]
+}

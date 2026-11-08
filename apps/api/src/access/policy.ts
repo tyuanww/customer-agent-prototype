@@ -81,6 +81,7 @@ export const PROTECTED_ROUTE_POLICIES = createRoutePolicyRegistry([
   ['GET /v1/policy', session()],
   ['POST /v1/policy/flags', session()],
   ['POST /v1/search', requires('query')],
+  ['POST /v1/sop/query', requires('query')],
   ['POST /v1/events/adoption', requires('query')],
   ['POST /v1/events/escalate', requires('query')],
   ['GET /v1/announce/current', requires('query')],

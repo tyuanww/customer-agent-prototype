@@ -29,6 +29,17 @@ const CSV_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v3';
 const LEGACY_CHECK_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v4';
 const SOP_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v5';
 const REPAIR_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v6';
+const SOP_QUERY_CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v8';
+const SOP_QUERY_LOCK = 'sop-query-contract-set.lock.json';
+const SOP_QUERY_CONSUMPTION_SCHEMA = 'customer-agent-sop-query-contract-consumption/v1';
+const SOP_QUERY_PREDECESSOR_SOURCE_SHA = '75e1889efee91322dab1dfa28aadc53fd718682b';
+const SOP_QUERY_PREDECESSOR_ID = 'cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9';
+const SOP_QUERY_APPROVAL_DATE = '2026-11-08';
+const SOP_QUERY_APPROVAL_EVIDENCE = 'EVD-SOP-QUERY-EXPORT-20261108';
+const SOP_QUERY_DESIGN_INPUTS = Object.freeze({
+  '2026-10-23-upstream-intake-sop-media.md': '1383a79b6ff8754f9d27f8e413547bb6708737e479232e11dd55793372d52de5',
+  '2026-10-29-sop-contract.proposal.schema.yaml': '86449c1f8029709117436e74c734b84e038375ab657b1c4411cdfc4f2742dec2',
+});
 const REPAIR_LOCK = 'repair-contract-set.lock.json';
 const REPAIR_SOURCE = 'business-docs/01-客服Agent项目/30-开发-进行中/content-intake-repair-successor-v1';
 const REPAIR_APPROVAL = 'business-docs/01-客服Agent项目/90-评审/2026-10-12_后继合同批准.json';
@@ -42,6 +53,15 @@ const INTAKE_STATUS = 'VERIFIED_NOT_ACTIVATED';
 const OPENAPI_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/openapi.v1.yaml';
 const DATABASE_SOURCE_PATH = 'business-docs/01-客服Agent项目/20-设计-进行中/33-schema-v1-草案.sql';
 const OWNER_SOURCE_ROOT = 'business-docs/01-客服Agent项目/30-开发-进行中';
+const SOP_QUERY_MEMBERS = Object.freeze({
+  storage: ['content-intake-sop-query-v1/storage.v1.sql', 'storage.v1.sql'],
+  installation: ['content-intake-sop-query-v1/installation.v1.json', 'installation.v1.json'],
+  provenance: ['content-intake-sop-query-v1/provenance.v1.json', 'provenance.v1.json'],
+  predecessor: ['content-intake-sop-query-v1/predecessor-lock.v1.json', 'predecessor-lock.v1.json'],
+  shapes: ['content-intake-sop-query-v1/shapes.v1.json', 'shapes.v1.json'],
+  rules: ['content-intake-sop-query-v1/rules.v1.json', 'rules.v1.json'],
+  approval: ['content-intake-sop-query-v1/approval.v1.json', 'approval.v1.json'],
+});
 // The versioned runtime profile has a closed set of companion artifacts. These
 // are immutable contract inputs, not executable hooks or paths supplied by HTTP.
 const RUNTIME_MEMBERS = Object.freeze({
@@ -167,6 +187,7 @@ function validateManifest(rawManifest) {
   const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
   const repairProfile = rawManifest?.schema === REPAIR_CONTRACT_SET_SCHEMA;
   const sopProfile = rawManifest?.schema === SOP_CONTRACT_SET_SCHEMA;
+  const sopQueryProfile = rawManifest?.schema === SOP_QUERY_CONTRACT_SET_SCHEMA;
   const legacyCheckProfile = rawManifest?.schema === LEGACY_CHECK_CONTRACT_SET_SCHEMA;
   const csvProfile = legacyCheckProfile || rawManifest?.schema === CSV_CONTRACT_SET_SCHEMA;
   const runtimeProfile = csvProfile || rawManifest?.schema === RUNTIME_CONTRACT_SET_SCHEMA;
@@ -184,10 +205,11 @@ function validateManifest(rawManifest) {
       ...(runtimeProfile ? ['runtime'] : []),
       ...(repairProfile ? ['repair'] : []),
       ...(readinessProfile ? ['readiness'] : []),
+      ...(sopQueryProfile ? ['sopGraph'] : []),
     ],
     'contract-set manifest',
   );
-  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !repairProfile && !readinessProfile) {
+  if (rawManifest.schema !== CONTRACT_SET_SCHEMA && !runtimeProfile && !sopProfile && !sopQueryProfile && !repairProfile && !readinessProfile) {
     throw new Error(`Unsupported contract-set schema: ${String(rawManifest.schema)}`);
   }
   if (rawManifest.source_repository !== SOURCE_REPOSITORY) {
@@ -222,6 +244,7 @@ function validateManifest(rawManifest) {
   const readinessPair = openapi.version === '1.24.0' && database.version === 'schema.v1.29';
   const repairPair = openapi.version === '1.24.0' && database.version === 'schema.v1.28';
   const sopPair = openapi.version === '1.23.0' && database.version === 'schema.v1.26';
+  const sopQueryPair = openapi.version === '1.25.0' && database.version === 'schema.v1.30';
   const legacyCheckPair = openapi.version === '1.22.0' && database.version === 'schema.v1.25';
   const csvPair = openapi.version === '1.22.0' && database.version === 'schema.v1.24';
   const runtimePair = openapi.version === '1.21.0' && database.version === 'schema.v1.23';
@@ -235,7 +258,7 @@ function validateManifest(rawManifest) {
   const ownerPair = openapi.version === '1.12.0' && database.version === 'schema.v1.15';
   const legacyPair = openapi.version === '1.11.0'
     && ['schema.v1.12', 'schema.v1.13', 'schema.v1.14'].includes(database.version);
-  if (readinessPair !== readinessProfile || repairPair !== repairProfile || sopPair !== sopProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!readinessPair && !repairPair && !sopPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
+  if (readinessPair !== readinessProfile || repairPair !== repairProfile || sopPair !== sopProfile || sopQueryPair !== sopQueryProfile || legacyCheckPair !== legacyCheckProfile || (csvPair || legacyCheckPair) !== csvProfile || (runtimePair || csvPair || legacyCheckPair) !== runtimeProfile || (!readinessPair && !repairPair && !sopPair && !sopQueryPair && !legacyCheckPair && !csvPair && !runtimePair && !directPair && !managementPair && !qualityPair && !usagePair && !intakePair && !opsLoopPair && !backendPair && !ownerPair && !legacyPair)) throw new Error('Unsupported contract version pair');
   let openapiPath = OPENAPI_SOURCE_PATH;
   let databasePath = DATABASE_SOURCE_PATH;
   if (readinessPair) {
@@ -259,6 +282,16 @@ function validateManifest(rawManifest) {
   } else if (sopPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v1.23.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/schema.v1.26.sql`;
+  } else if (sopQueryPair) {
+    openapiPath = `${OWNER_SOURCE_ROOT}/content-intake-sop-query-v1/openapi.v1.yaml`;
+    databasePath = `${OWNER_SOURCE_ROOT}/content-intake-sop-query-v1/schema-v1.30.sql`;
+    assertExactKeys(rawManifest.sopGraph, Object.keys(SOP_QUERY_MEMBERS), 'SOP query artifacts');
+    for (const [key, [sourcePath, file]] of Object.entries(SOP_QUERY_MEMBERS)) {
+      const descriptor = validateDescriptor(rawManifest.sopGraph[key], `sopGraph.${key}`);
+      if (descriptor.version !== '1' || descriptor.source_path !== `${OWNER_SOURCE_ROOT}/${sourcePath}` || descriptor.file !== file) {
+        throw new Error(`sopGraph.${key} descriptor does not match the SOP query profile`);
+      }
+    }
   } else if (runtimePair || csvPair || legacyCheckPair) {
     openapiPath = `${OWNER_SOURCE_ROOT}/openapi.v${csvProfile ? '1.22' : '1.21'}.yaml`;
     databasePath = `${OWNER_SOURCE_ROOT}/schema.v${legacyCheckPair ? '1.25' : csvPair ? '1.24' : '1.23'}.sql`;
@@ -313,6 +346,7 @@ function contractDescriptors(manifest) {
   return [['OpenAPI', manifest.openapi], ['Database', manifest.database],
     ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor]),
     ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor]),
+    ...Object.entries(manifest.sopGraph ?? {}).map(([key, descriptor]) => [`sopGraph.${key}`, descriptor]),
     ...Object.entries(manifest.readiness ?? {}).map(([key, descriptor]) => [`readiness.${key}`, descriptor])];
 }
 
@@ -328,6 +362,165 @@ function verifyRuntimeReferences(directory, manifest) {
     return;
   }
   verifyBaseRuntimeReferences(installation, manifest.openapi, manifest.database, manifest.runtime, provenance, manifest.schema === CSV_CONTRACT_SET_SCHEMA);
+}
+
+function verifySopQueryApproval(approval) {
+  assertExactKeys(approval, [
+    'schema', 'status', 'decisionDate', 'evidenceId', 'scope', 'designInputs',
+    'gitCommitApproved', 'pushApproved', 'deploymentApproved', 'runtimeActivated',
+    'businessMappingApproved', 'freezeCompleted', 'exportCompleted',
+  ], 'SOP query approval');
+  if (approval.schema !== 'customer-agent-sop-graph-implementation-approval/v1'
+    || approval.status !== 'APPROVED'
+    || approval.decisionDate !== SOP_QUERY_APPROVAL_DATE
+    || approval.evidenceId !== SOP_QUERY_APPROVAL_EVIDENCE
+    || typeof approval.evidenceId !== 'string' || approval.evidenceId.length === 0
+    || !Array.isArray(approval.scope)
+    || !isDeepStrictEqual([...approval.scope].sort(), ['formal-contract-change', 'product-implementation'])
+    || approval.gitCommitApproved !== true
+    || approval.pushApproved !== false
+    || approval.deploymentApproved !== false
+    || approval.runtimeActivated !== false
+    || approval.businessMappingApproved !== false
+    || approval.freezeCompleted !== true
+    || approval.exportCompleted !== true) {
+    throw new Error('SOP query approval boundary is invalid');
+  }
+  assertExactKeys(approval.designInputs, [
+    '2026-10-23-upstream-intake-sop-media.md',
+    '2026-10-29-sop-contract.proposal.schema.yaml',
+  ], 'SOP query approval design inputs');
+  if (!isDeepStrictEqual(approval.designInputs, SOP_QUERY_DESIGN_INPUTS)) {
+    throw new Error('SOP query approval design inputs mismatch');
+  }
+}
+
+function verifySopQueryReferences(directory, manifest) {
+  if (manifest.schema !== SOP_QUERY_CONTRACT_SET_SCHEMA) return;
+  const read = key => readJson(path.join(directory, manifest.sopGraph[key].file), `SOP query ${key}`);
+  const installation = read('installation');
+  assertExactKeys(installation, [
+    'schema', 'status', 'versions', 'runnableMigration', 'migrationPosition',
+    'predecessor', 'requiredProductWork', 'runtimeActivated', 'productionConsumerReady',
+    'queryTransport',
+  ], 'SOP query installation');
+  if (installation.schema !== 'customer-agent-sop-graph-installation/v1'
+    || installation.status !== 'CANDIDATE'
+    || !isDeepStrictEqual(installation.versions, { openapi: '1.25.0', database: 'schema.v1.30', profile: 'content-intake-sop-query-v1' })
+    || installation.runnableMigration !== false
+    || installation.migrationPosition !== null
+    || installation.runtimeActivated !== false
+    || installation.productionConsumerReady !== false
+    || !Array.isArray(installation.requiredProductWork)
+    || installation.requiredProductWork.length === 0
+    || installation.requiredProductWork.some(item => typeof item !== 'string' || item.length === 0)
+    || !isRecord(installation.queryTransport)
+    || installation.queryTransport.businessAlias !== 'menokin-sop-query-v1'
+    || installation.queryTransport.route !== '/v1/sop/query'
+    || !isDeepStrictEqual(installation.queryTransport.statuses, ['ready', 'blocked', 'stale', 'no_match'])
+    || installation.queryTransport.legacySearchSopBehavior !== '503-fail-closed'
+    || installation.queryTransport.runtimeActivated !== false) {
+    throw new Error('SOP query installation boundary is invalid');
+  }
+  assertExactKeys(installation.predecessor, ['sourceGitSha', 'contractSetId', 'artifacts'], 'SOP query installation predecessor');
+  assertExactKeys(installation.queryTransport, [
+    'businessAlias', 'route', 'statuses', 'legacySearchSopBehavior', 'runtimeActivated',
+  ], 'SOP query queryTransport');
+
+  const provenance = read('provenance');
+  assertExactKeys(provenance, [
+    'schema', 'status', 'proposedVersions', 'formalVersionAssigned', 'sourceGitSha',
+    'predecessorGitSha', 'designApproved', 'productImplementationApproved',
+    'freezeCompleted', 'exportCompleted', 'runtimeActivated', 'businessMappingApproved',
+    'businessAlias', 'graphCandidateManifestSha256', 'querySources', 'artifacts',
+    'exportBlockers',
+  ], 'SOP query provenance');
+  if (provenance.schema !== 'customer-agent-sop-query-contract-candidate/v1'
+    || provenance.status !== 'EXPORTED_CANDIDATE'
+    || !isDeepStrictEqual(provenance.proposedVersions, { openapi: '1.25.0', database: 'schema.v1.30', profile: 'content-intake-sop-query-v1' })
+    || provenance.formalVersionAssigned !== true
+    || provenance.sourceGitSha !== null
+    || provenance.predecessorGitSha !== SOP_QUERY_PREDECESSOR_SOURCE_SHA
+    || provenance.designApproved !== true
+    || provenance.productImplementationApproved !== true
+    || provenance.freezeCompleted !== true
+    || provenance.exportCompleted !== true
+    || provenance.runtimeActivated !== false
+    || provenance.businessMappingApproved !== false
+    || provenance.businessAlias !== 'menokin-sop-query-v1') {
+    throw new Error('SOP query provenance boundary is invalid');
+  }
+  requireString(provenance.graphCandidateManifestSha256, HASH_PATTERN, 'SOP query graph candidate manifest hash');
+  assertExactKeys(provenance.querySources, ['openapi', 'storage'], 'SOP query provenance sources');
+  if (provenance.querySources.openapi !== 'business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/openapi.fragment.json'
+    || provenance.querySources.storage !== 'business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/storage.fragment.sql'
+    || !Array.isArray(provenance.exportBlockers)
+    || provenance.exportBlockers.length !== 2
+    || provenance.exportBlockers.some(item => typeof item !== 'string' || item.length === 0)) {
+    throw new Error('SOP query provenance source or blocker boundary is invalid');
+  }
+  assertExactKeys(provenance.artifacts, ['openapi.candidate.yaml', 'schema.candidate.sql', 'storage.candidate.sql'], 'SOP query provenance artifacts');
+  const provenanceArtifacts = {
+    'openapi.candidate.yaml': manifest.openapi,
+    'schema.candidate.sql': manifest.database,
+    'storage.candidate.sql': manifest.sopGraph.storage,
+  };
+  for (const [key, descriptor] of Object.entries(provenanceArtifacts)) {
+    assertExactKeys(provenance.artifacts[key], ['sha256', 'bytes'], `SOP query provenance ${key}`);
+    if (provenance.artifacts[key].sha256 !== descriptor.sha256 || provenance.artifacts[key].bytes !== descriptor.bytes) {
+      throw new Error(`SOP query provenance artifact mismatch: ${key}`);
+    }
+  }
+
+  const predecessor = read('predecessor');
+  assertExactKeys(predecessor, ['sourceGitSha', 'contractSetId', 'artifacts'], 'SOP query predecessor');
+  requireString(predecessor.sourceGitSha, GIT_SHA_PATTERN, 'SOP query predecessor sourceGitSha');
+  requireString(predecessor.contractSetId, CONTRACT_SET_ID_PATTERN, 'SOP query predecessor contractSetId');
+  assertExactKeys(predecessor.artifacts, ['openapi.v1.yaml', 'schema-v1.29.sql'], 'SOP query predecessor artifacts');
+  for (const [key, artifact] of Object.entries(predecessor.artifacts)) {
+    assertExactKeys(artifact, ['path', 'sha256'], `SOP query predecessor ${key}`);
+    requireString(artifact.sha256, HASH_PATTERN, `SOP query predecessor ${key}.sha256`);
+  }
+
+  verifySopQueryApproval(read('approval'));
+  const openapi = readFileSync(path.join(directory, manifest.openapi.file), 'utf8');
+  const storage = readFileSync(path.join(directory, manifest.sopGraph.storage.file), 'utf8');
+  if (!openapi.includes('/v1/sop/query') || !openapi.includes('/v1/search') || !openapi.includes('503 fail-closed')) {
+    throw new Error('SOP query OpenAPI transport boundary is invalid');
+  }
+  if (!storage.includes('sop_query_leases')) throw new Error('SOP query lease storage is missing');
+}
+
+function verifySopQueryPredecessor(projectRoot, directory, manifest) {
+  const predecessor = readJson(
+    path.join(directory, manifest.sopGraph.predecessor.file),
+    'SOP query predecessor',
+  );
+  const readinessLockPath = path.join(projectRoot, UPSTREAM_ROOT, READINESS_LOCK);
+  assertPathInsideRoot(projectRoot, readinessLockPath);
+  assertRegularFile(readinessLockPath, 'Readiness predecessor lock');
+  const readinessLock = validateConsumptionLock(readJson(readinessLockPath, 'Readiness predecessor lock'));
+  const readinessDirectory = path.join(projectRoot, UPSTREAM_ROOT, readinessLock.contract_set_id);
+  assertPathInsideRoot(projectRoot, readinessDirectory);
+  const readiness = verifyContractSetDirectory(readinessDirectory);
+  if (readiness.manifest.schema !== READINESS_SCHEMA) {
+    throw new Error('SOP query predecessor requires a v7 readiness bundle');
+  }
+  assertLockMatchesContractSet(readinessLock, readiness);
+  if (predecessor.sourceGitSha !== SOP_QUERY_PREDECESSOR_SOURCE_SHA
+    || predecessor.contractSetId !== SOP_QUERY_PREDECESSOR_ID
+    || predecessor.sourceGitSha !== readiness.manifest.source_git_sha
+    || predecessor.contractSetId !== readiness.manifest.contract_set_id
+    || predecessor.artifacts['openapi.v1.yaml'].sha256 !== readiness.manifest.openapi.sha256
+    || predecessor.artifacts['schema-v1.29.sql'].sha256 !== readiness.manifest.database.sha256
+    || predecessor.artifacts['openapi.v1.yaml'].path !== readiness.manifest.openapi.source_path
+    || predecessor.artifacts['schema-v1.29.sql'].path !== readiness.manifest.database.source_path) {
+    throw new Error('SOP query predecessor does not match the verified v7 readiness bundle');
+  }
+  const installation = readJson(path.join(directory, manifest.sopGraph.installation.file), 'SOP query installation');
+  if (!isDeepStrictEqual(installation.predecessor, predecessor)) {
+    throw new Error('SOP query installation predecessor does not match predecessor lock');
+  }
 }
 
 function verifyBaseRuntimeReferences(installation, openapi, database, runtime, provenance, csvProfile) {
@@ -458,6 +651,7 @@ export function verifyContractSetDirectory(directory) {
   }
   for (const [label, descriptor] of physicalDescriptors(manifest)) assertMember(resolvedDirectory, descriptor, label);
   verifyRuntimeReferences(resolvedDirectory, manifest);
+  verifySopQueryReferences(resolvedDirectory, manifest);
   if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
@@ -481,6 +675,10 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
   if (manifest.schema === READINESS_SCHEMA) return; // Full references and approval are verified against this exact Git SHA.
+  if (manifest.schema === SOP_QUERY_CONTRACT_SET_SCHEMA) {
+    verifySopQueryApproval(JSON.parse(source(manifest.sopGraph.approval.source_path)));
+    return;
+  }
   const readinessHistory = String(runGit(repositoryRoot, ['log', '--full-history', '-1', '--format=%H', manifest.source_git_sha, '--', READINESS_APPROVAL], 'utf8')).trim();
   if (readinessHistory) throw new Error('Approved readiness successor cannot be downgraded');
   if (manifest.schema === REPAIR_CONTRACT_SET_SCHEMA) {
@@ -582,6 +780,14 @@ function verifySourceRepository(sourceRepositoryRoot, manifest) {
   runGit(resolvedRepositoryRoot, ['cat-file', '-e', `${manifest.source_git_sha}^{commit}`]);
 
   for (const [label, descriptor] of contractDescriptors(manifest)) {
+    const sourceTreeEntry = String(runGit(
+      resolvedRepositoryRoot,
+      ['ls-tree', manifest.source_git_sha, '--', descriptor.source_path],
+      'utf8',
+    )).trim();
+    if (!/^100(?:644|755) blob [0-9a-f]{40}\t/.test(sourceTreeEntry)) {
+      throw new Error(`${label} source Git object is not a regular blob`);
+    }
     const committedBytes = runGit(
       resolvedRepositoryRoot,
       ['show', `${manifest.source_git_sha}:${descriptor.source_path}`],
@@ -846,6 +1052,36 @@ function consumptionLock(verifiedContractSet) {
   };
 }
 
+function sopQueryConsumptionLock(verifiedContractSet) {
+  const base = consumptionLock(verifiedContractSet);
+  return {
+    ...base,
+    schema: SOP_QUERY_CONSUMPTION_SCHEMA,
+    profile: 'sopGraph',
+  };
+}
+
+function validateSopQueryConsumptionLock(rawLock) {
+  assertExactKeys(rawLock, [
+    'schema', 'profile', 'contract_set_id', 'source_repository', 'source_git_sha',
+    'manifest_sha256', 'openapi_sha256', 'database_sha256', 'intake_status',
+    'ddev_authorized', 'runtime_activated',
+  ], 'SOP query candidate lock');
+  if (rawLock.schema !== SOP_QUERY_CONSUMPTION_SCHEMA || rawLock.profile !== 'sopGraph') {
+    throw new Error('SOP query candidate lock identity is invalid');
+  }
+  const baseLock = Object.fromEntries(Object.entries(rawLock).filter(([key]) => key !== 'profile'));
+  validateConsumptionLock({ ...baseLock, schema: CONSUMPTION_SCHEMA });
+  return rawLock;
+}
+
+function assertSopQueryLockMatchesContractSet(lock, verifiedContractSet) {
+  const expected = sopQueryConsumptionLock(verifiedContractSet);
+  for (const [key, value] of Object.entries(expected)) {
+    if (lock[key] !== value) throw new Error(`SOP query candidate lock mismatch at ${key}`);
+  }
+}
+
 function validateConsumptionLock(rawLock) {
   assertExactKeys(
     rawLock,
@@ -1006,7 +1242,8 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
   const destination = path.join(upstreamRoot, source.manifest.contract_set_id);
   const isReadiness = source.manifest.schema === READINESS_SCHEMA;
   const isRepair = source.manifest.schema === REPAIR_CONTRACT_SET_SCHEMA;
-  const lockPath = path.join(upstreamRoot, isReadiness ? READINESS_LOCK : isRepair ? REPAIR_LOCK : LOCK_FILE);
+  const isSopQuery = source.manifest.schema === SOP_QUERY_CONTRACT_SET_SCHEMA;
+  const lockPath = path.join(upstreamRoot, isReadiness ? READINESS_LOCK : isRepair ? REPAIR_LOCK : isSopQuery ? SOP_QUERY_LOCK : LOCK_FILE);
   assertPathInsideRoot(resolvedRoot, upstreamRoot);
   assertPathInsideRoot(resolvedRoot, destination);
   assertPathInsideRoot(resolvedRoot, lockPath);
@@ -1018,25 +1255,34 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
     const readinessLockPath = path.join(upstreamRoot, READINESS_LOCK);
     if (existsSync(readinessLockPath)) {
       const existing = verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot));
-      if (!isReadiness || existing.contract_set_id !== source.manifest.contract_set_id) throw new Error('Refuse readiness lock downgrade or replacement');
+      if ((!isReadiness && !isSopQuery) || (isReadiness && existing.contract_set_id !== source.manifest.contract_set_id)) {
+        throw new Error('Refuse readiness lock downgrade or replacement');
+      }
     }
     const repairLockPath = path.join(upstreamRoot, REPAIR_LOCK);
     if (existsSync(repairLockPath)) {
       const existingRepair = verifyRepairIngested(resolvedRoot);
-      if (!isReadiness && (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id)) throw new Error('Refuse repair lock downgrade or replacement');
+      if (!isSopQuery && !isReadiness && (!isRepair || existingRepair.contract_set_id !== source.manifest.contract_set_id)) {
+        throw new Error('Refuse repair lock downgrade or replacement');
+      }
     }
     if (isReadiness) verifyReadinessPredecessor(resolvedRoot, source.directory, source.manifest, verifyRepairIngested(resolvedRoot));
     if (isRepair) verifyRepairPredecessor(resolvedRoot, source.directory);
+    if (isSopQuery) verifySopQueryPredecessor(resolvedRoot, source.directory, source.manifest);
     const current = existsSync(path.join(upstreamRoot, LOCK_FILE))
       ? verifyIngestedContractSet({ projectRoot: resolvedRoot })
       : null;
+
+    if (isSopQuery && !existsSync(destination) && existsSync(lockPath)) {
+      throw new Error('Refuse orphaned SOP query candidate lock without its destination');
+    }
 
     if (existsSync(destination)) {
       const existing = verifyContractSetDirectory(destination);
       if (!manifestsMatch(existing.manifest, source.manifest)) {
         throw new Error('Existing contract-set manifest differs from the verified source');
       }
-      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
+      if (!isSopQuery && source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA && (!current || current.contract_set_id !== source.manifest.contract_set_id)) {
         writeJsonAtomically(lockPath, consumptionLock(existing));
       }
       if (isReadiness) return Object.freeze({ ...repairMetadata(verifyReadinessIngested(resolvedRoot, verifyRepairIngested(resolvedRoot))), status: 'REUSED', generateMigrations: true, generateContracts: true });
@@ -1051,6 +1297,24 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
           generateMigrations: true,
         });
       }
+      if (isSopQuery) {
+        const existingLock = validateSopQueryConsumptionLock(readJson(lockPath, 'SOP query candidate lock'));
+        assertSopQueryLockMatchesContractSet(existingLock, existing);
+        return Object.freeze({
+          status: 'REUSED',
+          profile: 'sopGraph',
+          contract_set_id: existing.manifest.contract_set_id,
+          source_git_sha: existing.manifest.source_git_sha,
+          path: destination,
+          lock_path: lockPath,
+          preserved_lock: current?.contract_set_id ?? null,
+          intake_status: INTAKE_STATUS,
+          ddev_authorized: false,
+          runtime_activated: false,
+          generateMigrations: false,
+          generateContracts: false,
+        });
+      }
       const verified = verifyIngestedContractSet({
         projectRoot: resolvedRoot,
         expectedContractSetId: source.manifest.contract_set_id,
@@ -1059,6 +1323,8 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
     }
 
     const stagingDirectory = mkdtempSync(path.join(upstreamRoot, '.contract-intake-'));
+    let destinationInstalled = false;
+    let candidateLockInstalled = false;
     try {
       for (const member of expectedMembers(source.manifest)) {
         copyFileSync(
@@ -1074,11 +1340,18 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
         throw new Error('Staged contract-set manifest differs from the verified source');
       }
       const nextLock = consumptionLock(staged);
+      const nextSopQueryLock = isSopQuery ? sopQueryConsumptionLock(staged) : null;
       renameSync(stagingDirectory, destination);
-      if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA) writeJsonAtomically(lockPath, nextLock);
+      destinationInstalled = true;
+      if (isSopQuery) writeJsonAtomically(lockPath, nextSopQueryLock);
+      else if (source.manifest.schema !== SOP_CONTRACT_SET_SCHEMA) writeJsonAtomically(lockPath, nextLock);
+      if (isSopQuery) candidateLockInstalled = true;
     } catch (error) {
       if (existsSync(stagingDirectory)) {
         rmSync(stagingDirectory, { recursive: true, force: true });
+      }
+      if (isSopQuery && destinationInstalled && !candidateLockInstalled) {
+        rmSync(destination, { recursive: true, force: true });
       }
       throw error;
     }
@@ -1094,6 +1367,23 @@ export function ingestContractSet({ projectRoot, sourceDirectory, sourceReposito
         preserved_lock: kept.contract_set_id,
         path: destination,
         generateMigrations: true,
+      });
+    }
+    if (isSopQuery) {
+      const successor = verifyContractSetDirectory(destination);
+      return Object.freeze({
+        status: 'CREATED',
+        profile: 'sopGraph',
+        contract_set_id: successor.manifest.contract_set_id,
+        source_git_sha: successor.manifest.source_git_sha,
+        path: destination,
+        lock_path: lockPath,
+        preserved_lock: current?.contract_set_id ?? null,
+        intake_status: INTAKE_STATUS,
+        ddev_authorized: false,
+        runtime_activated: false,
+        generateMigrations: false,
+        generateContracts: false,
       });
     }
     const verified = verifyIngestedContractSet({

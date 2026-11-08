@@ -1,0 +1,13 @@
+{
+  "schema": "customer-agent-sop-query-contract-consumption/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "0fb1dc76ee2b84fda4a82025c081eea7dd697534",
+  "manifest_sha256": "f05a6a9df142cec58ccb147283bb4c8c8975b91146aea5c460170dd129e0d5b5",
+  "openapi_sha256": "9f8b09c7577f17df25a17854d99cbd50f055b8cfcde4810276cf1a8f8fab5cc1",
+  "database_sha256": "29af409df12f6ea511261812591d449deb2a1b11f9777af11c8a3a4800c167b8",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false,
+  "profile": "sopGraph"
+}
