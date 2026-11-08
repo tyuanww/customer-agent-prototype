@@ -1,6 +1,10 @@
-import { BrowserWindow, clipboard, type WebContents } from 'electron';
+import { BrowserWindow, clipboard, nativeImage, type WebContents } from 'electron';
 import { join } from 'node:path';
 import { resolveClipboardWrite } from '../shared/clipboard-write';
+import {
+  writeSopClipboard,
+  type SopClipboardPayload,
+} from '../shared/sop-pipeline';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { sanitizeDragDelta, type Rect } from '../shared/overlay-geometry';
 import { ALLERGY_SOP_SCENE_ID } from '../shared/sop-entry';
@@ -17,6 +21,7 @@ import {
 } from '../shared/sop-geometry';
 import {
   advanceSopNext,
+  canCopySopNode,
   chooseSopEdge,
   currentSopNode,
   projectSop,
@@ -54,6 +59,20 @@ export type SopWindowControllerOptions = {
   publishedScriptIds?: () => SopPublishSet;
   writeClipboard?: (text: string) => void;
 };
+
+/** INT-DESKTOP calls this with bytes already resolved by Main. Electron receives
+ * text and image in one write, so a failed image conversion cannot leave text
+ * behind as an apparent successful copy. */
+export function writeSopClipboardNative(payload: SopClipboardPayload): void {
+  writeSopClipboard(
+    { write: (data) => clipboard.write(data as Parameters<typeof clipboard.write>[0]) },
+    (bytes) => {
+      const image = nativeImage.createFromBuffer(Buffer.from(bytes), { scaleFactor: 1 });
+      return image.isEmpty() ? null : image;
+    },
+    payload,
+  );
+}
 
 export class SopWindowController {
   private window: BrowserWindow | null = null;
@@ -271,7 +290,10 @@ export class SopWindowController {
       return { ok: false, message: '没有可复制的话术内容' };
     }
     const node = currentSopNode(this.tree, this.progress);
-    if (node?.kind !== 'copyable') {
+    if (!node || !canCopySopNode(node, this.publishedScriptIds())) {
+      if (node?.kind === 'copyable') {
+        return { ok: false, message: '当前话术尚未发布，不能复制' };
+      }
       return { ok: false, message: '没有可复制的话术内容' };
     }
     const resolved = resolveClipboardWrite(node.answerText);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
-import { createSyntheticSopWorkbook, parseSopWorkbook, repairEmptySharedStringMarkers, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
+import { createSyntheticSopWorkbook, parseSopWorkbook, readSopCellText, repairEmptySharedStringMarkers, tryParseSopAsFaq, SOP_POLICY_VERSION, SOP_SHEET_NAMES, type SopParseContext } from '@customer-agent/content-intake';
 
 const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN5EAAAAASUVORK5CYII=';
 const context: SopParseContext = {
@@ -33,6 +33,16 @@ async function fixture(options: { imageOnly?: boolean; extraSheet?: boolean; ver
 }
 
 describe('candidate SOP workbook parser', () => {
+  it('keeps the display-only cell text boundary explicit', () => {
+    expect(readSopCellText({ richText: [{ text: '前' }, { text: '后' }] })).toBe('前后');
+    expect(readSopCellText({ text: { richText: [{ text: '链接文字' }] }, hyperlink: 'https://synthetic.example/' } as unknown as ExcelJS.CellValue))
+      .toBe('链接文字');
+    expect(readSopCellText({ formula: '=1+1', result: 2 } as unknown as ExcelJS.CellValue)).toBeUndefined();
+    expect(readSopCellText(new Date('2026-01-01T00:00:00.000Z') as unknown as ExcelJS.CellValue)).toBeUndefined();
+    expect(readSopCellText(true as unknown as ExcelJS.CellValue)).toBeUndefined();
+    expect(readSopCellText({ unknown: 'value' } as unknown as ExcelJS.CellValue)).toBeUndefined();
+  });
+
   it('keeps a finite step number and a rich-text run that follows an empty text marker', async () => {
     expect(repairEmptySharedStringMarkers('<ns0:si xmlns:ns0="urn:s"><ns0:t /><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>'))
       .toBe('<ns0:si xmlns:ns0="urn:s"><ns0:r><ns0:t>富文本步骤</ns0:t></ns0:r></ns0:si>');

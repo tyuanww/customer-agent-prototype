@@ -83,6 +83,7 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `packages/content-intake/` | 标准 FAQ 的 XLSX / CSV 解析、预算前检、错误/模板实物及可取消子进程；`faq-rules.ts` 独占格式无关业务校验，`csv.ts` 拥有原字节 CSV 格式边界；同一 runner 按服务端来源上下文选择解析器，P2 API 消费正式编译产物 | 不拥有授权/审批/正式候选、renderer IPC、真实来源或自行发布；experiments/csv 只保存合成原字节夹具 |
 | `packages/job-roster/` | 稳定职务目录、有限别名窗口，以及 `GET /v1/auth/job` 响应解析。登录登记和桌面按钮都读 `JOB_ROSTER` | 不连接数据库，不签发授权。Electron 预加载不能引用这个包，权利表在预加载里手写同一份句子 |
 | `apps/api/src/content-intake/` | 产品会话主体到组织／岗位／业务授权交集；原子授权、接收／解析、服务端 direct-v1 材料冻结、修订／取消与来源确认；候选质量计划及逐条人工检查复用封闭 DB 存储；publication 拥有确认意图、精确原操作恢复与内部 SQL 原子发布；仅在事务确认成功或已提交回执恢复后登记图片预览，回滚和未知提交不提前投影；rollback 拥有上一版完整影响预检、全部影响范围复核及新发布回执；evidence 保留来源确认与只读旧审批历史，四个审批写口拒绝 MODE_CONFLICT；usage 统一拥有会话／店铺／选择绑定、来源材料一致性、混合政策谱系、最早截止、逐页重验和坐席投影；discovery 投影来源资格及绑定会话／完整权限版本的分页 | 仅隔离 PG 合成消费者，无生产 HTTP factory／新 ACL；不安装新审批 provider，不制造审批通过，不创建第二 current，不隐式 bootstrap／认领旧同域内容 |
+| `apps/api/src/access/` | 唯一运行时准入所有者：精确 `METHOD path` 策略注册表、public allowlist、typed `AccessDecision`、Query／Dashboard settings／administrator 三投影、有界去重拒绝审计和 DB snapshot adapter。所有全局 API 路由在注册时必须声明策略；未知路由失败关闭 | 不拥有业务写事务、grant 状态机、角色上限值或 route 处理逻辑；投影不是写入票据，命令仍由 content-intake 事务与 PostgreSQL 最终复核 |
 | `apps/api/src/content-intake/usage-http.ts` | 六条发现/词表/店铺目录/资格/快照 HTTP 路由的认证、查询解码、正式错误与响应校验；保留认证私有引用，复用既有 usage 事务 | 仅隔离合成宿主显式注册；不导入桌面，不注册生产工厂，不授予新应用 ACL |
 | `apps/api/src/content-intake/grants-http.ts` / `authority.ts` / `discovery.ts` grants | 冻结授权合同的列表、只读预览、创建与撤销/接管 HTTP；预览与创建共用批次校验，列表在 SQL 扫描前按当前可管理范围收窄，菜单和签发共用 authority.ts 的有效分配授权 SQL，拒绝失效根资格下的委派；最终仍复核母授权；管理插件借出同一个 requireProductSession service | 仅合成宿主注册；不建立第二权限规则、不创建 root allocation；游标不携带无权范围的扫描行，预览没有持久写或回执 |
 | `apps/api/src/content-intake/management-http.ts` / `files.ts` | 管理端上传、接收与有界串行解析；服务端摘要、永久回执、容量门、会话锁、材料分页与 Excel 错误报告；来源确认、只读旧审批、确认发布／取消／回退及主体+action+operationId 回执查询；共享 http-boundary.ts 拥有认证引用、GET 实际空正文校验、错误封口及分页解码，候选地址与正文键必须一致；`seats-http.ts` / `seats.ts` 提供账号管理资格和四类坐席命令 | 仅隔离合成宿主显式注册；新审批请求／刷新返回 MODE_CONFLICT；不接受客户端角色、材料摘要／正文行或审批结论；质量 HTTP 保留摘要／样本／提交／回执；上传消费管理上下文及参与人目录；回退仅支持上一版，越范围须新纠正候选；账号资格独立于业务授权分配资格 |
@@ -235,6 +236,32 @@ v1.17 migrated PG15
 
 ## 5. 测试和验证层级
 
+### 5.1 统一架构手写合同（ARC-01）
+
+`packages/unified-contracts/src/index.ts` 是手写跨模块合同的唯一所有者，拥有 branded `UserId` / `SessionEpoch` / `ReleaseId` / `OperationId` / `QueryId`、`AccessDecision` 及其三个最小投影、`QueryOutcome`、`OperationEnvelope`、`ReleaseSnapshot` 和 `OverlaySnapshot`。`packages/contracts` 仍只拥有冻结上游 OpenAPI 的生成资产；两者之间的消费必须经过显式 adapter。
+
+`ROLE_CEILING_POLICY` 是 role、business actions、allocate、delegate 和 import-parent 上限的唯一策略源，形状与值镜像 `content_intake.role_ceiling`；`AUTHORIZATION_MATRIX` 从它展开，`grants-manage` 与 `accounts-manage` 也只在 `mayAllocate` 时派生。`packages/unified-contracts/scripts/generate-policy-artifacts.mjs` 生成 JSON 矩阵和数据库 role-ceiling seed，`check:generated` 以字节级比较拒绝手改漂移；静态测试读取 `0057_role_ceiling.sql`，同时校验实际列、`role` 主键和角色值。数据库仍是运行时授权权威，生成 seed 不代表已应用，也不授予 renderer、Query 或 Dashboard 额外能力。Query 只消费 `QueryAccessView`，Dashboard 设置只消费 `DashboardSettingsView`，管理员操作才消费 `AdminAccessView`。
+
+操作状态的 owner 保持在手写合同包内；API 后续实现负责持久化和恢复，必须遵守 accepted → running → committed/unknown 等显式转换与精确回执规则，`expired` 是显式终态。SOP branch 必须绑定 decision source；Scope、release index 身份和 content Top 3 的唯一排序/复制句柄也由本包验证。overlay 快照由桌面 adapter 按 epoch 和 generation 消费。本 PR 只验证合同边界和纯函数，不宣称下游 UI、API、数据库并发或真实业务数据已接线。
+
+### 5.2 统一操作顺序验证（FOR-01）
+
+`.cursor/skills/verify-unified-operation-ordering/models/operation-ordering.mjs` 对 ARC-01 的手写操作合同做有限状态穷举。模型直接导入 `OPERATION_TRANSITIONS`、`classifyOperationReuse` 和 `parseOperationStatus`，只拥有事件交错与不变量，不维护第二份状态转换或复用策略。它覆盖授权检查、命令受理、撤权、写入、accepted/running/unknown/committed 重复提交、未知提交、状态读取、恢复和全部终态，并要求源码/Actor/Command/RequestHash/SessionEpoch 绑定、至多一次已提交效果及终态原回执重放。受理只在撤权前可达，witness 记录真实事件顺序；写入效果后丢失持久回执可从 `running + effects=1 + durable=none` 到达 `unknown`，恢复在读到持久回执前保持 `unknown`；查询后仍无终态才可过期，持有持久 commit 回执不得过期。
+
+该模型证明的是有限合同状态机，不证明 PostgreSQL MVCC、网络分区、COMMIT 中途进程死亡、文件系统持久性、HTTP 或 IPC。真实 PostgreSQL 15 的请求时授权线性化由 `pnpm test:seat-administration-revocation` 验证：检查成功后撤权的已受理命令可以完成，撤权后开始的新命令必须被拒绝；授权生命周期另由 `authorization-reachability.integration.test.ts` 深度五的穷举回放验证。ARC-01 当前只有合同，没有产品 operation store，因此上述真实回放不冒充 envelope 已接入运行时。
+
+`receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令结果、环境和状态数，并对 unified 与 seat 回执执行精确来源清单，递归核验其来源哈希。`verify-manual-identity-with-basefix.mjs` 是 BASEFIX 文件的唯一所有者，持有固定 commit、文件 SHA-256、单文件范围和九文件 38 测试预期；unified 来源清单明确排除该文件，发现重复所有权时 fail-closed。检查器对缺失或删除声明的回执、来源漂移 fail-closed；它要求 `syncCommit` 是受测 head 的祖先，且该提交之后只允许两个回执文件变化。BASEFIX 不在测试树中时，正式入口创建临时归档并只替换该测试 blob；BASEFIX 已在祖先中时，入口运行当前 tested head 的真实测试文件，使后续迁移验证组合行为而不是旧快照。缺提交、错误祖先关系或结果不是精确 9 文件 38 测试都失败。运行时可生成机器可读报告，绑定精确 tested head、witness 路径、七个负向控制、BASEFIX blob 与 tested file hash、实测结果和错误数。改动受测源码后必须先重跑再更新证据；FORM 本身不修改陈旧测试。
+
+### 5.3 桌面 overlay 单一状态所有者（OVL-01）
+
+`apps/desktop/src/shared/overlay-machine.ts` 是 Fox / Query overlay 的唯一状态与转换所有者，集中保存 lifecycle/content phase、active surface、handoff identity/mode、focus intent、layout/resize sequence、drag session/settle identity、session epoch、generation 和 window generation。`applyOverlayEvent` 是纯函数，返回 `applied / ignored / rejected`、下一状态和 typing 后的 `NativeEffect[]`；BrowserWindow、focus、bounds、timers 和 renderer command 只能由 `overlay-controller.ts` 执行这些 effect。迟到 handoff、layout、drag、blur、session、release 和内容事件按 window generation、session epoch、handoff/layout sequence、release/content revision 与 drag settle identity fail-closed，不能重新打开已关闭窗口、回滚 release 或提交旧显示器的 bounds。Query 首次订阅晚于打开命令时，reducer 重放创建 opening 时保存的原始 `prepare-search`，不会用零中心或 identity transform 重造动画起点。
+
+Main 将同一个 `OverlaySnapshotProjection` 投影到 Fox / Query：`contract` 的类型、构造与运行时校验直接来自 ARC-01 `@customer-agent/unified-contracts`，外层只增加桌面渲染所需的 content/release sequence、focus、drag、Fox edge 与 shortcut 只读视图。projection 对顶层、handoff、layout、drag、session、settle、Fox、shortcut、rect 和 pending-open plan 都使用 exact-key 校验；renderer 不维护第二份 authoritative handoff/layout 真值。每条 renderer report 携带发起时的 session epoch、generation、window generation 与 content revision，release change 另带服务端单调 `releaseSequence`，Main 不让当前状态替旧事件补身份。没有 snapshot 时 Query 不生成默认 identity，也不报告 UI、layout 或 release。session epoch 变化通过 injectable typed work port 实际取消旧 query/copy、清空内容并把焦点恢复到仍存活的 Query；窗口重建只接受当前值加一的 generation，保留当前 release，并使旧 ACK 全部失效。新增的 `overlay:event` 是固定、精确 payload 的窄通道，也只接受可信主 frame；frame observation 作为其封闭事件变体，没有通用 IPC。
+
+Reducer 的 content transition table 保留原产品的合法路径：`RESULTS` / `COPIED` 才可进入 `COPIED`，空问题、命中、空结果和错误可从活动内容态重置；content revision 单调递增，迟到事件不能覆盖新内容。Main 在完整 effect 队列收敛后只发布一次快照；布局 ACK 的嵌套 effect 不再回放旧快照或重排已消费的超时。handoff、layout 和 drag timeout effect 携带创建时的 session / generation / window identity，layout 还携带 sequence 与 content revision；超时回到 reducer 判定后才执行 fallback，retry、关闭和旧代 timer 不能在当前状态上产生迟到的 renderer command。
+
+所有 transition 驱动的 renderer command 都由 `NativeEffect` 表达，包括 Query reactivation、display anchor 同步、fallback layout ACK 和 shortcut status。fallback native resize 完成后，Main 发出 `LAYOUT_FALLBACK_APPLIED`，再由 reducer 产生 `SEND_RENDERER_COMMAND` ACK。Main 只保留 effect executor 内的发送入口；snapshot 发布是 effect 队列收敛后的单向投影，不参与状态转换。被 reducer 拒绝的 layout report 不再按当前状态改原生 bounds 或提交 ACK。原生 Fox drag transaction、display reconciliation 和 post-drag work 绑定 session / window identity 与 drag generation，lifecycle 或 drag generation 变化后旧 timer 不得执行。frame 指标使用完整 origin identity 加 command kind/id，`coldMs` 是首个完成观测自身的 callback duration，并明确只测 Main 发送到 renderer callback，不宣称 paint completion。
+
 ```text
 unit          纯函数、协议、脚本和安全门
   ↓
@@ -292,14 +319,14 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏五页是工作台、内容库、SOP、资料审核、设置。`IntakeManagement` 同时支撑工作台摘要和资料审核；`IntakePermissions` 挂在「设置」，页内分别渲染授权与账号能力。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这五页一致。知识库组件、本机草稿路由和对应 Main/preload 通道已删除；既有磁盘文件保留但运行时不读写。字段见[资料页与设置页](reference-intake-pages.md)。
 
-四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。它们降低了跨层变更放大，但没有为了行数强行拆散状态机：`overlay-controller.ts`、`QueryApp.tsx` 和 `DashboardApp.tsx` 仍分别拥有窗口 handoff、查询焦点和工作台导航状态。
+四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。OVL-01 随后把窗口 handoff、layout、focus、drag、session 与 renderer phase 收口到共享 overlay reducer；`overlay-controller.ts` 只执行 typed native effects，`QueryApp.tsx` 和 `FoxApp.tsx` 只消费 snapshot，`DashboardApp.tsx` 继续拥有工作台导航状态。
 
 剩余耦合是有意保留的产品语义：检索 adapter 仍绑定桌面字段与发布租约，API `server.ts` 仍组合本项目的路由和合同，主状态机仍集中在上述入口。三份可复用能力 RFC（合同运行时、Migration 控制面、安全边界）均为 `DRAFT · 等待第二个真实消费者`；当前项目单独通过不能证明跨项目复用，出现第二个真实消费者前不继续抽公共包。
 
 CodeGraph 已就绪：仓根有 `.codegraph/`，本机 CLI 与 MCP 服务均可用（当前服务版本 1.6.0），本轮已用它读取跨模块调用路径。索引属于本机工具状态，不提交到业务仓；改代码前优先用 CodeGraph，索引过期或不可用时按 `AGENTS.md` 的规则降级到定向源码检查。
 
 
-三个高耦合入口仍保留主状态机：`overlay-controller.ts` 负责窗口生命周期 / handoff / bounds，`QueryApp.tsx` 负责查询命令与焦点，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。本轮只抽出可独立证明的叶子：overlay 命令工厂、`reportableOverlayPhase` / layout ACK 映射、Query 壳层 class / CSS vars / 数字键排名、Dashboard tooltip 几何，以及 renderer-only 的 Fox 睡眠计时与 CSS 变量写入。不移动 setBounds、焦点、handoff ACK 或导航状态机。
+高耦合业务入口仍按领域分工：`overlay-controller.ts` 执行 overlay typed effects，`QueryApp.tsx` 拥有查询命令与业务内容，`DashboardApp.tsx` 负责侧栏四阶段与拖宽。OVL-01 明确只把 overlay 窗口生命周期、handoff、layout、focus、drag 与 session 的决策移到 shared reducer；query transport、Dashboard、SOP、API 与数据库所有权不变。setBounds、原生焦点和 timer 仍是 Main 的副作用实现，但只在 reducer 接受事件后执行，不再自行推断下一次 handoff。
 
 Query 的模式确认可晚于原生窗口展开。overlay preload 在首次 `onOverlayCommand` 注册之后发出窄 `overlay:query-subscribed` 握手；Main 仅接受可信 Query 主帧，按当前开关意图重新建立交接，不在 preload 排队历史命令，不让迟到订阅撤销已完成的关闭。
 
@@ -361,6 +388,10 @@ B4 的 `apps/api/tests/support/g1a-e0/assemble-package.ts` 拥有仓外规范化
 
 `content-intake/transaction.ts` 是唯一内容事务 owner，直接调用冻结 `intake_runtime.lock_product_session`；ZA003/SESSION_UNAVAILABLE 映射为未授权。各业务 owner 可注册事务内最终不变量检查，但不得自行 COMMIT；最终事实/最早截止仍由事务 owner 复核。
 
+ACL-01 的路由准入先由 `installAccessAdmission` 在请求阶段验证 authenticated actor，并通过单个 `content_intake.access_snapshot` 观察 facts、role、policy/store 版本、有效 source、allocation 和 account 能力。`requestActor` 让 route handler 复用同一 authenticated DTO，避免重复认证。`/v1/access/query`、`/v1/access/settings` 和 `/v1/access/admin` 分别只返回 Query、Dashboard settings 与 administrator 的最小投影。dashboard 的 access revision 或 deadline 变化会使本机 projection 失效；PostgreSQL 的 `authorization_sources`、`authorization_deadline`、`seat_administration_allowed` 和命令事务仍拥有最终写入决定。
+
+ACL migration source 为 `packages/database/overlays/0082_access_evaluator.sql`，SOP migration source 为 `packages/database/overlays/0083_sop_pipeline_projection.sql`。INT-SCHEMA 已将两份 source 按 0082、0083 排序接入运行时迁移链，并由现有 generator 生成 manifest、catalogue 与每段 physical/ACL 校验 pin。`packages/database/migrations/0082_access_evaluator.sql` 和 `0083_sop_pipeline_projection.sql` 只在 source 前增加标准来源头，source 正文保持不变。
+
 SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用消费者仍留显式合成实验：`packages/content-intake/src/sop.ts` 唯一产生 `rowBindings`；治理候选拥有持久行映射与新版本删除 SQL；`apps/api/experiments/sop-row-deletion/consumer.ts` 只在显式合成测试装配中复用事务、资格、回执和提交后预览变更。`linked-preview.ts` 拥有预览数组别名与候选版本，解析成功登记版本、删除回执按版本及剩余行集合投影，空态也保留版本屏障，晚解析和旧回执不得改新版本。实验私有回执还绑定冻结材料的输入对象，删除只从该对象暂存字节生成独立候选预览，保留未删除图片且不修改既有发布别名。`trusted-stage.ts` 是同一实验的可信解析入口：从已采用对象读真实字节并校验摘要，复用唯一 SOP parser/material 构造，经已接收后继窄函数在同事务写候选、词项、job、完整行和媒体。新解析行显式列入 `freshRowIds`；继承只接受精确发布谱系与完整行／媒体映射；本轮持久候选逐张验证系统附件，不再因缓存为空拒绝继承。缺文件或错误摘要仍明确拒绝。图片字节读取在内容锁外完成，最终事务重新核对同一份行／媒体快照与资格；validated 恢复只取该 job 自己未采用的预约描述符，经已有带锁释放能力清理冗余副本，未知提交继续保留。预览在 COMMIT 前暂存输入、确认成功后采用，明确回滚只清本次暂存，未知提交保留。旧冻结 DELETE/204 未改；正式 HTTP/Main 与运行装配未接线，不从实验导入生产；持久字节读取仅在本轮候选实验显式装配。删除后重用由同一候选维护不可变删除事件：parser透传声明版本优先/无列hash的内容版本，新job不算新版本；旧版删除屏障不因新版本恢复当前媒体状态而消失。本轮后继候选将候选／发布媒体关系键补入 row_id，发布谱系的语句级触发器同事务写完整图片关系，图片原物理对象继续去重。正式0040已完成容量、并发和相关合成回归；HTTP/Main接线、生产装配及当前增量审查仍须各自完成，不由合同接收替代。
 
 `content-intake/runtime-pool.ts` 唯一拥有四用途连接的显式 SET ROLE/assert_purpose、借出失败销毁及关停；连接配置由调用者显式提供，不创建角色或读取环境凭据。业务/usage 分别创建原 service，worker 只服务既有失败收尾和报告容量。组织 `organization/{facts-writer,feishu-observer,registered-refresh}.ts` 隐藏可信绑定、观察及写入/恢复，在受限组织连接内消费冻结 schema/mapping；HTTP transport 仍留实验目录，无生产飞书接线。
@@ -376,7 +407,43 @@ SOP 单行删除合同已随批准的 schema1.28/0040 版本化接收，应用�
 
 SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件与独占文件锁，`experiments/sop-row-deletion/media-lifecycle.ts` 拥有同任务稳定预约、持锁重核、写入登记及失败清理，治理候选窄函数复用原 objects/object_reservations 容量账本。文件锁不随 DB 断连释放；所有附件写入及通用回收共用它，锁作用域结束前等待真实 I/O 完成。未知提交、锁竞争及崩溃残锁保守保留计费，不做自动 TTL 清理。`persistent-media.ts` 只读取绑定会话／租约的行级图片元数据及单张已授权文件；`usage.ts` 继续唯一拥有会话、当前权限、租约、适用性与最终截止核验，先过滤行再对可见图片去重。图片读取分为授权选取、锁外读文件、返回前重新选取三步，第二个短事务核对同一图片及最早授权截止，避免持有全局内容锁等待磁盘。内部 payload ID 不进 HTTP，列表不携带字节，文件坏损不能回退内存缓存。生产 factory 不注入这个实验 reader；旧调用默认内存 reader。
 
+### SOP pipeline source and release projection
+
+`packages/content-intake/src/sop-authoring.ts` owns the normalized authoring workbook model, graph validation, authoring preview metadata, and release-fact materialization. `sop-wps-image.ts` owns WPS `DISPIMG` extraction. It accepts only safe internal PNG, JPEG, or GIF relationships, applies archive and media budgets, and returns no partial images after an error. The six normalized sheets own scene, step, branch, message, resource, and search-entry facts. Gate-B node IDs stay unclassified until the workbook supplies an explicit node type.
+
+`packages/database/migrations/0083_sop_pipeline_projection.sql` is the SOP source migration. `publish_sop_release_facts` writes the normalized release tables and immutable `sop-release-v1` projection in the caller's transaction. The shared migration manifest and catalogue stay with INT-SCHEMA, so this branch does not generate them.
+
+`apps/api/src/query/sop-pipeline.ts` consumes only that immutable projection. It classifies SOP ownership before ranking, requires the complete order in `sop_release_severity`, returns the ARC SOP outcome shape, and never mixes ordinary content candidates into an SOP result. `apps/api/src/content-intake/sop-source.ts` parses the persisted projection at the database boundary. `publication.ts` exposes the same-transaction publication seam.
+
+`apps/desktop/src/shared/sop-pipeline.ts` owns the typed minimal projection, sales-agent branch choice, release, session, and revocation invalidation, and the one native clipboard payload. Image-bearing steps fail when metadata or bytes are missing. `SopPipelinePresenter` owns Main-side copy authority and checks the lease and selected step both before and after asynchronous media reads. INT-DESKTOP owns production window and IPC composition. The current composition keeps the existing SOP window contract fail closed while the dedicated positive transport remains unapproved.
+
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
+
+### OBS-01 观测机制
+
+`apps/api/src/observability/` 只拥有纯观测转换。`assembleTrace` 校验 ordinary 与 SOP 的阶段顺序、trace 关联、重复和迟到阶段，并汇总状态与时长。`summarizeLatency` 计算 p50、p95、p99、样本数、错误数和 warm/cold 标签。`buildAlertRecords` 只消费已经分类的预算、unknown operation、dead-letter、stale release 与 release-index 事实。`aggregateEvaluationPair` 先按冻结合同校验 ordinary 与 SOP 记录，再按固定 dataset ID/version 聚合。脱敏器移除未知字段，序列化器随后用合同 parser 重建 canonical 输出，因此未知字段不会进入序列化结果。
+
+`apps/desktop/src/main/observability/` 只把 copy、overlay 和 Dashboard 的稳定字段转换成合同 `StageRecord`。它不持有 Query、SOP、release、Dashboard 或授权状态。
+
+API 与 Desktop 的 OBS 模块直接导入 `@customer-agent/unified-contracts`，合同类型与 parser 只有该 workspace 包一个来源，不保留声明副本或同步脚本。`scripts/observability/report.ts` 使用合成 fixture 重建 JSON 和 Markdown 报告。报告中的延迟值是 fixture 分布，不是运行时性能结果。
+
+INT-API 已把 API request ID、QueryCoordinator 的 access、release-read、recall 或 SOP stage，以及 response validation 接到 typed observer port。默认序列化 sink 使用 OBS runtime 的 canonical serializer；observer 或 sink 失败不会改变查询结果。QRY-01 与 SOP-01 仍拥有各自的 pipeline 行为。INT-DESKTOP 在 Main 组合一个 Query/API session adapter、一个共享 DSH control plane 和一个 OVL `OverlayController`。DSH release invalidation 通过既有 typed Query command seam 取消查询、使复制失效并清空旧内容，不经过通用广播。默认 sink、retention、告警接收人和真实 dead-letter 存储仍未确定。
+
+### INT-API unified query composition
+
+`apps/api/src/integration/access.ts` owns the database-to-ARC access adapter. `integration/release.ts` reads the source-gated current release through the `intake_usage` capability and maps content and SOP projections into typed index inputs. `integration/query-runtime.ts` owns the lifecycle that shares one `AccessEvaluator`, one `QueryCoordinator`, one `ContentPipeline`, one mutable active `SopPipeline`, and one OBS observer port per API process. The content index is built at activation time and is not rebuilt inside a query.
+
+`server.ts` creates the runtime from the configured intake pools, initializes it before listening, and passes the same evaluator to route admission and query evaluation. The integration adapter maps legacy intake domains (`presale`, `campaign`, `aftersale`) to ARC scope domains at the database boundary. It expands shopless source grants against the active release's source scopes; it does not convert a renderer projection into authority.
+
+`/v1/search` still enters the existing search route and event transaction. The event repository claims idempotency first, then requests the coordinated `SearchBackendResult` from the runtime, and continues to own `query_events`, `candidate_impressions`, source-denial audit and response mapping. It does not expose SOP flows through the ordinary SearchResponse contract. A selected SOP that cannot produce a valid flow fails closed without ordinary candidates.
+
+While the dedicated SOP response contract remains open, `/v1/search` returns HTTP 503 with the existing `OVERLOADED` error code. SOP failures use the frozen `OverloadedErrorEnvelope` shape with `details.reason=SOURCE_GATE_NOT_READY` and carry the stable domain distinction in the allowed extension field `details.sop_reason`. The four values are `SOP_UNAVAILABLE`, `SOP_SEVERITY_ORDER_REQUIRED`, `SOP_GATE_B_UNRESOLVED`, and `SOP_FLOW_CONTRACT_UNAVAILABLE`. These failures roll back the query event and impression transaction. Actual SOP flow transport belongs to the separate SOP contract and INT-DESKTOP integration after `SOP-CONTENT-A/B` close.
+
+Successful content publish and rollback responses trigger a single-flight reload through the app lifecycle hook. Startup uses the same activation path. Each query rechecks the current release identity with one lightweight read; if it moved out of band, the request returns the stable unavailable failure, the old index is not served, and a reload is requested. Runtime shutdown waits for an in-flight activation and makes later queries fail closed.
+
+The API default OBS sink receives no raw question or answer. It receives stable request/query tokens, the existing redacted query fingerprint, stable failure codes and measured stage durations. The desktop adapter now parses ordinary `SearchResponse` and the four approved SOP fail-closed reasons at the Main HTTP boundary. A real Electron and synthetic HTTP/PostgreSQL host run is still required before this composition is treated as a complete product runtime.
+
+The current index projection reads the source-gated `release_items` that back the existing `SearchResponse` and `candidate_impressions` foreign keys. If the current intake lineage contains an upsert that has no corresponding `release_items` row, activation fails with `RELEASE_INDEX_ITEM_GAP` instead of serving a partial index. Mapping normalized intake entries into the ordinary SearchResponse and event candidate identity still needs an approved contract or migration change; INT-API does not invent those fields.
 
 ### 精确修复后继的版本接收（2026-10-12）
 

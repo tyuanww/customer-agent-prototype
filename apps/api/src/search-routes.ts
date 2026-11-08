@@ -5,10 +5,10 @@ import {
 } from '@customer-agent/contracts';
 import type { FastifyInstance } from 'fastify';
 import {
-  authenticateRequestHeaders,
   type AuthenticatedUser,
   type AuthService,
 } from './auth-service.js';
+import { requestActor } from './access/context.js';
 import {
   sendForbiddenOrPolicyDenied,
   sendOverloaded,
@@ -33,6 +33,7 @@ type SearchResponse = components['schemas']['SearchResponse'];
 
 export type PreparedSearchOperation = Readonly<{
   actor: AuthenticatedUser;
+  requestId?: string;
   queryId: string;
   parentQueryId: string | null;
   interactionReason: 'original' | 'reselection';
@@ -104,7 +105,7 @@ export function registerSearchRoute(
   dependencies?: SearchRouteDependencies,
 ): void {
   app.post('/v1/search', async (request, reply) => {
-    const actor = await authenticateRequestHeaders(authService, request.headers);
+    const actor = await requestActor(request, authService);
     if (actor === null) return sendUnauthorized(reply);
 
     const rawQueryText = request.body !== null && typeof request.body === 'object'
@@ -162,6 +163,7 @@ export function registerSearchRoute(
     );
     const prepared = Object.freeze({
       actor,
+      requestId: request.id,
       queryId: contract.value.query_id,
       parentQueryId: contract.value.parent_query_id,
       interactionReason: contract.value.interaction_reason,

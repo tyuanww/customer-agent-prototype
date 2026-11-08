@@ -54,9 +54,11 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('animation: query-surface-out var(--query-close-duration) ease-in both');
     expect(css).toContain('var(--query-handoff-clip-top)');
     expect(css).toContain('var(--query-handoff-fox-a)');
-    expect(queryApp).toContain("reportHandoffMilestone(command.handoffId, 'open-armed')");
-    expect(queryApp).toContain("reportHandoffMilestone(activeHandoffIdRef.current, 'open-finished')");
-    expect(queryApp).toContain("reportHandoffMilestone(activeHandoffIdRef.current, 'close-finished')");
+    expect(queryApp).toContain('pendingOpenArmedRef.current = command.handoffId');
+    expect(queryApp).toContain('reportPendingOpenArmed()');
+    expect(queryApp).toContain("'open-finished'");
+    expect(queryApp).toContain('reportCloseFrameAndMilestone');
+    expect(queryApp).toContain("'close-finished'");
     expect(queryApp).toContain("event.animationName === 'query-shell-unfold'");
     expect(queryApp).toContain("event.animationName === 'query-shell-fold'");
     expect(queryApp).toContain('export const SEARCH_FEEDBACK_MS = 280');

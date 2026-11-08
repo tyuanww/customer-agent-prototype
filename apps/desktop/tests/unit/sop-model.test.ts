@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { isAllergySopEntry } from '../../src/shared/sop-entry';
 import {
   SopTreeValidationError,
+  canCopySopNode,
   chooseSopEdge,
+  isSopScriptPublished,
   projectSop,
   startSopProgress,
   validateSopTree,
@@ -49,6 +51,17 @@ describe('SOP tree validator', () => {
     }))).toThrow(SopTreeValidationError);
   });
 
+  it('rejects cycles in declared nodes even when they are unreachable today', () => {
+    expect(() => validateSopTree(tree({
+      startNodeId: 'start',
+      nodes: [
+        { id: 'start', kind: 'internal', edges: [] },
+        { id: 'unreachable-a', kind: 'internal', edges: [{ id: 'to-b', label: '去B', targetId: 'unreachable-b' }] },
+        { id: 'unreachable-b', kind: 'internal', edges: [{ id: 'to-a', label: '去A', targetId: 'unreachable-a' }] },
+      ],
+    }))).toThrow(/cycle/i);
+  });
+
   it('rejects copyable nodes without scriptId', () => {
     expect(() => validateSopTree(tree({
       startNodeId: 'a',
@@ -61,6 +74,13 @@ describe('SOP tree validator', () => {
       startNodeId: 'a',
       nodes: [{ id: 'a', kind: 'decision', edges: [{ id: 'to-b', label: '去B', targetId: 'b' }] }, { id: 'b', kind: 'internal', edges: [] }],
     }))).toThrow(/prompt/);
+  });
+
+  it('rejects a decision node that silently terminates without a branch', () => {
+    expect(() => validateSopTree(tree({
+      startNodeId: 'a',
+      nodes: [{ id: 'a', kind: 'decision', prompt: '继续？', edges: [] }],
+    }))).toThrow(/outgoing branch/);
   });
 
   it('rejects voucher nodes with payout extras', () => {
@@ -99,7 +119,48 @@ describe('SOP tree validator', () => {
   });
 });
 
+describe('synthetic SOP path coverage', () => {
+  it('walks every declared branch from the entry node to a terminal node', () => {
+    const byId = new Map(ALLERGY_SOP_TREE.nodes.map((node) => [node.id, node]));
+    const terminalPaths: string[][] = [];
+
+    const walk = (nodeId: string, path: readonly string[]): void => {
+      const node = byId.get(nodeId);
+      expect(node).toBeDefined();
+      expect(path).not.toContain(nodeId);
+      const nextPath = [...path, nodeId];
+      const targets = [
+        ...(node?.nextId ? [node.nextId] : []),
+        ...(node?.edges.map((edge) => edge.targetId) ?? []),
+      ];
+      if (targets.length === 0) {
+        terminalPaths.push(nextPath);
+        return;
+      }
+      targets.forEach((targetId) => walk(targetId, nextPath));
+    };
+
+    walk(ALLERGY_SOP_TREE.startNodeId, []);
+
+    expect(terminalPaths).toEqual([
+      ['voucher-ask', 'insist-voucher'],
+      ['voucher-ask', 'severity', 'mild-copyable'],
+      ['voucher-ask', 'severity', 'severe-internal', 'severe-done'],
+    ]);
+    expect(new Set(terminalPaths.flat())).toEqual(new Set(ALLERGY_SOP_TREE.nodes.map((node) => node.id)));
+  });
+});
+
 describe('SOP projection', () => {
+  it('uses the published set as the copy boundary', () => {
+    const voucher = ALLERGY_SOP_TREE.nodes.find((node) => node.id === 'voucher-ask');
+    expect(isSopScriptPublished(voucher?.scriptId, 'fixture')).toBe(true);
+    expect(isSopScriptPublished(voucher?.scriptId, new Set())).toBe(false);
+    expect(canCopySopNode(voucher, new Set())).toBe(false);
+    expect(canCopySopNode(voucher, new Set([voucher?.scriptId ?? '']))).toBe(true);
+    expect(canCopySopNode(ALLERGY_SOP_TREE.nodes.find((node) => node.id === 'severity'), 'fixture')).toBe(false);
+  });
+
   it('projects the voucher screen without payout extras or internal notes for agents', () => {
     const projection = projectSop({
       tree: ALLERGY_SOP_TREE,

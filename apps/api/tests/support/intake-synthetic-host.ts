@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createNetServer, type AddressInfo, type Server } from 'node:net';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
@@ -26,6 +27,8 @@ import { registerSearchRoute } from '../../dist/search-routes.js';
 import { IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
 import { createIntakePurposePool, type IntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
 import { createRegisteredOrganizationRefresh } from '../../dist/content-intake/organization/registered-refresh.js';
+import { createDatabaseAccessEvaluator } from '../../dist/access/database.js';
+import { registerAccessRoutes } from '../../dist/access/routes.js';
 import { nativeOrganizationFixture } from './intake-organization-native.ts';
 import { seedIntakeSyntheticDirectory } from './intake-synthetic-directory.ts';
 import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
@@ -61,6 +64,10 @@ type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
 type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean };
+
+export function requiresAccessEvaluatorOverlay(migrations: readonly Readonly<{ id: string }>[]): boolean {
+  return !migrations.some(({ id }) => id === '0082_access_evaluator');
+}
 
 type AdjacentLoopbackPortReservation = Readonly<{
   apiPort: number;
@@ -226,7 +233,21 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   }
   try {
     pg.start(); const database = pg.createDatabase('intake_desktop');
-    admin = await pg.connect(database.config); await applyDatabaseMigrations(admin);
+    admin = await pg.connect(database.config);
+    const migrations = await applyDatabaseMigrations(admin);
+    if (requiresAccessEvaluatorOverlay(migrations.after.applied)) {
+      await admin.query('BEGIN');
+      try {
+        await admin.query(readFileSync(fileURLToPath(new URL(
+          '../../../../packages/database/overlays/0082_access_evaluator.sql',
+          import.meta.url,
+        )), 'utf8'));
+        await admin.query('COMMIT');
+      } catch (error) {
+        await admin.query('ROLLBACK');
+        throw error;
+      }
+    }
     await admin.query('BEGIN');
     await admin.query('SET CONSTRAINTS ALL DEFERRED');
     // /v1/auth/job only answers for a roster principal, and the intake routes only accept a
@@ -439,6 +460,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     });
     registerProductAuthRoutes(app, auth);
     registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
+    registerAccessRoutes(app, createDatabaseAccessEvaluator(pool), auth);
     // The real search door, on a real app_runtime LOGIN: the search function is executable
     // only by that capability, so the lanes cannot borrow the intake pools. The keys are
     // throwaway fixture material and are never printed. The login inherits app_runtime

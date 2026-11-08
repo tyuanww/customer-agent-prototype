@@ -27,6 +27,10 @@ import { LIBRARY_DOMAINS, composeLibraryDelta, type LibraryDomainCounts } from '
 export type DashboardContentSessionClient = Pick<ProductSession, 'view' | 'request'>;
 /** Runs after publish; returns the post-refresh per-domain counts when available (for the receipt deltas). */
 export type DashboardContentAfterPublish = (sessionEpoch: number) => Promise<LibraryDomainCounts | null>;
+export type DashboardContentOperationBoundary = Readonly<{
+  signal: AbortSignal;
+  beginCommit(): void;
+}>;
 
 function asFailure(error: unknown): DashboardContentFailure {
   if (!(error instanceof ProductHttpError)) return dashboardContentFailure('UNAVAILABLE');
@@ -118,18 +122,26 @@ async function waitUntilImportStaged(
   client: DashboardContentSessionClient,
   epoch: number,
   importBatchId: string,
+  signal?: AbortSignal,
 ): Promise<true | DashboardContentFailure> {
   if (!IMPORT_BATCH_ID.test(importBatchId)) return dashboardContentFailure('VALIDATION');
   const path = `/v1/content/import/${importBatchId}`;
   const deadline = Date.now() + IMPORT_POLL_BUDGET_MS;
   while (Date.now() <= deadline) {
+    signal?.throwIfAborted();
     let result: Awaited<ReturnType<DashboardContentSessionClient['request']>>;
     try {
-      result = await client.request(epoch, path, { timeoutMs: 5_000 });
+      result = await client.request(epoch, path, { timeoutMs: 5_000, ...(signal ? { signal } : {}) });
     } catch (error) {
       if (error instanceof ProductHttpError && error.code === 'RATE_LIMITED') {
         if (Date.now() + IMPORT_POLL_MS > deadline) break;
-        await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS));
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(resolve, IMPORT_POLL_MS);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+          }, { once: true });
+        });
         continue;
       }
       throw error;
@@ -139,7 +151,13 @@ async function waitUntilImportStaged(
     if (status && IMPORT_DEAD.has(status)) return dashboardContentFailure('CONFLICT');
     if (status !== 'validating') return dashboardContentFailure('UNAVAILABLE');
     if (Date.now() + IMPORT_POLL_MS > deadline) break;
-    await new Promise((resolve) => setTimeout(resolve, IMPORT_POLL_MS));
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, IMPORT_POLL_MS);
+      signal?.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      }, { once: true });
+    });
   }
   return dashboardContentFailure('UNAVAILABLE');
 }
@@ -273,6 +291,7 @@ export async function dashboardContentPublish(
   session: DashboardContentSessionClient | null,
   payload: unknown,
   afterPublish?: DashboardContentAfterPublish,
+  operation?: DashboardContentOperationBoundary,
 ): Promise<DashboardContentPublishResult> {
   if (!isDashboardContentPublishRequest(payload)) return dashboardContentFailure('VALIDATION');
   return withSession(session, async (client, epoch) => {
@@ -298,10 +317,11 @@ export async function dashboardContentPublish(
       form: buildImportForm(frozen, payload.sourceName, payload.sourceBindings),
       timeoutMs: CONTENT_IMPORT_TIMEOUT_MS,
       headers: { 'idempotency-key': randomUUID() },
+      ...(operation ? { signal: operation.signal } : {}),
     });
     const importBatchId = parseImportBatchId(imported.value);
     if (!importBatchId) return dashboardContentFailure('UNAVAILABLE');
-    const ready = await waitUntilImportStaged(client, epoch, importBatchId);
+    const ready = await waitUntilImportStaged(client, epoch, importBatchId, operation?.signal);
     if (ready !== true) return ready;
     // 四库 delta：本批绑定的域 = 本版已更新；其余 = 本版沿用。条数在 refresh 后用当次 snapshot
     // 内存补拿，拿不到就省略括号数字（不编造）。同一句既进 Announcement.summary，也进回执。
@@ -309,6 +329,8 @@ export async function dashboardContentPublish(
     const delta = composeLibraryDelta(
       LIBRARY_DOMAINS.filter((domain) => boundDomains.has(domain)).map((domain) => ({ domain, count: null })),
     );
+    operation?.signal.throwIfAborted();
+    operation?.beginCommit();
     const published = await client.request(epoch, '/v1/content/publish', {
       body: {
         import_batch_id: importBatchId,
@@ -316,6 +338,7 @@ export async function dashboardContentPublish(
         summary: delta,
       },
       headers: { 'idempotency-key': randomUUID() },
+      ...(operation ? { signal: operation.signal } : {}),
     });
     const release = parsePublishRelease(published.value);
     if (!release) return dashboardContentFailure('UNAVAILABLE');
@@ -346,15 +369,19 @@ export async function dashboardContentPublish(
 
 export async function dashboardContentRollbackPrevious(
   session: DashboardContentSessionClient | null,
+  operation?: DashboardContentOperationBoundary,
 ): Promise<DashboardContentRollbackResult> {
   return withSession(session, async (client, epoch) => {
     const view = client.view();
     if (!view.signedIn || view.role === null) {
       return dashboardContentFailure('UNAUTHORIZED', CONTENT_PUBLISH_COPY.noSession);
     }
+    operation?.signal.throwIfAborted();
+    operation?.beginCommit();
     const response = await client.request(epoch, '/v1/content/rollback-previous', {
       method: 'POST',
       headers: { 'idempotency-key': randomUUID() },
+      ...(operation ? { signal: operation.signal } : {}),
     });
     const release = parsePublishRelease(response.value);
     const record = response.value as Record<string, unknown> | null;
@@ -374,11 +401,15 @@ export async function dashboardContentRollbackPrevious(
 
 export async function dashboardContentCancelInFlight(
   session: DashboardContentSessionClient | null,
+  operation?: DashboardContentOperationBoundary,
 ): Promise<DashboardContentFailure | { ok: true }> {
   return withSession(session, async (client, epoch) => {
+    operation?.signal.throwIfAborted();
+    operation?.beginCommit();
     await client.request(epoch, `/v1/content/import/${ACTOR_IN_FLIGHT_IMPORT_ID}/cancel`, {
       body: { reason: 'in-flight-self' },
       headers: { 'idempotency-key': randomUUID() },
+      ...(operation ? { signal: operation.signal } : {}),
     });
     return Object.freeze({ ok: true as const });
   });

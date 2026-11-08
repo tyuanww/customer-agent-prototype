@@ -1,6 +1,16 @@
 import type { FastifyReply } from 'fastify';
 import { parseContractSchema } from '@customer-agent/contracts';
 
+export type OperationFailureReason =
+  | 'SOP_UNAVAILABLE'
+  | 'SOP_SEVERITY_ORDER_REQUIRED'
+  | 'SOP_GATE_B_UNRESOLVED'
+  | 'SOP_FLOW_CONTRACT_UNAVAILABLE';
+
+type OverloadedFailure =
+  | Readonly<{ kind: 'generic' }>
+  | Readonly<{ kind: 'sop'; reason: OperationFailureReason }>;
+
 const VALIDATION_ERROR_CODES = new Set([
   'FST_ERR_CTP_BODY_TOO_LARGE',
   'FST_ERR_CTP_EMPTY_JSON_BODY',
@@ -32,12 +42,23 @@ export function sendUnauthorized(reply: FastifyReply): FastifyReply {
   }));
 }
 
-export function sendOverloaded(reply: FastifyReply): FastifyReply {
+export function sendOverloaded(
+  reply: FastifyReply,
+  failure: OverloadedFailure = { kind: 'generic' },
+): FastifyReply {
   reply.header('retry-after', '1');
+  const details = failure.kind === 'sop'
+    ? {
+      reason: 'SOURCE_GATE_NOT_READY' as const,
+      retry_after_sec: 1,
+      sop_reason: failure.reason,
+    }
+    : undefined;
   return reply.code(503).send(parseContractSchema('OverloadedErrorEnvelope', {
     error: {
       code: 'OVERLOADED',
       message: '服务暂不可用',
+      ...(details === undefined ? {} : { details }),
     },
   }));
 }

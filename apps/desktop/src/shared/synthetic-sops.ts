@@ -74,7 +74,3 @@ export const ALLERGY_SOP_TREE: SopTree = defineAllergyTree({
     },
   ],
 });
-
-export function allergySopTree(): SopTree {
-  return ALLERGY_SOP_TREE;
-}

@@ -77,6 +77,8 @@ function showPermissionsNav() {
       phase: 'ready' as const,
       epoch: 1,
       settings: {
+        accessRevision: 1,
+        expiresAt: '2026-11-05T11:00:00Z',
         grants: { state: 'open' as const, body: null },
         accounts: 'open' as const,
       },

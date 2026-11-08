@@ -13,6 +13,7 @@ import { createContentImportService } from '../src/content-import-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentReviewService } from '../src/content-review-service.js';
 import { createContentWorker } from '../src/content-worker.js';
+import { createMockAccessEvaluator } from '../src/access/evaluator.js';
 import { createProductAuthService } from '../src/product-auth-service.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { createServiceRepository } from '../src/service-repository.js';
@@ -151,6 +152,7 @@ describe.skipIf(!enabled)('content worker and restricted review', () => {
         CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
         CUSTOMER_AGENT_API_PORT: '0', CUSTOMER_AGENT_BUILD_VERSION: 'synthetic-t3',
       }),
+      accessEvaluator: createMockAccessEvaluator(),
       repository,
       authService: auth,
       contentImportDependencies: { service: createContentImportService(store, repository.contentImport, HMAC, LOG_HASH) },

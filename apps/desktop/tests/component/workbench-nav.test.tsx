@@ -14,6 +14,8 @@ const openSnapshot: PageUseSnapshot = {
   phase: 'ready',
   epoch: 1,
   settings: {
+    accessRevision: 1,
+    expiresAt: '2026-11-05T11:00:00Z',
     grants: { state: 'open', body: null },
     accounts: 'open',
   },

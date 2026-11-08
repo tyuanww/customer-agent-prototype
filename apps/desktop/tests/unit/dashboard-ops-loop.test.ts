@@ -339,8 +339,30 @@ it('invokes remaining ops IPC channels and keeps a present software current with
   registerDashboardOpsLoopIpc(session as ProductSession, () => dashboard, () => 'http://127.0.0.1:5173/');
   vi.mocked(session.request)
     .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        state: 'open',
+        accessRevision: 1,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        grants: 'closed',
+        accounts: 'closed',
+        denyReason: null,
+      },
+    })
+    .mockResolvedValueOnce({
       status: 202,
       value: { ok: true, product_session_id: 'default', node_count: 1 },
+    })
+    .mockResolvedValueOnce({
+      status: 200,
+      value: {
+        state: 'open',
+        accessRevision: 1,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        grants: 'closed',
+        accounts: 'closed',
+        denyReason: null,
+      },
     })
     .mockResolvedValueOnce({ status: 200, value: { ...sopNode, lifecycle: 'deleted', version: 3 } })
     .mockResolvedValueOnce({ status: 200, value: { items: [release] } })

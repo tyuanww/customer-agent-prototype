@@ -99,7 +99,12 @@ function assertAcyclic(tree: SopTree, byId: ReadonlyMap<string, SopNode>): void 
     visiting.delete(nodeId);
     visited.add(nodeId);
   };
-  walk(tree.startNodeId);
+  // Validate every declared node. An unreachable cycle is still invalid data:
+  // a later entry-point change could make it executable without changing the
+  // node itself.
+  for (const node of tree.nodes) {
+    if (!visited.has(node.id)) walk(node.id);
+  }
 }
 
 export function validateSopTree(tree: SopTree): void {
@@ -146,6 +151,9 @@ export function validateSopTree(tree: SopTree): void {
     }
     if (node.kind === 'decision' && !isNonEmptyString(node.prompt)) {
       throw new SopTreeValidationError('INVALID', `decision node ${node.id} requires prompt`);
+    }
+    if (node.kind === 'decision' && node.edges.length === 0) {
+      throw new SopTreeValidationError('INVALID', `decision node ${node.id} requires an outgoing branch`);
     }
     if (node.prompt !== undefined && !isNonEmptyString(node.prompt)) {
       throw new SopTreeValidationError('INVALID', `SOP node ${node.id} prompt is invalid`);
@@ -202,7 +210,7 @@ export function advanceSopNext(tree: SopTree, progress: SopProgress): SopProgres
   });
 }
 
-function scriptPublished(scriptId: string | undefined, published: SopPublishSet): boolean {
+export function isSopScriptPublished(scriptId: string | undefined, published: SopPublishSet): boolean {
   if (!scriptId) {
     return true;
   }
@@ -210,6 +218,10 @@ function scriptPublished(scriptId: string | undefined, published: SopPublishSet)
     return true;
   }
   return published.has(scriptId);
+}
+
+export function canCopySopNode(node: SopNode | null | undefined, published: SopPublishSet): boolean {
+  return node?.kind === 'copyable' && isSopScriptPublished(node.scriptId, published);
 }
 
 function highRiskBannerFor(node: SopNode | null | undefined, shellState: SopShellState): string {
@@ -258,7 +270,7 @@ export function projectSop(input: {
   const privileged = input.role === 'coach' || input.role === 'owner';
   const shellState = input.shellState ?? 'ready';
   const script = node ? projectScript(node) : null;
-  const unpublished = Boolean(node?.scriptId) && !scriptPublished(node?.scriptId, input.published ?? 'fixture');
+  const unpublished = Boolean(node?.scriptId) && !isSopScriptPublished(node?.scriptId, input.published ?? 'fixture');
   const canNext = Boolean(node?.nextId) && shellState === 'ready';
   const terminal = Boolean(node) && !canNext && (node?.edges.length ?? 0) === 0 && shellState === 'ready';
   return Object.freeze({

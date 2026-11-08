@@ -4,7 +4,7 @@ import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { AuthenticatedUser } from './auth-service.js';
 import { mapDatabaseContractError } from './database-contract-errors.js';
 import type { PreparedIdempotencyHashes } from './idempotency.js';
-import type { OperationResult } from './operation-result.js';
+import type { OperationFailureReason, OperationResult } from './operation-result.js';
 import {
   createApiRuntimeDiagnostic,
   type ApiRuntimeDiagnosticSink,
@@ -15,7 +15,10 @@ import {
   rankingClusterKey,
 } from './iteration-task-signals.js';
 import { createSearchRepository } from './search-repository.js';
-import { createSearchBackend } from './search-service.js';
+import {
+  createSearchBackend,
+  type SearchBackendResult,
+} from './search-service.js';
 import type { PreparedSearchOperation } from './search-routes.js';
 
 type SearchResponse = components['schemas']['SearchResponse'];
@@ -39,7 +42,10 @@ export type PreparedEscalationOperation = Readonly<{
 }>;
 
 export type EventRepository = Readonly<{
-  executeSearch: (request: PreparedSearchOperation) => Promise<OperationResult<SearchResponse>>;
+  executeSearch: (
+    request: PreparedSearchOperation,
+    resolveSearch?: () => Promise<SearchBackendResult>,
+  ) => Promise<OperationResult<SearchResponse>>;
   recordAdoption: (
     request: PreparedAdoptionOperation,
   ) => Promise<OperationResult<AdoptionEventResponse>>;
@@ -84,10 +90,17 @@ function noticeOf(error: unknown): string | undefined {
   return REFUSAL_SENTENCES.has(message) ? message : undefined;
 }
 
-function failure(code: FailureCode, notice?: string) {
-  return Object.freeze(notice === undefined
-    ? { ok: false as const, code }
-    : { ok: false as const, code, notice });
+function failure(
+  code: FailureCode,
+  notice?: string,
+  reason?: OperationFailureReason,
+) {
+  return Object.freeze({
+    ok: false as const,
+    code,
+    ...(notice === undefined ? {} : { notice }),
+    ...(reason === undefined ? {} : { reason }),
+  });
 }
 
 function isSourceGateFailure(error: unknown): boolean {
@@ -248,7 +261,7 @@ export function createEventRepository(
   }
 
   return Object.freeze({
-    async executeSearch(request): Promise<OperationResult<SearchResponse>> {
+    async executeSearch(request, resolveSearch): Promise<OperationResult<SearchResponse>> {
       if (request.collectionMode !== 'synthetic' && request.collectionMode !== 'pilot_recorded') {
         return failure('POLICY_DENIED');
       }
@@ -283,10 +296,11 @@ export function createEventRepository(
         }
 
         const startedAt = performance.now();
-        const backend = createSearchBackend({
-          searchCandidates: createSearchRepository(client, request.actor.user_id).search,
-        });
-        const search = await backend.search(request.search);
+        const search = resolveSearch === undefined
+          ? await createSearchBackend({
+            searchCandidates: createSearchRepository(client, request.actor.user_id).search,
+          }).search(request.search)
+          : await resolveSearch();
         if (!search.ok) {
           releaseAsBroken = !(await rollback(client));
           if (search.code === 'SOURCE_GATE_NOT_READY') {
@@ -294,7 +308,7 @@ export function createEventRepository(
           } else {
             // A source-set refusal is not a gate denial: it says the caller may read nothing
             // here, and it keeps the sentence the database chose.
-            return failure(search.code, search.notice);
+            return failure(search.code, search.notice, search.reason);
           }
         } else {
           searchResponse = parseContractSchema('SearchResponse', {
