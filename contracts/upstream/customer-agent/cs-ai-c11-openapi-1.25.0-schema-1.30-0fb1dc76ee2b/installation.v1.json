@@ -1,0 +1,49 @@
+{
+  "schema": "customer-agent-sop-graph-installation/v1",
+  "status": "CANDIDATE",
+  "versions": {
+    "openapi": "1.25.0",
+    "database": "schema.v1.30",
+    "profile": "content-intake-sop-query-v1"
+  },
+  "runnableMigration": false,
+  "migrationPosition": null,
+  "predecessor": {
+    "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+    "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+    "artifacts": {
+      "openapi.v1.yaml": {
+        "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/openapi.v1.yaml",
+        "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5"
+      },
+      "schema-v1.29.sql": {
+        "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/schema-v1.29.sql",
+        "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771"
+      }
+    }
+  },
+  "requiredProductWork": [
+    "Use the product migration runner and exact actual predecessor receipts; do not label this storage delta as migration 0078 or assume 0041 is the live predecessor.",
+    "Install storage delta with explicit grants only through existing restricted definer functions, fixed search_path, and no PUBLIC execute. Tables stay immutable.",
+    "Replace canonical_encoding/format guards for the graph discriminator; preserve the existing FAQ constraints and six-sheet historical reader. Never globally lift empty-array checks.",
+    "Extend parser/freeze to enforce every shape and relational invariant, dependency projection and canonical digest; store graph projections and media in the same transaction as material.",
+    "Extend quality freeze/check/read/report and existing publish/rollback to enforce exact target sets, inheritance and lineage; gate current pointer commit on complete graph/media lineage.",
+    "Use normalized graph lineage for graph-format snapshots; legacy release_catalogs SOP arrays stay empty. Do not create a second snapshot source or independent current pointer.",
+    "Implement entitlement-only reads and action check, bounded paging, MIME/hash preview and main-process progression; no SQL bypass from renderer.",
+    "Complete PG15 install/upgrade/ACL, graph mutation/quality/atomicity/rollback tests, HTTP/Main/Electron tests and backup restore before declaring consumer readiness."
+  ],
+  "runtimeActivated": false,
+  "productionConsumerReady": false,
+  "queryTransport": {
+    "businessAlias": "menokin-sop-query-v1",
+    "route": "/v1/sop/query",
+    "statuses": [
+      "ready",
+      "blocked",
+      "stale",
+      "no_match"
+    ],
+    "legacySearchSopBehavior": "503-fail-closed",
+    "runtimeActivated": false
+  }
+}

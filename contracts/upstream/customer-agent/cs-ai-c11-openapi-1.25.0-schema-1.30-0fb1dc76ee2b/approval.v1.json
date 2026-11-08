@@ -1,0 +1,21 @@
+{
+  "schema": "customer-agent-sop-graph-implementation-approval/v1",
+  "status": "APPROVED",
+  "decisionDate": "2026-11-08",
+  "evidenceId": "EVD-SOP-QUERY-EXPORT-20261108",
+  "scope": [
+    "formal-contract-change",
+    "product-implementation"
+  ],
+  "designInputs": {
+    "2026-10-23-upstream-intake-sop-media.md": "1383a79b6ff8754f9d27f8e413547bb6708737e479232e11dd55793372d52de5",
+    "2026-10-29-sop-contract.proposal.schema.yaml": "86449c1f8029709117436e74c734b84e038375ab657b1c4411cdfc4f2742dec2"
+  },
+  "gitCommitApproved": true,
+  "pushApproved": false,
+  "deploymentApproved": false,
+  "runtimeActivated": false,
+  "businessMappingApproved": false,
+  "freezeCompleted": true,
+  "exportCompleted": true
+}
