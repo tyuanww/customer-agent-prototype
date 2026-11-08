@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApiApp } from '../src/app.js';
-import type { SopQueryOperation, SopQueryResponse } from '../src/sop-query-routes.js';
-import { MENOKIN_SOP_QUERY_CONTRACT_SET_ID } from '../src/sop-query-routes.js';
+import { createSopQueryOperation, type SopQueryOperation } from '../src/sop-query-operation.js';
+import type { SopQueryResponse } from '../src/sop-query-model.js';
+import { MENOKIN_SOP_QUERY_CONTRACT_SET_ID } from '../src/sop-query-model.js';
 import { parseApiRuntimeConfig } from '../src/runtime-config.js';
 import { unavailableContentImportRepository } from '../src/content-import-repository.js';
 import type { ServiceRepository } from '../src/service-repository.js';
@@ -101,6 +102,19 @@ function appWith(operation?: SopQueryOperation): FastifyInstance {
 }
 
 describe('SOP query candidate transport', () => {
+  it('binds the request identity after the read port returns a status result', async () => {
+    const expected = readyResponse() as Extract<SopQueryResponse, { status: 'ready' }>;
+    const { request_id: _ignored, ...readResult } = expected;
+    const read = vi.fn().mockResolvedValue(readResult);
+    const operation = createSopQueryOperation({ read });
+    const result = await operation.execute({
+      actor: { user_id: 'usr_synthetic_agent_001', role: 'agent', auth_mode: 'mock' },
+      request: request(),
+    });
+    expect(result).toEqual(expected);
+    expect(read).toHaveBeenCalledOnce();
+  });
+
   it('does not register the candidate route without an explicit operation', async () => {
     const response = await appWith().inject({
       method: 'POST', url: '/v1/sop/query', headers, payload: request(),

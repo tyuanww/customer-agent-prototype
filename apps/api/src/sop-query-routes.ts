@@ -1,9 +1,19 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import type { AuthService, AuthenticatedUser } from './auth-service.js';
+import type { AuthService } from './auth-service.js';
 import { authenticateRequestHeaders } from './auth-service.js';
-
-export const MENOKIN_SOP_QUERY_CONTRACT_SET_ID =
-  'cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b';
+import type { SopQueryOperation, SopQueryFailureCode } from './sop-query-operation.js';
+import {
+  MENOKIN_SOP_QUERY_CONTRACT_SET_ID,
+  type SopBranch,
+  type SopEmptyResult,
+  type SopMediaRef,
+  type SopMessage,
+  type SopNode,
+  type SopQueryReason,
+  type SopQueryRequest,
+  type SopQueryResponse,
+  type SopReadyResult,
+} from './sop-query-model.js';
 
 const SOP_GROUPS = new Set([
   '过敏流程SOP',
@@ -32,116 +42,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const SHOP_ID = /^[-A-Za-z0-9._:]+$/;
 
-export type SopQueryRequest = Readonly<{
-  sop_group: string;
-  shop_id: string;
-  product_context?: null | Readonly<{ type: string; ref: string }>;
-  query_text: string;
-  context_generation: string;
-  request_id: string;
-}>;
-
-export type SopQueryReason = Readonly<{
-  code: string;
-  source_ref?: string;
-}>;
-
-type SopNode = Readonly<{
-  node_id: string;
-  scenario_id: string;
-  sequence: number;
-  kind: 'instruction' | 'decision' | 'terminal';
-  terminal: boolean;
-  source_ref: string;
-}>;
-
-type SopBranch = Readonly<{
-  branch_id: string;
-  source_node_id: string;
-  option: string;
-  target_node_id: string | null;
-  is_unresolved: boolean;
-}>;
-
-type SopMessage = Readonly<{
-  message_id: string;
-  node_id: string;
-  title: string;
-  body: string;
-  risk_level: 'unclassified' | 'low' | 'medium' | 'high' | 'critical';
-  copy_allowed: boolean;
-}>;
-
-type SopMediaRef = Readonly<{
-  media_id: string;
-  node_id: string;
-  content_type: 'image/png' | 'image/jpeg' | 'image/gif';
-  preview_handle: string;
-  expires_at: string;
-}>;
-
-type SopReadyResult = Readonly<{
-  entry_node_id: string;
-  nodes: readonly SopNode[];
-  branches: readonly SopBranch[];
-  messages: readonly SopMessage[];
-  media_refs: readonly SopMediaRef[];
-}>;
-
-type SopEmptyResult = Readonly<{
-  nodes: readonly [];
-  branches: readonly [];
-  messages: readonly [];
-  media_refs: readonly [];
-}>;
-
-export type SopQueryResponse =
-  | Readonly<{
-      status: 'ready';
-      request_id: string;
-      release_id: string;
-      lease_expires_at: string;
-      result: SopReadyResult;
-      reasons: readonly [];
-    }>
-  | Readonly<{
-      status: 'blocked';
-      request_id: string;
-      release_id: null;
-      lease_expires_at: null;
-      result: null;
-      reasons: readonly SopQueryReason[];
-    }>
-  | Readonly<{
-      status: 'stale';
-      request_id: string;
-      release_id: string | null;
-      lease_expires_at: null;
-      result: null;
-      reasons: readonly SopQueryReason[];
-    }>
-  | Readonly<{
-      status: 'no_match';
-      request_id: string;
-      release_id: string;
-      lease_expires_at: string;
-      result: SopEmptyResult;
-      reasons: readonly [];
-    }>;
-
-export type SopQueryFailureCode =
-  | 'SCOPE_DENIED'
-  | 'IDEMPOTENCY_CONFLICT'
-  | 'SOP_BLOCKED'
-  | 'SOP_STALE'
-  | 'SOP_UNAVAILABLE';
-
-export type SopQueryOperation = Readonly<{
-  execute: (input: Readonly<{
-    actor: AuthenticatedUser;
-    request: SopQueryRequest;
-  }>) => Promise<SopQueryResponse | Readonly<{ ok: false; code: SopQueryFailureCode }>>;
-}>;
+export type {
+  SopQueryFailureCode,
+  SopQueryOperation,
+} from './sop-query-operation.js';
+export type { SopQueryRequest, SopQueryResponse } from './sop-query-model.js';
 
 export type SopQueryRouteDependencies = Readonly<{
   operation: SopQueryOperation;
