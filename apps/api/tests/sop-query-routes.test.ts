@@ -110,6 +110,7 @@ describe('SOP query candidate transport', () => {
     const result = await operation.execute({
       actor: { user_id: 'usr_synthetic_agent_001', role: 'agent', auth_mode: 'mock' },
       request: request(),
+      session_token_hash: null,
     });
     expect(result).toEqual(expected);
     expect(read).toHaveBeenCalledOnce();
@@ -144,6 +145,7 @@ describe('SOP query candidate transport', () => {
     expect(execute.mock.calls[0]?.[0]).toMatchObject({
       actor: { user_id: 'usr_synthetic_agent_001', role: 'agent' },
       request: request(),
+      session_token_hash: null,
     });
   });
 

@@ -17,6 +17,8 @@ export type SopQueryReadPort = Readonly<{
   read: (input: Readonly<{
     actor: AuthenticatedUser;
     request: SopQueryRequest;
+    /** Private product-session provenance. It never comes from the request body. */
+    session_token_hash: string | null;
   }>) => Promise<SopQueryReadResult | SopQueryOperationFailure>;
 }>;
 
@@ -24,6 +26,7 @@ export type SopQueryOperation = Readonly<{
   execute: (input: Readonly<{
     actor: AuthenticatedUser;
     request: SopQueryRequest;
+    session_token_hash: string | null;
   }>) => Promise<SopQueryResponse | SopQueryOperationFailure>;
 }>;
 

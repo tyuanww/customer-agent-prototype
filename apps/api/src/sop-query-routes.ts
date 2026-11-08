@@ -1,18 +1,13 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AuthService } from './auth-service.js';
 import { authenticateRequestHeaders } from './auth-service.js';
+import { authenticatedProductSession } from './product-auth-service.js';
 import type { SopQueryOperation, SopQueryFailureCode } from './sop-query-operation.js';
+import { isSopQueryResponse } from './sop-query-validation.js';
 import {
   MENOKIN_SOP_QUERY_CONTRACT_SET_ID,
-  type SopBranch,
-  type SopEmptyResult,
-  type SopMediaRef,
-  type SopMessage,
-  type SopNode,
-  type SopQueryReason,
   type SopQueryRequest,
   type SopQueryResponse,
-  type SopReadyResult,
 } from './sop-query-model.js';
 
 const SOP_GROUPS = new Set([
@@ -23,23 +18,7 @@ const SOP_GROUPS = new Set([
   '税收相关规则',
 ]);
 const PRODUCT_CONTEXT_TYPES = new Set(['storewide', 'category', 'sku']);
-const REASON_CODES = new Set([
-  'SCOPE_DENIED',
-  'LEASE_EXPIRED',
-  'APPROVAL_REVOKED',
-  'SOURCE_GATE_NOT_READY',
-  'GRAPH_UNRESOLVED',
-  'TERMINAL_HAS_OUTGOING_EDGE',
-  'SAFETY_REVIEW_REQUIRED',
-  'MEDIA_UNVERIFIED',
-  'STALE_RELEASE',
-  'IDEMPOTENCY_CONFLICT',
-]);
-const NODE_KINDS = new Set(['instruction', 'decision', 'terminal']);
-const RISK_LEVELS = new Set(['unclassified', 'low', 'medium', 'high', 'critical']);
-const MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const SHOP_ID = /^[-A-Za-z0-9._:]+$/;
 
 export type {
@@ -100,98 +79,6 @@ function parseRequest(value: unknown): SopQueryRequest | null {
   });
 }
 
-function isReason(value: unknown): value is SopQueryReason {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['code', 'source_ref']) || !REASON_CODES.has(String(value.code))) {
-    return false;
-  }
-  return value.source_ref === undefined || boundedString(value.source_ref, 1, 512);
-}
-
-function isNode(value: unknown): value is SopNode {
-  return isRecord(value) && hasOnlyKeys(value, ['node_id', 'scenario_id', 'sequence', 'kind', 'terminal', 'source_ref'])
-    && boundedString(value.node_id, 1, 256)
-    && boundedString(value.scenario_id, 1, 128)
-    && typeof value.sequence === 'number' && Number.isSafeInteger(value.sequence)
-    && value.sequence >= 0 && value.sequence <= 10000
-    && NODE_KINDS.has(String(value.kind))
-    && typeof value.terminal === 'boolean'
-    && boundedString(value.source_ref, 1, 512);
-}
-
-function isBranch(value: unknown): value is SopBranch {
-  return isRecord(value) && hasOnlyKeys(value, ['branch_id', 'source_node_id', 'option', 'target_node_id', 'is_unresolved'])
-    && boundedString(value.branch_id, 1, 256)
-    && boundedString(value.source_node_id, 1, 256)
-    && boundedString(value.option, 1, 512)
-    && (value.target_node_id === null || boundedString(value.target_node_id, 1, 256))
-    && typeof value.is_unresolved === 'boolean';
-}
-
-function isMessage(value: unknown): value is SopMessage {
-  return isRecord(value) && hasOnlyKeys(value, ['message_id', 'node_id', 'title', 'body', 'risk_level', 'copy_allowed'])
-    && boundedString(value.message_id, 1, 256)
-    && boundedString(value.node_id, 1, 256)
-    && boundedString(value.title, 1, 512)
-    && boundedString(value.body, 1, 8192)
-    && RISK_LEVELS.has(String(value.risk_level))
-    && typeof value.copy_allowed === 'boolean';
-}
-
-function isMediaRef(value: unknown): value is SopMediaRef {
-  return isRecord(value) && hasOnlyKeys(value, ['media_id', 'node_id', 'content_type', 'preview_handle', 'expires_at'])
-    && boundedString(value.media_id, 1, 256)
-    && boundedString(value.node_id, 1, 256)
-    && MEDIA_TYPES.has(String(value.content_type))
-    && boundedString(value.preview_handle, 1, 512)
-    && typeof value.expires_at === 'string' && ISO_DATE.test(value.expires_at)
-    && !Number.isNaN(Date.parse(value.expires_at));
-}
-
-function isReadyResult(value: unknown): value is SopReadyResult {
-  return isRecord(value) && hasOnlyKeys(value, ['entry_node_id', 'nodes', 'branches', 'messages', 'media_refs'])
-    && boundedString(value.entry_node_id, 1, 256)
-    && Array.isArray(value.nodes) && value.nodes.length <= 128 && value.nodes.every(isNode)
-    && Array.isArray(value.branches) && value.branches.length <= 512 && value.branches.every(isBranch)
-    && Array.isArray(value.messages) && value.messages.length <= 256 && value.messages.every(isMessage)
-    && Array.isArray(value.media_refs) && value.media_refs.length <= 500 && value.media_refs.every(isMediaRef);
-}
-
-function isEmptyResult(value: unknown): value is SopEmptyResult {
-  return isRecord(value) && hasOnlyKeys(value, ['nodes', 'branches', 'messages', 'media_refs'])
-    && Array.isArray(value.nodes) && value.nodes.length === 0
-    && Array.isArray(value.branches) && value.branches.length === 0
-    && Array.isArray(value.messages) && value.messages.length === 0
-    && Array.isArray(value.media_refs) && value.media_refs.length === 0;
-}
-
-function isSopQueryResponse(value: unknown): value is SopQueryResponse {
-  if (!isRecord(value) || !hasOnlyKeys(value, [
-    'status', 'request_id', 'release_id', 'lease_expires_at', 'result', 'reasons',
-  ]) || !UUID.test(String(value.request_id)) || !Array.isArray(value.reasons)
-    || value.reasons.length > 8 || !value.reasons.every(isReason)) return false;
-  if (value.status === 'ready') {
-    return boundedString(value.release_id, 1, 256)
-      && typeof value.lease_expires_at === 'string' && ISO_DATE.test(value.lease_expires_at)
-      && !Number.isNaN(Date.parse(value.lease_expires_at))
-      && isReadyResult(value.result) && value.reasons.length === 0;
-  }
-  if (value.status === 'blocked') {
-    return value.release_id === null && value.lease_expires_at === null
-      && value.result === null && value.reasons.length >= 1;
-  }
-  if (value.status === 'stale') {
-    return (value.release_id === null || boundedString(value.release_id, 1, 256))
-      && value.lease_expires_at === null && value.result === null && value.reasons.length >= 1;
-  }
-  if (value.status === 'no_match') {
-    return boundedString(value.release_id, 1, 256)
-      && typeof value.lease_expires_at === 'string' && ISO_DATE.test(value.lease_expires_at)
-      && !Number.isNaN(Date.parse(value.lease_expires_at))
-      && isEmptyResult(value.result) && value.reasons.length === 0;
-  }
-  return false;
-}
-
 function errorBody(code: string, message: string, requestId?: string): Record<string, unknown> {
   return {
     code,
@@ -247,7 +134,11 @@ export function registerSopQueryRoute(
     if (parsed === null) return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 Menokin SOP 查询合同', requestIdOf(request.body));
     let result: SopQueryResponse | Readonly<{ ok: false; code: SopQueryFailureCode }>;
     try {
-      result = await dependencies.operation.execute({ actor, request: parsed });
+      result = await dependencies.operation.execute({
+        actor,
+        request: parsed,
+        session_token_hash: authenticatedProductSession(actor),
+      });
     } catch {
       return sendSopError(reply, 503, 'SOP_UNAVAILABLE', '当前 SOP 服务不可用', parsed.request_id);
     }
