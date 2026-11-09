@@ -2,6 +2,12 @@
 
 All notable changes to this customer-agent product implementation repository are documented here. Synthetic desktop and formal-development runtime states remain explicitly separated below.
 
+## Unreleased
+
+- 显式 SOP 合成 profile 可从临时 PostgreSQL 查询已发布图，在独立窗口按明确分支推进并复制获准话术；条件、会话、版本或租约失效会清除旧内容。
+- 查询候选拒绝悬空、循环、终止出边、未分级和不安全过敏内容。重新登录后再次打开窗口会恢复店铺选择。
+- 新增 PostgreSQL 到 HTTP、Main 和 Electron 的联合验证。候选存储不进入默认迁移，媒体预览、正式图导入发布和真实运行仍未开放。
+
 ## [0.3.43] - 2026-11-05
 
 ### Fixed

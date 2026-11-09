@@ -176,3 +176,24 @@ html[data-role='sop'] #root {
   font-weight: 650;
   letter-spacing: 0.04em;
 }
+
+[data-testid="sop-query-shell"] form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+[data-testid="sop-query-shell"] label {
+  display: grid;
+  gap: 4px;
+}
+[data-testid="sop-query-shell"] label:last-of-type {
+  grid-column: 1 / -1;
+}
+[data-testid="sop-query-shell"] input,
+[data-testid="sop-query-shell"] select {
+  min-width: 0;
+  width: 100%;
+  color: var(--ink);
+  font: inherit;
+}

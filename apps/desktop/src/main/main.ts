@@ -1,3 +1,4 @@
+import { SopQueryRuntime } from './sop-query-runtime';
 import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
 import { ContentIntakePermissions } from './content-intake-permissions';
@@ -33,7 +34,7 @@ import { persistHydrateFromEnv } from './hydrate-catalog.ts';
 import { applyPackagedRetrievalDefaults } from './packaged-retrieval-paths';
 import { scheduleRetrievalEmbeddingsFromEnv } from './retrieval-embeddings-store.ts';
 import { join } from 'node:path';
-import { app, Menu, screen, session, shell } from 'electron';
+import { clipboard, app, Menu, screen, session, shell } from 'electron';
 import {
   applyChromiumLoopbackProxyBypass,
   applySessionLoopbackProxyBypass,
@@ -104,6 +105,7 @@ if (!gotLock) {
   const shuttingDown = createShutdownFence();
   let controller: OverlayController | null = null;
   let sopController: SopWindowController | null = null;
+  let sopQuery: SopQueryRuntime | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
   let productSession: ProductSession | null = null;
@@ -218,6 +220,7 @@ if (!gotLock) {
       ? process.env.DEMO_E2E_ACCELERATOR
       : undefined;
     sopController = new SopWindowController({
+      legacyEnabled: productProfile === undefined,
       rendererDevServerUrl: () => controller?.rendererDevServerUrl,
       queryBounds: () => controller?.queryWindowBounds() ?? null,
       workArea: () => sopWorkAreaForQuery(
@@ -275,6 +278,10 @@ if (!gotLock) {
         createLastSeenStore(userDataDirectory, productProfile.apiOrigin),
       );
       await productSession.restore();
+      if (productProfile.sopQuery === 'menokin-sop-query-v1' && productProfile.mode === 'synthetic-local') {
+        sopQuery = new SopQueryRuntime(productSession, (text) => clipboard.writeText(text));
+        sopController.setQueryRuntime(sopQuery);
+      }
     }
     if (productSession) {
       desktopComposition = createDesktopComposition({
@@ -314,7 +321,7 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
     disposeIntakeQuery = registerContentIntakeQueryIpc(workbenchSession,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
-      () => controller?.rendererDevServerUrl);
+      () => controller?.rendererDevServerUrl, () => sopQuery?.invalidate());
     // The shared Fox still reads unread in FAQ mode. A null service supplies the
     // existing unavailable projection without creating legacy I/O or missing IPC.
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],

@@ -1,0 +1,18 @@
+{
+  "status": "TEST_ONLY_CANDIDATE",
+  "runtimeActivated": false,
+  "predecessor": {
+    "position": 83,
+    "id": "0083_sop_pipeline_projection",
+    "file": "0083_sop_pipeline_projection.sql",
+    "source_ranges": [],
+    "sha256": "cd9fc5cadd86bb6f883bd718d52d74935dc5fe2edc0d8b1d6909d44f3caf7bac",
+    "bytes": 17191,
+    "contract_set_id": "cs-ai-c11-openapi-1.22.0-schema-1.25-db6ba13d4780",
+    "source_git_sha": "db6ba13d4780a3abb1558e8673e016f7bfb5604e",
+    "source_schema_sha256": "0620ee58a19543736f58b8dcf54ad5a2d0865cd48a74e24a245bbb384f1b7998"
+  },
+  "contractSetId": "cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b",
+  "sha256": "16d7dfbb4c6b26def0ad8dcd0c1d4e10aa1c76389184cfbbeedb55d98576d282",
+  "bytes": 62430
+}

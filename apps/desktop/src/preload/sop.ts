@@ -1,3 +1,4 @@
+import { isSopQueryProjection, isSopQueryCommand, type SopQueryProjection } from '../shared/sop-query';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   isSopLayoutAck,
@@ -24,10 +25,10 @@ const REPORT_LAYOUT = 'sop-window:report-layout';
 const COPY_CURRENT = 'sop-window:copy-current';
 const PROJECTION = 'sop-window:projection';
 
-const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection) => void>();
+const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void>();
 
 ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
-  if (!isSopProjection(payload) && !isSopPipelineProjection(payload)) {
+  if (!isSopProjection(payload) && !isSopPipelineProjection(payload) && !isSopQueryProjection(payload)) {
     return;
   }
   for (const listener of projectionListeners) {
@@ -38,6 +39,13 @@ ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
 const unavailable = { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程通道不可用' };
 
 const api: SopWindowApi = {
+  async queryCommand(command) {
+    if (!isSopQueryCommand(command)) return unavailable;
+    try {
+      const result: unknown = await ipcRenderer.invoke('sop-window:query-command', command);
+      return isSopWindowResult(result) ? result : unavailable;
+    } catch { return unavailable; }
+  },
   async close() {
     try {
       await ipcRenderer.invoke(CLOSE);

@@ -50,7 +50,7 @@
     },
     {
       "id": "api",
-      "paths": ["apps/api/**"],
+      "paths": ["apps/api/**", "scripts/intake-synthetic/sop-query-host.ts"],
       "description": "Application API and its runtime consumers."
     },
     {
@@ -170,6 +170,16 @@
       "checks": { "quick": ["lint", "typecheck", "architecture", "api-tests"] },
       "liveLanes": ["api-runtime"],
       "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "sop-query-postgres",
+      "owner": "api",
+      "paths": ["apps/api/src/sop-query*.ts", "apps/api/tests/sop-query*.ts", "apps/api/tests/support/sop-query*.ts", "scripts/intake-synthetic/sop-query-host.ts"],
+      "checks": { "quick": ["architecture"], "database": ["api-database-integration"] },
+      "liveLanes": ["sop-query-http"],
+      "databaseLanes": ["postgres-15"],
       "packagingLanes": [],
       "generatedInputs": []
     },

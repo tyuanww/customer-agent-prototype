@@ -1,8 +1,9 @@
+import { isSopQueryCommand } from '../shared/sop-query';
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import { SOP_OPEN_FAILURE_MESSAGE, isSopLayoutRequest, rejectedSopLayoutAck, sopWindowFailure, type SopCopyResult, type SopLayoutAck, type SopWindowResult } from '../shared/sop-window';
 import { canControlSopWindow, canQueryOpenSop, canQueryReadSopEntry } from '../shared/sop-ipc-access';
-import { isTrustedMainFrameSender, isTrustedSender } from './sender-guard';
+import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayController } from './overlay-controller';
 import type { SopWindowController } from './sop-window-controller';
 
@@ -16,7 +17,7 @@ function queryGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): OverlayC
   if (!overlay) {
     return null;
   }
-  const trusted = isTrustedSender(
+  const trusted = isTrustedMainFrameSender(
     event,
     overlay.trustedContents(),
     overlay.rendererDevServerUrl,
@@ -50,6 +51,11 @@ function sopGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): SopWindowC
 }
 
 export function registerSopWindowIpc(host: SopWindowIpcHost): void {
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_QUERY_COMMAND, async (event, ...args: unknown[]): Promise<SopWindowResult> => {
+    const sop = sopGuard(event, host);
+    if (!sop || args.length !== 1 || !isSopQueryCommand(args[0])) return sopWindowFailure('INVALID', '流程参数无效');
+    return sop.queryCommand(args[0]);
+  });
   ipcMain.handle(
     IPC_CHANNELS.SOP_WINDOW_OPEN,
     async (event, sceneId: unknown): Promise<SopWindowResult> => {

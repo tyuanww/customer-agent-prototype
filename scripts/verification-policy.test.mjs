@@ -103,6 +103,15 @@ test('contract changes select drift checks and every known workspace consumer', 
   assert.ok(plan.liveLanes.includes('contract-generation'));
 });
 
+test('SOP query changes require the real PostgreSQL consumer lane', () => {
+  for (const path of ['apps/api/src/sop-query-operation.ts', 'apps/api/tests/support/sop-query-synthetic-host.ts', 'scripts/intake-synthetic/sop-query-host.ts']) {
+    const plan = verificationPlan([path], map);
+    assert.ok(plan.requiredJobs.includes('database'));
+    assert.ok(ids(plan, 'database').includes('api-database-integration'));
+    assert.ok(plan.liveLanes.includes('sop-query-http'));
+  }
+});
+
 test('database changes select generated, PG15, backup and consumer database lanes', () => {
   const plan = verificationPlan(['packages/database/src/planner.ts'], map);
 

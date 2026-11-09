@@ -1,3 +1,4 @@
+import type { SopQueryProjection, SopQueryCommand } from './sop-query';
 import type { SopPipelineProjection } from './sop-pipeline';
 
 export type SopCopyResult =
@@ -80,6 +81,7 @@ export type SopLayoutAck = {
 };
 
 export type SopWindowApi = {
+  queryCommand?(command: SopQueryCommand): Promise<SopWindowResult>;
   close(): Promise<void>;
   endFlow(): Promise<void>;
   restart(): Promise<void>;
@@ -88,7 +90,7 @@ export type SopWindowApi = {
   moveBy(dx: number, dy: number, finished?: boolean): Promise<void>;
   reportLayout(request: SopLayoutRequest): Promise<SopLayoutAck>;
   copyCurrent(): Promise<SopCopyResult>;
-  onProjection(cb: (projection: SopProjection | SopPipelineProjection) => void): () => void;
+  onProjection(cb: (projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void): () => void;
 };
 
 export type QuerySopWindowApi = {

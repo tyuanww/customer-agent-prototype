@@ -64,6 +64,7 @@ export const IPC_CHANNELS = {
   LOGIN_WINDOW_CHOOSE_FEISHU: 'login-window:choose-feishu',
   LOGIN_WINDOW_SUBMIT_ACCOUNT: 'login-window:submit-account',
   LOGIN_WINDOW_CANCEL: 'login-window:cancel',
+  SOP_WINDOW_QUERY_COMMAND: 'sop-window:query-command',
   SOP_WINDOW_OPEN: 'sop-window:open',
   SOP_WINDOW_ENTRY_AVAILABLE: 'sop-window:entry-available',
   SOP_WINDOW_RESUME_AVAILABLE: 'sop-window:resume-available',

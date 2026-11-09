@@ -1,3 +1,5 @@
+import type { SopQueryRuntime } from './sop-query-runtime';
+import type { SopQueryCommand } from '../shared/sop-query';
 import { BrowserWindow, clipboard, nativeImage, type WebContents } from 'electron';
 import { join } from 'node:path';
 import { resolveClipboardWrite } from '../shared/clipboard-write';
@@ -52,6 +54,7 @@ import { lockRendererWindow } from './window-security';
 
 export type SopWindowControllerOptions = {
   preloadPath?: string;
+  legacyEnabled?: boolean;
   rendererDevServerUrl?: () => string | undefined;
   queryBounds: () => Rect | null;
   workArea: () => Rect;
@@ -76,6 +79,8 @@ export function writeSopClipboardNative(payload: SopClipboardPayload): void {
 
 export class SopWindowController {
   private window: BrowserWindow | null = null;
+  private queryRuntime: SopQueryRuntime | null = null;
+  private readonly legacyEnabled: boolean;
   private tree: SopTree | null = null;
   private progress: SopProgress | null = null;
   private shellState: SopShellState = 'opening';
@@ -98,6 +103,7 @@ export class SopWindowController {
   private readonly writeClipboard: (text: string) => void;
 
   constructor(options: SopWindowControllerOptions) {
+    this.legacyEnabled = options.legacyEnabled ?? true;
     this.preloadPath = options.preloadPath ?? join(__dirname, '../preload/sop.cjs');
     this.rendererDevServerUrl = options.rendererDevServerUrl;
     this.queryBounds = options.queryBounds;
@@ -122,7 +128,20 @@ export class SopWindowController {
     return this.window.webContents;
   }
 
+  setQueryRuntime(runtime: SopQueryRuntime): void {
+    this.queryRuntime = runtime;
+    runtime.subscribe(() => this.pushProjection());
+  }
+
+  async queryCommand(command: SopQueryCommand): Promise<SopWindowResult> {
+    if (!this.queryRuntime) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
+    const result = await this.queryRuntime.command(command);
+    return result.ok ? { ok: true } : sopWindowFailure('FAILED', '操作未完成，请查看流程提示');
+  }
+
   entryAvailable(): boolean {
+    if (this.queryRuntime) return true;
+    if (!this.legacyEnabled) return false;
     try {
       const tree = this.loadTree();
       validateSopTree(tree);
@@ -133,13 +152,15 @@ export class SopWindowController {
   }
 
   resumeAvailable(): boolean {
-    return this.liveWindow() !== null && this.progress !== null;
+    return this.liveWindow() !== null && (this.progress !== null || this.queryRuntime !== null);
   }
 
   async open(sceneId: string): Promise<SopWindowResult> {
     if (this.disposed) {
       return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);
     }
+    if (this.queryRuntime) return sceneId === 'sop-query' ? this.openQuery() : sopWindowFailure('INVALID', '请选择流程');
+    if (!this.legacyEnabled) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
     if (sceneId !== ALLERGY_SOP_SCENE_ID) {
       return sopWindowFailure('INVALID', '当前切片不能切换流程');
     }
@@ -183,6 +204,7 @@ export class SopWindowController {
   }
 
   endFlow(): void {
+    this.queryRuntime?.invalidate();
     this.clearLayoutTimer();
     this.scheduler.clear(this.copyTimer);
     this.copyTimer = null;
@@ -200,6 +222,7 @@ export class SopWindowController {
   }
 
   async restart(): Promise<SopWindowResult> {
+    if (this.queryRuntime) { await this.queryRuntime.open(this.sessionId); return { ok: true }; }
     if (this.disposed) {
       return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);
     }
@@ -317,6 +340,7 @@ export class SopWindowController {
   }
 
   destroy(): void {
+    this.queryRuntime?.dispose();
     if (this.disposed) {
       return;
     }
@@ -332,6 +356,30 @@ export class SopWindowController {
     if (win && !win.isDestroyed()) {
       win.destroy();
     }
+  }
+
+  private async openQuery(): Promise<SopWindowResult> {
+    if (this.opening) return this.opening;
+    this.opening = (async () => {
+      if (this.liveWindow()) {
+        this.revealExisting();
+        await this.queryRuntime!.open(this.sessionId);
+        return { ok: true } as const;
+      }
+      this.sessionId++; this.lastLayoutSequence = 0;
+      const win = createOverlayChromeWindow(this.preloadPath, { width: SOP_WIDTH, height: SOP_OPEN_HEIGHT, title: 'SOP 合成流程', backgroundThrottling: false });
+      lockRendererWindow(win); this.window = win;
+      win.on('closed', () => { if (this.window === win) { this.window = null; this.queryRuntime?.invalidate(); } });
+      this.placeWindow(win, sopOpeningSize());
+      try {
+        const loaded = await loadRenderer(win, 'sop', this.rendererDevServerUrl?.(), () => this.disposed);
+        if (loaded !== 'loaded' || this.disposed || win.isDestroyed()) return this.failLoad(win);
+        this.pushProjection(); win.showInactive();
+        await this.queryRuntime!.open(this.sessionId);
+        return { ok: true } as const;
+      } catch { return this.failLoad(win); }
+    })();
+    try { return await this.opening; } finally { this.opening = null; }
   }
 
   private async createOrReload(sceneId: string): Promise<SopWindowResult> {
@@ -481,6 +529,9 @@ export class SopWindowController {
 
   private pushProjection(): void {
     const win = this.liveWindow();
+    if (win && this.queryRuntime && !win.webContents.isDestroyed()) {
+      win.webContents.send(IPC_CHANNELS.SOP_WINDOW_PROJECTION, this.queryRuntime.projection()); return;
+    }
     if (!win || !this.tree || !this.progress || win.webContents.isDestroyed()) {
       return;
     }

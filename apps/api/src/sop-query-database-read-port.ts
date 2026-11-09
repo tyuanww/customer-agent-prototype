@@ -2,8 +2,8 @@ import type { PoolClient, QueryResultRow } from 'pg';
 import type { SopQueryFailureCode, SopQueryReadPort } from './sop-query-operation.js';
 import { isSopQueryReadResult } from './sop-query-validation.js';
 
-/** Candidate SQL boundary. The function belongs to the uninstalled v1.30
- * storage candidate, so this port is deliberately not registered by the API factory. */
+/** SQL belongs to database/candidates/0084_sop_query. Only the explicit
+ * disposable synthetic host installs and registers it; the product factory stays closed. */
 export const SOP_QUERY_READ_SQL = `SELECT content_intake.read_sop_query(
   $1::text,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::text,$9::uuid
 ) AS value`;

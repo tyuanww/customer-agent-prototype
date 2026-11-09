@@ -48,6 +48,7 @@ export type PackagedProductProfile = Readonly<{
   apiOrigin: string;
   identityOrigin: string;
   contentIntake?: 'faq-v2';
+  sopQuery?: 'menokin-sop-query-v1';
 }>;
 
 export function projectIntakeShellLine(
@@ -173,6 +174,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if ('contentIntake' in record && record.contentIntake !== 'faq-v2') {
     return { ok: false, kind: 'invalid' };
   }
+  if ('sopQuery' in record && (record.sopQuery !== 'menokin-sop-query-v1' || record.mode !== MODE || record.contentIntake !== 'faq-v2')) return { ok: false, kind: 'invalid' };
   if (record.mode === OFFLINE_MODE) {
     const keys = Object.keys(record);
     if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
@@ -194,7 +196,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     return { ok: false, kind: 'invalid' };
   }
   return { ok: true, profile: Object.freeze({ mode: MODE, apiOrigin, identityOrigin,
-    ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) }) };
+    ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
+    ...(record.sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}) }) };
 }
 
 /** Read and validate the packaged profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
@@ -285,6 +288,8 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const apiOrigin = environment.CUSTOMER_AGENT_DESKTOP_API_ORIGIN;
   const identityOrigin = environment.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
   const contentIntake = environment.CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE;
+  const sopQuery = environment.CUSTOMER_AGENT_DESKTOP_SOP_QUERY;
+  if (sopQuery !== undefined && (sopQuery !== 'menokin-sop-query-v1' || contentIntake !== 'faq-v2')) throw new Error('SOP query requires explicit FAQ synthetic profile');
   const loopbackApi = loopbackOrigin(apiOrigin);
   const loopbackIdentity = loopbackOrigin(identityOrigin);
   if (contentIntake !== undefined && (contentIntake !== 'faq-v2'
@@ -303,5 +308,6 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
     throw new Error('Synthetic loopback development origins must use a non-production adjacent port pair');
   }
   return Object.freeze({ mode: httpsOrigin(api) ? REMOTE_MODE : MODE, apiOrigin: api, identityOrigin: identity,
-    ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}) });
+    ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
+    ...(sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}) });
 }
