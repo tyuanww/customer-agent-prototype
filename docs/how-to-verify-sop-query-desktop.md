@@ -76,3 +76,5 @@ CUSTOMER_AGENT_SOP_QUERY_CANDIDATE=1 pnpm --filter @customer-agent/desktop exec 
 宿主提供实际授权/来源发现路由，以及符合严格 profile 的独立相邻 identity 端口。用例在这些前提不满足时失败，不注入假授权目录。测试保存窗口截图和实际 release/lease 关联，并在复制后撤销父授权，检查旧内容清除与复制拒绝。宿主使用持久化发布 fixture，不能据此宣称普通上传/发布链或含媒体的完整 B12 已贯通。
 
 PR 的 Electron lane 对桌面改动和独立 SOP 查询 API 改动执行 `sop-query.spec.ts`，持续验证合成 HTTP 到窗口的分支、复制和失效行为。该自动用例使用合成 HTTP 图，不能替代上面的临时 PG 联合用例；PG 查询另由数据库 lane 执行。
+
+Linux CI 在临时 D-Bus 会话和独立目录中启动 GNOME Keyring，并为此用例显式选择 `gnome-libsecret`。用例先检查系统加密可用且后端不是 `basic_text`，再完成正常登录；缺少密钥服务会直接失败，不能以明文存储绕过产品门禁。其依据是 [Electron 的 Linux 密码存储选项](https://github.com/electron/electron/blob/v43.4.0/docs/api/safe-storage.md)与 [GNOME Keyring 守护进程说明](https://manpages.debian.org/unstable/gnome-keyring/gnome-keyring-daemon.1.en.html)。该 CI 配置不代表 Linux 实机安装验收。

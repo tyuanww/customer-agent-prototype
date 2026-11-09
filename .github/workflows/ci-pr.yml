@@ -153,12 +153,21 @@ jobs:
       - name: Install Xvfb and Electron runtime libraries
         run: |
           sudo apt-get update
-          sudo apt-get install --yes xvfb
+          sudo apt-get install --yes xvfb dbus-x11 gnome-keyring libsecret-1-0
           pnpm --filter @customer-agent/desktop exec playwright install-deps
       - env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: xvfb-run --auto-servernum node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane electron
+          XDG_RUNTIME_DIR: ${{ runner.temp }}/sop-keyring-runtime
+          XDG_DATA_HOME: ${{ runner.temp }}/sop-keyring-data
+        run: |
+          install -d -m 700 "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME"
+          # Expand the range inside the private D-Bus session.
+          # shellcheck disable=SC2016
+          dbus-run-session -- bash -euo pipefail -c '
+            printf "%s" "synthetic-ci-keyring" | gnome-keyring-daemon --unlock --components=secrets --daemonize
+            xvfb-run --auto-servernum node scripts/verification-policy.mjs run --base "$BASE_SHA" --head "$HEAD_SHA" --lane electron
+          '
 
   windows:
     needs: changes
