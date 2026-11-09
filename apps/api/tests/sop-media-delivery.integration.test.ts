@@ -7,6 +7,7 @@ import { type Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, verifyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { generatedMigrationCatalogue } from '../../../packages/database/src/generated/migrations.generated.js';
 import { createSyntheticSopWorkbook } from '@customer-agent/content-intake';
 import type { components } from '@customer-agent/contracts';
 import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
@@ -48,7 +49,7 @@ describe.skipIf(!enabled)('Versioned SOP durable media: real publication and col
     pg = new Pg15Harness(); pg.start();
     const db = pg.createDatabase('sop_media_delivery');
     admin = await pg.connect(db.config);
-    const migrationCount = 81;
+    const migrationCount = generatedMigrationCatalogue.migrations.length;
     expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     // The intake read path and the legacy publisher both read authorization_sources now.

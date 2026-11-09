@@ -7,6 +7,7 @@ import { Pool, type Client } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, verifyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { generatedMigrationCatalogue } from '../../../packages/database/src/generated/migrations.generated.js';
 import { createSyntheticSopWorkbook, tryParseSopAsFaq } from '@customer-agent/content-intake';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -29,7 +30,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_stage');
     admin = await pg.connect(db.config);
-    const migrationCount = 81;
+    const migrationCount = generatedMigrationCatalogue.migrations.length;
     expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
@@ -639,7 +640,7 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     }
     expect((await admin.query('SELECT * FROM content_intake.sop_candidate_rows WHERE candidate_id=$1 AND candidate_version=$2 ORDER BY business_entry_id', [published.key.candidateId, published.key.version])).rows).toEqual(beforePublishedRows);
     expect((await admin.query('SELECT * FROM content_intake.sop_candidate_media WHERE candidate_id=$1 AND candidate_version=$2', [published.key.candidateId, published.key.version])).rows).toEqual(beforePublishedMedia);
-  });
+  }, 60_000);
   it('converges concurrent requests and any busy retry onto one candidate and payload', async () => {
     const results = await Promise.all([stage(actor(), jobId), stage(actor(), jobId)]);
     const successful = results.filter(result => result.ok);

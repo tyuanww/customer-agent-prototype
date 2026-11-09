@@ -109,7 +109,24 @@ test('SOP query changes require the real PostgreSQL consumer lane', () => {
     assert.ok(plan.requiredJobs.includes('database'));
     assert.ok(ids(plan, 'database').includes('api-database-integration'));
     assert.ok(plan.liveLanes.includes('sop-query-http'));
+    assert.ok(ids(plan, 'electron').includes('sop-query-electron'));
   }
+});
+
+test('desktop changes retain the independent SOP window regression', () => {
+  for (const path of ['apps/desktop/src/main/sop-query-runtime.ts', 'apps/desktop/src/renderer/SopQueryView.tsx']) {
+    const plan = verificationPlan([path], map);
+    assert.ok(ids(plan, 'electron').includes('sop-query-electron'));
+  }
+});
+
+test('SOP regression inputs cannot skip the PostgreSQL lane', () => {
+  for (const path of ['apps/api/tests/sop-trusted-stage.integration.test.ts', 'apps/api/src/content-intake/sop-freeze.ts', 'apps/api/experiments/sop-row-deletion/consumer.ts', 'packages/content-intake/src/sop-authoring.ts', 'apps/api/package.json']) {
+    const plan = verificationPlan([path], map);
+    assert.ok(ids(plan, 'database').includes('api-database-integration'), path);
+  }
+  const plan = verificationPlan(['scripts/verification-dependencies.json'], map);
+  assert.ok(ids(plan, 'electron').includes('sop-query-electron'));
 });
 
 test('database changes select generated, PG15, backup and consumer database lanes', () => {
@@ -147,7 +164,7 @@ test('workflow, desktop, API, query, SOP and overlay paths select their intended
   assert.equal(desktop.jobs.quick, true);
   assert.equal(desktop.jobs.electron, true);
   assert.ok(ids(desktop, 'quick').includes('desktop-tests'));
-  assert.deepEqual(ids(desktop, 'electron'), ['overlay-electron']);
+  assert.deepEqual(ids(desktop, 'electron'), ['overlay-electron', 'sop-query-electron']);
 
   const api = verificationPlan(['apps/api/src/app.ts'], map);
   assert.deepEqual(api.owners, ['api']);
@@ -169,7 +186,7 @@ test('workflow, desktop, API, query, SOP and overlay paths select their intended
   const overlay = verificationPlan(['apps/desktop/src/main/overlay-controller.ts'], map);
   assert.equal(overlay.jobs.electron, true);
   assert.ok(ids(overlay, 'quick').includes('overlay-unit'));
-  assert.deepEqual(ids(overlay, 'electron'), ['overlay-electron']);
+  assert.deepEqual(ids(overlay, 'electron'), ['overlay-electron', 'sop-query-electron']);
   assert.ok(overlay.liveLanes.includes('overlay-native'));
 });
 
@@ -389,7 +406,11 @@ test('plan commands are lane-scoped and deduplicated', () => {
   const quick = planLaneCommands(mixed, 'quick');
   assert.equal(quick.filter((command) => JSON.stringify(command) === JSON.stringify(['pnpm', '--filter', '@customer-agent/desktop', 'test'])).length, 1);
   assert.ok(quick.some((command) => JSON.stringify(command) === JSON.stringify(['pnpm', 'lint'])));
-  assert.deepEqual(planLaneCommands(mixed, 'electron'), [['pnpm', 'test:e2e:float']]);
+  assert.deepEqual(planLaneCommands(mixed, 'electron'), [
+    ['pnpm', 'test:e2e:float'],
+    ['pnpm', '--filter', '@customer-agent/desktop', 'build'],
+    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/sop-query.spec.ts'],
+  ]);
   assert.throws(() => planLaneCommands(mixed, 'unknown'), /PLAN_LANE_INVALID/u);
 });
 

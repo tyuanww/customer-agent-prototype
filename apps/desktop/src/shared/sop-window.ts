@@ -90,6 +90,7 @@ export type SopWindowApi = {
   moveBy(dx: number, dy: number, finished?: boolean): Promise<void>;
   reportLayout(request: SopLayoutRequest): Promise<SopLayoutAck>;
   copyCurrent(): Promise<SopCopyResult>;
+  /** Replays this document's latest validated Main projection, then subscribes to updates. */
   onProjection(cb: (projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void): () => void;
 };
 

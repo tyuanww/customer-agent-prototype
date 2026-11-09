@@ -26,11 +26,15 @@ const COPY_CURRENT = 'sop-window:copy-current';
 const PROJECTION = 'sop-window:projection';
 
 const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void>();
+// Main can publish before React subscribes. Retain only the latest validated
+// projection for this document; Main still owns state and invalidation.
+let latestProjection: SopProjection | SopPipelineProjection | SopQueryProjection | null = null;
 
 ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
   if (!isSopProjection(payload) && !isSopPipelineProjection(payload) && !isSopQueryProjection(payload)) {
     return;
   }
+  latestProjection = payload;
   for (const listener of projectionListeners) {
     listener(payload);
   }
@@ -131,6 +135,7 @@ const api: SopWindowApi = {
   },
   onProjection(cb) {
     projectionListeners.add(cb);
+    if (latestProjection) cb(latestProjection);
     return () => {
       projectionListeners.delete(cb);
     };

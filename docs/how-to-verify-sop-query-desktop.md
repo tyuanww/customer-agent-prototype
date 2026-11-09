@@ -74,3 +74,5 @@ CUSTOMER_AGENT_SOP_QUERY_CANDIDATE=1 pnpm --filter @customer-agent/desktop exec 
 ```
 
 宿主提供实际授权/来源发现路由，以及符合严格 profile 的独立相邻 identity 端口。用例在这些前提不满足时失败，不注入假授权目录。测试保存窗口截图和实际 release/lease 关联，并在复制后撤销父授权，检查旧内容清除与复制拒绝。宿主使用持久化发布 fixture，不能据此宣称普通上传/发布链或含媒体的完整 B12 已贯通。
+
+PR 的 Electron lane 对桌面改动和独立 SOP 查询 API 改动执行 `sop-query.spec.ts`，持续验证合成 HTTP 到窗口的分支、复制和失效行为。该自动用例使用合成 HTTP 图，不能替代上面的临时 PG 联合用例；PG 查询另由数据库 lane 执行。

@@ -4,6 +4,8 @@ All notable changes to this customer-agent product implementation repository are
 
 ## Unreleased
 
+- 修复 SOP 窗口订阅晚于 Main 首次状态推送时可能停留空白的问题；新订阅只接收最新已校验状态，包括撤权后的清空状态。
+- 五组 SOP PostgreSQL 专项纳入持续集成，迁移数以当前目录为准；桌面与 SOP 查询改动自动运行独立 SOP 窗口回归。
 - 显式 SOP 合成 profile 可从临时 PostgreSQL 查询已发布图，在独立窗口按明确分支推进并复制获准话术；条件、会话、版本或租约失效会清除旧内容。
 - 查询候选拒绝悬空、循环、终止出边、未分级和不安全过敏内容。重新登录后再次打开窗口会恢复店铺选择。
 - 新增 PostgreSQL 到 HTTP、Main 和 Electron 的联合验证。候选存储不进入默认迁移，媒体预览、正式图导入发布和真实运行仍未开放。
