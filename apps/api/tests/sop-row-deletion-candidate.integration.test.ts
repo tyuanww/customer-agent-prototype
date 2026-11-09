@@ -4,6 +4,7 @@ import { Pool, type Client } from 'pg';
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { applyDatabaseMigrations, verifyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { generatedMigrationCatalogue } from '../../../packages/database/src/generated/migrations.generated.js';
 import { createSyntheticSopWorkbook, tryParseSopAsFaq } from '@customer-agent/content-intake';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -29,7 +30,7 @@ describe.skipIf(!enabled)('Versioned SOP row deletion: actual PG15, restricted b
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_row');
     admin = await pg.connect(db.config);
-    const migrationCount = 81;
+    const migrationCount = generatedMigrationCatalogue.migrations.length;
     expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });

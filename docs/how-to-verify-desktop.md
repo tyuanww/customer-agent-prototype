@@ -532,10 +532,12 @@ pnpm test:db:integration
 
 ### SOP 后继合同接收后的合成回归
 
-先运行 `pnpm build` 生成当前合同与数据库运行产物，再在仓库根执行：
+先运行 `pnpm build:services` 生成当前服务依赖产物，无需构建桌面。然后在仓库根执行：
 
 ```sh
-CUSTOMER_AGENT_API_PG15_INTEGRATION=1 apps/api/node_modules/.bin/vitest run --root apps/api tests/sop-trusted-stage.integration.test.ts tests/sop-row-deletion-candidate.integration.test.ts tests/sop-media-capacity.integration.test.ts tests/sop-media-delivery.integration.test.ts
+pnpm --filter @customer-agent/api test:integration:sop
 ```
 
-这四组直接安装产品已接收的40段迁移，并核验物理状态；不再读取仓外候选SQL或依赖候选目录环境变量。全部资料、身份、PG集群和存储均为测试自建。实验reader仍显式注入，测试通过不代表生产HTTP/Main装配已开放。
+该命令明确运行 trusted-stage、media-delivery、row-deletion-candidate、media-capacity 和 pipeline-publication 五个专项，显式开启 `CUSTOMER_AGENT_API_PG15_INTEGRATION=1` 与 `CUSTOMER_AGENT_API_SOP_PG15_INTEGRATION=1`，使用单 worker 串行执行。既有 API `test:integration` 在构建及原有集成测试后调用同一命令，PR 数据库 lane 和 main CI 沿用该入口。SOP 测试、解析包、intake 实现与 API 脚本的改动都会选择该数据库 lane，避免只改测试时再次漏跑。
+
+前四组按 `generatedMigrationCatalogue` 的当前完整清单断言迁移数量，并保留数据库物理状态校验；发布投影组验证实体与投影的原子写入、重放和不可变性。全部资料、身份、PG 集群和存储均为测试自建。实验 reader 仍显式注入，测试通过不代表生产 HTTP/Main 装配已开放。

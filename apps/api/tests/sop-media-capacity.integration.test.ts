@@ -6,6 +6,7 @@ import { Client, type PoolConfig } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations, verifyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { generatedMigrationCatalogue } from '../../../packages/database/src/generated/migrations.generated.js';
 import { createSyntheticSopWorkbook } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../src/auth-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
@@ -37,7 +38,7 @@ describe.skipIf(!enabled)('Versioned SOP media capacity and purpose boundaries o
   beforeEach(async () => {
     pg = new Pg15Harness(); pg.start(); const db = pg.createDatabase('sop_media_capacity'); config = db.config;
     admin = await pg.connect(db.config);
-    const migrationCount = 81;
+    const migrationCount = generatedMigrationCatalogue.migrations.length;
     expect((await applyDatabaseMigrations(admin)).applied).toHaveLength(migrationCount);
     await seedIntakeSyntheticHost(admin, 'product', 'xlsx', true);
     expect(await verifyDatabaseMigrations(admin)).toMatchObject({ status: 'PASS', migrationCount });
