@@ -40,11 +40,11 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // borrow unused space from another group, even with a larger aggregate override.
 // Budgets use logical file/link bytes per retained path, independent of filesystem
 // allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 48.1 * 1024 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 51.3 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
-  // Approved 2026-11-08: the immutable Menokin SOP query candidate adds its
-  // ten-file v8 package beside the existing v1-v7 contract snapshots.
-  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 19.5 * 1024 * 1024 }),
+  // The 2026-11-09 unified SOP snapshot adds 3.18 MiB, including both legacy
+  // views. Its 3.2 MiB allocation also increases the aggregate source budget.
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 22.7 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.3 * 1024 * 1024 }),
 ]);

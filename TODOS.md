@@ -2,11 +2,11 @@
 
 ## 当前代码与收尾状态（2026-11-09）
 
-产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。既有代码栈经 PR #178、#179、#180 合入，其 [main CI](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42508954434) 已通过。新增查询链已通过 PR #181 合入 `7ada0497d5b2628db626a32eeb85085f825c07f8`，[对应 main CI](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42562908717) 以远端最终结果为准。已核对覆盖关系并关闭 #164 至 #177 的旧 PR，没有删除分支或工作树。
+产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。既有代码栈及查询回归经 PR #178 至 #183 合入，主干 `dca178283ccf6d43ed99e676d9fbcfa344d060b7` 的完整 CI 在第五次运行通过。Windows 下载故障的早期失败保留在运行历史中。[主干 CI](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42568094229)。
 
 独立 SOP 查询已有临时 PG15、HTTP、Main 与 SOP 窗口的合成消费链，覆盖逐字复制、重新登录恢复及撤权后清空。正式图导入、冻结、发布/回滚和安全媒体消费仍未完成。合同 `VERIFIED_NOT_ACTIVATED`，原表只用于仓外受控转换核对。六表转换通过不代表完整 Gate B、业务验收、真实运行或发布完成。真实身份、店铺授权、设备及发布条件需要各自证据。
 
-五组 SOP PostgreSQL 回归现在由 API `test:integration:sop` 统一执行，并纳入既有集成入口；桌面与独立 SOP 查询变更会选择 SOP 窗口回归。默认套件的 skip 数不能作为未覆盖总数，需与专项逐项对照。完整图写入仍需先解决上游图谱系与 direct-v1 发布的合同兼容，再补齐正常导入/质量/发布/回退、查询注解和媒体兑换；这些属于 AI 工程任务，不要求运营补写技术字段。
+五组 SOP PostgreSQL 回归现在由 API `test:integration:sop` 统一执行，并纳入既有集成入口；桌面与独立 SOP 查询变更会选择 SOP 窗口回归。默认套件的 skip 数不能作为未覆盖总数，需与专项逐项对照。完整图写入的统一合同已按 `33fc543523b95b47c1236ef7bbfccd3f772c9d0d` 精确导出并接收，包含完整任务图、独立查询及两份兼容视图。后续工程继续登记正式迁移，补齐正常导入、全图质量、发布/回退、查询权限事实与媒体兑换。[统一合同接收说明](docs/reference-sop-unified-contract-intake.md)。
 
 下面的历史版本、线上地址状态、发布编号和人员绑定仅代表原记录日期；没有本轮读回证据的内容不得作为当前状态使用。
 

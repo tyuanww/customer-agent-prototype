@@ -1,0 +1,69 @@
+{
+  "schema": "customer-agent-sop-unified-candidate/v1",
+  "status": "IMPLEMENTATION_APPROVED_CANDIDATE",
+  "versions": {
+    "openapi": "1.29.0",
+    "database": "schema.v1.33",
+    "profile": "content-intake-sop-unified-v1"
+  },
+  "formalVersionAssigned": true,
+  "sourceGitSha": null,
+  "authorizationEvidenceId": "EVD-SOP-UNIFIED-TECHNICAL-20261109",
+  "sources": {
+    "business-docs/08-工具/build_customer_agent_sop_unified_contract.mjs": "e41eab04862c684ed777c6b7e9d6ecce54533afc5dfbb6389e1e5dc6f2fca490",
+    "business-docs/08-工具/build_customer_agent_sop_query_contract_candidate.mjs": "e732037fb6d99c22414265625491a412caf6304f812d1c6bcf9c83fb0f1b2bf3",
+    "business-docs/08-工具/build_customer_agent_sop_graph_candidate.mjs": "cdb432cce7c1118142cd04d460d26504620b1663f47b7f71fb51e723891c2c08",
+    "business-docs/01-客服Agent项目/30-开发-进行中/sop-unified-candidate/source.json": "7d38d01aec36f2547b520060833e5022ad5582a6499271083a235465c1835568",
+    "business-docs/01-客服Agent项目/30-开发-进行中/sop-unified-candidate/authorization.source.json": "76eb719877b99da0d36a829e5919b82ebc37da784df01406bc0df2e238b4ec2b",
+    "business-docs/01-客服Agent项目/30-开发-进行中/sop-unified-candidate/query.source.json": "89f4ba148557acb4a12bd30ddc7bed43acbb834d14ed3e84b57a58f66d3da6f7",
+    "business-docs/01-客服Agent项目/30-开发-进行中/sop-unified-candidate/storage.patch.sql": "084cfd4340b67966c4d1709df7c7122814083605deba7378140e544ab9636e55"
+  },
+  "artifacts": {
+    "openapi.v1.yaml": {
+      "sha256": "6ab61ac566f0fe73168f435849f091862ef8745a3949ba46448ebadde57fb79a",
+      "bytes": 1349132
+    },
+    "schema-v1.33.sql": {
+      "sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+      "bytes": 867684
+    },
+    "storage.v1.sql": {
+      "sha256": "f2dfd7c6d7053d188089f7a171cb108ae2fa613bb5e7f30447acd0e1c4163510",
+      "bytes": 26978
+    },
+    "installation.v1.json": {
+      "sha256": "ad9b685ca0655044cfed9457784fd1cdcfa469e020764f7033479c87e6bcd3d0",
+      "bytes": 12202
+    },
+    "predecessor-lock.v1.json": {
+      "sha256": "7d38d01aec36f2547b520060833e5022ad5582a6499271083a235465c1835568",
+      "bytes": 2873
+    },
+    "compatibility.v1.json": {
+      "sha256": "01e796f4f6e52b98550a60ec81fe5fec614dfdcff840e07aebf86164419dc372",
+      "bytes": 5887
+    },
+    "operation-coverage.v1.json": {
+      "sha256": "a8c96f9b6ca8a60a3d1635b85d0543606a1e3e187e41a05cf0437d92a16f9033",
+      "bytes": 238422
+    },
+    "legacy-openapi.v7.yaml": {
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "bytes": 795585
+    },
+    "legacy-query.openapi.v1.json": {
+      "sha256": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
+      "bytes": 12271
+    },
+    "query-transport.v1.json": {
+      "sha256": "89f4ba148557acb4a12bd30ddc7bed43acbb834d14ed3e84b57a58f66d3da6f7",
+      "bytes": 16596
+    },
+    "authorization.v1.json": {
+      "sha256": "76eb719877b99da0d36a829e5919b82ebc37da784df01406bc0df2e238b4ec2b",
+      "bytes": 613
+    }
+  },
+  "runtimeActivated": false,
+  "businessMappingApproved": false
+}
