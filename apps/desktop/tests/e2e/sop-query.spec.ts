@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,7 +49,9 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
   const directory=mkdtempSync(path.join(tmpdir(),'sop-query-e2e-'));
   let app:ElectronApplication|undefined;
   try {
-    app=await electron.launch({executablePath:process.env.SOP_ELECTRON_EXECUTABLE,cwd:fileURLToPath(new URL('../..',import.meta.url)),args:[`--user-data-dir=${directory}`,...(process.platform==='linux'?['--password-store=gnome-libsecret']:[]),'out/main/index.js','--demo-e2e'],env:{...process.env,DEMO_E2E:'1',CUSTOMER_AGENT_DESKTOP_API_ORIGIN:apiOrigin,CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN:identityOrigin,CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE:'faq-v2',CUSTOMER_AGENT_DESKTOP_SOP_QUERY:'menokin-sop-query-v1'}});
+    // Explicit resolution avoids Playwright's loader overriding the OS keystore with --password-store=basic.
+    const executablePath=process.env.SOP_ELECTRON_EXECUTABLE ?? createRequire(import.meta.url)('electron') as string;
+    app=await electron.launch({executablePath,cwd:fileURLToPath(new URL('../..',import.meta.url)),args:[`--user-data-dir=${directory}`,...(process.platform==='linux'?['--password-store=gnome-libsecret']:[]),'out/main/index.js','--demo-e2e'],env:{...process.env,DEMO_E2E:'1',CUSTOMER_AGENT_DESKTOP_API_ORIGIN:apiOrigin,CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN:identityOrigin,CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE:'faq-v2',CUSTOMER_AGENT_DESKTOP_SOP_QUERY:'menokin-sop-query-v1'}});
     const storage=await app.evaluate(async({app,safeStorage})=>{await app.whenReady();return {available:safeStorage.isEncryptionAvailable(),backend:process.platform==='linux'?safeStorage.getSelectedStorageBackend():'native'};});
     console.info('SOP_SESSION_STORAGE',storage);
     expect(storage.available,'SOP login requires system encrypted storage').toBe(true);

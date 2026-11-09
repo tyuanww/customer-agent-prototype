@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,8 @@ export async function runSopQueryProbe(probe:SopSyntheticProbe, afterCopy?:(surf
   const directory=mkdtempSync(path.join(tmpdir(),'sop-external-host-'));
   let app:ElectronApplication|undefined;
   try {
-    app=await electron.launch({executablePath:process.env.SOP_ELECTRON_EXECUTABLE,cwd:fileURLToPath(new URL('../..',import.meta.url)),args:[`--user-data-dir=${directory}`,'out/main/index.js','--demo-e2e'],env});
+    const executablePath=process.env.SOP_ELECTRON_EXECUTABLE ?? createRequire(import.meta.url)('electron') as string;
+    app=await electron.launch({executablePath,cwd:fileURLToPath(new URL('../..',import.meta.url)),args:[`--user-data-dir=${directory}`,...(process.platform==='linux'?['--password-store=gnome-libsecret']:[]),'out/main/index.js','--demo-e2e'],env});
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=query'))).toBe(true);
     const query=app.windows().find(w=>w.url().includes('role=query'))!;
     await app.evaluate(({app})=>app.focus({steal:true}));await query.evaluate(()=>window.customerAgent!.openSearch());
