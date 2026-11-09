@@ -75,7 +75,8 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
     await sop.getByRole('button',{name:'已确认',exact:true}).click();
     await expect(sop.getByText('这是合成原文甲。\n保留换行。')).toBeVisible();
     const copies=sop.getByRole('button',{name:'复制话术'});await expect(copies.nth(1)).toBeDisabled();await copies.first().click();
-    expect(await app.evaluate(({clipboard})=>clipboard.readText())).toBe('这是合成原文甲。\n保留换行。');
+    await expect(sop.getByRole('status').filter({hasText:'已复制'})).toBeVisible();
+    expect(await app.evaluate(({clipboard})=>clipboard.readText()==='这是合成原文甲。\n保留换行。')).toBe(true);
     expect(await sop.evaluate(()=>({customerAgent:typeof window.customerAgent,require:typeof Reflect.get(window,'require'),apis:Object.keys(window.sopWindow!)}))).toMatchObject({customerAgent:'undefined',require:'undefined'});
     revoked=true;await copies.first().click();await expect(sop.getByTestId('sop-query-shell')).toHaveAttribute('data-state','stale');await expect(sop.getByText('这是合成原文甲。\n保留换行。')).toHaveCount(0);
     revoked=false;

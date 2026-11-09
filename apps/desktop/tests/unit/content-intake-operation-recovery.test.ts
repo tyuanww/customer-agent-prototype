@@ -1,5 +1,7 @@
 // @vitest-environment node
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+
+vi.mock('electron', () => ({ app: {}, BrowserWindow: {}, dialog: {}, ipcMain: {} }));
 import {
   operationRecoveryCommand,
   operationRecoveryOutcome,

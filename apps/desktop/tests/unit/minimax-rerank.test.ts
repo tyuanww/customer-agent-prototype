@@ -1,5 +1,10 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/main/desktop-fetch', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/desktop-fetch')>(),
+  electronNetFetch: () => null,
+}));
 import { loadMinimaxReranker, parseRerankIds } from '../../src/main/minimax-rerank';
 
 describe('minimax rerank parser', () => {
