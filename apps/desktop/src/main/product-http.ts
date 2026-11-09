@@ -36,7 +36,7 @@ export function productOrigin(value: string): string {
   if (!isPublicHostname(url.hostname)) throw new ProductHttpError('VALIDATION');
   return url.origin;
 }
-const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'idempotency-key'] as const;
+const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'x-intake-contract-set', 'idempotency-key'] as const;
 export type ProductHttpResult = {
   status: number; value: unknown;
   etag?: string; leaseToken?: string; leaseExpiresAt?: string;
@@ -90,6 +90,9 @@ export class ProductHttp {
         // Log only controlled diagnostics, never URL, payload or provider text.
         console.info(`[desktop] product-http ${response.status} ${failure.code} ${String(Date.now() - started)}ms`);
         throw new ProductHttpError(failure.code, failure.reason);
+      }
+      if (extra['x-intake-contract-set'] && response.headers.get('x-intake-contract-set') !== extra['x-intake-contract-set']) {
+        await response.body?.cancel(); throw new ProductHttpError('VALIDATION');
       }
       if (response.status === 204) return { status: 204, value: null, ...meta };
       if (options.responseType === 'xlsx') {

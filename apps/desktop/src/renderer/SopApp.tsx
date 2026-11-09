@@ -1,3 +1,5 @@
+import { isSopQueryProjection, type SopQueryProjection } from '@shared/sop-query';
+import { SopQueryView } from './SopQueryView';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import { useWindowDrag } from './lib/use-window-drag';
@@ -17,7 +19,7 @@ import {
 import './styles/sop.css';
 
 type SopAppProps = {
-  projection?: SopProjection | SopPipelineProjection;
+  projection?: SopProjection | SopPipelineProjection | SopQueryProjection;
 };
 
 const RISK_COPY = {
@@ -239,7 +241,7 @@ function SopCopyCard({
 }
 
 export function SopApp({ projection: injected }: SopAppProps) {
-  const [projection, setProjection] = useState<SopProjection | SopPipelineProjection | null>(injected ?? null);
+  const [projection, setProjection] = useState<SopProjection | SopPipelineProjection | SopQueryProjection | null>(injected ?? null);
   const [copying, setCopying] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
@@ -256,7 +258,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
   }, [injected]);
 
   const layoutSignature = projection
-    ? isSopPipelineProjection(projection)
+    ? isSopQueryProjection(projection) ? JSON.stringify(projection) : isSopPipelineProjection(projection)
       ? pipelineLayoutSignature(projection)
       : sopLayoutSignature(projection)
     : '';
@@ -325,6 +327,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
       if (
         event.key === '1'
         && projection
+        && !isSopQueryProjection(projection)
         && (isSopPipelineProjection(projection)
           ? projection.state === 'ready' && projection.stepText.length > 0 && projection.stepKind !== 'decision'
           : Boolean(projection.script) && !projection.unpublished)
@@ -344,6 +347,8 @@ export function SopApp({ projection: injected }: SopAppProps) {
   if (!projection) {
     return null;
   }
+
+  if (isSopQueryProjection(projection)) return <SopQueryView projection={projection} shellRef={shellRef} drag={drag} />;
 
   if (isSopPipelineProjection(projection)) {
     return (

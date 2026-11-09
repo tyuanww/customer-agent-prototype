@@ -419,3 +419,19 @@ it.each([
     CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: identity,
   })).toEqual({ mode, apiOrigin: api, identityOrigin: identity });
 });
+
+
+describe('independent SOP synthetic opt-in', () => {
+  it('requires explicit loopback FAQ mode and never enables remote profiles', () => {
+    const optIn = { ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2', CUSTOMER_AGENT_DESKTOP_SOP_QUERY: 'menokin-sop-query-v1' };
+    expect(developmentProductProfile(optIn)?.sopQuery).toBe('menokin-sop-query-v1');
+    expect(developmentProductProfile(LOOPBACK_ENV)?.sopQuery).toBeUndefined();
+    expect(() => developmentProductProfile({ ...optIn, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: undefined })).toThrow();
+    expect(() => developmentProductProfile({ ...optIn, CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://api.example.com', CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: 'https://identity.example.com' })).toThrow();
+    const directory = userDataDirectory();
+    write(directory, { mode:'product-remote', apiOrigin:'https://api.example.com', identityOrigin:'https://identity.example.com', contentIntake:'faq-v2', sopQuery:'menokin-sop-query-v1' });
+    expect(() => readPackagedProductProfile(directory)).toThrow();
+    write(directory, {...STACK_PROFILE,contentIntake:'faq-v2',sopQuery:'menokin-sop-query-v1'});
+    expect(readPackagedProductProfile(directory)?.sopQuery).toBe('menokin-sop-query-v1');
+  });
+});

@@ -11,7 +11,7 @@ import { writeSystemClipboard } from './system-clipboard';
  * A capability belongs to one trusted Query main frame and dies with its window. */
 export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null,
   trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null,
-  devUrl: () => string | undefined) {
+  devUrl: () => string | undefined, invalidateSop?: () => void) {
   const windows = new Map<WebContents, ContentIntakeQuery>();
   const channels = [C.INTAKE_QUERY_MODE, C.INTAKE_QUERY_ACCESS, C.INTAKE_QUERY_SELECT,
     C.INTAKE_QUERY_CONDITIONS, C.INTAKE_QUERY_SEARCH, C.INTAKE_QUERY_COPY, C.INTAKE_QUERY_CANCEL];
@@ -22,6 +22,7 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
       : channel === C.INTAKE_QUERY_SEARCH ? args.length === 1 && isIntakeSearchRequest(args[0])
         : channel === C.INTAKE_QUERY_COPY ? args.length === 1 && isIntakeCopyRequest(args[0]) : args.length === 0;
     if (!valid) return intakeQueryFailure('VALIDATION');
+    if ([C.INTAKE_QUERY_ACCESS, C.INTAKE_QUERY_SELECT, C.INTAKE_QUERY_CONDITIONS, C.INTAKE_QUERY_SEARCH, C.INTAKE_QUERY_CANCEL].some(c => c === channel)) invalidateSop?.();
     if (channel === C.INTAKE_QUERY_MODE) return { ok: true, enabled: session !== null };
     if (!session) return intakeQueryFailure('UNAVAILABLE');
     let query = windows.get(event.sender);
@@ -29,9 +30,10 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
       query = new ContentIntakeQuery(session, writeSystemClipboard); windows.set(event.sender, query);
       const owned = query;
       query.subscribe(invalidation => {
+        invalidateSop?.();
         if (!event.sender.isDestroyed()) event.sender.send(C.INTAKE_QUERY_INVALIDATED, invalidation);
       });
-      event.sender.once('destroyed', () => { windows.delete(event.sender); owned.dispose(); });
+      event.sender.once('destroyed', () => { invalidateSop?.(); windows.delete(event.sender); owned.dispose(); });
     }
     try {
       if (channel === C.INTAKE_QUERY_ACCESS) return { ok: true, ...await query.access() };

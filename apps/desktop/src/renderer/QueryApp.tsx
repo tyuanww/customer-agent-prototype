@@ -1,3 +1,4 @@
+import { SopQueryEntry } from './features/search/SopQueryEntry';
 import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
 import { PERMISSION_DENIAL_MESSAGE, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
@@ -2319,9 +2320,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
+            contextControls={intake ? <><SopQueryEntry /><IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
               onToggle={() => { setFiltersOpen(current => !current); setLayoutReady(false); }}
-              onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
+              onLayoutChange={() => setLayoutReady(false)} /></> : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
                 values={placeholderValues}

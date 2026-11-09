@@ -47,6 +47,7 @@ describe('SOP window IPC sender matrix', () => {
   const entryAvailable = vi.fn(() => true);
   const resumeAvailable = vi.fn(() => false);
   const chooseEdge = vi.fn(() => ({ ok: true as const }));
+  const queryCommand = vi.fn(async () => ({ ok: true as const }));
   const copyCurrent = vi.fn(() => ({ ok: true as const }));
 
   beforeEach(() => {
@@ -69,6 +70,7 @@ describe('SOP window IPC sender matrix', () => {
       resumeAvailable,
       chooseEdge,
       copyCurrent,
+      queryCommand,
     } as unknown as SopWindowController;
     registerSopWindowIpc({
       getOverlay: () => overlay,
@@ -93,6 +95,18 @@ describe('SOP window IPC sender matrix', () => {
     expect(handler(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)(fox.event)).toBe(false);
     expect(handler(IPC_CHANNELS.SOP_WINDOW_ENTRY_AVAILABLE)(sop.event)).toBe(false);
     expect(handler(IPC_CHANNELS.SOP_WINDOW_RESUME_AVAILABLE)(fox.event)).toBe(false);
+  });
+
+  it('accepts typed query commands only from the SOP main frame', async () => {
+    const run = handler('sop-window:query-command');
+    await expect(run(sop.event, { kind:'clear' })).resolves.toEqual({ok:true});
+    for (const event of [query.event,fox.event,dashboard.event,{...sop.event,senderFrame:{parent:{}}} as IpcMainInvokeEvent]) {
+      await expect(run(event,{kind:'clear'})).resolves.toMatchObject({ok:false});
+    }
+    await expect(run(sop.event,{kind:'clear',url:'https://invalid.example'})).resolves.toMatchObject({ok:false});
+    await expect(run(sop.event,{kind:'copy',key:'a'},'extra')).resolves.toMatchObject({ok:false});
+    await expect(handler(IPC_CHANNELS.SOP_WINDOW_OPEN)({...query.event,senderFrame:{parent:{}}} as IpcMainInvokeEvent,'sop-query')).resolves.toMatchObject({ok:false});
+    expect(queryCommand).toHaveBeenCalledTimes(1);
   });
 
   it('lets only the SOP window choose edges or copy', () => {
