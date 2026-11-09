@@ -1,5 +1,10 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/main/desktop-fetch', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/desktop-fetch')>(),
+  electronNetFetch: () => null,
+}));
 import { minimaxChatContent, minimaxConfigured } from '../../src/main/minimax-chat';
 
 const messages = [{ role: 'user' as const, content: '什么时候发货' }];

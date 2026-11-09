@@ -2,7 +2,12 @@
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/main/desktop-fetch', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/desktop-fetch')>(),
+  electronNetFetch: () => null,
+}));
 import { createMinimaxQuestionGenerator, parseGeneratedQuestions } from '../../src/main/doc2query-generate';
 import { assertOffRepoIndexPath, enrichRetrievalIndex } from '../../src/main/retrieval-index-store';
 import { mergeQuestions, normalizeQuestions } from '../../src/shared/doc2query';

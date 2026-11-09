@@ -3,6 +3,11 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/main/desktop-fetch', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/desktop-fetch')>(),
+  electronNetFetch: () => null,
+}));
 import { ProductSearch } from '../../src/main/product-search';
 import { noopRetrievalTelemetry } from '../../src/main/retrieval-telemetry-store';
 import { ProductSession } from '../../src/main/product-session';
