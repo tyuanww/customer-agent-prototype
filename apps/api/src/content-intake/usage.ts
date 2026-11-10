@@ -39,7 +39,7 @@ const memoryPreviewReader: IntakePreviewReader = {
 };
 type ScopeRow = { source_id: string; scope: C['IntakeSopSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
-  contract_view: 'legacy' | 'graph';
+  contract_view?: 'legacy' | 'graph';
   principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string;
   product_ids: string[]; scenario_ids: string[] };
 
@@ -312,10 +312,12 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         if (until<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
         client.validUntil(until);
         const id=`ite_${randomBytes(32).toString('hex')}`, hash=digest(id);
+        // The sealed legacy query host retains the 83-migration schema.
+        const graphView = intakeView() === 'graph';
         await client.query(`INSERT INTO content_intake.entitlements(entitlement_hash,principal_id,user_id,lease_token_hash,release_id,
-          shop_id,context_generation,principal_generation,release_generation,issued_at,valid_until,contract_view)
-          SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9,$10 FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
-        [hash,who.id,who.userId,leaseHash,release,ctx.shopId,ctx.contextGeneration,who.generation,new Date(until),intakeView()]);
+          shop_id,context_generation,principal_generation,release_generation,issued_at,valid_until${graphView ? ',contract_view' : ''})
+          SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9${graphView ? ",'graph'" : ''} FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
+        [hash,who.id,who.userId,leaseHash,release,ctx.shopId,ctx.contextGeneration,who.generation,new Date(until)]);
         await client.query('INSERT INTO content_intake.entitlement_scopes SELECT $1,unnest($2::text[])',[hash,scopes.map(s=>s.source_id)]);
         await client.query(`INSERT INTO content_intake.entitlement_contexts(entitlement_hash,session_token_hash,product_ids,scenario_ids)
           VALUES ($1,$2,$3,$4)`,[hash,sessionTokenHash,ctx.productIds,ctx.scenarioIds]);
@@ -336,9 +338,10 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
         if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
         if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
-        const scopes=await withIntakeView(lease.contract_view, () => scopesFor(client,who,ctx.shopId,hash));
+        const leaseView = lease.contract_view ?? 'legacy';
+        const scopes=await withIntakeView(leaseView, () => scopesFor(client,who,ctx.shopId,hash));
         if (lease.client_id!==binding(ctx,scopes)) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
-        if (lease.contract_view !== intakeView()) throw new IntakeRejection('UPGRADE_REQUIRED');
+        if (leaseView !== intakeView()) throw new IntakeRejection('UPGRADE_REQUIRED');
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
         const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),await releaseDeadline(client,lease.release_id,who.tenantId));
         client.validUntil(until);
