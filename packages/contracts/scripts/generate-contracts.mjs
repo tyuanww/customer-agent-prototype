@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
 import { parse, stringify } from 'yaml';
-import { verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { verifyIngestedSopResourceDisableContractSet, verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const CODEGEN_SCHEMA = 'customer-agent-contract-codegen/v1';
 const RUNTIME_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
@@ -33,6 +33,12 @@ const SOP_UNIFIED_OUTPUTS = Object.freeze(Object.fromEntries(
     '/openapi/', '/openapi/sop-unified/',
   ).replace('/src/generated/', '/src/generated/sop-unified/')]),
 ));
+const SOP_RESOURCE_OUTPUTS = Object.freeze(Object.fromEntries(
+  Object.entries(OUTPUTS).map(([key, file]) => [key, file.replace(
+    '/openapi/', '/openapi/sop-resource-disable/',
+  ).replace('/src/generated/', '/src/generated/sop-resource-disable/')]),
+));
+const SOP_RESOURCE_LOCK = 'contracts/upstream/customer-agent/sop-resource-disable-contract-set.lock.json';
 const SOP_CORRECTED_LOCK = 'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json';
 const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'deprecated',
@@ -403,10 +409,40 @@ async function buildSnapshotViews(projectRoot, snapshot) {
       source_artifacts: { openapi: manifest.openapi, database: manifest.database, ...manifest.sopUnified },
     },
   });
+  const resource = existsSync(path.join(projectRoot, SOP_RESOURCE_LOCK))
+    ? await buildResourceDisableView(projectRoot) : undefined;
+  if (!resource && existsSync(path.join(projectRoot, path.dirname(SOP_RESOURCE_OUTPUTS.manifest)))) {
+    throw new Error('SOP resource disable generated view requires its consumption lock');
+  }
   return Object.freeze({
     ...legacy,
-    views: { sopUnified: { contract_set_id: unified.contract_set_id, schema_count: unified.schema_count } },
-    files: new Map([...legacy.files, ...unified.files]),
+    views: {
+      sopUnified: { contract_set_id: unified.contract_set_id, schema_count: unified.schema_count },
+      ...(resource ? { sopResourceDisable: { contract_set_id: resource.contract_set_id, schema_count: resource.schema_count } } : {}),
+    },
+    files: new Map([...legacy.files, ...unified.files, ...(resource?.files ?? [])]),
+  });
+}
+
+async function buildResourceDisableView(projectRoot) {
+  const verified = verifyIngestedSopResourceDisableContractSet({ projectRoot });
+  const manifestBytes = readFileSync(path.join(verified.path, 'contract-set.json'));
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  const source = readFileSync(path.join(verified.path, manifest.openapi.file));
+  if (source.length !== manifest.openapi.bytes || sha256(source) !== verified.openapi_sha256) {
+    throw new Error('SOP resource disable source byte drift');
+  }
+  return buildGeneratedArtifactsFromSnapshot({
+    ...verified, lock: verified, manifest, openapi_source: source.toString('utf8'),
+  }, {
+    outputs: SOP_RESOURCE_OUTPUTS,
+    view: 'sop-resource-disable',
+    provenance: {
+      view: 'sopResourceDisable',
+      source_manifest: { sha256: sha256(manifestBytes), bytes: manifestBytes.length },
+      source_artifacts: { openapi: manifest.openapi, database: manifest.database,
+        ...manifest.resourceDisable, legacyV11: manifest.legacyV11 },
+    },
   });
 }
 
@@ -474,10 +510,12 @@ function assertExactGeneratedMemberSet(projectRoot, expectedPaths) {
   }
 }
 
-export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, check = false } = {}) {
+export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, check = false, profile } = {}) {
+  if (profile !== undefined && profile !== 'sopResourceDisable') throw new Error('Unsupported contract codegen profile');
   const resolvedRoot = path.resolve(projectRoot);
   return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, async (snapshot) => {
-    const generated = await buildSnapshotViews(resolvedRoot, snapshot);
+    const generated = profile === 'sopResourceDisable'
+      ? await buildResourceDisableView(resolvedRoot) : await buildSnapshotViews(resolvedRoot, snapshot);
     const drift = [];
 
     for (const [relativePath, expectedContent] of generated.files) {
@@ -510,10 +548,11 @@ export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, ch
 
 async function runCli() {
   const arguments_ = process.argv.slice(2);
-  if (arguments_.some((argument) => argument !== '--check')) {
-    throw new Error(`Unknown contract codegen option: ${arguments_.find((argument) => argument !== '--check')}`);
+  if (arguments_.some((argument) => !['--check', '--profile=sopResourceDisable'].includes(argument))) {
+    throw new Error(`Unknown contract codegen option: ${arguments_.find((argument) => !['--check', '--profile=sopResourceDisable'].includes(argument))}`);
   }
-  const result = await generateContracts({ check: arguments_.includes('--check') });
+  const result = await generateContracts({ check: arguments_.includes('--check'),
+    profile: arguments_.includes('--profile=sopResourceDisable') ? 'sopResourceDisable' : undefined });
   console.log(JSON.stringify(result, null, 2));
 }
 

@@ -1,6 +1,20 @@
 # SOP unified 合同接收
 
-## 当前协商修正版
+## v12 资源停用与完整查询证明
+
+OpenAPI `1.30.0` / `schema.v1.34` 的正式来源为 `0405c5651564958702ddd5484bbf41a0f193515f`，合同为 `cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564`。独立 `sopResourceDisable` profile 接收全部30件文件，包含原 v11 的14件字节谱系。来源 Git blob、manifest、provenance、header proof 与闭合成员同时校验。锁为 `sop-resource-disable-contract-set.lock.json`。
+
+`@customer-agent/contracts/sop-resource-disable` 提供独立类型和306个 runtime schema，使用原共享 intake 锁。旧默认与 v11 的十件生成物保持原字节。查询请求的 `entitlement_id` 绑定既有完整店铺、商品与场景选择，首次 open 的 `queryRequestId` 指向明确 ready 查询。其他 action 的该字段为 null。资源停用材料及其质量证据由同一正式合同描述。
+
+```sh
+node scripts/customer-agent-contract-set.mjs verify --profile=sopResourceDisable
+pnpm --filter @customer-agent/contracts generate:sop-resource-disable
+pnpm --filter @customer-agent/contracts check:sop-resource-disable
+```
+
+累计 DDL 是参考工件，安装采用核验后的实际87迁移前缀加独立 storage delta。当前接收锁和生成 provenance 为 `VERIFIED_NOT_ACTIVATED`。正常0088实施、后端及桌面同链验收分别绑定自己的实现和证据。
+
+## v11 协商修正基线
 
 OpenAPI `1.29.1` 与数据库 `schema.v1.33` 使用 `customer-agent-contract-set/v11`。修正覆盖 52 个请求头和 496 个响应头的版本 pattern，逐项验证实际 manifest 完整 ID。新成员 `negotiation-proof.v1.json` 保存全部 548 个 JSON Pointer 和变更前后约束，包内共有 14 文件。数据库、存储、v7 intake 和旧 query sidecar 的字节与纠错前序相同。
 
@@ -75,7 +89,7 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 
 ## Foundation 消费入口
 
-产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。foundation 的 83→84 独立测试保留其历史目录。当前正常 apply / verify 消费包含实施 overlay 的完整 86 条目录，前 85 条 SQL 与来源元数据保持不可变。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及 84/85/86 精确尾部。完整 corrected verifier 继续从固定 v10 前序重建产物。
+产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。foundation 的 83→84 独立测试保留其历史目录。当前正常 apply / verify 消费包含实施 overlay 的完整 87 条目录，前 86 条 SQL 与来源元数据保持不可变。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及 84/85/86/87 精确尾部。完整 corrected verifier 继续从固定 v10 前序重建产物。
 
 `@customer-agent/contracts/sop-unified` 从同一快照生成 128 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。foundation 的 79 个 component 扩为正常 facade 实际使用的 Intake 闭包，包含间接携带新 scope 和错误的请求与响应。生成 paths 仍只有原 `/v1/sop/query`。默认 contracts 视图的五项生成物保持原字节。正常目录依赖 corrected 锁和 sourcehash 钉住的 0085/0086 overlay，两个生成入口校验全部来源与产物。
 
