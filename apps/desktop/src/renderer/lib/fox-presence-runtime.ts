@@ -36,7 +36,6 @@ type ClearTimeoutFn = (handle: TimerHandle) => void;
 export class FoxSleepClock {
   private token = 0;
   private timer: TimerHandle | null = null;
-  private nested: TimerHandle | null = null;
   private schedule: FoxSleepSchedule | null = null;
 
   constructor(
@@ -57,19 +56,22 @@ export class FoxSleepClock {
     this.token = token;
     const schedule = createFoxSleepSchedule(this.nowFn(), token);
     this.schedule = schedule;
-    this.timer = this.setTimeoutFn(() => {
+    let deadline = schedule.drowsyAt;
+    const advance = (): void => {
       if (!isFoxSleepTokenCurrent(this.schedule, token)) return;
       this.timer = null;
-      const next = ambientFromDeadline(schedule, this.nowFn());
-      onAmbient(next);
-      if (next === 'sleeping') {
-        return;
+      const now = this.nowFn();
+      if (now >= deadline) {
+        const next = ambientFromDeadline(schedule, now);
+        onAmbient(next);
+        if (next === 'sleeping' || !isFoxSleepTokenCurrent(this.schedule, token)) return;
+        deadline = schedule.sleepAt;
       }
-      this.nested = this.setTimeoutFn(() => {
-        if (!isFoxSleepTokenCurrent(this.schedule, token)) return;
-        onAmbient('sleeping');
-      }, Math.max(0, schedule.sleepAt - this.nowFn()));
-    }, Math.max(0, schedule.drowsyAt - this.nowFn()));
+      // Browser timers can run before a fractional performance.now deadline.
+      // Recheck that deadline before advancing or queuing the next phase.
+      this.timer = this.setTimeoutFn(advance, Math.max(1, Math.ceil(deadline - this.nowFn())));
+    };
+    advance();
     return token;
   }
 
@@ -88,10 +90,6 @@ export class FoxSleepClock {
     if (this.timer !== null) {
       this.clearTimeoutFn(this.timer);
       this.timer = null;
-    }
-    if (this.nested !== null) {
-      this.clearTimeoutFn(this.nested);
-      this.nested = null;
     }
   }
 }

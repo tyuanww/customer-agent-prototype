@@ -488,6 +488,39 @@ describe('interruptible sleep clock', () => {
     expect(seen).toEqual(['live:drowsy', 'live:sleeping']);
   });
 
+  it('rechecks fractional deadlines when either timer fires early', () => {
+    let now = 1_000.25;
+    const pending: Array<() => void> = [];
+    const seen: string[] = [];
+    const clock = new FoxSleepClock(handler => {
+      pending.push(handler);
+      return handler;
+    }, () => undefined, () => now);
+    clock.start(pose => seen.push(pose));
+    now = 1_000.25 + FOX_DROWSY_AFTER_MS - 0.5;
+    pending.shift()?.();
+    expect(seen).toEqual([]);
+    now += 0.5;
+    pending.shift()?.();
+    expect(seen).toEqual(['drowsy']);
+    now = 1_000.25 + FOX_SLEEP_AFTER_MS - 0.5;
+    pending.shift()?.();
+    expect(seen).toEqual(['drowsy']);
+    now += 0.5;
+    pending.shift()?.();
+    expect(seen).toEqual(['drowsy', 'sleeping']);
+    expect(pending).toEqual([]);
+  });
+
+  it('stops scheduling if the transition callback invalidates the clock', () => {
+    vi.useFakeTimers();
+    const clock = new FoxSleepClock();
+    clock.start(() => clock.invalidate());
+    vi.advanceTimersByTime(FOX_DROWSY_AFTER_MS);
+    expect(clock.currentSchedule).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('creates independent deadline snapshots so an old callback cannot leak', () => {
     const first = createFoxSleepSchedule(0, 3);
     const second = createFoxSleepSchedule(50, 4);
