@@ -372,6 +372,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0082_access_evaluator',
     requiresPredecessor: 'SOP release projection requires the ACL projection',
   },
+  {
+    index: 83,
+    minimumCatalogueLength: 84,
+    id: '0084_sop_unified_storage',
+    predecessorId: '0083_sop_pipeline_projection',
+    requiresPredecessor: 'Unified SOP storage requires the complete formal predecessor',
+  },
 ];
 
 function requiredSuccessorStep(
@@ -422,7 +429,8 @@ function matchesCatalogueSuccessorStep(
   const occupiedChecksum = step === occupiedSuccessorStep
     ? migration.sha256
     : catalogue.migrations[occupiedSuccessorStep.index]?.sha256;
-  return occupiedChecksum === FROZEN_OCCUPIED_SHA256;
+  return occupiedChecksum === FROZEN_OCCUPIED_SHA256
+    && (step.id !== '0084_sop_unified_storage' || sameSignedSuccessor(migration, catalogue.compatibility.sopUnifiedSuccessor));
 }
 
 export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue): void {
@@ -521,15 +529,17 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
     const step = CATALOGUE_SUCCESSOR_STEPS.find((candidate) => candidate.index === index);
     let matchesRepair = false;
     let matchesReadiness = false;
+    let matchesUnified = false;
     if (step !== undefined && matchesCatalogueSuccessorStep(step, index, migration, catalogue, repair, readiness)) {
       if (!successorSuffix) catalogueError(step.requiresPredecessor);
       matchesRepair = step === repairSuccessorStep;
       matchesReadiness = step === readinessSuccessorStep;
+      matchesUnified = step.id === '0084_sop_unified_storage';
       successorSuffix = true;
     } else if (matchesSuccessor) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);
     if (
-      !matchesSuccessor && !matchesRepair && !matchesReadiness
+      !matchesSuccessor && !matchesRepair && !matchesReadiness && !matchesUnified
       && (migration.contractSetId !== expectedProvenance.contractSetId
       || migration.sourceGitSha !== expectedProvenance.sourceGitSha
       || migration.sourceSchemaSha256 !== expectedProvenance.sourceSchemaSha256)

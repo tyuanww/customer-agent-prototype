@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Client } from 'pg';
-import { verifyDatabaseMigrations } from '../../dist/index.js';
+import { verifyMigrationPrefix } from '../../dist/testkit/index.js';
 
 /** Never called by the product runner. Requires the disposable PG15 harness identity and socket. */
 export async function installSopQueryCandidate(client: Client): Promise<void> {
@@ -12,7 +12,7 @@ export async function installSopQueryCandidate(client: Client): Promise<void> {
   if (process.env.CUSTOMER_AGENT_SOP_QUERY_CANDIDATE !== '1'
     || !/^dev_m0_sop_query_[0-9a-f]{8}$/.test(current.db) || current.user_name !== 'gate_owner'
     || current.address !== null || current.major !== 15) throw new Error('SOP candidate is restricted to disposable PG15 tests');
-  await verifyDatabaseMigrations(client);
+  await verifyMigrationPrefix(client, 83);
   const manifest = JSON.parse(readFileSync(new URL('./manifest.generated.json', import.meta.url), 'utf8')) as {
     predecessor: { id: string; sha256: string }; sha256: string;
   };

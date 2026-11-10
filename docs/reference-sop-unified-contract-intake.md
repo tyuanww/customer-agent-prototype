@@ -73,6 +73,16 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 
 `verifyIngestedSopUnifiedContractSet` 提供相同只读核验。接收结果的 `generateMigrations`、`generateContracts`、`ddev_authorized` 与 `runtime_activated` 均为 false。共享 intake mutex 串行保护快照和锁安装。相同 bundle 重试返回 `REUSED`，损坏目标、孤立锁、孤立目录和内容冲突均拒绝。锁安装失败时清理本次目标并释放 mutex。
 
+## Foundation 消费入口
+
+产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。前 83 条 SQL 与来源元数据保持不可变，正常 apply / verify 使用完整 84 条目录。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及第 84 条字节。尾部只调用低层 bundle 校验和同一 migration renderer。完整 corrected verifier 继续从固定 v10 前序重建产物，两条路径独立。
+
+`@customer-agent/contracts/sop-unified` 从同一快照生成 79 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。默认 contracts 视图的五项生成物保持原字节。正常 84 条目录依赖 corrected 锁，缺失或损坏该锁时两个生成入口均拒绝。仅有旧 v10 锁不能生成正式 84 或新视图。
+
+旧 query candidate 的合成 host 显式应用前 83 条，并通过 testkit 的 `verifyMigrationPrefix(client, 83)` 核验物理前序后安装候选。该测试入口仍需既有 opt-in 和隔离 PG15 门禁。
+
+此 foundation 覆盖类型、存储登记和兼容验证。真实 API 图导入、冻结、完整质量、发布、回退、权限事实 writer、媒体与 full GateB 仍待实现。上游 installation 与消费锁继续保留其未激活元数据。
+
 ## 验证入口
 
 ```sh
@@ -80,7 +90,7 @@ pnpm test:sop-unified
 pnpm test:sop-unified:pg15
 ```
 
-安全入口先核验仓内实际 `sopUnified` 快照与独立锁，再运行自包含技术合同 fixture、独立合成 Git source 和 bundle。压缩 fixture 保存已核实的 v4 输入与统一 source，复用仓内原合同字节并逐一核对固定哈希。测试运行时从仓内构造输入。合成 producer 会在执行时抛错，正常 intake 通过证明接收过程仅消费其字节。
+安全入口先核验仓内实际 `sopUnified`、`sopUnifiedCorrected` 快照及各自独立锁，再运行自包含技术合同 fixture、独立合成 Git source 和 bundle。压缩 fixture 保存已核实的 v4 输入与统一 source，复用仓内原合同字节并逐一核对固定哈希。测试运行时从仓内构造输入。合成 producer 会在执行时抛错，正常 intake 通过证明接收过程仅消费其字节。
 
 根 `pnpm test` 经 `test:built`、`test:workflow` 调用安全测试及 readiness 接收回归。根 `pnpm check` 也运行安全测试，供 main CI 使用。PR 的 verification-policy quick lane 经既有 workflow-tests 调用同一入口。PG15 测试进入根 `test:db:integration`，由 main PostgreSQL job 和 PR database lane 消费。policy 回归检查这些实际调用关系。新增 scripts 路径沿用现有未知路径的 full fallback，登记范围限于根脚本与 policy 回归。
 

@@ -21,7 +21,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   it('verifies the actual current installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
       status: 'PASS', migrationCount: generatedMigrationCatalogue.migrations.length,
-      inventory: { tables: 119, views: 7, functions: 305 },
+      inventory: { tables: 128, views: 7, functions: 310 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
     const empty = await client.query(`SELECT script_id FROM ops_loop.list_resolved_inaccuracy_outcomes('coach')`);
@@ -35,6 +35,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       for (const [relation, constraint] of [
         ['parse_jobs', 'parse_jobs_contributor_ids_check'],
         ['principal_facts', 'principal_facts_department_ids_check'],
+        ['sop_graph_media_bindings', 'sop_graph_media_bindings_alt_check'],
       ]) {
         const result = await client.query<{ definition: string }>(`
           SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
@@ -82,6 +83,18 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       ALTER TABLE content_intake.principal_facts ADD CONSTRAINT principal_facts_department_ids_check
       CHECK (cardinality(department_ids) >= 1 AND cardinality(department_ids) <= 100 AND array_position(department_ids, NULL::text) IS NULL) NOT VALID`],
     ['restored CHECK missing', 'ALTER TABLE content_intake.parse_jobs DROP CONSTRAINT parse_jobs_contributor_ids_check'],
+    ['restored SOP alt weakened bound', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1025 AND alt ~ '\S'::text)`],
+    ['restored SOP alt weakened Boolean logic', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 OR char_length(alt) <= 1024 OR alt ~ '\S'::text)`],
+    ['restored SOP alt weakened content', `ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1024 AND alt ~ '.*'::text)`],
+    ['restored SOP alt unvalidated', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1024 AND alt ~ '\S'::text) NOT VALID`],
     ['legacy helper removed', 'REVOKE EXECUTE ON FUNCTION public.content_question_hash(jsonb) FROM intake_runtime_fn_owner'],
     ['legacy helper leaked to business', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_business'],
     ['legacy helper grant option', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner WITH GRANT OPTION'],
@@ -187,8 +200,8 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
         status: 'PASS',
         migrationCount: generatedMigrationCatalogue.migrations.length,
         triggerFingerprint: {
-          entries: 124,
-          frozenSha256: '8b647176cc37c9832288f38a462c3553824309dec122bfb894b3354177059c9b',
+          entries: 133,
+          frozenSha256: '8e0f0c238a34be2e80ed40ddbac6a116b6ae7938fe69d6d19f232ba7155ba79e',
           difference: 'import_batches_tgenabled',
           disabledTriggers: [
             'backend_review_sync_wait_on_batch_failed',

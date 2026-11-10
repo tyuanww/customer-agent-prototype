@@ -648,10 +648,32 @@ describe.skipIf(!enabled)('Versioned trusted SOP parser-stage: exact source byte
     const first = value(successful[0]!);
     for (const result of results) {
       if (result.ok) expect(result.value).toEqual(first);
+      else if (result.code === 'CONFLICT') expect(result).toMatchObject({ reason: 'MATERIAL_CHANGED', commit: 'rolled_back' });
       else expect(result).toMatchObject({ ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: 'sop-media-busy' });
     }
     expect(value(await stage(actor(), jobId))).toEqual(first);
     expect((await shape()).candidates).toBe(1);
+    expect((await admin.query("SELECT count(*)::int n FROM content_intake.objects WHERE purpose='sop-media'")).rows[0].n).toBe(1);
+  });
+  it('recovers the original candidate when another caller freezes while its input read is pending', async () => {
+    let startRead: () => void = () => undefined;
+    let resumeRead: () => void = () => undefined;
+    const reading = new Promise<void>(resolve => { startRead = resolve; });
+    const resumed = new Promise<void>(resolve => { resumeRead = resolve; });
+    const delayedStage = createTrustedSopStage(business, { ...store, async readPayload(id) {
+      startRead();
+      await resumed;
+      return store.readPayload(id);
+    } }, false);
+    const delayed = delayedStage(actor(), jobId);
+    await reading;
+    let completed: Awaited<ReturnType<typeof stage>>;
+    try { completed = await stage(actor(), jobId); }
+    finally { resumeRead(); }
+    const first = value(completed);
+    expect(await delayed).toMatchObject({ ok: false, code: 'CONFLICT', reason: 'MATERIAL_CHANGED', commit: 'rolled_back' });
+    expect(value(await delayedStage(actor(), jobId))).toEqual(first);
+    expect(await shape()).toMatchObject({ candidates: 1, job: 'validated' });
     expect((await admin.query("SELECT count(*)::int n FROM content_intake.objects WHERE purpose='sop-media'")).rows[0].n).toBe(1);
   });
   it('retains the other image when deletion commits before the freeze caller projects previews', async () => {

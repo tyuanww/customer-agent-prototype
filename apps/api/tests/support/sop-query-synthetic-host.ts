@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createServer } from 'node:http';
 import Fastify from 'fastify';
 import { Pool, type Client } from 'pg';
-import { applyDatabaseMigrations } from '@customer-agent/database';
+import { applyMigrationPrefix } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { installSopQueryCandidate } from '../../../../packages/database/candidates/0084_sop_query/install.test-only.ts';
 import { createProductAuthService, IdentityFailure } from '../../dist/product-auth-service.js';
@@ -62,7 +62,7 @@ export async function createSopQuerySyntheticHost(options: { initial?: 'ready' |
     pg.start();
     const db = pg.createDatabase('sop_query');
     admin = await pg.connect(db.config);
-    await applyDatabaseMigrations(admin);
+    await applyMigrationPrefix(admin, 83);
     await installSopQueryCandidate(admin);
     await seedSopQuerySource(admin);
     await seedIntakeSyntheticDirectory(admin);

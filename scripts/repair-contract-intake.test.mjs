@@ -20,10 +20,16 @@ async function fixture(t) {
   for(const d of [product,source,bundle])mkdirSync(d);
   writeFileSync(path.join(product,'package.json'),json({name:'customer-agent-demo'}));
   for(const rel of ['contracts/upstream/customer-agent','packages/database/migrations','packages/database/seeds','packages/database/overlays','packages/database/src/generated']) {
-    mkdirSync(path.dirname(path.join(product,rel)),{recursive:true});cpSync(path.join(root,rel),path.join(product,rel),{recursive:true});
+    mkdirSync(path.dirname(path.join(product,rel)),{recursive:true});cpSync(path.join(root,rel),path.join(product,rel),{recursive:true,filter:file=>!path.basename(file).startsWith('cs-ai-c11-openapi-1.29.1-schema-1.33-')});
   }
   rmSync(path.join(product,'contracts/upstream/customer-agent/readiness-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,'contracts/upstream/customer-agent/repair-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,'contracts/upstream/customer-agent/sop-unified-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json'),{force:true});
+  const migrationManifest=path.join(product,'packages/database/migrations/manifest.generated.json');
+  const priorManifest=JSON.parse(readFileSync(migrationManifest));
+  delete priorManifest.compatibility.sop_unified_successor;
+  writeFileSync(migrationManifest,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   // All payload is invented; only the exact immutable predecessor comes from the repository.
   const versions={openapi:'1.24.0',schema:'1.28',migration:'0040',exportProfile:'content-intake-repair-successor-v1'};

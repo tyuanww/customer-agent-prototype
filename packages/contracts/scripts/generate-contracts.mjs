@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
 import { parse, stringify } from 'yaml';
-import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const CODEGEN_SCHEMA = 'customer-agent-contract-codegen/v1';
 const RUNTIME_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
@@ -28,6 +28,12 @@ const OUTPUTS = Object.freeze({
   provenance: 'packages/contracts/src/generated/provenance.generated.ts',
   manifest: 'packages/contracts/src/generated/codegen-manifest.generated.json',
 });
+const SOP_UNIFIED_OUTPUTS = Object.freeze(Object.fromEntries(
+  Object.entries(OUTPUTS).map(([key, file]) => [key, file.replace(
+    '/openapi/', '/openapi/sop-unified/',
+  ).replace('/src/generated/', '/src/generated/sop-unified/')]),
+));
+const SOP_CORRECTED_LOCK = 'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json';
 const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'deprecated',
   'description',
@@ -153,8 +159,16 @@ export function toRuntimeSchema(value) {
   return transformed;
 }
 
-function generatedTypeSource(openapiDocument) {
-  return openapiTS(openapiDocument).then((ast) => (
+function generatedTypeSource(openapiDocument, preserveConstDiscriminators = false) {
+  const typeDocument = structuredClone(openapiDocument);
+  if (preserveConstDiscriminators) {
+    // openapi-typescript infers component names for an unmapped discriminator,
+    // overriding the schema's const status. Let the authoritative const win.
+    for (const schema of Object.values(typeDocument.components.schemas)) {
+      if (isRecord(schema.discriminator) && !schema.discriminator.mapping) delete schema.discriminator;
+    }
+  }
+  return openapiTS(typeDocument).then((ast) => (
     `/* ${GENERATED_HEADER} */\n\n${astToString(ast)}`
   ));
 }
@@ -196,7 +210,11 @@ function artifactDescriptor(relativePath, content) {
   });
 }
 
-async function buildGeneratedArtifactsFromSnapshot(snapshot) {
+async function buildGeneratedArtifactsFromSnapshot(snapshot, {
+  outputs = OUTPUTS,
+  view,
+  provenance = {},
+} = {}) {
   const effectiveSnapshot = snapshot.readiness ?? snapshot.repair ?? snapshot;
   const { lock, manifest, openapi_source: source } = effectiveSnapshot;
   const openapiDescriptor = requireRecord(manifest.openapi, 'OpenAPI descriptor');
@@ -221,7 +239,7 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   if (schemaNames.length === 0) {
     throw new Error('OpenAPI components.schemas must not be empty');
   }
-  const runtimeSchemaId = `urn:customer-agent:openapi:${contractVersion}:components`;
+  const runtimeSchemaId = `urn:customer-agent:openapi:${contractVersion}:${view ?? 'components'}`;
   const runtimeDocument = {
     $schema: RUNTIME_SCHEMA_DIALECT,
     $id: runtimeSchemaId,
@@ -236,19 +254,20 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
     throw new Error('Generated OpenAPI bundle does not round-trip to the verified source document');
   }
 
-  const generatedTypes = await generatedTypeSource(root);
+  const generatedTypes = await generatedTypeSource(root, view !== undefined);
   const generatedRuntimeSchema = generatedRuntimeSchemaSource(
     runtimeSchemaId,
     schemaNames,
     runtimeDocument,
   );
   const initialArtifacts = {
-    bundle: artifactDescriptor(OUTPUTS.bundle, bundledYaml),
-    types: artifactDescriptor(OUTPUTS.types, generatedTypes),
-    runtime_schema: artifactDescriptor(OUTPUTS.runtimeSchema, generatedRuntimeSchema),
+    bundle: artifactDescriptor(outputs.bundle, bundledYaml),
+    types: artifactDescriptor(outputs.types, generatedTypes),
+    runtime_schema: artifactDescriptor(outputs.runtimeSchema, generatedRuntimeSchema),
   };
   const provenanceValue = {
     schema: CODEGEN_SCHEMA,
+    ...provenance,
     contract_set_id: effectiveSnapshot.contract_set_id,
     source_repository: lock.source_repository,
     source_git_sha: effectiveSnapshot.source_git_sha,
@@ -272,7 +291,7 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
   ].join('\n');
   const artifacts = {
     ...initialArtifacts,
-    provenance: artifactDescriptor(OUTPUTS.provenance, generatedProvenance),
+    provenance: artifactDescriptor(outputs.provenance, generatedProvenance),
   };
   const codegenManifest = `${JSON.stringify({
     ...provenanceValue,
@@ -284,12 +303,110 @@ async function buildGeneratedArtifactsFromSnapshot(snapshot) {
     runtime_activated: false,
     schema_count: schemaNames.length,
     files: new Map([
-      [OUTPUTS.bundle, bundledYaml],
-      [OUTPUTS.types, generatedTypes],
-      [OUTPUTS.runtimeSchema, generatedRuntimeSchema],
-      [OUTPUTS.provenance, generatedProvenance],
-      [OUTPUTS.manifest, codegenManifest],
+      [outputs.bundle, bundledYaml],
+      [outputs.types, generatedTypes],
+      [outputs.runtimeSchema, generatedRuntimeSchema],
+      [outputs.provenance, generatedProvenance],
+      [outputs.manifest, codegenManifest],
     ]),
+  });
+}
+
+function references(value, consume) {
+  if (Array.isArray(value)) {
+    value.forEach((child) => references(child, consume));
+  } else if (isRecord(value)) {
+    if (Object.hasOwn(value, '$ref')) consume(requireString(value.$ref, '$ref'));
+    Object.values(value).forEach((child) => references(child, consume));
+  }
+}
+
+// The view selects schema families, then follows actual references. Field shapes
+// and validation constraints remain owned by the accepted OpenAPI bytes.
+export function sopUnifiedDocument(root) {
+  const schemas = requireRecord(root.components?.schemas, 'SOP unified schemas');
+  const roots = new Set(Object.keys(schemas).filter((name) => (
+    name.startsWith('IntakeSop') || name.startsWith('MenokinSopQuery')
+  )));
+  const parents = new Map();
+  for (const [name, schema] of Object.entries(schemas)) {
+    references(schema, (reference) => {
+      const prefix = '#/components/schemas/';
+      if (!reference.startsWith(prefix)) return;
+      const dependency = reference.slice(prefix.length);
+      const dependents = parents.get(dependency) ?? new Set();
+      dependents.add(name);
+      parents.set(dependency, dependents);
+    });
+  }
+  // Material, snapshot and quality envelopes carry the graph too. Include their
+  // transitive schema owners before resolving the forward reference closure.
+  for (const name of roots) {
+    for (const parent of parents.get(name) ?? []) roots.add(parent);
+  }
+  for (const name of ['IntakeSopFlowDefinition', 'MenokinSopQuerySopQueryRequest', 'MenokinSopQuerySopQueryResponse']) {
+    if (!roots.has(name)) throw new Error(`Missing SOP unified root schema: ${name}`);
+  }
+  const query = requireRecord(root.paths?.['/v1/sop/query'], 'SOP unified query path');
+  const components = Object.create(null);
+  const visited = new Set();
+  function include(reference) {
+    if (visited.has(reference)) return;
+    const match = /^#\/components\/([^/]+)\/([^/]+)$/.exec(reference);
+    if (!match) throw new Error(`Unsupported SOP unified reference: ${reference}`);
+    const [, group, encodedName] = match;
+    const name = encodedName.replaceAll('~1', '/').replaceAll('~0', '~');
+    const source = root.components[group];
+    if (!isRecord(source) || !Object.hasOwn(source, name)) {
+      throw new Error(`Unresolved SOP unified reference: ${reference}`);
+    }
+    visited.add(reference);
+    components[group] ??= Object.create(null);
+    components[group][name] = source[name];
+    references(source[name], include);
+  }
+  [...roots].sort().forEach((name) => include(`#/components/schemas/${name}`));
+  references(query, include);
+  for (const requirement of query.post?.security ?? root.security ?? []) {
+    Object.keys(requirement).forEach((name) => include(`#/components/securitySchemes/${name}`));
+  }
+  return { openapi: root.openapi, info: root.info, paths: { '/v1/sop/query': query }, components };
+}
+
+async function buildSnapshotViews(projectRoot, snapshot) {
+  const legacy = await buildGeneratedArtifactsFromSnapshot(snapshot);
+  if (!existsSync(path.join(projectRoot, SOP_CORRECTED_LOCK))) {
+    if (existsSync(path.join(projectRoot, path.dirname(SOP_UNIFIED_OUTPUTS.manifest)))) {
+      throw new Error('SOP unified generated view requires its accepted corrected consumption lock');
+    }
+    return legacy;
+  }
+  // The caller holds the shared intake lock across verification, reads and writes.
+  const verified = verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot });
+  const manifestBytes = readFileSync(path.join(verified.path, 'contract-set.json'));
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  const source = readFileSync(path.join(verified.path, manifest.openapi.file));
+  if (source.length !== manifest.openapi.bytes || sha256(source) !== verified.openapi_sha256) {
+    throw new Error('SOP unified source byte drift');
+  }
+  const root = requireRecord(parse(source.toString('utf8'), { maxAliasCount: 0 }), 'SOP unified OpenAPI');
+  inspectReferences(root);
+  const document = sopUnifiedDocument(root);
+  const unified = await buildGeneratedArtifactsFromSnapshot({
+    ...verified, lock: verified, manifest, openapi_source: stringify(document, { lineWidth: 0 }),
+  }, {
+    outputs: SOP_UNIFIED_OUTPUTS,
+    view: 'sop-unified',
+    provenance: {
+      view: 'sopUnified',
+      source_manifest: { sha256: sha256(manifestBytes), bytes: manifestBytes.length },
+      source_artifacts: { openapi: manifest.openapi, database: manifest.database, ...manifest.sopUnified },
+    },
+  });
+  return Object.freeze({
+    ...legacy,
+    views: { sopUnified: { contract_set_id: unified.contract_set_id, schema_count: unified.schema_count } },
+    files: new Map([...legacy.files, ...unified.files]),
   });
 }
 
@@ -340,6 +457,11 @@ function assertExactGeneratedMemberSet(projectRoot, expectedPaths) {
     expectedByDirectory.set(directory, names);
   }
 
+  for (const directory of expectedByDirectory.keys()) {
+    const parent = path.dirname(directory);
+    if (expectedByDirectory.has(parent)) expectedByDirectory.get(parent).push(path.basename(directory));
+  }
+
   for (const [relativeDirectory, expectedNames] of expectedByDirectory) {
     const absoluteDirectory = assertSafeOutputPath(projectRoot, relativeDirectory);
     const actualNames = readdirSync(absoluteDirectory).sort();
@@ -355,7 +477,7 @@ function assertExactGeneratedMemberSet(projectRoot, expectedPaths) {
 export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, check = false } = {}) {
   const resolvedRoot = path.resolve(projectRoot);
   return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, async (snapshot) => {
-    const generated = await buildGeneratedArtifactsFromSnapshot(snapshot);
+    const generated = await buildSnapshotViews(resolvedRoot, snapshot);
     const drift = [];
 
     for (const [relativePath, expectedContent] of generated.files) {
@@ -380,6 +502,7 @@ export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, ch
       contract_set_id: generated.contract_set_id,
       runtime_activated: false,
       schema_count: generated.schema_count,
+      ...(generated.views ? { views: generated.views } : {}),
       files: [...generated.files.keys()],
     });
   });

@@ -120,6 +120,14 @@ function fixture(t, mutate = () => {}) {
   } });
   mkdirSync(path.join(product, 'packages/database'), { recursive: true });
   cpSync(path.join(root, 'packages/database/migrations'), path.join(product, 'packages/database/migrations'), { recursive: true });
+  const migrationManifest = path.join(product, 'packages/database/migrations/manifest.generated.json');
+  const predecessor = JSON.parse(readFileSync(migrationManifest, 'utf8'));
+  for (const migration of predecessor.migrations.slice(83)) {
+    rmSync(path.join(product, 'packages/database/migrations', migration.file));
+  }
+  predecessor.migrations = predecessor.migrations.slice(0, 83);
+  delete predecessor.compatibility.sop_unified_successor;
+  writeFileSync(migrationManifest, json(predecessor));
   return { source, bundle, product, manifest, files };
 }
 const ingest = f => ingestContractSet({ projectRoot: f.product, sourceDirectory: f.bundle, sourceRepositoryRoot: f.source });
@@ -235,4 +243,36 @@ test('v11 normal CLI verifies the independent corrected lock and rejects active 
   chmodSync(file, 0o644);
   writeFileSync(file, '{}\n');
   assert.throws(() => verifyContractSetDirectory(destination(f)), /SHA-256|byte|mismatch/i);
+});
+
+test('v11 verification reconstructs product bytes without Git after coordinated hash changes', t => {
+  const f = fixture(t);
+  ingest(f);
+  rmSync(f.source, { recursive: true, force: true });
+  const directory = destination(f);
+  const manifestPath = path.join(directory, 'contract-set.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const apiPath = path.join(directory, manifest.openapi.file);
+  const api = JSON.parse(readFileSync(apiPath, 'utf8'));
+  api.paths['/v1/intake/sop/check'].post.parameters
+    .find(parameter => parameter.name === 'X-Intake-Contract-Set').required = false;
+  const apiBytes = json(api);
+  const provenancePath = path.join(directory, manifest.sopUnified.provenance.file);
+  const provenance = JSON.parse(readFileSync(provenancePath, 'utf8'));
+  provenance.artifacts[manifest.openapi.file] = { sha256: hash(apiBytes), bytes: apiBytes.length };
+  const provenanceBytes = json(provenance);
+  Object.assign(manifest.openapi, { sha256: hash(apiBytes), bytes: apiBytes.length });
+  Object.assign(manifest.sopUnified.provenance, { sha256: hash(provenanceBytes), bytes: provenanceBytes.length });
+  for (const [file, bytes] of [[apiPath, apiBytes], [provenancePath, provenanceBytes], [manifestPath, json(manifest)]]) {
+    chmodSync(file, 0o644);
+    writeFileSync(file, bytes);
+  }
+  const lockPath = path.join(f.product, upstream, SOP_CORRECTED_LOCK);
+  const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+  lock.manifest_sha256 = hash(readFileSync(manifestPath));
+  lock.openapi_sha256 = hash(apiBytes);
+  writeFileSync(lockPath, json(lock));
+  assert.doesNotThrow(() => verifyContractSetDirectory(directory));
+  assert.throws(() => verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot: f.product }),
+    /product reconstruction openapi.v1.yaml/);
 });

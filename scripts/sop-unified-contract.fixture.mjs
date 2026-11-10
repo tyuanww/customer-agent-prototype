@@ -138,5 +138,13 @@ export function fixture(t, mutate = () => {}) {
   });
   mkdirSync(path.join(product, 'packages/database'), { recursive: true });
   cpSync(path.join(repositoryRoot, 'packages/database/migrations'), path.join(product, 'packages/database/migrations'), { recursive: true });
+  const migrationManifest = path.join(product, 'packages/database/migrations/manifest.generated.json');
+  const predecessor = readJson(migrationManifest);
+  for (const migration of predecessor.migrations.slice(83)) {
+    rmSync(path.join(product, 'packages/database/migrations', migration.file));
+  }
+  predecessor.migrations = predecessor.migrations.slice(0, 83);
+  delete predecessor.compatibility.sop_unified_successor;
+  writeFileSync(migrationManifest, json(predecessor));
   return { root, source, bundle, product, manifest, files, inputs };
 }

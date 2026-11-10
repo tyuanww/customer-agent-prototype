@@ -23,6 +23,10 @@
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./dist/runtime.js"
+    },
+    "./sop-unified": {
+      "types": "./src/sop-unified.ts",
+      "import": "./dist/sop-unified.js"
     }
   },
   "scripts": {
@@ -30,10 +34,10 @@
     "check:generated": "node scripts/generate-contracts.mjs --check",
     "typecheck": "tsc --noEmit",
     "build:runtime": "tsc -p tsconfig.build.json",
-    "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs",
+    "test:package": "pnpm build:runtime && node --test tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs",
     "test": "vitest run && pnpm test:package",
     "build": "pnpm check:generated && pnpm build:runtime",
-    "test:package:built": "node --test tests/package-entry.smoke.mjs",
+    "test:package:built": "node --test tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs",
     "test:built": "vitest run && pnpm test:package:built"
   },
   "dependencies": {

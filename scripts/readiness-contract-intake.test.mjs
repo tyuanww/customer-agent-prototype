@@ -17,11 +17,13 @@ async function fixture(t) {
   for(const d of [product,source,bundle])mkdirSync(d);
   writeFileSync(path.join(product,'package.json'),json({name:'customer-agent-demo'}));
   for(const rel of [upstream,'packages/database/migrations','packages/database/seeds','packages/database/overlays','packages/database/src/generated']) {
-    mkdirSync(path.dirname(path.join(product,rel)),{recursive:true});cpSync(path.join(root,rel),path.join(product,rel),{recursive:true});
+    mkdirSync(path.dirname(path.join(product,rel)),{recursive:true});cpSync(path.join(root,rel),path.join(product,rel),{recursive:true,filter:file=>!path.basename(file).startsWith('cs-ai-c11-openapi-1.29.1-schema-1.33-')});
   }
   const input=process.env.CUSTOMER_AGENT_READINESS_TEST_BUNDLE ?? path.join(root,upstream,JSON.parse(readFileSync(path.join(root,upstream,READINESS_LOCK))).contract_set_id);
   // Rebuild the exact 40-migration predecessor without changing the real checkout.
   rmSync(path.join(product,upstream,READINESS_LOCK),{force:true});
+  rmSync(path.join(product,upstream,'sop-unified-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,upstream,'sop-unified-corrected-contract-set.lock.json'),{force:true});
   const priorManifestPath=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(priorManifestPath));
   while (priorManifest.migrations.length > 40) {
@@ -29,6 +31,7 @@ async function fixture(t) {
     rmSync(path.join(product,'packages/database/migrations',last.file),{force:true});
   }
   delete priorManifest.compatibility.readiness_successor;
+  delete priorManifest.compatibility.sop_unified_successor;
   writeFileSync(priorManifestPath,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   const original=verifyContractSetDirectory(input);
@@ -48,7 +51,7 @@ async function fixture(t) {
 }
 test('compact intake reconstructs exact contracts, preserves forty migrations and replays after generation',async t=>{
   const f=await fixture(t);const original=readFileSync(path.join(f.product,upstream,'repair-contract-set.lock.json'));
-  const catalogue=JSON.parse(readFileSync(path.join(root,'packages/database/migrations/manifest.generated.json'))).migrations;
+  const catalogue=JSON.parse(readFileSync(path.join(root,'packages/database/migrations/manifest.generated.json'))).migrations.slice(0,83);
   const predecessor=JSON.parse(readFileSync(path.join(f.product,'packages/database/migrations/manifest.generated.json'))).migrations;
   assert.equal(f.run().status,'CREATED');assert.equal(f.run().status,'REUSED');
   const built=await generateDatabaseMigrations({projectRoot:f.product});
