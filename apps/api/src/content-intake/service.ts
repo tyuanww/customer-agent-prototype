@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { createIntakeShopDirectory } from './shop-directory.js';
 import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +8,7 @@ import { clock } from './transaction.js';
 import { isContractValidationError, parseContractSchema, type components } from './contract-view.js';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
 import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, previewFromBytes, stagePreviews } from './linked-preview.js';
-import { INTAKE_POLICY, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, SOP_TASK_FORMAT, SOP_TASK_SHEETS, SopTaskWorkbookFailure, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
+import { INTAKE_POLICY, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, SOP_RESOURCE_FORMAT, SOP_TASK_FORMAT, SOP_TASK_SHEETS, SopTaskWorkbookFailure, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, ContentAttachmentStore, PersistedContentObject } from '../content-object-store.js';
@@ -94,7 +95,8 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const bytes = await store.readPayload(prepared.job.object_id);
       if (bytes.length !== Number(prepared.object.bytes) || digest(bytes) !== prepared.object.sha256) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
       const draft = await prepareImport(bytes, prepared.source, prepared.base);
-      for (const image of draft.workbook.images) {
+      const selectedResources = new Set(draft.mediaOwners.map(binding => binding.resourceId));
+      for (const image of draft.workbook.images.filter(image => selectedResources.has(image.resourceId))) {
         const stored = await lifecycle.persist(actor, id, prepared.source.scope.sourceId, image.bytes, image.mime);
         if (!stored.ok) return terminal(stored);
         persisted.set(image.resourceId, stored.value);
@@ -385,13 +387,14 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
         if (resource.sourceId) {
           const src = await source(client, parseContractSchema('IntakeId', resource.sourceId));
           await authorize(client, who, parseContractSchema('IntakeAction', resource.action), src);
-          if (isGraphSource(src) && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+          if (isGraphSource(src) && !isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
         } else if (resource.candidateId) {
           const address = await client.query<{ source_id: string; canonical_encoding: string }>('SELECT source_id,canonical_encoding FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2',
             [parseContractSchema('IntakeId', resource.candidateId), parseContractSchema('IntakeVersion', resource.version)]);
           if (!address.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
           await authorize(client, who, parseContractSchema('IntakeAction', resource.action), await source(client, address.rows[0].source_id));
-          if (address.rows[0].canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+          if (address.rows[0].canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph'
+            || address.rows[0].canonical_encoding === 'candidate-sop-resource-disable-v1' && intakeView() !== 'resource-disable') throw new IntakeRejection('UPGRADE_REQUIRED');
         } else if (resource.jobId) await getJob(client, who, parseContractSchema('IntakeId', resource.jobId));
         else if (resource.operationId) {
           const actions = resource.qualityOperation ? ['quality-freeze', 'quality-check'] : ['publish', 'rollback', 'cancel'];
@@ -405,7 +408,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     },
     policy(actor: AuthenticatedUser) {
       return run(actor, 'policy', null, null, async () => {
-        const graph = intakeView() === 'graph';
+        const graph = isSopView();
         if (graph && !isAttachmentStore(store)) throw new IntakeRejection('UPGRADE_REQUIRED');
         return parseContractSchema('IntakePolicy', { policyVersion: INTAKE_POLICY.version, templateVersion: 'faq-p1.1',
           maxFileBytes: INTAKE_POLICY.fileBytes, maxExpandedBytes: INTAKE_POLICY.expandedBytes, maxZipEntries: INTAKE_POLICY.zipEntries,
@@ -415,7 +418,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
           ticketMaxAgeSeconds: 60, selectedMediaSupported: graph, inputFormats: [
             { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', selectedSheets: ['来源', 'FAQ', '相似问法'] },
             { mime: 'text/csv', templateVersion: 'faq-csv-v1', ruleVersion: CSV_POLICY_VERSION, mappingVersion: 'faq-csv-columns-v1', structureDigest: CSV_STRUCTURE_SHA256, selectedSheets: ['CSV'] },
-            ...(graph ? [{ mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ...SOP_TASK_FORMAT, selectedSheets: [...SOP_TASK_SHEETS], selectedMediaSupported: true }] : []),
+            ...(graph ? [{ mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ...(intakeView() === 'resource-disable' ? SOP_RESOURCE_FORMAT : SOP_TASK_FORMAT), selectedSheets: [...SOP_TASK_SHEETS], selectedMediaSupported: true }] : []),
           ] });
       }, value => parseContractSchema('IntakePolicy', value));
     },
@@ -513,7 +516,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
         const lookup = await terminalPool.connect();
         let view = intakeView();
         try {
-          const row = await lookup.query<{ contract_view: 'legacy' | 'graph' }>(`SELECT j.contract_view FROM content_intake.parse_jobs j
+          const row = await lookup.query<{ contract_view: 'legacy' | 'graph' | 'resource-disable' }>(`SELECT j.contract_view FROM content_intake.parse_jobs j
             JOIN content_intake.principals p ON p.principal_id=j.actor_id WHERE j.job_id=$1 AND p.user_id=$2`, [id, actor.user_id]);
           view = row.rows[0]?.contract_view ?? view;
         } finally { lookup.release(); }

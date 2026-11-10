@@ -1,9 +1,12 @@
+import { parseContractSchema as parseSopAddress } from '@customer-agent/contracts/sop-unified';
+import { openingProof } from './content-intake/sop-command.js';
+import { isSopView } from './content-intake/contract-view.js';
 import { randomUUID } from 'node:crypto';
-import { parseContractSchema as parse, type components } from '@customer-agent/contracts/sop-unified';
+import { parseContractSchema as parse, type components } from './content-intake/contract-view.js';
 import type { AuthenticatedUser } from './auth-service.js';
 import { contentAttachmentBytesMatch, type ContentAttachmentStore, type ReservedAttachment } from './content-object-store.js';
 import { authenticatedProductSession } from './product-auth-service.js';
-import { intakeView, isContractValidationError } from './content-intake/contract-view.js';
+import { isContractValidationError, intakeView } from './content-intake/contract-view.js';
 import { canonical, digest } from './content-intake/material.js';
 import { issueSopContinuationEntitlement, prepareIntakeSelection, type PreparedIntakeSelection } from './content-intake/usage.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool, type IntakeResult, type IntakeTransaction, type Principal } from './content-intake/transaction.js';
@@ -26,11 +29,11 @@ type ActionCompletion = MediaUnavailable | { kind: 'checked' } | { kind: 'issued
 class ActionAdmission {
   readonly kind = 'admitted';
   constructor(readonly input: ActionInput, readonly releaseId: string, readonly prepared: PreparedIntakeSelection,
-    readonly selected: ReadyGraph, readonly media: MediaSelection[]) {}
+    readonly selected: ReadyGraph, readonly media: MediaSelection[], readonly openingProofHash: string | null) {}
 
   fingerprint(): string {
     return digest(canonical({ releaseId: this.releaseId, authority: this.prepared.binding,
-      scopes: this.prepared.scopes.map(scope => scope.scope), selected: this.selected, media: this.media }));
+      openingProofHash: this.openingProofHash, scopes: this.prepared.scopes.map(scope => scope.scope), selected: this.selected, media: this.media }));
   }
 }
 type ActionVerdict = ActionAdmission | MediaUnavailable;
@@ -54,6 +57,7 @@ function actionArguments(input: ActionInput) {
   const opening = input.kind === 'check' && input.request.action === 'open' ? {
     entitlement: digest(input.request.entitlementId), contextGeneration: request.contextGeneration,
     releaseId: input.request.releaseId, key: input.request.key, graphDigest: input.request.graphDigest, nodeId: input.request.nodeId,
+    proof: openingProof(input.request),
   } : null;
   return { hash: sopContinuationHash(request.continuationId), opening,
     entitlement: input.kind === 'check' && input.request.action !== 'open' ? digest(input.request.entitlementId) : null,
@@ -102,15 +106,15 @@ function object(value: unknown): Record<string, unknown> {
 function address(resource: SopContinuationResource) {
   if (resource.kind === 'media') {
     const query = object(resource.query);
-    return { kind: 'media', releaseId: parse('IntakeSopId', resource.releaseId),
-      entitlement: digest(parse('IntakeSopId', query.entitlementId)), sourceId: parse('IntakeSopId', query.sourceId),
-      flowId: parse('IntakeSopId', query.flowId) };
+    return { kind: 'media', releaseId: parseSopAddress('IntakeSopId', resource.releaseId),
+      entitlement: digest(parseSopAddress('IntakeSopId', query.entitlementId)), sourceId: parseSopAddress('IntakeSopId', query.sourceId),
+      flowId: parseSopAddress('IntakeSopId', query.flowId) };
   }
   const body = object(resource.body), hash = sopContinuationHash(body.continuationId);
   if (resource.kind === 'check' && body.action === 'open') {
     const key = object(body.key);
-    return { kind: 'open', continuation: hash, entitlement: digest(parse('IntakeSopId', body.entitlementId)),
-      sourceId: parse('IntakeSopId', key.sourceId), flowId: parse('IntakeSopId', key.flowId) };
+    return { kind: 'open', continuation: hash, entitlement: digest(parseSopAddress('IntakeSopId', body.entitlementId)),
+      sourceId: parseSopAddress('IntakeSopId', key.sourceId), flowId: parseSopAddress('IntakeSopId', key.flowId) };
   }
   return { kind: resource.kind, continuation: hash };
 }
@@ -125,9 +129,9 @@ export function createSopContinuationService(pool: IntakePool,
     const session = authenticatedProductSession(actor);
     if (!session) throw new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED');
     const selected = address(resource);
-    await client.query('SELECT content_intake.authorize_sop_continuation_resource($1,$2,$3::jsonb)',
-      [who.id, session, JSON.stringify(selected)]);
-    if (intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+    await client.query('SELECT content_intake.authorize_sop_continuation_resource($1,$2,$3::jsonb,$4)',
+      [who.id, session, JSON.stringify(selected), intakeView()]);
+    if (!isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
     return { session, selected };
   }
   async function selectMedia(client: IntakeTransaction, who: Principal, actor: AuthenticatedUser,
@@ -197,7 +201,8 @@ export function createSopContinuationService(pool: IntakePool,
     const bindings = new Set(media.map(item => canonical(item.binding)));
     if (bindings.size !== media.length || bindings.size !== selected.selectedMedia.length
       || selected.selectedMedia.some(item => !bindings.has(canonical(item)))) throw new IntakeRejection('SOP_MEDIA_UNAVAILABLE', 'OVERLOADED');
-    return new ActionAdmission(input, releaseId, prepared, { ...selected, facts: selected.facts }, media);
+    return new ActionAdmission(input, releaseId, prepared, { ...selected, facts: selected.facts }, media,
+      binding.opening_query_proof_hash == null ? null : parse('IntakeSopHash', binding.opening_query_proof_hash));
   }
 
   async function performAction(actor: AuthenticatedUser, kind: ActionInput['kind'], raw: unknown): Promise<IntakeResult<Exclude<ActionCompletion, MediaUnavailable>>> {
@@ -231,9 +236,9 @@ export function createSopContinuationService(pool: IntakePool,
       if (input.kind === 'check') {
         const opening = input.request;
         const opened = await client.query<{ value: unknown }>(
-          'SELECT content_intake.open_sop_active_use($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,true) AS value',
+          'SELECT content_intake.open_sop_active_use($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,true,$10::jsonb) AS value',
           [who.id, session, hash, digest(opening.entitlementId), opening.contextGeneration, opening.releaseId,
-            canonical(opening.key), opening.graphDigest, opening.nodeId]);
+            canonical(opening.key), opening.graphDigest, opening.nodeId, canonical(openingProof(opening))]);
         const openedState = object(opened.rows[0]?.value);
         if (openedState.kind === 'closed') return { kind: 'closed' };
         if (openedState.kind !== 'active') throw new IntakeRejection('SOP_SNAPSHOT_INVALID');

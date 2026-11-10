@@ -1,7 +1,8 @@
 import ExcelJS from 'exceljs';
 import { inspectArchive } from './archive.js';
 export { SOP_TASK_FORMAT, SOP_TASK_HEADERS, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256,
-  SopTaskWorkbookFailure, parseSopTaskWorkbook, type SopTaskWorkbook, type SopTaskRow, type SopTaskImage } from './sop-task-workbook.js';
+  SopTaskWorkbookFailure, parseSopTaskWorkbook, SOP_RESOURCE_FORMAT, type SopTaskRuleVersion,
+  type SopTaskWorkbook, type SopTaskRow, type SopTaskImage } from './sop-task-workbook.js';
 import { createFaqTableValidator, validRegisteredContext } from './faq-rules.js';
 export { parseCsv, createCsvTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256, type CsvContext, type CsvParseResult } from './csv.js';
 export { parseFamilyReference } from './faq-rules.js';

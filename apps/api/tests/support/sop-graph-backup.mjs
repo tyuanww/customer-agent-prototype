@@ -7,7 +7,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { Client } from 'pg';
 import Fastify from 'fastify';
-import { CONTRACT_PROVENANCE, parseContractSchema } from '@customer-agent/contracts/sop-unified';
+import { CONTRACT_PROVENANCE, parseContractSchema as parseLegacy } from '@customer-agent/contracts/sop-unified';
+import { CONTRACT_PROVENANCE as RESOURCE_PROVENANCE, parseContractSchema as parseResource } from '@customer-agent/contracts/sop-resource-disable';
 import { createBackupSet, verifyBackupSet, extractObjectArchive, DATABASE_DUMP_FILE, OBJECTS_ARCHIVE_FILE } from '../../../../scripts/ops/backup-set.mjs';
 import { verifyDatabaseMigrations } from '../../../../packages/database/dist/index.js';
 import { createContentObjectStore } from '../../dist/content-object-store.js';
@@ -23,13 +24,15 @@ import { sopContinuationRoutes } from '../../dist/sop-continuation-routes.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 
 const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const parseContractSchema = input.resourceProbe === true ? parseResource : parseLegacy;
+const selectedContractSetId = input.resourceProbe === true ? RESOURCE_PROVENANCE.contract_set_id : CONTRACT_PROVENANCE.contract_set_id;
 assert.match(path.basename(realpathSync(input.root)), /^customer-agent-pg15-/);
 assert.equal(realpathSync(input.host).startsWith(`${realpathSync(input.root)}/`), true);
 assert.match(input.database, /^dev_m0_intake_desktop_[0-9a-f]{8}$/);
 assert.match(input.user, /^[a-z_][a-z0-9_]*$/);
 const evidenceRoot = realpathSync(input.evidenceRoot);
 assert.equal(path.dirname(evidenceRoot), realpathSync(os.tmpdir()));
-assert.match(path.basename(evidenceRoot), /^sop-unified-(?:lifecycle-evidence|query-http|continuation-http)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(path.basename(evidenceRoot), /^(?:sop-unified-(?:lifecycle-evidence|query-http|continuation-http)|sop-resource-lifecycle)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const pgBin = process.env.CUSTOMER_AGENT_PG15_BIN ?? execFileSync('pg_config', ['--bindir'], { encoding: 'utf8' }).trim();
 const environment = { PATH: process.env.PATH, LC_ALL: 'C', PGCONNECT_TIMEOUT: '5' };
 const original = new Client({ host: input.host, port: input.port, user: input.user, database: input.database });
@@ -53,6 +56,8 @@ try {
       'source_confirmations', 'quality_plans', 'quality_rounds', 'publications', 'sop_media_objects', 'objects', 'object_reservations',
       'sop_query_fact_versions','sop_unified_query_bindings','sop_query_previews','sop_query_leases',
       'entitlements','entitlement_contexts','entitlement_scopes','backend_review.receipts',
+      ...(input.resourceProbe ? ['sop_resource_disables','sop_resource_disable_quality_targets',
+        'sop_resource_disable_quality_checks','sop_resource_disable_publications','sop_resource_disable_event_lineage'] : []),
       ...(input.continuationProbe ? ['sop_active_uses','backend_identity.sessions','public.snapshot_offline_leases'] : [])];
     const result = {};
     for (const table of tables) {
@@ -80,6 +85,18 @@ try {
   assert.equal(report.status, 'PASS'); assert.equal(report.migrationCount, generatedMigrationCatalogue.migrations.length);
   assert.deepEqual(await counts(restored), before);
   const restoredFidelity = await fidelity(restored);
+  if (input.resourceProbe) {
+    for (const name of ['sop_resource_disables','sop_resource_disable_quality_targets','sop_resource_disable_quality_checks',
+      'sop_resource_disable_publications','sop_resource_disable_event_lineage']) assert.ok(restoredFidelity[name].count > 0);
+    assert.equal((await restored.query(`SELECT count(*)::int count FROM content_intake.sop_resource_disable_event_lineage e
+      LEFT JOIN content_intake.sop_resource_disable_publications p USING(release_id,source_id,candidate_id,candidate_version,material_digest)
+      LEFT JOIN content_intake.publications original ON original.release_id=e.release_id AND original.candidate_id=e.candidate_id
+        AND original.candidate_version=e.candidate_version WHERE p.release_id IS NULL OR original.release_id IS NULL`)).rows[0].count, 0);
+    const activeProofs = (await restored.query(`SELECT opening_query_request_id,opening_query_proof,opening_query_proof_hash
+      FROM content_intake.sop_active_uses WHERE opening_query_request_id IS NOT NULL`)).rows;
+    assert.ok(activeProofs.length > 0);
+    for (const proof of activeProofs) assert.equal(digest(canonical(proof.opening_query_proof)), proof.opening_query_proof_hash);
+  }
   assert.deepEqual(restoredFidelity, sourceFidelity);
   assert.equal((await restored.query(`SELECT count(*)::int count FROM content_intake.sop_graph_release_lineage l
     LEFT JOIN content_intake.publications p ON p.candidate_id=l.candidate_id AND p.candidate_version=l.candidate_version
@@ -127,7 +144,7 @@ try {
     registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store) });
     const origin = await app.listen({ host: '127.0.0.1', port: 0 });
     const response = await fetch(`${origin}/v1/sop/query`, { method: 'POST', headers: { authorization: input.agentAuthorization,
-      'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id, 'content-type': 'application/json' }, body: JSON.stringify(input.query.request) });
+      'X-Intake-Contract-Set': selectedContractSetId, 'content-type': 'application/json' }, body: JSON.stringify(input.query.request) });
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
     assert.deepEqual(body, input.query.response);
@@ -138,7 +155,7 @@ try {
   const usage = createContentIntakeService(usagePool, store, undefined, undefined, { requireProductSession: true });
   await app.register(contentIntakeUsageRoutes, { auth, usage });
   const origin = await app.listen({ host: '127.0.0.1', port: 0 });
-  const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id };
+  const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': selectedContractSetId };
   const response = await fetch(`${origin}/v1/intake/entitlements`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
     body: JSON.stringify({ shopId: 'shop-a', productIds: ['product-graph', 'product-solo'], scenarioIds: ['scenario-graph', 'scenario-solo'], contextGeneration: 999, releaseId: null }) });
   const entitlementBody = await response.json();
@@ -172,7 +189,7 @@ try {
     const origin = app.server.address();
     assert.ok(origin && typeof origin === 'object');
     const base = `http://127.0.0.1:${origin.port}`;
-    const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id,
+    const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': selectedContractSetId,
       'content-type': 'application/json' };
     const activeCount = (await restored.query('SELECT count(*)::int count FROM content_intake.sop_active_uses WHERE closed_at IS NULL')).rows[0].count;
     const closedCount = (await restored.query('SELECT count(*)::int count FROM content_intake.sop_active_uses WHERE closed_at IS NOT NULL AND session_hash IS NULL')).rows[0].count;
@@ -213,7 +230,7 @@ try {
     WHERE n.nspname='content_intake' AND p.proname IN ('freeze_sop_graph_candidate','check_sop_graph_quality','project_sop_graph_release','read_sop_graph_current') ORDER BY 1`)).rows;
   assert.equal(acl.length, 4);
   for (const fn of acl) { assert.equal(fn.owner, 'intake_runtime_fn_owner'); assert.equal(fn.public_exec, false); assert.equal(fn.prosecdef, true); assert.deepEqual(fn.proconfig, ['search_path=pg_catalog']); }
-  writeFileSync(path.join(input.evidenceRoot, 'nonempty-restore-results.json'), JSON.stringify({ status: 'SYNTHETIC_PASS', source: '812a2e80584f08675fab8b7401ce8b4cd3ab5bca',
+  writeFileSync(path.join(input.evidenceRoot, 'nonempty-restore-results.json'), JSON.stringify({ status: 'SYNTHETIC_PASS', source: input.resourceProbe ? RESOURCE_PROVENANCE.source_git_sha : '812a2e80584f08675fab8b7401ce8b4cd3ab5bca',
     report, before, after: await counts(restored), sourceFidelity, restoredFidelity,
     releaseId: input.releaseId, graphDigests: input.graphDigests, consumed, acl, backup: backup.path,
     http }, null, 2));

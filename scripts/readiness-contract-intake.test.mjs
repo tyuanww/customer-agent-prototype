@@ -24,6 +24,7 @@ async function fixture(t) {
   rmSync(path.join(product,upstream,READINESS_LOCK),{force:true});
   rmSync(path.join(product,upstream,'sop-unified-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,upstream,'sop-unified-corrected-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,upstream,'sop-resource-disable-contract-set.lock.json'),{force:true});
   const priorManifestPath=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(priorManifestPath));
   while (priorManifest.migrations.length > 40) {
@@ -33,6 +34,7 @@ async function fixture(t) {
   delete priorManifest.compatibility.readiness_successor;
   delete priorManifest.compatibility.sop_unified_successor;
   delete priorManifest.compatibility.sop_lifecycle_overlay;
+  delete priorManifest.compatibility.sop_resource_overlay;
   writeFileSync(priorManifestPath,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   const original=verifyContractSetDirectory(input);

@@ -11,6 +11,21 @@ export const SOP_QUERY_SOURCE = Object.freeze({ position: 86, id: '0086_sop_unif
 export const SOP_CONTINUATION_SOURCE = Object.freeze({ position: 87, id: '0087_sop_unified_continuation',
   file: 'packages/database/overlays/0087_sop_unified_continuation.sql', sha256: 'aa8808e02893abe258d6f8f834b792444a321938fff5c8659f873b5ab338afc8' });
 
+export const SOP_RESOURCE_SOURCE = Object.freeze({ position: 88, id: '0088_sop_resource_lifecycle',
+  file: 'packages/database/overlays/0088_sop_resource_lifecycle.sql', sha256: '88331d988759867a2e414f477922d171edcc1b837f2166a0cd8466aaee2c0ac6' });
+
+export function renderSopResourceMigration({ manifest, storage_source }, source) {
+  if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564'
+    || manifest.source_git_sha !== '0405c5651564958702ddd5484bbf41a0f193515f'
+    || sha256(source) !== SOP_RESOURCE_SOURCE.sha256
+    || sha256(storage_source) !== manifest.resourceDisable.storage.sha256
+    || !source.includes(storage_source.trimEnd())) throw new Error('SOP resource lifecycle implementation source drifted');
+  return renderUpgradeMigration({ position: SOP_RESOURCE_SOURCE.position, id: SOP_RESOURCE_SOURCE.id,
+    version: `verified SOP resource lifecycle implementation; overlay_sha256=${SOP_RESOURCE_SOURCE.sha256}`,
+    ranges: [], sourceBody: source.trimEnd() }, { contract_set_id: manifest.contract_set_id,
+    source_git_sha: manifest.source_git_sha, manifest });
+}
+
 export function renderSopContinuationMigration({ manifest }, source) {
   if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'
     || manifest.source_git_sha !== '812a2e80584f08675fab8b7401ce8b4cd3ab5bca'

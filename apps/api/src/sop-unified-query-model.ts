@@ -1,4 +1,4 @@
-import type { components } from '@customer-agent/contracts/sop-unified';
+import type { components } from './content-intake/contract-view.js';
 import { CONTRACT_PROVENANCE } from '@customer-agent/contracts/sop-unified';
 import type { AuthenticatedUser } from './auth-service.js';
 import type { SopQueryOperationFailure } from './sop-query-operation.js';

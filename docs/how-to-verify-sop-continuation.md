@@ -1,6 +1,6 @@
 # 验证 SOP continuation 服务端
 
-## 合同与所有者
+## v11 合同与所有者
 
 采用 v11、OpenAPI 1.29.1、schema 1.33 和 source 812a2e80584f。正常迁移顺序为 0085 图生命周期、0086 查询事实、0087 continuation。前 86 段 SQL 和元数据保持原字节。
 
@@ -24,12 +24,31 @@ pnpm test:backup:integration
 
 定向 continuation 用例从空 graph 表开始，经 upload、receive、真实六表 parser、source confirmation、完整质量 targets/checks 和 direct publish 产生 R1。C 登记明确合成权限来源并 query ready 后，验证 open、合法 action、各媒体 owner 的真实 bytes、R2/R3 固定历史、新 current query、并发、真实提交后丢响应恢复、授权换链、自然 session expiry、真实 logout、停用后 rollback、新 handle 和终态。
 
-每次打印独立 `SOP_CONTINUATION_EVIDENCE` 目录。非空备份使用生产 backup-set 工具真实 dump/restore，逐表比较 graph、quality、publication、facts、active/closed、sessions、entitlement/context/scope 与 snapshot/query leases 的记录摘要，检查原 publication FK 和恢复后的 87 verifier。恢复 HTTP 重放 C query、renew 历史 active、读取真实媒体 bytes 并拒绝 closed handle。原 handle 仅经 stdin 传给恢复探针，不写备份元数据。所有输入均为合成，临时 PG、对象和恢复库由 harness 清理。
+每次打印独立 `SOP_CONTINUATION_EVIDENCE` 目录。非空备份使用生产 backup-set 工具真实 dump/restore，逐表比较 graph、quality、publication、facts、active/closed、sessions、entitlement/context/scope 与 snapshot/query leases 的记录摘要，检查原 publication FK 和恢复后的当前 migration verifier。恢复 HTTP 重放 C query、renew 历史 active、读取真实媒体 bytes 并拒绝 closed handle。原 handle 仅经 stdin 传给恢复探针，不写备份元数据。所有输入均为合成，临时 PG、对象和恢复库由 harness 清理。
 
-## 已知合同边界
+## v11 保留的合同边界
 
-资源独立停用的材料 identity、来源确认与独立质量形状等待正式后继 intake，v11 parser 对该请求返回带 sheet/row/column 的 `SOP_MAPPING_REQUIRED`。flow 和 entry 的已有停用入口继续使用正常发布谱系。
+v11 parser 对资源独立停用返回带 sheet/row/column 的 `SOP_MAPPING_REQUIRED`。flow 和 entry 的已有停用入口继续使用正常发布谱系。独立资源的正式后继形状与验证见下节。
 
-D open 没有 facts-version 字段。当前要求同 session、selection 和原图的有效 C 消费证明只有一个 facts 版本，歧义返回 `SOP_SNAPSHOT_INVALID`，已打开 active 始终固定原 facts。C query 固定空 scenario selection，非空 scenario 的 snapshot-only 首开还缺明确可追溯的 consumed facts 依据。这一边界不以选 latest 或猜测业务映射填补。
+v11 D open 要求同 session、selection 和原图的有效 C 消费证明只有一个 facts 版本，歧义返回 `SOP_SNAPSHOT_INVALID`，已打开 active 始终固定原 facts。v11 C query 固定空 scenario selection，非空 scenario 的 snapshot-only 首开保留原有拒绝语义。
 
 桌面联合消费和真实外部数据验收分别需要自身证据。
+
+## v12 资源停用与精确查询证明
+
+正式输入为 `cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564`，来源提交为 `0405c5651564958702ddd5484bbf41a0f193515f`。产品 `0088_sop_resource_lifecycle` 从完整87段前缀升级。累计schema供对照，实际安装由既有migration runner完成。
+
+`apps/api/tests/sop-resource-lifecycle.integration.test.ts` 使用真实临时PG15、HTTP与对象字节，从上传、六表解析、来源确认和联合质量门进入发布。覆盖多商品及非空场景选择、Q1/F1与Q2/F2、active重放、正常停用和rollback、新发布后历史pin、两阶段资源检查、四角色ACL、FK、不可变历史以及非空dump/restore。来源确认必须提交材料中的 `resourceDisableSetDigest`。普通rollback报告保留历史摘要和零新增停用数。
+
+```sh
+pnpm build:services
+CUSTOMER_AGENT_API_SOP_RESOURCE_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vitest run --maxWorkers=1 --no-file-parallelism tests/sop-resource-lifecycle.integration.test.ts
+pnpm --filter @customer-agent/api test:integration:sop
+pnpm test:backup:integration
+```
+
+原v11材料兼容正例位于 `sop-unified-query.integration.test.ts`。它先通过v11正常B入口发布，再由v12 current entitlement、C ready和explicit-query D open消费同一原图、话术及三类媒体owner，并核对原canonical与风险材料仍保持原字节。
+
+每次非空恢复使用独立临时目录。脚本先比较完整关系行及原publication FK，再通过88 verifier、当前图读、原Q回执重放、active续用、媒体字节和closed拒绝验证恢复结果。测试日志打印证据目录。原Q/E在授权换代后按原资格拒绝，active仍通过自己的原opening proof和新授权重放。opaque `context_generation` 与普通E numeric generation分属各自所有者。
+
+上述入口使用全合成显式事实。真实原表缺失的业务事实继续保留blocked，runtime activation保持false。Main的迟到结果丢弃、确认项进度和原生复制由桌面消费单元提供独立证据。

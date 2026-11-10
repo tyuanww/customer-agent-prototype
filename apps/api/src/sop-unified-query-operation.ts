@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { validateContractSchema, withIntakeView } from './content-intake/contract-view.js';
+import { intakeView, withIntakeView } from './content-intake/contract-view.js';
+import { querySelection, assertQuerySelection } from './content-intake/sop-command.js';
 import type { ContentAttachmentStore } from './content-object-store.js';
 import { canonical, digest } from './content-intake/material.js';
-import { createIntakeTransactions, clock, IntakeRejection, type IntakePool, type IntakeTransaction } from './content-intake/transaction.js';
-import { prepareIntakeUsage, issuePreparedIntakeEntitlement } from './content-intake/usage.js';
+import { createIntakeTransactions, clock, lockProductSession, IntakeRejection, type IntakePool, type IntakeTransaction } from './content-intake/transaction.js';
+import { prepareIntakeUsage, issuePreparedIntakeEntitlement, readCurrentIntakeEntitlement } from './content-intake/usage.js';
 import { parseSopQueryBundle, selectSopQueryCandidate, verifySopQueryMedia, verifySopQueryReplay } from './sop-unified-query-context.js';
 import { parseUnifiedSopQueryResponse, SopQueryIntegrityError } from './sop-unified-query-validation.js';
 import type { SopQueryReasonCode, UnifiedSopQueryOperation, UnifiedSopQueryRequest, UnifiedSopQueryResponse } from './sop-unified-query-model.js';
@@ -11,17 +12,6 @@ import type { SopQueryReasonCode, UnifiedSopQueryOperation, UnifiedSopQueryReque
 function closed(request: UnifiedSopQueryRequest, code: SopQueryReasonCode): UnifiedSopQueryResponse {
   return { status: 'blocked', request_id: request.request_id, release_id: null, lease_expires_at: null,
     result: null, reasons: [{ code }] };
-}
-function requestContext(request: UnifiedSopQueryRequest) {
-  // The transport's opaque generation remains on the independent SOP lease.
-  // The internal entitlement uses one fixed server-owned numeric generation.
-  const context = validateContractSchema('IntakeEntitlementRequest', {
-    shopId: request.shop_id, contextGeneration: 1, releaseId: null,
-    productIds: request.product_context && request.product_context.type !== 'storewide' ? [request.product_context.ref] : [],
-    scenarioIds: [],
-  });
-  if (!context.ok) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
-  return context.value;
 }
 async function sqlValue(client: IntakeTransaction, sql: string, values: unknown[]): Promise<unknown> {
   try {
@@ -46,22 +36,34 @@ export function createUnifiedSopQueryOperation(pool: IntakePool,
   const run = createIntakeTransactions(pool, report, { requireProductSession: true });
   return {
     async execute({ actor, request }) {
-      const result = await withIntakeView('graph', () => run(actor, 'sop-query-v11', null, null, async (client, who) => {
-        const prepared = await prepareIntakeUsage(client, who, actor, requestContext(request));
-        const authorityBinding = prepared.binding.slice('intake:'.length);
+      const view = intakeView() === 'resource-disable' ? 'resource-disable' : 'graph';
+      const result = await withIntakeView(view, () => run(actor, 'sop-query-v11', null, null, async (client, who) => {
+        const selection = querySelection(request);
+        const admission = selection.kind === 'legacy-request'
+          ? { kind: 'prepared' as const, prepared: await prepareIntakeUsage(client, who, actor, selection.request) }
+          : { kind: 'entitlement' as const, entitlementId: selection.entitlementId, session: await lockProductSession(client, actor) };
+        const session = admission.kind === 'prepared' ? admission.prepared.ctx.sessionTokenHash : admission.session.hash;
         const prior = await sqlValue(client,
-          'SELECT content_intake.replay_sop_unified_query($1,$2,$3::jsonb,$4) AS value',
-          [who.id, prepared.ctx.sessionTokenHash, canonical(request), authorityBinding]);
+          'SELECT content_intake.replay_sop_unified_query($1,$2,$3::jsonb,$4,$5) AS value',
+          [who.id, session, canonical(request), admission.kind === 'prepared' ? admission.prepared.binding.slice('intake:'.length) : null, view]);
         if (prior !== null) {
           const response = parseUnifiedSopQueryResponse(prior, request.request_id, await clock(client));
           if (response.status === 'ready' || response.status === 'no_match') {
+            if (admission.kind === 'entitlement') {
+              const current = await readCurrentIntakeEntitlement(client, who, actor, admission.entitlementId);
+              assertQuerySelection(request, current.ctx);
+            }
             client.validUntil(Date.parse(response.lease_expires_at));
-            const envelope = await sqlValue(client, 'SELECT content_intake.recheck_sop_unified_query($1,$2::uuid) AS value', [who.id, request.request_id]);
+            const envelope = await sqlValue(client, 'SELECT content_intake.recheck_sop_unified_query($1,$2,$3::uuid,$4) AS value', [who.id, session, request.request_id, view]);
             await verifySopQueryReplay(client, store, who.id, response, envelope);
           }
           return response;
         }
-        const entitlement = await issuePreparedIntakeEntitlement(client, who, prepared);
+        const prepared = admission.kind === 'prepared' ? { ...admission.prepared, entitlement: null }
+          : await readCurrentIntakeEntitlement(client, who, actor, admission.entitlementId);
+        if (admission.kind === 'entitlement') assertQuerySelection(request, prepared.ctx);
+        const authorityBinding = prepared.binding.slice('intake:'.length);
+        const entitlement = prepared.entitlement ?? await issuePreparedIntakeEntitlement(client, who, prepared);
         const context = { principalId: who.id, entitlementHash: digest(entitlement.entitlementId) };
         let response: UnifiedSopQueryResponse;
         let facts: { candidateId: string; candidateVersion: number; sourceId: string; flowId: string; version: number } | null = null;
@@ -94,8 +96,8 @@ export function createUnifiedSopQueryOperation(pool: IntakePool,
           facts = null;
         }
         const completed = await sqlValue(client,
-          'SELECT content_intake.complete_sop_unified_query($1,$2,$3::jsonb,$4,$5::jsonb,$6::jsonb) AS value',
-          [who.id, context.entitlementHash, canonical(request), authorityBinding, JSON.stringify(response), canonical(facts)]);
+          'SELECT content_intake.complete_sop_unified_query($1,$2,$3::jsonb,$4,$5::jsonb,$6::jsonb,$7) AS value',
+          [who.id, context.entitlementHash, canonical(request), authorityBinding, JSON.stringify(response), canonical(facts), view]);
         return parseUnifiedSopQueryResponse(completed, request.request_id, await clock(client));
       }, value => parseUnifiedSopQueryResponse(value, request.request_id)));
       if (result.ok) return result.value;

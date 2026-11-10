@@ -1,13 +1,14 @@
 import { digest } from '../src/content-intake/material.js';
 import { request as rawHttpRequest } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync, renameSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseContractSchema as parse, type ContractSchemaName, type components } from '@customer-agent/contracts/sop-unified';
+import { parseContractSchema as parseResource, CONTRACT_PROVENANCE as RESOURCE_PROVENANCE } from '@customer-agent/contracts/sop-resource-disable';
 import { SOP_TASK_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import { syntheticGraphMapping, syntheticTaskGraphWorkbook } from '../../../packages/content-intake/tests/support/sop-task-graph-workbook.js';
 import type { IntakePool } from '../src/content-intake/transaction.js';
@@ -93,7 +94,7 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
   }
   beforeAll(async () => {
     mkdirSync(evidenceRoot, { recursive: true });
-    host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime', includeSopQuery: true, includeLegacySearch: false,
+    host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime', includeSopQuery: true, includeSopContinuation: true, includeLegacySearch: false,
       wrapBusinessPool: uncertain, wrapUsagePool: uncertain,
       observeSyntheticRequest: (actor, headers) => { if (actor === 'agent') agentAuthorization = headers.get('authorization'); },
       observeError: error => diagnostics.push(error instanceof Error ? `${error.stack}\n${JSON.stringify(error, ['code', 'detail', 'where'])}` : String(error)),
@@ -235,6 +236,62 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
       'sourceClaim', 'fileSha256', 'sessionTokenHash', 'authorization', 'access_token']) expect(wire).not.toContain(privateValue);
     expect(response.result.permissions.every(item => item.source_ref.startsWith('synthetic:'))).toBe(true);
   }, 60_000);
+  it('consumes the original v11 publication through v12 entitlement, ready proof, open, copy and all media owners', async () => {
+    const original = (await admin.query(`SELECT canonical_material,canonical_encoding FROM content_intake.candidate_versions
+      WHERE candidate_id=$1 AND version=$2`, [first.key.candidateId, first.key.version])).rows[0];
+    expect(original.canonical_encoding).toBe('candidate-sop-task-graph-v2');
+    const material = JSON.parse(original.canonical_material);
+    expect(material.risk.policyVersion).toBe('risk-p1.1');
+    const headers = { 'x-intake-contract-set': RESOURCE_PROVENANCE.contract_set_id, 'content-type': 'application/json' };
+    const send = (url: string, body: unknown) => host.requestAs('agent', url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const entitlementResponse = await send('/v1/intake/entitlements', { shopId: 'shop-a', contextGeneration: 100,
+      releaseId: null, productIds: [], scenarioIds: [] });
+    expect(entitlementResponse.status).toBe(200);
+    const entitlement = parseResource('IntakeEntitlement', await entitlementResponse.json());
+    const requested = { ...query(), entitlement_id: entitlement.entitlementId, context_generation: 'v12-original-v11-publication' };
+    const queryResponse = await send('/v1/sop/query', requested);
+    expect(queryResponse.status).toBe(200);
+    const ready = parseResource('MenokinSopQuerySopQueryResponse', await queryResponse.json());
+    expect(ready.status).toBe('ready');
+    if (ready.status !== 'ready') throw new Error('Original v11 graph did not become ready through v12');
+    expect(ready.result.graph_digest).toBe(sopGraphDigest(first.graph));
+    expect(ready.result.entries).toEqual(first.graph.entries);
+    expect(ready.result.media.map(item => item.binding)).toEqual(first.graph.media);
+    const opening = { entitlementId: entitlement.entitlementId, releaseId: first.releaseId, contextGeneration: 100,
+      key: ready.result.flow.header.key, graphDigest: ready.result.graph_digest, nodeId: ready.result.flow.header.startNodeId,
+      action: 'open', edgeId: null, entry: null, continuationId: `sct_${randomBytes(32).toString('hex')}`, queryRequestId: requested.request_id };
+    const openedResponse = await send('/v1/intake/sop/check', opening);
+    expect(openedResponse.status, await openedResponse.clone().text()).toBe(200);
+    const opened = parseResource('IntakeSopContinuationReceipt', await openedResponse.json());
+    expect(opened.entitlement.releaseId).toBe(first.releaseId);
+    const scripted = ready.result.flow.nodes.find(node => node.body.scripts.length)!;
+    expect((await send('/v1/intake/sop/check', { ...opening, entitlementId: opened.entitlement.entitlementId,
+      queryRequestId: null, action: 'copy', nodeId: scripted.id, entry: scripted.body.scripts[0]!.entry })).status).toBe(204);
+    const owners = new Set<string>();
+    for (const item of ready.result.media) {
+      const binding = item.binding;
+      const ownerKind = binding.entry ? 'entry' : binding.graphTarget!.kind;
+      owners.add(ownerKind);
+      const search = new URLSearchParams({ entitlementId: opened.entitlement.entitlementId, sourceId: binding.flowKey.sourceId,
+        flowId: binding.flowKey.flowId, ownerKind, ownerId: binding.entry?.businessEntryId ?? binding.graphTarget!.id, resourceId: binding.resourceId });
+      const response = await host.requestAs('agent', `/v1/intake/sop/releases/${first.releaseId}/media/${binding.objectId}?${search}`,
+        { headers: { ...headers, 'x-sop-continuation': opening.continuationId } });
+      expect(response.status, await response.clone().text()).toBe(200);
+      const payload = parseResource('IntakeSopMediaPayload', await response.json());
+      expect(payload.mime).toBe(binding.mime); expect(digest(Buffer.from(payload.base64, 'base64'))).toBe(binding.sha256);
+    }
+    expect([...owners].sort()).toEqual(['entry','knowledge','task']);
+    expect((await admin.query(`SELECT canonical_material,canonical_encoding FROM content_intake.candidate_versions
+      WHERE candidate_id=$1 AND version=$2`, [first.key.candidateId, first.key.version])).rows[0]).toEqual(original);
+    const proof = (await admin.query('SELECT opening_query_request_id,opening_query_proof FROM content_intake.sop_active_uses WHERE continuation_hash=$1',
+      [digest(opening.continuationId)])).rows[0];
+    expect(proof.opening_query_request_id).toBe(requested.request_id);
+    expect(proof.opening_query_proof.selectedContractSetId).toBe(RESOURCE_PROVENANCE.contract_set_id);
+    writeFileSync(path.join(evidenceRoot, 'v11-publication-v12-consumption.json'), JSON.stringify({
+      originalCanonical: original.canonical_encoding, originalRisk: material.risk.policyVersion, originalCandidate: first.key,
+      releaseId: first.releaseId, graphDigest: ready.result.graph_digest, queryRequestId: requested.request_id,
+      entryCount: ready.result.entries.length, mediaCount: ready.result.media.length, owners: [...owners], originalUnchanged: true }, null, 2));
+  });
   it('preserves a PostgreSQL source-set instant when fresh principal facts share its millisecond', async () => {
     refreshAtSourceStamp = true;
     expect((await readQuery(query())).status).toBe('ready');

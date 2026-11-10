@@ -62,6 +62,10 @@ export function createIntakeEvidence(run: Run) {
         ? Reflect.get(raw,'operationId') as string : null, async (client, who) => {
         const req = parseContractSchema('IntakeSourceConfirmation', raw);
         const { view, material } = await candidateContext(client, who, req.key, 'source-confirm', true);
+        if (material.canonicalEncodingVersion === 'candidate-sop-resource-disable-v1'
+          && (!('resourceDisableSetDigest' in req) || req.resourceDisableSetDigest !== material.resourceDisableSetDigest)) {
+          throw new IntakeRejection('SOURCE_MISMATCH');
+        }
         if (view.sourceEvidenceVersion !== req.expectedEvidenceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
         if (material.object.sha256 !== req.objectSha256 || material.sourceClaim.acquisition !== req.acquisition) throw new IntakeRejection('SOURCE_MISMATCH');
         if (!req.reason.trim() || !req.confirmedVersionValue.trim()) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');

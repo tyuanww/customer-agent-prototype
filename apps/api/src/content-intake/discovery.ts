@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
@@ -5,7 +6,6 @@ import { allocationKinds, authorize, LIVE_ALLOCATION_GRANTS_SQL, mayManageGrant,
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
-import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Capability = C['IntakeAuthorization']['capabilities'][number];
@@ -76,7 +76,7 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
     JOIN rights ON rights.scope_id=s.scope_id AND rights.source_id=src.source_id
     WHERE s.tenant_id=$2 AND s.app_id=$3
       AND ($6::boolean OR m.template_version<>'sop-manual-authoring-v1.1')
-    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1, intakeView() === 'graph']);
+    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1, isSopView()]);
   if (result.rows.length > MAX_SOURCES) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [who.tenantId, who.appId]);
   if (!policy.rows[0]) throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
@@ -249,7 +249,7 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
         const session = await lockProductSession(client, actor);
         const id = parseContractSchema('IntakeId', sourceId), src = await source(client, id);
         const importUntil = await authorize(client, who, 'import', src);
-        if (src.templateVersion === 'sop-manual-authoring-v1.1' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+        if (src.templateVersion === 'sop-manual-authoring-v1.1' && !isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
         const validUntil = Math.min(session.validUntil, who.validUntil, importUntil);
         client.validUntil(validUntil);
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");

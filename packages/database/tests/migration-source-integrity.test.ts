@@ -41,6 +41,14 @@ describe('verified product migration sources', () => {
     }
   });
 
+  it('preserves every pre-resource SQL byte and descriptor', () => {
+    expect(sha256(JSON.stringify(manifest.migrations.slice(0, 87))))
+      .toBe('3d48f9989552918848421d2e2650d8da0bea80515cc728cdb790afcae4a1e8ae');
+    for (const entry of manifest.migrations.slice(0, 87)) {
+      expect(sha256(readFileSync(path.join(projectRoot, 'packages/database/migrations', entry.file), 'utf8'))).toBe(entry.sha256);
+    }
+  });
+
   it.each(sources)('preserves $id source bytes inside the generated migration', ({ position, id, source, sha256: sourceSha }) => {
     const sourceSql = readFileSync(path.join(projectRoot, source), 'utf8');
     const entry = manifest.migrations[position - 1];
@@ -55,14 +63,15 @@ describe('verified product migration sources', () => {
     expect(sha256(migrationSql)).toBe(entry?.sha256);
   });
 
-  it('keeps ACL and SOP before unified storage in the ordered catalogue', () => {
-    expect(manifest.migrations.slice(-6).map(({ position, id }) => ({ position, id }))).toEqual([
+  it('keeps the exact ordered predecessor and resource lifecycle tail', () => {
+    expect(manifest.migrations.slice(-7).map(({ position, id }) => ({ position, id }))).toEqual([
       { position: 82, id: '0082_access_evaluator' },
       { position: 83, id: '0083_sop_pipeline_projection' },
       { position: 84, id: '0084_sop_unified_storage' },
       { position: 85, id: '0085_sop_unified_lifecycle' },
       { position: 86, id: '0086_sop_unified_query' },
       { position: 87, id: '0087_sop_unified_continuation' },
+      { position: 88, id: '0088_sop_resource_lifecycle' },
     ]);
   });
 });

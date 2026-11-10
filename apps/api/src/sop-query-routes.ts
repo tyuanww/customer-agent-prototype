@@ -2,8 +2,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AuthService } from './auth-service.js';
 import { authenticateRequestHeaders } from './auth-service.js';
 import { authenticatedProductSession } from './product-auth-service.js';
-import { validateContractSchema } from '@customer-agent/contracts/sop-unified';
-import { SOP_UNIFIED_QUERY_CONTRACT_SET_ID, type UnifiedSopQueryOperation } from './sop-unified-query-model.js';
+import { validateContractSchema, selectIntakeView, isSopView, withIntakeView, intakeContractSet } from './content-intake/contract-view.js';
+import { type UnifiedSopQueryOperation } from './sop-unified-query-model.js';
 import { parseUnifiedSopQueryResponse } from './sop-unified-query-validation.js';
 import type { SopQueryOperation, SopQueryFailureCode } from './sop-query-operation.js';
 import { isSopQueryResponse } from './sop-query-validation.js';
@@ -137,22 +137,28 @@ export function registerSopQueryRoute(
       return sendSopError(reply, 401, 'SCOPE_DENIED', '缺少或无法验证产品会话');
     }
     const contractHeader = request.headers['x-intake-contract-set'];
-    if (contractHeader === SOP_UNIFIED_QUERY_CONTRACT_SET_ID && dependencies.unifiedOperation) {
+    const headers: string[] = [];
+    for (let index = 0; index < request.raw.rawHeaders.length; index += 2) {
+      if (request.raw.rawHeaders[index]?.toLowerCase() === 'x-intake-contract-set') headers.push(request.raw.rawHeaders[index + 1] ?? '');
+    }
+    const view = selectIntakeView(headers);
+    const unifiedOperation = dependencies.unifiedOperation;
+    if (isSopView(view) && unifiedOperation) return withIntakeView(view, async () => {
       const parsed = validateContractSchema('MenokinSopQuerySopQueryRequest', request.body);
       if (!parsed.ok || [parsed.value.query_text, parsed.value.context_generation, parsed.value.product_context?.ref]
         .some(text => text !== undefined && !isStorableText(text))) {
         return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 SOP 查询合同', requestIdOf(request.body));
       }
       try {
-        const result = await dependencies.unifiedOperation.execute({ actor, request: parsed.value });
+        const result = await unifiedOperation.execute({ actor, request: parsed.value });
         if ('ok' in result) return sendOperationFailure(reply, result);
         const value = parseUnifiedSopQueryResponse(result, parsed.value.request_id);
-        reply.header('x-intake-contract-set', SOP_UNIFIED_QUERY_CONTRACT_SET_ID);
+        reply.header('x-intake-contract-set', intakeContractSet());
         return reply.code(200).send(value);
       } catch {
         return sendSopError(reply, 503, 'SOP_UNAVAILABLE', '当前 SOP 服务不可用', parsed.value.request_id);
       }
-    }
+    });
     if (typeof contractHeader !== 'string' || contractHeader !== MENOKIN_SOP_QUERY_CONTRACT_SET_ID) {
       return sendSopError(reply, 409, 'CONTRACT_UPGRADE_REQUIRED', '请求使用的合同集不受支持', requestIdOf(request.body));
     }

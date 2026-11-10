@@ -1,4 +1,4 @@
-import { parseContractSchema, type components } from './contract-view.js';
+import { intakeView, parseContractSchema, type components } from './contract-view.js';
 
 import { candidateContext } from './candidate.js';
 import { canonical, digest } from './material.js';
@@ -112,8 +112,9 @@ export type IntakeQualityProgress = {
   state: 'not_frozen' | 'initial_required' | 'expansion_required' | 'passed' | 'revision_required' | 'blocked';
   plan: FrozenPlan | null; frozenBy: string | null; frozenAt: string | null; frozenFactsVersion: number | null;
   rounds: { phase: Phase; checks: QualityCheck[]; checkedBy: string; factsVersion: number; recordedAt: string }[];
-  canonicalEncodingVersion?: 'candidate-p1.1' | 'candidate-sop-task-graph-v2';
+  canonicalEncodingVersion?: C['IntakeMaterial']['canonicalEncodingVersion'];
   sopPlan?: C['IntakeSopSopQualityPlan'];
+  resourceDisablePlan?: C['IntakeResourceDisablePlan'];
 };
 type QualityCommand = C['IntakeQualityCommand'];
 type QualitySubmission = C['IntakeQualitySubmission'];
@@ -151,10 +152,12 @@ export async function readQualityView(client: IntakeTransaction, actor: Principa
     frozenBy: stored?.frozen_by ?? null, frozenAt: stored?.frozen_at.toISOString() ?? null,
     rounds: rounds.rows.map(r => ({ phase: r.phase, checks: r.checks, checkedBy: r.checked_by, factsVersion: Number(r.facts_version), recordedAt: r.recorded_at.toISOString() })) };
   const { material } = await candidateContext(client, actor, key, 'review', true);
-  const encoding = material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2' ? material.canonicalEncodingVersion : 'candidate-p1.1';
+  const encoding = material.canonicalEncodingVersion;
   progress.canonicalEncodingVersion = encoding;
-  const graph = encoding === 'candidate-sop-task-graph-v2' ? await qualityContribution(client, actor, key) : null;
+  const graph = encoding === 'candidate-sop-task-graph-v2' || encoding === 'candidate-sop-resource-disable-v1'
+    ? await qualityContribution(client, actor, key) : null;
   if (graph) progress.sopPlan = graph.sopPlan;
+  if (graph?.resource) progress.resourceDisablePlan = graph.resource.plan;
   const graphChecks = graph?.checks ?? [];
   return { preview, progress, graph, graphChecks };
 }
@@ -169,6 +172,7 @@ export async function freezeQuality(client: IntakeTransaction, actor: Principal,
     VALUES ($1,$2,$3,'intake-quality-v1',$4::jsonb,$5,$6) ON CONFLICT (candidate_id,candidate_version) DO NOTHING`,
   [p.key.candidateId, p.key.version, p.key.digest, JSON.stringify(frozenPlan(p)), actor.id, actor.factsVersion]);
   await client.query('SELECT content_intake.freeze_sop_graph_quality($1,$2,$3)', [actor.id, p.key.candidateId, p.key.version]);
+  if (intakeView() === 'resource-disable') await client.query('SELECT content_intake.freeze_sop_resource_quality($1,$2,$3)', [actor.id, p.key.candidateId, p.key.version]);
   return readQuality(client, actor, p.key);
 }
 
@@ -192,11 +196,16 @@ export async function checkQuality(client: IntakeTransaction, actor: Principal, 
   const size = await client.query<{ bytes: number }>('SELECT octet_length($1::jsonb::text) AS bytes', [encoded]);
   if (size.rows[0]!.bytes > QUALITY_LIMITS.checksBytes) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
   let recordedAt: string | null = null;
-  if (material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2') {
+  if (material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2' || material.canonicalEncodingVersion === 'candidate-sop-resource-disable-v1') {
     if (request.materialDigest !== request.key.digest || !request.sopChecks) return invalid();
     recordedAt = (await client.query<{ recorded_at: string }>('SELECT content_intake.check_sop_graph_quality($1,$2,$3,$4,$5::jsonb)::text AS recorded_at',
       [actor.id, request.key.candidateId, request.key.version, request.phase, JSON.stringify(request.sopChecks)])).rows[0]!.recorded_at;
   } else if (request.materialDigest !== undefined || request.sopChecks !== undefined) return invalid();
+  if (material.canonicalEncodingVersion === 'candidate-sop-resource-disable-v1') {
+    if (!('resourceDisableChecks' in request)) return invalid();
+    await client.query('SELECT content_intake.check_sop_resource_quality($1,$2,$3,$4,$5::jsonb,$6::timestamptz)',
+      [actor.id, request.key.candidateId, request.key.version, request.phase, JSON.stringify(request.resourceDisableChecks), recordedAt]);
+  }
   await client.query(`INSERT INTO content_intake.quality_rounds(candidate_id,candidate_version,candidate_digest,phase,checks,checked_by,facts_version,recorded_at)
     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,coalesce($8,clock_timestamp()))`, [request.key.candidateId, request.key.version, request.key.digest,
     request.phase, encoded, actor.id, actor.factsVersion, recordedAt]);

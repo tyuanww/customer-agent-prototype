@@ -1,4 +1,5 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts/sop-unified';
+import { parsePublishedIntakeRisk } from './content-intake/contract-view.js';
 import type { AuthenticatedUser } from './auth-service.js';
 import { canonical, digest } from './content-intake/material.js';
 import { IntakeRejection, type createIntakeTransactions } from './content-intake/transaction.js';
@@ -29,7 +30,7 @@ export type SopQueryPublicationFacts = {
   mappingDigest: string;
   mappingSha256: string;
   sourceClaim: components['schemas']['IntakeSourceClaim'];
-  risk: components['schemas']['IntakeRisk'];
+  risk: ReturnType<typeof parsePublishedIntakeRisk>;
   confirmation: {
     evidenceVersion: number;
     versionKind: 'integer' | 'opaque';
@@ -75,7 +76,7 @@ export function parseSopQueryPublicationFacts(raw: unknown): SopQueryPublication
     sourceVersion: parseContractSchema('IntakeVersion', value.sourceVersion),
     mappingDigest: parseContractSchema('IntakeSopHash', value.mappingDigest),
     mappingSha256: parseContractSchema('IntakeSopHash', value.mappingSha256), sourceClaim,
-    risk: parseContractSchema('IntakeRisk', value.risk),
+    risk: parsePublishedIntakeRisk(value.risk),
     confirmation: { evidenceVersion: parseContractSchema('IntakeVersion', confirmation.evidenceVersion),
       versionKind: confirmation.versionKind, versionValue, acquisition: sourceClaim.acquisition,
       objectSha256: parseContractSchema('IntakeSopHash', confirmation.objectSha256) },

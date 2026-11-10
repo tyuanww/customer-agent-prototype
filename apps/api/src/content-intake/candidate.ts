@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from './contract-view.js';
 import type { ParseResult } from '@customer-agent/content-intake';
@@ -11,7 +12,7 @@ export type Job = { job_id: string; source_id: string; object_id: string; actor_
   source_version: string; contributor_ids: string[]; generation: string; state: C['IntakeParseJob']['state'];
   base_release_id: string | null; expected_prior_id: string | null; expected_prior_version: string | null;
   expected_prior_digest: string | null; result_candidate_id: string | null; result_candidate_version: string | null;
-  report_object_id: string | null; started_at: Date; contract_view?: 'legacy' | 'graph' };
+  report_object_id: string | null; started_at: Date; contract_view?: 'legacy' | 'graph' | 'resource-disable' };
 
 export function jobView(job: Pick<Job, 'job_id' | 'generation' | 'state' | 'result_candidate_id' | 'result_candidate_version' | 'report_object_id'>, parsed?: ParseResult): C['IntakeParseJob'] {
   return parseContractSchema('IntakeParseJob', { jobId: job.job_id, generation: Number(job.generation), state: job.state,
@@ -28,7 +29,7 @@ export async function getJob(client: IntakeTransaction, actor: Principal, id: st
   if (!address) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   const src = await source(client, address.source_id);
   await authorize(client, actor, 'import', src);
-  if (address.contract_view === 'graph' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  if (address.contract_view && address.contract_view !== intakeView()) throw new IntakeRejection('UPGRADE_REQUIRED');
   const job = (await client.query<Job>('SELECT j.*, j.contributor_ids::text[] AS contributor_ids FROM content_intake.parse_jobs j WHERE job_id=$1', [id])).rows[0]!;
   return { job, src };
 }
@@ -49,7 +50,7 @@ async function currentBase(client: IntakeTransaction, expected: string | null): 
 export async function receive(client: IntakeTransaction, actor: Principal, sourceId: string, req: C['IntakeReceive']): Promise<C['IntakeParseJob']> {
   const src = await source(client, sourceId);
   await authorize(client, actor, 'import', src);
-  if (src.templateVersion === 'sop-manual-authoring-v1.1' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  if (src.templateVersion === 'sop-manual-authoring-v1.1' && !isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
   if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
   if (src.version !== req.sourceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
   await currentBase(client, req.baseReleaseId);
@@ -100,7 +101,8 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
     'SELECT source_id,canonical_encoding FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2', [id, version])).rows[0];
   if (!address) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   await authorize(client, actor, action, await source(client, address.source_id));
-  if (address.canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  if (address.canonical_encoding === 'candidate-sop-resource-disable-v1' && intakeView() !== 'resource-disable'
+    || address.canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
   const { rows } = await client.query<{ value: unknown }>(`SELECT jsonb_build_object(
     'key',jsonb_build_object('candidateId',c.candidate_id,'version',c.version,'digest',c.digest),
     'sourceId',c.source_id,'publicationPolicy',c.publication_policy,'state',c.state,'readinessReasons','[]'::jsonb,
@@ -254,7 +256,8 @@ export function cancellationReceipt(operationId: string, response: unknown): C['
   const candidate = historicalCandidate(response);
   if (candidate.state !== 'cancelled') throw new IntakeRejection('COMMIT_UNKNOWN');
   return parseContractSchema('IntakeReceipt', { operationId, key: candidate.key, action: 'cancel', state: 'cancelled',
-    releaseId: null, announcementId: null, reason: null });
+    releaseId: null, announcementId: null, reason: null,
+    ...(intakeView() === 'resource-disable' ? { resourceDisableLineage: null } : {}) });
 }
 
 /** Decode only server-owned durable candidate receipts written before policy was

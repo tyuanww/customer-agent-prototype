@@ -502,8 +502,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     // throwaway fixture material and are never printed. The login inherits app_runtime
     // rather than taking it with SET ROLE, because the event repository runs as the session.
     if (hooks.includeLegacySearch !== false) {
-      await admin!.query('CREATE ROLE synthetic_search_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO synthetic_search_runtime');
-      const searchPool = new Pool({ ...database.config, user: 'synthetic_search_runtime', max: 4 });
+      await admin!.query('CREATE ROLE stack_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO stack_runtime');
+      const searchPool = new Pool({ ...database.config, user: 'stack_runtime', max: 4 });
       ownedPools.push(searchPool);
       const searchEvents = createEventRepository(searchPool, 'synthetic_host_search');
       registerSearchRoute(app, auth, {

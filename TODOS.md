@@ -2,11 +2,11 @@
 
 ## 当前代码与收尾状态（2026-11-10）
 
-产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #191 已合入。最近读回全部6项通过的主干基线为 `c1b228dfbf9913b948eee98634ea878f95436949`，后续实际 main 的验证仍按各自提交读回。#190 增加完整 PostgreSQL job 的时间预算，#191 为完整迁移初始化设置独立正确性测试预算，SQL 性能检查保留5秒限制。Windows 原生进程回收的两个既有用例已进入持续门禁，并在 Windows runner 实际通过。[已通过的主干基线](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42779075531)。
+产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #193 已合入。已读回的完整主干证据包含 `9e16a012549ea2117e3e6bb525ab6f596d32f8ef` 的6项 CI 全部通过。#192 完成 v12 精确合同接收，#193 修复正式产物扫描对技术标识符的误报，后续主干检查分别绑定其实际提交。Windows 原生进程回收的两个既有用例已进入持续门禁，并在 Windows runner 实际通过。[主干验证证据](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42804454518)。
 
 正常 SOP 图导入、冻结、来源确认、全量质量、发布及回滚已通过 0085 生命周期闭环。0086 查询事实登记和正常 HTTP 查询已合并，独立导出恢复后也能消费原查询。0087 增加服务端开、续、关及受控图片读取，固定原发布和事实，保留原 handle 终态，按当前身份与授权重新校验。可选图片仍保留完整绑定，其字节失败在读取时明确返回。对应验证入口和已知合同边界见[续用验证说明](docs/how-to-verify-sop-continuation.md)。桌面当前实现的真实后端联合消费、完整 Gate B 和最终安装包验收继续收尾。
 
-正式 v11 输入继续绑定来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 OpenAPI 1.29.1 / schema 1.33。后继 v12 绑定来源 `0405c5651564958702ddd5484bbf41a0f193515f` 的 OpenAPI 1.30.0 / schema 1.34，30 文件已精确接收、验证并复用，独立类型与运行 validator 消费通过。旧十件生成物及前87项迁移保持原字节。v12 明确完整选择资格、原查询回执绑定及资源停用材料和质量合同，正常0088运行实现与联验继续推进。原表仅用于仓外受控核对，业务缺项继续 blocked。合同状态为 `VERIFIED_NOT_ACTIVATED`，真实身份、店铺授权、设备验收和发布各自需要实际证据。[合同接收说明](docs/reference-sop-unified-contract-intake.md)。
+正式 v11 输入继续绑定来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 OpenAPI 1.29.1 / schema 1.33。后继 v12 绑定来源 `0405c5651564958702ddd5484bbf41a0f193515f` 的 OpenAPI 1.30.0 / schema 1.34，30 文件已精确接收、验证并复用，独立类型与运行 validator 消费通过。旧十件生成物及前87项迁移保持原字节。v12 明确完整选择资格、原查询回执绑定及资源停用材料和质量合同，正常0088本地实现已通过完整PG15、FAQ、SOP与非空实际恢复验证，资源独立停用、回滚后新H和旧H终态、完整选择及明确Q绑定已有实际证据。交付按对应PR与主干检查继续，桌面真实后端联验及完整Gate B继续收尾。原表仅用于仓外受控核对，业务缺项继续 blocked。合同状态为 `VERIFIED_NOT_ACTIVATED`，真实身份、店铺授权、设备验收和发布各自需要实际证据。[合同接收说明](docs/reference-sop-unified-contract-intake.md)。
 
 SOP 八组 PostgreSQL 回归由 API `test:integration:sop` 串行执行，覆盖既有五专项及正常写入、查询、续用。默认套件的 skip 与专项结果按用例身份及源码输入核对。其余受控评测、设备与环境门继续各自保留。
 
