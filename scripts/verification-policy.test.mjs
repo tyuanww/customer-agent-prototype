@@ -243,7 +243,7 @@ test('packaging inputs select unsigned Windows and Linux package checks under th
     assert.equal(plan.jobs.packaging, true, file);
     assert.equal(plan.jobs.windows, true, file);
     assert.equal(plan.jobs.linux, true, file);
-    assert.deepEqual(ids(plan, 'windows'), ['windows-package'], file);
+    assert.deepEqual(ids(plan, 'windows'), ['windows-package', 'windows-owned-electron'], file);
     assert.deepEqual(ids(plan, 'linux'), ['linux-package'], file);
     assert.ok(plan.requiredJobs.includes('windows'), file);
     assert.ok(plan.requiredJobs.includes('linux'), file);
@@ -251,6 +251,24 @@ test('packaging inputs select unsigned Windows and Linux package checks under th
   }
 
   assert.equal(map.owners.filter((owner) => owner.id === 'desktop').length, 1);
+});
+
+test('Windows process cleanup follows packaging through the map-owned Windows lane', () => {
+  const commands = [
+    ['pnpm', 'package:win'],
+    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/owned-electron-windows.spec.ts'],
+  ];
+  for (const file of ['apps/desktop/tests/e2e/owned-electron-windows.spec.ts', 'apps/desktop/tests/support/owned-electron.ts']) {
+    const plan = verificationPlan([file], map);
+    assert.equal(plan.jobs.windows, true, file);
+    assert.ok(plan.requiredJobs.includes('windows'), file);
+    assert.deepEqual(planLaneCommands(plan, 'windows'), commands, file);
+  }
+  assert.deepEqual(planLaneCommands(verificationPlan([], map), 'windows'), commands);
+  const mainWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const windows = workflowJob(mainWorkflow, 'windows-feasibility');
+  assert.match(windows, /verification-policy\.mjs run --base HEAD --head HEAD --lane windows/u);
+  assert.doesNotMatch(windows, /run: pnpm package:win/u);
 });
 
 test('every source-code owner selects one deduplicated typecheck quick check', () => {

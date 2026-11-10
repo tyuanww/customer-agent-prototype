@@ -46,14 +46,16 @@ const SOP_LIFECYCLE_INPUT_BUDGET_BYTES = 531 * 1024;
 // FINAL-005-C counts the 0086 source/output, query facts, HTTP tests and docs.
 // The measured retained-input excess, including the context boundary cases, needs 123 KiB.
 const SOP_QUERY_INPUT_BUDGET_BYTES = 123 * 1024;
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES;
+// The shared Windows verification route and its policy regression retain 3 KiB.
+const VERIFICATION_POLICY_INPUT_BUDGET_BYTES = 3 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.
   // The 3.34 MiB correction includes the 548-header proof and needs 3.4 MiB.
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   // Corrected intake and the foundation consumers also increase source inputs.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
