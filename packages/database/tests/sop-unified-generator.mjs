@@ -34,7 +34,7 @@ test('formal generator appends only the verified unified storage and preserves t
     const first = buildDatabaseMigrationOutputs(input, { projectRoot });
     const second = buildDatabaseMigrationOutputs(input, { projectRoot });
     assert.equal(prior.migrations.length, 83);
-    assert.equal(first.migrations.length, 84);
+    assert.equal(first.migrations.length, 85);
     assert.deepEqual(first.migrations.slice(0, 83), prior.migrations);
     assert.deepEqual(first.outputs, second.outputs);
     assert.equal(sha256(JSON.stringify(first.manifest.migrations.slice(0, 83))), '21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae');
@@ -52,6 +52,12 @@ test('formal generator appends only the verified unified storage and preserves t
     assert.equal(added.sql.includes('sop_query_normalize'), false);
     assert.equal(added.sql.includes('CREATE TABLE public.content_current'), false);
     assert.equal(sha256(added.sql), added.sha256);
+    const lifecycle = first.migrations[84];
+    assert.equal(lifecycle.id, '0085_sop_unified_lifecycle');
+    assert.equal(lifecycle.source_git_sha, manifest.source_git_sha);
+    assert.equal(sha256(lifecycle.sql), lifecycle.sha256);
+    assert.equal(first.manifest.compatibility.sop_lifecycle_overlay.migration_sha256, lifecycle.sha256);
+    assert.ok(lifecycle.sql.includes(readFileSync(path.join(projectRoot, 'packages/database/overlays/0085_sop_unified_lifecycle.sql'), 'utf8').trimEnd()));
     assert.throws(() => buildDatabaseMigrationOutputs({ ...input,
       sopUnified: { manifest, storage_source: `${storage}\n-- drift` } }, { projectRoot }), /bytes or transaction boundary drifted/);
     assert.throws(() => buildDatabaseMigrationOutputs({ ...snapshot,
@@ -80,7 +86,7 @@ test('existing generation check rejects artifact drift and missing unified sourc
   assert.equal(readFileSync(target, 'utf8'), original);
 });
 
-test('snapshot consumption accepts only the locked formal 84 and its immutable predecessor', async t => {
+test('snapshot consumption accepts only the locked formal 85 and its immutable predecessors', async t => {
   const root = copyProduct(t);
   const migrationManifest = path.join(root, 'packages/database/migrations/manifest.generated.json');
   const originalManifest = readFileSync(migrationManifest, 'utf8');
@@ -100,6 +106,12 @@ test('snapshot consumption accepts only the locked formal 84 and its immutable p
     value => { value.compatibility.sop_unified_successor.storage_sha256 = '0'.repeat(64); },
     value => { value.compatibility.sop_unified_successor.migration_sha256 = '0'.repeat(64); },
     value => { value.migrations[82].source_git_sha = '0'.repeat(40); },
+    value => { value.migrations.pop(); },
+    value => { value.migrations[84].id = '0085_other'; },
+    value => { value.migrations[84].sha256 = '0'.repeat(64); },
+    value => { value.migrations[84].source_ranges = [{ start_line: 1, end_line: 1 }]; },
+    value => { value.compatibility.sop_lifecycle_overlay.source_sha256 = '0'.repeat(64); },
+    value => { value.compatibility.sop_lifecycle_overlay.migration_sha256 = '0'.repeat(64); },
   ];
   for (const mutate of mutations) {
     const value = JSON.parse(originalManifest);
@@ -111,6 +123,8 @@ test('snapshot consumption accepts only the locked formal 84 and its immutable p
   const relativeFiles = [
     'packages/database/migrations/0083_sop_pipeline_projection.sql',
     'packages/database/migrations/0084_sop_unified_storage.sql',
+    'packages/database/migrations/0085_sop_unified_lifecycle.sql',
+    'packages/database/overlays/0085_sop_unified_lifecycle.sql',
     'contracts/upstream/customer-agent/sop-unified-contract-set.lock.json',
     'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json',
     `contracts/upstream/customer-agent/${manifest.contract_set_id}/storage.v1.sql`,

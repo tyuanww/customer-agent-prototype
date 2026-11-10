@@ -1,4 +1,4 @@
-import { type components } from '@customer-agent/contracts';
+import { type components } from './contract-view.js';
 import type { ParseResult } from '@customer-agent/content-intake';
 import type { Source } from './authority.js';
 import { readCandidate, materialFor, type Job } from './candidate.js';

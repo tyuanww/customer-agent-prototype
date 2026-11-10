@@ -1,11 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { canonical, digest, SNAPSHOT_VOCABULARY_LIMIT, snapshotVocabularyKeys } from './material.js';
 import { listPreviews, previewApplies, type LinkedPreview } from './linked-preview.js';
 import { clock, createIntakeTransactions, lockProductSession, requireFresh, IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
+import { intakeView, withIntakeView } from './contract-view.js';
+import { readCurrent, snapshotPage } from './sop-graph.js';
+import type { IntakeResult } from './transaction.js';
 
 type C = components['schemas'];
+export type IntakeSnapshotView = C['IntakeSnapshot'] | import('@customer-agent/contracts').components['schemas']['IntakeSnapshot'];
 /** Immutable server-owned context, reconstructed from storage for every page.
  * Main owns its current selection; it never resends selection with pagination. */
 type IntakeUsageContext = {
@@ -33,8 +37,9 @@ const memoryPreviewReader: IntakePreviewReader = {
     return item.storage;
   },
 };
-type ScopeRow = { source_id: string; scope: C['IntakeSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
+type ScopeRow = { source_id: string; scope: C['IntakeSopSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
+  contract_view: 'legacy' | 'graph';
   principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string;
   product_ids: string[]; scenario_ids: string[] };
 
@@ -79,8 +84,9 @@ async function scopesFor(client: IntakeTransaction, actor: Principal, shop: stri
       WHERE allowed.scope_id=s.scope_id AND allowed.source_id=src.source_id
     ) granted ON TRUE
     WHERE s.tenant_id=$2 AND s.app_id=$3 AND (s.shop_id=$4 OR s.shop_id IS NULL)
+      AND ($7::boolean OR s.domain<>'sop')
       AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM content_intake.entitlement_scopes es WHERE es.entitlement_hash=$5 AND es.source_id=src.source_id))
-    ORDER BY src.source_id COLLATE "C"`, [actor.id, actor.tenantId, actor.appId, shop, hash ?? null, at]);
+    ORDER BY src.source_id COLLATE "C"`, [actor.id, actor.tenantId, actor.appId, shop, hash ?? null, at, intakeView() !== 'legacy']);
   if (hash) {
     const count = await client.query<{ count: string }>('SELECT count(*) FROM content_intake.entitlement_scopes WHERE entitlement_hash=$1', [hash]);
     if (Number(count.rows[0]!.count) !== rows.length || rows.some(s => !s.until || s.mode !== 'v2-preview')) {
@@ -92,6 +98,7 @@ async function scopesFor(client: IntakeTransaction, actor: Principal, shop: stri
   if (!brands.size) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
   const selected = authorized.filter(s => brands.has(s.scope.brandId));
   if (selected.length !== rows.length && hash) throw new IntakeRejection('PERMISSION_CHANGED', 'FORBIDDEN');
+  if (intakeView() === 'unsupported') throw new IntakeRejection('UPGRADE_REQUIRED');
   for (const s of selected) client.validUntil(s.until!.getTime());
   return selected;
 }
@@ -290,6 +297,10 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         const issued=await clock(client);
         let until=Math.min(who.validUntil,sessionUntil,issued+300_000,...scopes.map(s=>s.until!.getTime()),
           await releaseDeadline(client,release,who.tenantId),await contentDeadline(client,release,scopes,ctx,issued));
+        if (intakeView() === 'graph') {
+          const graph = await client.query<{ until: Date | null }>('SELECT content_intake.read_sop_graph_deadline($1,$2) AS until', [who.id, release]);
+          until = Math.min(until, graph.rows[0]!.until?.getTime() ?? Infinity);
+        }
         const lease=await client.query<{ offline_lease_token: string; lease_expires_at: Date; release_id: string }>(
           'SELECT * FROM public.issue_snapshot_offline_lease($1,$2,300)',[binding(ctx,scopes),who.userId]);
         const base=lease.rows[0]!;
@@ -302,9 +313,9 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         client.validUntil(until);
         const id=`ite_${randomBytes(32).toString('hex')}`, hash=digest(id);
         await client.query(`INSERT INTO content_intake.entitlements(entitlement_hash,principal_id,user_id,lease_token_hash,release_id,
-          shop_id,context_generation,principal_generation,release_generation,issued_at,valid_until)
-          SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9 FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
-        [hash,who.id,who.userId,leaseHash,release,ctx.shopId,ctx.contextGeneration,who.generation,new Date(until)]);
+          shop_id,context_generation,principal_generation,release_generation,issued_at,valid_until,contract_view)
+          SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9,$10 FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
+        [hash,who.id,who.userId,leaseHash,release,ctx.shopId,ctx.contextGeneration,who.generation,new Date(until),intakeView()]);
         await client.query('INSERT INTO content_intake.entitlement_scopes SELECT $1,unnest($2::text[])',[hash,scopes.map(s=>s.source_id)]);
         await client.query(`INSERT INTO content_intake.entitlement_contexts(entitlement_hash,session_token_hash,product_ids,scenario_ids)
           VALUES ($1,$2,$3,$4)`,[hash,sessionTokenHash,ctx.productIds,ctx.scenarioIds]);
@@ -312,7 +323,7 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           revocationGeneration:who.generation,validUntil:new Date(until).toISOString(),scopes:scopes.map(s=>s.scope) };
       },v=>parseContractSchema('IntakeEntitlement',v));
     },
-    snapshot(actor: AuthenticatedUser, raw: unknown) {
+    snapshot(actor: AuthenticatedUser, raw: unknown): Promise<IntakeResult<IntakeSnapshotView>> {
       return run(actor,'snapshot',null,null,async (client,who) => {
         const req=page(raw), hash=digest(req.entitlementId), {hash:sessionTokenHash}=await lockProductSession(client,actor);
         const leases=await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,c.product_ids,c.scenario_ids
@@ -325,13 +336,15 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           productIds:lease.product_ids,scenarioIds:lease.scenario_ids};
         if (Number(lease.principal_generation)!==who.generation) throw new IntakeRejection('PERMISSION_CHANGED','FORBIDDEN');
         if (Math.min(lease.valid_until.getTime(),lease.expires_at.getTime())<=await clock(client)) throw new IntakeRejection('LEASE_EXPIRED','FORBIDDEN');
-        const scopes=await scopesFor(client,who,ctx.shopId,hash);
+        const scopes=await withIntakeView(lease.contract_view, () => scopesFor(client,who,ctx.shopId,hash));
         if (lease.client_id!==binding(ctx,scopes)) throw new IntakeRejection('SCOPE_DENIED','NOT_FOUND');
+        if (lease.contract_view !== intakeView()) throw new IntakeRejection('UPGRADE_REQUIRED');
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
         const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),await releaseDeadline(client,lease.release_id,who.tenantId));
         client.validUntil(until);
         await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
-        const after=cursor(req.cursor,hash);
+        const successor = intakeView() === 'graph';
+        const after=successor ? ['',''] : cursor(req.cursor,hash);
         // Resolve the complete authorized set BEFORE pagination. Each selected
         // product/scenario gets an integer slot (one unrestricted slot if empty).
         // Multiranges union scenario coverage per product without expanding the
@@ -373,12 +386,12 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           WHERE NOT hidden.keys ? jsonb_build_array(source_id,business_entry_id)::text
             AND (source_id COLLATE "C",business_entry_id COLLATE "C")>($6::text COLLATE "C",$7::text COLLATE "C")
           ORDER BY source_id COLLATE "C",business_entry_id COLLATE "C" LIMIT $8`,
-        [lease.release_id,scopes.map(s=>s.source_id),lease.issued_at,ctx.productIds,ctx.scenarioIds,...after,req.limit+1]);
+        [lease.release_id,scopes.map(s=>s.source_id),lease.issued_at,ctx.productIds,ctx.scenarioIds,...after,successor ? 5001 : req.limit+1]);
         const rows: typeof result.rows=[];
         let vocabularyKeys=new Set<string>();
-        for (const row of result.rows.slice(0,req.limit)) {
+        for (const row of result.rows.slice(0,successor ? 5000 : req.limit)) {
           const combined=new Set([...vocabularyKeys,...snapshotVocabularyKeys(row.e)]);
-          if (combined.size>SNAPSHOT_VOCABULARY_LIMIT) {
+          if (!successor && combined.size>SNAPSHOT_VOCABULARY_LIMIT) {
             // An older unsupported single row is a visible limit failure, never
             // silently truncated or skipped. New candidates cannot reach here.
             if (!rows.length) throw new IntakeRejection('FILE_LIMIT','VALIDATION');
@@ -395,7 +408,11 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         }) }));
         // Only referenced display versions travel with this page. A later rename
         // must not rewrite the meaning/label of an immutable release.
-        const refs=faq.flatMap(f=>[...f.entry.productRefs,...f.entry.scenarioRefs]);
+        const graphs = successor ? (await readCurrent(client, who, hash)).graphs : [];
+        const refs=[...faq.flatMap(f=>[...f.entry.productRefs,...f.entry.scenarioRefs]),
+          ...graphs.flatMap(g => [...g.payload.definition.header.applicability.productRefs,...g.payload.definition.header.applicability.scenarioRefs,
+            ...g.payload.entries.flatMap(e => [...e.entry.productRefs,...e.entry.scenarioRefs]),
+            ...g.payload.media.flatMap(m => [...m.applicability.productRefs,...m.applicability.scenarioRefs])])];
         const vocabulary=await client.query<{ value: C['IntakeVocabulary'] }>(`SELECT DISTINCT jsonb_build_object('id',v.vocabulary_id,
           'kind',v.kind,'displayVersion',d.display_version,'displayName',d.display_name,'meaningDigest',v.meaning_digest,'active',v.active,
           'scope',jsonb_build_object('tenantId',s.tenant_id,'appId',s.app_id,'brandId',s.brand_id,'shopId',s.shop_id,'domain',s.domain,'sourceId',NULL)) AS value
@@ -405,14 +422,19 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
           JOIN content_intake.scopes s USING(scope_id) ORDER BY value`,[JSON.stringify(refs)]);
         const expected=new Set(refs.map(r=>`${r.id}:${r.displayVersion}`));
         if (vocabulary.rows.length!==expected.size || vocabulary.rows.some(v=>!v.value.active)) throw new IntakeRejection('SOURCE_MISMATCH','FORBIDDEN');
+        if (successor) {
+          if (result.rows.length > 5000) throw new IntakeRejection('FILE_LIMIT','VALIDATION');
+          return snapshotPage({ releaseId: lease.release_id, entitlementId: req.entitlementId, contextGeneration: ctx.contextGeneration,
+            faq, vocabulary: vocabulary.rows.map(v => v.value), graphs }, req.cursor, req.limit);
+        }
         const last=rows.at(-1);
         // Cursor is only a bounded keyset position, not authority. Rechecked
         // entitlement/scopes/selection always determine the accessible rows.
-        return { releaseId:lease.release_id,entitlementId:req.entitlementId,contextGeneration:ctx.contextGeneration,faq,
+        return parseContractSchema('IntakeSnapshot', { releaseId:lease.release_id,entitlementId:req.entitlementId,contextGeneration:ctx.contextGeneration,faq,
           // The consumed IntakeSnapshot contract keeps media, sopNodes and sopEdges at maxItems 0.
           // Related images are read through preview(), which returns bytes for this release only.
           sopNodes:[],sopEdges:[],media:[],vocabulary:vocabulary.rows.map(v=>v.value),
-          nextCursor:result.rows.length>rows.length && last ? Buffer.from(JSON.stringify([hash,last.source_id,last.business_entry_id])).toString('base64url') : null };
+          nextCursor:result.rows.length>rows.length && last ? Buffer.from(JSON.stringify([hash,last.source_id,last.business_entry_id])).toString('base64url') : null });
       },v=>parseContractSchema('IntakeSnapshot',v));
     },
     async preview(actor: AuthenticatedUser, raw: unknown) {

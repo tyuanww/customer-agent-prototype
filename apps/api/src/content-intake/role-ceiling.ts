@@ -1,4 +1,4 @@
-import type { components } from '@customer-agent/contracts';
+import type { components } from './contract-view.js';
 
 type Action = components['schemas']['IntakeAction'];
 

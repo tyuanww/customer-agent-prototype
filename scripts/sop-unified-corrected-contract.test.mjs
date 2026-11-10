@@ -127,6 +127,7 @@ function fixture(t, mutate = () => {}) {
   }
   predecessor.migrations = predecessor.migrations.slice(0, 83);
   delete predecessor.compatibility.sop_unified_successor;
+  delete predecessor.compatibility.sop_lifecycle_overlay;
   writeFileSync(migrationManifest, json(predecessor));
   return { source, bundle, product, manifest, files };
 }

@@ -127,6 +127,7 @@ export const PROTECTED_ROUTE_POLICIES = createRoutePolicyRegistry([
   ['GET /v1/intake/snapshot', requires('query')],
   ['GET /v1/intake/authorization', requires(...intakeRead)],
   ['GET /v1/intake/sources', requires(...intakeRead)],
+  ['GET /v1/intake/policy', requires(...intakeRead)],
 
   ['GET /v1/intake/sources/:sourceId/management-context', requires('import')],
   ['GET /v1/intake/principals', requires(...grantOrImport)],
@@ -145,6 +146,7 @@ export const PROTECTED_ROUTE_POLICIES = createRoutePolicyRegistry([
   ['POST /v1/intake/candidates/:candidateId/versions/:version/cancel', requires('candidate-cancel')],
   ['GET /v1/intake/candidates/:candidateId/versions/:version/review', requires('review')],
   ['GET /v1/intake/candidates/:candidateId/versions/:version/quality', requires('review')],
+  ['GET /v1/intake/candidates/:candidateId/versions/:version/sop/media/:mediaObjectId', requires('review')],
   ['GET /v1/intake/candidates/:candidateId/versions/:version/quality/samples', requires('review')],
   ['POST /v1/intake/candidates/:candidateId/versions/:version/quality/freeze', requires('review')],
   ['POST /v1/intake/candidates/:candidateId/versions/:version/quality/checks', requires('review')],

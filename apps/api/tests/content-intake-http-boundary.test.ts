@@ -2,7 +2,10 @@ import { request as httpRequest, type ClientRequest, type IncomingHttpHeaders } 
 import Fastify from 'fastify';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createMockAuthService } from '../src/auth-service.js';
-import { intakeHttpBoundary } from '../src/content-intake/http-boundary.js';
+import { intakeFailure, intakeHttpBoundary } from '../src/content-intake/http-boundary.js';
+import { SOP_CONTRACT_SET } from '../src/content-intake/contract-view.js';
+import { parseContractSchema as parseLegacySchema } from '@customer-agent/contracts';
+import { parseContractSchema as parseGraphSchema } from '@customer-agent/contracts/sop-unified';
 
 const apps: ReturnType<typeof Fastify>[] = [];
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())); });
@@ -19,6 +22,7 @@ async function host() {
       intakeHttpBoundary(child, auth);
       child.get('/read', read);
       child.post('/write', async request => request.body);
+      child.get('/media-failure', async (_request, reply) => intakeFailure(reply, 'CONFLICT', 'SOP_MEDIA_UNAVAILABLE'));
     });
   });
   const origin = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -47,6 +51,22 @@ it('accepts empty GET framing once even across nested intake hooks', async () =>
     expect(JSON.parse(response.body)).toEqual({ ok: true });
   }
   expect(f.read).toHaveBeenCalledTimes(3);
+});
+
+it('keeps inherited graph media failures within the selected error contract', async () => {
+  const f = await host();
+  for (const contract of [undefined, SOP_CONTRACT_SET]) {
+    const headers = contract ? { ...f.headers, 'X-Intake-Contract-Set': contract } : f.headers;
+    const response = await fetch(`${f.origin}/media-failure`, { headers });
+    const body: unknown = await response.json();
+    if (contract) {
+      expect(response.status).toBe(503);
+      expect(parseGraphSchema('IntakeError', body).error.details.reason).toBe('SOP_MEDIA_UNAVAILABLE');
+    } else {
+      expect(response.status).toBe(409);
+      expect(parseLegacySchema('IntakeError', body).error.details.reason).toBe('MATERIAL_CHANGED');
+    }
+  }
 });
 
 it('rejects nonempty GETs before business code and closes the failed connection', async () => {

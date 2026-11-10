@@ -101,8 +101,9 @@ apps/api/tests/support/g1a-e0（test-only；不进入 dist）
 | `apps/api/src/content-intake/discovery.ts` managementContext | 在原内容事务和发布锁内投影当前来源版本、本人 principal、事实版本、发布基线及最早有效期；只允许当前来源 import，receive 重新验权并比较版本 | 只读输入提示，不是资格、租约或提交票据；仅隔离宿主注册，不从 userId 推断主体或把未知基线当空值 |
 | `apps/api/src/content-intake/discovery.ts` candidates | 会话及完整权限绑定的候选游标；每页最多扫描 limit 个版本，readiness 复用 readCandidate | 可因动态状态过滤返回带 nextCursor 的空页；非同一时刻快照；不推断当前发布基线 |
 | `apps/api/src/content-intake/discovery.ts` principals / `transaction.ts` 身份投影 | 冻结参与人目录的来源/用途授权、会话及权限绑定游标；transaction 统一拥有主体事实/岗位投影，一次批量读取最多 limit+1 条身份；正式账号从 `app_users.display_name` 取标签，合成宿主可显式注入登记标签 | 贡献人可禁用或无业务 grant，授权接收人复用原岗位/同人规则并须事实新鲜；系统主体及两个旧合成身份的已知旧事实不进入目录，后者作为当前操作者或有新事实、姓名、飞书绑定、组织登记或核对基线后的新登录时恢复正常判断。迁移 0079 的受限函数只返回新身份活动的布尔值，不暴露身份标识；通过用途过滤的主体缺标签时整页失败，历史和授权不变 |
+| `apps/api/src/content-intake/sop-graph.ts` / `contract-view.ts` | 现有 facade 内的完整图闭包、canonical、精确依赖、媒体 owner、联合质量目标及受控当前图分页；exact view 通过可信请求上下文传递，持久 job 与 receipt 保留原 view | 既有权限、事务、current 与回执所有者继续负责原职责；005C query wire 与权限事实、005D continuation 与最终图片消费由后续单元接线 |
 | `apps/api/experiments/content-intake-p1/` | P1 权限/委派、材料/人工审批证据与提交点合成模型；复用 test-support 身份摘要工具 | API dist、正式 HTTP/DB 权限、真实飞书请求或第二发布指针 |
-| `packages/database/` | 在同一已验证快照内确定性生成当前八十一段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫，0035追加旧CHECK执行闭包，0079 投影身份活动，0080 将导入批次租户绑定到当前内容主体，0081 拒绝没有 principal 或只有 `default` 租户主体的新增导入批次；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
+| `packages/database/` | 在同一已验证快照内确定性生成当前八十五段 migration：0031/0032 为直发增量，0033 原子安装冻结运行伴随合同，0034 追加CSV格式守卫，0035追加旧CHECK执行闭包，0079 投影身份活动，0080 将导入批次租户绑定到当前内容主体，0081 拒绝没有 principal 或只有 `default` 租户主体的新增导入批次；0082 收敛权限 evaluator，0083 保存旧 SOP projection，0084 登记 unified storage，0085 完成正常图生命周期事务；拥有 catalogue、私有账本、合法前缀／N-1 升级规划、同会话锁／事务、稳定错误及 PG15 精确后验 | 创建连接、读取环境变量、API repository、desktop adapter、凭证、真实数据、部署或备份恢复 |
 | `apps/desktop/tests/unit/` | 纯函数、协议、脚本和安全合同 | 真实 OS 交互断言 |
 | `apps/desktop/tests/component/` | React 状态、焦点、拖拽和视图行为 | 打包产物验证 |
 | `apps/desktop/tests/e2e/` | Electron 窗口、renderer→preload→main 的集成链 | 把合成输入写成真实 macOS/Windows 证明 |

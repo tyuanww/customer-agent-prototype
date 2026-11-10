@@ -1,4 +1,4 @@
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { SopReleaseFacts } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
@@ -6,6 +6,9 @@ import { candidateContext, cancellationReceipt } from './candidate.js';
 import { assertSnapshotPageable } from './material.js';
 import { createIntakeTransactions, intakeReplay, IntakeRejection, type IntakeResult, type IntakeTransaction, type Reason } from './transaction.js';
 import { adoptPreviews } from './linked-preview.js';
+import type { ContentAttachmentStore, ReservedAttachment } from '../content-object-store.js';
+import { verifyGraphMedia } from './sop-graph.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Run = ReturnType<typeof createIntakeTransactions>;
@@ -71,13 +74,13 @@ const denials = new Set<Reason>(['FILE_LIMIT','MATERIAL_CHANGED','ALREADY_PUBLIS
 /** Owns confirmed direct publication followed by one atomic local commit.
  * Tickets never leave the server. A lost COMMIT response is recovered under the
  * original operation; a replay is a historical receipt, not current read authority. */
-export function createIntakePublication(run: Run) {
+export function createIntakePublication(run: Run, store?: Partial<ContentAttachmentStore>) {
   return {
     async publish(actor: AuthenticatedUser, raw: unknown): Promise<IntakeResult<C['IntakeReceipt']>> {
       const prepared = await run(actor,'publish-prepare',null,null,async (client,who) => {
         const req = parseContractSchema('IntakePublish',raw);
         const prior = await intakeReplay(client,who,'publish',json(req),req.operationId,receipt);
-        if (prior) return { req, prior: prior.value };
+        if (prior) return { req, prior: prior.value, media: [] };
         const c = await candidateContext(client,who,req.key,'publish',true);
         // Also guard durable candidates created before the reader's admission rule.
         assertSnapshotPageable(c.material.entries);
@@ -85,14 +88,18 @@ export function createIntakePublication(run: Run) {
         if (c.view.sourceEvidenceVersion!==req.sourceEvidenceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
         if (c.view.publicationPolicy !== 'direct-v1') throw new IntakeRejection('MODE_CONFLICT');
         if (!req.title.trim()) throw new IntakeRejection('FILE_INVALID','VALIDATION');
-        return { req, prior: null };
-      },v => v as { req: C['IntakePublish']; prior: C['IntakeReceipt'] | null });
+        const media = (await client.query<{ value: ReservedAttachment[] }>('SELECT content_intake.sop_graph_publish_media($1,$2,$3) AS value',
+          [who.id, req.key.candidateId, req.key.version])).rows[0]!.value;
+        return { req, prior: null, media };
+      },v => v as { req: C['IntakePublish']; prior: C['IntakeReceipt'] | null; media: ReservedAttachment[] });
       if (!prepared.ok) return prepared;
       const { req,prior } = prepared.value;
       if (prior) {
         projectPublishedPreviews(prior);
         return { ok:true,value:prior };
       }
+      try { await verifyGraphMedia(store, prepared.value.media); }
+      catch (error) { return run(actor,'publish-media',null,null,async () => { throw error; },receipt); }
       const result = await run(actor,'publish',json(req),req.operationId,async (client,who) => {
         try {
           const result = await client.query<{ value: { receipt: unknown; validUntil: string } }>(
@@ -129,9 +136,10 @@ export function createIntakePublication(run: Run) {
       const result = await run(actor,'operation-receipt',null,null,async (client,who) => {
         const op = parseContractSchema('IntakeId',operationId);
         if (action !== 'publish' && action !== 'cancel' && action !== 'rollback') throw new IntakeRejection('FILE_INVALID','VALIDATION');
-        const saved = await client.query<{ response: unknown }>(`SELECT response FROM backend_review.receipts
+        const saved = await client.query<{ response: unknown; contract_view: string }>(`SELECT response,contract_view FROM backend_review.receipts
           WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3`,[who.userId,`intake:${action}`,op]);
         if (!saved.rows[0]) throw new IntakeRejection('COMMIT_UNKNOWN','NOT_FOUND');
+        if (saved.rows[0].contract_view !== intakeView()) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
         const result = action === 'cancel' ? cancellationReceipt(op,saved.rows[0].response)
           : parseContractSchema('IntakeOperationReceipt',saved.rows[0].response);
         if (result.operationId !== op || result.action !== action) throw new IntakeRejection('COMMIT_UNKNOWN');

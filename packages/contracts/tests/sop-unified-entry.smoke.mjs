@@ -36,7 +36,7 @@ function checkRejected(name, value) {
 }
 
 test('public SOP unified entry compiles every component and preserves both registries', () => {
-  assert.equal(unified.contractSchemaNames.length, 79);
+  assert.equal(unified.contractSchemaNames.length, 128);
   assert.equal(legacy.contractSchemaNames.length, 246);
   assert.notEqual(unified.ContractValidationError, legacy.ContractValidationError);
   for (const name of unified.contractSchemaNames) assert.doesNotThrow(() => unified.validateContractSchema(name, null));
@@ -231,6 +231,7 @@ test('normal generation is idempotent and rejects output, source, lock and membe
   try {
     cpSync(path.join(projectRoot, 'contracts'), path.join(directory, 'contracts'), { recursive: true });
     cpSync(path.join(projectRoot, 'packages/database/migrations'), path.join(directory, 'packages/database/migrations'), { recursive: true });
+    cpSync(path.join(projectRoot, 'packages/database/overlays'), path.join(directory, 'packages/database/overlays'), { recursive: true });
     writeFileSync(path.join(directory, 'package.json'), readFileSync(path.join(projectRoot, 'package.json')));
     const first = await generateContracts({ projectRoot: directory });
     const readArtifacts = () => new Map(first.files.map((file) => [file, readFileSync(path.join(directory, file))]));

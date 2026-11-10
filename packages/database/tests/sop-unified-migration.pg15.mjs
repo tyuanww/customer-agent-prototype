@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { readFileSync, realpathSync } from 'node:fs';
 import test from 'node:test';
 import { Pg15Harness } from '../dist/testkit/index.js';
-import { applyDatabaseMigrations, applyMigrationPrefix, verifyDatabaseMigrations } from '../dist/index.js';
+import { applyMigrationPrefix } from '../dist/index.js';
 import { applyMigrationCatalogue } from '../dist/runner.js';
 import { verifyReadinessSuccessor } from '../dist/verifier.js';
 import { generatedMigrationCatalogue as catalogue } from '../dist/generated/migrations.generated.js';
 
 const prefix = { ...catalogue, migrations: catalogue.migrations.slice(0, 83) };
+// Preserve the foundation's historical 83→84 proof separately from normal hosts,
+// which install and verify the entire current catalogue.
+const storageCatalogue = { ...catalogue, migrations: catalogue.migrations.slice(0, 84) };
+const applyDatabaseMigrations = client => applyMigrationCatalogue(client, storageCatalogue);
+const verifyDatabaseMigrations = client => verifyReadinessSuccessor(client, storageCatalogue);
 const graphTables = ['sop_graph_versions', 'sop_graph_media_bindings', 'sop_graph_quality_targets',
   'sop_graph_quality_checks', 'sop_graph_release_lineage', 'sop_graph_release_media',
   'sop_active_uses', 'sop_graph_disable_events', 'sop_query_leases'];
@@ -29,7 +34,7 @@ async function expectNoUnifiedStorage(client) {
   assert.equal((await receipts(client)).length, 83);
 }
 
-test('formal unified SOP migration on isolated PostgreSQL 15', { timeout: 180000 }, async t => {
+test('historical unified SOP storage migration on isolated PostgreSQL 15', { timeout: 180000 }, async t => {
   const pg = new Pg15Harness();
   const clients = [];
   const clusters = [pg];
@@ -122,7 +127,7 @@ test('formal unified SOP migration on isolated PostgreSQL 15', { timeout: 180000
       }
       return retry.query(...args);
     } };
-    await assert.rejects(applyMigrationCatalogue(interrupted, catalogue), error => error.code === 'MIGRATION_APPLY_FAILED' && error.migrationId === '0084_sop_unified_storage' && error.databaseCode === '22012');
+    await assert.rejects(applyMigrationCatalogue(interrupted, storageCatalogue), error => error.code === 'MIGRATION_APPLY_FAILED' && error.migrationId === '0084_sop_unified_storage' && error.databaseCode === '22012');
     assert.equal(injected, true);
     await expectNoUnifiedStorage(retry);
     assert.deepEqual(await receipts(retry), beforeRetry);
@@ -144,7 +149,7 @@ test('formal unified SOP migration on isolated PostgreSQL 15', { timeout: 180000
       }
       return result;
     } };
-    await assert.rejects(applyMigrationCatalogue(lostAcknowledgement, catalogue), error => error.code === 'MIGRATION_COMMIT_UNKNOWN');
+    await assert.rejects(applyMigrationCatalogue(lostAcknowledgement, storageCatalogue), error => error.code === 'MIGRATION_COMMIT_UNKNOWN');
     const { host, port, user, database: name } = unknown.connectionParameters;
     await unknown.end();
     const reconnected = await pg.connect({ host, port, user, database: name });

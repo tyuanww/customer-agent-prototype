@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import { clock, IntakeRejection, principal, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
 import { roleAllows, roleMayAllocate, roleMayDelegate } from './role-ceiling.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Scope = C['IntakeScope'];
 type Grant = C['IntakeGrant'];
-export type Source = { scopeId: string; scope: C['IntakeSourceScope']; version: number;
-  templateVersion: string; ruleVersion: string; mappingVersion: string; structureDigest: string; mode: string };
+export type Source = { scopeId: string; scope: C['IntakeSopSourceScope']; version: number;
+  templateVersion: string; ruleVersion: string; mappingVersion: string; structureDigest: string; mode: string; graphMapping?: unknown };
 
 /** Bind $1 to the recipient. Shared by allocation discovery and grant selection;
  * grant_parent_guard permits delegation only under a root allocation. */
@@ -46,6 +47,7 @@ export async function authorize(client: IntakeTransaction, actor: Principal, act
     'SELECT content_intake.authorization_deadline($1,$2,$3,$4,clock_timestamp()) AS until',
     [actor.id, action, src.scopeId, src.scope.sourceId]);
   if (!rows[0]?.until) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+  if (intakeView() === 'unsupported') throw new IntakeRejection('UPGRADE_REQUIRED');
   client.validUntil(rows[0].until.getTime());
   return rows[0].until.getTime();
 }

@@ -379,6 +379,13 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0083_sop_pipeline_projection',
     requiresPredecessor: 'Unified SOP storage requires the complete formal predecessor',
   },
+  {
+    index: 84,
+    minimumCatalogueLength: 85,
+    id: '0085_sop_unified_lifecycle',
+    predecessorId: '0084_sop_unified_storage',
+    requiresPredecessor: 'SOP lifecycle requires the exact unified storage predecessor',
+  },
 ];
 
 function requiredSuccessorStep(
@@ -430,6 +437,9 @@ function matchesCatalogueSuccessorStep(
     ? migration.sha256
     : catalogue.migrations[occupiedSuccessorStep.index]?.sha256;
   return occupiedChecksum === FROZEN_OCCUPIED_SHA256
+    && (step.id !== '0085_sop_unified_lifecycle' || sameSignedSuccessor(migration, catalogue.compatibility.sopLifecycleOverlay)
+      && migration.sha256 === generatedMigrationCatalogue.migrations[84]?.sha256
+      && catalogue.migrations[83]?.sha256 === catalogue.compatibility.sopUnifiedSuccessor?.migrationSha256)
     && (step.id !== '0084_sop_unified_storage' || sameSignedSuccessor(migration, catalogue.compatibility.sopUnifiedSuccessor));
 }
 
@@ -534,7 +544,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       if (!successorSuffix) catalogueError(step.requiresPredecessor);
       matchesRepair = step === repairSuccessorStep;
       matchesReadiness = step === readinessSuccessorStep;
-      matchesUnified = step.id === '0084_sop_unified_storage';
+      matchesUnified = step.id === '0084_sop_unified_storage' || step.id === '0085_sop_unified_lifecycle';
       successorSuffix = true;
     } else if (matchesSuccessor) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);

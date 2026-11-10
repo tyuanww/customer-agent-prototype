@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { ContractValidationError, type components } from '@customer-agent/contracts';
+import { ContractValidationError, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
+import { intakeView } from './contract-view.js';
 
-export type Reason = components['schemas']['IntakeFailure']['details']['reason'];
+export type Reason = components['schemas']['IntakeFailure']['details']['reason'] | 'SOP_MAPPING_REQUIRED' | 'SOP_GRAPH_INVALID'
+  | 'SOP_DEPENDENCY_INVALID' | 'SOP_MEDIA_UNAVAILABLE' | 'SOP_RELEASE_CHANGED' | 'SOP_SNAPSHOT_INVALID';
 export class IntakeRejection extends Error {
   constructor(readonly reason: Reason, readonly code: components['schemas']['IntakeFailure']['code'] = 'CONFLICT') {
     super(reason);
@@ -125,17 +127,18 @@ export function requireFresh(p: Principal, now: number): void {
 }
 
 const requestDigest = (request: CanonicalJsonValue): string =>
-  `intake-request-v1:${createHash('sha256').update(canonicalJson(request)).digest('hex')}`;
+  `intake-request-v1:${createHash('sha256').update(canonicalJson(intakeView() === 'graph' ? ['sop-task-graph-v2', request] : request)).digest('hex')}`;
 
 /** Multi-phase commands consult the same durable receipt before doing external I/O.
  * Call under lock_content; a receipt recovers the original result, never authorizes a new write. */
 export async function intakeReplay<T>(client: Queryable, actor: Principal, command: string,
   request: CanonicalJsonValue, operationId: string, decode: (value: unknown) => T): Promise<{ value: T } | null> {
-  const prior = await client.query<{ request_hash: string; response: unknown }>(
-    'SELECT request_hash,response FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3',
+  const prior = await client.query<{ request_hash: string; response: unknown; contract_view: string }>(
+    'SELECT request_hash,response,contract_view FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3',
     [actor.userId, `intake:${command}`, operationId]);
+  if (intakeView() === 'unsupported') throw new IntakeRejection('UPGRADE_REQUIRED');
   if (!prior.rows[0]) return null;
-  if (prior.rows[0].request_hash !== requestDigest(request)) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
+  if (prior.rows[0].contract_view !== intakeView() || prior.rows[0].request_hash !== requestDigest(request)) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
   return { value: decode(prior.rows[0].response) };
 }
 
@@ -188,10 +191,12 @@ export function createIntakeTransactions(pool: IntakePool,
           return { ok: true, value: prior.value };
         }
       }
-      const value = decode(await work(transaction, who));
+      const result = await work(transaction, who);
+      if (intakeView() === 'unsupported') throw new IntakeRejection('UPGRADE_REQUIRED');
+      const value = decode(result);
       if (operationId !== null && requestHash !== null) await client.query(
-        'INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response) VALUES ($1,$2,$3,$4,$5::jsonb)',
-        [who.userId, operation, operationId, requestHash, JSON.stringify(value)]);
+        'INSERT INTO backend_review.receipts(actor_user_id,operation,request_key,request_hash,response,contract_view) VALUES ($1,$2,$3,$4,$5::jsonb,$6)',
+        [who.userId, operation, operationId, requestHash, JSON.stringify(value), intakeView()]);
       for (const check of finalChecks) await check();
       // Time spent queued or executing cannot borrow validity from transaction start.
       requireFresh(await principal(client, { id: who.id }), await clock(client));
@@ -213,6 +218,10 @@ export function createIntakeTransactions(pool: IntakePool,
       // Keep the public code/reason aligned with the unknown commit state.
       if (committing || broken) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       const rejection = error instanceof IntakeRejection ? error
+        : error instanceof Error && 'code' in error && error.code === 'ZA002' && error.message === 'SCOPE_DENIED'
+          ? new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND')
+        : error instanceof Error && 'code' in error && error.code === 'ZA003' && /^(SOP_MAPPING_REQUIRED|SOP_GRAPH_INVALID|SOP_DEPENDENCY_INVALID|SOP_MEDIA_UNAVAILABLE|MATERIAL_CHANGED|BASE_CHANGED|SOURCE_MISMATCH|PERMISSION_CHANGED|IDEMPOTENCY_CONFLICT)$/.test(error.message)
+          ? new IntakeRejection(error.message as Reason)
         : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SOURCE_FORMAT_MISMATCH'
           ? new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION')
           : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')

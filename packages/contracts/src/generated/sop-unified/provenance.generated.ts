@@ -111,7 +111,7 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
-  "component_schema_count": 79,
+  "component_schema_count": 128,
   "tools": {
     "openapi_typescript": "7.13.0",
     "yaml": "2.9.0",
@@ -121,18 +121,18 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "artifacts": {
     "bundle": {
       "path": "packages/contracts/openapi/sop-unified/bundle.generated.yaml",
-      "sha256": "1b809b017c1e9f98c85f294023eee306e53d158b0f14101f0c12a9bcd15b2a6f",
-      "bytes": 188868
+      "sha256": "e534e20e804101f37310386a4e1af5620e53d4252029f8f446d65f77bd916386",
+      "bytes": 236619
     },
     "types": {
       "path": "packages/contracts/src/generated/sop-unified/openapi.generated.ts",
-      "sha256": "51c4de67ed607a81b656ff25daaa5cc3676d7bff9944f3c3678dedebb422a718",
-      "bytes": 45370
+      "sha256": "7fd224e9e3569ba19ede6ea24a4ab0ab455fda78aa3fee1075e34730b5e632ec",
+      "bytes": 67674
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/sop-unified/runtime-schema.generated.ts",
-      "sha256": "3034c499f4648f88cf809f6874b222b6d8089b0c01076486eb6516120fc1b08b",
-      "bytes": 271163
+      "sha256": "56e424d4ffae7f6918389b62b55c79347dc4490e525de017772c7ceb07cddafe",
+      "bytes": 328019
     }
   }
 });

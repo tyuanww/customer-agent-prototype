@@ -1,10 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { parseContractSchema, type ContractSchemaName, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type ContractSchemaName, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authorize, source } from './authority.js';
 import { canonical, digest } from './material.js';
 import { QUALITY_LIMITS, readQualityView, type IntakeQualityProgress } from './quality.js';
 import { clock, IntakeRejection, lockProductSession, type createIntakeTransactions } from './transaction.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Phase = C['IntakeQualitySubmission']['phase'];
@@ -27,15 +28,20 @@ function query(raw: unknown, samples: boolean) {
     || ('cursor' in r && (typeof r.cursor !== 'string' || r.cursor.length < 1 || r.cursor.length > 512)))) return invalid();
   return { digest: r.digest, viewHash: r.viewHash as string, phase: r.phase as Phase, limit: limit as number, cursor: r.cursor as string | undefined };
 }
-function summary({ preview: p, progress: s }: Awaited<ReturnType<typeof readQualityView>>): C['IntakeQualityStatus'] {
+function summary({ preview: p, progress: s, graphChecks }: Awaited<ReturnType<typeof readQualityView>>): C['IntakeQualityStatus'] {
   const state = { key: s.key, state: s.state,
+    ...(intakeView() === 'graph' ? { canonicalEncodingVersion: s.canonicalEncodingVersion } : {}),
     plan: { policyVersion: 'intake-quality-v1' as const, ordinaryCount: p.ordinaryCount, mandatoryCount: p.mandatoryCount,
       withdrawalCount: p.withdrawals.length, initialTarget: p.initialTarget, expandedTarget: p.expandedTarget,
       initialCount: p.initialScriptIds.length, expandedCount: p.expandedScriptIds.length, seedHash: p.seedHash,
-      populationManifestHash: p.populationManifestHash, selectionManifestHash: p.selectionManifestHash },
+      populationManifestHash: p.populationManifestHash, selectionManifestHash: p.selectionManifestHash,
+      ...(s.sopPlan ? { sopPlan: s.sopPlan } : {}) },
     frozen: s.frozenBy === null ? null : { principalId: s.frozenBy, factsVersion: s.frozenFactsVersion, recordedAt: s.frozenAt },
     rounds: s.rounds.map(r => ({ phase: r.phase, reviewer: { principalId: r.checkedBy, factsVersion: r.factsVersion, recordedAt: r.recordedAt },
-      checkedCount: r.checks.length, defectCount: r.checks.filter(c => c.defect).length })) };
+      checkedCount: r.checks.length, defectCount: r.checks.filter(c => c.defect).length,
+      ...(s.sopPlan ? { sopChecksSummary: { checkedCount: graphChecks.filter(c => c.phase === r.phase).length,
+        defectCount: graphChecks.filter(c => c.phase === r.phase && c.check.defect).length,
+        checksDigest: digest(canonical(graphChecks.filter(c => c.phase === r.phase).map(c => c.check))) } } : {}) })) };
   return bounded('IntakeQualityStatus', { ...state, viewHash: digest(canonical(state)) }, QUALITY_LIMITS.summaryBytes);
 }
 
@@ -52,7 +58,9 @@ export function qualityReceipt(operationId: string, action: C['IntakeQualityRece
     if (!last || (last.phase !== 'initial' && last.phase !== 'expanded')) throw new Error('INVALID_QUALITY_RECEIPT');
     phase = last.phase;
   }
-  return bounded('IntakeQualityReceipt', { operationId, action, key: progress.key, state: progress.state, phase }, QUALITY_LIMITS.summaryBytes);
+  return bounded('IntakeQualityReceipt', { operationId, action, key: progress.key, state: progress.state, phase,
+    ...(intakeView() === 'graph' ? { canonicalEncodingVersion: progress.canonicalEncodingVersion ?? 'candidate-p1.1' } : {}),
+    ...(progress.sopPlan ? { sopPlan: progress.sopPlan } : {}) }, QUALITY_LIMITS.summaryBytes);
 }
 
 /** The existing quality state machine owns sampling and writes. This reader owns
@@ -78,7 +86,7 @@ export function createIntakeQualityAccess(run: ReturnType<typeof createIntakeTra
         const until = Math.min(session.validUntil, who.validUntil, await authorize(client, who, 'review', src));
         const policy = (await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [who.tenantId, who.appId])).rows[0];
         if (!policy) throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
-        const binding = canonical(['quality-samples', session.hash, who.id, who.factsVersion, who.generation, policy.version, src.version, key, status.viewHash, q.phase, q.limit]);
+        const binding = canonical(['quality-samples', intakeView(), session.hash, who.id, who.factsVersion, who.generation, policy.version, src.version, key, status.viewHash, q.phase, q.limit]);
         let start = 0, deadline = until;
         if (q.cursor) {
           const parts = q.cursor.split('.');
@@ -93,31 +101,43 @@ export function createIntakeQualityAccess(run: ReturnType<typeof createIntakeTra
         }
         client.validUntil(deadline);
         const p = view.preview, ids = q.phase === 'initial' ? p.initialScriptIds : p.expandedScriptIds;
-        if (start > 0 && start >= ids.length) return changed();
+        const total = ids.length + (view.graph?.targets.length ?? 0);
+        if (start > 0 && start >= total) return changed();
         const entries = new Map(p.entries.map(e => [e.scriptId, e.entry]));
         const population = new Map(p.population.map(r => [r.script_id, r]));
         // Expanded checks inherit immutable initial checks before that round exists.
         const checks = new Map(view.progress.rounds.filter(r => r.phase === 'initial' || q.phase === 'expanded').flatMap(r => r.checks).map(c => [c.scriptId, c]));
         const cursor = (offset: number): string | null => {
-          if (offset >= ids.length) return null;
+          if (offset >= total) return null;
           const body = Buffer.from(JSON.stringify([offset, deadline])).toString('base64url');
           return `${body}.${mac(body, binding).toString('base64url')}`;
         };
-        const page: C['IntakeQualitySamplePage'] = { key, viewHash: status.viewHash, phase: q.phase,
-          selectionManifestHash: p.selectionManifestHash, items: [], nextCursor: null };
+        const page = { key, viewHash: status.viewHash, phase: q.phase,
+          selectionManifestHash: p.selectionManifestHash, items: [] as C['IntakeQualitySample'][], nextCursor: null as string | null,
+          ...(intakeView() === 'graph' ? { canonicalEncodingVersion: view.progress.canonicalEncodingVersion } : {}),
+          ...(view.graph ? { sopItems: [] as C['IntakeSopSopQualitySample'][] } : {}) };
         // Reserve the maximum cursor and comma overhead once; complete entries
         // are measured individually so sizing stays linear even near 8 MiB.
         let bytes = Buffer.byteLength(JSON.stringify(page)) + 514;
         let end = start;
-        while (end < ids.length && page.items.length < q.limit) {
+        const limitBytes = intakeView() === 'graph' ? 1_048_576 : QUALITY_LIMITS.sampleBytes;
+        while (end < total && page.items.length + (page.sopItems?.length ?? 0) < q.limit) {
+          if (end >= ids.length && view.graph && page.sopItems) {
+            const target = view.graph.targets[end - ids.length]!;
+            const check = view.graphChecks.find(c => c.phase === q.phase && canonical(c.check.key) === canonical(target.key))?.check
+              ?? (q.phase === 'expanded' ? view.graphChecks.find(c => c.phase === 'initial' && canonical(c.check.key) === canonical(target.key))?.check : null) ?? null;
+            const item = { target, check }, added = Buffer.byteLength(JSON.stringify(item)) + 1;
+            if (bytes + added > limitBytes) break;
+            page.sopItems.push(item); bytes += added; end++; continue;
+          }
           const id = ids[end]!, row = population.get(id)!, entry = entries.get(id)!;
           if (entry.operation !== 'upsert') throw new Error('INVALID_QUALITY_SAMPLE');
           const item = { scriptId: id, contentHash: row.content_hash, mandatory: row.risk_level === 'high', entry: { ...entry, operation: entry.operation }, check: checks.get(id) ?? null };
           const added = Buffer.byteLength(JSON.stringify(item)) + (page.items.length ? 1 : 0);
-          if (bytes + added > QUALITY_LIMITS.sampleBytes) break;
+          if (bytes + added > limitBytes) break;
           page.items.push(item); bytes += added; end++;
         }
-        if (end === start && start < ids.length) throw new Error('QUALITY_SAMPLE_LIMIT');
+        if (end === start && start < total) throw new Error('QUALITY_SAMPLE_LIMIT');
         page.nextCursor = cursor(end);
         return bounded('IntakeQualitySamplePage', page, QUALITY_LIMITS.sampleBytes);
       }, value => bounded('IntakeQualitySamplePage', value, QUALITY_LIMITS.sampleBytes));
@@ -126,8 +146,9 @@ export function createIntakeQualityAccess(run: ReturnType<typeof createIntakeTra
       return run(actor, 'quality-operation-receipt', null, null, async (client, who) => {
         const id = parseContractSchema('IntakeId', operationId);
         if (action !== 'quality-freeze' && action !== 'quality-check') return invalid();
-        const saved = await client.query<{ response: unknown }>('SELECT response FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3', [who.userId, `intake:${action}`, id]);
+        const saved = await client.query<{ response: unknown; contract_view: string }>('SELECT response,contract_view FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3', [who.userId, `intake:${action}`, id]);
         if (!saved.rows[0]) throw new IntakeRejection('COMMIT_UNKNOWN', 'NOT_FOUND');
+        if (saved.rows[0].contract_view !== intakeView()) throw new IntakeRejection('IDEMPOTENCY_CONFLICT');
         return qualityReceipt(id, action, saved.rows[0].response);
       }, value => bounded('IntakeQualityReceipt', value, QUALITY_LIMITS.summaryBytes));
     },

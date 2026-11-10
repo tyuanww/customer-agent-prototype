@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { validateContractSchema } from '@customer-agent/contracts';
+import { validateContractSchema } from './contract-view.js';
 import { qualityReceipt } from './quality-access.js';
 import { QUALITY_LIMITS } from './quality.js';
 import type { Readable } from 'node:stream';
@@ -14,6 +14,7 @@ import type { IntakePool } from './transaction.js';
 import type { ApprovalAdapter } from './approval-adapter.js';
 import type { IntakePrincipalLabels } from './discovery.js';
 import { intakeFailure, intakeHttpBoundary, intakePageQuery, materialPageQuery, sendIntake } from './http-boundary.js';
+import { policyForRoute } from '../access/policy.js';
 
 const MAX_PENDING_PARSE = 10;
 
@@ -52,9 +53,20 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   seatService?: SeatService;
   report?: (diagnosticId: string, error: unknown) => void;
 }> = async (app, { auth, pool, store, approval, principalLabels, terminalPool, seatService, report }) => {
-  const actor = intakeHttpBoundary(app, auth, report);
+  const actor = intakeHttpBoundary(app, auth, report, (who, request) => {
+    const route = request.routeOptions.url ?? '', resource = params(request), policy = policyForRoute(request.method, route, 'product');
+    return service.negotiate(who, { ...(resource.sourceId ? { sourceId: resource.sourceId } : {}),
+      ...(resource.candidateId ? { candidateId: resource.candidateId, version: version(request) } : {}),
+      ...(resource.operationId ? { operationId: resource.operationId, operationAction: Reflect.get(request.query as object, 'action'),
+        qualityOperation: route.includes('/quality/operations/') } : {}),
+      ...(resource.jobId ? { jobId: resource.jobId } : {}), ...(policy.kind === 'requires' ? { action: policy.anyOf[0] } : {}) });
+  });
   const service = createContentIntakeService(pool, store, report, approval,
     { requireProductSession: true, ...(principalLabels ? { principalLabels } : {}), ...(terminalPool ? { terminalPool } : {}) });
+  app.get('/v1/intake/policy', { exposeHeadRoute: false }, async (request, reply) => {
+    if (!noQuery(request)) return intakeFailure(reply, 'VALIDATION', 'FILE_INVALID');
+    return sendIntake(reply, await service.policy(actor(request)), 'IntakePolicy');
+  });
   await app.register(contentIntakeGrantRoutes, { auth, service, ...(report ? { report } : {}) });
 
   // Production fallback needs the stack root and home. The isolated host injects an already
@@ -135,6 +147,8 @@ export const contentIntakeManagementRoutes: FastifyPluginAsync<{
   });
   app.get('/v1/intake/candidates/:candidateId/versions/:version/material', { exposeHeadRoute: false }, async (request, reply) =>
     sendIntake(reply, await service.material(actor(request), params(request).candidateId!, version(request), materialPageQuery(request)), 'IntakeCandidatePage'));
+  app.get('/v1/intake/candidates/:candidateId/versions/:version/sop/media/:mediaObjectId', { exposeHeadRoute: false }, async (request, reply) =>
+    sendIntake(reply, await service.candidateMedia(actor(request), params(request).candidateId!, version(request), params(request).mediaObjectId!, request.query), 'IntakeSopCandidateMediaPayload'));
   for (const [path, method, schema, status] of [
     ['source-confirmation', 'confirmSource', 'IntakeCandidate', 200],
     ['review', 'requestReview', 'IntakeReview', 202],

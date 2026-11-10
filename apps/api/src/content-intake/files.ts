@@ -1,7 +1,7 @@
 import { IntakeCapacityCommitUnknown, type IntakeCapacity } from './capacity.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Readable } from 'node:stream';
-import { ContractValidationError, parseContractSchema, type components } from '@customer-agent/contracts';
+import { ContractValidationError, parseContractSchema, type components } from './contract-view.js';
 import { isParseResult, writeIssueReport, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
@@ -9,9 +9,11 @@ import { parseIntakeUploadMultipart } from '../content-import-multipart.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import { authorize, source } from './authority.js';
 import { candidateContext, getJob, jobView, readCandidate } from './candidate.js';
-import { digest } from './material.js';
+import { canonical, digest } from './material.js';
+import { readQualityView } from './quality.js';
 import { sourceInputFormat } from './input-format.js';
 import { IntakeRejection, type createIntakeTransactions, type IntakeResult, type IntakeTransaction, type Principal } from './transaction.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Run = ReturnType<typeof createIntakeTransactions>;
@@ -46,6 +48,36 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
   }
   const checkSource = (actor: AuthenticatedUser, sourceId: string) => run(actor, 'upload-authorize', null, null,
     (client, who) => allowedSource(client, who, sourceId), v => v as ReturnType<typeof sourceInputFormat>);
+
+  const qualityReport = (actor: AuthenticatedUser, id: string) => run(actor, 'graph-quality-report', null, null, async (client, who) => {
+    const { job } = await getJob(client, who, id);
+    if (!job.result_candidate_id || !job.result_candidate_version) throw new IntakeRejection('MATERIAL_CHANGED');
+    const candidate = await readCandidate(client, who, job.result_candidate_id, Number(job.result_candidate_version), 'import');
+    const { material } = await candidateContext(client, who, candidate.key, 'import');
+    if (material.canonicalEncodingVersion !== 'candidate-sop-task-graph-v2') return null;
+    const { progress, graph } = await readQualityView(client, who, candidate.key);
+    if (!graph) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH');
+    const { rounds, plan, ...metadata } = progress;
+    const rows: string[][] = [['metadata', '0', canonical(metadata)], ['sopPlan', '0', canonical(graph.sopPlan)]];
+    for (const [name, field] of Object.entries(plan ?? {})) {
+      const items = Array.isArray(field) ? field : [field];
+      items.forEach((item, index) => rows.push([`faqPlan.${name}`, String(index), canonical(item)]));
+    }
+    graph.targets.forEach((target, index) => rows.push(['sopTarget', String(index), canonical(target)]));
+    for (const round of rounds) {
+      const { checks, ...attribution } = round;
+      rows.push(['round', round.phase, canonical(attribution)]);
+      checks.forEach((check, index) => rows.push([`faqCheck.${round.phase}`, String(index), canonical(check)]));
+    }
+    graph.checks.forEach((check, index) => rows.push(['sopCheck', String(index), canonical(check)]));
+    return rows;
+  }, value => {
+    if (value === null) return null;
+    if (!Array.isArray(value) || !value.every((row): row is string[] => Array.isArray(row) && row.length === 3 && row.every(cell => typeof cell === 'string'))) {
+      throw new Error('INVALID_QUALITY_REPORT');
+    }
+    return value;
+  });
 
   async function state(actor: AuthenticatedUser, id: string) {
     return run(actor, 'job-report', null, null, async (client, who) => {
@@ -141,6 +173,17 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
       try {
         const result = await readReport(actor, id);
         if (!result.ok) return result;
+        if (intakeView() === 'graph' && result.value.view.state === 'validated') {
+          const evidence = await qualityReport(actor, id);
+          if (!evidence.ok) return evidence;
+          if (evidence.value !== null) {
+            const bytes = await writeIssueReport([], evidence.value);
+            const current = await qualityReport(actor, id);
+            if (!current.ok) return current;
+            if (canonical(current.value) !== canonical(evidence.value)) throw new IntakeRejection('MATERIAL_CHANGED');
+            return { ok: true, value: bytes };
+          }
+        }
         if (!result.value.parsed) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
         const bytes = await writeIssueReport(result.value.parsed.issues);
         const allowed = await state(actor, id);
@@ -159,9 +202,11 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
         if (query.previous !== undefined && typeof query.previous !== 'boolean') throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         const view = await readCandidate(client, who, parseContractSchema('IntakeId', id), parseContractSchema('IntakeVersion', version));
         const { material } = await candidateContext(client, who, view.key, 'content-manage');
-        const binding = JSON.stringify([view.key, authenticatedProductSession(actor), who.generation, who.factsVersion, limit]);
+        const binding = JSON.stringify([view.key, intakeView(), authenticatedProductSession(actor), who.generation, who.factsVersion, limit]);
         const sign = (offset: number) => createHmac('sha256', cursorSecret).update(binding).update(String(offset)).digest('base64url');
-        const total = Math.max(material.entries.length, material.differences.length);
+        const graph = material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2';
+        const total = graph ? material.entries.length + material.differences.length + (material.sopFlows?.length ?? 0) + (material.sopDifferences?.length ?? 0)
+          : Math.max(material.entries.length, material.differences.length);
         let offset = 0;
         if (query.cursor !== undefined) {
           if (typeof query.cursor !== 'string' || query.cursor.length > 512) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
@@ -170,18 +215,55 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
             throw new IntakeRejection('MATERIAL_CHANGED');
           }
           offset = Number(match[1]);
-          // A forward cursor may not point at the start or past the end. A backward
-          // step re-uses the cursor of the page on screen, which the server reduces by
-          // one page, so the reader never needs a second signed token.
-          if (query.previous === true) offset = Math.max(0, offset - Number(limit));
+          // Graph pages also pack by bytes, so their previous boundary is computed
+          // from the same immutable material below.
+          if (query.previous === true && !graph) offset = Math.max(0, offset - Number(limit));
           else if (offset === 0 || offset >= total) throw new IntakeRejection('MATERIAL_CHANGED');
         } else if (query.previous === true) {
           throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         }
-        const { entries, differences, ...materialHeader } = material;
+        const { entries, differences, sopFlows, sopDifferences, ...materialHeader } = material;
+        if (graph) {
+          const records = [
+            ...entries.map(value => ({ collection: 'entries' as const, value })),
+            ...differences.map(value => ({ collection: 'differences' as const, value })),
+            ...(sopFlows ?? []).map(value => ({ collection: 'sopFlows' as const, value })),
+            ...(sopDifferences ?? []).map(value => ({ collection: 'sopDifferences' as const, value })),
+          ];
+          const page = { key: view.key, entries: [] as C['IntakeEntry'][], differences: [] as C['IntakeDifference'][],
+            sopFlows: [] as C['IntakeSopFlowDefinition'][], sopDifferences: [] as C['IntakeSopFlowDifference'][], materialHeader, nextCursor: null as string | null };
+          const headerBytes = Buffer.byteLength(JSON.stringify(page)) + 514;
+          const pageEnd = (start: number) => {
+            let end = start, bytes = headerBytes;
+            while (end < records.length && end - start < Number(limit)) {
+              const added = Buffer.byteLength(JSON.stringify(records[end]!.value)) + 1;
+              if (bytes + added > 1_048_576) break;
+              end++; bytes += added;
+            }
+            if (end === start && end < total) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
+            return end;
+          };
+          if (query.previous === true) {
+            let start = 0;
+            while (pageEnd(start) < offset) start = pageEnd(start);
+            if (pageEnd(start) !== offset) throw new IntakeRejection('MATERIAL_CHANGED');
+            offset = start;
+          }
+          const end = pageEnd(offset);
+          for (const record of records.slice(offset, end)) {
+            switch (record.collection) {
+              case 'entries': page.entries.push(record.value); break;
+              case 'differences': page.differences.push(record.value); break;
+              case 'sopFlows': page.sopFlows.push(record.value); break;
+              case 'sopDifferences': page.sopDifferences.push(record.value); break;
+            }
+          }
+          page.nextCursor = end < total ? `${end}.${sign(end)}` : null;
+          return parseContractSchema('IntakeCandidatePage', page);
+        }
         const end = offset + Number(limit);
-        return { key: view.key, entries: entries.slice(offset, end), differences: differences.slice(offset, end), materialHeader,
-          nextCursor: end < total ? `${end}.${sign(end)}` : null };
+        return parseContractSchema('IntakeCandidatePage', { key: view.key, entries: entries.slice(offset, end), differences: differences.slice(offset, end), materialHeader,
+          nextCursor: end < total ? `${end}.${sign(end)}` : null });
       }, v => parseContractSchema('IntakeCandidatePage', v));
     },
   };

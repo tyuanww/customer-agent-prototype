@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpServer, request as rawHttpRequest } from 'node:http';
 import { createServer as createNetServer, type AddressInfo, type Server } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +63,11 @@ export function createIntakeSyntheticCsv(options: SyntheticFileOptions = {}) {
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
-type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean };
+type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
+  includeLegacySearch?: boolean;
+  configureDatabase?: (client: Awaited<ReturnType<Pg15Harness['connect']>>) => Promise<void>;
+  wrapBusinessPool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
+  observeSyntheticRequest?: (actor: DesktopSyntheticIdentity, headers: Headers) => void };
 
 export function requiresAccessEvaluatorOverlay(migrations: readonly Readonly<{ id: string }>[]): boolean {
   return !migrations.some(({ id }) => id === '0082_access_evaluator');
@@ -144,16 +148,18 @@ export async function reserveAdjacentLoopbackPorts(): Promise<AdjacentLoopbackPo
 export function createIntakeSyntheticHost(options: { prepareCandidate: false; } & HostOptions): Promise<HostState>;
 export function createIntakeSyntheticHost(options?: { prepareCandidate?: true; } & HostOptions): Promise<PreparedHost>;
 export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean; } & HostOptions): Promise<HostState> {
-  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false, options?.inputFormat ?? 'xlsx', options?.includeSopSource ?? false);
+  return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false, options?.inputFormat ?? 'xlsx', options?.includeSopSource ?? false, options ?? {});
 }
 
 /** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
  * files, existing DB, production factory or real provider is ever consumed.
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
-async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean) {
+async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
+  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
   const pg = new Pg15Harness();
+  const authLogin = profile === 'purpose-runtime' ? 'stack_backend_auth' : 'synthetic_intake_auth';
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: IntakePool | undefined;
   let usagePool: IntakePool | undefined, terminalPool: IntakePool | undefined;
@@ -212,7 +218,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     sessions.clear(); loginCodes.clear();
     if (failures.length) throw new AggregateError(failures, 'Synthetic host cleanup failed');
   }
-  async function requestAs(actor: DesktopSyntheticIdentity, pathname: string, options: RequestInit = {}) {
+  async function requestAs(actor: DesktopSyntheticIdentity, pathname: string, options: RequestInit = {}, contractHeaders?: readonly string[]) {
     if (!/^\/v1\/[A-Za-z0-9/?=&%._-]+$/.test(pathname)) throw new Error('Only local v1 requests are accepted');
     let token = sessions.get(actor);
     if (!token) {
@@ -229,6 +235,29 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       token = session.access_token; sessions.set(actor, token);
     }
     const headers = new Headers(options.headers); headers.set('authorization', `Bearer ${token}`);
+    hooks.observeSyntheticRequest?.(actor, new Headers(headers));
+    if (contractHeaders) {
+      if (options.method && options.method !== 'GET' || options.body) throw new Error('Raw contract headers are restricted to GET fixtures');
+      return new Promise<Response>((resolve, reject) => {
+        const raw = ['Host', new URL(apiOrigin).host, ...[...headers.entries()].flat(),
+          ...contractHeaders.flatMap(value => ['X-Intake-Contract-Set', value])];
+        const outgoing = rawHttpRequest(`${apiOrigin}${pathname}`, { method: 'GET', headers: raw }, incoming => {
+          const bytes: Buffer[] = [];
+          incoming.on('data', data => bytes.push(Buffer.from(data)));
+          incoming.on('error', reject);
+          incoming.on('end', () => {
+            const resultHeaders = new Headers();
+            for (const [key, value] of Object.entries(incoming.headers)) {
+              if (typeof value === 'string') resultHeaders.set(key, value);
+            }
+            if (incoming.statusCode === undefined) { reject(new Error('Missing HTTP response status')); return; }
+            resolve(new Response(Buffer.concat(bytes), { status: incoming.statusCode, headers: resultHeaders }));
+          });
+        });
+        outgoing.setTimeout(15_000, () => outgoing.destroy(new Error('Raw header fixture timed out')));
+        outgoing.on('error', reject); outgoing.end();
+      });
+    }
     return fetch(`${apiOrigin}${pathname}`, { ...options, headers, signal: options.signal ?? AbortSignal.timeout(15_000), redirect: 'error' });
   }
   try {
@@ -422,7 +451,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         clock_timestamp()-interval '1 minute', clock_timestamp()+interval '4 minutes','合成只查询','director','root-query',
         (SELECT version FROM content_intake.policy_versions WHERE tenant_id='tenant-a' AND app_id='app-a'), 1)`);
     await admin.query('COMMIT');
-    await admin.query('CREATE ROLE synthetic_intake_auth LOGIN NOINHERIT; GRANT app_backend_auth TO synthetic_intake_auth');
+    await admin.query(`CREATE ROLE ${authLogin} LOGIN NOINHERIT; GRANT app_backend_auth TO ${authLogin}`);
+    await hooks.configureDatabase?.(admin);
     if (profile === 'purpose-runtime') {
       const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePool>;
       for (const purpose of ['business', 'usage', 'worker', 'organization'] as const) {
@@ -447,7 +477,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await portReservation.releaseIdentity();
     await listenNetServer(identity, portReservation.identityPort);
     identityOrigin = `http://127.0.0.1:${String((identity.address() as AddressInfo).port)}`;
-    auth = await createProductAuthService({ connectionString: `postgresql://synthetic_intake_auth@localhost/${database.name}?${new URLSearchParams({ host: pg.socket, port: String(pg.port) })}`,
+    auth = await createProductAuthService({ connectionString: `postgresql://${authLogin}@localhost/${database.name}?${new URLSearchParams({ host: pg.socket, port: String(pg.port) })}`,
       poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 }, {
       authorizeUrl: state => `${identityOrigin}/authorize?state=${state}`,
       exchange: async code => { const value = loginCodes.get(code); loginCodes.delete(code);
@@ -465,22 +495,25 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     // only by that capability, so the lanes cannot borrow the intake pools. The keys are
     // throwaway fixture material and are never printed. The login inherits app_runtime
     // rather than taking it with SET ROLE, because the event repository runs as the session.
-    await admin!.query('CREATE ROLE synthetic_search_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO synthetic_search_runtime');
-    const searchPool = new Pool({ ...database.config, user: 'synthetic_search_runtime', max: 4 });
-    ownedPools.push(searchPool);
-    const searchEvents = createEventRepository(searchPool, 'synthetic_host_search');
-    registerSearchRoute(app, auth, {
-      operation: { execute: (request) => searchEvents.executeSearch(request) },
-      logHash: { version: 'hmac-log-v1', key: 'synthetic-host-log-hash-material-0001' },
-      idempotencyHmac: { currentVersion: 'hmac-idempotency-v1',
-        keys: { 'hmac-idempotency-v1': 'synthetic-host-idempotency-material-0001' } },
-    });
+    if (hooks.includeLegacySearch !== false) {
+      await admin!.query('CREATE ROLE synthetic_search_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO synthetic_search_runtime');
+      const searchPool = new Pool({ ...database.config, user: 'synthetic_search_runtime', max: 4 });
+      ownedPools.push(searchPool);
+      const searchEvents = createEventRepository(searchPool, 'synthetic_host_search');
+      registerSearchRoute(app, auth, {
+        operation: { execute: (request) => searchEvents.executeSearch(request) },
+        logHash: { version: 'hmac-log-v1', key: 'synthetic-host-log-hash-material-0001' },
+        idempotencyHmac: { currentVersion: 'hmac-idempotency-v1',
+          keys: { 'hmac-idempotency-v1': 'synthetic-host-idempotency-material-0001' } },
+      });
+    }
     app.get('/v1/notices/current', async (request, reply) => {
       if (!(await authenticateRequestHeaders(auth!, request.headers))) return reply.code(401).send();
       return reply.code(410).send({ error: { code: 'GONE', message: 'No notice in the synthetic fixture' } });
     });
     const store = createContentObjectStore(path.join(pg.root, 'objects'));
-    const report = (id: string, error: unknown) => { diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
+    pool = hooks.wrapBusinessPool?.(pool) ?? pool;
+    const report = (id: string, error: unknown) => { hooks.observeError?.(error); diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
     const seatRoot = path.join(pg.root, 'seat-accounts');

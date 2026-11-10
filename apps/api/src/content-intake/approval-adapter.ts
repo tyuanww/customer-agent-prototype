@@ -1,4 +1,4 @@
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import { INTAKE_POLICY } from '@customer-agent/content-intake';
 import { canonical, digest } from './material.js';
 import { IntakeRejection } from './transaction.js';

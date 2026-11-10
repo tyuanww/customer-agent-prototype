@@ -175,6 +175,7 @@ const SOP_TRIGGER_ENTRIES = 124;
 const SOP_TRIGGER_SHA256 = '8b647176cc37c9832288f38a462c3553824309dec122bfb894b3354177059c9b';
 const UNIFIED_SOP_TRIGGER_SHA256 = '8e0f0c238a34be2e80ed40ddbac6a116b6ae7938fe69d6d19f232ba7155ba79e';
 const UNIFIED_SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = 'c008c0d0a59a7c875eccf877cabc0f926abd2854047aee6757d09f31419012f7';
+const SOP_LIFECYCLE_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = '1e61dd1d475ea434958e8fee4017e2db389b5d7218bab1f8db7367ceb6318f6f';
 const SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = 'd60a11a6928e9c1d8fc063503bbeec9ae4c0a2323c4799792a3abed581eeca34';
 const IMPORT_BATCH_TRIGGER_PREFIXES = Object.freeze([
   'public.import_batches|backend_review_sync_wait_on_batch_failed|backend_review.sync_wait_on_batch_failed()|17|',
@@ -945,6 +946,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === 133
     && expectedTriggerSha === UNIFIED_SOP_TRIGGER_SHA256
+  ) || (
+    expectedTriggerEntries === 135
+    && expectedTriggerSha === 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc'
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -973,7 +977,9 @@ async function verifyCatalogueState(
         || (catalogue.migrations.length === 83
           && triggerSha === SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256)
         || (catalogue.migrations.length === 84
-          && triggerSha === UNIFIED_SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
+          && triggerSha === UNIFIED_SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256)
+        || (catalogue.migrations.length === 85
+          && triggerSha === SOP_LIFECYCLE_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
@@ -1174,6 +1180,7 @@ const READINESS_SUFFIX = [
   { length: 82, index: 81, id: '0082_access_evaluator' },
   { length: 83, index: 82, id: '0083_sop_pipeline_projection' },
   { length: 84, index: 83, id: '0084_sop_unified_storage' },
+  { length: 85, index: 84, id: '0085_sop_unified_lifecycle', sha256: 'ff92a37c4a960cb2deb1e6b5060a896c2df6ebd6c29166a0ab8c05ea35327b88' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1253,6 +1260,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   82: { tables: 111, functions: 302, objectEntries: 3446, objectSha256: '4f81eb71a39c591d55474114203747c7322dcc988c8310797eb5d2d888d9d261', functionEntries: 302, functionSha256: '03f03d32c109accd93b63cbdbe82befd935df10e9632399524dcc338ea8a0d33', triggerEntries: 116, triggerSha256: CURRENT_IMPORT_BATCH_TRIGGER_SHA256 },
   83: { tables: 119, functions: 305, objectEntries: 3612, objectSha256: '9fefcdc96471091c98ea00aee520a2aa25ab7f26ad749212623cef57dc974b13', functionEntries: 305, functionSha256: '71db2fe2bf55f5a6faffd60c8bfa5a3c653dbcb83052ff335a5751814d9347c3', triggerEntries: SOP_TRIGGER_ENTRIES, triggerSha256: SOP_TRIGGER_SHA256 },
   84: { tables: 128, functions: 310, objectEntries: 3909, objectSha256: '9193d9d1ea5d38c5da8729bc8c5b82d00713393c20f5aa7b79b83ffd823b384a', functionEntries: 310, functionSha256: '48c77a14a7592c97b84e987221672d010716d5ea909b873a91ed4283402b5a50', triggerEntries: 133, triggerSha256: UNIFIED_SOP_TRIGGER_SHA256 },
+  85: { tables: 128, functions: 328, objectEntries: 3946, objectSha256: '85e0e91e657a1767c1418edf929e750c4edb67a5d2a850a46669708426694400', functionEntries: 328, functionSha256: 'adbe454cc6a149351403fef03af05a3d49fafef9071d467d82415b2be00bdb7e', triggerEntries: 135, triggerSha256: 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1309,6 +1317,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   82: { entries: 656, sha256: 'fb9a07a15bc13c79334f2043978e551ceee3b2d560dc4fe921d007ece09b3250' },
   83: { entries: 658, sha256: '35f50f0f6aa864b86cedfaf170e31f083af146ef3b6366e6a384af25a8d4672c' },
   84: { entries: 658, sha256: '35f50f0f6aa864b86cedfaf170e31f083af146ef3b6366e6a384af25a8d4672c' },
+  85: { entries: 668, sha256: '4c97ae7d16cc19a79bb21c2e8436a4f87d9b4af2a5db6766bd9b414a1dcf02bf' },
 };
 
 export async function verifyReadinessSuccessor(

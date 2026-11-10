@@ -4,6 +4,8 @@ import { CSV_MAPPING_VERSION, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, CSV_TEMP
 import type { ContentSourceType } from '../content-object-store.js';
 import type { Source } from './authority.js';
 import { IntakeRejection } from './transaction.js';
+import { SOP_TASK_FORMAT, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
+import { intakeView } from './contract-view.js';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' as const;
 
@@ -14,6 +16,13 @@ export function sourceInputFormat(source: Source): Readonly<{
   sourceType: ContentSourceType; context: IntakeParseContext; selectedSheets: string[];
 }> {
   const scope = source.scope;
+  if (Object.entries(SOP_TASK_FORMAT).every(([key, value]) => Reflect.get(source, key) === value)
+    && source.structureDigest === SOP_TASK_STRUCTURE_SHA256) {
+    if (intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+    return { mime: XLSX, sourceType: 'excel', selectedSheets: [...SOP_TASK_SHEETS],
+      context: { sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? 'brand',
+        scopeKind: scope.shopId === null ? 'brand' : 'shop', domain: scope.domain, templateVersion: 'sop-manual-authoring-v1.1' } };
+  }
   const context = { sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? 'brand',
     scopeKind: scope.shopId === null ? 'brand' as const : 'shop' as const, domain: scope.domain };
   if (source.templateVersion === CSV_TEMPLATE_VERSION && source.ruleVersion === CSV_POLICY_VERSION

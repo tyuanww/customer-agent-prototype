@@ -1,4 +1,4 @@
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { candidateContext, historicalCandidate, syncCandidateReadiness } from './candidate.js';

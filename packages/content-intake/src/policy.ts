@@ -37,7 +37,8 @@ export const CSV_STRUCTURE_SHA256 = 'daaa4126d63194f59949c2b6f464b108ed87a430090
 export type CsvContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: typeof CSV_TEMPLATE_VERSION };
 /** The SOP workbook parser reads the sheet list, never the FAQ sheet slot. */
 export type SopContext = Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: 'sop-v1' };
-export type IntakeParseContext = ParseContext | CsvContext | SopContext;
+export type IntakeParseContext = ParseContext | CsvContext | SopContext
+  | (Omit<ParseContext, 'sheet' | 'templateVersion'> & { templateVersion: 'sop-manual-authoring-v1.1' });
 export type IntakePolicyVersion = typeof INTAKE_POLICY.version | typeof CSV_POLICY_VERSION;
 export type Issue = Readonly<{ code: string; sheet: string; row: number; column: string; fix: string }>;
 export type FaqRow = Readonly<{

@@ -64,6 +64,7 @@ const SOP_REPAIR_SUFFIX = [
   '0082_access_evaluator',
   '0083_sop_pipeline_projection',
   '0084_sop_unified_storage',
+  '0085_sop_unified_lifecycle',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -220,6 +221,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0082_access_evaluator',
         '0083_sop_pipeline_projection',
         '0084_sop_unified_storage',
+        '0085_sop_unified_lifecycle',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
@@ -787,7 +789,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(report).toMatchObject({
         status: 'PASS',
         migrationCount: generatedMigrationCatalogue.migrations.length,
-        inventory: { tables: 128, views: 7, functions: 310 },
+        inventory: { tables: 128, views: 7, functions: 328 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
@@ -886,7 +888,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       });
 
       const sop = await applyDatabaseMigrations(client);
-      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage']);
+      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage', '0085_sop_unified_lifecycle']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
 
       const privileges = await client.query<{
@@ -1143,7 +1145,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       }
       await expectVerificationFailureAfterMutation(client,'GRANT SELECT ON content_intake.quality_rounds TO app_runtime');
       await expectVerificationFailureAfterMutation(client,'ALTER TABLE content_intake.quality_rounds DISABLE TRIGGER quality_round_guard');
-      await expectVerificationFailureAfterMutation(client,'ALTER FUNCTION content_intake.quality_state(TEXT,BIGINT) SECURITY DEFINER');
+      await expectVerificationFailureAfterMutation(client,'ALTER FUNCTION content_intake.quality_state(TEXT,BIGINT) SECURITY INVOKER');
     } finally { await client.end(); }
   });
 

@@ -28,6 +28,7 @@ try {
   const context = JSON.parse(process.argv[2] ?? 'null') as IntakeParseContext;
   policyVersion = context?.templateVersion === CSV_TEMPLATE_VERSION ? CSV_POLICY_VERSION : INTAKE_POLICY.version;
   if (context?.templateVersion === SOP_TEMPLATE_VERSION) throw new Error('SOP_WORKBOOK_NOT_AN_FAQ_PARSE');
+  if (context?.templateVersion === 'sop-manual-authoring-v1.1') throw new Error('SOP_TASK_WORKBOOK_REQUIRES_REGISTERED_MAPPING');
   const bytes = Buffer.concat(chunks);
   const result = context?.templateVersion === CSV_TEMPLATE_VERSION
     ? (await import('./csv.js')).parseCsv(bytes, context)

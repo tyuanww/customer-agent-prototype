@@ -503,7 +503,8 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
       expect(JSON.stringify(preview)).not.toMatch(/staging_id|internalNote|合成内部说明/);
       for (const query of ['', `digest=${f.c.key.digest}&digest=${f.c.key.digest}`, `digest=${f.c.key.digest}&userId=enabler`]) expect((await q.get(query)).statusCode).toBe(400);
       const command = { operationId: 'wire-freeze', key: f.c.key };
-      for (const bad of [{ ...command, actor: 'enabler' }, { ...command, key: { ...f.c.key, version: 2 } }]) expect((await q.post('freeze', bad)).statusCode).toBe(400);
+      for (const bad of [{ ...command, actor: 'enabler' }, { ...command, key: { ...f.c.key, version: 2 } },
+        { ...command, materialDigest: f.c.key.digest }, { ...command, sopChecks: [] }]) expect((await q.post('freeze', bad)).statusCode).toBe(400);
       expect((await q.post('freeze', command, { 'content-encoding': 'gzip' })).statusCode).toBe(400);
       const frozen = await q.post('freeze', command); expect(frozen.statusCode, frozen.body).toBe(200);
       const s = await q.status(); expect(s.frozen).toMatchObject({ principalId: 'enabler', factsVersion: 1 });
@@ -906,7 +907,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
           ...(snapshotCursor ? { cursor: snapshotCursor } : {}) });
         const response = await fetch(`${origin}/v1/intake/snapshot?${query}`, { headers });
         expect(response.status, await response.clone().text()).toBe(200);
-        const page = parseContractSchema('IntakeSnapshot', await response.json());
+        const page: C['IntakeSnapshot'] = parseContractSchema('IntakeSnapshot', await response.json());
         collected.push(...page.faq.map(row => row.entry));
         snapshotCursor = page.nextCursor ?? null;
       } while (snapshotCursor);
@@ -2708,7 +2709,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const pageSizes: number[] = [];
     let cursor: string | null = null;
     do {
-      const page: C['IntakeSnapshot'] = value(await snapshot(entitlement.entitlementId,{limit,...(cursor ? {cursor} : {})}));
+      const page: C['IntakeSnapshot'] = parseContractSchema('IntakeSnapshot', value(await snapshot(entitlement.entitlementId,{limit,...(cursor ? {cursor} : {})})));
       expect(page.releaseId).toBe(entitlement.releaseId);
       entries.push(...page.faq);pageSizes.push(page.faq.length);cursor=page.nextCursor;
     } while(cursor);
@@ -3417,7 +3418,7 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     const ent=value(await issue());
     const ids:string[]=[];let nextCursor:string|null=null;
     do {
-      const page:C['IntakeSnapshot']=value(await snapshot(ent.entitlementId,{limit:100,...(nextCursor===null?{}:{cursor:nextCursor})}));
+      const page: C['IntakeSnapshot'] = parseContractSchema('IntakeSnapshot',value(await snapshot(ent.entitlementId,{limit:100,...(nextCursor===null?{}:{cursor:nextCursor})})));
       ids.push(...page.faq.map(f=>f.entry.businessEntryId));nextCursor=page.nextCursor;
     } while (nextCursor!==null);
     expect(ids).toEqual(rows.map(r=>r[0]));expect(new Set(ids).size).toBe(5000);

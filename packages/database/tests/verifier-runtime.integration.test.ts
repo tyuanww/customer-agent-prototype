@@ -21,7 +21,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
   it('verifies the actual current installation with both new schemas and all 17 sealed roles', async () => {
     expect(await verifyDatabaseMigrations(client)).toMatchObject({
       status: 'PASS', migrationCount: generatedMigrationCatalogue.migrations.length,
-      inventory: { tables: 128, views: 7, functions: 310 },
+      inventory: { tables: 128, views: 7, functions: 328 },
       capabilityRoles: { total: 17, safe: 17, memberships: 0 },
     });
     const empty = await client.query(`SELECT script_id FROM ops_loop.list_resolved_inaccuracy_outcomes('coach')`);
@@ -200,8 +200,8 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
         status: 'PASS',
         migrationCount: generatedMigrationCatalogue.migrations.length,
         triggerFingerprint: {
-          entries: 133,
-          frozenSha256: '8e0f0c238a34be2e80ed40ddbac6a116b6ae7938fe69d6d19f232ba7155ba79e',
+          entries: 135,
+          frozenSha256: 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc',
           difference: 'import_batches_tgenabled',
           disabledTriggers: [
             'backend_review_sync_wait_on_batch_failed',

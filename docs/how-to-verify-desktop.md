@@ -268,7 +268,7 @@ pnpm clean:preview
 
 `workspace:size` 按磁盘分配量拆分 `release/`、各 workspace 包的 `node_modules/` 与已知构建输出、精确派生图标、`.git/`、本地工具索引 / 报告与其余源码。项目外的 pnpm store、Playwright / Electron 下载缓存不会算进工作区总量，也不会被仓内清理脚本修改。
 
-`workspace:check` 按现有三组检查所有保留输入：源码、测试、文档、资产、migration、生成源码与配置为 **22.3 MiB**，`contracts/upstream/` 冻结合同为 **16 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认合计上限 **48.1 MiB**。分组或总量任一超限均非零退出，不能借另一组余量掩盖增长；合同和证据仍完整计费。
+`workspace:check` 按现有三组检查全部保留输入。源码、测试、文档、资产、migration、生成源码与配置的上限为 **22.5 MiB + 531 KiB**，`contracts/upstream/` 冻结合同为 **26.1 MiB**，`evidence/` 冻结证据为 **10.5 MiB**，默认总体上限为 **54.8 MiB + 531 KiB**。FINAL-005-B 按实际逻辑字节核算生成类型闭包、0085 源与产物、正常链实现及测试，增加最小整数 KiB 配额。分组或总量任一超限均非零退出，合同和证据完整计费。
 
 预算统计采用逻辑字节：普通文件按实际内容长度，符号链接按链接文本的字节长度（含悬空链接），不跟随链接，目录不计元数据。同一源路径只计一次；不同路径即使内容相同或互为硬链接，也分别计入各自所属分组。`workspaceInventory` 的 `sourceBudgetGroups[].bytes` 和 `checkWorkspaceBudget` 的 `remainderBytes` 使用此口径；`categories[].bytes`、`totalBytes`、`workspace:size` 与清理报告继续使用 allocated bytes（磁盘分配量，按 inode 去重），用于盘点占用和预计回收空间，不能用来限制跨平台源内容。
 

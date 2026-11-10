@@ -32,6 +32,7 @@ async function fixture(t) {
   }
   delete priorManifest.compatibility.readiness_successor;
   delete priorManifest.compatibility.sop_unified_successor;
+  delete priorManifest.compatibility.sop_lifecycle_overlay;
   writeFileSync(priorManifestPath,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   const original=verifyContractSetDirectory(input);

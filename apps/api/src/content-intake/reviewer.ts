@@ -1,4 +1,4 @@
-import type { components } from '@customer-agent/contracts';
+import type { components } from './contract-view.js';
 import type { HumanDecision } from './approval-adapter.js';
 import type { Source } from './authority.js';
 import { IntakeRejection, type IntakeTransaction } from './transaction.js';

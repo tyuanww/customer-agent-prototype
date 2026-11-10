@@ -40,14 +40,17 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // borrow unused space from another group, even with a larger aggregate override.
 // Budgets use logical file/link bytes per retained path, independent of filesystem
 // allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024;
+// FINAL-005-B counts the generated closure, 0085 source/output and normal-chain
+// implementation/tests by logical bytes. The measured minimum addition is 531 KiB.
+const SOP_LIFECYCLE_INPUT_BUDGET_BYTES = 531 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.
   // The 3.34 MiB correction includes the 548-header proof and needs 3.4 MiB.
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   // Corrected intake and the foundation consumers also increase source inputs.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
