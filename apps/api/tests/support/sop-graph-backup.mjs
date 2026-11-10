@@ -1,3 +1,4 @@
+import { assertSopQueryGraph } from '../../dist/sop-unified-query-validation.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -14,6 +15,9 @@ import { canonical, digest } from '../../dist/content-intake/material.js';
 import { createProductAuthService } from '../../dist/product-auth-service.js';
 import { createIntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
+import { generatedMigrationCatalogue } from '../../../../packages/database/dist/generated/migrations.generated.js';
+import { registerSopQueryRoute } from '../../dist/sop-query-routes.js';
+import { createUnifiedSopQueryOperation } from '../../dist/sop-unified-query-operation.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 
 const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
@@ -23,7 +27,7 @@ assert.match(input.database, /^dev_m0_intake_desktop_[0-9a-f]{8}$/);
 assert.match(input.user, /^[a-z_][a-z0-9_]*$/);
 const evidenceRoot = realpathSync(input.evidenceRoot);
 assert.equal(path.dirname(evidenceRoot), realpathSync(os.tmpdir()));
-assert.match(path.basename(evidenceRoot), /^sop-unified-lifecycle-evidence-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(path.basename(evidenceRoot), /^sop-unified-(?:lifecycle-evidence|query-http)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const pgBin = process.env.CUSTOMER_AGENT_PG15_BIN ?? execFileSync('pg_config', ['--bindir'], { encoding: 'utf8' }).trim();
 const environment = { PATH: process.env.PATH, LC_ALL: 'C', PGCONNECT_TIMEOUT: '5' };
 const original = new Client({ host: input.host, port: input.port, user: input.user, database: input.database });
@@ -44,10 +48,12 @@ try {
   const fidelity = async client => {
     const tables = ['sop_graph_versions', 'sop_graph_media_bindings', 'sop_graph_quality_targets', 'sop_graph_quality_checks',
       'sop_graph_release_lineage', 'sop_graph_release_media', 'sop_graph_disable_events', 'candidate_versions',
-      'source_confirmations', 'quality_plans', 'quality_rounds', 'publications', 'sop_media_objects', 'objects', 'object_reservations'];
+      'source_confirmations', 'quality_plans', 'quality_rounds', 'publications', 'sop_media_objects', 'objects', 'object_reservations',
+      'sop_query_fact_versions','sop_unified_query_bindings','sop_query_previews','sop_query_leases',
+      'entitlements','entitlement_contexts','entitlement_scopes','backend_review.receipts'];
     const result = {};
     for (const table of tables) {
-      const rows = (await client.query(`SELECT to_jsonb(t) AS row FROM content_intake.${table} t ORDER BY to_jsonb(t)::text COLLATE "C"`)).rows;
+      const rows = (await client.query(`SELECT to_jsonb(t) AS row FROM ${table.includes('.') ? table : `content_intake.${table}`} t ORDER BY to_jsonb(t)::text COLLATE "C"`)).rows;
       result[table] = { count: rows.length, sha256: digest(canonical(rows)) };
     }
     return result;
@@ -57,7 +63,7 @@ try {
     pgPort: input.port, pgSocketDirectory: input.host, pgUser: input.user, objectStoreDirectory: path.join(input.root, 'objects') },
   pgBin, backupRoot: path.join(input.evidenceRoot, 'nonempty-backup'), copyRoot: '' });
   const verified = await verifyBackupSet(backup.path, { pgBin });
-  assert.equal(verified.manifest.database.migrations.length, 85);
+  assert.equal(verified.manifest.database.migrations.length, generatedMigrationCatalogue.migrations.length);
   await original.query(`CREATE DATABASE ${restoredName} TEMPLATE template0 OWNER ${input.user}`);
   const args = ['--exit-on-error', '--host', input.host, '--port', String(input.port), '--username', input.user,
     '--dbname', restoredName, path.join(backup.path, DATABASE_DUMP_FILE)];
@@ -68,7 +74,7 @@ try {
   restored = new Client({ host: input.host, port: input.port, user: input.user, database: restoredName });
   await restored.connect();
   const report = await verifyDatabaseMigrations(restored);
-  assert.equal(report.status, 'PASS'); assert.equal(report.migrationCount, 85);
+  assert.equal(report.status, 'PASS'); assert.equal(report.migrationCount, generatedMigrationCatalogue.migrations.length);
   assert.deepEqual(await counts(restored), before);
   const restoredFidelity = await fidelity(restored);
   assert.deepEqual(restoredFidelity, sourceFidelity);
@@ -79,7 +85,18 @@ try {
   const graph = (await restored.query('SELECT content_intake.read_sop_graph_current($1,$2) AS value', ['agent', input.entitlementHash])).rows[0].value;
   await restored.query('COMMIT');
   assert.deepEqual(graph.graphs.map(item => item.graphDigest), input.graphDigests);
-  for (const item of graph.graphs) assert.equal(digest(canonical(item.payload)), item.graphDigest);
+  for (const item of graph.graphs) {
+    const original = (await restored.query(`SELECT version.graph_payload FROM content_intake.sop_graph_release_lineage lineage
+      JOIN content_intake.sop_graph_versions version USING(candidate_id,candidate_version,source_id,flow_id,flow_version,graph_digest)
+      WHERE lineage.release_id=$1 AND lineage.source_id=$2 AND lineage.flow_id=$3 AND lineage.graph_digest=$4`,
+    [input.releaseId, item.payload.definition.header.key.sourceId, item.payload.definition.header.key.flowId, item.graphDigest])).rows[0]?.graph_payload;
+    assert.ok(original);
+    assertSopQueryGraph(original, item.graphDigest);
+    assert.deepEqual(item.payload.definition, original.definition);
+    assert.deepEqual(item.payload.entries, original.entries);
+    const fullMedia = new Set(original.media.map(media => canonical(media)));
+    assert.ok(item.payload.media.every(media => fullMedia.has(canonical(media))));
+  }
   const objects = (await restored.query(`SELECT DISTINCT media.payload_object_id AS "objectId",media.sha256,media.bytes::int AS "sizeBytes",media.mime
     FROM content_intake.sop_graph_release_media binding JOIN content_intake.sop_media_objects media ON media.media_object_id=binding.object_id
     WHERE binding.release_id=$1`, [input.releaseId])).rows;
@@ -98,8 +115,22 @@ try {
     exchange: async () => { throw new Error('Restore reads never exchange provider data'); }, close: () => undefined,
   }, 'mock');
   usagePool = createIntakePurposePool({ host: input.host, port: input.port, user: 'synthetic_usage', database: restoredName, max: 2 }, 'usage');
-  const usage = createContentIntakeService(usagePool, store, undefined, undefined, { requireProductSession: true });
   app = Fastify();
+  let http;
+  if (input.query) {
+    for (const table of ['sop_query_fact_versions','sop_unified_query_bindings','sop_query_previews','sop_query_leases']) assert.ok(sourceFidelity[table].count>0);
+    registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store) });
+    const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const response = await fetch(`${origin}/v1/sop/query`, { method: 'POST', headers: { authorization: input.agentAuthorization,
+      'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id, 'content-type': 'application/json' }, body: JSON.stringify(input.query.request) });
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.deepEqual(body, input.query.response);
+    assert.deepEqual(await fidelity(restored), restoredFidelity);
+    http = { queryStatus: body.status, graphDigest: body.result.graph_digest, permissionCount: body.result.permissions.length,
+      mediaCount: body.result.media.length, sameRequestRecovered: true };
+  } else {
+  const usage = createContentIntakeService(usagePool, store, undefined, undefined, { requireProductSession: true });
   await app.register(contentIntakeUsageRoutes, { auth, usage });
   const origin = await app.listen({ host: '127.0.0.1', port: 0 });
   const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id };
@@ -128,6 +159,8 @@ try {
   assert.equal(digest(canonical(projection)), pages[0].snapshotDigest);
   assert.deepEqual(projection.sopFlows.map(flow => flow.graphDigest), input.graphDigests);
   assert.equal(projection.media.length, 3);
+    http = { pageCount: pages.length, totals: pages[0].totals, snapshotDigest: pages[0].snapshotDigest };
+  }
   const acl = (await restored.query(`SELECT p.oid::regprocedure::text AS function,owner.rolname AS owner,p.prosecdef,p.proconfig,
     EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public_exec
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles owner ON owner.oid=p.proowner
@@ -137,7 +170,7 @@ try {
   writeFileSync(path.join(input.evidenceRoot, 'nonempty-restore-results.json'), JSON.stringify({ status: 'SYNTHETIC_PASS', source: '812a2e80584f08675fab8b7401ce8b4cd3ab5bca',
     report, before, after: await counts(restored), sourceFidelity, restoredFidelity,
     releaseId: input.releaseId, graphDigests: input.graphDigests, consumed, acl, backup: backup.path,
-    http: { pageCount: pages.length, totals: pages[0].totals, snapshotDigest: pages[0].snapshotDigest } }, null, 2));
+    http }, null, 2));
   process.stdout.write('NONEMPTY_GRAPH_RESTORE_PASS\n');
 } finally {
   await app?.close();

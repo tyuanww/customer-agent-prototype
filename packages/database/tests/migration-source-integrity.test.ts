@@ -56,11 +56,12 @@ describe('verified product migration sources', () => {
   });
 
   it('keeps ACL and SOP before unified storage in the ordered catalogue', () => {
-    expect(manifest.migrations.slice(-4).map(({ position, id }) => ({ position, id }))).toEqual([
+    expect(manifest.migrations.slice(-5).map(({ position, id }) => ({ position, id }))).toEqual([
       { position: 82, id: '0082_access_evaluator' },
       { position: 83, id: '0083_sop_pipeline_projection' },
       { position: 84, id: '0084_sop_unified_storage' },
       { position: 85, id: '0085_sop_unified_lifecycle' },
+      { position: 86, id: '0086_sop_unified_query' },
     ]);
   });
 });

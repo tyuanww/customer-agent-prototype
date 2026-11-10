@@ -34,7 +34,7 @@ test('formal generator appends only the verified unified storage and preserves t
     const first = buildDatabaseMigrationOutputs(input, { projectRoot });
     const second = buildDatabaseMigrationOutputs(input, { projectRoot });
     assert.equal(prior.migrations.length, 83);
-    assert.equal(first.migrations.length, 85);
+    assert.equal(first.migrations.length, 86);
     assert.deepEqual(first.migrations.slice(0, 83), prior.migrations);
     assert.deepEqual(first.outputs, second.outputs);
     assert.equal(sha256(JSON.stringify(first.manifest.migrations.slice(0, 83))), '21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae');
@@ -58,6 +58,11 @@ test('formal generator appends only the verified unified storage and preserves t
     assert.equal(sha256(lifecycle.sql), lifecycle.sha256);
     assert.equal(first.manifest.compatibility.sop_lifecycle_overlay.migration_sha256, lifecycle.sha256);
     assert.ok(lifecycle.sql.includes(readFileSync(path.join(projectRoot, 'packages/database/overlays/0085_sop_unified_lifecycle.sql'), 'utf8').trimEnd()));
+    const query = first.migrations[85];
+    assert.equal(query.id, '0086_sop_unified_query');
+    assert.equal(first.manifest.compatibility.sop_query_overlay.migration_sha256, query.sha256);
+    assert.equal(sha256(query.sql), query.sha256);
+
     assert.throws(() => buildDatabaseMigrationOutputs({ ...input,
       sopUnified: { manifest, storage_source: `${storage}\n-- drift` } }, { projectRoot }), /bytes or transaction boundary drifted/);
     assert.throws(() => buildDatabaseMigrationOutputs({ ...snapshot,

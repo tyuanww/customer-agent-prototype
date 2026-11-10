@@ -341,6 +341,31 @@ describe('coordinated /v1/search SOP failure contract', () => {
     expect(result.events.statements.some((sql) => sql.includes('candidate_impressions'))).toBe(false);
   }
 
+  it('keeps explicit SOP search fail-closed while the same FAQ search operation is available', async () => {
+    const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
+    const runtime = createApiQueryRuntime({ loader: async () => loadedWithSop(sopProjection(null)), access,
+      observer: { record: () => undefined }, now: () => new Date('2099-01-01T00:00:00.000Z') });
+    await runtime.initialize();
+    const { app, events } = coordinatedApp(runtime);
+    const payload = { parent_query_id: null, interaction_reason: 'original', collection_mode: 'synthetic',
+      detected_platform: 'qianniu', platform: 'qianniu', platform_source: 'foreground_process',
+      product_context_type: null, product_context_ref: null, top_k: 3 };
+    const headers = { 'x-mock-user': 'usr_synthetic_agent', 'x-mock-role': 'agent' };
+    try {
+      const faq = await app.inject({ method: 'POST', url: '/v1/search', headers,
+        payload: { ...payload, query_id: '4d690ef7-a98d-4a56-a9c4-92ae4c52168f', query_text: '什么时候发货' } });
+      expect(faq.statusCode).toBe(200); expect(faq.json()).toMatchObject({ hit_status: 'hit', telemetry_status: 'recorded' });
+      const recorded = events.statements.filter(sql => sql.includes('INSERT INTO public.query_events')).length;
+      expect(recorded).toBeGreaterThan(0);
+      const sop = await app.inject({ method: 'POST', url: '/v1/search', headers,
+        payload: { ...payload, query_id: 'b33069ba-03fb-48a1-bec6-e89219def340', query_text: '过敏流程' } });
+      expect(sop.statusCode).toBe(503);
+      expect(sop.json()).toMatchObject({ error: { details: { reason: 'SOURCE_GATE_NOT_READY', sop_reason: 'SOP_SEVERITY_ORDER_REQUIRED' } } });
+      expect(sop.body).not.toContain('candidates');
+      expect(events.statements.filter(sql => sql.includes('INSERT INTO public.query_events')).length).toBe(recorded);
+    } finally { await app.close(); }
+  });
+
   it('distinguishes a ready SOP release whose pipeline is missing', async () => {
     const access = createMockAccessEvaluator(() => new Date('2099-01-01T00:00:00.000Z'));
     const runtime = createApiQueryRuntime({

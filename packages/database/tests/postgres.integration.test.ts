@@ -65,6 +65,7 @@ const SOP_REPAIR_SUFFIX = [
   '0083_sop_pipeline_projection',
   '0084_sop_unified_storage',
   '0085_sop_unified_lifecycle',
+  '0086_sop_unified_query',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -222,6 +223,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         '0083_sop_pipeline_projection',
         '0084_sop_unified_storage',
         '0085_sop_unified_lifecycle',
+        '0086_sop_unified_query',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
@@ -793,7 +795,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       expect(report).toMatchObject({
         status: 'PASS',
         migrationCount: generatedMigrationCatalogue.migrations.length,
-        inventory: { tables: 128, views: 7, functions: 328 },
+        inventory: { tables: 131, views: 7, functions: 336 },
         capabilityRoles: { total: 17, safe: 17, memberships: 0 },
         phase1PolicyHardOff: true,
         compatibility: {
@@ -892,7 +894,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
       });
 
       const sop = await applyDatabaseMigrations(client);
-      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage', '0085_sop_unified_lifecycle']);
+      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage', '0085_sop_unified_lifecycle', '0086_sop_unified_query']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
 
       const privileges = await client.query<{
