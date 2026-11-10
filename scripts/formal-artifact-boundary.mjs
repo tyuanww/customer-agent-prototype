@@ -32,7 +32,7 @@ export const FORBIDDEN_FORMAL_ARTIFACT_MARKERS = Object.freeze([
   Object.freeze({ code: 'E2E_RUNTIME_SWITCH', pattern: /DEMO_E2E/u }),
   Object.freeze({ code: 'GITHUB_TOKEN', pattern: /gh[opusr]_[A-Za-z0-9]{20,}/u }),
   Object.freeze({ code: 'GITHUB_FINE_GRAINED_TOKEN', pattern: /github_pat_[A-Za-z0-9_]{20,}/u }),
-  Object.freeze({ code: 'OPENAI_TOKEN', pattern: /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/u }),
+  Object.freeze({ code: 'OPENAI_TOKEN', pattern: /(?<![A-Za-z0-9])sk-(?:proj-)?[A-Za-z0-9_-]{20,}/u }),
   Object.freeze({ code: 'SLACK_TOKEN', pattern: /xox[baprs]-[A-Za-z0-9-]{20,}/u }),
   Object.freeze({ code: 'AWS_ACCESS_KEY', pattern: /(?:A3T|AKIA|ASIA|ABIA)[A-Z0-9]{16}/u }),
   Object.freeze({ code: 'GOOGLE_API_KEY', pattern: /AIza[A-Za-z0-9_-]{30,}/u }),

@@ -51,9 +51,9 @@ const VERIFICATION_POLICY_INPUT_BUDGET_BYTES = 3 * 1024;
 // FINAL-005-D retains the 0087 owner, generated SQL, HTTP and restore evidence.
 // Its measured source-input excess requires 341 KiB.
 const SOP_CONTINUATION_INPUT_BUDGET_BYTES = 341 * 1024;
-// The v12 immutable snapshot and independent codegen retain measured logical bytes.
+// The v12 snapshot, codegen and artifact-marker regressions retain measured logical bytes.
 const SOP_RESOURCE_CONTRACT_SNAPSHOT_BUDGET_BYTES = 6772 * 1024;
-const SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES = 2201 * 1024;
+const SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES = 2203 * 1024;
 export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES + SOP_CONTINUATION_INPUT_BUDGET_BYTES + SOP_RESOURCE_CONTRACT_SNAPSHOT_BUDGET_BYTES + SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.
