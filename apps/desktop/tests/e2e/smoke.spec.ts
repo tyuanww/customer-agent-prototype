@@ -1386,6 +1386,20 @@ test('@float honors reduced motion without adding a rectangular fox background',
       const before = getComputedStyle(button, '::before');
       return { animationName: before.animationName, opacity: before.opacity };
     });
+    console.log('FOX_REDUCED_MOTION_DIAGNOSTIC', {
+      halo,
+      state: await fox.getByTestId('fox-idle').evaluate((root) => ({
+        className: root.className,
+        pose: root.getAttribute('data-fox-pose'),
+        structural: root.getAttribute('data-fox-structural'),
+        transient: root.getAttribute('data-fox-transient'),
+        warning: root.getAttribute('data-fox-warning'),
+        halo: root.getAttribute('data-halo'),
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        reducedTransparency: matchMedia('(prefers-reduced-transparency: reduce)').matches,
+        forcedColors: matchMedia('(forced-colors: active)').matches,
+      })),
+    });
     expect(halo.animationName).toBe('none');
     expect(Number(halo.opacity)).toBeGreaterThanOrEqual(0.5);
 
