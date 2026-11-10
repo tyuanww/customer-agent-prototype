@@ -195,7 +195,9 @@ function frozenIntakePrefix(count: number) {
     migrations:generatedMigrationCatalogue.migrations.slice(0,count)};
 }
 
-describe.sequential('PostgreSQL 15 immutable migration gate', () => {
+// Complete-catalog correctness cases include the full migration bootstrap.
+// Performance cases enforce their own five-second PostgreSQL statement budget.
+describe.sequential('PostgreSQL 15 immutable migration gate', { timeout: 30_000 }, () => {
   // Registrar role is intentionally fail-closed on reuse: each test owns its cluster.
   let harness: Pg15Harness;
   beforeEach(() => { harness = new Pg15Harness(); harness.start(); }, 60_000);
@@ -505,6 +507,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   });
 
   it('checks explicit roots and all three applicability dimensions on the complete catalog', async () => {
+    const started = performance.now();
     const database=harness.createDatabase('family_policy'); const client=await harness.connect(database.config);
     const root:FamilyEntry={source:'brand-source',id:'root'};
     const child:FamilyEntry={source:'shop-source',id:'child',shop:'shop-one',familySourceId:root.source,familyBusinessEntryId:root.id};
@@ -535,6 +538,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     ];
     try {
       await applyDatabaseMigrations(client);
+      const checksStarted = performance.now();
       for (const [label,entries,allowed] of cases) {
         await client.query('BEGIN');
         try {
@@ -551,6 +555,9 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
         await expect(client.query("SELECT content_intake.inherit_legacy_catalog('family-release','next')"))
           .rejects.toMatchObject({code:'ZA003',message:'legacy publisher cannot inherit explicit family'});
       } finally { await client.query('ROLLBACK'); }
+      console.info(JSON.stringify({ probe: 'family-explicit-roots', cases: cases.length,
+        migrations: generatedMigrationCatalogue.migrations.length,
+        bootstrapMs: checksStarted - started, checksMs: performance.now() - checksStarted }));
     } finally { await client.end(); }
   });
 
