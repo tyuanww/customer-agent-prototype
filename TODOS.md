@@ -2,7 +2,7 @@
 
 ## 当前代码与收尾状态（2026-11-11）
 
-产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #196 已合入。最近功能合并基线为 `6f6efc8308955d4924f1592392e3138d4adab4b0`，其六项 CI 全部通过。#195 接通桌面统一 SOP 正常链，#196 完成补测修复。#196 的四项必需 PR 检查成功，合同、数据库及两个打包 lane 按路径计划跳过。合并后的主干另完成完整门禁。Windows 原生 Electron 和 Linux 打包运行证据绑定各自 runner。[功能基线检查](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42877313568)
+产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #196 已合入。最近功能合并基线为 `6f6efc8308955d4924f1592392e3138d4adab4b0`，其六项 CI 全部通过。#195 接通桌面统一 SOP 正常链，#196 完成补测修复。#196 的四项必需 PR 检查成功，合同、数据库及两个打包 lane 按路径计划跳过。合并后的主干另完成完整门禁。Windows CI 完成 NSIS 结构后验及三项原生 Electron 回归，Linux CI 完成 AppImage 结构后验及构建目录启动测试。[功能基线检查](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42877313568)
 
 正常 SOP 图导入、冻结、来源确认、全量质量、发布及回滚已通过 0085 生命周期闭环。0086 查询事实登记和正常 HTTP 查询已合并，独立导出恢复后也能消费原查询。0087 增加服务端开、续、关及受控图片读取，固定原发布和事实，保留原 handle 终态，按当前身份与授权重新校验。0088 完成显式查询证明与资源停用发布。最终后端 69 项正常 HTTP/PG、数据库、FAQ、备份恢复及根检查通过，345 件实际 M0 构建产物逐文件校验通过。对应入口和合同边界见[续用验证说明](docs/how-to-verify-sop-continuation.md)。
 
