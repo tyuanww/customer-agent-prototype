@@ -60,7 +60,7 @@ test('dependency map is structurally valid and owns every declared route referen
   assert.ok(RULE_DOCUMENTS.has('docs/reference-engineering-workflow.md'));
 });
 
-test('docs-only changes skip runtime, database, Electron and packaging lanes', () => {
+test('docs-only changes enforce the workspace budget before merge', () => {
   const plan = verificationPlan([
     'README.md',
     'docs/reference-engineering-workflow.md',
@@ -81,7 +81,7 @@ test('docs-only changes skip runtime, database, Electron and packaging lanes', (
     packaging: false,
   });
   assert.deepEqual(ids(plan, 'precheck'), ['policy-tests', 'documentation']);
-  assert.deepEqual(ids(plan, 'quick'), []);
+  assert.deepEqual(ids(plan, 'quick'), ['workspace-check']);
   assert.deepEqual(ids(plan, 'database'), []);
   assert.deepEqual(plan.fullFallbackReasons, []);
 });
@@ -430,7 +430,7 @@ test('full fallback materializes every map-owned check', () => {
 
 test('plan commands are lane-scoped and deduplicated', () => {
   const docs = verificationPlan(['docs/reference-engineering-workflow.md'], map);
-  assert.deepEqual(planLaneCommands(docs, 'quick'), []);
+  assert.deepEqual(planLaneCommands(docs, 'quick'), [['pnpm', 'workspace:check']]);
 
   const mixed = verificationPlan([
     'apps/desktop/src/main/main.ts',

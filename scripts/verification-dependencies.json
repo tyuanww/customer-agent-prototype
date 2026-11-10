@@ -114,7 +114,7 @@
       "owner": "repository-docs",
       "paths": ["AGENTS.md", "CONTRIBUTING.md", "README.md", "PROJECT_CHARTER.md", "CHANGELOG.md", "TODOS.md", "DESIGN.md", "DEVELOPMENT_BRIEF.md", "docs/**/*.md", "evidence/**/*.md"],
       "rules": true,
-      "checks": { "precheck": ["policy-tests", "documentation"] },
+      "checks": { "precheck": ["policy-tests", "documentation"], "quick": ["workspace-check"] },
       "liveLanes": [],
       "databaseLanes": [],
       "packagingLanes": [],
