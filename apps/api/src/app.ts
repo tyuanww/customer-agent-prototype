@@ -39,6 +39,7 @@ import type {
 } from './service-repository.js';
 import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
 import { registerSopQueryRoute, type SopQueryRouteDependencies } from './sop-query-routes.js';
+import { createUnifiedSopQueryOperation } from './sop-unified-query-operation.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
 import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
 import { registerContentReviewRoutes, type ContentReviewRouteDependencies } from './content-review-routes.js';
@@ -50,7 +51,7 @@ import { contentIntakeManagementRoutes } from './content-intake/management-http.
 import { contentIntakeUsageRoutes } from './content-intake/usage-http.js';
 import { createContentIntakeService } from './content-intake/service.js';
 import { syntheticPrincipalLabels } from './content-intake/synthetic-principal-labels.js';
-import type { ContentObjectStore } from './content-object-store.js';
+import type { ContentObjectStore, ContentAttachmentStore } from './content-object-store.js';
 import type { IntakePurposePool } from './content-intake/runtime-pool.js';
 import { installAccessAdmission } from './access/admission.js';
 import { createBoundedDenialAudit, type AccessDenialAudit } from './access/audit.js';
@@ -102,7 +103,7 @@ export type ApiAppOptions = Readonly<{
     business: IntakePurposePool;
     usage: IntakePurposePool;
     worker: IntakePurposePool;
-    store: ContentObjectStore;
+    store: ContentObjectStore & Partial<Pick<ContentAttachmentStore, 'readAttachment'>>;
   }> | undefined;
   accessEvaluator?: AccessEvaluator | undefined;
   accessDenialAudit?: AccessDenialAudit | undefined;
@@ -260,7 +261,9 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   registerPolicyReadRoute(app, config, repository, authService);
   registerPolicyWriteRoute(app, policyAdminRepository, authService);
   registerSearchRoute(app, authService, searchDependencies);
-  registerSopQueryRoute(app, authService, sopQueryDependencies);
+  registerSopQueryRoute(app, authService, sopQueryDependencies ?? (intakeDependencies && authService.kind === 'product'
+    ? { unifiedOperation: createUnifiedSopQueryOperation(intakeDependencies.usage, intakeDependencies.store) }
+    : undefined));
   registerEventRoutes(app, authService, eventDependencies);
   registerContentImportRoutes(app, authService, contentImportDependencies);
   registerContentReviewRoutes(app, authService, contentReviewDependencies);

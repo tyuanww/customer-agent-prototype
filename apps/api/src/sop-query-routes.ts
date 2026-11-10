@@ -2,6 +2,9 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AuthService } from './auth-service.js';
 import { authenticateRequestHeaders } from './auth-service.js';
 import { authenticatedProductSession } from './product-auth-service.js';
+import { validateContractSchema } from '@customer-agent/contracts/sop-unified';
+import { SOP_UNIFIED_QUERY_CONTRACT_SET_ID, type UnifiedSopQueryOperation } from './sop-unified-query-model.js';
+import { parseUnifiedSopQueryResponse } from './sop-unified-query-validation.js';
 import type { SopQueryOperation, SopQueryFailureCode } from './sop-query-operation.js';
 import { isSopQueryResponse } from './sop-query-validation.js';
 import {
@@ -28,7 +31,8 @@ export type {
 export type { SopQueryRequest, SopQueryResponse } from './sop-query-model.js';
 
 export type SopQueryRouteDependencies = Readonly<{
-  operation: SopQueryOperation;
+  operation?: SopQueryOperation;
+  unifiedOperation?: UnifiedSopQueryOperation;
 }>;
 
 type RecordValue = Readonly<Record<string, unknown>>;
@@ -127,9 +131,23 @@ export function registerSopQueryRoute(
       return sendSopError(reply, 401, 'SCOPE_DENIED', '缺少或无法验证产品会话');
     }
     const contractHeader = request.headers['x-intake-contract-set'];
+    if (contractHeader === SOP_UNIFIED_QUERY_CONTRACT_SET_ID && dependencies.unifiedOperation) {
+      const parsed = validateContractSchema('MenokinSopQuerySopQueryRequest', request.body);
+      if (!parsed.ok) return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 SOP 查询合同', requestIdOf(request.body));
+      try {
+        const result = await dependencies.unifiedOperation.execute({ actor, request: parsed.value });
+        if ('ok' in result) return sendOperationFailure(reply, result);
+        const value = parseUnifiedSopQueryResponse(result, parsed.value.request_id);
+        reply.header('x-intake-contract-set', SOP_UNIFIED_QUERY_CONTRACT_SET_ID);
+        return reply.code(200).send(value);
+      } catch {
+        return sendSopError(reply, 503, 'SOP_UNAVAILABLE', '当前 SOP 服务不可用', parsed.value.request_id);
+      }
+    }
     if (typeof contractHeader !== 'string' || contractHeader !== MENOKIN_SOP_QUERY_CONTRACT_SET_ID) {
       return sendSopError(reply, 409, 'CONTRACT_UPGRADE_REQUIRED', '请求使用的合同集不受支持', requestIdOf(request.body));
     }
+    if (!dependencies.operation) return sendSopError(reply, 409, 'CONTRACT_UPGRADE_REQUIRED', '请求使用的合同集不受支持', requestIdOf(request.body));
     const parsed = parseRequest(request.body);
     if (parsed === null) return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 Menokin SOP 查询合同', requestIdOf(request.body));
     let result: SopQueryResponse | Readonly<{ ok: false; code: SopQueryFailureCode }>;

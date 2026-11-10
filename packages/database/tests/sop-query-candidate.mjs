@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('legacy candidate check verifies the complete 85 tail and preserves historical 83/84 artifacts', t => {
+test('legacy candidate check verifies the complete 86 tail and preserves historical 83/84/85 artifacts', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'sop-query-candidate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
@@ -26,9 +26,16 @@ test('legacy candidate check verifies the complete 85 tail and preserves histori
   const check = () => spawnSync(process.execPath, [path.join(candidateRoot, 'generate.mjs'), '--check'], { encoding: 'utf8' });
   let result = check();
   assert.equal(result.status, 0, result.stderr);
+  const lifecyclePrefix = JSON.parse(original);
+  lifecyclePrefix.migrations = lifecyclePrefix.migrations.slice(0, 85);
+  delete lifecyclePrefix.compatibility.sop_query_overlay;
+  writeFileSync(migrationManifest, JSON.stringify(lifecyclePrefix));
+  result = check();
+  assert.equal(result.status, 0, result.stderr);
   const storage = JSON.parse(original);
   storage.migrations = storage.migrations.slice(0, 84);
   delete storage.compatibility.sop_lifecycle_overlay;
+  delete storage.compatibility.sop_query_overlay;
   writeFileSync(migrationManifest, JSON.stringify(storage));
   result = check();
   assert.equal(result.status, 0, result.stderr);
@@ -36,6 +43,7 @@ test('legacy candidate check verifies the complete 85 tail and preserves histori
   prefix.migrations = prefix.migrations.slice(0, 83);
   delete prefix.compatibility.sop_unified_successor;
   delete prefix.compatibility.sop_lifecycle_overlay;
+  delete prefix.compatibility.sop_query_overlay;
   writeFileSync(migrationManifest, JSON.stringify(prefix));
   result = check();
   assert.equal(result.status, 0, result.stderr);

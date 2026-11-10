@@ -386,6 +386,8 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0084_sop_unified_storage',
     requiresPredecessor: 'SOP lifecycle requires the exact unified storage predecessor',
   },
+  { index: 85, minimumCatalogueLength: 86, id: '0086_sop_unified_query',
+    predecessorId: '0085_sop_unified_lifecycle', requiresPredecessor: 'SOP query requires the exact normal lifecycle predecessor' },
 ];
 
 function requiredSuccessorStep(
@@ -437,6 +439,9 @@ function matchesCatalogueSuccessorStep(
     ? migration.sha256
     : catalogue.migrations[occupiedSuccessorStep.index]?.sha256;
   return occupiedChecksum === FROZEN_OCCUPIED_SHA256
+    && (step.id !== '0086_sop_unified_query' || sameSignedSuccessor(migration, catalogue.compatibility.sopQueryOverlay)
+      && migration.sha256 === generatedMigrationCatalogue.migrations[85]?.sha256
+      && catalogue.migrations[84]?.sha256 === catalogue.compatibility.sopLifecycleOverlay?.migrationSha256)
     && (step.id !== '0085_sop_unified_lifecycle' || sameSignedSuccessor(migration, catalogue.compatibility.sopLifecycleOverlay)
       && migration.sha256 === generatedMigrationCatalogue.migrations[84]?.sha256
       && catalogue.migrations[83]?.sha256 === catalogue.compatibility.sopUnifiedSuccessor?.migrationSha256)
@@ -544,7 +549,7 @@ export function assertMigrationCatalogue(catalogue: ExecutableMigrationCatalogue
       if (!successorSuffix) catalogueError(step.requiresPredecessor);
       matchesRepair = step === repairSuccessorStep;
       matchesReadiness = step === readinessSuccessorStep;
-      matchesUnified = step.id === '0084_sop_unified_storage' || step.id === '0085_sop_unified_lifecycle';
+      matchesUnified = ['0084_sop_unified_storage', '0085_sop_unified_lifecycle', '0086_sop_unified_query'].includes(step.id);
       successorSuffix = true;
     } else if (matchesSuccessor) successorSuffix = true;
     else if (successorSuffix) catalogueError(`Migration catalogue successor suffix is interrupted at ${migration.id}`);

@@ -75,9 +75,9 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 
 ## Foundation 消费入口
 
-产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。foundation 的 83→84 独立测试保留其历史目录。当前正常 apply / verify 消费包含实施 overlay 的完整 85 条目录，前 84 条 SQL 与来源元数据保持不可变。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及 84/85 精确尾部。完整 corrected verifier 继续从固定 v10 前序重建产物。
+产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。foundation 的 83→84 独立测试保留其历史目录。当前正常 apply / verify 消费包含实施 overlay 的完整 86 条目录，前 85 条 SQL 与来源元数据保持不可变。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及 84/85/86 精确尾部。完整 corrected verifier 继续从固定 v10 前序重建产物。
 
-`@customer-agent/contracts/sop-unified` 从同一快照生成 128 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。foundation 的 79 个 component 扩为正常 facade 实际使用的 Intake 闭包，包含间接携带新 scope 和错误的请求与响应。生成 paths 仍只有原 `/v1/sop/query`。默认 contracts 视图的五项生成物保持原字节。正常目录依赖 corrected 锁和 sourcehash 钉住的 0085 overlay，两个生成入口校验全部来源与产物。
+`@customer-agent/contracts/sop-unified` 从同一快照生成 128 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。foundation 的 79 个 component 扩为正常 facade 实际使用的 Intake 闭包，包含间接携带新 scope 和错误的请求与响应。生成 paths 仍只有原 `/v1/sop/query`。默认 contracts 视图的五项生成物保持原字节。正常目录依赖 corrected 锁和 sourcehash 钉住的 0085/0086 overlay，两个生成入口校验全部来源与产物。
 
 旧 query candidate 的合成 host 显式应用前 83 条，并通过 testkit 的 `verifyMigrationPrefix(client, 83)` 核验物理前序后安装候选。该测试入口仍需既有 opt-in 和隔离 PG15 门禁。
 
@@ -94,6 +94,18 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 当前图通过既有 intake entitlement 与 snapshot 分页读取，合并 FAQ、词表、flows、nodes、edges、media，绑定 totals、pageCount 与完整 snapshotDigest。内部 `readCurrent(tx, principal, entitlementHash)` 调用受限 `read_sop_graph_current(text,text)`。图生效边界在不可变资格插入前由 `read_sop_graph_deadline(text,text)` 计算。005C 负责独立 query wire 与权限事实 writer，005D 负责 continuation 与最终图片消费。真实业务映射、来源和批准输入继续由对应 owner 提供。
 
 正常链专项在 `apps/api/tests/sop-unified-lifecycle.integration.test.ts`，由 `test:integration:sop` 串行执行。它通过真实 HTTP 创建候选、质量与 R1/R2/R3，随后使用现有 backup-set 工具 dump/restore 非空图与媒体，再运行 85 verifier、受控当前图读取及实际 bytes 校验。所有输入为合成 fixture。上游 installation 与消费锁保留其未激活元数据。
+
+## 正常查询与权限事实
+
+`0086_sop_unified_query` 复用既有 content_current、entitlement、ProductSession、父授权与永久 receipts。`sop-unified-query-operation.ts` 拥有 v11 查询事务与独立 server-owned query lease，`sop-query-routes.ts` 按冻结 exact ID 分派。opaque context_generation 参与原请求、lease 和幂等绑定，只做相等比较。
+
+内部 `createSyntheticSopQueryFactWriter` 接受显式 synthetic 来源标识、版本与原字节，计算 SHA 并以 CAS 追加不可变事实。登记绑定原 candidate/version、完整 graph digest 和原 publication。原 sourceClaim、材料 risk、来源 confirmation 及 source_mappings 版本从原发布读取。逐 entry risk/copy/source_ref 由显式事实提供。合成来源别名及版本只接受字母、数字、点、下划线、冒号和连字符，source_ref 精确绑定别名@版本#entry ID。已知分组的缺事实只阻塞该候选，缺分组登记导致歧义时保持 blocked。
+
+`content-intake/sop-graph.ts` 继续拥有完整图闭包、digest 与媒体字节检查。`sop-unified-query-validation.ts` 集中补充 terminal outgoing、标题或正文过敏安全及 owner+ordinal 唯一性。C 先验证完整 original graph，再发送 B sop_graph_selection 产生的 selectedMedia，wire 保留 original graph_digest。合法不适用的媒体由 selection 排除。相同 resource/object 可被多个 owner 引用，每个完整 binding 独立 preview，不能借其他 owner 句柄。
+
+`read_sop_unified_query_bundle`、`read_sop_query_media` 和 `recheck_sop_unified_query` 是 current-only 入口。私有 `sop_query_publication_facts` 和 `sop_query_media_descriptor` 提供原发布事实与完整 tuple descriptor。D 历史 issuer 先锁 active 行取得 pinned release，再完成授权和截止检查。C 的 prepareIntakeUsage 包含 current release gate，历史 continuation 由 D 的窄 issuer 拥有。
+
+`test:integration:sop-query` 通过正常 HTTP 导入、冻结、确认、质量与发布后登记合成事实，再经 PG/HTTP 验证 query。非空 backup 恢复核对事实、lease、完整 preview binding、receipt 和原请求重放。完整响应按实际 UTF-8 JSON bytes 限制为 1 MiB。真实业务映射与完整 GateB 联验仍按各自批准和证据推进。
 
 ## 验证入口
 

@@ -949,6 +949,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === 135
     && expectedTriggerSha === 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc'
+  ) || (
+    expectedTriggerEntries === 138
+    && expectedTriggerSha === 'e0e06bc5a97f5f8a4d0370aec3f402e2c00a3fcc4ef0f0bc9225b5c81de5701a'
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -979,7 +982,9 @@ async function verifyCatalogueState(
         || (catalogue.migrations.length === 84
           && triggerSha === UNIFIED_SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256)
         || (catalogue.migrations.length === 85
-          && triggerSha === SOP_LIFECYCLE_DISABLED_IMPORT_BATCH_TRIGGER_SHA256))
+          && triggerSha === SOP_LIFECYCLE_DISABLED_IMPORT_BATCH_TRIGGER_SHA256)
+        || (catalogue.migrations.length === 86
+          && triggerSha === '09f71b81494edf994d9128961d547940ec1597342b43f3b459edda57d830068a'))
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
@@ -1181,6 +1186,7 @@ const READINESS_SUFFIX = [
   { length: 83, index: 82, id: '0083_sop_pipeline_projection' },
   { length: 84, index: 83, id: '0084_sop_unified_storage' },
   { length: 85, index: 84, id: '0085_sop_unified_lifecycle', sha256: 'ff92a37c4a960cb2deb1e6b5060a896c2df6ebd6c29166a0ab8c05ea35327b88' },
+  { length: 86, index: 85, id: '0086_sop_unified_query', sha256: '1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1261,6 +1267,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   83: { tables: 119, functions: 305, objectEntries: 3612, objectSha256: '9fefcdc96471091c98ea00aee520a2aa25ab7f26ad749212623cef57dc974b13', functionEntries: 305, functionSha256: '71db2fe2bf55f5a6faffd60c8bfa5a3c653dbcb83052ff335a5751814d9347c3', triggerEntries: SOP_TRIGGER_ENTRIES, triggerSha256: SOP_TRIGGER_SHA256 },
   84: { tables: 128, functions: 310, objectEntries: 3909, objectSha256: '9193d9d1ea5d38c5da8729bc8c5b82d00713393c20f5aa7b79b83ffd823b384a', functionEntries: 310, functionSha256: '48c77a14a7592c97b84e987221672d010716d5ea909b873a91ed4283402b5a50', triggerEntries: 133, triggerSha256: UNIFIED_SOP_TRIGGER_SHA256 },
   85: { tables: 128, functions: 328, objectEntries: 3946, objectSha256: '85e0e91e657a1767c1418edf929e750c4edb67a5d2a850a46669708426694400', functionEntries: 328, functionSha256: 'adbe454cc6a149351403fef03af05a3d49fafef9071d467d82415b2be00bdb7e', triggerEntries: 135, triggerSha256: 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc' },
+  86: { tables: 131, functions: 336, objectEntries: 4025, objectSha256: '512dfc117ce740a39222fef20d82d5720c994891552fbea9770111d6c6036274', functionEntries: 336, functionSha256: '6c0e591f853bcdb666d72e0194cdec98cc5904297d24b8150b3d5d8936817b8a', triggerEntries: 138, triggerSha256: 'e0e06bc5a97f5f8a4d0370aec3f402e2c00a3fcc4ef0f0bc9225b5c81de5701a' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1318,6 +1325,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   83: { entries: 658, sha256: '35f50f0f6aa864b86cedfaf170e31f083af146ef3b6366e6a384af25a8d4672c' },
   84: { entries: 658, sha256: '35f50f0f6aa864b86cedfaf170e31f083af146ef3b6366e6a384af25a8d4672c' },
   85: { entries: 668, sha256: '4c97ae7d16cc19a79bb21c2e8436a4f87d9b4af2a5db6766bd9b414a1dcf02bf' },
+  86: { entries: 676, sha256: '5a540cf8ed9526f74c4403668d3f7e266b028ed047b0d0a16ad7a19c9052c0dc' },
 };
 
 export async function verifyReadinessSuccessor(

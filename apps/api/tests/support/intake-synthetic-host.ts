@@ -24,11 +24,15 @@ import { createSeatServiceFromEnv } from '../../dist/content-intake/seats.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { createEventRepository } from '../../dist/event-repository.js';
 import { registerSearchRoute } from '../../dist/search-routes.js';
-import { IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
+import { createIntakeTransactions, IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
 import { createIntakePurposePool, type IntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
 import { createRegisteredOrganizationRefresh } from '../../dist/content-intake/organization/registered-refresh.js';
 import { createDatabaseAccessEvaluator } from '../../dist/access/database.js';
 import { registerAccessRoutes } from '../../dist/access/routes.js';
+import { registerSopQueryRoute } from '../../dist/sop-query-routes.js';
+import { createUnifiedSopQueryOperation } from '../../dist/sop-unified-query-operation.js';
+import { createSyntheticSopQueryFactWriter } from '../../dist/sop-unified-query-facts.js';
+import type { RegisteredSyntheticSopFacts } from '../../src/sop-unified-query-facts.js';
 import { nativeOrganizationFixture } from './intake-organization-native.ts';
 import { seedIntakeSyntheticDirectory } from './intake-synthetic-directory.ts';
 import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-synthetic-seed.ts';
@@ -63,10 +67,10 @@ export function createIntakeSyntheticCsv(options: SyntheticFileOptions = {}) {
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
-type HostOptions = { profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
+type HostOptions = { includeSopQuery?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
   includeLegacySearch?: boolean;
   configureDatabase?: (client: Awaited<ReturnType<Pg15Harness['connect']>>) => Promise<void>;
-  wrapBusinessPool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
+  wrapBusinessPool?: (pool: IntakePool) => IntakePool; wrapUsagePool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
   observeSyntheticRequest?: (actor: DesktopSyntheticIdentity, headers: Headers) => void };
 
 export function requiresAccessEvaluatorOverlay(migrations: readonly Readonly<{ id: string }>[]): boolean {
@@ -156,7 +160,7 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
-  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch'> = {}) {
+  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
   const pg = new Pg15Harness();
   const authLogin = profile === 'purpose-runtime' ? 'stack_backend_auth' : 'synthetic_intake_auth';
@@ -514,6 +518,9 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     const store = createContentObjectStore(path.join(pg.root, 'objects'));
     pool = hooks.wrapBusinessPool?.(pool) ?? pool;
     const report = (id: string, error: unknown) => { hooks.observeError?.(error); diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
+    usagePool = hooks.wrapUsagePool?.(usagePool) ?? usagePool;
+    if (hooks.includeSopQuery) registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store, report) });
+    const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
     const seatRoot = path.join(pg.root, 'seat-accounts');
@@ -581,6 +588,13 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     return {
       apiOrigin, identityOrigin, root: pg.root, expiresAt: facts.rows[0].expires.toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
+      async writeSopQueryFacts(actor: IntakeSyntheticIdentity, input: { operationId: string; expectedVersion: number; source: RegisteredSyntheticSopFacts }) {
+        if (!hooks.includeSopQuery || !auth) throw new Error('Synthetic SOP query registration is closed');
+        const token = sessions.get(actor);
+        const authenticated = token ? await auth.authenticate({ authorization: `Bearer ${token}` }) : null;
+        if (!authenticated) throw new Error('Synthetic SOP facts writer requires an existing product session');
+        return queryFactWriter.write(authenticated, input);
+      },
       selectIdentity(value: DesktopSyntheticIdentity) {
         if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',
       'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only', 'roster-review-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;

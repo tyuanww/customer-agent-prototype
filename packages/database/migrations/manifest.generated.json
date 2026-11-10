@@ -123,6 +123,13 @@
       "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
       "source_sha256": "e76859e42aea66744005295b4baaf7e4872914e6b1ba2f162d46d2b0c1b16924",
       "migration_sha256": "ff92a37c4a960cb2deb1e6b5060a896c2df6ebd6c29166a0ab8c05ea35327b88"
+    },
+    "sop_query_overlay": {
+      "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+      "source_sha256": "33e3c0aa4b3983062455ccf56283abdc44dd18e01384752a80fa9d5fbdc5cd2b",
+      "migration_sha256": "1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc"
     }
   },
   "migrations": [
@@ -1212,6 +1219,17 @@
       "source_ranges": [],
       "sha256": "ff92a37c4a960cb2deb1e6b5060a896c2df6ebd6c29166a0ab8c05ea35327b88",
       "bytes": 111241,
+      "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12"
+    },
+    {
+      "position": 86,
+      "id": "0086_sop_unified_query",
+      "file": "0086_sop_unified_query.sql",
+      "source_ranges": [],
+      "sha256": "1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc",
+      "bytes": 31749,
       "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
       "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
       "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12"

@@ -418,6 +418,8 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 `apps/desktop/src/shared/sop-pipeline.ts` owns the earlier pipeline projection and `SopPipelinePresenter` owns its copy authority. These are separate from the explicit query transport below; neither an approved contract nor a synthetic consumer activates the production runtime.
 
+正常 v11 查询由 `sop-unified-query-operation.ts` 复用 `content-intake/usage.ts` 的当前资格 owner，在同一事务提交 versioned permission facts 绑定、独立 query lease 与既有 receipts。`sop-unified-query-facts.ts` 拥有显式 synthetic 来源字节/version 和原 publication provenance 校验。`sop-unified-query-context.ts` 拥有候选分组与权限闭包，`sop-unified-query-validation.ts` 复用 B 图校验并集中 C/D 共享安全约束。完整原图先验 digest，再按 B selection 投影媒体，保留 original digest。受限 SQL 登记在正常 `0086_sop_unified_query`，旧83候选保持隔离。D 历史 continuation 从锁定 active 行取得原 release，使用同一纯图/事实校验及私有完整媒体 descriptor，历史 issuer 由 D 拥有。验证见[独立 SOP 查询验证](how-to-verify-sop-query.md)。
+
 独立查询使用已冻结的 `cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b`，由 `sop-query-routes.ts`、`sop-query-operation.ts` 和 `sop-query-database-read-port.ts` 分别拥有 HTTP 校验、查询编排和受限数据库调用。`packages/database/candidates/0084_sop_query/` 在完整 0083 前驱之后生成并安装候选，只允许临时 PG15 测试；不属于默认迁移目录。它从不可变图谱系读取当前发布，维护请求终态与租约，重新校验授权，不另设 current 指针。图片缺少完整预览协议时返回 blocked。
 
 桌面 `main/sop-query-runtime.ts` 拥有独立查询的选择、图推进、失效、短期动作句柄与剪贴板副作用。`shared/sop-query.ts` 定义窄命令、wire 校验与 renderer 投影；SOP 独立 preload 只传动作意图，不提供 URL、token 或任意正文复制。只有显式 loopback `faq-v2` 加 `sopQuery: menokin-sop-query-v1` 的合成 profile 启用此入口。只沿明确边推进，sequence 不补出边；每次选择或复制都重新检查同一内容及原租约。验证与未完成边界见[独立 SOP 查询验证](how-to-verify-sop-query.md)。
