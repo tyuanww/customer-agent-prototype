@@ -1,0 +1,18 @@
+{
+  "schema": "customer-agent-sop-unified-authorization/v1",
+  "status": "APPROVED",
+  "evidenceId": "EVD-SOP-UNIFIED-TECHNICAL-20261109",
+  "decisionDate": "2026-11-09",
+  "authority": "Project owner conversation authorizes continuing the full SOP closeout, AI technical recommendations and author self-review.",
+  "scope": [
+    "formal-contract-change",
+    "product-implementation",
+    "local-commit",
+    "local-export"
+  ],
+  "model": "unified-taskgraph-v4-with-query-transport",
+  "businessMappingApproved": false,
+  "runtimeActivated": false,
+  "realDataApproved": false,
+  "deploymentApproved": false
+}

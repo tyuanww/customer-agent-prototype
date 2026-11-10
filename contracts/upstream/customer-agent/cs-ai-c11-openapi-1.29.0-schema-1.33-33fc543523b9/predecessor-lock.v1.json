@@ -1,0 +1,45 @@
+{
+  "schema": "customer-agent-sop-unified-source/v1",
+  "versions": {
+    "openapi": "1.29.0",
+    "database": "schema.v1.33",
+    "profile": "content-intake-sop-unified-v1"
+  },
+  "sourceGitSha": "0fb1dc76ee2b84fda4a82025c081eea7dd697534",
+  "model": {
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-task-graph-compat-v4",
+    "members": {
+      "compatibility.v4.json": "cbda94cc1817c31897c82d9cfb19516e4ca9c3cd5bbb58ff7104c397506a48aa",
+      "installation.v4.json": "3164cc4900a7ca89af940b810a4a12b3ff957328da5cb627437caded3950af3a",
+      "legacy-openapi.v7.yaml": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "openapi.v1.yaml": "4c7a92d8f357bf79eb27d4e9e8f120a3555c3ebf8583e6b55a19ceac1fcaa805",
+      "operation-coverage.v4.json": "41b65c42d2b62e6a0de020428c931fd16e0a1986f82ec77442753c33574c603f",
+      "provenance.v4.json": "969630c7901c6ece24a49eb22fffdf0f1462110b463df5de2ced326b31f4d7da",
+      "schema-v1.32.sql": "c050492b331fe8e40ae81bd35113c45d93a1cb91f867ed448f79d1b4d14a425a",
+      "storage.v4.sql": "9dd191ab78fd1dd53a26aa743d138f5c80d0e22a790d7baf15110d916a303110"
+    }
+  },
+  "legacyQuery": {
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-query-v1",
+    "members": {
+      "approval.v1.json": "9292d302dc7881acaad21c312cc81df326c2e38541d8edaef52a704effdeb065",
+      "installation.v1.json": "5561da9e98147331d57329bb0f6b4c856b31622f4316fdec3d0be8aee33c26d3",
+      "openapi.v1.yaml": "9f8b09c7577f17df25a17854d99cbd50f055b8cfcde4810276cf1a8f8fab5cc1",
+      "predecessor-lock.v1.json": "1f8c4a8e68458a28764ef622198870c430d5ffdc6299e397182b8b66c796228c",
+      "provenance.v1.json": "acc3d10d9672731eda67c36390bc4b5e1ae88cd15fc0971cbc50890f25c14fd8",
+      "rules.v1.json": "d73d5073c73e0bf5a8b1093ae35285e53bb37583b59ef65ead86dff37546451f",
+      "schema-v1.30.sql": "29af409df12f6ea511261812591d449deb2a1b11f9777af11c8a3a4800c167b8",
+      "shapes.v1.json": "e2dde63c43f28f21b2b88eb64a50b8457e8aa763835fe2e14e29e9904e0002ba",
+      "storage.v1.sql": "623202dc1248ee9d3be1bbf6f7f6ebf43438c07ff65094bcd7365e4c9c2016fe"
+    },
+    "fragment": "business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/openapi.fragment.json",
+    "leaseStorage": "business-docs/01-客服Agent项目/30-开发-进行中/sop-query-candidate/storage.fragment.sql",
+    "fragmentSha256": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
+    "leaseStorageSha256": "9ffca2f73ed97118848ccaf4829308578e8ef83b482cdd90dc8fa066bf21fea6"
+  },
+  "schemaPredecessor": {
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1",
+    "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+    "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9"
+  }
+}

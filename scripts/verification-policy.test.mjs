@@ -823,3 +823,29 @@ test('main CI continues to hardcode the authoritative full mode', () => {
   assert.match(changes, /echo "mode=full"/u);
   assert.doesNotMatch(changes, /verification-policy\.mjs plan/u);
 });
+
+test('unified safety checks reach root tests, PR plans and main CI through registered scripts', () => {
+  const rootPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const scripts = rootPackage.scripts;
+  assert.equal(scripts['test:sop-unified'], 'node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified && node scripts/customer-agent-contract-set.mjs verify --profile=sopUnifiedCorrected && node --test scripts/sop-unified-contract-intake.test.mjs scripts/sop-unified-corrected-contract.test.mjs');
+  assert.ok(scripts.test.includes('pnpm test:built'));
+  assert.ok(scripts['test:built'].includes('pnpm test:workflow'));
+  assert.ok(scripts['test:workflow'].includes('pnpm test:sop-unified'));
+  assert.ok(scripts['test:sop-unified'].includes('scripts/sop-unified-corrected-contract.test.mjs'));
+  assert.ok(scripts['test:workflow'].includes('scripts/readiness-contract-intake.test.mjs'));
+  assert.ok(scripts.check.includes('pnpm test:sop-unified'));
+  assert.ok(scripts['test:db:integration'].includes('pnpm test:sop-unified:pg15'));
+  assert.ok(scripts['test:sop-unified:pg15'].includes('node --test scripts/sop-unified-storage.pg15.test.mjs'));
+  for (const changed of ['package.json', 'scripts/sop-unified-contract.mjs', 'scripts/sop-unified-contract-intake.test.mjs']) {
+    const plan = verificationPlan([changed], map);
+    assert.ok(planLaneCommands(plan, 'quick').some(argv => argv.join(' ') === 'pnpm test:workflow'));
+  }
+  const full = verificationPlan(['scripts/sop-unified-storage.pg15.test.mjs'], map);
+  assert.ok(planLaneCommands(full, 'database').some(argv => argv.join(' ') === 'pnpm test:db:integration'));
+  const mainWorkflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  assert.match(mainWorkflow, /run: pnpm check\n/);
+  assert.match(mainWorkflow, /run: pnpm test:db:integration\n/);
+  const prWorkflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
+  assert.match(workflowJob(prWorkflow, 'quick'), /verification-policy\.mjs run[^\n]*--lane quick/);
+  assert.match(workflowJob(prWorkflow, 'database'), /verification-policy\.mjs run[^\n]*--lane database/);
+});

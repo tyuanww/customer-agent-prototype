@@ -1,0 +1,2749 @@
+{
+  "schema": "customer-agent-sop-negotiation-proof/v1",
+  "predecessorSourceGitSha": "33fc543523b95b47c1236ef7bbfccd3f772c9d0d",
+  "header": "X-Intake-Contract-Set",
+  "fromPattern": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+  "toPattern": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$",
+  "changedHeaders": [
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/201/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1sources~1{sourceId}~1objects/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/parameters/3/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/410/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1releases~1{releaseId}~1media~1{mediaObjectId}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1rollback/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/parameters/3/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/204/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1rows~1{rowId}/delete/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/204/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}/delete/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1shop-directory/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1management-context/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1quality~1operations~1{operationId}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1checks/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1freeze/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/parameters/7/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality~1samples/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/parameters/3/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1quality/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review~1refresh/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1principals/get/parameters/4/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1{rollbackPlanId}~1review/get/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1snapshot/get/parameters/3/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1entitlements/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/202/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1rollback~1preview/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1operations~1{operationId}/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1cancel/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/202/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1publish/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review~1refresh/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1review/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1source-confirmation/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1material/get/parameters/4/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates/get/parameters/4/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}~1report/get/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1parse-jobs~1{jobId}/get/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/202/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1candidates/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/201/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1objects/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/get/parameters/3/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1vocabulary/post/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}~1template/get/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources~1{sourceId}/put/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sources/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1{grantId}/patch/parameters/1/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants~1preview/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1grants/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1authorization/get/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/429/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/500/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1policy/get/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/parameters/2/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1candidates~1{candidateId}~1versions~1{version}~1row-deletions/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/204/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1check/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/parameters/11/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/403/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/410/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/413/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1candidates~1{candidateId}~1versions~1{version}~1sop~1media~1{mediaObjectId}/get/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/200/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1renew/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/204/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/400/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/401/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/404/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/409/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/422/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/responses/503/headers/X-Intake-Contract-Set/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    },
+    {
+      "pointer": "/paths/~1v1~1intake~1sop~1continuations~1close/post/parameters/0/schema/pattern",
+      "before": "^cs-ai-c11-openapi-1\\.28\\.0-schema-1\\.32-[0-9a-f]{12}$",
+      "after": "^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$"
+    }
+  ]
+}

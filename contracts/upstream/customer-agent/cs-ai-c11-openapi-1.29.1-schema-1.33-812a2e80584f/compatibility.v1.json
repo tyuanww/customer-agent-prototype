@@ -1,0 +1,84 @@
+{
+  "schema": "customer-agent-sop-unified-compatibility/v2",
+  "modelCompatibility": {
+    "status": "REVIEW_CANDIDATE",
+    "proposedVersions": {
+      "openapi": "1.28.0",
+      "database": "schema.v1.32",
+      "profile": "content-intake-sop-task-graph-v4",
+      "contractSetEnvelope": "customer-agent-contract-set/v9"
+    },
+    "legacy": {
+      "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+      "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+      "openapiPath": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/openapi.v1.yaml",
+      "openapiSha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "openapiBytes": 795585
+    },
+    "historicalLocalV3": {
+      "status": "LOCAL_FROZEN_REVIEW_ONLY",
+      "sourceGitSha": null,
+      "formalVersionAssigned": false,
+      "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-task-graph-v3",
+      "members": {
+        "approval.v3.json": "83446145c7b4563de0d314d79897bf1b049f3e155232a718902dd6547da9ee48",
+        "installation.v3.json": "51c97081b8a627addde317c119978498bbbfe0a608887dd9d0e85d3f77545fef",
+        "openapi.v1.yaml": "ac2d97b9d6093221be347b8ebca7015fa980e0c05c2e9a37cfb2198bc7df3f78",
+        "predecessor-lock.v3.json": "1f8c4a8e68458a28764ef622198870c430d5ffdc6299e397182b8b66c796228c",
+        "provenance.v3.json": "069e204d74090610f3d5255594174e1177a5a0bcb67218117b3b6cfe3bcc7a60",
+        "rules.v3.json": "4ec89bce7870b0f096cb72519508b42f52a1773b8fd1dd687b12c184ab9af968",
+        "schema-v1.32.sql": "c050492b331fe8e40ae81bd35113c45d93a1cb91f867ed448f79d1b4d14a425a",
+        "shapes.v3.json": "c1342b9a4932a2e44e113f61214e0b3e956fa20d69008e3b9b72bb3888cf40db",
+        "storage.v3.sql": "9dd191ab78fd1dd53a26aa743d138f5c80d0e22a790d7baf15110d916a303110"
+      }
+    },
+    "negotiation": {
+      "header": "X-Intake-Contract-Set",
+      "legacySelection": "For any pre-existing intake operation, absence of the header or the exact locked v7 ID selects the complete locked v7 request, response and behavior. This includes pre-existing six-sheet SOP and its media operation, not only FAQ. Return all otherwise eligible FAQ and preserve v7 authorization, limits, paging and errors; old snapshot SOP arrays remain empty as required by v7.",
+      "successorSelection": "The exact complete ID from the deployed successor manifest selects the successor view; a prefix, profile, proposed number or merely pattern-matching ID is insufficient. Every new graph operation, graph candidate, graph media binding and graph projection requires this exact ID. The published ID does not exist until a real source commit and reviewed export.",
+      "unsupported": "After normal authentication and resource authorization, an empty, duplicated, malformed or unsupported header, or a legacy selection requesting an exclusively new graph resource or operation, must fail before writes or protected disclosure. Use HTTP 409 with the original v7 IntakeError shape and reason UPGRADE_REQUIRED where negotiation has not selected the successor, including legacy access to an exclusively new graph resource. Do not emit a v9-only error reason to a v7 client. A normal, representable old request is never rejected solely because graph content also exists.",
+      "consistency": "Keep the selected view on all pages, operations, receipts, errors and media reads. Bind or revalidate the view for cursor and operation retries; reject a mixed-view continuation before protected disclosure without creating duplicate writes. Apply original authorization and no-disclosure behavior in either view.",
+      "fullRelease": "The separate /v1/announce/snapshot operation and its reachable schemas retain the locked v7 contract. Preserve the complete eligible four-domain FAQ release, its existing source and lease semantics, and its current pointer. The SOP graph uses the existing release lineage and the negotiated intake graph projection; the v7 intake snapshot keeps its required empty SOP arrays. No parallel publication or catalog is introduced."
+    },
+    "laterUserDecisions": {
+      "source": "User decisions in this conversation after the earlier graph implementation approval; wording is a summary, not a new approval record.",
+      "decisions": [
+        "An active flow may continue its original published version after temporary loss and restoration of current authorization, while the original content remains valid and all current dependencies are rechecked.",
+        "When the login session expires automatically, the same account may log in again and resume the same eligible active flow after reauthorization and rebinding.",
+        "An explicit logout or normal application close ends the active flow. The server cannot promise to detect every abnormal exit without a separate heartbeat or recovery mechanism.",
+        "Publishing a new version does not interrupt an already active valid flow; a newly opened flow uses the current published version. Revocation or actual content invalidation stops protected actions."
+      ],
+      "originalGraphApprovalCoversTheseLaterDecisions": false,
+      "separateApprovalOfThisCandidateRecorded": false
+    }
+  },
+  "intake": {
+    "status": "IMPLEMENTATION_APPROVED_CANDIDATE",
+    "header": "X-Intake-Contract-Set",
+    "legacyContractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+    "successorContractSetId": "deployment-manifest-exact-id",
+    "legacySelection": "For any pre-existing intake operation, absence of the header or the exact locked v7 ID selects the complete locked v7 request, response and behavior. This includes pre-existing six-sheet SOP and its media operation, not only FAQ. Return all otherwise eligible FAQ and preserve v7 authorization, limits, paging and errors; old snapshot SOP arrays remain empty as required by v7.",
+    "successorSelection": "The exact complete ID from the deployed successor manifest selects the successor view; a prefix, profile, proposed number or merely pattern-matching ID is insufficient. Every new graph operation, graph candidate, graph media binding and graph projection requires this exact ID. The published ID does not exist until a real source commit and reviewed export.",
+    "unsupported": "After normal authentication and resource authorization, an empty, duplicated, malformed or unsupported header, or a legacy selection requesting an exclusively new graph resource or operation, must fail before writes or protected disclosure. Use HTTP 409 with the original v7 IntakeError shape and reason UPGRADE_REQUIRED where negotiation has not selected the successor, including legacy access to an exclusively new graph resource. Do not emit a v9-only error reason to a v7 client. A normal, representable old request is never rejected solely because graph content also exists.",
+    "consistency": "Keep the selected view on all pages, operations, receipts, errors and media reads. Bind or revalidate the view for cursor and operation retries; reject a mixed-view continuation before protected disclosure without creating duplicate writes. Apply original authorization and no-disclosure behavior in either view.",
+    "fullRelease": "The separate /v1/announce/snapshot operation and its reachable schemas retain the locked v7 contract. Preserve the complete eligible four-domain FAQ release, its existing source and lease semantics, and its current pointer. The SOP graph uses the existing release lineage and the negotiated intake graph projection; the v7 intake snapshot keeps its required empty SOP arrays. No parallel publication or catalog is introduced.",
+    "predecessorReference": "#/x-locked-v7-openapi"
+  },
+  "query": {
+    "route": "/v1/sop/query",
+    "header": "X-Intake-Contract-Set",
+    "required": true,
+    "legacyContractSetId": "cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b",
+    "legacySchemaFile": "legacy-query.openapi.v1.json",
+    "successorContractSetId": "deployment-manifest-exact-id",
+    "successorSchemaFile": "query-transport.v1.json",
+    "legacyUnrepresentable": "blocked with GRAPH_UNRESOLVED; preserve complete knowledge and task semantics in the unified view",
+    "statuses": [
+      "ready",
+      "blocked",
+      "stale",
+      "no_match"
+    ],
+    "legacySearchSopBehavior": "503-fail-closed"
+  }
+}

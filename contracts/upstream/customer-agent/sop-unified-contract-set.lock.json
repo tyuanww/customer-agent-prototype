@@ -1,0 +1,13 @@
+{
+  "schema": "customer-agent-sop-unified-contract-consumption/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.29.0-schema-1.33-33fc543523b9",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "33fc543523b95b47c1236ef7bbfccd3f772c9d0d",
+  "manifest_sha256": "e0df563b0edb29d5b488c73604be967cd6e38e2fbd4ac1b1e90196bae50f4307",
+  "openapi_sha256": "6ab61ac566f0fe73168f435849f091862ef8745a3949ba46448ebadde57fb79a",
+  "database_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false,
+  "profile": "sopUnified"
+}

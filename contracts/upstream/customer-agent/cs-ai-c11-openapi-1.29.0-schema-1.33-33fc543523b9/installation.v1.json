@@ -1,0 +1,105 @@
+{
+  "schema": "customer-agent-sop-unified-installation/v1",
+  "status": "IMPLEMENTATION_APPROVED_CANDIDATE",
+  "versions": {
+    "openapi": "1.29.0",
+    "database": "schema.v1.33",
+    "profile": "content-intake-sop-unified-v1"
+  },
+  "predecessor": {
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1",
+    "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+    "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9"
+  },
+  "modelInstallation": {
+    "schema": "customer-agent-sop-task-graph-installation/v1",
+    "status": "CANDIDATE",
+    "proposedVersions": {
+      "openapi": "1.28.0",
+      "database": "schema.v1.32",
+      "profile": "content-intake-sop-task-graph-v4",
+      "contractSetEnvelope": "customer-agent-contract-set/v9"
+    },
+    "runnableMigration": false,
+    "migrationPosition": null,
+    "predecessor": {
+      "sourceGitSha": "75e1889efee91322dab1dfa28aadc53fd718682b",
+      "contractSetId": "cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9",
+      "artifacts": {
+        "openapi.v1.yaml": {
+          "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/openapi.v1.yaml",
+          "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5"
+        },
+        "schema-v1.29.sql": {
+          "path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-readiness-successor-v1/schema-v1.29.sql",
+          "sha256": "04b30ed1c5f9c01d99fd2a4912d809aa66a7c7764b0a2f3a0bb060c535804771"
+        }
+      }
+    },
+    "requiredProductWork": [
+      "Use the product migration runner and exact actual predecessor receipts; do not label this storage delta as migration 0078 or assume 0041 is the live predecessor.",
+      "Install storage delta with explicit grants only through existing restricted definer functions, fixed search_path, and no PUBLIC execute. Graph, media, quality and disable-event projections stay immutable; active continuation rows are updated only by narrow owner functions for close and lifecycle.",
+      "Replace canonical_encoding/format guards for the graph discriminator; preserve the existing FAQ constraints and six-sheet historical reader. Never globally lift empty-array checks.",
+      "Extend parser/freeze to enforce every shape and relational invariant, dependency projection and canonical digest; store graph projections and media in the same transaction as material.",
+      "Extend the existing intake policy response with the registered v1.1 six-sheet graph format and selected image support while retaining the existing FAQ and CSV descriptors and their prior format-specific media behavior. Advertise the successor only when its parser and image path are actually available for that negotiated contract set.",
+      "Reconcile the existing IntakeSelectionIds empty-selection contract with the current usage selection owner before enabling graph projection; reuse that owner for flow applicability and authorized vocabulary. Do not maintain a separate graph-only selection or permission system.",
+      "Extend the existing quality freeze/check/read/report owner and its samples pagination for bounded graph target/check projections, byte preflight and negotiated v7/v9 responses; enforce exact target sets, inheritance and lineage. Gate the existing current-pointer transaction on complete graph/media lineage.",
+      "Add the candidate-image review projection to the existing candidate review and object owners with pre-read and post-read reauthorization, exact binding and hash checks; do not create a second media store, grant model or release path.",
+      "Use normalized graph lineage for graph-format snapshots; legacy release_catalogs SOP arrays stay empty. Do not create a second snapshot source or independent current pointer.",
+      "Implement entitlement-only reads and action check, bounded paging, MIME/hash preview and main-process progression; no SQL bypass from renderer.",
+      "Complete PG15 install/upgrade/ACL, graph mutation/quality/atomicity/rollback tests, HTTP/Main/Electron tests and backup restore before declaring consumer readiness.",
+      "Implement and verify actionCheck.continuation.currentAuthority in the existing product authorization owner before declaring consumer readiness; never add an independent grant or generation truth.",
+      "Implement an active continuation independent of the short entitlement. After automatic session expiry, allow reauthentication to the same principal and account to rebind only after verifying the expired session was not explicitly revoked and Main retains the handle only in the running process; explicit logout closes the flow. Recheck current authorization and content before issuing a fresh immutable entitlement/lease. No caller-selected historical release; no second current pointer or separate grant predicates.",
+      "Keep existing registered FAQ and historical six-sheet SOP behavior unchanged. The uninstalled, unexported graph-v1 files are historical evidence only: do not install graph-v1, add a runtime graph-v1 reader, or generate v1-to-v2 migration. Use a new explicitly negotiated graph discriminator from the actual formal predecessor.",
+      "One flow-scoped media binding and one release-media projection handle entry, task and knowledge owners. Atomic publish/rollback, GC and backup include exact dependencies; no parallel v1/aux tables.",
+      "Existing issue_snapshot_offline_lease targets current only. Implement a narrowly controlled continuation-aware issuer and associated SQL validation, not a TTL increase or a change to unrestricted callers.",
+      "In the existing release validation owner, distinguish a new current-release request from a server-recorded active continuation: current reads require current_mapping_version; continuation reads validate the pinned published candidate's retained mapping, confirmation and content deadline together with current source authority, session, grants and disable events. Include graph lineage and its direct-v1 or approval-v1 dependencies, including standalone flows with no FAQ lineage. Never let the caller choose an arbitrary historical release.",
+      "Verify the full stored graphDigest on the server; compute snapshotDigest over the exact scoped projection and preserve graphDigest as its bound immutable identity. Do not reveal out-of-scope media just to let a client recompute a full-graph digest. Resolve every image request by its full release-media binding and, for historical execution, the matching continuation.",
+      "Migrate the existing Main HTTP contract-set header allowlist and paginated snapshot reader together with API and generated contracts. Accept valid graph-only or media-only pages while checking bounded page progress, totals and complete digest; keep existing FAQ behavior. Do not add a parallel reader.",
+      "Allow an explicit null anchor and an empty FAQ dependency collection for SOP graph candidates; preserve the non-empty rule for existing FAQ material and use registered source and scope for graph authorization.",
+      "New submissions use direct-v1 with current publish authorization, source confirmation and human quality checks. Only accept approval-v1 new submissions when the existing approval state machine actually supports the full path; inherited approval-v1 lineage still requires its matching real review request and current evidence. Do not fabricate review evidence.",
+      "Bind each continuation-issued entitlement to the exact active continuation in the existing entitlement owner. A continuation snapshot and its pagination are limited to that flow and exact dependencies; normal search and other flows reject the bound entitlement. Ordinary FAQ reads retain their existing bounded behavior after a publication change; ordinary entitlements cannot read historical SOP graphs or their flow-only dependencies. Issue a new full IntakeEntitlement receipt after reauthorization and validate its current shop/scopes in Main.",
+      "Implement restart as close followed by current-release open in Main; do not use an action that returns 204 as proof of a new continuation. Keep the original flow closed and report a failed open; recover unknown outcomes using the same continuationId and immutable binding.",
+      "Main generates a CSPRNG continuationId before open and keeps it private; open binds it to the current entitlement, session, flow and release. An exact replay returns the existing active continuation after live revalidation, while a different binding for the same ID fails. Close with the same ID is idempotent. This permits safe restart recovery without retaining a plaintext server token.",
+      "Keep the opening entitlement context, the most recently bound session record, and required original graph, mapping, source, content and media dependencies available while an in-process continuation may be resumed. A close atomically clears the last-session reference; retain the minimal closed tombstone for as long as existing immutable entitlement history references it. Clean up eligible records through the existing retention owner. Without a received close or a lifecycle signal the server cannot identify every abandoned record; do not invent a heartbeat or expire an otherwise valid user flow merely to claim complete orphan cleanup. Document the remaining retention policy before release.",
+      "For renew, Main supplies only the opaque continuationId and its new contextGeneration. Restore the original shop/product/scenario selection from the stored opening entitlement context after current authorization succeeds; reject inaccessible selections and never accept a caller-selected historical release or alternate selection."
+    ],
+    "runtimeActivated": false,
+    "productionConsumerReady": false,
+    "compatibilityRequiredProductWork": [
+      "Implement negotiated views in the existing service and client owners; resolve and verify the complete locked v7 document from the installed predecessor or the standalone export sidecar before use.",
+      "Maintain every locked v7 operation, reachable request/response schema and runtime behavior, including old SOP media and the full release snapshot.",
+      "Use the exact deployed successor manifest ID for graph operations and implement the decision, error, retry and paging semantics in compatibility.source.json.",
+      "This candidate is not a migration, an activated runtime, a formal approval or evidence of real client execution."
+    ]
+  },
+  "queryTransport": {
+    "route": "/v1/sop/query",
+    "header": "X-Intake-Contract-Set",
+    "required": true,
+    "legacyContractSetId": "cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b",
+    "legacySchemaFile": "legacy-query.openapi.v1.json",
+    "successorContractSetId": "deployment-manifest-exact-id",
+    "successorSchemaFile": "query-transport.v1.json",
+    "legacyUnrepresentable": "blocked with GRAPH_UNRESOLVED; preserve complete knowledge and task semantics in the unified view",
+    "statuses": [
+      "ready",
+      "blocked",
+      "stale",
+      "no_match"
+    ],
+    "legacySearchSopBehavior": "503-fail-closed"
+  },
+  "migrationPosition": null,
+  "runnableMigration": false,
+  "runtimeActivated": false,
+  "productionConsumerReady": false,
+  "requirements": [
+    "Append after the product-verified immutable migration prefix. Reject a pre-existing incompatible graph installation before any mutation.",
+    "Use the existing candidate, source confirmation, full graph quality, publication and rollback transaction owners.",
+    "Bind graph dependencies, entry permission facts and media previews at the exact material and graph digests. Unknown source facts stay blocked.",
+    "The query response carries complete tasks, knowledge, requirements and script relationships. Ready permission facts must cover all exact entries once.",
+    "Check preview node/resource/release/lease identity and expiry. Required media failure blocks actions and copy.",
+    "Verify every declared legacy view, request deadline, revocation, continuation and byte budget through the actual API and Main consumers."
+  ]
+}

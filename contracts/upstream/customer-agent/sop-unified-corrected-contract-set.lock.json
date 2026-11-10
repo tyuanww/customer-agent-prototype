@@ -1,0 +1,13 @@
+{
+  "schema": "customer-agent-sop-unified-corrected-consumption/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+  "manifest_sha256": "b2cec936b26d5e3b7990f84d25efc10f6556dde49b6e010e353e380c21f60a52",
+  "openapi_sha256": "987c2a005f5aa2b4b4e5852c8e9f9054acc1021f304edc5cad6f59dcf0808408",
+  "database_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false,
+  "profile": "sopUnifiedCorrected"
+}
