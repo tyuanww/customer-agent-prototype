@@ -8,10 +8,10 @@ import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('legacy candidate check accepts the exact 83 prefix in both catalogues and preserves its artifacts', t => {
+test('legacy candidate check verifies the complete 85 tail and preserves historical 83/84 artifacts', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'sop-query-candidate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const relative of ['contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
+  for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
     'scripts/readiness-contract.mjs', 'scripts/sop-unified-contract.mjs', 'scripts/sop-unified-corrected-contract.mjs']) {
     mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
     cpSync(path.join(projectRoot, relative), path.join(root, relative), {
@@ -26,15 +26,27 @@ test('legacy candidate check accepts the exact 83 prefix in both catalogues and 
   const check = () => spawnSync(process.execPath, [path.join(candidateRoot, 'generate.mjs'), '--check'], { encoding: 'utf8' });
   let result = check();
   assert.equal(result.status, 0, result.stderr);
+  const storage = JSON.parse(original);
+  storage.migrations = storage.migrations.slice(0, 84);
+  delete storage.compatibility.sop_lifecycle_overlay;
+  writeFileSync(migrationManifest, JSON.stringify(storage));
+  result = check();
+  assert.equal(result.status, 0, result.stderr);
   const prefix = JSON.parse(original);
   prefix.migrations = prefix.migrations.slice(0, 83);
   delete prefix.compatibility.sop_unified_successor;
+  delete prefix.compatibility.sop_lifecycle_overlay;
   writeFileSync(migrationManifest, JSON.stringify(prefix));
   result = check();
   assert.equal(result.status, 0, result.stderr);
   prefix.migrations[82].source_git_sha = '0'.repeat(40);
   writeFileSync(migrationManifest, JSON.stringify(prefix));
   assert.match(check().stderr, /immutable 0083 predecessor/);
+  writeFileSync(migrationManifest, original);
+  const lifecycle = JSON.parse(original);
+  lifecycle.migrations[84].sha256 = '0'.repeat(64);
+  writeFileSync(migrationManifest, JSON.stringify(lifecycle));
+  assert.match(check().stderr, /lifecycle implementation metadata drift/);
   writeFileSync(migrationManifest, original);
   const lastPrefix = path.join(root, 'packages/database/migrations/0083_sop_pipeline_projection.sql');
   writeFileSync(lastPrefix, `${readFileSync(lastPrefix, 'utf8')}\n-- drift`);

@@ -326,7 +326,7 @@ function references(value, consume) {
 export function sopUnifiedDocument(root) {
   const schemas = requireRecord(root.components?.schemas, 'SOP unified schemas');
   const roots = new Set(Object.keys(schemas).filter((name) => (
-    name.startsWith('IntakeSop') || name.startsWith('MenokinSopQuery')
+    name.startsWith('Intake') || name.startsWith('MenokinSopQuery')
   )));
   const parents = new Map();
   for (const [name, schema] of Object.entries(schemas)) {

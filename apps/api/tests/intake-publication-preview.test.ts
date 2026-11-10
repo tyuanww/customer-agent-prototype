@@ -27,7 +27,7 @@ const now = Date.parse('2026-10-11T00:00:00.000Z');
  * final authority, COMMIT certainty and receipt replay. This is not a PG probe. */
 function harness(mode: 'commit' | 'expire' | 'unknown-committed' | 'unknown-absent' = 'commit') {
   const hash = `intake-request-v1:${createHash('sha256').update(canonicalJson(request as CanonicalJsonValue)).digest('hex')}`;
-  let saved: { request_hash: string; response: C['IntakeOperationReceipt'] } | undefined;
+  let saved: { request_hash: string; response: C['IntakeOperationReceipt']; contract_view: 'legacy' } | undefined;
   let pending: typeof saved;
   let publishing = false;
   let expire = false;
@@ -38,7 +38,7 @@ function harness(mode: 'commit' | 'expire' | 'unknown-committed' | 'unknown-abse
   const statements: string[] = [];
   const pool = { connect: async () => {
     connectionCount++;
-    if (connectionCount === 2 && replayOnSecondConnection) saved = { request_hash: hash, response: published };
+    if (connectionCount === 2 && replayOnSecondConnection) saved = { request_hash: hash, response: published, contract_view: 'legacy' };
     return {
       async query(sql: string, values: unknown[] = []) {
         statements.push(sql);
@@ -48,16 +48,17 @@ function harness(mode: 'commit' | 'expire' | 'unknown-committed' | 'unknown-abse
           tenant_id: 'synthetic', app_id: 'synthetic', identity_scope: 'synthetic', person_key: 'synthetic',
           current_facts_version: '1', revocation_generation: '1', enabled: true, checked_at: new Date(now - 1000),
           valid_until: new Date(expire ? now - 1 : now + 60_000), roles: ['manager'] }] };
-        if (sql.startsWith('SELECT request_hash,response FROM backend_review.receipts') || sql.startsWith('SELECT response FROM backend_review.receipts')) {
+        if (sql.startsWith('SELECT request_hash,response,contract_view FROM backend_review.receipts') || sql.startsWith('SELECT response,contract_view FROM backend_review.receipts')) {
           return { rows: saved && values[0] === actor.user_id && values[2] === request.operationId ? [saved] : [] };
         }
+        if (sql.includes('SELECT content_intake.sop_graph_publish_media')) return { rows: [{ value: [] }] };
         if (sql.includes('SELECT content_intake.publish_candidate')) {
           publishing = true;
           return { rows: [{ value: { receipt: published, validUntil: new Date(now + 60_000).toISOString() } }] };
         }
         if (sql.includes('SELECT min(f.valid_until)')) return { rows: [{ until: null }] };
         if (sql.startsWith('INSERT INTO backend_review.receipts')) {
-          pending = { request_hash: values[3] as string, response: JSON.parse(values[4] as string) };
+          pending = { request_hash: values[3] as string, response: JSON.parse(values[4] as string), contract_view: 'legacy' };
           if (mode === 'expire') expire = true;
         }
         if (sql === 'ROLLBACK') pending = undefined;
@@ -74,7 +75,7 @@ function harness(mode: 'commit' | 'expire' | 'unknown-committed' | 'unknown-abse
   } } as unknown as IntakePool;
   stagePreviews(key.candidateId, [previewFromBytes(Buffer.from('synthetic-image'), 'image/png', [...sources][0]!, 'synthetic-row')]);
   return { service: createIntakePublication(createIntakeTransactions(pool)), observations, statements,
-    seedReceipt(value: C['IntakeOperationReceipt'] = published) { saved = { request_hash: hash, response: value }; },
+    seedReceipt(value: C['IntakeOperationReceipt'] = published) { saved = { request_hash: hash, response: value, contract_view: 'legacy' }; },
     failReceiptCommit() { failReceiptCommit = true; },
     replayOnSecondConnection() { replayOnSecondConnection = true; },
   };

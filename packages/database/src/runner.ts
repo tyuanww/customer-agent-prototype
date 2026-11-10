@@ -188,6 +188,7 @@ export async function applyMigrationCatalogue(
       const defaultTenant = migration.id === '0043_intake_publish_default_tenant';
       const directoryActivity = migration.id === '0079_directory_identity_activity';
       const unifiedStorage = migration.id === '0084_sop_unified_storage';
+      const sopLifecycle = migration.id === '0085_sop_unified_lifecycle';
       try {
         // This grant-only successor requires a verified physical predecessor,
         // not merely a matching ledger. Both audits share its ACL/ledger
@@ -211,7 +212,8 @@ export async function applyMigrationCatalogue(
         if (unifiedStorage) {
           await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 83) });
         }
-        const verifierSearchPath = closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage
+        if (sopLifecycle) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 84) });
+        const verifierSearchPath = closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage || sopLifecycle
           ? (await client.query<{ search_path: string }>("SELECT current_setting('search_path') AS search_path")).rows[0]?.search_path
           : undefined;
         await client.query(migration.sql);
@@ -231,7 +233,7 @@ export async function applyMigrationCatalogue(
             executionMs,
           ],
         );
-        if (closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage) {
+        if (closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage || sopLifecycle) {
           // Generated SQL changes search_path locally. pg_get_* definitions use
           // that path when qualifying names; audit in the same context as the
           // predecessor instead of mistaking rendering differences for drift.
@@ -241,7 +243,8 @@ export async function applyMigrationCatalogue(
           else if (readinessSuccessor) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 41) });
           else if (occupiedDomain) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 42) });
           else if (defaultTenant) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 43) });
-          else if (unifiedStorage) await verifyReadinessSuccessor(client, catalogue);
+          else if (unifiedStorage) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 84) });
+          else if (sopLifecycle) await verifyReadinessSuccessor(client, catalogue);
           else if (directoryActivity) {
             await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 79) });
           }

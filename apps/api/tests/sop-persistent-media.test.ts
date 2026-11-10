@@ -22,6 +22,9 @@ function setup() {
   let inspect: ((sql: string) => Promise<void>) | undefined;
   const client = { query: async (sql: string) => {
     commands.push(sql);
+    if (sql.includes('SELECT source_id,contract_view FROM content_intake.parse_jobs')) {
+      return { rows: [{ source_id: 'source-a', contract_view: 'legacy' }] };
+    }
     if (sql.includes('SELECT j.*')) return { rows: [{ source_id: 'source-a' }] };
     if (sql.includes('FROM content_intake.sources src')) return { rows: [{ scope_id: 'scope-a', tenant_id: 'tenant-a', app_id: 'app-a', brand_id: 'brand-a', shop_id: 'shop-a', domain: 'sop', current_mapping_version: '1' }] };
     if (sql.includes('clock_timestamp() AS time')) return { rows: [{ time: new Date() }] };

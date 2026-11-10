@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
-import type { components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from '@customer-agent/contracts';
 import type { AuthenticatedUser, ProductAuthService } from '../src/auth-service.js';
 import { createContentObjectStore } from '../src/content-object-store.js';
 import { createContentIntakeService } from '../src/content-intake/service.js';
@@ -155,7 +155,7 @@ describe.skipIf(!enabled)('actual service on formal purpose roles (synthetic PG1
     const result: C['IntakeSnapshot']['faq'] = [];
     let cursor: string | null = null;
     do {
-      const page: C['IntakeSnapshot'] = value(await reader.snapshot(actors.agent!, { entitlementId: entitlement.entitlementId, limit: 1, ...(cursor ? { cursor } : {}) }));
+      const page: C['IntakeSnapshot'] = parseContractSchema('IntakeSnapshot', value(await reader.snapshot(actors.agent!, { entitlementId: entitlement.entitlementId, limit: 1, ...(cursor ? { cursor } : {}) })));
       result.push(...page.faq); cursor = page.nextCursor;
     } while (cursor);
     expect(JSON.stringify({ entitlement, result })).not.toContain('osl_');

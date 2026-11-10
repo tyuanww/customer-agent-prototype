@@ -62,6 +62,7 @@ function makeProduct() {
   cpSync(path.join(repositoryRoot, 'contracts/upstream/customer-agent'), path.join(product, 'contracts/upstream/customer-agent'), { recursive: true });
   mkdirSync(path.join(product, 'packages/database'), { recursive: true });
   cpSync(path.join(repositoryRoot, 'packages/database/migrations'), path.join(product, 'packages/database/migrations'), { recursive: true });
+  cpSync(path.join(repositoryRoot, 'packages/database/overlays'), path.join(product, 'packages/database/overlays'), { recursive: true });
   const candidateRoot = path.join(product, 'contracts/upstream/customer-agent');
   const manifest = readJson(path.join(sourceBundle, 'contract-set.json'));
   rmSync(path.join(candidateRoot, manifest.contract_set_id), { recursive: true, force: true });

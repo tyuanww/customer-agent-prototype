@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import type { ContentAttachmentStore, ReservedAttachment } from '../content-object-store.js';
+import { verifyGraphMedia } from './sop-graph.js';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { authorize, source } from './authority.js';
@@ -42,7 +44,7 @@ async function plan(client: IntakeTransaction, who: Principal, id: string, allow
   let current: Impact;
   if (historical) {
     const ids = (await client.query<{source_id:string}>('SELECT source_id FROM content_intake.rollback_scopes WHERE rollback_plan_id=$1 ORDER BY source_id',[id])).rows.map(r=>r.source_id);
-    const scopes: C['IntakeSourceScope'][] = [];
+    const scopes: C['IntakeSopSourceScope'][] = [];
     for (const sourceId of ids) { const src=await source(client,sourceId); await authorize(client,who,'rollback',src); scopes.push(src.scope); }
     current={baseReleaseId:p.base_release_id,targetReleaseId:p.target_release_id,impactDigest:p.impact_digest,sourceIds:ids,scopes,requiresCorrectiveCandidate:false};
   } else current = await impact(client,who,p.base_release_id,p.target_release_id);
@@ -81,7 +83,7 @@ async function view(client: IntakeTransaction, b: RollbackReviewBinding): Promis
 }
 /** Corrective publication retains the full-impact plan and current authority.
  * Legacy approval history remains readable; no new approval writes are admitted. */
-export function createIntakeRollback(run: Run) {
+export function createIntakeRollback(run: Run, store?: Partial<ContentAttachmentStore>) {
   const unavailable = (actor: AuthenticatedUser, id: string, raw: unknown) => run(actor, 'rollback-review-disabled', null, null, async (client, who) => {
     parseContractSchema('IntakeRollbackReviewRequest', raw);
     await plan(client, who, id, true);
@@ -106,13 +108,16 @@ export function createIntakeRollback(run: Run) {
     async rollback(actor:AuthenticatedUser,raw:unknown) {
       const prepared=await run(actor,'rollback-prepare',null,null,async(client,who)=>{
         const req=parseContractSchema('IntakeRollback',raw);const prior=await intakeReplay(client,who,'rollback',json(req),req.operationId,receipt);
-        if(prior)return {req,prior:prior.value};
+        if(prior)return {req,prior:prior.value,media:[]};
         const p=await plan(client,who,req.rollbackPlanId);
         if(p.impactDigest!==req.impactDigest)throw new IntakeRejection('MATERIAL_CHANGED');
         if(p.baseReleaseId!==req.baseReleaseId||p.targetReleaseId!==req.targetReleaseId)throw new IntakeRejection('BASE_CHANGED');
-        return {req,prior:null};
-      },v=>v as {req:C['IntakeRollback'];prior:C['IntakeRollbackReceipt']|null});
+        const media=(await client.query<{value:ReservedAttachment[]}>('SELECT content_intake.sop_graph_rollback_media($1,$2) AS value',[who.id,p.rollbackPlanId])).rows[0]!.value;
+        return {req,prior:null,media};
+      },v=>v as {req:C['IntakeRollback'];prior:C['IntakeRollbackReceipt']|null;media:ReservedAttachment[]});
       if(!prepared.ok)return prepared;const {req,prior}=prepared.value;if(prior)return {ok:true as const,value:prior};
+      try { await verifyGraphMedia(store,prepared.value.media); }
+      catch(error) { return run(actor,'rollback-media',null,null,async()=>{throw error;},receipt); }
       return run(actor,'rollback',json(req),req.operationId,async(client,who)=>{
         const r=await sql(()=>client.query<{value:{receipt:unknown;validUntil:string}}>('SELECT content_intake.execute_rollback($1,$2::jsonb,$3::jsonb) AS value',[who.id,JSON.stringify(req),'null']));
         client.validUntil(Date.parse(r.rows[0]!.value.validUntil));return receipt(r.rows[0]!.value.receipt);

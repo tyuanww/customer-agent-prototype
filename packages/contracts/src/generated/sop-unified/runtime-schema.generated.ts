@@ -2,18 +2,42 @@
 
 export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.29.1:sop-unified";
 export const COMPONENT_SCHEMA_NAMES = [
+  "IntakeAction",
+  "IntakeAuthorization",
+  "IntakeCancel",
+  "IntakeCandidate",
   "IntakeCandidateKey",
+  "IntakeCandidateList",
   "IntakeCandidatePage",
+  "IntakeContributorDeclaration",
+  "IntakeCoordinate",
   "IntakeDifference",
+  "IntakeDigest",
   "IntakeEntitlement",
+  "IntakeEntitlementRequest",
   "IntakeEntry",
+  "IntakeError",
+  "IntakeFailure",
+  "IntakeGrant",
+  "IntakeGrantBatch",
+  "IntakeGrantChange",
+  "IntakeGrantItem",
+  "IntakeGrantList",
   "IntakeId",
+  "IntakeIssue",
+  "IntakeManagementContext",
   "IntakeMaterial",
   "IntakeMaterialHeader",
   "IntakeObject",
+  "IntakeOperationReceipt",
+  "IntakeParseJob",
+  "IntakePolicy",
+  "IntakePrincipalPage",
+  "IntakePublish",
   "IntakePublishedEntry",
   "IntakeQualityAttribution",
   "IntakeQualityCheck",
+  "IntakeQualityCommand",
   "IntakeQualityPlan",
   "IntakeQualityReceipt",
   "IntakeQualityRound",
@@ -22,9 +46,21 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakeQualityStatus",
   "IntakeQualitySubmission",
   "IntakeQuestion",
+  "IntakeReceipt",
+  "IntakeReceive",
+  "IntakeReview",
+  "IntakeReviewRequest",
   "IntakeRisk",
+  "IntakeRollback",
   "IntakeRollbackImpact",
+  "IntakeRollbackPreview",
+  "IntakeRollbackReceipt",
+  "IntakeRollbackReview",
+  "IntakeRollbackReviewRequest",
   "IntakeScope",
+  "IntakeSelectionIds",
+  "IntakeShopDirectory",
+  "IntakeShopDisplay",
   "IntakeSnapshot",
   "IntakeSopActionCheck",
   "IntakeSopApplicability",
@@ -65,11 +101,15 @@ export const COMPONENT_SCHEMA_NAMES = [
   "IntakeSopVersion",
   "IntakeSource",
   "IntakeSourceClaim",
+  "IntakeSourceConfirmation",
   "IntakeSourceList",
   "IntakeSourceScope",
+  "IntakeSourceWrite",
   "IntakeTermRef",
   "IntakeVersion",
   "IntakeVocabulary",
+  "IntakeVocabularyList",
+  "IntakeVocabularyWrite",
   "MenokinSopQuerySopBlockedResponse",
   "MenokinSopQuerySopEmptyResult",
   "MenokinSopQuerySopEntryPermission",
@@ -80,7 +120,16 @@ export const COMPONENT_SCHEMA_NAMES = [
   "MenokinSopQuerySopReadyResponse",
   "MenokinSopQuerySopReadyResult",
   "MenokinSopQuerySopReason",
-  "MenokinSopQuerySopStaleResponse"
+  "MenokinSopQuerySopStaleResponse",
+  "SopCandidateMaterial",
+  "SopCandidateRow",
+  "SopMediaObject",
+  "SopPreview",
+  "SopPublishCommand",
+  "SopPublishReceipt",
+  "SopRollbackCommand",
+  "SopRollbackReceipt",
+  "SopUploadReceipt"
 ] as const;
 export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[number];
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
@@ -88,6 +137,242 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:customer-agent:openapi:1.29.1:sop-unified",
   "$defs": {
+    "IntakeAction": {
+      "type": "string",
+      "enum": [
+        "query",
+        "content-manage",
+        "import",
+        "source-confirm",
+        "review",
+        "publish",
+        "candidate-cancel",
+        "rollback"
+      ]
+    },
+    "IntakeAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factsVersion",
+        "revocationGeneration",
+        "policyVersion",
+        "validUntil",
+        "capabilities",
+        "nextCursor"
+      ],
+      "properties": {
+        "factsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policyVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "actions",
+              "mayAllocate",
+              "mayDelegate",
+              "validUntil"
+            ],
+            "properties": {
+              "scope": {
+                "$ref": "#/$defs/IntakeScope"
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "mayAllocate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "mayDelegate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IntakeAction"
+                },
+                "minItems": 0,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date-time",
+                "maxLength": 35
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeCancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        }
+      }
+    },
+    "IntakeCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "sourceId",
+        "state",
+        "readinessReasons",
+        "sourceEvidenceVersion",
+        "approvalEvidenceVersion",
+        "revocationGeneration",
+        "createdAt",
+        "updatedAt",
+        "publishedReleaseId",
+        "publicationPolicy"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "awaiting-evidence",
+            "ready",
+            "publishing",
+            "published",
+            "cancelled",
+            "invalidated"
+          ]
+        },
+        "readinessReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "sourceEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "approvalEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "publishedReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "publicationPolicy": {
+          "type": "string",
+          "enum": [
+            "approval-v1",
+            "direct-v1"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "publicationPolicy": {
+                "const": "direct-v1"
+              }
+            },
+            "required": [
+              "publicationPolicy"
+            ],
+            "type": "object"
+          },
+          "then": {
+            "properties": {
+              "approvalEvidenceVersion": {
+                "const": 0
+              }
+            },
+            "type": "object"
+          }
+        }
+      ]
+    },
     "IntakeCandidateKey": {
       "type": "object",
       "additionalProperties": false,
@@ -111,6 +396,32 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "pattern": "^[0-9a-f]{64}$",
           "minLength": 64,
           "maxLength": 64
+        }
+      }
+    },
+    "IntakeCandidateList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeCandidate"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
         }
       }
     },
@@ -218,6 +529,67 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       ]
     },
+    "IntakeContributorDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preparerPrincipalId",
+        "editorPrincipalIds",
+        "confirmed"
+      ],
+      "properties": {
+        "preparerPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "editorPrincipalIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 98,
+          "uniqueItems": true
+        },
+        "confirmed": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        }
+      }
+    },
+    "IntakeCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheet",
+        "row",
+        "column"
+      ],
+      "properties": {
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5002
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      }
+    },
     "IntakeDifference": {
       "type": "object",
       "additionalProperties": false,
@@ -273,6 +645,12 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "IntakeDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
     "IntakeEntitlement": {
       "type": "object",
       "additionalProperties": false,
@@ -324,6 +702,43 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           },
           "minItems": 0,
           "maxItems": 1000
+        }
+      }
+    },
+    "IntakeEntitlementRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shopId",
+        "contextGeneration",
+        "releaseId",
+        "productIds",
+        "scenarioIds"
+      ],
+      "properties": {
+        "shopId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contextGeneration": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "productIds": {
+          "$ref": "#/$defs/IntakeSelectionIds"
+        },
+        "scenarioIds": {
+          "$ref": "#/$defs/IntakeSelectionIds"
         }
       }
     },
@@ -2497,11 +2912,475 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       ]
     },
+    "IntakeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/IntakeFailure"
+        }
+      }
+    },
+    "IntakeFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "VALIDATION",
+            "UNAUTHORIZED",
+            "FORBIDDEN",
+            "NOT_FOUND",
+            "CONFLICT",
+            "RATE_LIMITED",
+            "OVERLOADED",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "diagnosticId"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "enum": [
+                "ORG_FACTS_UNAVAILABLE",
+                "PERMISSION_CHANGED",
+                "SCOPE_DENIED",
+                "ROLE_CEILING",
+                "GRANT_AUTHORITY_DENIED",
+                "SELF_ESCALATION",
+                "REDELEGATION_DENIED",
+                "NO_STEWARD",
+                "SOURCE_MISMATCH",
+                "SOURCE_ORDER_UNKNOWN",
+                "FILE_INVALID",
+                "FILE_LIMIT",
+                "TEMPLATE_VERSION",
+                "EMPTY_DATA",
+                "QUOTA_EXCEEDED",
+                "AWAITING_APPROVAL",
+                "APPROVAL_UNAVAILABLE",
+                "HUMAN_REVIEW_REQUIRED",
+                "APPROVAL_BINDING",
+                "ATTACHMENT_UNVERIFIED",
+                "MATERIAL_CHANGED",
+                "BASE_CHANGED",
+                "APPROVAL_CHANGED",
+                "APPROVAL_REVOKED",
+                "TICKET_EXPIRED",
+                "TICKET_CONSUMED",
+                "IDEMPOTENCY_CONFLICT",
+                "COMMIT_UNKNOWN",
+                "ALREADY_PUBLISHED",
+                "MODE_CONFLICT",
+                "UPGRADE_REQUIRED",
+                "VOCABULARY_IN_USE",
+                "MEANING_CHANGED",
+                "LEASE_EXPIRED",
+                "NO_SHOP",
+                "CHOOSE_SHOP",
+                "SHOP_DIRECTORY_CURSOR",
+                "SHOP_DIRECTORY_SESSION",
+                "SHOP_DISPLAY_MISSING",
+                "SHOP_DIRECTORY_CHANGED",
+                "SHOP_DIRECTORY_EXPIRED",
+                "SHOP_DIRECTORY_UNAVAILABLE",
+                "SOURCE_FORMAT_MISMATCH",
+                "SOP_MAPPING_REQUIRED",
+                "SOP_GRAPH_INVALID",
+                "SOP_DEPENDENCY_INVALID",
+                "SOP_RELEASE_CHANGED",
+                "SOP_SNAPSHOT_INVALID",
+                "CONTRACT_UPGRADE_REQUIRED",
+                "SOP_MEDIA_UNAVAILABLE"
+              ]
+            },
+            "diagnosticId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "IntakeGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grantId",
+        "version",
+        "kind",
+        "issuerPrincipalId",
+        "recipientPrincipalId",
+        "action",
+        "scope",
+        "startsAt",
+        "expiresAt",
+        "revokedAt",
+        "stewardPrincipalId",
+        "reason",
+        "mayRedelegate",
+        "lastChangeReason"
+      ],
+      "properties": {
+        "grantId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "business",
+            "allocation",
+            "delegation"
+          ]
+        },
+        "issuerPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "recipientPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action": {
+          "$ref": "#/$defs/IntakeAction"
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeScope"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "stewardPrincipalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "mayRedelegate": {
+          "type": "boolean",
+          "enum": [
+            false
+          ]
+        },
+        "lastChangeReason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "if": {
+        "properties": {
+          "version": {
+            "const": 1
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "lastChangeReason": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "else": {
+        "properties": {
+          "lastChangeReason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeGrantBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "issuerFactsVersion",
+        "policyVersion",
+        "items"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "issuerFactsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "policyVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeGrantItem"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      }
+    },
+    "IntakeGrantChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "expectedVersion",
+        "change",
+        "stewardPrincipalId",
+        "reason"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expectedVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "change": {
+          "type": "string",
+          "enum": [
+            "revoke",
+            "takeover"
+          ]
+        },
+        "stewardPrincipalId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "IntakeGrantItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "recipientPrincipalId",
+        "recipientFactsVersion",
+        "action",
+        "scope",
+        "startsAt",
+        "expiresAt",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "business",
+            "delegation"
+          ]
+        },
+        "recipientPrincipalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "recipientFactsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "action": {
+          "$ref": "#/$defs/IntakeAction"
+        },
+        "scope": {
+          "$ref": "#/$defs/IntakeScope"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeGrantList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeGrant"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
     "IntakeId": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
       "minLength": 1,
       "maxLength": 128
+    },
+    "IntakeIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "location"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "location": {
+          "$ref": "#/$defs/IntakeCoordinate"
+        }
+      }
+    },
+    "IntakeManagementContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "sourceVersion",
+        "baseReleaseId",
+        "principalId",
+        "factsVersion",
+        "validUntil"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "baseReleaseId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "principalId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "factsVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
     },
     "IntakeMaterial": {
       "type": "object",
@@ -3303,6 +4182,391 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
           "minLength": 1,
           "maxLength": 128
+        }
+      }
+    },
+    "IntakeOperationReceipt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/IntakeReceipt"
+        },
+        {
+          "$ref": "#/$defs/IntakeRollbackReceipt"
+        }
+      ]
+    },
+    "IntakeParseJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "generation",
+        "state",
+        "candidateId",
+        "candidateVersion",
+        "issues",
+        "totalIssues",
+        "excludedSheetCount",
+        "excludedMediaCount",
+        "reportObjectId"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "generation": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "reading",
+            "parsing",
+            "validated",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "candidateId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "candidateVersion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeIssue"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "totalIssues": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excludedSheetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excludedMediaCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reportObjectId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "templateVersion",
+        "maxFileBytes",
+        "maxExpandedBytes",
+        "maxZipEntries",
+        "maxRows",
+        "maxColumns",
+        "maxCells",
+        "maxCellCharacters",
+        "maxSharedStrings",
+        "parseTimeoutMs",
+        "maxActiveCandidatesPerActor",
+        "maxActiveCandidatesPerSource",
+        "maxTenantStagingBytes",
+        "orgFactsMaxAgeSeconds",
+        "approvalFactsMaxAgeSeconds",
+        "ticketMaxAgeSeconds",
+        "selectedMediaSupported",
+        "inputFormats"
+      ],
+      "properties": {
+        "policyVersion": {
+          "type": "string",
+          "enum": [
+            "intake-p1.1"
+          ]
+        },
+        "templateVersion": {
+          "type": "string",
+          "enum": [
+            "faq-p1.1"
+          ]
+        },
+        "maxFileBytes": {
+          "type": "integer",
+          "enum": [
+            10485760
+          ]
+        },
+        "maxExpandedBytes": {
+          "type": "integer",
+          "enum": [
+            52428800
+          ]
+        },
+        "maxZipEntries": {
+          "type": "integer",
+          "enum": [
+            512
+          ]
+        },
+        "maxRows": {
+          "type": "integer",
+          "enum": [
+            5000
+          ]
+        },
+        "maxColumns": {
+          "type": "integer",
+          "enum": [
+            32
+          ]
+        },
+        "maxCells": {
+          "type": "integer",
+          "enum": [
+            200000
+          ]
+        },
+        "maxCellCharacters": {
+          "type": "integer",
+          "enum": [
+            32767
+          ]
+        },
+        "maxSharedStrings": {
+          "type": "integer",
+          "enum": [
+            100000
+          ]
+        },
+        "parseTimeoutMs": {
+          "type": "integer",
+          "enum": [
+            30000
+          ]
+        },
+        "maxActiveCandidatesPerActor": {
+          "type": "integer",
+          "enum": [
+            10
+          ]
+        },
+        "maxActiveCandidatesPerSource": {
+          "type": "integer",
+          "enum": [
+            100
+          ]
+        },
+        "maxTenantStagingBytes": {
+          "type": "integer",
+          "enum": [
+            1073741824
+          ]
+        },
+        "orgFactsMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            300
+          ]
+        },
+        "approvalFactsMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            300
+          ]
+        },
+        "ticketMaxAgeSeconds": {
+          "type": "integer",
+          "enum": [
+            60
+          ]
+        },
+        "selectedMediaSupported": {
+          "type": "boolean",
+          "const": true
+        },
+        "inputFormats": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "const": {
+                "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "templateVersion": "faq-p1.1",
+                "ruleVersion": "intake-p1.1",
+                "selectedSheets": [
+                  "来源",
+                  "FAQ",
+                  "相似问法"
+                ]
+              }
+            },
+            {
+              "const": {
+                "mime": "text/csv",
+                "templateVersion": "faq-csv-v1",
+                "ruleVersion": "intake-csv-v1",
+                "mappingVersion": "faq-csv-columns-v1",
+                "structureDigest": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165",
+                "selectedSheets": [
+                  "CSV"
+                ]
+              }
+            },
+            {
+              "const": {
+                "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "templateVersion": "sop-manual-authoring-v1.1",
+                "ruleVersion": "sop-task-graph-v2",
+                "mappingVersion": "sop-manual-to-task-graph-v2",
+                "selectedSheets": [
+                  "场景目录",
+                  "执行任务",
+                  "判断分支",
+                  "客户话术",
+                  "知识与案例",
+                  "资源与图片"
+                ],
+                "selectedMediaSupported": true
+              }
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "IntakePrincipalPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "principalId",
+              "displayLabel",
+              "factsVersion",
+              "validUntil",
+              "enabled"
+            ],
+            "properties": {
+              "principalId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "displayLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "factsVersion": {
+                "$ref": "#/$defs/IntakeVersion"
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date-time",
+                "maxLength": 35
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakePublish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "baseReleaseId",
+        "sourceEvidenceVersion",
+        "title",
+        "summary",
+        "confirmed"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceEvidenceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
         }
       }
     },
@@ -5536,6 +6800,22 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         "type": "object"
       }
     },
+    "IntakeQualityCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        }
+      }
+    },
     "IntakeQualityPlan": {
       "type": "object",
       "additionalProperties": false,
@@ -6442,6 +7722,260 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "IntakeReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "state",
+        "releaseId",
+        "announcementId",
+        "reason",
+        "action"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "unknown",
+            "published",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "announcementId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "publish",
+            "cancel"
+          ]
+        }
+      }
+    },
+    "IntakeReceive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "objectId",
+        "sourceVersion",
+        "baseReleaseId",
+        "contributorDeclaration",
+        "expectedPriorKey"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "objectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "baseReleaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "contributorDeclaration": {
+          "$ref": "#/$defs/IntakeContributorDeclaration"
+        },
+        "expectedPriorKey": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IntakeCandidateKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "IntakeReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "reviewRequestId",
+        "instanceCode",
+        "evidenceVersion",
+        "revocationGeneration",
+        "state",
+        "checkedAt",
+        "validUntil",
+        "reviewPackageObjectId",
+        "reviewPackageSha256"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "reviewRequestId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "instanceCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "creating",
+            "pending",
+            "approved",
+            "rejected",
+            "revoked",
+            "unavailable"
+          ]
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reviewPackageObjectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reviewPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "approved"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "checkedAt": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          },
+          "instanceCode": {
+            "type": "string"
+          },
+          "evidenceVersion": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "expectedEvidenceVersion"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "expectedEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
     "IntakeRisk": {
       "type": "object",
       "additionalProperties": false,
@@ -6494,6 +8028,51 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "IntakeRollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "baseReleaseId",
+        "targetReleaseId",
+        "impactDigest",
+        "rollbackPlanId",
+        "confirmed"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "impactDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
     "IntakeRollbackImpact": {
       "type": "object",
       "additionalProperties": false,
@@ -6540,6 +8119,234 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "$ref": "#/$defs/IntakeId"
         },
         "approvalEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "IntakeRollbackPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseReleaseId",
+        "targetReleaseId"
+      ],
+      "properties": {
+        "baseReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "targetReleaseId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "IntakeRollbackReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "rollbackPlanId",
+        "state",
+        "releaseId",
+        "announcementId",
+        "reason",
+        "action"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "unknown",
+            "published",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "releaseId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "announcementId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "rollback"
+          ]
+        }
+      }
+    },
+    "IntakeRollbackReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackPlanId",
+        "reviewRequestId",
+        "evidenceVersion",
+        "state",
+        "instanceCode",
+        "revocationGeneration",
+        "checkedAt",
+        "validUntil",
+        "reviewPackageObjectId",
+        "reviewPackageSha256",
+        "impactDigest"
+      ],
+      "properties": {
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "reviewRequestId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "creating",
+            "pending",
+            "approved",
+            "rejected",
+            "revoked",
+            "unavailable"
+          ]
+        },
+        "instanceCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revocationGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checkedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 35
+        },
+        "reviewPackageObjectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reviewPackageSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "impactDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "approved"
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "checkedAt": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          },
+          "instanceCode": {
+            "type": "string"
+          },
+          "evidenceVersion": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "IntakeRollbackReviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "impactDigest",
+        "expectedEvidenceVersion"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "impactDigest": {
+          "$ref": "#/$defs/IntakeDigest"
+        },
+        "expectedEvidenceVersion": {
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
@@ -6603,6 +8410,70 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
           "minLength": 1,
           "maxLength": 128
+        }
+      }
+    },
+    "IntakeSelectionIds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/IntakeId"
+      },
+      "minItems": 0,
+      "maxItems": 100,
+      "uniqueItems": true
+    },
+    "IntakeShopDirectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor",
+        "validUntil"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeShopDisplay"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "IntakeShopDisplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shopId",
+        "displayName",
+        "displayVersion"
+      ],
+      "properties": {
+        "shopId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\s\\u0000-\\u001f\\u007f\\u2028\\u2029](?:[^\\u0000-\\u001f\\u007f\\u2028\\u2029]*[^\\s\\u0000-\\u001f\\u007f\\u2028\\u2029])?$"
+        },
+        "displayVersion": {
+          "$ref": "#/$defs/IntakeVersion"
         }
       }
     },
@@ -9651,6 +11522,66 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "IntakeSourceConfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "key",
+        "expectedEvidenceVersion",
+        "confirmedVersionKind",
+        "confirmedVersionValue",
+        "acquisition",
+        "objectSha256",
+        "reason"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "key": {
+          "$ref": "#/$defs/IntakeCandidateKey"
+        },
+        "expectedEvidenceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "confirmedVersionKind": {
+          "type": "string",
+          "enum": [
+            "integer",
+            "opaque"
+          ]
+        },
+        "confirmedVersionValue": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "acquisition": {
+          "type": "string",
+          "enum": [
+            "feishu-export",
+            "controlled-synthetic-export"
+          ]
+        },
+        "objectSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
     "IntakeSourceList": {
       "type": "object",
       "additionalProperties": false,
@@ -9733,6 +11664,88 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         }
       }
     },
+    "IntakeSourceWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "expectedVersion",
+        "templateVersion",
+        "ruleVersion",
+        "mappingVersion",
+        "structureDigest"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expectedVersion": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "structureDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-p1.1"
+            },
+            "ruleVersion": {
+              "const": "intake-p1.1"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "faq-csv-v1"
+            },
+            "ruleVersion": {
+              "const": "intake-csv-v1"
+            },
+            "mappingVersion": {
+              "const": "faq-csv-columns-v1"
+            },
+            "structureDigest": {
+              "const": "daaa4126d63194f59949c2b6f464b108ed87a430090e4dfe36e255663ab59165"
+            }
+          },
+          "type": "object"
+        }
+      ]
+    },
     "IntakeTermRef": {
       "type": "object",
       "additionalProperties": false,
@@ -9802,6 +11815,90 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
         },
         "active": {
           "type": "boolean"
+        }
+      }
+    },
+    "IntakeVocabularyList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntakeVocabulary"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "IntakeVocabularyWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "change",
+        "id",
+        "kind",
+        "expectedDisplayVersion",
+        "displayName",
+        "meaningDigest"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "change": {
+          "type": "string",
+          "enum": [
+            "create",
+            "rename",
+            "retire"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "product",
+            "scenario"
+          ]
+        },
+        "expectedDisplayVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "meaningDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
         }
       }
     },
@@ -10243,6 +12340,299 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
           "items": {
             "$ref": "#/$defs/MenokinSopQuerySopReason"
           }
+        }
+      }
+    },
+    "SopCandidateMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "version",
+        "sheets",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "sheets": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "rows"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "过敏流程SOP",
+                  "少错破SOP",
+                  "品质售后SOP",
+                  "税收相关规则",
+                  "品牌对接资源汇总",
+                  "长痘痘SOP"
+                ]
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/SopCandidateRow"
+                }
+              }
+            }
+          }
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      }
+    },
+    "SopCandidateRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rowId",
+        "sheetName",
+        "rowNumber",
+        "answer",
+        "media"
+      ],
+      "properties": {
+        "rowId": {
+          "type": "string",
+          "pattern": "^sop:[^:]{1,128}:[1-9][0-9]{0,3}$"
+        },
+        "sheetName": {
+          "type": "string",
+          "enum": [
+            "过敏流程SOP",
+            "少错破SOP",
+            "品质售后SOP",
+            "税收相关规则",
+            "品牌对接资源汇总",
+            "长痘痘SOP"
+          ]
+        },
+        "rowNumber": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "media": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/SopMediaObject"
+          }
+        }
+      }
+    },
+    "SopMediaObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mediaObjectId",
+        "sheetName",
+        "rowNumber",
+        "ordinal",
+        "sha256",
+        "mime",
+        "bytes"
+      ],
+      "properties": {
+        "mediaObjectId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "sheetName": {
+          "type": "string",
+          "enum": [
+            "过敏流程SOP",
+            "少错破SOP",
+            "品质售后SOP",
+            "税收相关规则",
+            "品牌对接资源汇总",
+            "长痘痘SOP"
+          ]
+        },
+        "rowNumber": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "mime": {
+          "type": "string",
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5242880
+        },
+        "preview": {
+          "$ref": "#/$defs/SopPreview"
+        }
+      }
+    },
+    "SopPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previewToken",
+        "expiresAt"
+      ],
+      "properties": {
+        "previewToken": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 35
+        }
+      }
+    },
+    "SopPublishCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "contentHash",
+        "confirm"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "confirm": {
+          "const": true
+        }
+      }
+    },
+    "SopPublishReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "contentHash",
+        "state"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "state": {
+          "const": "published"
+        }
+      }
+    },
+    "SopRollbackCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackPlanId",
+        "operationId",
+        "confirm"
+      ],
+      "properties": {
+        "rollbackPlanId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "confirm": {
+          "const": true
+        }
+      }
+    },
+    "SopRollbackReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "state"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "state": {
+          "const": "rolled_back"
+        }
+      }
+    },
+    "SopUploadReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "candidateId",
+        "version",
+        "state"
+      ],
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/IntakeId"
+        },
+        "version": {
+          "$ref": "#/$defs/IntakeVersion"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "staged",
+            "idempotent"
+          ]
         }
       }
     }

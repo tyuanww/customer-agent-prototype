@@ -75,13 +75,25 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 
 ## Foundation 消费入口
 
-产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。前 83 条 SQL 与来源元数据保持不可变，正常 apply / verify 使用完整 84 条目录。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及第 84 条字节。尾部只调用低层 bundle 校验和同一 migration renderer。完整 corrected verifier 继续从固定 v10 前序重建产物，两条路径独立。
+产品数据库生成器通过 `verifyIngestedCorrectedSopUnifiedContractSet` 选择独立 corrected 锁所绑定的 v11 快照，将其中的 `storage.v1.sql` 登记为正常目录的 `0084_sop_unified_storage`。生成物统一绑定 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 来源。foundation 的 83→84 独立测试保留其历史目录。当前正常 apply / verify 消费包含实施 overlay 的完整 85 条目录，前 84 条 SQL 与来源元数据保持不可变。host 的 repair 和 readiness 前序检查直接校验 corrected 独立锁、v11 合同目录及 84/85 精确尾部。完整 corrected verifier 继续从固定 v10 前序重建产物。
 
-`@customer-agent/contracts/sop-unified` 从同一快照生成 79 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。默认 contracts 视图的五项生成物保持原字节。正常 84 条目录依赖 corrected 锁，缺失或损坏该锁时两个生成入口均拒绝。仅有旧 v10 锁不能生成正式 84 或新视图。
+`@customer-agent/contracts/sop-unified` 从同一快照生成 128 个引用闭合的 schema，拥有独立的类型、validator 注册表与 provenance。foundation 的 79 个 component 扩为正常 facade 实际使用的 Intake 闭包，包含间接携带新 scope 和错误的请求与响应。生成 paths 仍只有原 `/v1/sop/query`。默认 contracts 视图的五项生成物保持原字节。正常目录依赖 corrected 锁和 sourcehash 钉住的 0085 overlay，两个生成入口校验全部来源与产物。
 
 旧 query candidate 的合成 host 显式应用前 83 条，并通过 testkit 的 `verifyMigrationPrefix(client, 83)` 核验物理前序后安装候选。该测试入口仍需既有 opt-in 和隔离 PG15 门禁。
 
-此 foundation 覆盖类型、存储登记和兼容验证。真实 API 图导入、冻结、完整质量、发布、回退、权限事实 writer、媒体与 full GateB 仍待实现。上游 installation 与消费锁继续保留其未激活元数据。
+## 正常图生命周期实施
+
+既有 `createContentIntakeService` facade 继续拥有上传、接收、来源确认、人工质量、发布、回退与永久回执。内部 `sop-graph.ts` 集中关系闭包、canonical、精确依赖、图差异和媒体 owner。纯六表解析与 Excel 报告由 `packages/content-intake` 拥有。`0085_sop_unified_lifecycle` 从 overlays 经现有生成器登记，绑定相同 source 和合同版本。
+
+只有 exact manifest ID 选择 successor validator。缺头或 exact v7 ID 使用原 validator。资源查址、身份和来源授权先于协商拒绝，随后才读取材料、映射和媒体。parse job、永久 receipt、资格及游标绑定 view。队列恢复读取持久 job 的原 view。
+
+图来源登记 exact v1.1 tuple、六表结构 SHA 和显式 `source_mappings.graph_mapping`。该映射包含明确的 `riskLevel`（routine 或 critical）、`sourceClaim` 的版本声明及 acquisition、`flows[flowId]` 的 anchorEntry 与 audience、`entries[businessEntryId]` 的完整非正文元数据、`images[resourceId]` 的 required/alt/ordinal。对象哈希来自实际上传 bytes。业务映射缺失时返回 `SOP_MAPPING_REQUIRED`。六表中的列表采用 JSON 文本，适用范围采用合同 Applicability 的 JSON，任务类型显式为操作/判断/结束，维护字段逐行填写。原文、来源 scope、风险与关联依赖显式登记和行记录。
+
+正常管理入口沿用 upload→receive→job→material→source-confirmation→quality/freeze→quality/checks→publish，回退沿用 rollback/preview 与 rollback。候选图片复核使用 `GET …/sop/media/{mediaObjectId}`，锁外读取真实 bytes 后重验 exact binding、权限与哈希。验证后的 graph job 报告由原 report 入口输出 XLSX，质量证据页保留完整 plan、targets、阶段检查及归因，读取需同时具有原 job 与 review 权限。
+
+当前图通过既有 intake entitlement 与 snapshot 分页读取，合并 FAQ、词表、flows、nodes、edges、media，绑定 totals、pageCount 与完整 snapshotDigest。内部 `readCurrent(tx, principal, entitlementHash)` 调用受限 `read_sop_graph_current(text,text)`。图生效边界在不可变资格插入前由 `read_sop_graph_deadline(text,text)` 计算。005C 负责独立 query wire 与权限事实 writer，005D 负责 continuation 与最终图片消费。真实业务映射、来源和批准输入继续由对应 owner 提供。
+
+正常链专项在 `apps/api/tests/sop-unified-lifecycle.integration.test.ts`，由 `test:integration:sop` 串行执行。它通过真实 HTTP 创建候选、质量与 R1/R2/R3，随后使用现有 backup-set 工具 dump/restore 非空图与媒体，再运行 85 verifier、受控当前图读取及实际 bytes 校验。所有输入为合成 fixture。上游 installation 与消费锁保留其未激活元数据。
 
 ## 验证入口
 

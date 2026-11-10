@@ -1,10 +1,13 @@
 import { createIntakeShopDirectory } from './shop-directory.js';
 import { createIntakeCapacity } from './capacity.js';
 import { randomUUID } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { createGraphMediaReader, freeze as freezeGraph, isGraphSource, makeMaterial, prepareImport, readBase, type GraphBase } from './sop-graph.js';
+import { withIntakeView, intakeView } from './contract-view.js';
+import { clock } from './transaction.js';
+import { ContractValidationError, parseContractSchema, type components } from './contract-view.js';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
 import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, previewFromBytes, stagePreviews } from './linked-preview.js';
-import { INTAKE_POLICY, CSV_POLICY_VERSION, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
+import { INTAKE_POLICY, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, SOP_TASK_FORMAT, SOP_TASK_SHEETS, SopTaskWorkbookFailure, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import type { ContentObjectStore, ContentAttachmentStore, PersistedContentObject } from '../content-object-store.js';
@@ -64,6 +67,73 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   const candidate = (v: unknown) => parseContractSchema('IntakeCandidate', v);
   const job = (v: unknown) => parseContractSchema('IntakeParseJob', v);
   const evidence = createIntakeEvidence(run);
+
+  async function executeGraphParse(actor: AuthenticatedUser, id: string, prepared: {
+    job: import('./candidate.js').Job; source: import('./authority.js').Source;
+    object: { sha256: string; bytes: string; mime: string }; base: GraphBase;
+  }): Promise<IntakeResult<C['IntakeCandidate']>> {
+    const lifecycle = isAttachmentStore(store) ? createSopMediaLifecycle(run, store) : null;
+    const persisted = new Map<string, import('./sop-media.js').SopMediaReservation>();
+    const terminal = async (failure: Exclude<IntakeResult<C['IntakeCandidate']>, { ok: true }>, issues: ParseResult['issues'] = [{ code: failure.reason, sheet: '', row: 0, column: '', fix: '补齐显式映射并重新接收工作簿' }]): Promise<IntakeResult<C['IntakeCandidate']>> => {
+      if (failure.commit === 'unknown') return failure;
+      try {
+        await finishFailure(id, { ...failedParse('FILE_INVALID'), issues }, actor.user_id);
+        if (lifecycle) for (const item of new Map([...persisted.values()].map(item => [item.objectId, item])).values()) {
+          const released = await lifecycle.release(actor, id, item);
+          if (!released.ok) return released;
+        }
+        return failure;
+      } catch (error) {
+        const diagnosticId = `intake_${randomUUID()}`;
+        try { report(diagnosticId, error); } catch { /* Observational. */ }
+        return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
+      }
+    };
+    try {
+      if (!lifecycle) throw new IntakeRejection('SOP_MEDIA_UNAVAILABLE', 'OVERLOADED');
+      const bytes = await store.readPayload(prepared.job.object_id);
+      if (bytes.length !== Number(prepared.object.bytes) || digest(bytes) !== prepared.object.sha256) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+      const draft = await prepareImport(bytes, prepared.source, prepared.base);
+      for (const image of draft.workbook.images) {
+        const stored = await lifecycle.persist(actor, id, prepared.source.scope.sourceId, image.bytes, image.mime);
+        if (!stored.ok) return terminal(stored);
+        persisted.set(image.resourceId, stored.value);
+      }
+      const registration = prepared.source.graphMapping;
+      const imageMapping: unknown = registration && typeof registration === 'object' ? Reflect.get(registration, 'images') : null;
+      const media: C['IntakeSopMedia'][] = [];
+      for (const binding of draft.mediaOwners) {
+        const stored = persisted.get(binding.resourceId);
+        const metadata: unknown = imageMapping && typeof imageMapping === 'object' ? Reflect.get(imageMapping, binding.resourceId) : null;
+        if (!stored || !metadata || typeof metadata !== 'object') throw new IntakeRejection('SOP_MAPPING_REQUIRED', 'VALIDATION');
+        const audience = binding.row['可见对象'] === '对客可用' ? 'customer'
+          : binding.row['可见对象'] === '坐席可读' ? 'agent' : binding.row['可见对象'] === '主管可读' ? 'coach' : null;
+        const item = parseContractSchema('IntakeSopMedia', { ...metadata, ...binding.owner,
+          flowKey: binding.flow.header.key, resourceId: binding.resourceId, objectId: stored.mediaObjectId,
+          sha256: stored.sha256, bytes: stored.bytes, mime: stored.mime, audience,
+          applicability: JSON.parse(binding.row['适用范围'] ?? '') });
+        if (!media.some(existing => JSON.stringify(existing) === JSON.stringify(item))) media.push(item);
+      }
+      if (new Set(draft.mediaOwners.map(binding => binding.resourceId)).size !== persisted.size) throw new IntakeRejection('SOP_MAPPING_REQUIRED', 'VALIDATION');
+      const frozen = await run(actor, 'freeze', null, null, async (client, who) => {
+        const { job, src } = await getJob(client, who, id);
+        if (job.state === 'validated') return readCandidate(client, who, job.result_candidate_id!, Number(job.result_candidate_version), 'import');
+        const base = await readBase(client, who, job.source_id, job.base_release_id);
+        const material = makeMaterial({ prepared: draft, source: { ...src, graphMapping: prepared.source.graphMapping }, base,
+          object: parseContractSchema('IntakeObject', { sourceId: job.source_id, objectId: job.object_id,
+            sha256: prepared.object.sha256, bytes: Number(prepared.object.bytes), mime: prepared.object.mime }), job, media, now: await clock(client) });
+        return freezeGraph(client, who, job, src, material);
+      }, candidate);
+      return frozen.ok ? frozen : terminal(frozen);
+    } catch (error) {
+      const reason = error instanceof IntakeRejection ? error.reason : error instanceof ContractValidationError ? 'SOP_GRAPH_INVALID' : error instanceof Error
+        && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID', 'SOP_MEDIA_UNAVAILABLE', 'FILE_LIMIT'].includes(error.message)
+        ? error.message as import('./transaction.js').Reason : 'FILE_INVALID';
+      const diagnosticId = `intake_${randomUUID()}`;
+      try { report(diagnosticId, error); } catch { /* Observational. */ }
+      return terminal({ ok: false, code: 'VALIDATION', reason, commit: 'rolled_back', diagnosticId }, error instanceof SopTaskWorkbookFailure ? [error.issue] : undefined);
+    }
+  }
 
   /** Worker-only terminal bookkeeping must still finish after user permission expires.
    * It cannot create a candidate, alter a terminal job or grant any authority. */
@@ -149,8 +219,13 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       const objects = await client.query<{ sha256: string; bytes: string; mime: string }>('SELECT sha256,bytes,mime FROM content_intake.objects WHERE object_id=$1', [j.object_id]);
       if (objects.rows[0]?.mime !== format.mime) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION');
       await client.query("UPDATE content_intake.parse_jobs SET state='parsing' WHERE job_id=$1", [id]);
-      return { job: j, source: src, object: objects.rows[0]! };
-    }, v => v as { candidate: C['IntakeCandidate'] } | { job: import('./candidate.js').Job; source: import('./authority.js').Source; object: { sha256: string; bytes: string; mime: string } });
+      if (isGraphSource(src)) {
+        const mapping = await client.query<{ graph_mapping: unknown }>('SELECT graph_mapping FROM content_intake.source_mappings WHERE source_id=$1 AND version=$2', [j.source_id, j.source_version]);
+        return { job: j, source: { ...src, graphMapping: mapping.rows[0]?.graph_mapping }, object: objects.rows[0]!, base: await readBase(client, who, j.source_id, j.base_release_id) };
+      }
+      return { job: j, source: src, object: objects.rows[0]!, base: null };
+    }, v => v as { candidate: C['IntakeCandidate'] } | { job: import('./candidate.js').Job; source: import('./authority.js').Source;
+      object: { sha256: string; bytes: string; mime: string }; base: GraphBase | null });
     if (!prepared.ok) {
       // A queued HTTP admission can lose its session before a worker starts.
       // Close only that actor's still-pending job; this grants no business write
@@ -174,6 +249,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       }
       return { ok: true, value: recovered };
     }
+    if (prepared.value.base !== null) return executeGraphParse(actor, id, { ...prepared.value, base: prepared.value.base });
     // A locked read still in reading/parsing proves the earlier uncertain freeze
     // did not leave a durable result. Retire only the record this call observed.
     if (pending) {
@@ -303,9 +379,51 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
   }
 
   return {
+    negotiate(actor: AuthenticatedUser, resource: { sourceId?: string; candidateId?: string; version?: number; jobId?: string; action?: unknown;
+      operationId?: string; operationAction?: unknown; qualityOperation?: boolean }) {
+      return run(actor, 'negotiate', null, null, async (client, who) => {
+        if (resource.sourceId) {
+          const src = await source(client, parseContractSchema('IntakeId', resource.sourceId));
+          await authorize(client, who, parseContractSchema('IntakeAction', resource.action), src);
+          if (isGraphSource(src) && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+        } else if (resource.candidateId) {
+          const address = await client.query<{ source_id: string; canonical_encoding: string }>('SELECT source_id,canonical_encoding FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2',
+            [parseContractSchema('IntakeId', resource.candidateId), parseContractSchema('IntakeVersion', resource.version)]);
+          if (!address.rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+          await authorize(client, who, parseContractSchema('IntakeAction', resource.action), await source(client, address.rows[0].source_id));
+          if (address.rows[0].canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+        } else if (resource.jobId) await getJob(client, who, parseContractSchema('IntakeId', resource.jobId));
+        else if (resource.operationId) {
+          const actions = resource.qualityOperation ? ['quality-freeze', 'quality-check'] : ['publish', 'rollback', 'cancel'];
+          if (typeof resource.operationAction !== 'string' || !actions.includes(resource.operationAction)) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+          const receipt = await client.query('SELECT 1 FROM backend_review.receipts WHERE actor_user_id=$1 AND operation=$2 AND request_key=$3',
+            [who.userId, `intake:${resource.operationAction}`, parseContractSchema('IntakeId', resource.operationId)]);
+          if (!receipt.rowCount) throw new IntakeRejection('COMMIT_UNKNOWN', 'NOT_FOUND');
+        }
+        return true;
+      }, value => value === true);
+    },
+    policy(actor: AuthenticatedUser) {
+      return run(actor, 'policy', null, null, async () => {
+        const graph = intakeView() === 'graph';
+        if (graph && !isAttachmentStore(store)) throw new IntakeRejection('UPGRADE_REQUIRED');
+        return parseContractSchema('IntakePolicy', { policyVersion: INTAKE_POLICY.version, templateVersion: 'faq-p1.1',
+          maxFileBytes: INTAKE_POLICY.fileBytes, maxExpandedBytes: INTAKE_POLICY.expandedBytes, maxZipEntries: INTAKE_POLICY.zipEntries,
+          maxRows: INTAKE_POLICY.rows, maxColumns: INTAKE_POLICY.columns, maxCells: INTAKE_POLICY.cells, maxCellCharacters: INTAKE_POLICY.cellChars,
+          maxSharedStrings: INTAKE_POLICY.sharedStrings, parseTimeoutMs: INTAKE_POLICY.timeoutMs, maxActiveCandidatesPerActor: 10,
+          maxActiveCandidatesPerSource: 100, maxTenantStagingBytes: 1_073_741_824, orgFactsMaxAgeSeconds: 300, approvalFactsMaxAgeSeconds: 300,
+          ticketMaxAgeSeconds: 60, selectedMediaSupported: graph, inputFormats: [
+            { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', selectedSheets: ['来源', 'FAQ', '相似问法'] },
+            { mime: 'text/csv', templateVersion: 'faq-csv-v1', ruleVersion: CSV_POLICY_VERSION, mappingVersion: 'faq-csv-columns-v1', structureDigest: CSV_STRUCTURE_SHA256, selectedSheets: ['CSV'] },
+            ...(graph ? [{ mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ...SOP_TASK_FORMAT, selectedSheets: [...SOP_TASK_SHEETS], selectedMediaSupported: true }] : []),
+          ] });
+      }, value => parseContractSchema('IntakePolicy', value));
+    },
+    ...(isAttachmentStore(store) ? createGraphMediaReader(run, store) : { candidateMedia: async () => ({ ok: false as const,
+      code: 'OVERLOADED' as const, reason: 'SOP_MEDIA_UNAVAILABLE' as const, commit: 'rolled_back' as const, diagnosticId: `intake_${randomUUID()}` }) }),
     ...evidence,
-    ...createIntakeRollback(run),
-    ...createIntakePublication(run),
+    ...createIntakeRollback(run, store),
+    ...createIntakePublication(run, store),
     ...createIntakeUsage(run, createReleasePreviewReader(store)),
     ...createIntakeShopDirectory(run),
     ...createIntakeDiscovery(run, options.principalLabels),
@@ -391,7 +509,16 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
     async parse(actor: AuthenticatedUser, id: string, signal?: AbortSignal): Promise<IntakeResult<C['IntakeCandidate']>> {
       if (parseActive) return { ok: false, code: 'OVERLOADED', reason: 'QUOTA_EXCEEDED', commit: 'rolled_back', diagnosticId: `intake_${randomUUID()}` };
       parseActive = true;
-      try { return await executeParse(actor, id, signal); } finally { parseActive = false; }
+      try {
+        const lookup = await terminalPool.connect();
+        let view = intakeView();
+        try {
+          const row = await lookup.query<{ contract_view: 'legacy' | 'graph' }>(`SELECT j.contract_view FROM content_intake.parse_jobs j
+            JOIN content_intake.principals p ON p.principal_id=j.actor_id WHERE j.job_id=$1 AND p.user_id=$2`, [id, actor.user_id]);
+          view = row.rows[0]?.contract_view ?? view;
+        } finally { lookup.release(); }
+        return await withIntakeView(view, () => executeParse(actor, id, signal));
+      } finally { parseActive = false; }
     },
   };
 }

@@ -29,6 +29,7 @@ async function fixture(t) {
   const migrationManifest=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(migrationManifest));
   delete priorManifest.compatibility.sop_unified_successor;
+  delete priorManifest.compatibility.sop_lifecycle_overlay;
   writeFileSync(migrationManifest,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   // All payload is invented; only the exact immutable predecessor comes from the repository.

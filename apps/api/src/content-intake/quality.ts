@@ -1,9 +1,10 @@
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 
 import { candidateContext } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { requireIndependentReviewer } from './reviewer.js';
 import { IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
+import { qualityContribution } from './sop-graph.js';
 
 type C = components['schemas'];
 
@@ -111,6 +112,8 @@ export type IntakeQualityProgress = {
   state: 'not_frozen' | 'initial_required' | 'expansion_required' | 'passed' | 'revision_required' | 'blocked';
   plan: FrozenPlan | null; frozenBy: string | null; frozenAt: string | null; frozenFactsVersion: number | null;
   rounds: { phase: Phase; checks: QualityCheck[]; checkedBy: string; factsVersion: number; recordedAt: string }[];
+  canonicalEncodingVersion?: 'candidate-p1.1' | 'candidate-sop-task-graph-v2';
+  sopPlan?: C['IntakeSopSopQualityPlan'];
 };
 type QualityCommand = C['IntakeQualityCommand'];
 type QualitySubmission = C['IntakeQualitySubmission'];
@@ -133,7 +136,7 @@ function frozenPlan(p: IntakeQualityPreview): FrozenPlan {
 
 /** Rechecks current authority/material before exposing durable quality evidence.
  * A passed quality state is never an approval, ticket or permission to publish. */
-export async function readQualityView(client: IntakeTransaction, actor: Principal, rawKey: unknown): Promise<{ preview: IntakeQualityPreview; progress: IntakeQualityProgress }> {
+export async function readQualityView(client: IntakeTransaction, actor: Principal, rawKey: unknown) {
   const preview = await previewQuality(client, actor, rawKey);
   const key = preview.key;
   const args = [key.candidateId, key.version, key.digest];
@@ -147,7 +150,13 @@ export async function readQualityView(client: IntakeTransaction, actor: Principa
     frozenFactsVersion: stored ? Number(stored.facts_version) : null,
     frozenBy: stored?.frozen_by ?? null, frozenAt: stored?.frozen_at.toISOString() ?? null,
     rounds: rounds.rows.map(r => ({ phase: r.phase, checks: r.checks, checkedBy: r.checked_by, factsVersion: Number(r.facts_version), recordedAt: r.recorded_at.toISOString() })) };
-  return { preview, progress };
+  const { material } = await candidateContext(client, actor, key, 'review', true);
+  const encoding = material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2' ? material.canonicalEncodingVersion : 'candidate-p1.1';
+  progress.canonicalEncodingVersion = encoding;
+  const graph = encoding === 'candidate-sop-task-graph-v2' ? await qualityContribution(client, actor, key) : null;
+  if (graph) progress.sopPlan = graph.sopPlan;
+  const graphChecks = graph?.checks ?? [];
+  return { preview, progress, graph, graphChecks };
 }
 
 export async function readQuality(client: IntakeTransaction, actor: Principal, rawKey: unknown): Promise<IntakeQualityProgress> {
@@ -159,6 +168,7 @@ export async function freezeQuality(client: IntakeTransaction, actor: Principal,
   await client.query(`INSERT INTO content_intake.quality_plans(candidate_id,candidate_version,candidate_digest,policy_version,plan,frozen_by,facts_version)
     VALUES ($1,$2,$3,'intake-quality-v1',$4::jsonb,$5,$6) ON CONFLICT (candidate_id,candidate_version) DO NOTHING`,
   [p.key.candidateId, p.key.version, p.key.digest, JSON.stringify(frozenPlan(p)), actor.id, actor.factsVersion]);
+  await client.query('SELECT content_intake.freeze_sop_graph_quality($1,$2,$3)', [actor.id, p.key.candidateId, p.key.version]);
   return readQuality(client, actor, p.key);
 }
 
@@ -181,8 +191,14 @@ export async function checkQuality(client: IntakeTransaction, actor: Principal, 
   const encoded = JSON.stringify(request.checks);
   const size = await client.query<{ bytes: number }>('SELECT octet_length($1::jsonb::text) AS bytes', [encoded]);
   if (size.rows[0]!.bytes > QUALITY_LIMITS.checksBytes) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
-  await client.query(`INSERT INTO content_intake.quality_rounds(candidate_id,candidate_version,candidate_digest,phase,checks,checked_by,facts_version)
-    VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)`, [request.key.candidateId, request.key.version, request.key.digest,
-    request.phase, encoded, actor.id, actor.factsVersion]);
+  let recordedAt: string | null = null;
+  if (material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2') {
+    if (request.materialDigest !== request.key.digest || !request.sopChecks) return invalid();
+    recordedAt = (await client.query<{ recorded_at: string }>('SELECT content_intake.check_sop_graph_quality($1,$2,$3,$4,$5::jsonb)::text AS recorded_at',
+      [actor.id, request.key.candidateId, request.key.version, request.phase, JSON.stringify(request.sopChecks)])).rows[0]!.recorded_at;
+  } else if (request.materialDigest !== undefined || request.sopChecks !== undefined) return invalid();
+  await client.query(`INSERT INTO content_intake.quality_rounds(candidate_id,candidate_version,candidate_digest,phase,checks,checked_by,facts_version,recorded_at)
+    VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,coalesce($8,clock_timestamp()))`, [request.key.candidateId, request.key.version, request.key.digest,
+    request.phase, encoded, actor.id, actor.factsVersion, recordedAt]);
   return readQuality(client, actor, request.key);
 }

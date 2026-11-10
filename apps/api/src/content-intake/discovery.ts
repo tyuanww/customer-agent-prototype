@@ -1,10 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { allocationKinds, authorize, LIVE_ALLOCATION_GRANTS_SQL, mayManageGrant, readGrant, recipientRoleAllows, samePerson, source } from './authority.js';
 import { readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { clock, createIntakeTransactions, IntakeRejection, lockProductSession, registeredPrincipalPage, requireFresh, type IntakeTransaction, type Principal } from './transaction.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 type Capability = C['IntakeAuthorization']['capabilities'][number];
@@ -74,7 +75,8 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
     JOIN content_intake.source_mappings m ON m.source_id=src.source_id AND m.version=src.current_mapping_version
     JOIN rights ON rights.scope_id=s.scope_id AND rights.source_id=src.source_id
     WHERE s.tenant_id=$2 AND s.app_id=$3
-    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1]);
+      AND ($6::boolean OR m.template_version<>'sop-manual-authoring-v1.1')
+    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1, intakeView() === 'graph']);
   if (result.rows.length > MAX_SOURCES) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [who.tenantId, who.appId]);
   if (!policy.rows[0]) throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
@@ -216,7 +218,7 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
           throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
         }
         const items = rows.rows.map(row => parseContractSchema('IntakeVocabulary', row.value));
-        const revision = digest(canonical([id,src,who.factsVersion,who.generation,until,request.limit,items]));
+        const revision = digest(canonical([id,src.scope,src.version,src.structureDigest,src.mode,who.factsVersion,who.generation,until,request.limit,items]));
         let offset = 0;
         if (request.cursor) {
           const parts = request.cursor.split('.'), body = parts[0] ?? '';
@@ -247,6 +249,7 @@ export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransac
         const session = await lockProductSession(client, actor);
         const id = parseContractSchema('IntakeId', sourceId), src = await source(client, id);
         const importUntil = await authorize(client, who, 'import', src);
+        if (src.templateVersion === 'sop-manual-authoring-v1.1' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
         const validUntil = Math.min(session.validUntil, who.validUntil, importUntil);
         client.validUntil(validUntil);
         await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");

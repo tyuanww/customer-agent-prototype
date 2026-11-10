@@ -32,10 +32,10 @@ function sha256(content: string): string {
 }
 
 describe('verified product migration sources', () => {
-  it('preserves all 83 historical descriptors and migration bytes', () => {
-    expect(sha256(JSON.stringify(manifest.migrations.slice(0, 83))))
-      .toBe('21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae');
-    for (const entry of manifest.migrations.slice(0, 83)) {
+  it('preserves all 84 historical descriptors and migration bytes', () => {
+    expect(sha256(JSON.stringify(manifest.migrations.slice(0, 84))))
+      .toBe('94ade2a97a3446d461d4055e3bd340b0f80e94ff8fd0ac8855c7e85c45f6a28c');
+    for (const entry of manifest.migrations.slice(0, 84)) {
       expect(sha256(readFileSync(path.join(projectRoot, 'packages/database/migrations', entry.file), 'utf8')))
         .toBe(entry.sha256);
     }
@@ -56,10 +56,11 @@ describe('verified product migration sources', () => {
   });
 
   it('keeps ACL and SOP before unified storage in the ordered catalogue', () => {
-    expect(manifest.migrations.slice(-3).map(({ position, id }) => ({ position, id }))).toEqual([
+    expect(manifest.migrations.slice(-4).map(({ position, id }) => ({ position, id }))).toEqual([
       { position: 82, id: '0082_access_evaluator' },
       { position: 83, id: '0083_sop_pipeline_projection' },
       { position: 84, id: '0084_sop_unified_storage' },
+      { position: 85, id: '0085_sop_unified_lifecycle' },
     ]);
   });
 });

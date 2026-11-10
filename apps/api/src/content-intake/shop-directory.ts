@@ -1,4 +1,4 @@
-import { ContractValidationError, parseContractSchema } from '@customer-agent/contracts';
+import { ContractValidationError, parseContractSchema } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import { IntakeRejection, type createIntakeTransactions } from './transaction.js';

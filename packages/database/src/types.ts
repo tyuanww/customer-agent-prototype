@@ -50,6 +50,7 @@ export type ExecutableMigrationCatalogue = Readonly<{
     readinessSuccessor?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
     /** Exact unified graph storage appended after the immutable 83-migration prefix. */
     sopUnifiedSuccessor?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
+    sopLifecycleOverlay?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;

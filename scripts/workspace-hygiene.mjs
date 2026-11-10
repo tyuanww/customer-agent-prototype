@@ -40,14 +40,17 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // borrow unused space from another group, even with a larger aggregate override.
 // Budgets use logical file/link bytes per retained path, independent of filesystem
 // allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024;
+// FINAL-005-B counts the generated closure, 0085 source/output and normal-chain
+// implementation/tests by logical bytes. The input allowance is 531 KiB.
+const SOP_LIFECYCLE_INPUT_BUDGET_BYTES = 531 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.
   // The 3.34 MiB correction includes the 548-header proof and needs 3.4 MiB.
   Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   // Corrected intake and the foundation consumers also increase source inputs.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([
@@ -115,6 +118,8 @@ const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'contracts-dependencies', label: 'contracts package dependency links', path: 'packages/contracts/node_modules' },
   { key: 'content-intake-dependencies', label: 'content-intake package dependency links', path: 'packages/content-intake/node_modules' },
   { key: 'retrieval-core-dependencies', label: 'retrieval-core package dependency links', path: 'packages/retrieval-core/node_modules' },
+  { key: 'job-roster-dependencies', label: 'job-roster package dependency links', path: 'packages/job-roster/node_modules' },
+  { key: 'unified-contracts-dependencies', label: 'unified-contracts package dependency links', path: 'packages/unified-contracts/node_modules' },
   { key: 'desktop-dependencies', label: 'desktop package dependency links', path: 'apps/desktop/node_modules' },
   { key: 'git', label: 'Git history and metadata', path: '.git' },
   { key: 'local-reference', label: 'user-owned ignored reference', path: 'clawd-on-desk-0.15.0.zip' },
@@ -126,6 +131,8 @@ const INVENTORY_CATEGORIES = Object.freeze([
   { key: 'contracts-build-output', label: 'rebuildable contracts output', path: 'packages/contracts/dist' },
   { key: 'content-intake-build-output', label: 'rebuildable content-intake output', path: 'packages/content-intake/dist' },
   { key: 'retrieval-core-build-output', label: 'rebuildable retrieval-core output', path: 'packages/retrieval-core/dist' },
+  { key: 'job-roster-build-output', label: 'rebuildable job-roster output', path: 'packages/job-roster/dist' },
+  { key: 'unified-contracts-build-output', label: 'rebuildable unified-contracts output', path: 'packages/unified-contracts/dist' },
   // Only the exact derived icon files are excluded. Canonical assets, build
   // configuration, checked-in generated source and frozen evidence still count.
   { key: 'derived-icon-png', label: 'rebuildable packaging icon', path: 'apps/desktop/build/icon.png' },

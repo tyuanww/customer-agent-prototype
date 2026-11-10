@@ -1,6 +1,19 @@
 import { createHash } from 'node:crypto';
 export const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.';
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+export const SOP_LIFECYCLE_SOURCE = Object.freeze({ position: 85, id: '0085_sop_unified_lifecycle',
+  file: 'packages/database/overlays/0085_sop_unified_lifecycle.sql',
+  sha256: 'e76859e42aea66744005295b4baaf7e4872914e6b1ba2f162d46d2b0c1b16924' });
+
+export function renderSopLifecycleMigration({ manifest }, source) {
+  if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'
+    || manifest.source_git_sha !== '812a2e80584f08675fab8b7401ce8b4cd3ab5bca'
+    || sha256(source) !== SOP_LIFECYCLE_SOURCE.sha256) throw new Error('SOP lifecycle implementation source drifted');
+  return renderUpgradeMigration({ position: SOP_LIFECYCLE_SOURCE.position, id: SOP_LIFECYCLE_SOURCE.id,
+    version: `verified SOP lifecycle implementation; overlay_sha256=${SOP_LIFECYCLE_SOURCE.sha256}`,
+    ranges: [], sourceBody: source.trimEnd() }, { contract_set_id: manifest.contract_set_id,
+    source_git_sha: manifest.source_git_sha, manifest });
+}
 
 export function renderUpgradeMigration(descriptor, snapshot) {
   const { position, id, version, ranges, sourceBody } = descriptor;

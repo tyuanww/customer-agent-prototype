@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, Client } from 'pg';
+import { parseContractSchema } from '@customer-agent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSopQueryDatabaseReadPort } from '../src/sop-query-database-read-port.js';
 import { MENOKIN_SOP_QUERY_CONTRACT_SET_ID } from '../src/sop-query-model.js';
@@ -54,6 +55,8 @@ describe.skipIf(!enabled).sequential('SOP candidate real PostgreSQL 15 to loopba
     expect(await query({...body,query_text:'changed'})).toMatchObject({status:409,body:{code:'IDEMPOTENCY_CONFLICT'}});
   });
   it('serves real query eligibility and the shop directory on the same host',async () => {
+    expect((await admin.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns
+      WHERE table_schema='content_intake' AND table_name='entitlements' AND column_name='contract_view') AS exists`)).rows[0].exists).toBe(false);
     for (const pathname of ['/v1/intake/authorization?limit=100','/v1/intake/sources?limit=100','/v1/intake/shop-directory?limit=100']) {
       const response=await fetch(`${origin}${pathname}`,{headers:{authorization:`Bearer ${token}`}});
       expect(response.status,await response.clone().text()).toBe(200);
@@ -62,6 +65,11 @@ describe.skipIf(!enabled).sequential('SOP candidate real PostgreSQL 15 to loopba
     const response=await fetch(`${origin}/v1/intake/entitlements`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},
       body:JSON.stringify({shopId:'shop-a',contextGeneration:1,productIds:[],scenarioIds:[],releaseId:'rel_graph_one'})});
     expect(response.status,await response.clone().text()).toBe(200);
+    const entitlement = parseContractSchema('IntakeEntitlement', await response.json());
+    const snapshot = await fetch(`${origin}/v1/intake/snapshot?entitlementId=${encodeURIComponent(entitlement.entitlementId)}&limit=100`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(snapshot.status, await snapshot.clone().text()).toBe(200);
   });
   it('denies cross-shop and guessed session provenance',async () => {
     expect(await query({...request(),shop_id:'shop-b'})).toMatchObject({status:403});

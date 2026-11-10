@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { parseContractSchema, type ContractSchemaName, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type ContractSchemaName, type components } from './contract-view.js';
 import type { AuthService, AuthenticatedUser } from '../auth-service.js';
 import { requestActor } from '../access/context.js';
 import type { IntakeResult } from './transaction.js';
+import { intakeView, selectIntakeView, withIntakeView, SOP_CONTRACT_SET } from './contract-view.js';
 
 declare module 'fastify' {
   interface FastifyContextConfig { intakeFileLimitStatus?: 413 }
@@ -48,22 +49,47 @@ async function emptyGetBody(request: FastifyRequest): Promise<boolean> {
 }
 
 export function intakeFailure(reply: FastifyReply, code: Failure['code'], reason: Failure['details']['reason'], diagnosticId: string = randomUUID()) {
+  if (intakeView() !== 'graph' && reason.startsWith('SOP_')) reason = 'MATERIAL_CHANGED';
   const value: components['schemas']['IntakeError'] = { error: { code, message: '资料请求未完成。', details: { reason, diagnosticId } } };
+  if (intakeView() === 'graph') reply.header('X-Intake-Contract-Set', SOP_CONTRACT_SET);
   // Only the new quality contract opts into 413; preserve predecessor error wire.
-  const status = code === 'VALIDATION' && reason === 'FILE_LIMIT' ? reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
+  const status = intakeView() === 'graph' && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID'].includes(reason) ? 422
+    : intakeView() === 'graph' && reason === 'SOP_MEDIA_UNAVAILABLE' ? 503
+    : code === 'VALIDATION' && reason === 'FILE_LIMIT' ? intakeView() === 'graph' ? 413 : reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
   return reply.code(status).send(value);
 }
 export function sendIntake(reply: FastifyReply, result: IntakeResult<unknown>, schema: ContractSchemaName, status = 200) {
   if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);
   const value = parseContractSchema(schema, result.value);
+  if (intakeView() === 'graph') reply.header('X-Intake-Contract-Set', SOP_CONTRACT_SET);
   return reply.code(status).send(value);
 }
 
 /** Install only in an encapsulated intake plugin. Preserve product-auth's private
  * DTO identity; each DB operation still locks its authenticated session. */
 export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
-  report?: (diagnosticId: string, error: unknown) => void) {
+  report?: (diagnosticId: string, error: unknown) => void,
+  negotiate?: (actor: AuthenticatedUser, request: FastifyRequest) => Promise<IntakeResult<unknown>>) {
   const actors = new WeakMap<FastifyRequest, AuthenticatedUser>();
+  app.addHook('onRoute', route => {
+    const handler = route.handler;
+    route.handler = function(request, reply) {
+      const headers: string[] = [];
+      for (let i = 0; i < request.raw.rawHeaders.length; i += 2) {
+        if (request.raw.rawHeaders[i]?.toLowerCase() === 'x-intake-contract-set') headers.push(request.raw.rawHeaders[i + 1] ?? '');
+      }
+      const view = selectIntakeView(headers);
+      return withIntakeView(view, async () => {
+        const graphBody = request.body && typeof request.body === 'object' && ('sopChecks' in request.body || 'materialDigest' in request.body);
+        if (negotiate && (view === 'unsupported' || view === 'legacy' && (graphBody || route.url.includes('/sop/media/')))) {
+          const result = await negotiate(actors.get(request)!, request);
+          if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);
+          if (view === 'legacy' && route.url.includes('/sop/media/')) return intakeFailure(reply, 'CONFLICT', 'UPGRADE_REQUIRED');
+        }
+        return handler.call(this, request, reply);
+      });
+    };
+  });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const actor = await requestActor(request, auth);

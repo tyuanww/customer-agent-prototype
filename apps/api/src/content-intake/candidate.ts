@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema, type components } from './contract-view.js';
 import type { ParseResult } from '@customer-agent/content-intake';
 import { canonical, digest, materialFromParse } from './material.js';
 import { authorize, source, type Source } from './authority.js';
 import { clock, IntakeRejection, principal, type IntakeTransaction, type Principal } from './transaction.js';
+import { intakeView } from './contract-view.js';
 
 type C = components['schemas'];
 export type Job = { job_id: string; source_id: string; object_id: string; actor_id: string;
   source_version: string; contributor_ids: string[]; generation: string; state: C['IntakeParseJob']['state'];
   base_release_id: string | null; expected_prior_id: string | null; expected_prior_version: string | null;
   expected_prior_digest: string | null; result_candidate_id: string | null; result_candidate_version: string | null;
-  report_object_id: string | null; started_at: Date };
+  report_object_id: string | null; started_at: Date; contract_view?: 'legacy' | 'graph' };
 
 export function jobView(job: Pick<Job, 'job_id' | 'generation' | 'state' | 'result_candidate_id' | 'result_candidate_version' | 'report_object_id'>, parsed?: ParseResult): C['IntakeParseJob'] {
   return parseContractSchema('IntakeParseJob', { jobId: job.job_id, generation: Number(job.generation), state: job.state,
@@ -23,11 +24,12 @@ export function jobView(job: Pick<Job, 'job_id' | 'generation' | 'state' | 'resu
 }
 
 export async function getJob(client: IntakeTransaction, actor: Principal, id: string): Promise<{ job: Job; src: Source }> {
-  const { rows } = await client.query<Job>('SELECT j.*, j.contributor_ids::text[] AS contributor_ids FROM content_intake.parse_jobs j WHERE job_id=$1', [id]);
-  const job = rows[0];
-  if (!job) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
-  const src = await source(client, job.source_id);
+  const address = (await client.query<Pick<Job, 'source_id' | 'contract_view'>>('SELECT source_id,contract_view FROM content_intake.parse_jobs WHERE job_id=$1', [id])).rows[0];
+  if (!address) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+  const src = await source(client, address.source_id);
   await authorize(client, actor, 'import', src);
+  if (address.contract_view === 'graph' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  const job = (await client.query<Job>('SELECT j.*, j.contributor_ids::text[] AS contributor_ids FROM content_intake.parse_jobs j WHERE job_id=$1', [id])).rows[0]!;
   return { job, src };
 }
 
@@ -47,6 +49,7 @@ async function currentBase(client: IntakeTransaction, expected: string | null): 
 export async function receive(client: IntakeTransaction, actor: Principal, sourceId: string, req: C['IntakeReceive']): Promise<C['IntakeParseJob']> {
   const src = await source(client, sourceId);
   await authorize(client, actor, 'import', src);
+  if (src.templateVersion === 'sop-manual-authoring-v1.1' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
   if (src.mode !== 'v2-preview') throw new IntakeRejection('MODE_CONFLICT');
   if (src.version !== req.sourceVersion) throw new IntakeRejection('SOURCE_MISMATCH');
   await currentBase(client, req.baseReleaseId);
@@ -84,16 +87,21 @@ export async function receive(client: IntakeTransaction, actor: Principal, sourc
   if (Number(count.actor) > 10 || Number(count.source) > 100 || Number(count.actor_jobs) >= 10
     || Number(count.source_jobs) >= 100 || Number(count.bytes) > 1073741824) throw new IntakeRejection('QUOTA_EXCEEDED', 'RATE_LIMITED');
   const { rows } = await client.query<Job>(`INSERT INTO content_intake.parse_jobs(job_id,source_version,contributor_ids,generation,
-    source_id,object_id,actor_id,state,base_release_id,started_at,expected_prior_id,expected_prior_version,expected_prior_digest)
-    VALUES ($1,$2,$3,1,$4,$5,$6,'reading',$7,clock_timestamp(),$8,$9,$10) RETURNING *`,
+    source_id,object_id,actor_id,state,base_release_id,started_at,expected_prior_id,expected_prior_version,expected_prior_digest,contract_view)
+    VALUES ($1,$2,$3,1,$4,$5,$6,'reading',$7,clock_timestamp(),$8,$9,$10,$11) RETURNING *`,
   [`parse_${randomUUID()}`, src.version, contributors, sourceId, req.objectId, actor.id, req.baseReleaseId,
-    req.expectedPriorKey?.candidateId ?? null, req.expectedPriorKey?.version ?? null, req.expectedPriorKey?.digest ?? null]);
+    req.expectedPriorKey?.candidateId ?? null, req.expectedPriorKey?.version ?? null, req.expectedPriorKey?.digest ?? null, intakeView()]);
   return jobView(rows[0]!);
 }
 
 export async function readCandidate(client: IntakeTransaction, actor: Principal, id: string, version: number,
   action: C['IntakeAction'] = 'content-manage'): Promise<C['IntakeCandidate']> {
-  const { rows } = await client.query<{ source_id: string; value: unknown }>(`SELECT c.source_id,jsonb_build_object(
+  const address = (await client.query<{ source_id: string; canonical_encoding: string }>(
+    'SELECT source_id,canonical_encoding FROM content_intake.candidate_versions WHERE candidate_id=$1 AND version=$2', [id, version])).rows[0];
+  if (!address) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
+  await authorize(client, actor, action, await source(client, address.source_id));
+  if (address.canonical_encoding === 'candidate-sop-task-graph-v2' && intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  const { rows } = await client.query<{ value: unknown }>(`SELECT jsonb_build_object(
     'key',jsonb_build_object('candidateId',c.candidate_id,'version',c.version,'digest',c.digest),
     'sourceId',c.source_id,'publicationPolicy',c.publication_policy,'state',c.state,'readinessReasons','[]'::jsonb,
     'sourceEvidenceVersion',c.source_evidence_version,'approvalEvidenceVersion',c.approval_evidence_version,
@@ -101,9 +109,7 @@ export async function readCandidate(client: IntakeTransaction, actor: Principal,
     'publishedReleaseId',p.release_id) AS value FROM content_intake.candidate_versions c
     LEFT JOIN content_intake.publications p ON p.candidate_id=c.candidate_id AND p.candidate_version=c.version
     WHERE c.candidate_id=$1 AND c.version=$2`, [id, version]);
-  if (!rows[0]) throw new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND');
-  await authorize(client, actor, action, await source(client, rows[0].source_id));
-  const view = parseContractSchema('IntakeCandidate', rows[0].value);
+  const view = parseContractSchema('IntakeCandidate', rows[0]!.value);
   if (!['awaiting-evidence', 'ready'].includes(view.state)) return view;
   // Readiness is a projection of current evidence, never a cached permission.
   // Merely reading it does not renew approval validity or change its history.
@@ -167,7 +173,7 @@ export async function syncCandidateReadiness(client: IntakeTransaction, actor: P
  * entries, the live vocabulary and the recent disable count. Both the generic
  * freeze and the SOP freeze build the same material from these, so a SOP upload
  * cannot drift into a second definition of scope, inheritance or risk. */
-export async function materialFor(client: IntakeTransaction, job: Job, src: Source, parsed: ParseResult): Promise<C['IntakeMaterial']> {
+export async function materialFor(client: IntakeTransaction, job: Job, src: Source, parsed: ParseResult): Promise<import('@customer-agent/contracts').components['schemas']['IntakeMaterial']> {
   const objects = await client.query<{ object_id: string; sha256: string; bytes: string; mime: string }>(
     'SELECT * FROM content_intake.objects WHERE object_id=$1', [job.object_id]);
   const o = objects.rows[0]!;

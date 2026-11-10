@@ -1,5 +1,7 @@
 import ExcelJS from 'exceljs';
 import { inspectArchive } from './archive.js';
+export { SOP_TASK_FORMAT, SOP_TASK_HEADERS, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256,
+  SopTaskWorkbookFailure, parseSopTaskWorkbook, type SopTaskWorkbook, type SopTaskRow, type SopTaskImage } from './sop-task-workbook.js';
 import { createFaqTableValidator, validRegisteredContext } from './faq-rules.js';
 export { parseCsv, createCsvTemplate, CSV_TEMPLATE_VERSION, CSV_POLICY_VERSION, CSV_MAPPING_VERSION, CSV_HEADERS, CSV_STRUCTURE_SHA256, type CsvContext, type CsvParseResult } from './csv.js';
 export { parseFamilyReference } from './faq-rules.js';
@@ -190,9 +192,14 @@ export async function createTemplate(context: Omit<ParseContext, 'scopeKind'>, r
 }
 
 /** Only coordinates and recovery instructions are exported; raw untrusted text is omitted. */
-export async function writeIssueReport(issues: readonly Issue[]): Promise<Buffer> {
+export async function writeIssueReport(issues: readonly Issue[], qualityRows: readonly (readonly string[])[] = []): Promise<Buffer> {
   const book = new ExcelJS.Workbook(), sheet = book.addWorksheet('校验问题');
   sheet.addRow(['工作表', '行', '列', '错误码', '修正建议']);
   issues.forEach((i) => sheet.addRow([i.sheet, String(i.row), i.column, i.code, i.fix]));
+  if (qualityRows.length) {
+    const quality = book.addWorksheet('质量证据');
+    quality.addRow(['类别', '序号', '内容']);
+    qualityRows.forEach(row => quality.addRow([...row]));
+  }
   return Buffer.from(await book.xlsx.writeBuffer());
 }
