@@ -2,13 +2,13 @@
 
 ## 当前代码与收尾状态（2026-11-11）
 
-产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #194 已合入。#194 最终提交 `4cc8f202` 的八项 PR 检查全部通过，合并后实际主干为 `7c0582c177cdd64d99b67fb583d3ae8966562f9a`，其六项 CI 全部通过。#192 完成 v12 精确合同接收，#193 修复正式产物扫描对技术标识符的误报，#194 修复正常来源发现与首开证明的合同版本漂移。Windows 原生进程回收的两个既有用例已进入持续门禁，并在 Windows runner 实际通过。[当前主干检查](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42851879981)。
+产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #195 已合入。#195 的 `5f2fd1` 八项 PR 检查全部通过，正常合并后实际主干为 `380771df747b25e6c067c4a057e32560e461b965`，其六项 CI 全部通过。#192 完成 v12 精确合同接收，#193 修复正式产物标识误报，#194 修复正常来源发现与首开证明的合同版本漂移，#195 接通桌面统一 SOP 正常链。Windows 原生 Electron 三项与 Linux SOP 两项在对应 runner 实际执行。[当前主干检查](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42869147425)
 
 正常 SOP 图导入、冻结、来源确认、全量质量、发布及回滚已通过 0085 生命周期闭环。0086 查询事实登记和正常 HTTP 查询已合并，独立导出恢复后也能消费原查询。0087 增加服务端开、续、关及受控图片读取，固定原发布和事实，保留原 handle 终态，按当前身份与授权重新校验。0088 完成显式查询证明与资源停用发布。最终后端 69 项正常 HTTP/PG、数据库、FAQ、备份恢复及根检查通过，345 件实际 M0 构建产物逐文件校验通过。对应入口和合同边界见[续用验证说明](docs/how-to-verify-sop-continuation.md)。
 
-桌面统一 taskgraph 消费候选已完成十四项正常 PG/HTTP/Electron 用例，覆盖原生复制、图片、重试、身份失效、发布回退及正常 blocked。实际 GIF 解码与资源停用终态处理问题已经修复，旧合同编号的测试断言已更正。PG-free 桌面 SOP 回归已纳入 Linux Electron 与 Windows 原生进程回收命令的用例映射。桌面最终完整回归、原 Gate B 补充、跨 lane 跳过项对账及 unsigned 安装包验收继续收尾。后端有限模型仍未穷尽，不能写为 TLA+ 全部通过。真实数据、账号、设备、签名、公证与正式发布各自保留后续准入门。
+桌面统一 taskgraph 已完成十四项正常 PG/HTTP/Electron 用例，覆盖原生复制、图片、重试、身份失效、发布回退及正常 blocked。完整 Electron 回归 41 项通过、17 项跳过，包含正常十四项。`5f2fd1` 的 unsigned universal DMG/ZIP 已生成，实际 DMG 副本正常十四项与既有安装态十一项均通过。FINAL014 补测发现的十二项 API 失败来自测试夹具的迁移、身份及授权前提漂移，修正后八文件三十九项和身份专项三十八项通过。两个桌面失败分别涉及 BM25-only 同分排序和旧版回滚夹具，原语料、断言及旧版目录前提下已通过复测。新修复提交 `128b9764` 的 lint、typecheck、test、build、workspace、docs、architecture 七项根检查均通过。修复的 PR/main CI、新包及逐用例对账继续推进，旧包证据绑定旧提交。后端有限模型仍未穷尽，不能写为 TLA+ 全部通过。真实数据、账号、设备、签名、公证与正式发布各自保留后续准入门。
 
-正式 v11 输入继续绑定来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 OpenAPI 1.29.1 / schema 1.33。原 v12 来源 `0405c5651564958702ddd5484bbf41a0f193515f` 的30件冻结快照及独立锁保留。资源发现修正版绑定来源 `5fb5c1285056b7a862ef5a03cf25975fb91802b5` 的 OpenAPI 1.30.1 / schema 1.35，独立v13合同集已实际导出30件、读回验证、复用并进入产品接收。修正覆盖来源精确tuple、按view筛选发现集合和游标的exact view绑定，正常0088后验及完整HTTP链按修正后候选重新验证。桌面真实后端联验及完整Gate B继续收尾。原表仅用于仓外受控核对，业务缺项继续 blocked。合同状态为 `VERIFIED_NOT_ACTIVATED`，真实身份、店铺授权、设备验收和发布各自需要实际证据。[合同接收说明](docs/reference-sop-unified-contract-intake.md)。
+正式 v11 输入继续绑定来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 OpenAPI 1.29.1 / schema 1.33。原 v12 来源 `0405c5651564958702ddd5484bbf41a0f193515f` 的30件冻结快照及独立锁保留。资源发现修正版绑定来源 `5fb5c1285056b7a862ef5a03cf25975fb91802b5` 的 OpenAPI 1.30.1 / schema 1.35，独立v13合同集已实际导出30件、读回验证、复用并进入产品接收。修正覆盖来源精确tuple、按view筛选发现集合和游标的exact view绑定，正常0088后验及完整HTTP链按修正后候选重新验证。桌面合成数据下的正常后端联验已通过，原 Gate B 的技术证据对账与真实业务验收分别跟踪。原表仅用于仓外受控核对，业务缺项继续 blocked。合同状态为 `VERIFIED_NOT_ACTIVATED`，真实身份、店铺授权、设备验收和发布各自需要实际证据。[合同接收说明](docs/reference-sop-unified-contract-intake.md)。
 
 SOP 九组 PostgreSQL 回归由 API `test:integration:sop` 串行执行，覆盖既有五专项及正常写入、查询、续用和资源生命周期。默认套件的 skip 与专项结果按用例身份及源码输入核对。其余受控评测、设备与环境门继续各自保留。
 
