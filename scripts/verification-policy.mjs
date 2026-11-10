@@ -264,7 +264,7 @@ export function verificationPlan(files, map = loadDependencyMap()) {
   plan.jobs.quick = true;
   plan.jobs.packaging = plan.packagingLanes.length > 0;
   if (routes.size === 0) return fullPlan([reason('unknown-route', 'no dependency route matched')], validated);
-  if (plan.owners.length === 1 && plan.owners[0] === 'repository-docs' && !plan.jobs.contracts && !plan.jobs.database && !plan.jobs.electron && !plan.jobs.packaging && plan.checks.quick.length === 0) plan.mode = 'docs';
+  if (plan.owners.length === 1 && plan.owners[0] === 'repository-docs' && !plan.jobs.contracts && !plan.jobs.database && !plan.jobs.electron && !plan.jobs.packaging) plan.mode = 'docs';
   if (plan.mode === 'docs') plan.requiredJobs = ['changes', 'quick'];
   else { plan.mode = 'focused'; plan.requiredJobs = ['changes', ...JOB_ORDER.filter((job) => plan.jobs[job])]; }
   return plan;

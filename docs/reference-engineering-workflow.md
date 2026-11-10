@@ -105,7 +105,7 @@ Skill 缺失或工具失败时先判断能否完成等价核验：可选环节�
 
 本地入口分工固定为：`pnpm verify:changed` 按当前变更执行计划选中检查，`pnpm verify:fast` 是快速 PR 门，`pnpm verify:full` 是完整测试与仓库门，`pnpm verify:release` 在完整门之后构建可消费产物。`pnpm verify:plan --base <sha>` 只输出计划；PR workflow 的 precheck 及各 job lane 都使用同一策略文件的 `run --lane` 入口执行依赖图中的命令，不再在 YAML 内复制检查命令。每个解析显式 PR base/head 的 job 都检出完整历史，避免浅克隆在运行检查前无法解析比较范围。
 
-路径必须只对应一个 owner，未知、非法、重复 owner、缺 route、缺检查引用、空变更集、stale-generated 或需要重新生成的冻结输入都 fail-closed 到 full gate。文档-only 计划只保留 precheck、documentation 和聚合 quick job；所有代码路由都执行 `pnpm check:architecture`，full fallback 也保留该门。合同计划包含生成 / drift 与已声明消费者；数据库计划包含 migration、隔离 PostgreSQL 15、备份恢复和 API / identity / backend 消费者。PR 聚合门从计划输出推导精确 job 集合并核对 `required_jobs`，因此 focused PR 可以跳过无关的昂贵 lane，缺失、额外、未知或乱序 job 以及合同、数据库和 unknown PR 的失败仍会阻止聚合门通过。
+路径必须只对应一个 owner，未知、非法、重复 owner、缺 route、缺检查引用、空变更集、stale-generated 或需要重新生成的冻结输入都 fail-closed 到 full gate。文档-only 计划执行 precheck、documentation 和 quick 中的 `workspace:check`，沿用源文件预算门禁。所有代码路由都执行 `pnpm check:architecture`，full fallback 也保留该门。合同计划包含生成 / drift 与已声明消费者；数据库计划包含 migration、隔离 PostgreSQL 15、备份恢复和 API / identity / backend 消费者。PR 聚合门从计划输出推导精确 job 集合并核对 `required_jobs`，因此 focused PR 可以跳过无关的昂贵 lane，缺失、额外、未知或乱序 job 以及合同、数据库和 unknown PR 的失败仍会阻止聚合门通过。
 
 每个 PR 只能由一个 owner 在一个独立 worktree 和 branch 写入其声明边界。写入边界由依赖图的 `writeBoundary` 与提交前的 `matchesWriteBoundary` 检查共同约束；超出边界的依赖必须停止并报告给协调者。每个工作单元保留一份 canonical decision log，至少区分架构选择、失败方案、验证结果和真实 blocker；普通命令不逐条写入日志。
 
