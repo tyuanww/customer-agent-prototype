@@ -206,6 +206,10 @@ function canonicalObjectManifest(manifest: string): string {
     const noNulls = `(array_position(${column}, ${nullExpression}) IS NULL)`;
     equivalents.set(`${prefix}(${bounds} AND ${noNulls}))`, `${prefix}((${bounds}) AND ${noNulls}))`);
   }
+  const altPrefix = 'constraint|content_intake.sop_graph_media_bindings.sop_graph_media_bindings_alt_check|type=c|deferrable=f|deferred=f|validated=t|definition=CHECK (';
+  const altBounds = '(char_length(alt) >= 1) AND (char_length(alt) <= 1024)';
+  const altContent = String.raw`(alt ~ '\S'::text)`;
+  equivalents.set(`${altPrefix}(${altBounds} AND ${altContent}))`, `${altPrefix}((${altBounds}) AND ${altContent}))`);
   return manifest.split('\n').map((entry) => equivalents.get(entry) ?? entry).join('\n');
 }
 

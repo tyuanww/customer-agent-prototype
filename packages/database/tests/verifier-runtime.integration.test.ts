@@ -35,6 +35,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       for (const [relation, constraint] of [
         ['parse_jobs', 'parse_jobs_contributor_ids_check'],
         ['principal_facts', 'principal_facts_department_ids_check'],
+        ['sop_graph_media_bindings', 'sop_graph_media_bindings_alt_check'],
       ]) {
         const result = await client.query<{ definition: string }>(`
           SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
@@ -82,6 +83,18 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
       ALTER TABLE content_intake.principal_facts ADD CONSTRAINT principal_facts_department_ids_check
       CHECK (cardinality(department_ids) >= 1 AND cardinality(department_ids) <= 100 AND array_position(department_ids, NULL::text) IS NULL) NOT VALID`],
     ['restored CHECK missing', 'ALTER TABLE content_intake.parse_jobs DROP CONSTRAINT parse_jobs_contributor_ids_check'],
+    ['restored SOP alt weakened bound', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1025 AND alt ~ '\S'::text)`],
+    ['restored SOP alt weakened Boolean logic', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 OR char_length(alt) <= 1024 OR alt ~ '\S'::text)`],
+    ['restored SOP alt weakened content', `ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1024 AND alt ~ '.*'::text)`],
+    ['restored SOP alt unvalidated', String.raw`ALTER TABLE content_intake.sop_graph_media_bindings DROP CONSTRAINT sop_graph_media_bindings_alt_check;
+      ALTER TABLE content_intake.sop_graph_media_bindings ADD CONSTRAINT sop_graph_media_bindings_alt_check
+      CHECK (char_length(alt) >= 1 AND char_length(alt) <= 1024 AND alt ~ '\S'::text) NOT VALID`],
     ['legacy helper removed', 'REVOKE EXECUTE ON FUNCTION public.content_question_hash(jsonb) FROM intake_runtime_fn_owner'],
     ['legacy helper leaked to business', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_business'],
     ['legacy helper grant option', 'GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner WITH GRANT OPTION'],
