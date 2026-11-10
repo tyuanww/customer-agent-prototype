@@ -12,8 +12,8 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration } from './migration-artifact.mjs';
-import { withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration } from './migration-artifact.mjs';
+import { verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 
@@ -447,7 +447,7 @@ function renderCatalogue(manifest, migrations, compatibleUpgrades) {
     sourceRanges: Object.freeze(${JSON.stringify(migration.source_ranges.map((range) => ({ startLine: range.start_line, endLine: range.end_line })))}),
     sql: ${JSON.stringify(migration.sql)},
   })`).join(',\n');
-  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)}${manifest.compatibility.repair_successor ? `, repairSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.repair_successor.contract_set_id, sourceGitSha: manifest.compatibility.repair_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.repair_successor.source_schema_sha256, migrationSha256: manifest.compatibility.repair_successor.migration_sha256 })})` : ''}${manifest.compatibility.readiness_successor ? `, readinessSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.readiness_successor.contract_set_id, sourceGitSha: manifest.compatibility.readiness_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.readiness_successor.source_schema_sha256, migrationSha256: manifest.compatibility.readiness_successor.migration_sha256 })})` : ''} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
+  return `// ${GENERATED_HEADER}\nimport type { ExecutableMigrationCatalogue } from '../types.js';\n\nexport const generatedMigrationCatalogue: ExecutableMigrationCatalogue = Object.freeze({\n  schema: ${JSON.stringify(manifest.schema)},\n  contractSetId: ${JSON.stringify(manifest.contract_set_id)},\n  sourceGitSha: ${JSON.stringify(manifest.source_git_sha)},\n  sourceSchemaSha256: ${JSON.stringify(manifest.source_schema_sha256)},\n  compatibility: Object.freeze({ current: 'N', priorSignedBaseline: Object.freeze({ contractSetId: ${JSON.stringify(BASELINE.contractSetId)}, sourceGitSha: ${JSON.stringify(BASELINE.sourceGitSha)}, sourceSchemaSha256: ${JSON.stringify(BASELINE.sourceSchemaSha256)}, migrationCount: ${BASELINE.migrationCount} }), priorReviewedUpgrades: Object.freeze(${JSON.stringify(compatibleUpgrades.map((p) => ({ contractSetId: p.contractSetId, sourceGitSha: p.sourceGitSha, sourceSchemaSha256: p.sourceSchemaSha256, migrationCount: p.migrationCount })))}), additiveSuccessor: ${additiveSuccessorLiteral(manifest)}${manifest.compatibility.repair_successor ? `, repairSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.repair_successor.contract_set_id, sourceGitSha: manifest.compatibility.repair_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.repair_successor.source_schema_sha256, migrationSha256: manifest.compatibility.repair_successor.migration_sha256 })})` : ''}${manifest.compatibility.readiness_successor ? `, readinessSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.readiness_successor.contract_set_id, sourceGitSha: manifest.compatibility.readiness_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.readiness_successor.source_schema_sha256, migrationSha256: manifest.compatibility.readiness_successor.migration_sha256 })})` : ''}${manifest.compatibility.sop_unified_successor ? `, sopUnifiedSuccessor: Object.freeze(${JSON.stringify({ contractSetId: manifest.compatibility.sop_unified_successor.contract_set_id, sourceGitSha: manifest.compatibility.sop_unified_successor.source_git_sha, sourceSchemaSha256: manifest.compatibility.sop_unified_successor.source_schema_sha256, migrationSha256: manifest.compatibility.sop_unified_successor.migration_sha256 })})` : ''} }),\n  migrations: Object.freeze([\n${migrationEntries}\n  ]),\n});\n`;
 }
 
 function buildDirectMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
@@ -734,7 +734,7 @@ function renderVerifiedProductMigration(projectRoot, snapshot, descriptor) {
   }, snapshot);
 }
 
-export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+function buildPreUnifiedMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
   if (snapshot?.manifest?.database?.sha256 !== LEGACY_CHECK_DATABASE_SHA256) {
     return buildCsvMigrationOutputs(snapshot, { projectRoot });
   }
@@ -917,6 +917,38 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   return Object.freeze({ manifest, migrations: publishedMigrations, outputs });
 }
 
+/** Append the verified storage delta while retaining every historical receipt. */
+export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_PROJECT_ROOT } = {}) {
+  const prior = buildPreUnifiedMigrationOutputs(snapshot, { projectRoot });
+  if (!snapshot.sopUnified) return prior;
+  const { manifest: sourceManifest } = snapshot.sopUnified;
+  if (prior.migrations.length !== 83 || prior.migrations.at(-1).id !== '0083_sop_pipeline_projection'
+    || sha256(JSON.stringify(prior.manifest.migrations)) !== '21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae') {
+    throw new Error('Unified SOP storage requires the immutable 83-migration predecessor');
+  }
+  const migration = renderSopUnifiedMigration(snapshot.sopUnified);
+  const migrations = Object.freeze([...prior.migrations, migration]);
+  const manifest = Object.freeze({ ...prior.manifest,
+    compatibility: Object.freeze({ ...prior.manifest.compatibility,
+      sop_unified_successor: Object.freeze({
+        contract_set_id: sourceManifest.contract_set_id, source_git_sha: sourceManifest.source_git_sha,
+        source_schema_sha256: sourceManifest.database.sha256, storage_sha256: sourceManifest.sopUnified.storage.sha256,
+        migration_sha256: migration.sha256,
+      }),
+    }),
+    migrations: Object.freeze(migrations.map(({ sql: _sql, ...entry }) => entry)),
+  });
+  const compatibleUpgrades = manifest.compatibility.prior_reviewed_upgrades.map(entry => ({
+    contractSetId: entry.contract_set_id, sourceGitSha: entry.source_git_sha,
+    sourceSchemaSha256: entry.source_schema_sha256, migrationCount: entry.migration_count,
+  }));
+  const outputs = new Map(prior.outputs);
+  outputs.set(`packages/database/migrations/${migration.file}`, migration.sql);
+  outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
+  return Object.freeze({ manifest, migrations, outputs });
+}
+
 function outputGroupFor(relativePath) {
   const group = OUTPUT_GROUPS.find(({ prefix }) => relativePath.startsWith(prefix));
   if (!group) {
@@ -1059,7 +1091,18 @@ export function publishDatabaseMigrationOutputs(
 export async function generateDatabaseMigrations({ projectRoot = DEFAULT_PROJECT_ROOT, check = false } = {}) {
   const resolvedRoot = path.resolve(projectRoot);
   return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, (snapshot) => {
-    const built = buildDatabaseMigrationOutputs(snapshot, { projectRoot: resolvedRoot });
+    const unifiedLock = path.join(resolvedRoot, 'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json');
+    const unified = existsSync(unifiedLock) ? verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot: resolvedRoot }) : null;
+    const previousManifestPath = path.join(resolvedRoot, MANIFEST_PATH);
+    if (!unified && existsSync(previousManifestPath)
+      && JSON.parse(readFileSync(previousManifestPath, 'utf8')).compatibility?.sop_unified_successor) {
+      throw new Error('Unified SOP migration requires its verified corrected contract lock; refusing a downgrade');
+    }
+    const unifiedManifest = unified ? JSON.parse(readFileSync(path.join(unified.path, 'contract-set.json'), 'utf8')) : null;
+    const built = buildDatabaseMigrationOutputs({ ...snapshot,
+      ...(unified ? { sopUnified: { manifest: unifiedManifest,
+        storage_source: readFileSync(path.join(unified.path, unifiedManifest.sopUnified.storage.file), 'utf8') } } : {}),
+    }, { projectRoot: resolvedRoot });
     const relativePaths = [...built.outputs.keys()];
     if (check) {
       verifyExactOutputGroups(resolvedRoot, built.outputs);

@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
-import { renderReadinessMigration, renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
+import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
 import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
@@ -934,6 +934,46 @@ function verifyRepairReferences(directory, manifest) {
   });
 }
 
+function verifySopUnifiedMigrationTail(projectRoot, actual) {
+  const lockPath = path.join(projectRoot, UPSTREAM_ROOT, SOP_CORRECTED_LOCK);
+  assertPathInsideRoot(projectRoot, lockPath);
+  assertRegularFile(lockPath, 'SOP corrected unified lock');
+  const profile = SOP_QUERY_PROFILES.get(SOP_CORRECTED_SCHEMA);
+  const lock = validateSopQueryConsumptionLock(readJson(lockPath, 'SOP corrected unified lock'), profile);
+  const directory = path.join(projectRoot, UPSTREAM_ROOT, lock.contract_set_id);
+  assertPathInsideRoot(projectRoot, directory);
+  // The high-level unified verifier re-enters predecessor verification.
+  const verified = verifyContractSetDirectory(directory);
+  if (verified.manifest.schema !== SOP_CORRECTED_SCHEMA) throw new Error('SOP corrected unified lock requires a v11 bundle');
+  assertSopQueryLockMatchesContractSet(lock, verified);
+  const manifest = verified.manifest;
+  const migrationRoot = path.join(projectRoot, 'packages/database/migrations');
+  const prefix = actual.migrations.slice(0, 83);
+  if (sha256Bytes(Buffer.from(JSON.stringify(prefix))) !== '21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae') {
+    throw new Error('SOP unified requires the immutable 83-migration predecessor');
+  }
+  for (const migration of prefix) {
+    const file = path.join(migrationRoot, migration.file);
+    assertPathInsideRoot(projectRoot, file);
+    assertRegularFile(file, 'SOP unified predecessor migration');
+    if (sha256(file) !== migration.sha256 || lstatSync(file).size !== migration.bytes) {
+      throw new Error(`SOP unified predecessor bytes drift: ${migration.file}`);
+    }
+  }
+  const { sql, ...expected } = renderSopUnifiedMigration({ manifest,
+    storage_source: readFileSync(path.join(directory, manifest.sopUnified.storage.file), 'utf8') });
+  if (!isDeepStrictEqual(actual.migrations[83], expected)) throw new Error('SOP unified migration metadata drift');
+  if (!isDeepStrictEqual(actual.compatibility?.sop_unified_successor, {
+    contract_set_id: manifest.contract_set_id, source_git_sha: manifest.source_git_sha,
+    source_schema_sha256: manifest.database.sha256, storage_sha256: manifest.sopUnified.storage.sha256,
+    migration_sha256: expected.sha256,
+  })) throw new Error('SOP unified successor metadata drift');
+  const file = path.join(migrationRoot, expected.file);
+  assertPathInsideRoot(projectRoot, file);
+  assertRegularFile(file, 'SOP unified migration');
+  if (readFileSync(file, 'utf8') !== sql) throw new Error('SOP unified migration bytes drift');
+}
+
 // This is an upgrade over the exact installed generator closure, never a bootstrap.
 function verifyRepairPredecessor(projectRoot, directory) {
   verifyIngestedContractSet({ projectRoot });
@@ -944,7 +984,8 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (actual.migrations.length === 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
   if (actual.migrations.length >= 81 && actual.migrations[80]?.id !== '0081_require_import_batch_principal') throw new Error('Unrecognized required import tenant binding');
@@ -1025,7 +1066,8 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (actual.migrations.length === 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
   if (actual.migrations.length >= 81 && actual.migrations[80]?.id !== '0081_require_import_batch_principal') throw new Error('Unrecognized required import tenant binding');

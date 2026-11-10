@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync, realpathSync } from 'node:fs';
 import test from 'node:test';
-import { Pg15Harness } from '../packages/database/dist/testkit/index.js';
-import { applyDatabaseMigrations, verifyDatabaseMigrations } from '../packages/database/dist/index.js';
-import { fixtureInputs } from './sop-unified-inputs.fixture.mjs';
+import { Pg15Harness, verifyMigrationPrefix } from '../packages/database/dist/testkit/index.js';
+import { applyMigrationPrefix, verifyDatabaseMigrations } from '../packages/database/dist/index.js';
+import { verifyIngestedCorrectedSopUnifiedContractSet } from './customer-agent-contract-set.mjs';
 
 test('unified storage preserves the actual prefix and remains unregistered with the formal verifier', { timeout: 180000 }, async t => {
   const pg = new Pg15Harness();
@@ -17,14 +17,14 @@ test('unified storage preserves the actual prefix and remains unregistered with 
     assert.equal(server.socket_only, true);
     assert.equal(server.tcp, '');
     assert.equal(Math.trunc(server.version / 10000), 15);
-    await applyDatabaseMigrations(client);
-    await verifyDatabaseMigrations(client);
+    await applyMigrationPrefix(client, 83);
+    await verifyMigrationPrefix(client, 83);
     const before = (await client.query('SELECT migration_id,migration_sha256 FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
     const manifest = JSON.parse(readFileSync(new URL('../packages/database/migrations/manifest.generated.json', import.meta.url)));
-    assert.equal(before.length, manifest.migrations.length);
-    assert.equal(before.at(-1).migration_id, manifest.migrations.at(-1).id);
-    const lease = fixtureInputs.leaseStorage.replace(/^BEGIN;[ \t]*\r?\n/m, '').replace(/\s*COMMIT;\s*$/, '').replaceAll("'15 minutes'", "'5 minutes'");
-    const storage = fixtureInputs['model/storage.v4.sql'] + lease + fixtureInputs['input/storage.patch.sql'];
+    assert.equal(before.length, 83);
+    assert.equal(before.at(-1).migration_id, manifest.migrations[82].id);
+    const unified = verifyIngestedCorrectedSopUnifiedContractSet();
+    const storage = readFileSync(new URL(`../contracts/upstream/customer-agent/${unified.contract_set_id}/storage.v1.sql`, import.meta.url), 'utf8');
     assert.doesNotMatch(storage, /^\s*(BEGIN|COMMIT);/m);
     await client.query('BEGIN');
     try {

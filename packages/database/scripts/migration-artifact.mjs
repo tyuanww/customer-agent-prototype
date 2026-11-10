@@ -37,3 +37,18 @@ export function renderReadinessMigration(snapshot) {
   return renderUpgradeMigration({ position: 41, id: '0041_intake_readiness_v1_29',
     version: 'Approved schema.v1.29 readiness successor', ranges: [], sourceBody: source.trimEnd() }, snapshot);
 }
+
+/** The formal storage delta shares one byte recipe with intake verification. */
+export function renderSopUnifiedMigration({ manifest, storage_source: source }) {
+  if (manifest.schema !== 'customer-agent-contract-set/v11'
+    || manifest.openapi.version !== '1.29.1' || manifest.database.version !== 'schema.v1.33'
+    || typeof source !== 'string' || sha256(source) !== manifest.sopUnified.storage.sha256
+    || /^\s*(BEGIN|COMMIT|ROLLBACK);/m.test(source)) {
+    throw new Error('Unified SOP storage bytes or transaction boundary drifted');
+  }
+  return renderUpgradeMigration({
+    position: 84, id: '0084_sop_unified_storage',
+    version: `schema.v1.33 unified SOP storage; storage_sha256=${manifest.sopUnified.storage.sha256}`,
+    ranges: [], sourceBody: source.trimEnd(),
+  }, { contract_set_id: manifest.contract_set_id, source_git_sha: manifest.source_git_sha, manifest });
+}
