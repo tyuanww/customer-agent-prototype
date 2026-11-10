@@ -4,114 +4,114 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "schema": "customer-agent-contract-codegen/v1",
   "view": "sopResourceDisable",
   "source_manifest": {
-    "sha256": "e60033b96859cf2c7060f04c2055b5b616c967ecaf32fc6178ca6476b31fc426",
-    "bytes": 10620
+    "sha256": "c7a87a580f4c86d2a3c722311120fe061a0a03db02362880c1feff65c77744e1",
+    "bytes": 10678
   },
   "source_artifacts": {
     "openapi": {
-      "version": "1.30.0",
+      "version": "1.30.1",
       "file": "openapi.v1.yaml",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/openapi.v1.yaml",
-      "sha256": "f9de8d829a67fd7662923d4a4cbc5a3aad38dc47210c448934065b29fb53704f",
-      "bytes": 1374310
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/openapi.v1.yaml",
+      "sha256": "39de74592e08e0d309256b6b3139fd00957335eeaf5d191758ba2dc9aab0126f",
+      "bytes": 1374848
     },
     "database": {
-      "version": "schema.v1.34",
-      "file": "schema-v1.34.sql",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/schema-v1.34.sql",
-      "sha256": "e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1",
-      "bytes": 883511
+      "version": "schema.v1.35",
+      "file": "schema-v1.35.sql",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/schema-v1.35.sql",
+      "sha256": "130a8103d9d892d637549fe92b327b02d11fa397bcb809b92867787f200f139b",
+      "bytes": 883675
     },
     "storage": {
       "version": "1",
       "file": "storage.v1.sql",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/storage.v1.sql",
-      "sha256": "184e15f53ab478fa08e78bd5a9217f7abe3c6ac0fbaeeee661f15e221e7c1afb",
-      "bytes": 15702
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/storage.v1.sql",
+      "sha256": "605c439e9461bb7bb71585fe9fa795b053455c974675f0c0da29f65a37834bc5",
+      "bytes": 15866
     },
     "installation": {
       "version": "1",
       "file": "installation.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/installation.v1.json",
-      "sha256": "5dab8c464eed1d109930e2da1e3d6e036a162700036cad282c88bf424d33b0fc",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/installation.v1.json",
+      "sha256": "d8d076835917011cc6c46ec44723bc11d1fae3550339fc0fa6e18783c234f795",
       "bytes": 16921
     },
     "provenance": {
       "version": "1",
       "file": "provenance.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/provenance.v1.json",
-      "sha256": "e224e7a45aef88ddbb9c11b74cc4901475d13c550183ade1ad003d0a2e3d742f",
-      "bytes": 7926
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/provenance.v1.json",
+      "sha256": "5ff0427833263b05954eb191249809e555ca41cb3ac6fb66c702f6febb5c6b40",
+      "bytes": 8016
     },
     "predecessor": {
       "version": "1",
       "file": "predecessor-lock.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/predecessor-lock.v1.json",
-      "sha256": "9d90e76aff3669477653ae3c9f3bd5a2ee2ee54d67e6703541c4344c64a5c2c4",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/predecessor-lock.v1.json",
+      "sha256": "0aaf0a54faa030765e39ddf0b0ba989d12e412929287f3cbe0d74e0a4bf8f397",
       "bytes": 3736
     },
     "compatibility": {
       "version": "1",
       "file": "compatibility.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/compatibility.v1.json",
-      "sha256": "e8ddf77bfe08f3f60e7aceeb5d77cc223923867b25dc5f43a189ec5802ee9844",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/compatibility.v1.json",
+      "sha256": "44a99d2bc9d8bf5924af22afe8f4f999a3ffc6df29667dfd658b2c3fd66d477e",
       "bytes": 16786
     },
     "coverage": {
       "version": "1",
       "file": "operation-coverage.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/operation-coverage.v1.json",
-      "sha256": "6c4b51007f5e316a64696d0006a394d74eadbc63b6c37d4de1088c4669b69d7f",
-      "bytes": 18366
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/operation-coverage.v1.json",
+      "sha256": "f48dffff8b1348c32d96d7a01e83fcf5437d3f66659839f17ba1d43a60d65633",
+      "bytes": 18386
     },
     "legacyIntake": {
       "version": "7",
       "file": "legacy-openapi.v7.yaml",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/legacy-openapi.v7.yaml",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/legacy-openapi.v7.yaml",
       "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
       "bytes": 795585
     },
     "legacyQuery": {
       "version": "1",
       "file": "legacy-query.openapi.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/legacy-query.openapi.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/legacy-query.openapi.v1.json",
       "sha256": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
       "bytes": 12271
     },
     "query": {
       "version": "1",
       "file": "query-transport.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/query-transport.v1.json",
-      "sha256": "984d3a60dcc460cb933416436b27ebfe2b7b7795bf06215b40f6b09dc91b6cd4",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/query-transport.v1.json",
+      "sha256": "0a99b07ca47a0189f50b013c0502637cf1a066754e3a9b52b352ed976c461f5f",
       "bytes": 31012
     },
     "authorization": {
       "version": "1",
       "file": "authorization.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/authorization.v1.json",
-      "sha256": "e7311bcf508d8d44f38eb1b80440e0a8369105c1ce4b9f967e85d7310a12f1ae",
-      "bytes": 4418
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/authorization.v1.json",
+      "sha256": "74bc499a3e34d7be541564aa0ca2fd8456a4f571818b6e93b78dfa669490ff16",
+      "bytes": 5170
     },
     "negotiation": {
       "version": "1",
       "file": "negotiation-proof.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/negotiation-proof.v1.json",
-      "sha256": "608f307255b11b248fc077399c4f2af68faa94d2191e7c8ac85a1c729b8dea69",
-      "bytes": 181048
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/negotiation-proof.v1.json",
+      "sha256": "bf1f2a8b7640544879ac81ec692e903d2ce0d7c1647b78342a657f053a3e84c2",
+      "bytes": 181243
     },
     "handoff": {
       "version": "1",
       "file": "consumer-handoff.v1.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/consumer-handoff.v1.json",
-      "sha256": "91c8465af012ac528052556bb2434c0d9f9876c82b66187580001c4db7a5ba95",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/consumer-handoff.v1.json",
+      "sha256": "1774eda8cc14f081a1599bf14a95bd61bcf943b0fcd6fd77647a75b4b68c6096",
       "bytes": 27500
     },
     "exportSchema": {
       "version": "1",
       "file": "export.schema.json",
-      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/export.schema.json",
-      "sha256": "b776771d4091f971ef72775f76d43092f8b511adb805d5ad9e882ec6d97cefdb",
-      "bytes": 29507
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/export.schema.json",
+      "sha256": "9ca07ecb5792b1fdc8a6e6864665bf305422d740583c6fc618a217710898fe83",
+      "bytes": 29565
     },
     "legacyV11": {
       "sourceGitSha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
@@ -120,112 +120,112 @@ export const CONTRACT_PROVENANCE = Object.freeze({
         "openapi.v1.yaml": {
           "version": "1.29.1",
           "file": "v11-openapi.v1.yaml",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-openapi.v1.yaml",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-openapi.v1.yaml",
           "sha256": "987c2a005f5aa2b4b4e5852c8e9f9054acc1021f304edc5cad6f59dcf0808408",
           "bytes": 1349158
         },
         "schema-v1.33.sql": {
           "version": "schema.v1.33",
           "file": "v11-schema-v1.33.sql",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-schema-v1.33.sql",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-schema-v1.33.sql",
           "sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
           "bytes": 867684
         },
         "storage.v1.sql": {
           "version": "1",
           "file": "v11-storage.v1.sql",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-storage.v1.sql",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-storage.v1.sql",
           "sha256": "f2dfd7c6d7053d188089f7a171cb108ae2fa613bb5e7f30447acd0e1c4163510",
           "bytes": 26978
         },
         "installation.v1.json": {
           "version": "1",
           "file": "v11-installation.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-installation.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-installation.v1.json",
           "sha256": "e7cd3e4cb55825c0a1b4d2c4e9a5975e07d35b8927b55eb061197c3861907f5b",
           "bytes": 13020
         },
         "provenance.v1.json": {
           "version": "1",
           "file": "v11-provenance.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-provenance.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-provenance.v1.json",
           "sha256": "f16491f11efc885723eaff6a18726bbdf581a0b9e814810d9b2d5eea5068c544",
           "bytes": 2720
         },
         "predecessor-lock.v1.json": {
           "version": "1",
           "file": "v11-predecessor-lock.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-predecessor-lock.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-predecessor-lock.v1.json",
           "sha256": "d54c44873f2fa1b0f7bd29048fc40b66b22e2d7aac0c3b9f513c16c9d2763209",
           "bytes": 1842
         },
         "compatibility.v1.json": {
           "version": "1",
           "file": "v11-compatibility.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-compatibility.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-compatibility.v1.json",
           "sha256": "debd346f146178dcc47fa22cc8a36f177a2d3e87efc6e70ee1526c5f3325fc55",
           "bytes": 8378
         },
         "operation-coverage.v1.json": {
           "version": "1",
           "file": "v11-operation-coverage.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-operation-coverage.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-operation-coverage.v1.json",
           "sha256": "d5c9e304459d099792002ec12d8becdf70f48bd12cfdb7cfdf9f13f20c078d20",
           "bytes": 238594
         },
         "legacy-openapi.v7.yaml": {
           "version": "7",
           "file": "v11-legacy-openapi.v7.yaml",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-legacy-openapi.v7.yaml",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-legacy-openapi.v7.yaml",
           "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
           "bytes": 795585
         },
         "legacy-query.openapi.v1.json": {
           "version": "1",
           "file": "v11-legacy-query.openapi.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-legacy-query.openapi.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-legacy-query.openapi.v1.json",
           "sha256": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
           "bytes": 12271
         },
         "query-transport.v1.json": {
           "version": "1",
           "file": "v11-query-transport.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-query-transport.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-query-transport.v1.json",
           "sha256": "57e47b7c6b15b9e051fa5cc164c82c1a80a338596f994633f16f7c7dbaf4546c",
           "bytes": 16596
         },
         "authorization.v1.json": {
           "version": "1",
           "file": "v11-authorization.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-authorization.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-authorization.v1.json",
           "sha256": "a7fe341de00b52c18bccbebb39f269ded5948b4d47dc588bb7267a271748f66d",
           "bytes": 727
         },
         "negotiation-proof.v1.json": {
           "version": "1",
           "file": "v11-negotiation-proof.v1.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-negotiation-proof.v1.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-negotiation-proof.v1.json",
           "sha256": "5ce0fdded223e75b9468820db1d741fc229ba87c4c31d13b0fa0199afca54944",
           "bytes": 165955
         },
         "contract-set.json": {
           "version": "11",
           "file": "v11-contract-set.json",
-          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1/v11-contract-set.json",
+          "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2/v11-contract-set.json",
           "sha256": "b2cec936b26d5e3b7990f84d25efc10f6556dde49b6e010e353e380c21f60a52",
           "bytes": 4547
         }
       }
     }
   },
-  "contract_set_id": "cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564",
+  "contract_set_id": "cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056",
   "source_repository": "ai-赋能立项",
-  "source_git_sha": "0405c5651564958702ddd5484bbf41a0f193515f",
-  "manifest_sha256": "e60033b96859cf2c7060f04c2055b5b616c967ecaf32fc6178ca6476b31fc426",
-  "openapi_version": "1.30.0",
-  "openapi_sha256": "f9de8d829a67fd7662923d4a4cbc5a3aad38dc47210c448934065b29fb53704f",
-  "database_version": "schema.v1.34",
-  "database_sha256": "e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1",
+  "source_git_sha": "5fb5c1285056b7a862ef5a03cf25975fb91802b5",
+  "manifest_sha256": "c7a87a580f4c86d2a3c722311120fe061a0a03db02362880c1feff65c77744e1",
+  "openapi_version": "1.30.1",
+  "openapi_sha256": "39de74592e08e0d309256b6b3139fd00957335eeaf5d191758ba2dc9aab0126f",
+  "database_version": "schema.v1.35",
+  "database_sha256": "130a8103d9d892d637549fe92b327b02d11fa397bcb809b92867787f200f139b",
   "intake_status": "VERIFIED_NOT_ACTIVATED",
   "runtime_activated": false,
   "runtime_schema_dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -239,18 +239,18 @@ export const CONTRACT_PROVENANCE = Object.freeze({
   "artifacts": {
     "bundle": {
       "path": "packages/contracts/openapi/sop-resource-disable/bundle.generated.yaml",
-      "sha256": "55ad3752304d52c1dc55434e0951815fa1fca23b11b16e09f565e29ed43b554b",
-      "bytes": 1012890
+      "sha256": "642be44382808ec60ee0cbbbbac138b077f894fc205e6c4e8a1aa17aef1c18ef",
+      "bytes": 1013268
     },
     "types": {
       "path": "packages/contracts/src/generated/sop-resource-disable/openapi.generated.ts",
-      "sha256": "25866532f912e5a9761721cecabec5bdbcc18476292820a339a8d9c120f12235",
-      "bytes": 708004
+      "sha256": "de15bf25a9ac869cb39522556b7435ae94a07c455f2a9843bac7313f1f566a6c",
+      "bytes": 708302
     },
     "runtime_schema": {
       "path": "packages/contracts/src/generated/sop-resource-disable/runtime-schema.generated.ts",
-      "sha256": "123f81db8ec9a1237cf2df1a723446b8c11d77d1819d5ccdffc524935c1b5345",
-      "bytes": 466206
+      "sha256": "6b4e222aac8dc7526791179eae5a5b3b508c13237ec701197b0ed6f71e699913",
+      "bytes": 466736
     }
   }
 });

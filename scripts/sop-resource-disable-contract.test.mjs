@@ -5,15 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { parseCliArguments, verifyContractSetDirectory, verifyIngestedSopResourceDisableContractSet } from './customer-agent-contract-set.mjs';
+import { parseCliArguments, verifyContractSetDirectory, verifyIngestedSopResourceDisableContractSet, verifyIngestedCorrectedSopResourceDisableContractSet, verifyCurrentSopResourceDisableContractSet } from './customer-agent-contract-set.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const upstream = path.join(root, 'contracts/upstream/customer-agent');
 const lockPath = path.join(upstream, 'sop-resource-disable-contract-set.lock.json');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
-function withChangedSnapshot(change, pattern) {
-  const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+function withChangedSnapshot(change, pattern, snapshotLockPath = lockPath) {
+  const lock = JSON.parse(readFileSync(snapshotLockPath, 'utf8'));
   const directory = mkdtempSync(path.join(os.tmpdir(), 'sop-resource-intake-'));
   try {
     cpSync(path.join(upstream, lock.contract_set_id), directory, { recursive: true });
@@ -91,4 +91,34 @@ for (const [name, change, pattern] of [
   ['unclosed source provenance', ({ update }) => { update('provenance', value => { value.sources['unapproved.js'] = 'a'.repeat(64); }); }, /source closure/],
 ]) {
   test(`resource intake rejects ${name}`, () => withChangedSnapshot(change, pattern));
+}
+
+
+test('the corrected resource lock preserves the frozen v12 and selects the independent v13 source', () => {
+  const original = verifyIngestedSopResourceDisableContractSet({ projectRoot: root });
+  const corrected = verifyIngestedCorrectedSopResourceDisableContractSet({ projectRoot: root });
+  const current = verifyCurrentSopResourceDisableContractSet({ projectRoot: root });
+  assert.equal(original.contract_set_id, 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564');
+  assert.equal(corrected.contract_set_id, 'cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056');
+  assert.equal(current.contract_set_id, corrected.contract_set_id);
+  assert.notEqual(original.lock_path, corrected.lock_path);
+  const snapshot = verifyContractSetDirectory(corrected.path);
+  assert.equal(snapshot.manifest.schema, 'customer-agent-contract-set/v13');
+  assert.equal(snapshot.manifest.openapi.version, '1.30.1');
+  assert.equal(corrected.runtime_activated, false);
+  assert.equal(corrected.generateMigrations, false);
+  assert.equal(parseCliArguments(['verify', '--profile=sopResourceDisableCorrected']).options.profile, 'sopResourceDisableCorrected');
+});
+
+for (const [name, change, pattern] of [
+  ['original schema with corrected identity', ({ manifest }) => { manifest.schema = 'customer-agent-contract-set/v12'; }, /identity/],
+  ['original OpenAPI version', ({ manifest }) => { manifest.openapi.version = '1.30.0'; }, /descriptor/],
+  ['unallocated source SHA', ({ manifest }) => {
+    manifest.source_git_sha = 'a'.repeat(40);
+    manifest.contract_set_id = 'cs-ai-c11-openapi-1.30.1-schema-1.35-aaaaaaaaaaaa';
+  }, /identity/],
+]) {
+  test(`corrected resource intake rejects ${name}`, () => {
+    withChangedSnapshot(change, pattern, path.join(upstream, 'sop-resource-disable-corrected-contract-set.lock.json'));
+  });
 }

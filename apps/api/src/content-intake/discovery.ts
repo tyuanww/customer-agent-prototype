@@ -1,4 +1,5 @@
-import { isSopView } from './contract-view.js';
+import { isSopView, intakeContractSet, intakeView } from './contract-view.js';
+import { SOP_RESOURCE_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
@@ -75,8 +76,12 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
     JOIN content_intake.source_mappings m ON m.source_id=src.source_id AND m.version=src.current_mapping_version
     JOIN rights ON rights.scope_id=s.scope_id AND rights.source_id=src.source_id
     WHERE s.tenant_id=$2 AND s.app_id=$3
-      AND ($6::boolean OR m.template_version<>'sop-manual-authoring-v1.1')
-    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1, isSopView()]);
+      AND ($6::boolean OR m.template_version<>$8)
+      AND ($7::boolean OR (m.template_version,m.rule_version,m.mapping_version,m.structure_digest)
+        IS DISTINCT FROM ($8::text,$9::text,$10::text,$11::text))
+    ORDER BY src.source_id COLLATE "C" LIMIT $5`, [who.id, who.tenantId, who.appId, allocating, MAX_SOURCES + 1,
+    isSopView(), intakeView() === 'resource-disable', SOP_RESOURCE_FORMAT.templateVersion,
+    SOP_RESOURCE_FORMAT.ruleVersion, SOP_RESOURCE_FORMAT.mappingVersion, SOP_TASK_STRUCTURE_SHA256]);
   if (result.rows.length > MAX_SOURCES) throw new IntakeRejection('FILE_LIMIT', 'OVERLOADED');
   const policy = await client.query<{ version: string }>('SELECT version FROM content_intake.policy_versions WHERE tenant_id=$1 AND app_id=$2', [who.tenantId, who.appId]);
   if (!policy.rows[0]) throw new IntakeRejection('ORG_FACTS_UNAVAILABLE', 'FORBIDDEN');
@@ -115,7 +120,8 @@ async function discover(client: IntakeTransaction, who: Principal, sessionUntil:
  */
 export function createIntakeDiscovery(run: ReturnType<typeof createIntakeTransactions>, labels?: IntakePrincipalLabels) {
   const secret = randomBytes(32);
-  const signature = (body: string, sessionHash: string) => createHmac('sha256', secret).update(`${sessionHash}\0${body}`).digest();
+  const signature = (body: string, sessionHash: string) => createHmac('sha256', secret)
+    .update(`${intakeContractSet()}\0${sessionHash}\0${body}`).digest();
   async function read<S extends 'IntakeAuthorization' | 'IntakeSourceList'>(actor: AuthenticatedUser, raw: unknown, kind: Kind, schema: S) {
     return run(actor, `discover-${kind}`, null, null, async (client, who) => {
       const request = page(raw), session = await lockProductSession(client, actor);

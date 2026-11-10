@@ -1,0 +1,672 @@
+{
+  "schema": "customer-agent-sop-resource-disable-coverage/v1",
+  "operations": [
+    {
+      "route": "/v1/intake/sop/sources/{sourceId}/objects",
+      "method": "post",
+      "operationId": "uploadSopWorkbook"
+    },
+    {
+      "route": "/v1/intake/sop/candidates/{candidateId}/versions/{version}/material",
+      "method": "get",
+      "operationId": "readSopCandidateMaterial"
+    },
+    {
+      "route": "/v1/intake/sop/candidates/{candidateId}/versions/{version}/publish",
+      "method": "post",
+      "operationId": "publishSopCandidate"
+    },
+    {
+      "route": "/v1/intake/sop/releases/{releaseId}/media/{mediaObjectId}",
+      "method": "get",
+      "operationId": "previewSopMedia"
+    },
+    {
+      "route": "/v1/intake/sop/rollback",
+      "method": "post",
+      "operationId": "rollbackSopRelease"
+    },
+    {
+      "route": "/v1/intake/sop/candidates/{candidateId}/versions/{version}/rows/{rowId}",
+      "method": "delete",
+      "operationId": "deleteUnusedSopRow"
+    },
+    {
+      "route": "/v1/intake/sop/candidates/{candidateId}/versions/{version}",
+      "method": "delete",
+      "operationId": "deleteUnusedSopUpload"
+    },
+    {
+      "route": "/v1/intake/shop-directory",
+      "method": "get",
+      "operationId": "listIntakeShopDirectory"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/management-context",
+      "method": "get",
+      "operationId": "getIntakeManagementContext"
+    },
+    {
+      "route": "/v1/intake/quality/operations/{operationId}",
+      "method": "get",
+      "operationId": "getIntakeQualityOperation"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/quality/checks",
+      "method": "post",
+      "operationId": "checkIntakeQuality"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/quality/freeze",
+      "method": "post",
+      "operationId": "freezeIntakeQuality"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/quality/samples",
+      "method": "get",
+      "operationId": "getIntakeQualitySamples"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/quality",
+      "method": "get",
+      "operationId": "getIntakeQuality"
+    },
+    {
+      "route": "/v1/intake/rollback/{rollbackPlanId}/review/refresh",
+      "method": "post",
+      "operationId": "refreshIntakeRollbackReview"
+    },
+    {
+      "route": "/v1/intake/principals",
+      "method": "get",
+      "operationId": "listIntakePrincipals"
+    },
+    {
+      "route": "/v1/intake/rollback/{rollbackPlanId}/review",
+      "method": "post",
+      "operationId": "requestIntakeRollbackReview"
+    },
+    {
+      "route": "/v1/intake/rollback/{rollbackPlanId}/review",
+      "method": "get",
+      "operationId": "getIntakeRollbackReview"
+    },
+    {
+      "route": "/v1/intake/snapshot",
+      "method": "get",
+      "operationId": "readIntakeSnapshot"
+    },
+    {
+      "route": "/v1/intake/entitlements",
+      "method": "post",
+      "operationId": "issueIntakeEntitlement"
+    },
+    {
+      "route": "/v1/intake/rollback",
+      "method": "post",
+      "operationId": "rollbackIntakeRelease"
+    },
+    {
+      "route": "/v1/intake/rollback/preview",
+      "method": "post",
+      "operationId": "previewIntakeRollback"
+    },
+    {
+      "route": "/v1/intake/operations/{operationId}",
+      "method": "get",
+      "operationId": "getIntakeOperation"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/cancel",
+      "method": "post",
+      "operationId": "cancelIntakeCandidate"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/publish",
+      "method": "post",
+      "operationId": "publishIntakeCandidate"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/review/refresh",
+      "method": "post",
+      "operationId": "refreshIntakeHumanReview"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/review",
+      "method": "post",
+      "operationId": "requestIntakeHumanReview"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/review",
+      "method": "get",
+      "operationId": "getIntakeHumanReview"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/source-confirmation",
+      "method": "post",
+      "operationId": "confirmIntakeSource"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/material",
+      "method": "get",
+      "operationId": "getIntakeCandidateMaterial"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}",
+      "method": "get",
+      "operationId": "getIntakeCandidate"
+    },
+    {
+      "route": "/v1/intake/candidates",
+      "method": "get",
+      "operationId": "listIntakeCandidates"
+    },
+    {
+      "route": "/v1/intake/parse-jobs/{jobId}/report",
+      "method": "get",
+      "operationId": "downloadIntakeReport"
+    },
+    {
+      "route": "/v1/intake/parse-jobs/{jobId}",
+      "method": "get",
+      "operationId": "getIntakeParseJob"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/candidates",
+      "method": "post",
+      "operationId": "receiveIntakeCandidate"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/objects",
+      "method": "post",
+      "operationId": "uploadIntakeObject"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/vocabulary",
+      "method": "get",
+      "operationId": "listIntakeVocabulary"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/vocabulary",
+      "method": "post",
+      "operationId": "writeIntakeVocabulary"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}/template",
+      "method": "get",
+      "operationId": "downloadIntakeTemplate"
+    },
+    {
+      "route": "/v1/intake/sources/{sourceId}",
+      "method": "put",
+      "operationId": "updateIntakeSourceMapping"
+    },
+    {
+      "route": "/v1/intake/sources",
+      "method": "get",
+      "operationId": "listIntakeSources"
+    },
+    {
+      "route": "/v1/intake/grants/{grantId}",
+      "method": "patch",
+      "operationId": "changeIntakeGrant"
+    },
+    {
+      "route": "/v1/intake/grants/preview",
+      "method": "post",
+      "operationId": "previewIntakeGrants"
+    },
+    {
+      "route": "/v1/intake/grants",
+      "method": "get",
+      "operationId": "listIntakeGrants"
+    },
+    {
+      "route": "/v1/intake/grants",
+      "method": "post",
+      "operationId": "createIntakeGrants"
+    },
+    {
+      "route": "/v1/intake/authorization",
+      "method": "get",
+      "operationId": "getIntakeAuthorization"
+    },
+    {
+      "route": "/v1/intake/policy",
+      "method": "get",
+      "operationId": "getIntakePolicy"
+    },
+    {
+      "route": "/v1/software/releases/current",
+      "method": "get",
+      "operationId": "getCurrentSoftwareRelease"
+    },
+    {
+      "route": "/v1/software/releases",
+      "method": "get",
+      "operationId": "listSoftwareReleases"
+    },
+    {
+      "route": "/v1/metrics/retrieval",
+      "method": "get",
+      "operationId": "getRetrievalMetrics"
+    },
+    {
+      "route": "/v1/content/scripts/{script_id}",
+      "method": "patch",
+      "operationId": "patchContentScript"
+    },
+    {
+      "route": "/v1/content/scripts/{script_id}",
+      "method": "delete",
+      "operationId": "deleteContentScript"
+    },
+    {
+      "route": "/v1/sop/nodes/{node_id}",
+      "method": "patch",
+      "operationId": "patchSopNode"
+    },
+    {
+      "route": "/v1/sop/nodes/{node_id}",
+      "method": "delete",
+      "operationId": "deleteSopNode"
+    },
+    {
+      "route": "/v1/sop/import",
+      "method": "post",
+      "operationId": "importSopCatalog"
+    },
+    {
+      "route": "/v1/sop/catalog",
+      "method": "get",
+      "operationId": "getSopCatalog"
+    },
+    {
+      "route": "/v1/inaccuracy-reports",
+      "method": "post",
+      "operationId": "recordInaccuracyReport"
+    },
+    {
+      "route": "/v1/admin/content/reviews/{batch_id}/cancel",
+      "method": "post",
+      "operationId": "cancelReviewedImport"
+    },
+    {
+      "route": "/v1/admin/content/reviews/{batch_id}/resume",
+      "method": "post",
+      "operationId": "resumeReviewedImport"
+    },
+    {
+      "route": "/v1/admin/content/reviews/{batch_id}",
+      "method": "get",
+      "operationId": "readContentReviewPage"
+    },
+    {
+      "route": "/v1/admin/content/reviews/{batch_id}/quality-evidence",
+      "method": "post",
+      "operationId": "recordQualityEvidence"
+    },
+    {
+      "route": "/v1/admin/content/reviews/{batch_id}/decisions",
+      "method": "post",
+      "operationId": "recordReviewDecision"
+    },
+    {
+      "route": "/v1/admin/content/reviews",
+      "method": "get",
+      "operationId": "listContentReviews"
+    },
+    {
+      "route": "/v1/auth/callback",
+      "method": "get",
+      "operationId": "receiveProviderCallback"
+    },
+    {
+      "route": "/v1/auth/logout",
+      "method": "post",
+      "operationId": "logoutSession"
+    },
+    {
+      "route": "/v1/auth/login-requests/{login_id}/exchange",
+      "method": "post",
+      "operationId": "exchangeLoginRequest"
+    },
+    {
+      "route": "/v1/auth/login-requests",
+      "method": "post",
+      "operationId": "createLoginRequest"
+    },
+    {
+      "route": "/health",
+      "method": "get",
+      "operationId": "getHealth"
+    },
+    {
+      "route": "/ready",
+      "method": "get",
+      "operationId": "getReadiness"
+    },
+    {
+      "route": "/v1/auth/mock-login",
+      "method": "post",
+      "operationId": "mockLogin"
+    },
+    {
+      "route": "/v1/auth/me",
+      "method": "get",
+      "operationId": "getCurrentUser"
+    },
+    {
+      "route": "/v1/notices/current",
+      "method": "get",
+      "operationId": "getCurrentPrivacyNotice"
+    },
+    {
+      "route": "/v1/notices/{version}/decision",
+      "method": "post",
+      "operationId": "recordPrivacyNoticeDecision"
+    },
+    {
+      "route": "/v1/search",
+      "method": "post",
+      "operationId": "searchScripts"
+    },
+    {
+      "route": "/v1/events/adoption",
+      "method": "post",
+      "operationId": "recordAdoption"
+    },
+    {
+      "route": "/v1/events/escalate",
+      "method": "post",
+      "operationId": "recordEscalation"
+    },
+    {
+      "route": "/v1/metrics/tool",
+      "method": "get",
+      "operationId": "getToolMetrics"
+    },
+    {
+      "route": "/v1/metrics/stream",
+      "method": "get",
+      "operationId": "getMetricsStream"
+    },
+    {
+      "route": "/v1/metrics/iteration-tasks",
+      "method": "get",
+      "operationId": "listIterationTasks"
+    },
+    {
+      "route": "/v1/events/iteration-tasks/{task_id}/start",
+      "method": "post",
+      "operationId": "startIterationTask"
+    },
+    {
+      "route": "/v1/events/iteration-tasks/{task_id}/close",
+      "method": "post",
+      "operationId": "closeIterationTask"
+    },
+    {
+      "route": "/v1/work-orders/imports",
+      "method": "post",
+      "operationId": "createWorkOrderImport"
+    },
+    {
+      "route": "/v1/work-orders/imports/{import_batch_id}",
+      "method": "get",
+      "operationId": "getWorkOrderImport"
+    },
+    {
+      "route": "/v1/work-orders/analysis",
+      "method": "get",
+      "operationId": "getWorkOrderAnalysis"
+    },
+    {
+      "route": "/v1/work-orders/records",
+      "method": "get",
+      "operationId": "listWorkOrderRecords"
+    },
+    {
+      "route": "/v1/work-orders/analysis/export",
+      "method": "get",
+      "operationId": "exportWorkOrderAnalysis"
+    },
+    {
+      "route": "/v1/content/import",
+      "method": "post",
+      "operationId": "createContentImport"
+    },
+    {
+      "route": "/v1/content/import/{import_batch_id}",
+      "method": "get",
+      "operationId": "getContentImport"
+    },
+    {
+      "route": "/v1/content/import/{import_batch_id}/cancel",
+      "method": "post",
+      "operationId": "cancelContentImport"
+    },
+    {
+      "route": "/v1/content/publish",
+      "method": "post",
+      "operationId": "publishContent"
+    },
+    {
+      "route": "/v1/content/rollback",
+      "method": "post",
+      "operationId": "rollbackContent"
+    },
+    {
+      "route": "/v1/announce/current",
+      "method": "get",
+      "operationId": "getCurrentAnnouncement"
+    },
+    {
+      "route": "/v1/announce/snapshot",
+      "method": "get",
+      "operationId": "getAnnouncementSnapshot"
+    },
+    {
+      "route": "/v1/announce/ack",
+      "method": "post",
+      "operationId": "acknowledgeAnnouncement"
+    },
+    {
+      "route": "/v1/policy",
+      "method": "get",
+      "operationId": "getPolicy"
+    },
+    {
+      "route": "/v1/policy/flags",
+      "method": "post",
+      "operationId": "setPolicyFlag"
+    },
+    {
+      "route": "/v1/intake/sop/candidates/{candidateId}/versions/{version}/row-deletions",
+      "method": "post",
+      "operationId": "reviseUnusedSopRow"
+    },
+    {
+      "route": "/v1/intake/sop/check",
+      "method": "post",
+      "operationId": "checkIntakeSopAction"
+    },
+    {
+      "route": "/v1/intake/candidates/{candidateId}/versions/{version}/sop/media/{mediaObjectId}",
+      "method": "get",
+      "operationId": "readIntakeSopCandidateMedia"
+    },
+    {
+      "route": "/v1/intake/sop/continuations/renew",
+      "method": "post",
+      "operationId": "renewIntakeSopContinuation"
+    },
+    {
+      "route": "/v1/intake/sop/continuations/close",
+      "method": "post",
+      "operationId": "closeIntakeSopContinuation"
+    },
+    {
+      "route": "/v1/sop/query",
+      "method": "post",
+      "operationId": "querySop"
+    }
+  ],
+  "addedHttpOperations": [],
+  "headerSchemas": 548,
+  "schemaCount": 306,
+  "schemaChanges": [
+    "IntakeQualityReceipt",
+    "IntakeQualitySamplePage",
+    "IntakeQualityStatus",
+    "IntakeQualityRound",
+    "IntakeQualityPlan",
+    "IntakeQualitySubmission",
+    "IntakeMaterialHeader",
+    "IntakeRollbackReceipt",
+    "IntakeRollbackImpact",
+    "IntakeRollback",
+    "IntakeReceipt",
+    "IntakeSourceConfirmation",
+    "IntakeCandidatePage",
+    "IntakeMaterial",
+    "IntakeRisk",
+    "IntakeSource",
+    "IntakeSopMaterialDelta",
+    "IntakeSopActionCheck",
+    "MenokinSopQuerySopQueryRequest",
+    "IntakeResourceDisableKey",
+    "IntakeResourceDisableOwner",
+    "IntakeResourceDisableContent",
+    "IntakeResourceDisableBinding",
+    "IntakeResourceDisable",
+    "IntakeResourceDisableTarget",
+    "IntakeResourceDisableCheck",
+    "IntakeResourceDisablePlan",
+    "IntakeResourceDisableCheckSummary",
+    "IntakeResourceDisableSample",
+    "IntakeResourceDisableLineage",
+    "IntakeResourceDisableQualityReport"
+  ],
+  "consumerFields": [
+    "resourceDisablePlan",
+    "resourceDisableItems",
+    "resourceDisableChecks",
+    "resourceDisableChecksSummary"
+  ],
+  "legacyViews": [
+    "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+    "locked-v7",
+    "menokin-sop-query-v1"
+  ],
+  "pgVerified": false,
+  "queryHeaderSchemas": {
+    "fullApi": 2,
+    "transport": 2
+  },
+  "queryContinuationAcceptance": [
+    {
+      "id": "Q01",
+      "obligation": "full nonempty scenario and multiple-product selection",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q02",
+      "obligation": "optional product_context asserts membership without replacing selection",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q03",
+      "obligation": "actor/session/shop/current-release/deadline and ordinary entitlement",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q04",
+      "obligation": "two ready facts versions resolve by exact query UUID, snapshot-only denied",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q05",
+      "obligation": "canonical query idempotency, conflict and ready lost-ack",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q06",
+      "obligation": "first-open current, query/entitlement deadline and concurrent invalidation",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q07",
+      "obligation": "existing-handle immutable replay after query expiry and later publication",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q08",
+      "obligation": "same-account natural session rebind and explicit revocation denial",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q09",
+      "obligation": "concurrent open, transaction failure, lost-ack, close and narrow renew",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q10",
+      "obligation": "opening-scoped R1H1/R2disable/R3rollbackH2/R4disable",
+      "verification": "static-contract-and-consumer-runtime",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q11",
+      "obligation": "request conditions, UUID, strict headers, Unicode NUL/unpaired negatives and valid astral, all 306 schemas",
+      "verification": "static-schema",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q12",
+      "obligation": "immutable legacy14, closure, source regularity and actual patch replay",
+      "verification": "static-artifact",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q13",
+      "obligation": "PG15 cumulative reference and actual exact87 delta, FK/ACL/immutability",
+      "verification": "parent-scheduled-pg15",
+      "runtimeVerified": false
+    },
+    {
+      "id": "Q14",
+      "obligation": "Main/C/D normal entry points, original facts, media and copying",
+      "verification": "consumer-runtime",
+      "runtimeVerified": false
+    }
+  ],
+  "queryUnicodeText": {
+    "fields": [
+      "query_text",
+      "context_generation",
+      "product_context.ref"
+    ],
+    "pattern": "^[^\\u0000\\uD800-\\uDFFF]*$",
+    "regexMode": "unicode",
+    "invalid": [
+      "NUL",
+      "unpaired-high-surrogate",
+      "unpaired-low-surrogate"
+    ],
+    "validAstralAllowed": true,
+    "httpStatus": 400,
+    "classification": "existing-request-validation",
+    "owner": "existing-HTTP-boundedString-and-request-schema",
+    "businessRestriction": false
+  }
+}

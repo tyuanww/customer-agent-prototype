@@ -1,0 +1,18 @@
+{
+  "schema": "customer-agent-sop-unified-correction-authorization/v1",
+  "status": "APPROVED",
+  "evidenceId": "EVD-SOP-UNIFIED-NEGOTIATION-20261109",
+  "decisionDate": "2026-11-09",
+  "authority": "Project owner conversation continues engineering, local commit and local export authorization for the negotiation correction. The current worker implements and freezes only; the parent owns the exact source commit and export.",
+  "scope": [
+    "formal-contract-change",
+    "product-implementation",
+    "local-commit",
+    "local-export"
+  ],
+  "model": "unified-taskgraph-v4-with-query-transport",
+  "businessMappingApproved": false,
+  "runtimeActivated": false,
+  "realDataApproved": false,
+  "deploymentApproved": false
+}

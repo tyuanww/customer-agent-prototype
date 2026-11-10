@@ -111,11 +111,11 @@
       "source_schema_sha256": "1c0a4e508ea0aab97d40abff4829ea5a0ce65882ad6a044187fc231872bbe39c"
     },
     "sop_resource_overlay": {
-      "contract_set_id": "cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564",
-      "source_git_sha": "0405c5651564958702ddd5484bbf41a0f193515f",
-      "source_schema_sha256": "e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1",
-      "source_sha256": "88331d988759867a2e414f477922d171edcc1b837f2166a0cd8466aaee2c0ac6",
-      "migration_sha256": "a93c72f9ce026e86a139d81834016ec0cf3ad03b6f0ba1e713951dcbbb387dae"
+      "contract_set_id": "cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056",
+      "source_git_sha": "5fb5c1285056b7a862ef5a03cf25975fb91802b5",
+      "source_schema_sha256": "130a8103d9d892d637549fe92b327b02d11fa397bcb809b92867787f200f139b",
+      "source_sha256": "9efa55bb15efcb33214e966a9b6eeac81157523acbe47281610cd5be55027c60",
+      "migration_sha256": "1ad88eab6fb5eeb22552471838f10f14b701430d8f8c913c50df71baee53488e"
     },
     "sop_unified_successor": {
       "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
@@ -1264,11 +1264,11 @@
       "id": "0088_sop_resource_lifecycle",
       "file": "0088_sop_resource_lifecycle.sql",
       "source_ranges": [],
-      "sha256": "a93c72f9ce026e86a139d81834016ec0cf3ad03b6f0ba1e713951dcbbb387dae",
-      "bytes": 174392,
-      "contract_set_id": "cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564",
-      "source_git_sha": "0405c5651564958702ddd5484bbf41a0f193515f",
-      "source_schema_sha256": "e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1"
+      "sha256": "1ad88eab6fb5eeb22552471838f10f14b701430d8f8c913c50df71baee53488e",
+      "bytes": 174556,
+      "contract_set_id": "cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056",
+      "source_git_sha": "5fb5c1285056b7a862ef5a03cf25975fb91802b5",
+      "source_schema_sha256": "130a8103d9d892d637549fe92b327b02d11fa397bcb809b92867787f200f139b"
     }
   ]
 }

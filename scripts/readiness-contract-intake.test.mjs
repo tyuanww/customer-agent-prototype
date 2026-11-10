@@ -25,6 +25,7 @@ async function fixture(t) {
   rmSync(path.join(product,upstream,'sop-unified-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,upstream,'sop-unified-corrected-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,upstream,'sop-resource-disable-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,upstream,'sop-resource-disable-corrected-contract-set.lock.json'),{force:true});
   const priorManifestPath=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(priorManifestPath));
   while (priorManifest.migrations.length > 40) {

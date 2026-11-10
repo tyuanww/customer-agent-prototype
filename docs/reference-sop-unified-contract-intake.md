@@ -1,6 +1,10 @@
 # SOP unified 合同接收
 
-## v12 资源停用与完整查询证明
+## 资源停用与完整查询证明
+
+当前修正输入为 OpenAPI `1.30.1` / `schema.v1.35`，来源 `5fb5c1285056b7a862ef5a03cf25975fb91802b5`，合同为 `cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056`。独立 `sopResourceDisableCorrected` profile 与 `sop-resource-disable-corrected-contract-set.lock.json` 接收 v13 合同集的30件文件。它补齐 `IntakeSource` 的精确资源 rule/mapping 分支，保留原 v11 分支。当前资源代码生成优先读取经过验证的修正版锁。 schema1.35 的不可变首开证明函数验证有界规范ID形状；query/open owner验证精确部署合同和原ready证明。
+
+原 v12 冻结接收记录继续保留。
 
 OpenAPI `1.30.0` / `schema.v1.34` 的正式来源为 `0405c5651564958702ddd5484bbf41a0f193515f`，合同为 `cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564`。独立 `sopResourceDisable` profile 接收全部30件文件，包含原 v11 的14件字节谱系。来源 Git blob、manifest、provenance、header proof 与闭合成员同时校验。锁为 `sop-resource-disable-contract-set.lock.json`。
 

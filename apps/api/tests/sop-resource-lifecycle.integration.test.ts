@@ -7,10 +7,10 @@ import { parseContractSchema as parseAuth } from '@customer-agent/contracts';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseContractSchema as parse, type components, type ContractSchemaName, CONTRACT_PROVENANCE } from '@customer-agent/contracts/sop-resource-disable';
-import { SOP_RESOURCE_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
+import { SOP_RESOURCE_FORMAT, SOP_TASK_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import { syntheticGraphMapping, syntheticTaskGraphWorkbook, syntheticResourceDisableWorkbook, readSyntheticQualityReport } from '../../../packages/content-intake/tests/support/sop-task-graph-workbook.js';
 import { createIntakeSyntheticHost, type IntakeSyntheticHost, type DesktopSyntheticIdentity } from './support/intake-synthetic-host.js';
-import { parseContractSchema, withIntakeView } from '../src/content-intake/contract-view.js';
+import { LEGACY_CONTRACT_SET, SOP_CONTRACT_SET, parseContractSchema, withIntakeView } from '../src/content-intake/contract-view.js';
 import { canonical, digest } from '../src/content-intake/material.js';
 import { graphFor } from '../src/content-intake/sop-graph.js';
 import type { IntakePool } from '../src/content-intake/transaction.js';
@@ -30,7 +30,7 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
   let restorable: Awaited<ReturnType<typeof query>>;
   const op = (label: string) => `resource-${label}-${++sequence}`;
   const base = (key: C['IntakeCandidateKey']) => `/v1/intake/candidates/${key.candidateId}/versions/${key.version}`;
-  const request = (actor: DesktopSyntheticIdentity, url: string, init: RequestInit = {}, view = contract) => {
+  const request = (actor: DesktopSyntheticIdentity, url: string, init: RequestInit = {}, view: string = contract) => {
     const headers = new Headers(init.headers); headers.set('x-intake-contract-set', view);
     if (actor === 'agent' && replacementAuthorization) {
       headers.set('authorization', replacementAuthorization); agentAuthorization = replacementAuthorization;
@@ -38,7 +38,7 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
     }
     return host.requestAs(actor, url, { ...init, headers });
   };
-  const post = (actor: DesktopSyntheticIdentity, url: string, body: unknown, view = contract) =>
+  const post = (actor: DesktopSyntheticIdentity, url: string, body: unknown, view: string = contract) =>
     request(actor, url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, view);
   async function checked<Name extends ContractSchemaName>(response: Response, name: Name): Promise<C[Name]> {
     const body: unknown = await response.json();
@@ -98,12 +98,13 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
           await admin.query('INSERT INTO content_intake.vocabulary VALUES($1,$2,$3,$4,true)', [id, 'scope-resource', kind, digest(id!)]);
           await admin.query('INSERT INTO content_intake.vocabulary_displays VALUES($1,1,$2)', [id, `合成词项 ${id}`]);
         }
-        for (const [sourceId, mapping] of [['source-solo', syntheticGraphMapping(true, true)],
-          ['source-quality', syntheticGraphMapping(false, false, false, 501)]] as const) {
+        for (const [sourceId, mapping, format] of [['source-solo', syntheticGraphMapping(true, true), SOP_RESOURCE_FORMAT],
+          ['source-quality', syntheticGraphMapping(false, false, false, 501), SOP_RESOURCE_FORMAT],
+          ['source-v11-discovery', syntheticGraphMapping(), SOP_TASK_FORMAT]] as const) {
           await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES($1,'scope-resource',2,'v2-preview')", [sourceId]);
           await admin.query(`INSERT INTO content_intake.source_mappings(source_id,version,template_version,rule_version,mapping_version,structure_digest,graph_mapping)
-            VALUES($1,2,$2,$3,$4,$5,$6::jsonb)`, [sourceId, SOP_RESOURCE_FORMAT.templateVersion, SOP_RESOURCE_FORMAT.ruleVersion,
-            SOP_RESOURCE_FORMAT.mappingVersion, SOP_TASK_STRUCTURE_SHA256, JSON.stringify(mapping)]);
+            VALUES($1,2,$2,$3,$4,$5,$6::jsonb)`, [sourceId, format.templateVersion, format.ruleVersion,
+            format.mappingVersion, SOP_TASK_STRUCTURE_SHA256, JSON.stringify(mapping)]);
           await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
             to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-'||$1::text,'source_id',$1::text))).*
             FROM content_intake.grants g WHERE source_id='source-resource'`, [sourceId]);
@@ -250,7 +251,73 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
   async function postResponse(input: Awaited<ReturnType<typeof query>>) { return post('agent', '/v1/intake/sop/check', input.opening); }
   let r1: Awaited<ReturnType<typeof publish>>, r2: Awaited<ReturnType<typeof publish>>;
   let q1: Awaited<ReturnType<typeof query>>, q2: Awaited<ReturnType<typeof query>>, active: C['IntakeSopContinuationReceipt'];
+  it('discovers sources and complete vocabulary through the selected view before entering the normal write chain', async () => {
+    const resourceIds = ['source-quality', 'source-resource', 'source-solo'];
+    const observations: Record<string, { sourceIds: string[]; capabilityIds: (string | null)[] }> = {};
+    let resourceCursor: string | null = null;
+    for (const view of [
+      { name: 'resource-disable', id: contract }, { name: 'graph', id: SOP_CONTRACT_SET },
+      { name: 'legacy', id: LEGACY_CONTRACT_SET }, { name: 'legacy-absent', id: null },
+    ] as const) {
+      const selected = view.name === 'legacy-absent' ? 'legacy' : view.name;
+      const read = async (url: string): Promise<unknown> => {
+        const response = view.id === null ? await host.requestAs('agent', url) : await request('agent', url, {}, view.id);
+        expect(response.status, await response.clone().text()).toBe(200);
+        expect(response.headers.get('cache-control')).toContain('no-store');
+        if (selected !== 'legacy') expect(response.headers.get('x-intake-contract-set')).toBe(view.id);
+        return response.json();
+      };
+      const sources: C['IntakeSource'][] = [];
+      let cursor: string | null = null;
+      do {
+        const body: unknown = await read(`/v1/intake/sources?${new URLSearchParams({ limit: '1', ...(cursor ? { cursor } : {}) })}`);
+        const page = withIntakeView(selected, () => parseContractSchema('IntakeSourceList', body));
+        sources.push(...page.items);
+        if (view.name === 'resource-disable' && resourceCursor === null) resourceCursor = page.nextCursor;
+        cursor = page.nextCursor;
+      } while (cursor);
+      const capabilities: C['IntakeAuthorization']['capabilities'] = [];
+      do {
+        const body: unknown = await read(`/v1/intake/authorization?${new URLSearchParams({ limit: '1', ...(cursor ? { cursor } : {}) })}`);
+        const page = withIntakeView(selected, () => parseContractSchema('IntakeAuthorization', body));
+        capabilities.push(...page.capabilities); cursor = page.nextCursor;
+      } while (cursor);
+      const sourceIds = sources.map(source => source.scope.sourceId).sort();
+      const capabilityIds = capabilities.map(capability => capability.scope.sourceId).sort();
+      expect(capabilityIds).toEqual(sourceIds);
+      expect(new Set(sourceIds).size).toBe(sourceIds.length);
+      expect(sourceIds).toContain('source-a');
+      if (selected === 'resource-disable') {
+        expect(sourceIds).toEqual(expect.arrayContaining([...resourceIds, 'source-v11-discovery']));
+        for (const source of sources.filter(source => resourceIds.includes(source.scope.sourceId))) {
+          expect(source).toMatchObject({ ...SOP_RESOURCE_FORMAT, structureDigest: SOP_TASK_STRUCTURE_SHA256 });
+        }
+      } else {
+        expect(sourceIds.some(id => resourceIds.includes(id))).toBe(false);
+        expect(sourceIds.includes('source-v11-discovery')).toBe(selected === 'graph');
+      }
+      observations[view.name] = { sourceIds, capabilityIds };
+    }
+    if (!resourceCursor) throw new Error('Expected resource discovery cursor');
+    await denied(await request('agent', `/v1/intake/sources?${new URLSearchParams({ limit: '1', cursor: resourceCursor })}`, {}, SOP_CONTRACT_SET), 409);
+    const vocabulary: C['IntakeVocabulary'][] = [];
+    let cursor: string | null = null;
+    do {
+      const page: C['IntakeVocabularyList'] = await checked(await request('agent', `/v1/intake/sources/source-resource/vocabulary?${new URLSearchParams({ limit: '1', ...(cursor ? { cursor } : {}) })}`), 'IntakeVocabularyList');
+      vocabulary.push(...page.items); cursor = page.nextCursor;
+    } while (cursor);
+    expect(vocabulary.map(item => [item.id, item.kind])).toEqual([
+      ['product-extra', 'product'], ['product-graph', 'product'], ['scenario-graph', 'scenario'],
+    ]);
+    for (const item of vocabulary) expect(item).toMatchObject({ displayVersion: 1, meaningDigest: digest(item.id), active: true });
+    for (const sourceId of ['source-b', 'source-does-not-exist']) {
+      await denied(await request('agent', `/v1/intake/sources/${sourceId}/vocabulary?limit=1`), 404, 'SCOPE_DENIED');
+    }
+    writeFileSync(path.join(evidenceRoot, 'source-discovery.json'), JSON.stringify({ observations, vocabulary }, null, 2));
+  });
   it('publishes real graph/media and consumes the entire existing E selection without issuing another E', async () => {
+    const selectedContract = (await admin.query("SELECT content_intake.sop_query_contract('resource-disable') AS id")).rows[0].id;
+    expect(selectedContract).toBe(contract);
     r1 = await publish(await receive(await syntheticTaskGraphWorkbook({ sharedTaskImage: true }), 'rel_native_base'));
     await registerFacts(r1);
     q1 = await query();
@@ -270,6 +337,7 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
     active = await open(q1);
     const row = (await admin.query('SELECT * FROM content_intake.sop_active_uses WHERE continuation_hash=$1', [digest(q1.opening.continuationId)])).rows[0];
     expect(Number(row.facts_version)).toBe(1); expect(row.opening_query_request_id).toBe(q1.body.request_id);
+    expect(row.opening_query_proof.selectedContractSetId).toBe(contract);
     expect(row.opening_query_proof.factsVersion).toBe(1); expect(row.opening_query_proof_hash).toBe(digest(canonical(row.opening_query_proof)));
     expect((await open(q1)).continuationId).toBe(active.continuationId);
     const second = await open(q2); expect(second.entitlement.releaseId).toBe(r1.releaseId);

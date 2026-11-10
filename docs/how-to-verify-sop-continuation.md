@@ -36,7 +36,7 @@ v11 D open 要求同 session、selection 和原图的有效 C 消费证明只有
 
 ## v12 资源停用与精确查询证明
 
-正式输入为 `cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564`，来源提交为 `0405c5651564958702ddd5484bbf41a0f193515f`。产品 `0088_sop_resource_lifecycle` 从完整87段前缀升级。累计schema供对照，实际安装由既有migration runner完成。
+正式修正输入为 `cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056`，来源提交为 `5fb5c1285056b7a862ef5a03cf25975fb91802b5`，由独立v13合同集和接收锁拥有。原v12冻结件保留。产品 `0088_sop_resource_lifecycle` 从完整87段前缀升级。累计schema供对照，实际安装由既有migration runner完成。
 
 `apps/api/tests/sop-resource-lifecycle.integration.test.ts` 使用真实临时PG15、HTTP与对象字节，从上传、六表解析、来源确认和联合质量门进入发布。覆盖多商品及非空场景选择、Q1/F1与Q2/F2、active重放、正常停用和rollback、新发布后历史pin、两阶段资源检查、四角色ACL、FK、不可变历史以及非空dump/restore。来源确认必须提交材料中的 `resourceDisableSetDigest`。普通rollback报告保留历史摘要和零新增停用数。
 

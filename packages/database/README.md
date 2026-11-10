@@ -48,7 +48,7 @@ PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOME
 
 ## 0088 正常资源生命周期
 
-`overlays/0088_sop_resource_lifecycle.sql` 消费正式1.30.0/schema1.34资源增量，生成器钉住其source SHA，并逐项保留前87段SQL与metadata。planner、runner、readiness与repair消费检查均识别精确88尾部。verifier的对象、函数、安全属性、触发器及ACL摘要来自真实PG15安装测量，恢复使用同一精确后验。
+`overlays/0088_sop_resource_lifecycle.sql` 消费正式1.30.1/schema1.35修正版资源增量，生成器钉住其source SHA，并逐项保留前87段SQL与metadata。planner、runner、readiness与repair消费检查均识别精确88尾部。verifier的对象、函数、安全属性、触发器及ACL摘要来自真实PG15安装测量，恢复使用同一精确后验。
 
 五个资源关系保存显式停用记录、质量目标、归因检查、原发布及generic event谱系。表属主为 `intake_runtime_fn_owner`，四个运行能力角色通过受限函数工作。原publisher和rollback owner继续原子管理current、publication与永久receipt。`sop_active_uses`保留原Q的窄引用与摘要，C的原ready/facts/lease及opening entitlement提供可恢复的关系证明。
 

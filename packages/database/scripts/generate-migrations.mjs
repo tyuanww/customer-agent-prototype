@@ -13,7 +13,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE } from './migration-artifact.mjs';
-import { verifyIngestedCorrectedSopUnifiedContractSet, verifyIngestedSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { verifyIngestedCorrectedSopUnifiedContractSet, verifyCurrentSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
 
@@ -1127,7 +1127,9 @@ export async function generateDatabaseMigrations({ projectRoot = DEFAULT_PROJECT
     }
     const unifiedManifest = unified ? JSON.parse(readFileSync(path.join(unified.path, 'contract-set.json'), 'utf8')) : null;
     const resourceLock = path.join(resolvedRoot, 'contracts/upstream/customer-agent/sop-resource-disable-contract-set.lock.json');
-    const resource = existsSync(resourceLock) ? verifyIngestedSopResourceDisableContractSet({ projectRoot: resolvedRoot }) : null;
+    const correctedResourceLock = path.join(resolvedRoot, 'contracts/upstream/customer-agent/sop-resource-disable-corrected-contract-set.lock.json');
+    const resource = existsSync(resourceLock) || existsSync(correctedResourceLock)
+      ? verifyCurrentSopResourceDisableContractSet({ projectRoot: resolvedRoot }) : null;
     if (!resource && existsSync(previousManifestPath)
       && JSON.parse(readFileSync(previousManifestPath, 'utf8')).compatibility?.sop_resource_overlay) {
       throw new Error('SOP resource lifecycle requires its verified contract lock; refusing a downgrade');

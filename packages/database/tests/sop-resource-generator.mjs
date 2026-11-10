@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildDatabaseMigrationOutputs } from '../scripts/generate-migrations.mjs';
-import { verifyIngestedCorrectedSopUnifiedContractSet, verifyIngestedSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { verifyIngestedCorrectedSopUnifiedContractSet, verifyCurrentSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const hash = value => createHash('sha256').update(value).digest('hex');
 function source(verified, field) {
@@ -23,7 +23,7 @@ test('resource lifecycle generation pins the actual source and preserves all 87 
       filter: source => !['node_modules', 'dist'].includes(path.basename(source)) });
   }
   const sopUnified = source(verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot }), 'sopUnified');
-  const sopResource = source(verifyIngestedSopResourceDisableContractSet({ projectRoot }), 'resourceDisable');
+  const sopResource = source(verifyCurrentSopResourceDisableContractSet({ projectRoot }), 'resourceDisable');
   await withVerifiedContractSetSnapshot({ projectRoot }, snapshot => {
     const prior = buildDatabaseMigrationOutputs({ ...snapshot, sopUnified }, { projectRoot });
     const result = buildDatabaseMigrationOutputs({ ...snapshot, sopUnified, sopResource }, { projectRoot });
@@ -32,7 +32,7 @@ test('resource lifecycle generation pins the actual source and preserves all 87 
     assert.equal(hash(JSON.stringify(result.manifest.migrations.slice(0, 87))), '3d48f9989552918848421d2e2650d8da0bea80515cc728cdb790afcae4a1e8ae');
     const final = result.migrations[87];
     assert.equal(final.id, '0088_sop_resource_lifecycle');
-    assert.equal(final.source_git_sha, '0405c5651564958702ddd5484bbf41a0f193515f');
+    assert.equal(final.source_git_sha, '5fb5c1285056b7a862ef5a03cf25975fb91802b5');
     assert.equal(hash(final.sql), final.sha256);
     assert.ok(final.sql.includes(sopResource.storage_source.trimEnd()));
     assert.throws(() => buildDatabaseMigrationOutputs({ ...snapshot, sopUnified, sopResource: {

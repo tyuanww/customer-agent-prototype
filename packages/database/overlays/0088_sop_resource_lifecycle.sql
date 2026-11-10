@@ -162,8 +162,10 @@ BEGIN
     IF jsonb_typeof(p_proof->field) IS DISTINCT FROM 'string'
       OR (p_proof->>field) !~ '^[0-9a-f]{64}$' THEN RETURN false; END IF;
   END LOOP;
+  -- The query/open owner checks the exact deployed view and original ready proof.
   IF jsonb_typeof(p_proof->'selectedContractSetId') IS DISTINCT FROM 'string'
-    OR (p_proof->>'selectedContractSetId') !~ '^cs-ai-c11-openapi-1\.30\.0-schema-1\.34-[0-9a-f]{12}$'
+    OR length(p_proof->>'selectedContractSetId') > 128
+    OR (p_proof->>'selectedContractSetId') !~ '^cs-ai-c11-openapi-[0-9]+[.][0-9]+[.][0-9]+-schema-[0-9]+[.][0-9]+-[0-9a-f]{12}$'
     OR jsonb_typeof(p_proof->'factsCandidateId') IS DISTINCT FROM 'string'
     OR (p_proof->>'factsCandidateId') !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' THEN RETURN false; END IF;
   FOREACH field IN ARRAY ARRAY['factsCandidateVersion','factsVersion'] LOOP
@@ -995,7 +997,7 @@ CREATE FUNCTION content_intake.sop_query_contract(p_view text) RETURNS text
 LANGUAGE plpgsql IMMUTABLE STRICT SET search_path=pg_catalog AS $$
 BEGIN
   IF p_view='graph' THEN RETURN 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'; END IF;
-  IF p_view='resource-disable' THEN RETURN 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564'; END IF;
+  IF p_view='resource-disable' THEN RETURN 'cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056'; END IF;
   RAISE EXCEPTION USING ERRCODE='ZA003',MESSAGE='SCOPE_DENIED';
 END $$;
 CREATE FUNCTION content_intake.sop_query_actor_binding(p_actor text,p_session text,p_view text) RETURNS text

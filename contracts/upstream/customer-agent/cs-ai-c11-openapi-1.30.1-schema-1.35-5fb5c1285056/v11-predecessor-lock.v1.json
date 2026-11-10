@@ -1,0 +1,31 @@
+{
+  "schema": "customer-agent-sop-unified-correction-source/v1",
+  "versions": {
+    "openapi": "1.29.1",
+    "database": "schema.v1.33",
+    "profile": "content-intake-sop-unified-v1-1"
+  },
+  "predecessor": {
+    "sourceGitSha": "33fc543523b95b47c1236ef7bbfccd3f772c9d0d",
+    "contractSetId": "cs-ai-c11-openapi-1.29.0-schema-1.33-33fc543523b9",
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1",
+    "members": {
+      "authorization.v1.json": "76eb719877b99da0d36a829e5919b82ebc37da784df01406bc0df2e238b4ec2b",
+      "compatibility.v1.json": "01e796f4f6e52b98550a60ec81fe5fec614dfdcff840e07aebf86164419dc372",
+      "installation.v1.json": "ad9b685ca0655044cfed9457784fd1cdcfa469e020764f7033479c87e6bcd3d0",
+      "legacy-openapi.v7.yaml": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "legacy-query.openapi.v1.json": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
+      "openapi.v1.yaml": "6ab61ac566f0fe73168f435849f091862ef8745a3949ba46448ebadde57fb79a",
+      "operation-coverage.v1.json": "a8c96f9b6ca8a60a3d1635b85d0543606a1e3e187e41a05cf0437d92a16f9033",
+      "predecessor-lock.v1.json": "7d38d01aec36f2547b520060833e5022ad5582a6499271083a235465c1835568",
+      "provenance.v1.json": "0ea8a329ea49899e6ff4f72a2703cffb8de9acfca51f3e308f6fbd5bc90628b2",
+      "query-transport.v1.json": "89f4ba148557acb4a12bd30ddc7bed43acbb834d14ed3e84b57a58f66d3da6f7",
+      "schema-v1.33.sql": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+      "storage.v1.sql": "f2dfd7c6d7053d188089f7a171cb108ae2fa613bb5e7f30447acd0e1c4163510"
+    }
+  },
+  "acceptedProductPredecessor": {
+    "sourceGitSha": "0fb1dc76ee2b84fda4a82025c081eea7dd697534",
+    "contractSetId": "cs-ai-c11-openapi-1.25.0-schema-1.30-0fb1dc76ee2b"
+  }
+}

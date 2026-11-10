@@ -12,11 +12,11 @@ export const SOP_CONTINUATION_SOURCE = Object.freeze({ position: 87, id: '0087_s
   file: 'packages/database/overlays/0087_sop_unified_continuation.sql', sha256: 'aa8808e02893abe258d6f8f834b792444a321938fff5c8659f873b5ab338afc8' });
 
 export const SOP_RESOURCE_SOURCE = Object.freeze({ position: 88, id: '0088_sop_resource_lifecycle',
-  file: 'packages/database/overlays/0088_sop_resource_lifecycle.sql', sha256: '88331d988759867a2e414f477922d171edcc1b837f2166a0cd8466aaee2c0ac6' });
+  file: 'packages/database/overlays/0088_sop_resource_lifecycle.sql', sha256: '9efa55bb15efcb33214e966a9b6eeac81157523acbe47281610cd5be55027c60' });
 
 export function renderSopResourceMigration({ manifest, storage_source }, source) {
-  if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564'
-    || manifest.source_git_sha !== '0405c5651564958702ddd5484bbf41a0f193515f'
+  if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056'
+    || manifest.source_git_sha !== '5fb5c1285056b7a862ef5a03cf25975fb91802b5'
     || sha256(source) !== SOP_RESOURCE_SOURCE.sha256
     || sha256(storage_source) !== manifest.resourceDisable.storage.sha256
     || !source.includes(storage_source.trimEnd())) throw new Error('SOP resource lifecycle implementation source drifted');

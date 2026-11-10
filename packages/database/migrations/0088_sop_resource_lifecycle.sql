@@ -1,8 +1,8 @@
 -- GENERATED FILE. DO NOT EDIT. Run `pnpm db:migrations:generate` from the repository root.
--- 0088_sop_resource_lifecycle; source verified SOP resource lifecycle implementation; overlay_sha256=88331d988759867a2e414f477922d171edcc1b837f2166a0cd8466aaee2c0ac6
--- contract_set_id=cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564
--- source_git_sha=0405c5651564958702ddd5484bbf41a0f193515f
--- source_schema_sha256=e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1
+-- 0088_sop_resource_lifecycle; source verified SOP resource lifecycle implementation; overlay_sha256=9efa55bb15efcb33214e966a9b6eeac81157523acbe47281610cd5be55027c60
+-- contract_set_id=cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056
+-- source_git_sha=5fb5c1285056b7a862ef5a03cf25975fb91802b5
+-- source_schema_sha256=130a8103d9d892d637549fe92b327b02d11fa397bcb809b92867787f200f139b
 SET LOCAL search_path = public, pg_catalog, pg_temp;
 
 -- Normal resource lifecycle implementation over the immutable 0087 prefix.
@@ -169,8 +169,10 @@ BEGIN
     IF jsonb_typeof(p_proof->field) IS DISTINCT FROM 'string'
       OR (p_proof->>field) !~ '^[0-9a-f]{64}$' THEN RETURN false; END IF;
   END LOOP;
+  -- The query/open owner checks the exact deployed view and original ready proof.
   IF jsonb_typeof(p_proof->'selectedContractSetId') IS DISTINCT FROM 'string'
-    OR (p_proof->>'selectedContractSetId') !~ '^cs-ai-c11-openapi-1\.30\.0-schema-1\.34-[0-9a-f]{12}$'
+    OR length(p_proof->>'selectedContractSetId') > 128
+    OR (p_proof->>'selectedContractSetId') !~ '^cs-ai-c11-openapi-[0-9]+[.][0-9]+[.][0-9]+-schema-[0-9]+[.][0-9]+-[0-9a-f]{12}$'
     OR jsonb_typeof(p_proof->'factsCandidateId') IS DISTINCT FROM 'string'
     OR (p_proof->>'factsCandidateId') !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' THEN RETURN false; END IF;
   FOREACH field IN ARRAY ARRAY['factsCandidateVersion','factsVersion'] LOOP
@@ -1002,7 +1004,7 @@ CREATE FUNCTION content_intake.sop_query_contract(p_view text) RETURNS text
 LANGUAGE plpgsql IMMUTABLE STRICT SET search_path=pg_catalog AS $$
 BEGIN
   IF p_view='graph' THEN RETURN 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'; END IF;
-  IF p_view='resource-disable' THEN RETURN 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564'; END IF;
+  IF p_view='resource-disable' THEN RETURN 'cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056'; END IF;
   RAISE EXCEPTION USING ERRCODE='ZA003',MESSAGE='SCOPE_DENIED';
 END $$;
 CREATE FUNCTION content_intake.sop_query_actor_binding(p_actor text,p_session text,p_view text) RETURNS text
