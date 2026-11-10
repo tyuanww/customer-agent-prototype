@@ -1,0 +1,81 @@
+{
+  "schema": "customer-agent-sop-resource-disable-authorization/v1",
+  "status": "APPROVED",
+  "decisionDate": "2026-11-10",
+  "basis": {
+    "sourcePath": "business-docs/01-客服Agent项目/30-开发-进行中/sop-unified-candidate/authorization.source.json",
+    "sha256": "76eb719877b99da0d36a829e5919b82ebc37da784df01406bc0df2e238b4ec2b",
+    "evidenceId": "EVD-SOP-UNIFIED-TECHNICAL-20261109"
+  },
+  "authority": "Existing project-owner full SOP closeout, technical recommendation and author-self-review delegation, reconciled and selected by the parent in this task. This record does not claim the operator reviewed individual technical fields.",
+  "scope": [
+    "formal-contract-change",
+    "product-implementation",
+    "local-commit",
+    "local-export"
+  ],
+  "parentSelection": {
+    "reviewedDraftCandidateDigest": "3d3a5c4cec074d45376cd5d05b2bf617952917136f8979dccb93e278246f1f53",
+    "boundary": "retain flow targets and add explicit resource-disable targets",
+    "versions": {
+      "openapi": "1.30.0",
+      "database": "schema.v1.34",
+      "profile": "content-intake-sop-resource-disable-v1"
+    },
+    "meaning": "Use the reviewed DRAFT only as a structural shape reference. Preserve exact v11 disable-since-opening and permanently closed old handles. An authorized freshly validated rollback current may be explicitly opened with a distinct new handle. Ordinary rollback copies existing lineage without new source-disable intent, and historical events or catalog copying do not require a new source upsert. This is a technical semantic correction under the continuing delegation and does not claim operator review of individual fields.",
+    "semanticAuthority": {
+      "sourceGitSha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "contractSetId": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "member": "openapi.v1.yaml",
+      "jsonPointers": {
+        "firstOpen": "/x-sop-graph-contract/actionCheck/description",
+        "invalidation": "/x-sop-graph-contract/actionCheck/invalidation/1",
+        "resume": "/x-sop-graph-contract/actionCheck/continuation/resume",
+        "restart": "/x-sop-graph-contract/actionCheck/continuation/end",
+        "rollback": "/x-sop-graph-contract/publication/rules/5",
+        "explicitDisable": "/x-sop-graph-contract/format/rules/8",
+        "rollbackScope": "/paths/~1v1~1intake~1rollback~1preview/post/description"
+      }
+    },
+    "queryContinuation": {
+      "selection": {
+        "strategy": "reuse-current-entitlement",
+        "approvedDesignSha256": "4a674297dbd04cf4814c7ab0d2f15d55b06175080d43c85e7a73557862a66052",
+        "openingProof": "immutable-resolvable-reference-and-digest",
+        "sqlMapping": "actual-exact-product87-consumer-owned"
+      },
+      "authority": "Continuing full SOP technical delegation and parent approval of round03 design, followed by the explicit implementation instruction for this uncommitted 1.30/schema1.34 candidate.",
+      "operatorIndividualFieldReviewClaimed": false,
+      "meaning": "Reuse the existing ordinary current entitlement full selection. Bind open to the original C committed-ready UUID and exact consumed facts. Store a narrow immutable resolvable reference and digest with necessary bindings, retain it through active replay, and add no undefined lease/private facts FK to the install delta. Parent subsequently authorized the v12 Unicode scalar/JSON/PostgreSQL boundary after its synthetic HTTP probe, preserving valid Chinese and astral Unicode and the original frozen views.",
+      "unicodeBoundary": {
+        "fields": [
+          "query_text",
+          "context_generation",
+          "product_context.ref"
+        ],
+        "pattern": "^[^\\u0000\\uD800-\\uDFFF]*$",
+        "regexMode": "unicode",
+        "invalid": [
+          "NUL",
+          "unpaired-high-surrogate",
+          "unpaired-low-surrogate"
+        ],
+        "validAstralAllowed": true,
+        "httpStatus": 400,
+        "classification": "existing-request-validation",
+        "owner": "existing-HTTP-boundedString-and-request-schema",
+        "businessRestriction": false
+      }
+    }
+  },
+  "executionOwners": {
+    "sourcePreparation": "worker",
+    "gitCommit": "parent",
+    "actualExport": "parent",
+    "heavyVerification": "parent-scheduled"
+  },
+  "businessMappingApproved": false,
+  "runtimeActivated": false,
+  "realDataApproved": false,
+  "deploymentApproved": false
+}

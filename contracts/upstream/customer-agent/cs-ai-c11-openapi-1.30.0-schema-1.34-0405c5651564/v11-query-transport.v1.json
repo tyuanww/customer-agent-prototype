@@ -1,0 +1,621 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Menokin SOP query contract candidate",
+    "version": "1.29.1",
+    "license": {
+      "name": "Internal contract draft",
+      "identifier": "internal-draft"
+    },
+    "description": "Draft only. Adds an independent positive SOP query transport to the approved SOP graph successor. The formal contract-set id is assigned from the source commit after approval and export.",
+    "x-business-contract-set-id": "menokin-sop-query-v1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "与当前 Web/Electron 客户端同源的 API 根路径；部署地址由 intake 环境提供。"
+    }
+  ],
+  "paths": {
+    "/v1/sop/query": {
+      "post": {
+        "tags": [
+          "sop"
+        ],
+        "operationId": "querySop",
+        "summary": "在当前授权范围内查询一条 Menokin SOP 流程",
+        "description": "独立 SOP 正向查询。认证主体、授权范围、当前 release 和 lease 均由服务端取得或复核；请求体不得携带 userId、token、主体 ID 或任意授权 scope。SOP 不通过 /v1/search 回退；/v1/search 对 SOP 继续 503 fail-closed。 The unified view returns the complete task graph, exact FAQ dependencies, media bindings and entry-level permission facts. Unclassified risk, unresolved source facts or missing required preview bindings yield blocked. Ready permissions cover the exact graph dependencies once. Legacy query view remains bound to its original exact contract ID.",
+        "security": [
+          {
+            "ProductSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Intake-Contract-Set",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "description": "完整、由部署清单固定的合同集 ID；不得填写业务别名 menokin-sop-query-v1。缺失或不受支持返回 CONTRACT_UPGRADE_REQUIRED。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SopQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "返回 ready、no_match、blocked 或 stale 的显式状态联合体。",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "X-Intake-Contract-Set": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SopQueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/SopBlocked"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "x-max-response-bytes": 1048576
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ProductSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Opaque product session"
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "严格 body/header 校验失败。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "产品会话无效或缺失。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "当前主体没有该店铺或 SOP 查询资格。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "合同、release、lease 或幂等键冲突。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      },
+      "SopBlocked": {
+        "description": "图完整性、安全或媒体条件阻断查询。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "来源门或服务依赖不可用，必须 fail closed。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SopErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SopQueryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sop_group",
+          "shop_id",
+          "query_text",
+          "context_generation",
+          "request_id"
+        ],
+        "properties": {
+          "sop_group": {
+            "type": "string",
+            "enum": [
+              "过敏流程SOP",
+              "长痘痘SOP",
+              "品质售后SOP",
+              "少错破SOP",
+              "税收相关规则"
+            ]
+          },
+          "shop_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[-A-Za-z0-9._:]+$"
+          },
+          "product_context": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "ref"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "storewide",
+                      "category",
+                      "sku"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            ]
+          },
+          "query_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "pattern": "\\S"
+          },
+          "context_generation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SopQueryResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SopReadyResponse"
+          },
+          {
+            "$ref": "#/components/schemas/SopBlockedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/SopStaleResponse"
+          },
+          {
+            "$ref": "#/components/schemas/SopNoMatchResponse"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "status"
+        }
+      },
+      "SopReadyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "request_id",
+          "release_id",
+          "lease_expires_at",
+          "result",
+          "reasons"
+        ],
+        "properties": {
+          "status": {
+            "const": "ready"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "release_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "$ref": "#/components/schemas/SopReadyResult"
+          },
+          "reasons": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      },
+      "SopBlockedResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "request_id",
+          "release_id",
+          "lease_expires_at",
+          "result",
+          "reasons"
+        ],
+        "properties": {
+          "status": {
+            "const": "blocked"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "release_id": {
+            "type": "null"
+          },
+          "lease_expires_at": {
+            "type": "null"
+          },
+          "result": {
+            "type": "null"
+          },
+          "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/SopReason"
+            }
+          }
+        }
+      },
+      "SopStaleResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "request_id",
+          "release_id",
+          "lease_expires_at",
+          "result",
+          "reasons"
+        ],
+        "properties": {
+          "status": {
+            "const": "stale"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "release_id": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lease_expires_at": {
+            "type": "null"
+          },
+          "result": {
+            "type": "null"
+          },
+          "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/SopReason"
+            }
+          }
+        }
+      },
+      "SopNoMatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "request_id",
+          "release_id",
+          "lease_expires_at",
+          "result",
+          "reasons"
+        ],
+        "properties": {
+          "status": {
+            "const": "no_match"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "release_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "$ref": "#/components/schemas/SopEmptyResult"
+          },
+          "reasons": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      },
+      "SopReadyResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flow",
+          "graph_digest",
+          "entries",
+          "media",
+          "permissions"
+        ],
+        "properties": {
+          "flow": {
+            "$ref": "#/components/schemas/IntakeSopFlowDefinition"
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sourceId",
+                "entry"
+              ],
+              "properties": {
+                "sourceId": {
+                  "$ref": "#/components/schemas/IntakeSopId"
+                },
+                "entry": {
+                  "$ref": "#/components/schemas/IntakePublishedEntry"
+                }
+              }
+            }
+          },
+          "media": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "binding",
+                "preview_handle",
+                "expires_at"
+              ],
+              "properties": {
+                "binding": {
+                  "$ref": "#/components/schemas/IntakeSopMedia"
+                },
+                "preview_handle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "$ref": "#/components/schemas/SopEntryPermission"
+            }
+          },
+          "graph_digest": {
+            "$ref": "#/components/schemas/IntakeSopHash"
+          }
+        }
+      },
+      "SopEmptyResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flow",
+          "entries",
+          "media",
+          "permissions"
+        ],
+        "properties": {
+          "flow": {
+            "type": "null"
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 0
+          },
+          "media": {
+            "type": "array",
+            "maxItems": 0
+          },
+          "permissions": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      },
+      "SopReason": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "SCOPE_DENIED",
+              "LEASE_EXPIRED",
+              "APPROVAL_REVOKED",
+              "SOURCE_GATE_NOT_READY",
+              "GRAPH_UNRESOLVED",
+              "TERMINAL_HAS_OUTGOING_EDGE",
+              "SAFETY_REVIEW_REQUIRED",
+              "MEDIA_UNVERIFIED",
+              "STALE_RELEASE",
+              "IDEMPOTENCY_CONFLICT"
+            ]
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "SopErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "CONTRACT_UPGRADE_REQUIRED",
+              "SCOPE_DENIED",
+              "SOP_BLOCKED",
+              "SOP_STALE",
+              "IDEMPOTENCY_CONFLICT",
+              "SOP_UNAVAILABLE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SopEntryPermission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entry",
+          "risk_level",
+          "copy_allowed",
+          "source_ref"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/IntakeSopEntryRef"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "copy_allowed": {
+            "type": "boolean"
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    }
+  }
+}

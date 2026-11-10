@@ -22,6 +22,7 @@ import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL,
 import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
+import { createSopResourceDisableProfile, SOP_RESOURCE_SCHEMA, SOP_RESOURCE_LOCK, SOP_RESOURCE_CONSUMPTION_SCHEMA } from './sop-resource-disable-contract.mjs';
 import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
@@ -98,7 +99,9 @@ const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\.\d+)-([0-9a-f]{12})$/;
 const sopUnified = createSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
 const sopCorrected = createCorrectedSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
+const sopResourceDisable = createSopResourceDisableProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
 const SOP_QUERY_PROFILES = new Map([
+  [SOP_RESOURCE_SCHEMA, { name: 'sopResourceDisable', lock: SOP_RESOURCE_LOCK, schema: SOP_RESOURCE_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopResourcePredecessor }],
   [SOP_QUERY_CONTRACT_SET_SCHEMA, { name: 'sopGraph', lock: SOP_QUERY_LOCK, schema: SOP_QUERY_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopQueryPredecessor }],
   [SOP_UNIFIED_SCHEMA, { name: 'sopUnified', lock: SOP_UNIFIED_LOCK, schema: SOP_UNIFIED_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopUnifiedPredecessor }],
   [SOP_CORRECTED_SCHEMA, { name: 'sopUnifiedCorrected', lock: SOP_CORRECTED_LOCK, schema: SOP_CORRECTED_CONSUMPTION_SCHEMA, verifyPredecessor: verifyCorrectedSopPredecessor }],
@@ -193,6 +196,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  if (rawManifest?.schema === SOP_RESOURCE_SCHEMA) return sopResourceDisable.validateManifest(rawManifest);
   if (rawManifest?.schema === SOP_CORRECTED_SCHEMA) return sopCorrected.validateManifest(rawManifest);
   if (rawManifest?.schema === SOP_UNIFIED_SCHEMA) return sopUnified.validateManifest(rawManifest);
   const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
@@ -358,6 +362,8 @@ function contractDescriptors(manifest) {
     ...Object.entries(manifest.runtime ?? {}).map(([key, descriptor]) => [`runtime.${key}`, descriptor]),
     ...Object.entries(manifest.repair ?? {}).map(([key, descriptor]) => [`repair.${key}`, descriptor]),
     ...Object.entries(manifest.sopGraph ?? {}).map(([key, descriptor]) => [`sopGraph.${key}`, descriptor]),
+    ...Object.entries(manifest.resourceDisable ?? {}).map(([key, descriptor]) => [`resourceDisable.${key}`, descriptor]),
+    ...Object.entries(manifest.legacyV11?.members ?? {}).map(([key, descriptor]) => [`legacyV11.${key}`, descriptor]),
     ...Object.entries(manifest.sopUnified ?? {}).map(([key, descriptor]) => [`sopUnified.${key}`, descriptor]),
     ...Object.entries(manifest.readiness ?? {}).map(([key, descriptor]) => [`readiness.${key}`, descriptor])];
 }
@@ -548,6 +554,11 @@ function verifySopUnifiedPredecessor(projectRoot) {
   verifySopQueryPredecessor(projectRoot, directory, predecessor.manifest);
 }
 
+function verifySopResourcePredecessor(projectRoot, directory, manifest) {
+  const previous = verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot });
+  sopResourceDisable.verifyPredecessor(directory, manifest, previous.path);
+}
+
 function verifyCorrectedSopPredecessor(projectRoot, directory, manifest) {
   const previous = verifyIngestedSopUnifiedContractSet({ projectRoot });
   const verified = verifyContractSetDirectory(previous.path);
@@ -685,6 +696,7 @@ export function verifyContractSetDirectory(directory) {
   verifyRuntimeReferences(resolvedDirectory, manifest);
   verifySopQueryReferences(resolvedDirectory, manifest);
   if (manifest.schema === SOP_UNIFIED_SCHEMA) sopUnified.verifyReferences(resolvedDirectory, manifest);
+  if (manifest.schema === SOP_RESOURCE_SCHEMA) sopResourceDisable.verifyReferences(resolvedDirectory, manifest);
   if (manifest.schema === SOP_CORRECTED_SCHEMA) sopCorrected.verifyReferences(resolvedDirectory, manifest);
   if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
@@ -708,6 +720,10 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === SOP_RESOURCE_SCHEMA) {
+    sopResourceDisable.verifySource(repositoryRoot, manifest);
+    return;
+  }
   if (manifest.schema === SOP_CORRECTED_SCHEMA) {
     sopCorrected.verifySource(repositoryRoot, manifest);
     return;
@@ -1337,6 +1353,10 @@ export function verifyIngestedSopUnifiedContractSet(options) {
   return verifyIngestedSopCandidate(options, SOP_UNIFIED_SCHEMA);
 }
 
+export function verifyIngestedSopResourceDisableContractSet(options) {
+  return verifyIngestedSopCandidate(options, SOP_RESOURCE_SCHEMA);
+}
+
 export function verifyIngestedCorrectedSopUnifiedContractSet(options) {
   return verifyIngestedSopCandidate(options, SOP_CORRECTED_SCHEMA);
 }
@@ -1612,13 +1632,13 @@ export function parseCliArguments(argv) {
     }
     options[match[1]] = match[2];
   }
-  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
+  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected', 'sopResourceDisable'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
   return { command, options };
 }
 
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
-  const verifiers = { sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
+  const verifiers = { sopResourceDisable: verifyIngestedSopResourceDisableContractSet, sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
   const result = command === 'ingest'
     ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],

@@ -1,0 +1,13 @@
+{
+  "schema": "customer-agent-sop-resource-disable-consumption/v1",
+  "contract_set_id": "cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "0405c5651564958702ddd5484bbf41a0f193515f",
+  "manifest_sha256": "e60033b96859cf2c7060f04c2055b5b616c967ecaf32fc6178ca6476b31fc426",
+  "openapi_sha256": "f9de8d829a67fd7662923d4a4cbc5a3aad38dc47210c448934065b29fb53704f",
+  "database_sha256": "e34ecfd709860472ec9f29ffa14b8400c07eb58e1d4588c6275beab9ef5d07b1",
+  "intake_status": "VERIFIED_NOT_ACTIVATED",
+  "ddev_authorized": false,
+  "runtime_activated": false,
+  "profile": "sopResourceDisable"
+}

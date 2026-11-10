@@ -51,14 +51,17 @@ const VERIFICATION_POLICY_INPUT_BUDGET_BYTES = 3 * 1024;
 // FINAL-005-D retains the 0087 owner, generated SQL, HTTP and restore evidence.
 // Its measured source-input excess requires 341 KiB.
 const SOP_CONTINUATION_INPUT_BUDGET_BYTES = 341 * 1024;
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES + SOP_CONTINUATION_INPUT_BUDGET_BYTES;
+// The v12 immutable snapshot and independent codegen retain measured logical bytes.
+const SOP_RESOURCE_CONTRACT_SNAPSHOT_BUDGET_BYTES = 6772 * 1024;
+const SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES = 2201 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES + SOP_CONTINUATION_INPUT_BUDGET_BYTES + SOP_RESOURCE_CONTRACT_SNAPSHOT_BUDGET_BYTES + SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.
   // The 3.34 MiB correction includes the 548-header proof and needs 3.4 MiB.
-  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 }),
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 + SOP_RESOURCE_CONTRACT_SNAPSHOT_BUDGET_BYTES }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   // Corrected intake and the foundation consumers also increase source inputs.
-  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES + SOP_CONTINUATION_INPUT_BUDGET_BYTES }),
+  Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.5 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES + VERIFICATION_POLICY_INPUT_BUDGET_BYTES + SOP_CONTINUATION_INPUT_BUDGET_BYTES + SOP_RESOURCE_CONTRACT_INPUT_BUDGET_BYTES }),
 ]);
 
 export const GENERATED_CLEAN_TARGETS = Object.freeze([

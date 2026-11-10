@@ -1,0 +1,56 @@
+{
+  "schema": "customer-agent-sop-resource-disable-source/v1",
+  "versions": {
+    "openapi": "1.30.0",
+    "database": "schema.v1.34",
+    "profile": "content-intake-sop-resource-disable-v1"
+  },
+  "predecessor": {
+    "sourceGitSha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+    "directory": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1",
+    "contractSetId": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+    "members": {
+      "authorization.v1.json": "a7fe341de00b52c18bccbebb39f269ded5948b4d47dc588bb7267a271748f66d",
+      "compatibility.v1.json": "debd346f146178dcc47fa22cc8a36f177a2d3e87efc6e70ee1526c5f3325fc55",
+      "installation.v1.json": "e7cd3e4cb55825c0a1b4d2c4e9a5975e07d35b8927b55eb061197c3861907f5b",
+      "legacy-openapi.v7.yaml": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "legacy-query.openapi.v1.json": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
+      "negotiation-proof.v1.json": "5ce0fdded223e75b9468820db1d741fc229ba87c4c31d13b0fa0199afca54944",
+      "openapi.v1.yaml": "987c2a005f5aa2b4b4e5852c8e9f9054acc1021f304edc5cad6f59dcf0808408",
+      "operation-coverage.v1.json": "d5c9e304459d099792002ec12d8becdf70f48bd12cfdb7cfdf9f13f20c078d20",
+      "predecessor-lock.v1.json": "d54c44873f2fa1b0f7bd29048fc40b66b22e2d7aac0c3b9f513c16c9d2763209",
+      "provenance.v1.json": "f16491f11efc885723eaff6a18726bbdf581a0b9e814810d9b2d5eea5068c544",
+      "query-transport.v1.json": "57e47b7c6b15b9e051fa5cc164c82c1a80a338596f994633f16f7c7dbaf4546c",
+      "schema-v1.33.sql": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+      "storage.v1.sql": "f2dfd7c6d7053d188089f7a171cb108ae2fa613bb5e7f30447acd0e1c4163510"
+    },
+    "manifestSha256": "b2cec936b26d5e3b7990f84d25efc10f6556dde49b6e010e353e380c21f60a52"
+  },
+  "reviewedDraft": {
+    "candidateDigest": "3d3a5c4cec074d45376cd5d05b2bf617952917136f8979dccb93e278246f1f53",
+    "members": {
+      "business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/README.md": "1e1518ef45f6cfc49ad622df36f563916453a1c5f5488c7df2a01cd711da70e2",
+      "business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/confirmation.md": "7dbdd8ec0ee369440da1dc9eeb1f24821bce037c57ae789ea6ccc5a4ca8d04c9",
+      "business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/shapes.source.json": "010a22921adf86bcef10bdd9074abc1285f797a86447e91e353214345d94afd4",
+      "business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/source.json": "3164e9ada2f5be7ffda9f4fac069e18f45cae3b589a8dffe9e6e1a2dced4df32",
+      "business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/storage.source.sql": "59e2eaee600d9aaac5bd27ae0818a6f40184620de49f892e48d7c31a8fa37cc5",
+      "business-docs/08-工具/build_customer_agent_sop_resource_disable_draft.mjs": "930d9ea8cfbfc80b312c14856b818f49aa283a7ac035882c1462913607c6e3ec",
+      "sites/tests/sop-resource-disable-draft.test.mjs": "38815f7ac4eed7aa2a948cf70e29850eec0d38a42309bb390d60e7bd7fd26eb5"
+    }
+  },
+  "releaseSequenceOwner": "public.content_releases.release_seq",
+  "productMigration": {
+    "expectedPredecessorPosition": 87,
+    "plannedPosition": 88,
+    "sourceDelta": "storage.source.sql",
+    "runnableProductMigration": false
+  },
+  "sourceGitSha": null,
+  "contractSetId": null,
+  "queryContinuation": {
+    "strategy": "reuse-current-entitlement",
+    "approvedDesignSha256": "4a674297dbd04cf4814c7ab0d2f15d55b06175080d43c85e7a73557862a66052",
+    "openingProof": "immutable-resolvable-reference-and-digest",
+    "sqlMapping": "actual-exact-product87-consumer-owned"
+  }
+}
