@@ -44,8 +44,8 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // implementation/tests by logical bytes. The input allowance is 531 KiB.
 const SOP_LIFECYCLE_INPUT_BUDGET_BYTES = 531 * 1024;
 // FINAL-005-C counts the 0086 source/output, query facts, HTTP tests and docs.
-// The measured retained-input excess needs another 121 KiB.
-const SOP_QUERY_INPUT_BUDGET_BYTES = 121 * 1024;
+// The measured retained-input excess, including the context boundary cases, needs 123 KiB.
+const SOP_QUERY_INPUT_BUDGET_BYTES = 123 * 1024;
 export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.8 * 1024 * 1024 + SOP_LIFECYCLE_INPUT_BUDGET_BYTES + SOP_QUERY_INPUT_BUDGET_BYTES;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
   // The original unified snapshot and its correction are immutable inputs.

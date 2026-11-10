@@ -270,6 +270,20 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     }
     expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_query_leases')).rows[0].count).toBe(count);
   });
+  it('denies unregistered product references across the complete transport boundary without issuing a lease', async () => {
+    const references = ['not-a-vocabulary-item', 'x'.repeat(128), 'x'.repeat(129), 'x'.repeat(256), '../unregistered'];
+    const before = (await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_query_leases')).rows[0].count;
+    const observed: Array<{ length: number; status: number; code: string }> = [];
+    for (const ref of references) {
+      const body = parse('MenokinSopQuerySopQueryRequest', query({ product_context: { type: 'sku', ref } }));
+      const response = await post('agent', '/v1/sop/query', body);
+      const error = parse('MenokinSopQuerySopErrorEnvelope', await response.json());
+      observed.push({ length: ref.length, status: response.status, code: error.code });
+    }
+    writeFileSync(path.join(evidenceRoot, 'unregistered-product-context.json'), JSON.stringify(observed));
+    expect(observed).toEqual(references.map(ref => ({ length: ref.length, status: 403, code: 'SCOPE_DENIED' })));
+    expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_query_leases')).rows[0].count).toBe(before);
+  });
   it('recovers the same immutable result and rejects the same request ID with a different body', async () => {
     const body = query(); const initial = await readQuery(body);
     expect(await readQuery(body)).toEqual(initial);

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { parseContractSchema, withIntakeView } from './content-intake/contract-view.js';
+import { validateContractSchema, withIntakeView } from './content-intake/contract-view.js';
 import type { ContentAttachmentStore } from './content-object-store.js';
 import { canonical, digest } from './content-intake/material.js';
 import { createIntakeTransactions, clock, IntakeRejection, type IntakePool, type IntakeTransaction } from './content-intake/transaction.js';
@@ -15,11 +15,13 @@ function closed(request: UnifiedSopQueryRequest, code: SopQueryReasonCode): Unif
 function requestContext(request: UnifiedSopQueryRequest) {
   // The transport's opaque generation remains on the independent SOP lease.
   // The internal entitlement uses one fixed server-owned numeric generation.
-  return parseContractSchema('IntakeEntitlementRequest', {
+  const context = validateContractSchema('IntakeEntitlementRequest', {
     shopId: request.shop_id, contextGeneration: 1, releaseId: null,
     productIds: request.product_context && request.product_context.type !== 'storewide' ? [request.product_context.ref] : [],
     scenarioIds: [],
   });
+  if (!context.ok) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+  return context.value;
 }
 async function sqlValue(client: IntakeTransaction, sql: string, values: unknown[]): Promise<unknown> {
   try {
