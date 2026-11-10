@@ -454,6 +454,22 @@ describe('workspace hygiene', () => {
     ]);
   });
 
+  it.each(['job-roster', 'unified-contracts'])('keeps rebuildable %s package outputs outside retained source', name => {
+    const root = createWorkspaceFixture();
+    const packageRoot = path.join(root, 'packages', name);
+    mkdirSync(path.join(packageRoot, 'src'), { recursive: true });
+    writeFileSync(path.join(packageRoot, 'src/index.ts'), 'export const retained = true;\n');
+    const before = checkWorkspaceBudget(root);
+    mkdirSync(path.join(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(path.join(packageRoot, 'node_modules/.bin'), { recursive: true });
+    writeFileSync(path.join(packageRoot, 'dist/index.js'), Buffer.alloc(4096, 'x'));
+    writeFileSync(path.join(packageRoot, 'node_modules/.bin/tsc'), Buffer.alloc(550, 'x'));
+    expect(checkWorkspaceBudget(root).sourceBudgetGroups).toEqual(before.sourceBudgetGroups);
+    expect(checkWorkspaceBudget(root).remainderBytes).toBe(before.remainderBytes);
+    writeFileSync(path.join(packageRoot, 'src/new.ts'), 'retained');
+    expect(checkWorkspaceBudget(root).remainderBytes).toBe(before.remainderBytes + 8);
+  });
+
   it.each([
     { key: 'frozen-contracts' as const, relativePath: 'contracts/upstream/frozen/input.sql' },
     { key: 'frozen-evidence' as const, relativePath: 'evidence/qa/frozen.log' },
