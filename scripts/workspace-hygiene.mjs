@@ -40,11 +40,11 @@ const REQUIRED_WORKSPACE_ROOTS = Object.freeze(
 // borrow unused space from another group, even with a larger aggregate override.
 // Budgets use logical file/link bytes per retained path, independent of filesystem
 // allocation. Disk inventory and cleanup continue to use allocated bytes per inode.
-export const WORKSPACE_REMAINDER_BUDGET_BYTES = 51.3 * 1024 * 1024;
+export const WORKSPACE_REMAINDER_BUDGET_BYTES = 54.7 * 1024 * 1024;
 export const SOURCE_BUDGET_GROUPS = Object.freeze([
-  // The 2026-11-09 unified SOP snapshot adds 3.18 MiB, including both legacy
-  // views. Its 3.2 MiB allocation also increases the aggregate source budget.
-  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 22.7 * 1024 * 1024 }),
+  // The original unified snapshot and its correction are immutable inputs.
+  // The 3.34 MiB correction includes the 548-header proof and needs 3.4 MiB.
+  Object.freeze({ key: 'frozen-contracts', path: 'contracts/upstream', budgetBytes: 26.1 * 1024 * 1024 }),
   Object.freeze({ key: 'frozen-evidence', path: 'evidence', budgetBytes: 10.5 * 1024 * 1024 }),
   Object.freeze({ key: 'source-inputs', path: null, budgetBytes: 22.3 * 1024 * 1024 }),
 ]);

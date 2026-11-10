@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SOP_UNIFIED_INPUT, SOP_UNIFIED_LOCK, SOP_UNIFIED_SOURCE, SOP_UNIFIED_SOURCE_FILES, SOP_UNIFIED_MEMBERS } from './sop-unified-contract.mjs';
 import { fixtureInputs } from './sop-unified-inputs.fixture.mjs';
+import { SOP_CORRECTED_LOCK } from './sop-unified-corrected-contract.mjs';
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const upstream = 'contracts/upstream/customer-agent';
@@ -129,7 +130,9 @@ export function fixture(t, mutate = () => {}) {
     filter: file => {
       const name = path.basename(file);
       // Each fixture starts before unified intake, including after the real bundle is installed.
-      return name !== SOP_UNIFIED_LOCK && !name.startsWith('cs-ai-c11-openapi-1.29.0-schema-1.33-')
+      return name !== SOP_UNIFIED_LOCK && name !== SOP_CORRECTED_LOCK
+        && !name.startsWith('cs-ai-c11-openapi-1.29.0-schema-1.33-')
+        && !name.startsWith('cs-ai-c11-openapi-1.29.1-schema-1.33-')
         && name !== '.contract-intake.lock' && !name.startsWith('.contract-intake-') && !name.startsWith('.lock-write-');
     },
   });

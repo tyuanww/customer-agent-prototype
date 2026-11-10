@@ -86,7 +86,7 @@
     "content:retention": "node scripts/content-retention.ts",
     "identity:accounts:init": "node scripts/synthetic-stack/identity-accounts-init.ts",
     "verify:plan": "node scripts/verification-policy.mjs plan",
-    "test:sop-unified": "node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified && node --test scripts/sop-unified-contract-intake.test.mjs",
+    "test:sop-unified": "node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified && node scripts/customer-agent-contract-set.mjs verify --profile=sopUnifiedCorrected && node --test scripts/sop-unified-contract-intake.test.mjs scripts/sop-unified-corrected-contract.test.mjs",
     "test:sop-unified:pg15": "pnpm --filter @customer-agent/database build && node --test scripts/sop-unified-storage.pg15.test.mjs",
     "test:workflow": "pnpm test:sop-unified && node --test scripts/verification-policy.test.mjs scripts/repair-contract-intake.test.mjs scripts/readiness-contract-intake.test.mjs scripts/sop-query-contract-intake.test.mjs scripts/synthetic-stack/stack.test.ts scripts/dev-help.test.mjs scripts/update-download-page.test.mjs scripts/ops/health-check.test.mjs scripts/ops/customer-agent-release.test.mjs scripts/version-identity.test.mjs scripts/ops/production-consistency.test.mjs scripts/ops/production-smoke.test.mjs scripts/ops/production-intake-tenancy.test.mjs scripts/ops/customer-agent-production-release.test.mjs scripts/ops/production-tenant-source-rebind-pg15.test.mjs scripts/ops/backup-set.test.mjs",
     "test:tenant-source-rebind": "pnpm build:services && CUSTOMER_AGENT_TENANT_REBIND_PG15_INTEGRATION=1 node --test scripts/ops/production-tenant-source-rebind-pg15.test.mjs",

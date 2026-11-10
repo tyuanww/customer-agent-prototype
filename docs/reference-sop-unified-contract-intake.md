@@ -1,5 +1,21 @@
 # SOP unified 合同接收
 
+## 当前协商修正版
+
+OpenAPI `1.29.1` 与数据库 `schema.v1.33` 使用 `customer-agent-contract-set/v11`。修正覆盖 52 个请求头和 496 个响应头的版本 pattern，逐项验证实际 manifest 完整 ID。新成员 `negotiation-proof.v1.json` 保存全部 548 个 JSON Pointer 和变更前后约束，包内共有 14 文件。数据库、存储、v7 intake 和旧 query sidecar 的字节与纠错前序相同。
+
+来源由治理仓 `content-intake-sop-unified-v1-1` 冻结，精确提交为 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca`，合同为 `cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f`。14 个实际导出文件已逐字节接收核对，首次接收 CREATED，重复接收 REUSED，只读验证 VERIFIED。产品接收使用独立 `sop-unified-corrected-contract-set.lock.json`，profile 为 `sopUnifiedCorrected`。旧 `sopUnified` 锁和快照保留为固定纠错前序。
+
+```sh
+node scripts/customer-agent-contract-set.mjs verify --profile=sopUnifiedCorrected
+```
+
+新 profile 独立钉住前序的十二项产物哈希，从指定 Git 提交读取三个机器源并重建全部产物。它同时检查实际合同 ID、全部 header pattern、变更清单、元数据及产品中的原始前序。接收、幂等、原子失败回收与路径安全继续由既有 host 负责。根安全入口同时验证两份实际快照，再运行旧版与纠错专项。
+
+新锁保持 `VERIFIED_NOT_ACTIVATED`。正常图发布链、查询权限事实、媒体消费和真实验收各自记录实现与验证。新增纠错快照约 3.34 MiB，冻结合同组和总体容量分别增加 3.4 MiB 配额。
+
+## 纠错前序 1.29.0
+
 `customer-agent-contract-set/v10` 接收 `content-intake-sop-unified-v1` 的统一 taskgraph 合同。版本固定为 OpenAPI `1.29.0`、数据库 `schema.v1.33`、架构 `1.16` 和实施 `1.22`。当前接收绑定来源提交 `33fc543523b95b47c1236ef7bbfccd3f772c9d0d` 与 `cs-ai-c11-openapi-1.29.0-schema-1.33-33fc543523b9`，已完成实际 export 的精确字节核对。
 
 ## 成员和来源

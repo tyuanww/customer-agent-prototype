@@ -827,10 +827,11 @@ test('main CI continues to hardcode the authoritative full mode', () => {
 test('unified safety checks reach root tests, PR plans and main CI through registered scripts', () => {
   const rootPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const scripts = rootPackage.scripts;
-  assert.equal(scripts['test:sop-unified'], 'node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified && node --test scripts/sop-unified-contract-intake.test.mjs');
+  assert.equal(scripts['test:sop-unified'], 'node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified && node scripts/customer-agent-contract-set.mjs verify --profile=sopUnifiedCorrected && node --test scripts/sop-unified-contract-intake.test.mjs scripts/sop-unified-corrected-contract.test.mjs');
   assert.ok(scripts.test.includes('pnpm test:built'));
   assert.ok(scripts['test:built'].includes('pnpm test:workflow'));
   assert.ok(scripts['test:workflow'].includes('pnpm test:sop-unified'));
+  assert.ok(scripts['test:sop-unified'].includes('scripts/sop-unified-corrected-contract.test.mjs'));
   assert.ok(scripts['test:workflow'].includes('scripts/readiness-contract-intake.test.mjs'));
   assert.ok(scripts.check.includes('pnpm test:sop-unified'));
   assert.ok(scripts['test:db:integration'].includes('pnpm test:sop-unified:pg15'));

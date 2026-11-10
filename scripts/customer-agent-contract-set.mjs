@@ -22,6 +22,7 @@ import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL,
 import { renderReadinessMigration, renderRepairMigration } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
+import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
 const CONTRACT_SET_SCHEMA = 'customer-agent-contract-set/v1';
@@ -96,9 +97,11 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\.\d+)-([0-9a-f]{12})$/;
 const sopUnified = createSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
+const sopCorrected = createCorrectedSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
 const SOP_QUERY_PROFILES = new Map([
   [SOP_QUERY_CONTRACT_SET_SCHEMA, { name: 'sopGraph', lock: SOP_QUERY_LOCK, schema: SOP_QUERY_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopQueryPredecessor }],
   [SOP_UNIFIED_SCHEMA, { name: 'sopUnified', lock: SOP_UNIFIED_LOCK, schema: SOP_UNIFIED_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopUnifiedPredecessor }],
+  [SOP_CORRECTED_SCHEMA, { name: 'sopUnifiedCorrected', lock: SOP_CORRECTED_LOCK, schema: SOP_CORRECTED_CONSUMPTION_SCHEMA, verifyPredecessor: verifyCorrectedSopPredecessor }],
 ]);
 
 function isRecord(value) {
@@ -190,6 +193,7 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
+  if (rawManifest?.schema === SOP_CORRECTED_SCHEMA) return sopCorrected.validateManifest(rawManifest);
   if (rawManifest?.schema === SOP_UNIFIED_SCHEMA) return sopUnified.validateManifest(rawManifest);
   const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
   const repairProfile = rawManifest?.schema === REPAIR_CONTRACT_SET_SCHEMA;
@@ -544,6 +548,13 @@ function verifySopUnifiedPredecessor(projectRoot) {
   verifySopQueryPredecessor(projectRoot, directory, predecessor.manifest);
 }
 
+function verifyCorrectedSopPredecessor(projectRoot, directory, manifest) {
+  const previous = verifyIngestedSopUnifiedContractSet({ projectRoot });
+  const verified = verifyContractSetDirectory(previous.path);
+  sopCorrected.verifyPredecessor(verified.manifest);
+  sopCorrected.verifyReconstruction(directory, manifest, previous.path);
+}
+
 function verifyBaseRuntimeReferences(installation, openapi, database, runtime, provenance, csvProfile) {
   const members = csvProfile ? CSV_MEMBERS : RUNTIME_MEMBERS;
   if (installation.schema !== 'content-intake-installation/v1' || installation.sqlContract !== database.version
@@ -674,6 +685,7 @@ export function verifyContractSetDirectory(directory) {
   verifyRuntimeReferences(resolvedDirectory, manifest);
   verifySopQueryReferences(resolvedDirectory, manifest);
   if (manifest.schema === SOP_UNIFIED_SCHEMA) sopUnified.verifyReferences(resolvedDirectory, manifest);
+  if (manifest.schema === SOP_CORRECTED_SCHEMA) sopCorrected.verifyReferences(resolvedDirectory, manifest);
   if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
   return Object.freeze({ directory: resolvedDirectory, manifest });
@@ -696,6 +708,10 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
+  if (manifest.schema === SOP_CORRECTED_SCHEMA) {
+    sopCorrected.verifySource(repositoryRoot, manifest);
+    return;
+  }
   if (manifest.schema === SOP_UNIFIED_SCHEMA) {
     sopUnified.verifySource(repositoryRoot, manifest);
     return;
@@ -1182,7 +1198,7 @@ export function verifyIngestedContractSet({ projectRoot, expectedContractSetId }
   const destination = path.join(upstreamRoot, lock.contract_set_id);
   assertPathInsideRoot(resolvedRoot, destination);
   const verified = verifyContractSetDirectory(destination);
-  if (verified.manifest.schema === SOP_UNIFIED_SCHEMA) throw new Error('SOP unified requires its independent candidate lock');
+  if (SOP_QUERY_PROFILES.has(verified.manifest.schema)) throw new Error('SOP unified requires its independent candidate lock');
   assertLockMatchesContractSet(lock, verified);
   return Object.freeze({
     status: 'VERIFIED',
@@ -1196,23 +1212,31 @@ export function verifyIngestedContractSet({ projectRoot, expectedContractSetId }
   });
 }
 
-export function verifyIngestedSopUnifiedContractSet({ projectRoot, expectedContractSetId } = {}) {
+function verifyIngestedSopCandidate({ projectRoot, expectedContractSetId } = {}, schema) {
   const resolvedRoot = assertProjectRoot(projectRoot ?? defaultProjectRoot());
   const upstreamRoot = path.join(resolvedRoot, UPSTREAM_ROOT);
-  const lockPath = path.join(upstreamRoot, SOP_UNIFIED_LOCK);
+  const profile = SOP_QUERY_PROFILES.get(schema);
+  const lockPath = path.join(upstreamRoot, profile.lock);
   assertPathInsideRoot(resolvedRoot, lockPath);
   assertRegularFile(lockPath, 'SOP unified candidate lock');
-  const profile = SOP_QUERY_PROFILES.get(SOP_UNIFIED_SCHEMA);
   const lock = validateSopQueryConsumptionLock(readJson(lockPath, 'SOP unified candidate lock'), profile);
   if (expectedContractSetId && lock.contract_set_id !== expectedContractSetId) throw new Error('Unexpected SOP unified contract set');
   const directory = path.join(upstreamRoot, lock.contract_set_id);
   assertPathInsideRoot(resolvedRoot, directory);
   const verified = verifyContractSetDirectory(directory);
-  if (verified.manifest.schema !== SOP_UNIFIED_SCHEMA) throw new Error('SOP unified lock requires a v10 bundle');
+  if (verified.manifest.schema !== schema) throw new Error(`SOP unified lock requires a ${schema.split('/')[1]} bundle`);
   assertSopQueryLockMatchesContractSet(lock, verified);
-  verifySopUnifiedPredecessor(resolvedRoot);
+  profile.verifyPredecessor(resolvedRoot, directory, verified.manifest);
   return Object.freeze({ status: 'VERIFIED', ...lock, path: directory, lock_path: lockPath,
     generateMigrations: false, generateContracts: false });
+}
+
+export function verifyIngestedSopUnifiedContractSet(options) {
+  return verifyIngestedSopCandidate(options, SOP_UNIFIED_SCHEMA);
+}
+
+export function verifyIngestedCorrectedSopUnifiedContractSet(options) {
+  return verifyIngestedSopCandidate(options, SOP_CORRECTED_SCHEMA);
 }
 
 /**
@@ -1486,19 +1510,20 @@ export function parseCliArguments(argv) {
     }
     options[match[1]] = match[2];
   }
-  if (options.profile && (command !== 'verify' || options.profile !== 'sopUnified')) throw new Error('Unsupported contract-set profile');
+  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
   return { command, options };
 }
 
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
+  const verifiers = { sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
   const result = command === 'ingest'
     ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],
         sourceDirectory: options.source,
         sourceRepositoryRoot: options['source-repository-root'],
       })
-    : (options.profile === 'sopUnified' ? verifyIngestedSopUnifiedContractSet : verifyIngestedContractSet)({
+    : (verifiers[options.profile] ?? verifyIngestedContractSet)({
         projectRoot: options['project-root'],
         expectedContractSetId: options.id,
       });
