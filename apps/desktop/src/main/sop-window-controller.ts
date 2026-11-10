@@ -1,3 +1,5 @@
+import { SopUnifiedRuntime } from './sop-unified-runtime';
+import type { SopUnifiedCommand } from '../shared/sop-unified';
 import type { SopQueryRuntime } from './sop-query-runtime';
 import type { SopQueryCommand } from '../shared/sop-query';
 import { BrowserWindow, clipboard, nativeImage, type WebContents } from 'electron';
@@ -79,7 +81,7 @@ export function writeSopClipboardNative(payload: SopClipboardPayload): void {
 
 export class SopWindowController {
   private window: BrowserWindow | null = null;
-  private queryRuntime: SopQueryRuntime | null = null;
+  private queryRuntime: SopQueryRuntime | SopUnifiedRuntime | null = null;
   private readonly legacyEnabled: boolean;
   private tree: SopTree | null = null;
   private progress: SopProgress | null = null;
@@ -128,9 +130,15 @@ export class SopWindowController {
     return this.window.webContents;
   }
 
-  setQueryRuntime(runtime: SopQueryRuntime): void {
+  setQueryRuntime(runtime: SopQueryRuntime | SopUnifiedRuntime): void {
     this.queryRuntime = runtime;
     runtime.subscribe(() => this.pushProjection());
+  }
+
+  async unifiedCommand(command: SopUnifiedCommand): Promise<SopWindowResult> {
+    if (!(this.queryRuntime instanceof SopUnifiedRuntime)) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
+    const result = await this.queryRuntime.command(command);
+    return result.ok ? { ok: true } : sopWindowFailure('FAILED', '操作未完成，请查看流程提示');
   }
 
   async queryCommand(command: SopQueryCommand): Promise<SopWindowResult> {
@@ -203,8 +211,10 @@ export class SopWindowController {
     win.webContents.setBackgroundThrottling(false);
   }
 
-  endFlow(): void {
-    this.queryRuntime?.invalidate();
+  async endFlow(): Promise<void> {
+    if (this.queryRuntime instanceof SopUnifiedRuntime) {
+      if (!(await this.queryRuntime.finish()).ok) return;
+    } else this.queryRuntime?.invalidate();
     this.clearLayoutTimer();
     this.scheduler.clear(this.copyTimer);
     this.copyTimer = null;
@@ -222,6 +232,10 @@ export class SopWindowController {
   }
 
   async restart(): Promise<SopWindowResult> {
+    if (this.queryRuntime instanceof SopUnifiedRuntime) {
+      const result = await this.queryRuntime.restart();
+      return result.ok ? { ok: true } : sopWindowFailure('FAILED', '流程未重新开始，请查看提示');
+    }
     if (this.queryRuntime) { await this.queryRuntime.open(this.sessionId); return { ok: true }; }
     if (this.disposed) {
       return sopWindowFailure('UNAVAILABLE', SOP_OPEN_FAILURE_MESSAGE);

@@ -427,6 +427,8 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 桌面 `main/sop-query-runtime.ts` 拥有独立查询的选择、图推进、失效、短期动作句柄与剪贴板副作用。`shared/sop-query.ts` 定义窄命令、wire 校验与 renderer 投影；SOP 独立 preload 只传动作意图，不提供 URL、token 或任意正文复制。只有显式 loopback `faq-v2` 加 `sopQuery: menokin-sop-query-v1` 的合成 profile 启用此入口。只沿明确边推进，sequence 不补出边；每次选择或复制都重新检查同一内容及原租约。验证与未完成边界见[独立 SOP 查询验证](how-to-verify-sop-query.md)。
 
+统一 taskgraph 桌面由 `main/sop-unified-runtime.ts` 拥有单个历史流程、确认进度、原请求重试、短期动作句柄、过期、媒体工作取消与原生复制。`sop-unified-port.ts` 拥有固定合同路径、wire parser 和完整媒体绑定。Query 的 `ContentIntakeUsage` 继续独占当前完整选择，通过 Main-only qualification 供 SOP 使用。`shared/sop-task-graph.ts` 拥有纯图校验及推进，`shared/sop-unified.ts` 拥有窄 IPC 命令与展示投影，`SopUnifiedView` 只显示投影及发送意图。`sop-image-decoder.ts` 在 Main 解码已核对哈希的图片，GIF 使用无 preload、无 Node 的隐藏 sandbox 文档，拥有取消和截止清理。v11 与 v12 合成 profile 必须分别匹配精确受锁合同，正式运行保持未激活。正常后端及原生复制验证见[continuation 验证说明](how-to-verify-sop-continuation.md#桌面正常后端联合验证)。
+
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
 ### OBS-01 观测机制

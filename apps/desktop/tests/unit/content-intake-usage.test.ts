@@ -4,6 +4,7 @@ import type { components } from '@customer-agent/contracts';
 import { ContentIntakeUsage, type IntakeUsageSession } from '../../src/main/content-intake-usage';
 import { ProductHttpError } from '../../src/main/product-http';
 import type { ProductSession } from '../../src/main/product-session';
+import { SOP_RESOURCE_CONTRACT } from '../../src/shared/sop-unified';
 
 type C = components['schemas'];
 const selection = {shopId:'shop-a',productIds:[],scenarioIds:[]};
@@ -304,5 +305,41 @@ describe('Main sealed intake usage consumer',()=>{
       expect(()=>s.usage.select({...selection,contextGeneration:99})).toThrow('VALIDATION');
       expect((await s.usage.refresh()).read()!.faq).toEqual([]);
     }finally{s.usage.dispose();}
+  });
+});
+
+
+describe('ordinary SOP qualification remains Main-owned', () => {
+  it('issues a complete sorted selection without consuming FAQ pages or replacing selection', async () => {
+    const s = setup();
+    try {
+      s.usage.select({ shopId: 'shop-a', productIds: ['product-b', 'product-a'], scenarioIds: ['scenario-b', 'scenario-a'] });
+      const controller = new AbortController();
+      const qualification = await s.usage.qualify(controller.signal, 'sop');
+      expect(qualification.selection).toEqual({ shopId: 'shop-a', productIds: ['product-a', 'product-b'], scenarioIds: ['scenario-a', 'scenario-b'] });
+      expect(qualification.entitlement.contextGeneration).toBe(2);
+      expect(s.request.mock.calls[0]![2]).toMatchObject({ body: { ...qualification.selection, contextGeneration: 2, releaseId: null },
+        headers: { 'x-intake-contract-set': SOP_RESOURCE_CONTRACT } });
+      expect(s.pages).not.toHaveBeenCalled();
+      expect(qualification.isCurrent()).toBe(true);
+      s.usage.select({ shopId: 'shop-a', productIds: [], scenarioIds: [] });
+      expect(qualification.isCurrent()).toBe(false);
+    } finally { s.usage.dispose(); }
+  });
+  it('expires ordinary authority with time, cancellation, session change and disposal', async () => {
+    vi.useFakeTimers();
+    const s = setup();
+    try {
+      const controller = new AbortController();
+      const first = await s.usage.qualify(controller.signal, 'sop');
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(first.isCurrent()).toBe(false);
+      const second = await s.usage.qualify(controller.signal, 'sop');
+      controller.abort();
+      expect(second.isCurrent()).toBe(false);
+      const third = await s.usage.qualify(new AbortController().signal, 'sop');
+      s.replace(); expect(third.isCurrent()).toBe(false);
+      await expect(s.usage.qualify(new AbortController().signal, 'sop')).rejects.toMatchObject({ code: 'STALE' });
+    } finally { s.usage.dispose(); }
   });
 });

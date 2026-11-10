@@ -11,7 +11,7 @@ import { writeSystemClipboard } from './system-clipboard';
  * A capability belongs to one trusted Query main frame and dies with its window. */
 export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null,
   trusted: () => WebContents[], role: (sender: WebContents) => OverlayRole | null,
-  devUrl: () => string | undefined, invalidateSop?: () => void) {
+  devUrl: () => string | undefined, invalidateSop?: () => void, sopDiscovery = false) {
   const windows = new Map<WebContents, ContentIntakeQuery>();
   const channels = [C.INTAKE_QUERY_MODE, C.INTAKE_QUERY_ACCESS, C.INTAKE_QUERY_SELECT,
     C.INTAKE_QUERY_CONDITIONS, C.INTAKE_QUERY_SEARCH, C.INTAKE_QUERY_COPY, C.INTAKE_QUERY_CANCEL];
@@ -27,7 +27,7 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
     if (!session) return intakeQueryFailure('UNAVAILABLE');
     let query = windows.get(event.sender);
     if (!query) {
-      query = new ContentIntakeQuery(session, writeSystemClipboard); windows.set(event.sender, query);
+      query = new ContentIntakeQuery(session, writeSystemClipboard, sopDiscovery); windows.set(event.sender, query);
       const owned = query;
       query.subscribe(invalidation => {
         invalidateSop?.();
@@ -44,8 +44,19 @@ export function registerContentIntakeQueryIpc(session: IntakeUsageSession | null
       query.cancel(); return { ok: true, cancelled: true };
     } catch (error) { return intakeQueryFailure(error instanceof IntakeUsageError ? error.code : 'UNAVAILABLE'); }
   });
-  return () => {
+  const dispose = () => {
     for (const query of windows.values()) query.dispose(); windows.clear();
     for (const channel of channels) ipcMain.removeHandler(channel);
+  };
+  return {
+    dispose,
+    qualifySop(contents: WebContents, signal: AbortSignal) {
+      if (contents.isDestroyed() || !trusted().includes(contents) || role(contents) !== 'query') {
+        throw new IntakeUsageError('FORBIDDEN');
+      }
+      const query = windows.get(contents);
+      if (!query) throw new IntakeUsageError('STALE');
+      return query.qualifySop(signal);
+    },
   };
 }

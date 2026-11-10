@@ -47,7 +47,7 @@ it('guards all FAQ capabilities with trusted Query main-frame identity, exact pa
     expect(await handlers.get(C.INTAKE_QUERY_COPY)!(event(query), { key: 'opaque', text: 'forged' })).toMatchObject({ code: 'VALIDATION' });
     expect(await handlers.get(C.INTAKE_QUERY_SEARCH)!(event(query), { queryText: 'x'.repeat(501), contextId: oldContext })).toMatchObject({ code: 'VALIDATION' });
     expect(await handlers.get(C.INTAKE_QUERY_SEARCH)!(event(query), { queryText: '洁面', contextId: 'invalid' })).toMatchObject({ code: 'VALIDATION' });
-  } finally { dispose(); }
+  } finally { dispose.dispose(); }
   expect(handlers.size).toBe(0);
 });
 it('awaits online copy verification and forwards denial and invalidation through the Query IPC', async () => {
@@ -66,6 +66,10 @@ it('awaits online copy verification and forwards denial and invalidation through
   try {
     clipboardWrite.mockClear();
     await handlers.get(C.INTAKE_QUERY_SELECT)!(event, { shopId: 'shop-a' });
+    const qualification = await dispose.qualifySop(query, new AbortController().signal);
+    expect(qualification.selection).toEqual({ shopId: 'shop-a', productIds: [], scenarioIds: [] });
+    expect(qualification.isCurrent()).toBe(true);
+    expect(() => dispose.qualifySop({ ...query, id: 3 } as WebContents, new AbortController().signal)).toThrow('FORBIDDEN');
     const result = await handlers.get(C.INTAKE_QUERY_SEARCH)!(event, { queryText: '洁面', contextId: oldContext });
     expect(result).toMatchObject({ ok: true });
     if (!result || typeof result !== 'object' || !('rows' in result) || !Array.isArray(result.rows)) throw new Error('missing rows');
@@ -83,7 +87,7 @@ it('awaits online copy verification and forwards denial and invalidation through
     expect(await handlers.get(C.INTAKE_QUERY_COPY)!(event, { key: fresh.rows[0].key })).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     expect(clipboardWrite).toHaveBeenCalledTimes(1);
     expect(sent).toHaveBeenCalledWith(C.INTAKE_QUERY_INVALIDATED, { reason: 'invalidated', contextId: newContext });
-  } finally { dispose(); }
+  } finally { dispose.dispose(); }
 });
 
 it('queues a Main invalidation before a replacement search and delivers it through preload while that search waits', async () => {
@@ -127,5 +131,5 @@ it('queues a Main invalidation before a replacement search and delivers it throu
     if (!fresh.ok || !fresh.rows[0]) throw new Error('missing replacement result');
     expect(await intakeQuery.copy({ key: fresh.rows[0].key })).toEqual({ ok: true, copied: true });
     expect(clipboardWrite).toHaveBeenCalledTimes(1);
-  } finally { release(); unsubscribe(); renderer.event = null; dispose(); }
+  } finally { release(); unsubscribe(); renderer.event = null; dispose.dispose(); }
 });

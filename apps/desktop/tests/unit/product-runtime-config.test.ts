@@ -1,3 +1,4 @@
+import { SOP_RESOURCE_CONTRACT, SOP_UNIFIED_CONTRACT } from '../../src/shared/sop-unified';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -433,5 +434,48 @@ describe('independent SOP synthetic opt-in', () => {
     expect(() => readPackagedProductProfile(directory)).toThrow();
     write(directory, {...STACK_PROFILE,contentIntake:'faq-v2',sopQuery:'menokin-sop-query-v1'});
     expect(readPackagedProductProfile(directory)?.sopQuery).toBe('menokin-sop-query-v1');
+  });
+});
+
+
+describe('explicit unified SOP contract selection', () => {
+  it('keeps legacy default and requires exact v11 profile plus manifest', () => {
+    expect(developmentProductProfile({ ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2' })?.sopQuery).toBeUndefined();
+    const env = { ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2', CUSTOMER_AGENT_DESKTOP_SOP_QUERY: 'menokin-sop-unified-v11', CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: SOP_UNIFIED_CONTRACT };
+    expect(developmentProductProfile(env)).toMatchObject({ sopQuery: 'menokin-sop-unified-v11', sopContractSet: SOP_UNIFIED_CONTRACT });
+    for (const value of [undefined, '', 'cs-ai-c11-openapi-1.29.1-schema-1.33-000000000000']) {
+      expect(() => developmentProductProfile({ ...env, CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: value })).toThrow();
+    }
+  });
+  it('validates packaged exact selection and rejects it for remote profiles', () => {
+    const directory = userDataDirectory();
+    const profile = { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v11', sopContractSet: SOP_UNIFIED_CONTRACT };
+    write(directory, profile);
+    expect(readPackagedProductProfile(directory)).toMatchObject({ sopQuery: 'menokin-sop-unified-v11' });
+    write(directory, { ...profile, sopContractSet: 'wrong' }); expect(() => readPackagedProductProfile(directory)).toThrow();
+    write(directory, { ...profile, mode: 'product-remote' }); expect(() => readPackagedProductProfile(directory)).toThrow();
+  });
+});
+
+
+describe('formal v12 SOP profile', () => {
+  it('requires the exact v12 manifest and preserves legacy defaults', () => {
+    expect(SOP_RESOURCE_CONTRACT).toBe('cs-ai-c11-openapi-1.30.1-schema-1.35-5fb5c1285056');
+    const env = { ...LOOPBACK_ENV, CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
+      CUSTOMER_AGENT_DESKTOP_SOP_QUERY: 'menokin-sop-unified-v12', CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: SOP_RESOURCE_CONTRACT };
+    expect(developmentProductProfile(env)).toMatchObject({ sopQuery: 'menokin-sop-unified-v12', sopContractSet: SOP_RESOURCE_CONTRACT });
+    for (const contract of [undefined, SOP_UNIFIED_CONTRACT,
+      'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564', 'cs-ai-c11-openapi-1.30.0-schema-1.34-000000000000']) {
+      expect(() => developmentProductProfile({ ...env, CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: contract })).toThrow();
+    }
+    expect(developmentProductProfile(LOOPBACK_ENV)?.sopQuery).toBeUndefined();
+    const directory = userDataDirectory();
+    write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v12', sopContractSet: SOP_RESOURCE_CONTRACT });
+    expect(readPackagedProductProfile(directory)).toMatchObject({ sopQuery: 'menokin-sop-unified-v12' });
+    write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v12',
+      sopContractSet: 'cs-ai-c11-openapi-1.30.0-schema-1.34-0405c5651564' });
+    expect(() => readPackagedProductProfile(directory)).toThrow();
+    write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v12', sopContractSet: SOP_UNIFIED_CONTRACT });
+    expect(() => readPackagedProductProfile(directory)).toThrow();
   });
 });

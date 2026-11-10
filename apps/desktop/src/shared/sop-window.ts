@@ -1,3 +1,4 @@
+import type { SopUnifiedCommand, SopUnifiedProjection } from './sop-unified';
 import type { SopQueryProjection, SopQueryCommand } from './sop-query';
 import type { SopPipelineProjection } from './sop-pipeline';
 
@@ -81,6 +82,7 @@ export type SopLayoutAck = {
 };
 
 export type SopWindowApi = {
+  unifiedCommand?(command: SopUnifiedCommand): Promise<SopWindowResult>;
   queryCommand?(command: SopQueryCommand): Promise<SopWindowResult>;
   close(): Promise<void>;
   endFlow(): Promise<void>;
@@ -91,7 +93,7 @@ export type SopWindowApi = {
   reportLayout(request: SopLayoutRequest): Promise<SopLayoutAck>;
   copyCurrent(): Promise<SopCopyResult>;
   /** Replays this document's latest validated Main projection, then subscribes to updates. */
-  onProjection(cb: (projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void): () => void;
+  onProjection(cb: (projection: SopProjection | SopPipelineProjection | SopQueryProjection | SopUnifiedProjection) => void): () => void;
 };
 
 export type QuerySopWindowApi = {

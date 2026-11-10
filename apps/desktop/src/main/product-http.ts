@@ -36,7 +36,7 @@ export function productOrigin(value: string): string {
   if (!isPublicHostname(url.hostname)) throw new ProductHttpError('VALIDATION');
   return url.origin;
 }
-const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'x-intake-contract-set', 'idempotency-key'] as const;
+const EXTRA_HEADERS = ['x-client-id', 'x-snapshot-lease', 'if-none-match', 'x-intake-contract-set', 'x-sop-continuation', 'idempotency-key'] as const;
 export type ProductHttpResult = {
   status: number; value: unknown;
   etag?: string; leaseToken?: string; leaseExpiresAt?: string;

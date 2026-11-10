@@ -1,3 +1,5 @@
+import { SopUnifiedRuntime } from './sop-unified-runtime';
+import { SopUnifiedPort } from './sop-unified-port';
 import { SopQueryRuntime } from './sop-query-runtime';
 import { registerContentIntakeCatalogIpc } from './content-intake-catalog-ipc';
 import { registerContentIntakePermissionsIpc } from './content-intake-permissions-ipc';
@@ -8,6 +10,7 @@ import { registerSeatAccountIpc } from './seat-account-ipc';
 import { registerContentIntakeManagementIpc } from './content-intake-management-ipc';
 import { registerWorkbenchModeIpc } from './workbench-mode-ipc';
 import { registerContentIntakeQueryIpc } from './content-intake-query-ipc';
+import { decodeSopImage } from './sop-image-decoder';
 import { registerProductSearchIpc } from './product-search-ipc';
 import { ProductHttp } from './product-http';
 import { ProductSession } from './product-session';
@@ -105,7 +108,7 @@ if (!gotLock) {
   const shuttingDown = createShutdownFence();
   let controller: OverlayController | null = null;
   let sopController: SopWindowController | null = null;
-  let sopQuery: SopQueryRuntime | null = null;
+  let sopQuery: SopQueryRuntime | SopUnifiedRuntime | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
   let productSession: ProductSession | null = null;
@@ -116,7 +119,7 @@ if (!gotLock) {
   let disposePageUse: (() => void) | null = null;
   let seatAccounts: ReturnType<typeof registerSeatAccountIpc> | null = null;
   let disposeIntakeCatalog: (() => void) | null = null;
-  let disposeIntakeQuery: (() => void) | null = null;
+  let intakeQuery: ReturnType<typeof registerContentIntakeQueryIpc> | null = null;
   let desktopComposition: DesktopComposition | null = null;
   let pendingSecondInstance = false;
 
@@ -163,7 +166,7 @@ if (!gotLock) {
     intakePermissions?.dispose(); intakePermissions = null;
     seatAccounts?.dispose(); seatAccounts = null;
     disposeIntakeCatalog?.(); disposeIntakeCatalog = null;
-    disposeIntakeQuery?.(); disposeIntakeQuery = null;
+    intakeQuery?.dispose(); intakeQuery = null;
     desktopComposition?.dispose(); desktopComposition = null;
     void productSession?.shutdown();
     shuttingDown.begin();
@@ -278,8 +281,15 @@ if (!gotLock) {
         createLastSeenStore(userDataDirectory, productProfile.apiOrigin),
       );
       await productSession.restore();
-      if (productProfile.sopQuery === 'menokin-sop-query-v1' && productProfile.mode === 'synthetic-local') {
-        sopQuery = new SopQueryRuntime(productSession, (text) => clipboard.writeText(text));
+      if (productProfile.sopQuery && productProfile.mode === 'synthetic-local') {
+        sopQuery = productProfile.sopQuery !== 'menokin-sop-query-v1'
+          ? new SopUnifiedRuntime(new SopUnifiedPort(productSession, decodeSopImage,
+            productProfile.sopQuery === 'menokin-sop-unified-v12' ? 'v12' : 'v11'), text => clipboard.writeText(text), signal => {
+            const contents = controller?.trustedContents().find(value => controller?.overlayRoleOf(value) === 'query');
+            if (!intakeQuery || !contents) throw new Error('SOP_SELECTION_REQUIRED');
+            return intakeQuery.qualifySop(contents, signal);
+          })
+          : new SopQueryRuntime(productSession, text => clipboard.writeText(text));
         sopController.setQueryRuntime(sopQuery);
       }
     }
@@ -319,9 +329,12 @@ if (!gotLock) {
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
-    disposeIntakeQuery = registerContentIntakeQueryIpc(workbenchSession,
+    intakeQuery = registerContentIntakeQueryIpc(workbenchSession,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
-      () => controller?.rendererDevServerUrl, () => sopQuery?.invalidate());
+      () => controller?.rendererDevServerUrl, () => {
+        // Legacy Query context changes do not own the independent v11 continuation.
+        if (sopQuery instanceof SopQueryRuntime) sopQuery.invalidate();
+      }, productProfile?.sopQuery === 'menokin-sop-unified-v12');
     // The shared Fox still reads unread in FAQ mode. A null service supplies the
     // existing unavailable projection without creating legacy I/O or missing IPC.
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
