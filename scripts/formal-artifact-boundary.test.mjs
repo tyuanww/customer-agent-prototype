@@ -34,6 +34,36 @@ test('accepts generic contract vocabulary without desktop fixture modules', () =
   });
 });
 
+test('accepts formal task and risk identifiers that contain a token-like substring', () => {
+  withTemporaryProject((root) => {
+    mkdirSync(path.join(root, 'dist'));
+    writeFileSync(path.join(root, 'dist', 'contract.js'), JSON.stringify({
+      ruleVersion: 'sop-task-graph-resource-disable-v1',
+      mappingVersion: 'sop-manual-to-task-graph-resource-disable-v1',
+      policyVersion: 'risk-sop-resource-disable-v1',
+    }));
+
+    assert.equal(verifyFormalArtifactBoundary({ projectRoot: root, artifactRoots: ['dist'] }).scannedFileCount, 1);
+  });
+});
+
+test('rejects OpenAI credential markers beside punctuation, Unicode and valid contract identifiers', () => {
+  withTemporaryProject((root) => {
+    mkdirSync(path.join(root, 'dist'));
+    for (const prefix of ['sk-', 'sk-proj-', 'sk-svcacct-']) {
+      const token = prefix + 'a'.repeat(32);
+      for (const text of [token, `key=${token}`, JSON.stringify({ token }), `Bearer ${token}`,
+        `密钥${token}`, `value_${token}`, `sop-task-graph-resource-disable-v1\n${token}`]) {
+        writeFileSync(path.join(root, 'dist', 'runtime.js'), text);
+        assert.throws(
+          () => verifyFormalArtifactBoundary({ projectRoot: root, artifactRoots: ['dist'] }),
+          /OPENAI_TOKEN/u,
+        );
+      }
+    }
+  });
+});
+
 test('rejects a desktop synthetic fixture import', () => {
   withTemporaryProject((root) => {
     mkdirSync(path.join(root, 'dist'));
