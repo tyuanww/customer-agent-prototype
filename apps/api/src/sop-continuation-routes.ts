@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import type { components } from '@customer-agent/contracts/sop-unified';
 import type { AuthenticatedUser, AuthService } from './auth-service.js';
-import { SOP_CONTRACT_SET } from './content-intake/contract-view.js';
+import { intakeContractSet } from './content-intake/contract-view.js';
 import { intakeFailure, intakeHttpBoundary, sendIntake } from './content-intake/http-boundary.js';
 import type { IntakeResult } from './content-intake/transaction.js';
 
@@ -39,7 +39,7 @@ function addressedResource(request: FastifyRequest): SopContinuationResource {
   return { kind: 'check', body: request.body };
 }
 function complete(reply: FastifyReply) {
-  return reply.header('X-Intake-Contract-Set', SOP_CONTRACT_SET).code(204).send();
+  return reply.header('X-Intake-Contract-Set', intakeContractSet()).code(204).send();
 }
 type Failure = Exclude<IntakeResult<unknown>, { ok: true }>;
 function protocolFailure(failure: Failure): Failure {

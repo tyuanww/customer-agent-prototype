@@ -2739,6 +2739,13 @@ export interface components {
             ruleVersion: "sop-task-graph-v2";
             /** @constant */
             mappingVersion: "sop-manual-to-task-graph-v2";
+        } | {
+            /** @constant */
+            templateVersion: "sop-manual-authoring-v1.1";
+            /** @constant */
+            ruleVersion: "sop-task-graph-resource-disable-v1";
+            /** @constant */
+            mappingVersion: "sop-manual-to-task-graph-resource-disable-v1";
         });
         IntakePolicy: {
             /** @enum {string} */

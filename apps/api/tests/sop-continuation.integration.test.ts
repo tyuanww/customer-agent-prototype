@@ -522,7 +522,7 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
     expect(result.status, output).toBe(0); expect(output).toContain('NONEMPTY_GRAPH_RESTORE_PASS');
     const restored = JSON.parse(readFileSync(path.join(evidenceRoot, 'nonempty-restore-results.json'), 'utf8'));
     expect(restored.http.continuation).toMatchObject({ restoredRenew: true, closedRejected: true, repeatedClose: true });
-    expect(restored.report.migrationCount).toBe(87);
+    expect(restored.report.migrationCount).toBe(88);
   }, 180_000);
 
   it('pins consumed permission facts and blocks ambiguous first-open observations without replacing old active facts', async () => {
@@ -725,7 +725,8 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
       has_function_privilege('public',p.oid,'EXECUTE') public_execute,has_function_privilege('app_runtime',p.oid,'EXECUTE') app_execute
       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles owner ON owner.oid=p.proowner
       WHERE n.nspname='content_intake' AND p.proname=ANY($1::text[]) ORDER BY 1`, [names])).rows;
-    expect(rows).toHaveLength(names.length);
+    expect(rows).toHaveLength(names.length + 1);
+    expect(rows.filter(row => row.signature.startsWith('content_intake.open_sop_active_use('))).toHaveLength(2);
     for (const row of rows) expect(row).toMatchObject({ owner: 'intake_runtime_fn_owner', prosecdef: true,
       proconfig: ['search_path=pg_catalog'], public_execute: false, app_execute: false });
     expect((await verifyDatabaseMigrations(admin)).status).toBe('PASS');

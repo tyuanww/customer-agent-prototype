@@ -1,6 +1,6 @@
 /* GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root. */
 
-export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.30.0:sop-resource-disable";
+export const OPENAPI_RUNTIME_SCHEMA_ID = "urn:customer-agent:openapi:1.30.1:sop-resource-disable";
 export const COMPONENT_SCHEMA_NAMES = [
   "AdoptedEventRequest",
   "AdoptionEventRequest",
@@ -313,7 +313,7 @@ export type GeneratedComponentSchemaName = (typeof COMPONENT_SCHEMA_NAMES)[numbe
 export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> =
   {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:customer-agent:openapi:1.30.0:sop-resource-disable",
+  "$id": "urn:customer-agent:openapi:1.30.1:sop-resource-disable",
   "$defs": {
     "AdoptedEventRequest": {
       "type": "object",
@@ -13899,6 +13899,25 @@ export const OPENAPI_RUNTIME_SCHEMA_DOCUMENT: Readonly<Record<string, unknown>> 
             },
             "mappingVersion": {
               "const": "sop-manual-to-task-graph-v2"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "required": [
+            "templateVersion",
+            "ruleVersion",
+            "mappingVersion"
+          ],
+          "properties": {
+            "templateVersion": {
+              "const": "sop-manual-authoring-v1.1"
+            },
+            "ruleVersion": {
+              "const": "sop-task-graph-resource-disable-v1"
+            },
+            "mappingVersion": {
+              "const": "sop-manual-to-task-graph-resource-disable-v1"
             }
           },
           "type": "object"

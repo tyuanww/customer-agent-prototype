@@ -1,10 +1,11 @@
+import { isSopView, intakeContractSet } from './contract-view.js';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { parseContractSchema, type ContractSchemaName, type components } from './contract-view.js';
 import type { AuthService, AuthenticatedUser } from '../auth-service.js';
 import { requestActor } from '../access/context.js';
 import type { IntakeResult } from './transaction.js';
-import { intakeView, selectIntakeView, withIntakeView, SOP_CONTRACT_SET } from './contract-view.js';
+import { selectIntakeView, withIntakeView } from './contract-view.js';
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -53,20 +54,20 @@ async function emptyGetBody(request: FastifyRequest): Promise<boolean> {
 }
 
 export function intakeFailure(reply: FastifyReply, code: Failure['code'], reason: Failure['details']['reason'], diagnosticId: string = randomUUID()) {
-  if (intakeView() !== 'graph' && reason.startsWith('SOP_')) reason = 'MATERIAL_CHANGED';
+  if (!isSopView() && reason.startsWith('SOP_')) reason = 'MATERIAL_CHANGED';
   const value: components['schemas']['IntakeError'] = { error: { code, message: '资料请求未完成。', details: { reason, diagnosticId } } };
-  if (intakeView() === 'graph') reply.header('X-Intake-Contract-Set', SOP_CONTRACT_SET);
+  if (isSopView()) reply.header('X-Intake-Contract-Set', intakeContractSet());
   // Only the new quality contract opts into 413; preserve predecessor error wire.
-  const status = intakeView() === 'graph' && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID'].includes(reason) ? 422
-    : intakeView() === 'graph' && reason === 'SOP_MEDIA_UNAVAILABLE' ? 503
-    : intakeView() === 'graph' && reason === 'LEASE_EXPIRED' && reply.request.routeOptions.config.intakeLeaseExpiredStatus === 410 ? 410
-    : code === 'VALIDATION' && reason === 'FILE_LIMIT' ? intakeView() === 'graph' ? 413 : reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
+  const status = isSopView() && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID'].includes(reason) ? 422
+    : isSopView() && reason === 'SOP_MEDIA_UNAVAILABLE' ? 503
+    : isSopView() && reason === 'LEASE_EXPIRED' && reply.request.routeOptions.config.intakeLeaseExpiredStatus === 410 ? 410
+    : code === 'VALIDATION' && reason === 'FILE_LIMIT' ? isSopView() ? 413 : reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
   return reply.code(status).send(value);
 }
 export function sendIntake(reply: FastifyReply, result: IntakeResult<unknown>, schema: ContractSchemaName, status = 200) {
   if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);
   const value = parseContractSchema(schema, result.value);
-  if (intakeView() === 'graph') reply.header('X-Intake-Contract-Set', SOP_CONTRACT_SET);
+  if (isSopView()) reply.header('X-Intake-Contract-Set', intakeContractSet());
   return reply.code(status).send(value);
 }
 

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ContentAttachmentStore, ReservedAttachment } from '../content-object-store.js';
 import { verifyGraphMedia } from './sop-graph.js';
-import { parseContractSchema, type components } from './contract-view.js';
+import { intakeView, parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { CanonicalJsonValue } from '../idempotency.js';
 import { authorize, source } from './authority.js';
@@ -10,7 +10,8 @@ import { clock, createIntakeTransactions, intakeReplay, IntakeRejection, type In
 
 type C = components['schemas'];
 type Run = ReturnType<typeof createIntakeTransactions>;
-type Impact = Omit<C['IntakeRollbackImpact'], 'rollbackPlanId' | 'approvalEvidenceVersion'> & { sourceIds: string[] };
+type WithoutReview<T> = T extends unknown ? Omit<T, 'rollbackPlanId' | 'approvalEvidenceVersion'> & { sourceIds: string[] } : never;
+type Impact = WithoutReview<C['IntakeRollbackImpact']>;
 type Plan = C['IntakeRollbackImpact'] & { actorId: string; sourceIds: string[] };
 type Facts = { facts_version: string; revocation_generation: string; state: 'pending'|'approved'|'rejected'|'revoked';
   checked_at: Date; valid_until: Date; reviewer_id: string | null; human_task_id: string | null; decided_at: Date | null };
@@ -28,7 +29,7 @@ async function sql<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 async function impact(client: IntakeTransaction, who: Principal, base: string, target: string): Promise<Impact> {
-  const result = await sql(() => client.query<{ value: Impact }>('SELECT content_intake.preview_rollback($1,$2,$3) AS value',[who.id,base,target]));
+  const result = await sql(() => client.query<{ value: Impact }>('SELECT content_intake.preview_rollback($1,$2,$3,$4) AS value',[who.id,base,target,intakeView()]));
   const value = result.rows[0]!.value;
   // Carry every authority deadline consumed by the SQL projection through COMMIT.
   for (const scope of value.scopes) await authorize(client,who,'rollback',await source(client,scope.sourceId));
@@ -97,7 +98,9 @@ export function createIntakeRollback(run: Run, store?: Partial<ContentAttachment
         await client.query(`INSERT INTO content_intake.rollback_plans VALUES($1,$2,$3,$4,$5,clock_timestamp())`,[id,req.baseReleaseId,req.targetReleaseId,v.impactDigest,who.id]);
         for (const sourceId of v.sourceIds) await client.query('INSERT INTO content_intake.rollback_scopes VALUES($1,$2)',[id,sourceId]);
         return {baseReleaseId:v.baseReleaseId,targetReleaseId:v.targetReleaseId,impactDigest:v.impactDigest,scopes:v.scopes,
-          requiresCorrectiveCandidate:v.requiresCorrectiveCandidate,rollbackPlanId:id,approvalEvidenceVersion:0};
+          requiresCorrectiveCandidate:v.requiresCorrectiveCandidate,rollbackPlanId:id,approvalEvidenceVersion:0,
+          ...('retainedResourceDisableEventsDigest' in v ? { retainedResourceDisableEventsDigest: v.retainedResourceDisableEventsDigest,
+            newResourceDisableCount: v.newResourceDisableCount } : {}) };
       },v => parseContractSchema('IntakeRollbackImpact',v));
     },
     rollbackReview(actor:AuthenticatedUser,id:string) {

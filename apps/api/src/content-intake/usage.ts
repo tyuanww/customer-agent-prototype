@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
@@ -42,7 +43,7 @@ const memoryPreviewReader: IntakePreviewReader = {
 };
 type ScopeRow = { source_id: string; scope: C['IntakeSopSourceScope']; generation: string; mode_version: string; mode: string; until: Date | null };
 type Lease = { entitlement_hash: string; release_id: string; shop_id: string; context_generation: string;
-  contract_view?: 'legacy' | 'graph';
+  contract_view?: 'legacy' | 'graph' | 'resource-disable';
   sop_continuation_hash?: string | null;
   principal_generation: string; issued_at: Date; valid_until: Date; expires_at: Date; client_id: string; source_binding_hash: string;
   product_ids: string[]; scenario_ids: string[] };
@@ -132,17 +133,17 @@ async function registerIntakeEntitlement(client: IntakeTransaction, who: Princip
   const until = Math.min(prepared.until, lease.validUntil);
   if (until <= await clock(client)) throw new IntakeRejection('LEASE_EXPIRED', 'FORBIDDEN');
   client.validUntil(until);
-  const id = `ite_${randomBytes(32).toString('hex')}`, hash = digest(id), graphView = intakeView() === 'graph';
+  const id = `ite_${randomBytes(32).toString('hex')}`, hash = digest(id), graphView = isSopView();
   if (continuationHash && !graphView) throw new IntakeRejection('UPGRADE_REQUIRED');
   // Select the lease's original PostgreSQL issued_at without a Date round trip.
   // Legacy 83 has neither successor column. Its complete old insertion remains
   // valid while graph uses the same context/scope/lease registration owner.
   await client.query(`INSERT INTO content_intake.entitlements(entitlement_hash,principal_id,user_id,lease_token_hash,release_id,
     shop_id,context_generation,principal_generation,release_generation,issued_at,valid_until${graphView ? ',contract_view' : ''}${continuationHash ? ',sop_continuation_hash' : ''})
-    SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9${graphView ? ",'graph'" : ''}${continuationHash ? ',$10' : ''}
+    SELECT $1,$2,$3,$4,$5,$6,$7,$8,0,issued_at,$9${graphView ? ',$10' : ''}${continuationHash ? ',$11' : ''}
     FROM public.snapshot_offline_leases WHERE lease_token_hash=$4`,
   [hash, who.id, who.userId, lease.hash, lease.releaseId, ctx.shopId, ctx.contextGeneration, who.generation,
-    new Date(until), ...(continuationHash ? [continuationHash] : [])]);
+    new Date(until), ...(graphView ? [intakeView()] : []), ...(continuationHash ? [continuationHash] : [])]);
   await client.query('INSERT INTO content_intake.entitlement_scopes SELECT $1,unnest($2::text[])', [hash, scopes.map(scope => scope.source_id)]);
   await client.query(`INSERT INTO content_intake.entitlement_contexts(entitlement_hash,session_token_hash,product_ids,scenario_ids)
     VALUES ($1,$2,$3,$4)`, [hash, ctx.sessionTokenHash, ctx.productIds, ctx.scenarioIds]);
@@ -154,7 +155,7 @@ async function registerIntakeEntitlement(client: IntakeTransaction, who: Princip
  * release itself, then this existing usage owner records fresh current scopes. */
 export async function issueSopContinuationEntitlement(client: IntakeTransaction, who: Principal, prepared: PreparedIntakeSelection,
   continuationHash: string): Promise<{ kind: 'closed' } | { kind: 'issued'; entitlement: C['IntakeEntitlement'] }> {
-  if (intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  if (!isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
   const response = await client.query<{ value: unknown }>(
     'SELECT content_intake.issue_sop_continuation_lease($1,$2,$3,$4,$5) AS value',
     [who.id, prepared.ctx.sessionTokenHash, continuationHash, prepared.binding, new Date(prepared.until)]);
@@ -171,6 +172,44 @@ export async function issueSopContinuationEntitlement(client: IntakeTransaction,
 }
 
 export type PreparedIntakeUsage = PreparedIntakeSelection & { release: string };
+export type ExistingEntitlementUse = PreparedIntakeUsage & { entitlement: C['IntakeEntitlement'] };
+
+/** Reuses the selected ordinary entitlement without issuing another lease. */
+export async function readCurrentIntakeEntitlement(client: IntakeTransaction, who: Principal,
+  actor: AuthenticatedUser, entitlementId: string): Promise<ExistingEntitlementUse> {
+  const session = await lockProductSession(client, actor), hash = digest(entitlementId);
+  const result = await client.query<Lease>(`SELECT e.*,l.client_id,l.expires_at,l.source_binding_hash,
+    context.product_ids,context.scenario_ids FROM content_intake.entitlements e
+    JOIN public.snapshot_offline_leases l USING(lease_token_hash)
+    JOIN content_intake.entitlement_contexts context USING(entitlement_hash)
+    WHERE e.entitlement_hash=$1 AND e.principal_id=$2 AND e.user_id=$3 AND context.session_token_hash=$4`,
+  [hash, who.id, who.userId, session.hash]);
+  const lease = result.rows[0];
+  if (!lease || lease.sop_continuation_hash || lease.contract_view !== intakeView()) {
+    throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+  }
+  if (Number(lease.principal_generation) !== who.generation) throw new IntakeRejection('PERMISSION_CHANGED', 'FORBIDDEN');
+  const ctx: IntakeUsageContext = { sessionTokenHash: session.hash, shopId: lease.shop_id,
+    contextGeneration: Number(lease.context_generation), productIds: lease.product_ids, scenarioIds: lease.scenario_ids };
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('cs_ai_content_publish'))");
+  const scopes = await scopesFor(client, who, ctx.shopId, hash);
+  await validateSelection(client, ctx, scopes);
+  if (lease.client_id !== binding(ctx, scopes)) throw new IntakeRejection('SCOPE_DENIED', 'FORBIDDEN');
+  const current = await client.query<{ current_release_id: string }>('SELECT current_release_id FROM public.content_current WHERE id=1');
+  if (current.rows[0]?.current_release_id !== lease.release_id) throw new IntakeRejection('BASE_CHANGED');
+  let until = Math.min(lease.valid_until.getTime(), lease.expires_at.getTime(), session.validUntil, who.validUntil,
+    ...scopes.map(scope => scope.until!.getTime()));
+  if (until <= await clock(client)) throw new IntakeRejection('LEASE_EXPIRED', 'FORBIDDEN');
+  until = Math.min(until, await releaseDeadline(client, lease.release_id, who.tenantId),
+    await contentDeadline(client, lease.release_id, scopes, ctx, lease.issued_at.getTime()));
+  const graph = await client.query<{ until: Date | null }>('SELECT content_intake.read_sop_graph_deadline($1,$2) AS until', [who.id, lease.release_id]);
+  until = Math.min(until, graph.rows[0]?.until?.getTime() ?? Infinity);
+  client.validUntil(until);
+  return { ctx, scopes, until, release: lease.release_id, binding: binding(ctx, scopes), entitlement: {
+    entitlementId, releaseId: lease.release_id, shopId: ctx.shopId, contextGeneration: ctx.contextGeneration,
+    revocationGeneration: who.generation, validUntil: new Date(until).toISOString(), scopes: scopes.map(scope => scope.scope),
+  } };
+}
 
 /** Current query preparation adds the existing whole-release gates to the
  * shared live selection. A historical continuation never enters this gate. */
@@ -183,7 +222,7 @@ export async function prepareIntakeUsage(client: IntakeTransaction, who: Princip
   if (request.releaseId !== null && request.releaseId !== release) throw new IntakeRejection('BASE_CHANGED');
   let until = Math.min(prepared.until, await releaseDeadline(client, release, who.tenantId),
     await contentDeadline(client, release, prepared.scopes, prepared.ctx, await clock(client)));
-  if (intakeView() === 'graph') {
+  if (isSopView()) {
     const graph = await client.query<{ until: Date | null }>('SELECT content_intake.read_sop_graph_deadline($1,$2) AS until', [who.id, release]);
     until = Math.min(until, graph.rows[0]!.until?.getTime() ?? Infinity);
   }
@@ -452,7 +491,7 @@ export function createIntakeUsage(run: ReturnType<typeof createIntakeTransaction
         const until=Math.min(lease.valid_until.getTime(),lease.expires_at.getTime(),await releaseDeadline(client,lease.release_id,who.tenantId));
         client.validUntil(until);
         await contentDeadline(client,lease.release_id,scopes,ctx,lease.issued_at.getTime());
-        const successor = intakeView() === 'graph';
+        const successor = isSopView();
         const after=successor ? ['',''] : cursor(req.cursor,hash);
         // Resolve the complete authorized set BEFORE pagination. Each selected
         // product/scenario gets an integer slot (one unrestricted slot if empty).

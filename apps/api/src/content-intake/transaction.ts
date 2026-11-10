@@ -1,3 +1,4 @@
+import { isSopView, intakeContractSet } from './contract-view.js';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { isContractValidationError, type components } from './contract-view.js';
@@ -127,7 +128,7 @@ export function requireFresh(p: Principal, now: number): void {
 }
 
 const requestDigest = (request: CanonicalJsonValue): string =>
-  `intake-request-v1:${createHash('sha256').update(canonicalJson(intakeView() === 'graph' ? ['sop-task-graph-v2', request] : request)).digest('hex')}`;
+  `intake-request-v1:${createHash('sha256').update(canonicalJson(isSopView() ? [intakeView() === 'resource-disable' ? intakeContractSet() : 'sop-task-graph-v2', request] : request)).digest('hex')}`;
 
 /** Multi-phase commands consult the same durable receipt before doing external I/O.
  * Call under lock_content; a receipt recovers the original result, never authorizes a new write. */

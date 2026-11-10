@@ -3,7 +3,7 @@ import { SOP_TASK_HEADERS, SOP_TASK_SHEETS, type SopTaskSheet } from '../../src/
 
 export const graphApplicability = (solo = false, shopWide = false) => shopWide ? { productRefs: [], scenarioRefs: [] } : ({ productRefs: [{ id: solo ? 'product-solo' : 'product-graph', displayVersion: 1 }],
   scenarioRefs: [{ id: solo ? 'scenario-solo' : 'scenario-graph', displayVersion: 1 }] });
-export function syntheticGraphMapping(solo = false, shopWide = false, queryBudgetProbe = false) {
+export function syntheticGraphMapping(solo = false, shopWide = false, queryBudgetProbe = false, qualityCount = 0) {
   const metadata = { questions: [], ...graphApplicability(solo, shopWide), effectiveFrom: '2020-01-01T00:00:00.000Z',
     effectiveTo: '2099-01-01T00:00:00.000Z', applicabilityNote: '合成明确范围', familySourceId: null, familyBusinessEntryId: null,
     brandNonOverridable: false, category: '合成分类', internalNote: '合成内部说明', riskNote: '', attachmentNote: '' };
@@ -11,6 +11,7 @@ export function syntheticGraphMapping(solo = false, shopWide = false, queryBudge
     sourceClaim: { versionKind: 'unknown', versionValue: null, acquisition: 'controlled-synthetic-export' },
     riskLevel: 'routine',
     entries: solo ? {} : { 'script-a': metadata, 'script-b': metadata,
+      ...Object.fromEntries(Array.from({ length: qualityCount }, (_, index) => [`quality-script-${index}`, metadata])),
       ...Object.fromEntries((queryBudgetProbe ? Array.from({ length: 12 }, (_, index) => `budget-script-${index}`) : []).map(id => [id, metadata])) },
     images: solo ? {} : Object.fromEntries(['image-entry', 'image-task', 'image-knowledge'].map(id => [id, { required: true, alt: `合成 ${id}`, ordinal: 1 }])) };
 }
@@ -31,7 +32,7 @@ export async function readSyntheticQualityReport(bytes: Buffer): Promise<string[
   return rows;
 }
 
-export async function syntheticTaskGraphWorkbook(options: { narrowKnowledgeImage?: boolean; sharedTaskImage?: boolean; effectiveTo?: string; queryBudgetProbe?: boolean; shopWide?: boolean; revision?: number; solo?: boolean; disable?: boolean;
+export async function syntheticTaskGraphWorkbook(options: { qualityCount?: number; withoutTaskImages?: boolean; narrowKnowledgeImage?: boolean; sharedTaskImage?: boolean; effectiveTo?: string; queryBudgetProbe?: boolean; shopWide?: boolean; revision?: number; solo?: boolean; disable?: boolean;
   missingUnknown?: boolean; unresolvedConfirmation?: boolean; wrongHeader?: boolean; longTaskId?: boolean } = {}) {
   const { revision = 1, solo = false } = options;
   const book = new ExcelJS.Workbook();
@@ -48,8 +49,8 @@ export async function syntheticTaskGraphWorkbook(options: { narrowKnowledgeImage
   if (solo) task('task-a', '结束');
   else {
     task('task-a', '操作', { 下一任务编号: 'task-b', 确认项配置: options.unresolvedConfirmation ? '' : '有确认项',
-      关联知识编号: '["knowledge-a"]', 关联资源编号: '["document-a","image-task"]' });
-    task('task-b', '判断', options.sharedTaskImage ? { 关联资源编号: '["image-task"]' } : {}); task('task-known', '结束'); task('task-unknown', '结束');
+      关联知识编号: '["knowledge-a"]', 关联资源编号: options.withoutTaskImages ? '["document-a"]' : '["document-a","image-task"]' });
+    task('task-b', '判断', options.sharedTaskImage && !options.withoutTaskImages ? { 关联资源编号: '["image-task"]' } : {}); task('task-known', '结束'); task('task-unknown', '结束');
     for (const [id, ordinal] of [['confirm-a', '1'], ['confirm-b', '2']]) row('执行任务', { 记录类型: '确认项', 任务编号: 'task-a', 场景编号: flowId,
       确认项编号: id!, 确认项文字: `合成确认 ${id}`, 确认项顺序: ordinal! });
     for (const [id, taskId, scriptId, relation] of [
@@ -62,6 +63,8 @@ export async function syntheticTaskGraphWorkbook(options: { narrowKnowledgeImage
       是否无法判断: unknown!, 匹配词: JSON.stringify([`合成匹配 ${id}`]), 分支顺序: ordinal! });
     row('客户话术', { 话术编号: 'script-a', 话术标题: '合成对客 A', 对客正文: `合成对客原文 A\n版本 ${revision}`, 关联资源编号: '["image-entry"]' });
     row('客户话术', { 话术编号: 'script-b', 话术标题: '合成对客 B', 对客正文: '合成对客原文 B', 关联资源编号: '[]' });
+    for (let index = 0; index < (options.qualityCount ?? 0); index++) row('客户话术', { 话术编号: `quality-script-${index}`,
+      话术标题: `合成质量话术 ${index}`, 对客正文: `合成质量正文 ${index}`, 关联资源编号: '[]' });
     if (options.queryBudgetProbe) for (let index = 0; index < 12; index++) {
       const id = `budget-script-${index}`;
       row('客户话术', { 话术编号: id, 话术标题: `合成大正文 ${index}`, 对客正文: '合'.repeat(32700), 关联资源编号: '[]' });
@@ -70,7 +73,7 @@ export async function syntheticTaskGraphWorkbook(options: { narrowKnowledgeImage
     }
     row('知识与案例', { 知识编号: 'knowledge-a', 标题: '合成知识', 正文: '合成知识原文', 可见对象: '坐席可读', 关联资源编号: '["image-knowledge"]' });
     row('资源与图片', { 资源编号: 'document-a', 资源类型: '资料', 资源名称: '合成资料', 可见对象: '坐席可读', 适用范围: scope, 资源内容: '合成资料原文' });
-    for (const id of ['image-entry', 'image-task', 'image-knowledge']) {
+    for (const id of ['image-entry', 'image-task', 'image-knowledge'].filter(id => !options.withoutTaskImages || id !== 'image-task')) {
       const data = row('资源与图片', { 资源编号: id, 资源类型: '图片', 资源名称: `合成 ${id}`, 可见对象: id === 'image-entry' ? '对客可用' : '坐席可读', 适用范围: options.narrowKnowledgeImage && id === 'image-knowledge'
         ? JSON.stringify({ productRefs: [{ id: 'product-query-image', displayVersion: 1 }], scenarioRefs: [] }) : scope });
       const fixture = graphImageFixtures.get(id)!;
@@ -82,5 +85,17 @@ export async function syntheticTaskGraphWorkbook(options: { narrowKnowledgeImage
   if (options.longTaskId) for (const sheet of book.worksheets) sheet.eachRow(row => row.eachCell(cell => {
     if (cell.value === 'task-a') cell.value = 't'.repeat(128);
   }));
+  return Buffer.from(await book.xlsx.writeBuffer());
+}
+
+/** Explicit reviewed resource rows. No flow difference or media bytes are inferred. */
+export async function syntheticResourceDisableWorkbook(resourceIds: readonly string[]) {
+  const book = new ExcelJS.Workbook();
+  for (const name of SOP_TASK_SHEETS) book.addWorksheet(name).addRow([...SOP_TASK_HEADERS[name]]);
+  for (const id of resourceIds) {
+    const values: Record<string, string> = { 资源编号: id, 资源类型: '图片', 资源名称: `合成停用 ${id}`,
+      维护状态: '停用', 业务确认人: '合成来源维护人', 待确认事项: '' };
+    book.getWorksheet('资源与图片')!.addRow(SOP_TASK_HEADERS['资源与图片'].map(header => values[header] ?? ''));
+  }
   return Buffer.from(await book.xlsx.writeBuffer());
 }

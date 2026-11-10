@@ -955,6 +955,9 @@ async function verifyCatalogueState(
   ) || (
     expectedTriggerEntries === 144
     && expectedTriggerSha === '49ae03b3cfebcfbe49c15b4459040faf8c2e6d0e567fc679f8a33f9b63401d72'
+  ) || (
+    expectedTriggerEntries === 150
+    && expectedTriggerSha === '5f9474bf8d214fcf1d54b5bd9f5783af1b0a0b07acf403c53d290f1365b44435'
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -989,7 +992,9 @@ async function verifyCatalogueState(
         || (catalogue.migrations.length === 86
           && triggerSha === '09f71b81494edf994d9128961d547940ec1597342b43f3b459edda57d830068a')
         || (catalogue.migrations.length === 87
-          && triggerSha === 'bfa28111ba9ea45f46e7bb4c309933d19ed40f5fff905ae44873732e2cc8b541'))
+          && triggerSha === 'bfa28111ba9ea45f46e7bb4c309933d19ed40f5fff905ae44873732e2cc8b541')
+        || (catalogue.migrations.length === 88
+          && triggerSha === '3447da31313acba701e8f439050eec5117a4b7a9e3c23865408ef32acc07e237'))
     ) {
       triggerFingerprint = Object.freeze({
         entries: trigger.entries,
@@ -1193,6 +1198,7 @@ const READINESS_SUFFIX = [
   { length: 85, index: 84, id: '0085_sop_unified_lifecycle', sha256: 'ff92a37c4a960cb2deb1e6b5060a896c2df6ebd6c29166a0ab8c05ea35327b88' },
   { length: 86, index: 85, id: '0086_sop_unified_query', sha256: '1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc' },
   { length: 87, index: 86, id: '0087_sop_unified_continuation', sha256: '112136a8bd99270cc2494720338fc9955cca4143a3ff8deb6320c91748d50665' },
+  { length: 88, index: 87, id: '0088_sop_resource_lifecycle', sha256: '1ad88eab6fb5eeb22552471838f10f14b701430d8f8c913c50df71baee53488e' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1275,6 +1281,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   85: { tables: 128, functions: 328, objectEntries: 3946, objectSha256: '85e0e91e657a1767c1418edf929e750c4edb67a5d2a850a46669708426694400', functionEntries: 328, functionSha256: 'adbe454cc6a149351403fef03af05a3d49fafef9071d467d82415b2be00bdb7e', triggerEntries: 135, triggerSha256: 'abc3b71ca97f353b34afab7d0bf5404a7fe573ed5ca3efc07a0e65197a27c1bc' },
   86: { tables: 131, functions: 336, objectEntries: 4025, objectSha256: '512dfc117ce740a39222fef20d82d5720c994891552fbea9770111d6c6036274', functionEntries: 336, functionSha256: '6c0e591f853bcdb666d72e0194cdec98cc5904297d24b8150b3d5d8936817b8a', triggerEntries: 138, triggerSha256: 'e0e06bc5a97f5f8a4d0370aec3f402e2c00a3fcc4ef0f0bc9225b5c81de5701a' },
   87: { tables: 131, functions: 360, objectEntries: 4063, objectSha256: '2e267e34d4a22e719688d40a7e0f64d1e97a3800a4de55ba9ae88dc72d2e2478', functionEntries: 360, functionSha256: '3ed6b5b05f8410955298a6aaaddb6e23e56799c7d784b946b5361ed54cb2a02f', triggerEntries: 144, triggerSha256: '49ae03b3cfebcfbe49c15b4459040faf8c2e6d0e567fc679f8a33f9b63401d72' },
+  88: { tables: 136, functions: 381, objectEntries: 4254, objectSha256: '4e8911be0a35b4a68c440a833a144d7e3ac7d06448fef6d5ef732f5eef918c47', functionEntries: 381, functionSha256: '6af5c95321f4b3f01617f86d5b254f36868429eac721168b41e42fa84fa85617', triggerEntries: 150, triggerSha256: '5f9474bf8d214fcf1d54b5bd9f5783af1b0a0b07acf403c53d290f1365b44435' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
   45: { entries: 572, sha256: FEISHU_ADMIT_ACL_SHA256 },
@@ -1334,6 +1341,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   85: { entries: 668, sha256: '4c97ae7d16cc19a79bb21c2e8436a4f87d9b4af2a5db6766bd9b414a1dcf02bf' },
   86: { entries: 676, sha256: '5a540cf8ed9526f74c4403668d3f7e266b028ed047b0d0a16ad7a19c9052c0dc' },
   87: { entries: 686, sha256: '095fd4657db4665352c80afc1f20dcf644af5f07b3ee41a9ea23b6a866cba4cd' },
+  88: { entries: 696, sha256: 'b5dc769a700ba6d583242c9828344a8f1794a6c811c3c71146128c2fd86b8056' },
 };
 
 export async function verifyReadinessSuccessor(

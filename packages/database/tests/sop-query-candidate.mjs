@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('legacy candidate check verifies the complete 87 tail and preserves historical 83/84/85 artifacts', t => {
+test('legacy candidate check verifies the complete 88 tail and preserves historical 83/84/85 artifacts', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'sop-query-candidate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
@@ -28,12 +28,14 @@ test('legacy candidate check verifies the complete 87 tail and preserves histori
   let result = check();
   assert.equal(result.status, 0, result.stderr);
   const queryPrefix = JSON.parse(original);
+  delete queryPrefix.compatibility.sop_resource_overlay;
   queryPrefix.migrations = queryPrefix.migrations.slice(0, 86);
   delete queryPrefix.compatibility.sop_continuation_overlay;
   writeFileSync(migrationManifest, JSON.stringify(queryPrefix));
   result = check();
   assert.equal(result.status, 0, result.stderr);
   const lifecyclePrefix = JSON.parse(original);
+  delete lifecyclePrefix.compatibility.sop_resource_overlay;
   lifecyclePrefix.migrations = lifecyclePrefix.migrations.slice(0, 85);
   delete lifecyclePrefix.compatibility.sop_query_overlay;
   delete lifecyclePrefix.compatibility.sop_continuation_overlay;
@@ -41,6 +43,7 @@ test('legacy candidate check verifies the complete 87 tail and preserves histori
   result = check();
   assert.equal(result.status, 0, result.stderr);
   const storage = JSON.parse(original);
+  delete storage.compatibility.sop_resource_overlay;
   storage.migrations = storage.migrations.slice(0, 84);
   delete storage.compatibility.sop_lifecycle_overlay;
   delete storage.compatibility.sop_query_overlay;
@@ -49,6 +52,7 @@ test('legacy candidate check verifies the complete 87 tail and preserves histori
   result = check();
   assert.equal(result.status, 0, result.stderr);
   const prefix = JSON.parse(original);
+  delete prefix.compatibility.sop_resource_overlay;
   prefix.migrations = prefix.migrations.slice(0, 83);
   delete prefix.compatibility.sop_unified_successor;
   delete prefix.compatibility.sop_lifecycle_overlay;

@@ -6,6 +6,18 @@ import { SOP_CORRECTED_MEMBERS } from './sop-unified-corrected-contract.mjs';
 export const SOP_RESOURCE_SCHEMA = 'customer-agent-contract-set/v12';
 export const SOP_RESOURCE_LOCK = 'sop-resource-disable-contract-set.lock.json';
 export const SOP_RESOURCE_CONSUMPTION_SCHEMA = 'customer-agent-sop-resource-disable-consumption/v1';
+export const SOP_RESOURCE_CORRECTED_SCHEMA = 'customer-agent-contract-set/v13';
+export const SOP_RESOURCE_CORRECTED_LOCK = 'sop-resource-disable-corrected-contract-set.lock.json';
+export const SOP_RESOURCE_CORRECTED_CONSUMPTION_SCHEMA = 'customer-agent-sop-resource-disable-corrected-consumption/v1';
+export const SOP_RESOURCE_CORRECTED_PROFILE = Object.freeze({
+  schema: SOP_RESOURCE_CORRECTED_SCHEMA,
+  source: 'business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1-2',
+  input: 'business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-candidate-1.30.1-schema1.35',
+  versions: Object.freeze({ openapi: '1.30.1', database: 'schema.v1.35', profile: 'content-intake-sop-resource-disable-v1' }),
+  sourceSha: '5fb5c1285056b7a862ef5a03cf25975fb91802b5',
+  manifestSha: 'c7a87a580f4c86d2a3c722311120fe061a0a03db02362880c1feff65c77744e1',
+  toPattern: '^cs-ai-c11-openapi-1\\.30\\.1-schema-1\\.35-[0-9a-f]{12}$',
+});
 export const SOP_RESOURCE_SOURCE = 'business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-resource-disable-v1';
 const INPUT = 'business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-candidate';
 const VERSIONS = Object.freeze({ openapi: '1.30.0', database: 'schema.v1.34', profile: 'content-intake-sop-resource-disable-v1' });
@@ -15,21 +27,10 @@ const PREDECESSOR_SHA = '812a2e80584f08675fab8b7401ce8b4cd3ab5bca';
 const PREDECESSOR_ID = 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f';
 const FROM_PATTERN = '^cs-ai-c11-openapi-1\\.29\\.1-schema-1\\.33-[0-9a-f]{12}$';
 const TO_PATTERN = '^cs-ai-c11-openapi-1\\.30\\.0-schema-1\\.34-[0-9a-f]{12}$';
-const MEMBERS = Object.freeze({
-  ...SOP_CORRECTED_MEMBERS,
-  openapi: ['openapi.v1.yaml', '1.30.0'], database: ['schema-v1.34.sql', 'schema.v1.34'],
-  handoff: ['consumer-handoff.v1.json', '1'], exportSchema: ['export.schema.json', '1'],
+const DEFAULT_PROFILE = Object.freeze({
+  schema: SOP_RESOURCE_SCHEMA, source: SOP_RESOURCE_SOURCE, input: INPUT, versions: VERSIONS,
+  sourceSha: APPROVED_SOURCE_SHA, manifestSha: APPROVED_MANIFEST_SHA, toPattern: TO_PATTERN,
 });
-const INTEGRATION = Object.freeze({ expectedPredecessorPosition: 87, plannedPosition: 88, sourceDelta: 'storage.source.sql', runnableProductMigration: false });
-const SOURCE_FILES = [
-  ...['authorization.source.json', 'export.schema.json', 'source.json', 'storage.source.sql', 'v11-manifest.source.json'].map(file => `${INPUT}/${file}`),
-  ...['README.md', 'confirmation.md', 'shapes.source.json', 'source.json', 'storage.source.sql'].map(file => `business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/${file}`),
-  ...['build_customer_agent_backend_contract.mjs', 'build_customer_agent_csv_contract.mjs', 'build_customer_agent_owner_contract.mjs',
-    'build_customer_agent_runtime_closure.mjs', 'build_customer_agent_sop_resource_disable_contract.mjs',
-    'build_customer_agent_sop_resource_disable_draft.mjs', 'build_customer_agent_sop_unified_negotiation_contract.mjs',
-    'export_customer_agent_contract_set.mjs', 'sop_query_continuation_contract.mjs'].map(file => `business-docs/08-工具/${file}`),
-  'sites/tests/sop-resource-disable-draft.test.mjs',
-];
 
 function equal(actual, expected, label) {
   if (!isDeepStrictEqual(actual, expected)) throw new Error(`SOP resource disable ${label} mismatch`);
@@ -50,8 +51,25 @@ function patterns(value, pattern, pointer = '', found = []) {
 }
 
 /** The host owns Git, files, shared locking and installation. This profile only
- * verifies the closed v12 snapshot and its immutable v11 lineage as data. */
-export function createSopResourceDisableProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit }) {
+ * verifies the closed resource snapshot and its immutable v11 lineage as data. */
+export function createSopResourceDisableProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit }, profile = DEFAULT_PROFILE) {
+  const { schema: SOP_RESOURCE_SCHEMA, source: SOP_RESOURCE_SOURCE, input: INPUT, versions: VERSIONS,
+    sourceSha: APPROVED_SOURCE_SHA, manifestSha: APPROVED_MANIFEST_SHA, toPattern: TO_PATTERN } = profile;
+  const MEMBERS = Object.freeze({
+    ...SOP_CORRECTED_MEMBERS,
+    openapi: ['openapi.v1.yaml', VERSIONS.openapi], database: [`${VERSIONS.database.replace('schema.', 'schema-')}.sql`, VERSIONS.database],
+    handoff: ['consumer-handoff.v1.json', '1'], exportSchema: ['export.schema.json', '1'],
+  });
+  const INTEGRATION = Object.freeze({ expectedPredecessorPosition: 87, plannedPosition: 88, sourceDelta: 'storage.source.sql', runnableProductMigration: false });
+  const SOURCE_FILES = [
+    ...['authorization.source.json', 'export.schema.json', 'source.json', 'storage.source.sql', 'v11-manifest.source.json'].map(file => `${INPUT}/${file}`),
+    ...['README.md', 'confirmation.md', 'shapes.source.json', 'source.json', 'storage.source.sql'].map(file => `business-docs/01-客服Agent项目/30-开发-进行中/sop-resource-disable-draft/${file}`),
+    ...['build_customer_agent_backend_contract.mjs', 'build_customer_agent_csv_contract.mjs', 'build_customer_agent_owner_contract.mjs',
+      'build_customer_agent_runtime_closure.mjs', 'build_customer_agent_sop_resource_disable_contract.mjs',
+      'build_customer_agent_sop_resource_disable_draft.mjs', 'build_customer_agent_sop_unified_negotiation_contract.mjs',
+      'export_customer_agent_contract_set.mjs', 'sop_query_continuation_contract.mjs'].map(file => `business-docs/08-工具/${file}`),
+    'sites/tests/sop-resource-disable-draft.test.mjs',
+  ];
   const descriptors = manifest => ({ openapi: manifest.openapi, database: manifest.database, ...manifest.resourceDisable });
   const read = (directory, manifest, key) => readJson(path.join(directory, descriptors(manifest)[key].file), `SOP resource disable ${key}`);
 
@@ -62,7 +80,7 @@ export function createSopResourceDisableProfile({ assertExactKeys, validateDescr
     if (manifest.source_repository !== 'ai-赋能立项' || typeof manifest.source_git_sha !== 'string'
       || !/^[0-9a-f]{40}$/.test(manifest.source_git_sha)
       || manifest.source_git_sha !== APPROVED_SOURCE_SHA
-      || manifest.contract_set_id !== `cs-ai-c11-openapi-1.30.0-schema-1.34-${manifest.source_git_sha.slice(0, 12)}`
+      || manifest.contract_set_id !== `cs-ai-c11-openapi-${VERSIONS.openapi}-${VERSIONS.database.replace('schema.v', 'schema-')}-${manifest.source_git_sha.slice(0, 12)}`
       || manifest.architecture_version !== '1.16' || manifest.implementation_version !== '1.22') {
       throw new Error('SOP resource disable manifest identity is invalid');
     }
@@ -203,7 +221,7 @@ export function createSopResourceDisableProfile({ assertExactKeys, validateDescr
       properties: Object.fromEntries(Object.entries(descriptors).map(([key, descriptor]) => [key, descriptorSchema(descriptor)])),
     });
     equal(schema, {
-      $schema: 'https://json-schema.org/draft/2020-12/schema', $id: 'urn:customer-agent:contract-set:v12',
+      $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `urn:customer-agent:contract-set:${SOP_RESOURCE_SCHEMA.split('/')[1]}`,
       type: 'object', additionalProperties: false,
       required: ['schema', 'contract_set_id', 'source_repository', 'source_git_sha', 'architecture_version', 'implementation_version', 'openapi', 'database', 'resourceDisable', 'legacyV11'],
       properties: {

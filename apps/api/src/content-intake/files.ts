@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { IntakeCapacityCommitUnknown, type IntakeCapacity } from './capacity.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Readable } from 'node:stream';
@@ -10,6 +11,7 @@ import { authenticatedProductSession } from '../product-auth-service.js';
 import { authorize, source } from './authority.js';
 import { candidateContext, getJob, jobView, readCandidate } from './candidate.js';
 import { canonical, digest } from './material.js';
+import { graphMaterialHeader } from './sop-graph.js';
 import { readQualityView } from './quality.js';
 import { sourceInputFormat } from './input-format.js';
 import { IntakeRejection, type createIntakeTransactions, type IntakeResult, type IntakeTransaction, type Principal } from './transaction.js';
@@ -54,7 +56,8 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
     if (!job.result_candidate_id || !job.result_candidate_version) throw new IntakeRejection('MATERIAL_CHANGED');
     const candidate = await readCandidate(client, who, job.result_candidate_id, Number(job.result_candidate_version), 'import');
     const { material } = await candidateContext(client, who, candidate.key, 'import');
-    if (material.canonicalEncodingVersion !== 'candidate-sop-task-graph-v2') return null;
+    if (material.canonicalEncodingVersion !== 'candidate-sop-task-graph-v2'
+      && material.canonicalEncodingVersion !== 'candidate-sop-resource-disable-v1') return null;
     const { progress, graph } = await readQualityView(client, who, candidate.key);
     if (!graph) throw new IntakeRejection('SOURCE_FORMAT_MISMATCH');
     const { rounds, plan, ...metadata } = progress;
@@ -70,6 +73,14 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
       checks.forEach((check, index) => rows.push([`faqCheck.${round.phase}`, String(index), canonical(check)]));
     }
     graph.checks.forEach((check, index) => rows.push(['sopCheck', String(index), canonical(check)]));
+    if (graph.resource) {
+      rows.push(['resourceDisablePlan', '0', canonical(graph.resource.plan)]);
+      graph.resource.samples.forEach((sample, index) => {
+        rows.push(['resourceDisableTarget', String(index), canonical(sample.target)]);
+        rows.push(['resourceDisable', String(index), canonical(sample.disable)]);
+      });
+      graph.resource.checks.forEach((check, index) => rows.push(['resourceDisableCheck', String(index), canonical(check)]));
+    }
     return rows;
   }, value => {
     if (value === null) return null;
@@ -173,7 +184,7 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
       try {
         const result = await readReport(actor, id);
         if (!result.ok) return result;
-        if (intakeView() === 'graph' && result.value.view.state === 'validated') {
+        if (isSopView() && result.value.view.state === 'validated') {
           const evidence = await qualityReport(actor, id);
           if (!evidence.ok) return evidence;
           if (evidence.value !== null) {
@@ -204,8 +215,9 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
         const { material } = await candidateContext(client, who, view.key, 'content-manage');
         const binding = JSON.stringify([view.key, intakeView(), authenticatedProductSession(actor), who.generation, who.factsVersion, limit]);
         const sign = (offset: number) => createHmac('sha256', cursorSecret).update(binding).update(String(offset)).digest('base64url');
-        const graph = material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2';
-        const total = graph ? material.entries.length + material.differences.length + (material.sopFlows?.length ?? 0) + (material.sopDifferences?.length ?? 0)
+        const graph = material.canonicalEncodingVersion === 'candidate-sop-task-graph-v2' || material.canonicalEncodingVersion === 'candidate-sop-resource-disable-v1';
+        const resources = 'resourceDisables' in material ? material.resourceDisables : null;
+        const total = graph ? material.entries.length + material.differences.length + (material.sopFlows?.length ?? 0) + (material.sopDifferences?.length ?? 0) + (resources?.length ?? 0)
           : Math.max(material.entries.length, material.differences.length);
         let offset = 0;
         if (query.cursor !== undefined) {
@@ -222,16 +234,19 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
         } else if (query.previous === true) {
           throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
         }
-        const { entries, differences, sopFlows, sopDifferences, ...materialHeader } = material;
+        const { entries, differences, sopFlows, sopDifferences } = material;
+        const materialHeader = graphMaterialHeader(material);
         if (graph) {
           const records = [
             ...entries.map(value => ({ collection: 'entries' as const, value })),
             ...differences.map(value => ({ collection: 'differences' as const, value })),
             ...(sopFlows ?? []).map(value => ({ collection: 'sopFlows' as const, value })),
             ...(sopDifferences ?? []).map(value => ({ collection: 'sopDifferences' as const, value })),
+            ...(resources ?? []).map(value => ({ collection: 'resourceDisables' as const, value })),
           ];
           const page = { key: view.key, entries: [] as C['IntakeEntry'][], differences: [] as C['IntakeDifference'][],
-            sopFlows: [] as C['IntakeSopFlowDefinition'][], sopDifferences: [] as C['IntakeSopFlowDifference'][], materialHeader, nextCursor: null as string | null };
+            sopFlows: [] as C['IntakeSopFlowDefinition'][], sopDifferences: [] as C['IntakeSopFlowDifference'][],
+            ...(resources ? { resourceDisables: [] as C['IntakeResourceDisable'][] } : {}), materialHeader, nextCursor: null as string | null };
           const headerBytes = Buffer.byteLength(JSON.stringify(page)) + 514;
           const pageEnd = (start: number) => {
             let end = start, bytes = headerBytes;
@@ -256,6 +271,7 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
               case 'differences': page.differences.push(record.value); break;
               case 'sopFlows': page.sopFlows.push(record.value); break;
               case 'sopDifferences': page.sopDifferences.push(record.value); break;
+              case 'resourceDisables': page.resourceDisables?.push(record.value); break;
             }
           }
           page.nextCursor = end < total ? `${end}.${sign(end)}` : null;

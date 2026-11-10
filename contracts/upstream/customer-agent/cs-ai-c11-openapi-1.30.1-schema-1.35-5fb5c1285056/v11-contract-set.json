@@ -1,0 +1,101 @@
+{
+  "schema": "customer-agent-contract-set/v11",
+  "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+  "source_repository": "ai-赋能立项",
+  "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+  "architecture_version": "1.16",
+  "implementation_version": "1.22",
+  "openapi": {
+    "version": "1.29.1",
+    "file": "openapi.v1.yaml",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/openapi.v1.yaml",
+    "sha256": "987c2a005f5aa2b4b4e5852c8e9f9054acc1021f304edc5cad6f59dcf0808408",
+    "bytes": 1349158
+  },
+  "database": {
+    "version": "schema.v1.33",
+    "file": "schema-v1.33.sql",
+    "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/schema-v1.33.sql",
+    "sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+    "bytes": 867684
+  },
+  "sopUnified": {
+    "storage": {
+      "version": "1",
+      "file": "storage.v1.sql",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/storage.v1.sql",
+      "sha256": "f2dfd7c6d7053d188089f7a171cb108ae2fa613bb5e7f30447acd0e1c4163510",
+      "bytes": 26978
+    },
+    "installation": {
+      "version": "1",
+      "file": "installation.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/installation.v1.json",
+      "sha256": "e7cd3e4cb55825c0a1b4d2c4e9a5975e07d35b8927b55eb061197c3861907f5b",
+      "bytes": 13020
+    },
+    "provenance": {
+      "version": "1",
+      "file": "provenance.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/provenance.v1.json",
+      "sha256": "f16491f11efc885723eaff6a18726bbdf581a0b9e814810d9b2d5eea5068c544",
+      "bytes": 2720
+    },
+    "predecessor": {
+      "version": "1",
+      "file": "predecessor-lock.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/predecessor-lock.v1.json",
+      "sha256": "d54c44873f2fa1b0f7bd29048fc40b66b22e2d7aac0c3b9f513c16c9d2763209",
+      "bytes": 1842
+    },
+    "compatibility": {
+      "version": "1",
+      "file": "compatibility.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/compatibility.v1.json",
+      "sha256": "debd346f146178dcc47fa22cc8a36f177a2d3e87efc6e70ee1526c5f3325fc55",
+      "bytes": 8378
+    },
+    "coverage": {
+      "version": "1",
+      "file": "operation-coverage.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/operation-coverage.v1.json",
+      "sha256": "d5c9e304459d099792002ec12d8becdf70f48bd12cfdb7cfdf9f13f20c078d20",
+      "bytes": 238594
+    },
+    "legacyIntake": {
+      "version": "7",
+      "file": "legacy-openapi.v7.yaml",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/legacy-openapi.v7.yaml",
+      "sha256": "9bc9071cb36ad75c0f0131aeb5648c477e26580579769bf1090a3e2a5f2d38b5",
+      "bytes": 795585
+    },
+    "legacyQuery": {
+      "version": "1",
+      "file": "legacy-query.openapi.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/legacy-query.openapi.v1.json",
+      "sha256": "ba93b2c29dd9e21829355252427016a649707278102aedbc649017f608f00dc9",
+      "bytes": 12271
+    },
+    "query": {
+      "version": "1",
+      "file": "query-transport.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/query-transport.v1.json",
+      "sha256": "57e47b7c6b15b9e051fa5cc164c82c1a80a338596f994633f16f7c7dbaf4546c",
+      "bytes": 16596
+    },
+    "authorization": {
+      "version": "1",
+      "file": "authorization.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/authorization.v1.json",
+      "sha256": "a7fe341de00b52c18bccbebb39f269ded5948b4d47dc588bb7267a271748f66d",
+      "bytes": 727
+    },
+    "negotiation": {
+      "version": "1",
+      "file": "negotiation-proof.v1.json",
+      "source_path": "business-docs/01-客服Agent项目/30-开发-进行中/content-intake-sop-unified-v1-1/negotiation-proof.v1.json",
+      "sha256": "5ce0fdded223e75b9468820db1d741fc229ba87c4c31d13b0fa0199afca54944",
+      "bytes": 165955
+    }
+  }
+}

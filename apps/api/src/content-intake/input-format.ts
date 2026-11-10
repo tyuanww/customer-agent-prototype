@@ -1,13 +1,20 @@
+import { isSopView } from './contract-view.js';
 import { CSV_MAPPING_VERSION, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, CSV_TEMPLATE_VERSION,
   INTAKE_POLICY, SOP_MAPPING_VERSION, SOP_RULE_VERSION, SOP_SHEET_NAMES, SOP_STRUCTURE_SHA256,
   SOP_TEMPLATE_VERSION, TEMPLATE_VERSION, type IntakeParseContext } from '@customer-agent/content-intake';
 import type { ContentSourceType } from '../content-object-store.js';
 import type { Source } from './authority.js';
 import { IntakeRejection } from './transaction.js';
-import { SOP_TASK_FORMAT, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
+import { SOP_TASK_FORMAT, SOP_RESOURCE_FORMAT, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import { intakeView } from './contract-view.js';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' as const;
+
+export function sourceGraphFormat(source: Source): typeof SOP_TASK_FORMAT | typeof SOP_RESOURCE_FORMAT | null {
+  if (source.structureDigest !== SOP_TASK_STRUCTURE_SHA256) return null;
+  return [SOP_TASK_FORMAT, SOP_RESOURCE_FORMAT].find(format => Object.entries(format)
+    .every(([key, value]) => Reflect.get(source, key) === value)) ?? null;
+}
 
 /** Owns the registered format tuple used by upload, isolated parsing and material.
  * Neither a client filename/MIME nor file metadata selects a template or grants a scope. */
@@ -16,9 +23,10 @@ export function sourceInputFormat(source: Source): Readonly<{
   sourceType: ContentSourceType; context: IntakeParseContext; selectedSheets: string[];
 }> {
   const scope = source.scope;
-  if (Object.entries(SOP_TASK_FORMAT).every(([key, value]) => Reflect.get(source, key) === value)
-    && source.structureDigest === SOP_TASK_STRUCTURE_SHA256) {
-    if (intakeView() !== 'graph') throw new IntakeRejection('UPGRADE_REQUIRED');
+  const graphFormat = sourceGraphFormat(source);
+  if (graphFormat) {
+    if (!isSopView()) throw new IntakeRejection('UPGRADE_REQUIRED');
+    if (graphFormat === SOP_RESOURCE_FORMAT && intakeView() !== 'resource-disable') throw new IntakeRejection('UPGRADE_REQUIRED');
     return { mime: XLSX, sourceType: 'excel', selectedSheets: [...SOP_TASK_SHEETS],
       context: { sourceId: scope.sourceId, brandId: scope.brandId, scope: scope.shopId ?? 'brand',
         scopeKind: scope.shopId === null ? 'brand' : 'shop', domain: scope.domain, templateVersion: 'sop-manual-authoring-v1.1' } };

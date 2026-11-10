@@ -1,5 +1,7 @@
-import { ContractValidationError, parseContractSchema as parse, type components } from '@customer-agent/contracts/sop-unified';
-import { parseSopTaskWorkbook, SOP_TASK_FORMAT, SOP_TASK_SHEETS, SOP_TASK_STRUCTURE_SHA256,
+import { parseContractSchema as parse } from '@customer-agent/contracts/sop-unified';
+import { parseContractSchema as parseResource } from '@customer-agent/contracts/sop-resource-disable';
+import { parseContractSchema as parseMaterial, isContractValidationError, intakeView, type components } from './contract-view.js';
+import { parseSopTaskWorkbook, SOP_TASK_FORMAT, SOP_RESOURCE_FORMAT, SOP_TASK_SHEETS,
   type SopTaskWorkbook, type SopTaskRow } from '@customer-agent/content-intake';
 import type { Source } from './authority.js';
 import { authorize } from './authority.js';
@@ -7,6 +9,7 @@ import { readCandidate, type Job } from './candidate.js';
 import { canonical, digest } from './material.js';
 import { IntakeRejection, type IntakeTransaction, type Principal } from './transaction.js';
 import { candidateContext } from './candidate.js';
+import { sourceGraphFormat } from './input-format.js';
 import type { ContentAttachmentStore, ReservedAttachment } from '../content-object-store.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { createIntakeTransactions } from './transaction.js';
@@ -19,10 +22,21 @@ type Media = C['IntakeSopMedia'];
 type Published = { sourceId: string; entry: C['IntakePublishedEntry'] };
 export type Graph = { definition: Flow; entries: Published[]; media: Media[] };
 export type GraphMaterial = C['IntakeMaterial'] & { canonicalEncodingVersion: 'candidate-sop-task-graph-v2';
-  sopFlows: Flow[]; sopDifferences: C['IntakeSopFlowDifference'][]; mappingDigest: string };
-export type GraphBase = { entries: Entry[]; graphs: Graph[]; recentDisables: number; versions: Record<string, number> };
-export const isGraphSource = (source: Source): boolean => Object.entries(SOP_TASK_FORMAT)
-  .every(([key, value]) => Reflect.get(source, key) === value) && source.structureDigest === SOP_TASK_STRUCTURE_SHA256;
+  sopFlows: Flow[]; sopDifferences: C['IntakeSopFlowDifference'][]; mappingDigest: string }
+  | Extract<C['IntakeMaterial'], { canonicalEncodingVersion: 'candidate-sop-resource-disable-v1' }>;
+type ResourceHistory = { baseReleaseSeq: number | null;
+  bindings: { resourceId: string; binding: C['IntakeResourceDisableBinding'] }[] };
+export type GraphBase = { entries: Entry[]; graphs: Graph[]; recentDisables: number;
+  versions: Record<string, number>; resourceHistory: ResourceHistory | null };
+export const isGraphSource = (source: Source): boolean => sourceGraphFormat(source) !== null;
+export function graphMaterialHeader(material: C['IntakeMaterial']) {
+  const { entries: _entries, differences: _differences, sopFlows: _flows, sopDifferences: _sopDifferences, ...remaining } = material;
+  if ('resourceDisables' in remaining) {
+    const { resourceDisables: _resources, ...header } = remaining;
+    return header;
+  }
+  return remaining;
+}
 const fail = (reason: 'SOP_MAPPING_REQUIRED' | 'SOP_GRAPH_INVALID' | 'SOP_DEPENDENCY_INVALID' = 'SOP_MAPPING_REQUIRED'): never => {
   throw new IntakeRejection(reason, 'VALIDATION');
 };
@@ -44,6 +58,32 @@ const json = (raw: string | undefined): unknown => {
 };
 const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
 const sorted = <T>(values: readonly T[], key: (value: T) => string): T[] => [...values].sort((a, b) => compare(key(a), key(b)));
+function sortResourceBindings(bindings: C['IntakeResourceDisableBinding'][]): C['IntakeResourceDisableBinding'][] {
+  const unique = new Set(bindings.map(binding => canonical(binding)));
+  if (unique.size !== bindings.length) return fail();
+  return [...bindings].sort((a, b) => {
+    const graph = a.releaseSeq - b.releaseSeq || compare(a.releaseId, b.releaseId)
+      || compare(a.flowKey.sourceId, b.flowKey.sourceId) || compare(a.flowKey.flowId, b.flowKey.flowId)
+      || a.flowKey.flowVersion - b.flowKey.flowVersion || compare(a.owner.kind, b.owner.kind);
+    if (graph) return graph;
+    let owner = 0;
+    if (a.owner.kind === 'entry' && b.owner.kind === 'entry') {
+      owner = compare(a.owner.entry.sourceId, b.owner.entry.sourceId)
+        || compare(a.owner.entry.businessEntryId, b.owner.entry.businessEntryId)
+        || a.owner.entry.scriptVersion - b.owner.entry.scriptVersion;
+    } else if (a.owner.kind !== 'entry' && b.owner.kind !== 'entry') owner = compare(a.owner.id, b.owner.id);
+    if (owner) return owner;
+    const kind = compare(a.content.kind, b.content.kind);
+    if (kind) return kind;
+    if (a.content.kind === 'image' && b.content.kind === 'image') {
+      return a.content.ordinal - b.content.ordinal || compare(a.content.objectId, b.content.objectId);
+    }
+    if (a.content.kind === 'knowledge' && b.content.kind === 'knowledge') {
+      return compare(a.content.nodeId, b.content.nodeId) || compare(a.content.contentDigest, b.content.contentDigest);
+    }
+    return 0;
+  });
+}
 const refKey = (ref: C['IntakeSopEntryRef']): string => canonical([ref.sourceId, ref.businessEntryId, ref.scriptVersion]);
 const flowKey = (key: C['IntakeSopFlowKey']): string => canonical([key.sourceId, key.flowId, key.flowVersion]);
 export function mediaKey(media: Media): string {
@@ -172,16 +212,20 @@ function audience(value: string | undefined): 'agent' | 'coach' | 'customer' {
 export async function prepareImport(bytes: Buffer, source: Source, base: GraphBase): Promise<{
   workbook: SopTaskWorkbook; entries: Entry[]; flows: Flow[]; mediaOwners: { resourceId: string; flow: Flow;
     owner: { entry: C['IntakeSopEntryRef'] } | { graphTarget: NonNullable<Media['graphTarget']> }; row: SopTaskRow['values'] }[];
+  resourceDisables: SopTaskRow[];
 }> {
-  if (!isGraphSource(source)) return fail();
+  const format = sourceGraphFormat(source);
+  if (!format) return fail();
   const mapping = object(source.graphMapping), flowMappings = object(mapping.flows), entryMappings = object(mapping.entries);
   if (mapping.riskLevel !== 'routine' && mapping.riskLevel !== 'critical') return fail();
   try { parse('IntakeSourceClaim', { ...object(mapping.sourceClaim), fileSha256: digest(bytes) }); }
-  catch (error) { if (error instanceof ContractValidationError) return fail(); throw error; }
-  const workbook = await parseSopTaskWorkbook(bytes);
+  catch (error) { if (isContractValidationError(error)) return fail(); throw error; }
+  const workbook = await parseSopTaskWorkbook(bytes, format.ruleVersion);
   const before = new Map(base.entries.map(entry => [entry.businessEntryId, entry]));
   const entries = new Map(before);
-  const resources = rowsById(workbook.sheets['资源与图片'], '资源编号');
+  rowsById(workbook.sheets['资源与图片'], '资源编号');
+  const resourceDisables = workbook.sheets['资源与图片'].filter(row => row.values['维护状态'] === '停用');
+  const resources = rowsById(workbook.sheets['资源与图片'].filter(row => row.values['维护状态'] === '启用'), '资源编号');
   const knowledge = rowsById(workbook.sheets['知识与案例'], '知识编号');
   for (const [id, row] of rowsById(workbook.sheets['客户话术'], '话术编号')) {
     const metadata = object(entryMappings[id]);
@@ -190,7 +234,7 @@ export async function prepareImport(bytes: Buffer, source: Source, base: GraphBa
     try {
       entry = parse('IntakeEntry', { ...metadata, businessEntryId: id, scriptVersion: old?.scriptVersion ?? 1,
         operation: row['维护状态'] === '停用' ? 'disable' : 'upsert', title: row['话术标题'], answerText: row['对客正文'] });
-    } catch (error) { if (error instanceof ContractValidationError) return fail(); throw error; }
+    } catch (error) { if (isContractValidationError(error)) return fail(); throw error; }
     if (old && canonical({ ...old, scriptVersion: 1 }) !== canonical({ ...entry, scriptVersion: 1 })) entry.scriptVersion++;
     if (!old && entry.operation === 'disable') return fail();
     entries.set(id, entry);
@@ -289,7 +333,7 @@ export async function prepareImport(bytes: Buffer, source: Source, base: GraphBa
   }
   if (usedTasks.size !== tasks.size || usedResources.size !== resources.size || usedKnowledge.size !== knowledge.size
     || workbook.sheets['判断分支'].some(row => !usedTasks.has(row.values['任务编号'] ?? ''))) return fail();
-  return { workbook, entries: sorted([...entries.values()], entry => entry.businessEntryId), flows, mediaOwners };
+  return { workbook, entries: sorted([...entries.values()], entry => entry.businessEntryId), flows, mediaOwners, resourceDisables };
 }
 
 export async function readBase(tx: IntakeTransaction, actor: Principal, sourceId: string, release: string | null): Promise<GraphBase> {
@@ -302,7 +346,18 @@ export async function readBase(tx: IntakeTransaction, actor: Principal, sourceId
     FROM content_intake.publications p JOIN content_intake.candidate_versions c ON c.candidate_id=p.candidate_id AND c.version=p.candidate_version
     JOIN public.content_releases r ON r.release_id=p.release_id WHERE c.source_id=$1
       AND r.published_at>clock_timestamp()-interval '24 hours' AND r.published_at<=clock_timestamp()`, [sourceId]);
-  return { versions: graphs.rows[0]?.value.versions ?? {}, recentDisables: Number(recent.rows[0]!.count), entries: entries.rows.map(row => parse('IntakeEntry', row.entry)), graphs: (graphs.rows[0]?.value.graphs ?? []).map(graph => {
+  let resourceHistory: ResourceHistory | null = null;
+  if (intakeView() === 'resource-disable') {
+    const history = await tx.query<{ value: unknown }>('SELECT content_intake.read_sop_resource_history($1,$2,$3) AS value', [actor.id, sourceId, release]);
+    const raw = object(history.rows[0]?.value);
+    if (raw.baseReleaseSeq !== null && !Number.isSafeInteger(raw.baseReleaseSeq) || !Array.isArray(raw.bindings)) return fail();
+    resourceHistory = { baseReleaseSeq: raw.baseReleaseSeq === null ? null : Number(raw.baseReleaseSeq),
+      bindings: raw.bindings.map(value => {
+        const row = object(value);
+        return { resourceId: parse('IntakeId', row.resourceId), binding: parseResource('IntakeResourceDisableBinding', row.binding) };
+      }) };
+  }
+  return { resourceHistory, versions: graphs.rows[0]?.value.versions ?? {}, recentDisables: Number(recent.rows[0]!.count), entries: entries.rows.map(row => parse('IntakeEntry', row.entry)), graphs: (graphs.rows[0]?.value.graphs ?? []).map(graph => {
     validateGraph(graph); return graph;
   }) };
 }
@@ -345,26 +400,46 @@ export function makeMaterial(input: { prepared: Awaited<ReturnType<typeof prepar
       previousVersion: old?.scriptVersion ?? null, nextVersion: entry.scriptVersion,
       beforeDigest: old ? digest(canonical(old)) : null, afterDigest: digest(canonical(entry)) }];
   });
-  const disabled = differences.filter(item => item.change === 'disable').length + sopDifferences.filter(item => item.change === 'disable').length;
+  const resourceDisables = prepared.resourceDisables.map(row => {
+    if (!base.resourceHistory || !base.resourceHistory.baseReleaseSeq) return fail();
+    const resourceId = row.values['资源编号'];
+    const bindings = base.resourceHistory.bindings.filter(item => item.resourceId === resourceId).map(item => item.binding);
+    return parseResource('IntakeResourceDisable', { key: { sourceId: source.scope.sourceId, resourceId }, operation: 'disable',
+      sourceRow: { sheet: '资源与图片', row: row.row, resourceName: row.values['资源名称'], maintenanceState: '停用' },
+      bindings: sortResourceBindings(bindings) });
+  });
+  resourceDisables.sort((a, b) => compare(a.key.resourceId, b.key.resourceId));
+  if (resourceDisables.length > 100 || resourceDisables.reduce((sum, item) => sum + item.bindings.length, 0) > 5000) {
+    throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
+  }
+  const disabled = differences.filter(item => item.change === 'disable').length + sopDifferences.filter(item => item.change === 'disable').length
+    + resourceDisables.length;
   const critical = object(source.graphMapping).riskLevel === 'critical' || prepared.entries.some(entry => entry.riskNote.trim())
     || base.entries.some(entry => entry.riskNote.trim()) || disabled + base.recentDisables >= 2;
-  const material = { canonicalEncodingVersion: 'candidate-sop-task-graph-v2' as const, scope: source.scope, sourceVersion: source.version,
+  const resourceFormat = sourceGraphFormat(source) === SOP_RESOURCE_FORMAT;
+  const material = { canonicalEncodingVersion: resourceFormat ? 'candidate-sop-resource-disable-v1' as const : 'candidate-sop-task-graph-v2' as const,
+    scope: source.scope, sourceVersion: source.version,
     sourceClaim: parse('IntakeSourceClaim', { ...object(object(source.graphMapping).sourceClaim), fileSha256: input.object.sha256 }),
-    ...SOP_TASK_FORMAT, selectedSheets: [...SOP_TASK_SHEETS], object: input.object, entries: prepared.entries, differences,
+    ...(resourceFormat ? SOP_RESOURCE_FORMAT : SOP_TASK_FORMAT), selectedSheets: [...SOP_TASK_SHEETS], object: input.object, entries: prepared.entries, differences,
     contributors: sorted(input.job.contributor_ids, id => id), baseReleaseId: input.job.base_release_id,
-    risk: { policyVersion: 'risk-p1.1' as const, level: critical ? 'critical' as const : 'routine' as const,
-      reasons: critical ? ['CRITICAL_CHANGE'] : [], explicitDisableCount: disabled, sameSourceDisabledLast24Hours: base.recentDisables, evaluatedAt: new Date(input.now).toISOString() },
+    risk: { policyVersion: resourceFormat ? 'risk-sop-resource-disable-v1' as const : 'risk-p1.1' as const, level: critical ? 'critical' as const : 'routine' as const,
+      reasons: [...(critical ? ['CRITICAL_CHANGE'] : []), ...(resourceDisables.length ? ['SOP_RESOURCE_DISABLE'] : [])],
+      explicitDisableCount: disabled, sameSourceDisabledLast24Hours: base.recentDisables, evaluatedAt: new Date(input.now).toISOString() },
     sopFlows: sorted([...flows.values()], flow => flowKey(flow.header.key)), sopDifferences: sorted(sopDifferences, difference => difference.flowId),
-    media: sortMedia([...media.values()]), mappingDigest: '' };
+    media: sortMedia([...media.values()]), mappingDigest: '', ...(resourceFormat ? { resourceDisables,
+      resourceDisableCount: resourceDisables.length, resourceDisableSetDigest: digest(canonical(resourceDisables)),
+      baseReleaseSeq: base.resourceHistory?.baseReleaseSeq ?? null } : {}) };
   material.mappingDigest = digest(canonical({ mappingVersion: material.mappingVersion, sourceVersion: material.sourceVersion, scope: material.scope,
     objectSha256: material.object.sha256, selectedSheets: material.selectedSheets, flows: material.sopFlows,
     entryRefs: material.entries.map(entry => ({ sourceId: source.scope.sourceId, businessEntryId: entry.businessEntryId, scriptVersion: entry.scriptVersion })), media: material.media }));
-  const validated = parse('IntakeMaterial', material);
-  if (validated.canonicalEncodingVersion !== 'candidate-sop-task-graph-v2' || !validated.sopFlows || !validated.sopDifferences || !validated.mappingDigest) return fail();
-  const result: GraphMaterial = { ...validated, canonicalEncodingVersion: validated.canonicalEncodingVersion,
-    sopFlows: validated.sopFlows, sopDifferences: validated.sopDifferences, mappingDigest: validated.mappingDigest };
+  const validated = parseMaterial('IntakeMaterial', material);
+  if (validated.canonicalEncodingVersion !== 'candidate-sop-task-graph-v2' && validated.canonicalEncodingVersion !== 'candidate-sop-resource-disable-v1'
+    || !validated.sopFlows || !validated.sopDifferences || !validated.mappingDigest) return fail();
+  const result: GraphMaterial = validated.canonicalEncodingVersion === 'candidate-sop-resource-disable-v1' ? validated
+    : { ...validated, canonicalEncodingVersion: 'candidate-sop-task-graph-v2',
+      sopFlows: validated.sopFlows, sopDifferences: validated.sopDifferences, mappingDigest: validated.mappingDigest };
   for (const flow of result.sopFlows) graphFor(result, flow);
-  const { entries: _entries, differences: _differences, sopFlows: _flows, sopDifferences: _sopDifferences, ...header } = result;
+  const header = graphMaterialHeader(result);
   if (Buffer.byteLength(JSON.stringify(result)) > 33_554_432 || Buffer.byteLength(JSON.stringify(header)) > 262_144) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
   for (const record of [...result.entries, ...result.sopFlows]) {
     if (Buffer.byteLength(JSON.stringify(record)) + Buffer.byteLength(JSON.stringify(header)) + 4096 > 1_048_576) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
@@ -374,6 +449,14 @@ export function makeMaterial(input: { prepared: Awaited<ReturnType<typeof prepar
     const sample = { scriptId, contentHash: '0'.repeat(64), mandatory: true, entry,
       check: { scriptId, contentHash: '0'.repeat(64), defect: true, reason: '😀'.repeat(2000) } };
     if (Buffer.byteLength(JSON.stringify(sample)) > 524_288) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
+  }
+  for (const disable of resourceDisables) {
+    const target = { key: disable.key, disableDigest: digest(canonical(disable)) };
+    const sample = { target, disable, check: { target, defect: true, reason: '😀'.repeat(2000) } };
+    if (Buffer.byteLength(JSON.stringify(sample)) > 524_288
+      || Buffer.byteLength(JSON.stringify(disable)) + Buffer.byteLength(JSON.stringify(header)) + 4096 > 1_048_576) {
+      throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
+    }
   }
   return result;
 }
@@ -392,7 +475,24 @@ export async function qualityContribution(tx: IntakeTransaction, actor: Principa
     'SELECT content_intake.read_sop_graph_quality($1,$2,$3,$4) AS value', [actor.id, key.candidateId, key.version, key.digest]);
   const targets = (rows.rows[0]?.value.targets ?? []).map(target => parse('IntakeSopSopQualityTarget', target));
   const checks = (rows.rows[0]?.value.checks ?? []).map(row => ({ phase: row.phase, check: parse('IntakeSopFlowCheck', row.check) }));
-  return { targets, checks, sopPlan: { policyVersion: 'sop-task-graph-quality-v2' as const, materialDigest: key.digest,
+  let resource: { samples: C['IntakeResourceDisableSample'][];
+    checks: { phase: 'initial' | 'expanded'; check: C['IntakeResourceDisableCheck'] }[];
+    plan: C['IntakeResourceDisablePlan'] } | null = null;
+  if (intakeView() === 'resource-disable') {
+    const result = await tx.query<{ value: { disables: unknown[];
+      checks: { phase: 'initial' | 'expanded'; check: unknown }[] } }>(
+      'SELECT content_intake.read_sop_resource_quality($1,$2,$3,$4) AS value', [actor.id, key.candidateId, key.version, key.digest]);
+    const value = result.rows[0]?.value;
+    if (!value) return fail();
+    const disables = value.disables.map(item => parseResource('IntakeResourceDisable', item));
+    const resourceTargets = disables.map(disable => ({ key: disable.key, disableDigest: digest(canonical(disable)) }));
+    resource = { samples: disables.map((disable, index) => ({ disable, target: resourceTargets[index]!, check: null })),
+      checks: value.checks.map(row => ({ phase: row.phase, check: parseResource('IntakeResourceDisableCheck', row.check) })),
+      plan: { policyVersion: 'sop-resource-disable-quality-v1', materialDigest: key.digest,
+        resourceDisableSetDigest: digest(canonical(disables)), targetCount: disables.length,
+        targetsDigest: digest(canonical(resourceTargets)) } };
+  }
+  return { targets, checks, resource, sopPlan: { policyVersion: 'sop-task-graph-quality-v2' as const, materialDigest: key.digest,
     targetCount: targets.length, targetsDigest: digest(canonical(targets)) } };
 }
 

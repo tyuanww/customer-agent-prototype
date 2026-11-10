@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { parseSopTaskWorkbook, SopTaskWorkbookFailure, SOP_TASK_SHEETS } from '../src/sop-task-workbook.js';
+import { parseSopTaskWorkbook, SopTaskWorkbookFailure, SOP_TASK_SHEETS, SOP_RESOURCE_FORMAT } from '../src/sop-task-workbook.js';
 import { graphImageFixtures, syntheticTaskGraphWorkbook } from './support/sop-task-graph-workbook.js';
 
 describe('registered v1.1 six-table parser', () => {
@@ -44,5 +44,29 @@ describe('registered v1.1 six-table parser', () => {
       expect(error).toBeInstanceOf(SopTaskWorkbookFailure);
       expect(error).toMatchObject({ issue: { code: 'NON_TEXT_CELL', sheet: '客户话术', row: 2, column: 'C' } });
     }
+  });
+
+  it('retains explicitly reviewed resource disables for the registered successor rule', async () => {
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await syntheticTaskGraphWorkbook() as unknown as ExcelJS.Buffer);
+    book.getWorksheet('资源与图片')!.getCell('H3').value = '停用';
+    const parsed = await parseSopTaskWorkbook(Buffer.from(await book.xlsx.writeBuffer()), SOP_RESOURCE_FORMAT.ruleVersion);
+    expect(parsed.sheets['资源与图片'][1]).toMatchObject({ row: 3, values: { 维护状态: '停用' } });
+    expect(parsed.images).toHaveLength(3);
+  });
+
+  it('still rejects a successor resource disable with unresolved review or another unsupported row kind', async () => {
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await syntheticTaskGraphWorkbook() as unknown as ExcelJS.Buffer);
+    const resources = book.getWorksheet('资源与图片')!;
+    resources.getCell('H3').value = '停用';
+    resources.getCell('J3').value = '合成待确认项';
+    await expect(parseSopTaskWorkbook(Buffer.from(await book.xlsx.writeBuffer()), SOP_RESOURCE_FORMAT.ruleVersion))
+      .rejects.toMatchObject({ issue: { code: 'SOP_MAPPING_REQUIRED', sheet: '资源与图片', row: 3 } });
+    resources.getCell('J3').value = '';
+    const tasks = book.getWorksheet('执行任务')!;
+    tasks.getCell(2, tasks.columnCount - 2).value = '停用';
+    await expect(parseSopTaskWorkbook(Buffer.from(await book.xlsx.writeBuffer()), SOP_RESOURCE_FORMAT.ruleVersion))
+      .rejects.toMatchObject({ code: 'SOP_MAPPING_REQUIRED' });
   });
 });

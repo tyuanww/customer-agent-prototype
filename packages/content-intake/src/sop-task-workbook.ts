@@ -9,6 +9,9 @@ import { extractWpsDisplayImages, type WpsImageCoordinate } from './sop-wps-imag
 const review = ['维护状态', '业务确认人', '待确认事项'];
 export const SOP_TASK_FORMAT = Object.freeze({ templateVersion: 'sop-manual-authoring-v1.1',
   ruleVersion: 'sop-task-graph-v2', mappingVersion: 'sop-manual-to-task-graph-v2' });
+export const SOP_RESOURCE_FORMAT = Object.freeze({ templateVersion: SOP_TASK_FORMAT.templateVersion,
+  ruleVersion: 'sop-task-graph-resource-disable-v1', mappingVersion: 'sop-manual-to-task-graph-resource-disable-v1' });
+export type SopTaskRuleVersion = typeof SOP_TASK_FORMAT.ruleVersion | typeof SOP_RESOURCE_FORMAT.ruleVersion;
 export const SOP_TASK_HEADERS = {
   场景目录: ['场景编号', '场景名称', '适用范围', '起始任务编号', '入口词', '生效时间', '失效时间', ...review],
   执行任务: ['记录类型', '任务编号', '场景编号', '阶段', '任务名称', '任务类型', '操作要求', '确认项配置', '下一任务编号', '关联知识编号', '关联资源编号', '可见对象', '关联编号', '话术编号', '适用条件', '话术关系', '确认项编号', '确认项文字', '确认项顺序', ...review],
@@ -29,7 +32,8 @@ export class SopTaskWorkbookFailure extends IntakeFailure {
 
 /** Reads the registered six-table format only. Identity, authority and mapping
  * remain server-owned. A rejected row never produces a partial usable graph. */
-export async function parseSopTaskWorkbook(bytes: Buffer): Promise<SopTaskWorkbook> {
+export async function parseSopTaskWorkbook(bytes: Buffer,
+  ruleVersion: SopTaskRuleVersion = SOP_TASK_FORMAT.ruleVersion): Promise<SopTaskWorkbook> {
   await inspectArchive(bytes);
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await prepareSopWorkbookBytes(bytes) as unknown as ExcelJS.Buffer);
@@ -72,11 +76,12 @@ export async function parseSopTaskWorkbook(bytes: Buffer): Promise<SopTaskWorkbo
       if (!['启用', '停用'].includes(values['维护状态'] ?? '') || !values['业务确认人']?.trim()
         || values['待确认事项'] !== '') throw new SopTaskWorkbookFailure({ code: 'SOP_MAPPING_REQUIRED', sheet: name,
           row: number, column: row.getCell(headers.length).address.replace(/[0-9]/g, ''), fix: '逐行明确维护状态、确认人及待确认事项' });
-      if (name === '资源与图片' && values['维护状态'] === '停用') throw new SopTaskWorkbookFailure({
+      const resourceDisable = name === '资源与图片' && values['维护状态'] === '停用';
+      if (resourceDisable && ruleVersion !== SOP_RESOURCE_FORMAT.ruleVersion) throw new SopTaskWorkbookFailure({
         code: 'SOP_MAPPING_REQUIRED', sheet: name, row: number, column: 'H',
         fix: '冻结材料缺少可审阅的资源独立停用及对应质量目标，补齐合同后重新接收',
       });
-      if (name !== '场景目录' && name !== '客户话术' && values['维护状态'] === '停用') throw new IntakeFailure('SOP_MAPPING_REQUIRED');
+      if (name !== '场景目录' && name !== '客户话术' && !resourceDisable && values['维护状态'] === '停用') throw new IntakeFailure('SOP_MAPPING_REQUIRED');
       sheets[name].push({ row: number, values });
       if (name === '资源与图片') resourceRows.set(number, values['资源编号'] ?? '');
     });

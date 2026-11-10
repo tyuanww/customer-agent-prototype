@@ -1,0 +1,910 @@
+{
+  "schema": "customer-agent-resource-disable-consumer-handoff/v1",
+  "versions": {
+    "openapi": "1.30.1",
+    "database": "schema.v1.35",
+    "profile": "content-intake-sop-resource-disable-v1"
+  },
+  "sourceGitSha": null,
+  "contractSetId": null,
+  "predecessor": {
+    "sourceGitSha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+    "contractSetId": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f"
+  },
+  "canonicalEncodingVersion": "candidate-sop-resource-disable-v1",
+  "releaseSequenceOwner": "public.content_releases.release_seq",
+  "schemas": {
+    "IntakeResourceDisableKey": {
+      "required": [
+        "sourceId",
+        "resourceId"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/components/schemas/IntakeId"
+        },
+        "resourceId": {
+          "$ref": "#/components/schemas/IntakeId"
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableOwner": {
+      "required": [],
+      "properties": {},
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "task",
+                "knowledge"
+              ]
+            },
+            "id": {
+              "$ref": "#/components/schemas/IntakeId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entry"
+          ],
+          "properties": {
+            "kind": {
+              "const": "entry"
+            },
+            "entry": {
+              "$ref": "#/components/schemas/IntakeSopEntryRef"
+            }
+          }
+        }
+      ]
+    },
+    "IntakeResourceDisableContent": {
+      "required": [],
+      "properties": {},
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "objectId",
+            "sha256",
+            "mime",
+            "bytes",
+            "alt",
+            "required",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "image"
+            },
+            "objectId": {
+              "$ref": "#/components/schemas/IntakeId"
+            },
+            "sha256": {
+              "$ref": "#/components/schemas/IntakeSopHash"
+            },
+            "mime": {
+              "enum": [
+                "image/png",
+                "image/jpeg",
+                "image/gif"
+              ]
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5242880
+            },
+            "alt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contentDigest",
+            "title",
+            "body",
+            "audience",
+            "nodeId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "knowledge"
+            },
+            "contentDigest": {
+              "$ref": "#/components/schemas/IntakeSopHash"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32767
+            },
+            "audience": {
+              "enum": [
+                "agent",
+                "coach"
+              ]
+            },
+            "nodeId": {
+              "$ref": "#/components/schemas/IntakeId"
+            }
+          }
+        }
+      ]
+    },
+    "IntakeResourceDisableBinding": {
+      "required": [
+        "releaseId",
+        "releaseSeq",
+        "flowKey",
+        "graphDigest",
+        "owner",
+        "content"
+      ],
+      "properties": {
+        "releaseId": {
+          "$ref": "#/components/schemas/IntakeId"
+        },
+        "releaseSeq": {
+          "$ref": "#/components/schemas/IntakeVersion"
+        },
+        "flowKey": {
+          "$ref": "#/components/schemas/IntakeSopFlowKey"
+        },
+        "graphDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "owner": {
+          "$ref": "#/components/schemas/IntakeResourceDisableOwner"
+        },
+        "content": {
+          "$ref": "#/components/schemas/IntakeResourceDisableContent"
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisable": {
+      "required": [
+        "key",
+        "operation",
+        "sourceRow",
+        "bindings"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/components/schemas/IntakeResourceDisableKey"
+        },
+        "operation": {
+          "const": "disable"
+        },
+        "sourceRow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sheet",
+            "row",
+            "resourceName",
+            "maintenanceState"
+          ],
+          "properties": {
+            "sheet": {
+              "const": "资源与图片"
+            },
+            "row": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1048576
+            },
+            "resourceName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "maintenanceState": {
+              "const": "停用"
+            }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/components/schemas/IntakeResourceDisableBinding"
+          }
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableTarget": {
+      "required": [
+        "key",
+        "disableDigest"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/components/schemas/IntakeResourceDisableKey"
+        },
+        "disableDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableCheck": {
+      "required": [
+        "target",
+        "defect",
+        "reason"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/components/schemas/IntakeResourceDisableTarget"
+        },
+        "defect": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisablePlan": {
+      "required": [
+        "policyVersion",
+        "materialDigest",
+        "resourceDisableSetDigest",
+        "targetCount",
+        "targetsDigest"
+      ],
+      "properties": {
+        "policyVersion": {
+          "const": "sop-resource-disable-quality-v1"
+        },
+        "materialDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "resourceDisableSetDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "targetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "targetsDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableCheckSummary": {
+      "required": [
+        "checkedCount",
+        "defectCount",
+        "checksDigest"
+      ],
+      "properties": {
+        "checkedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "defectCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "checksDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableSample": {
+      "required": [
+        "target",
+        "disable",
+        "check"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/components/schemas/IntakeResourceDisableTarget"
+        },
+        "disable": {
+          "$ref": "#/components/schemas/IntakeResourceDisable"
+        },
+        "check": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/IntakeResourceDisableCheck"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableLineage": {
+      "required": [
+        "materialDigest",
+        "resourceDisableSetDigest",
+        "resourceDisableCount"
+      ],
+      "properties": {
+        "materialDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "resourceDisableSetDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "resourceDisableCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "oneOf": []
+    },
+    "IntakeResourceDisableQualityReport": {
+      "required": [
+        "key",
+        "canonicalEncodingVersion",
+        "sourceEvidenceVersion",
+        "mappingDigest",
+        "baseReleaseId",
+        "baseReleaseSeq",
+        "plan",
+        "samples",
+        "rounds"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/components/schemas/IntakeCandidateKey"
+        },
+        "canonicalEncodingVersion": {
+          "const": "candidate-sop-resource-disable-v1"
+        },
+        "sourceEvidenceVersion": {
+          "$ref": "#/components/schemas/IntakeVersion"
+        },
+        "mappingDigest": {
+          "$ref": "#/components/schemas/IntakeSopHash"
+        },
+        "baseReleaseId": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/IntakeId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseReleaseSeq": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/IntakeVersion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plan": {
+          "$ref": "#/components/schemas/IntakeResourceDisablePlan"
+        },
+        "samples": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/components/schemas/IntakeResourceDisableSample"
+          }
+        },
+        "rounds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "phase",
+              "reviewer",
+              "checks",
+              "summary"
+            ],
+            "properties": {
+              "phase": {
+                "enum": [
+                  "initial",
+                  "expanded"
+                ]
+              },
+              "reviewer": {
+                "$ref": "#/components/schemas/IntakeQualityAttribution"
+              },
+              "checks": {
+                "type": "array",
+                "minItems": 0,
+                "maxItems": 100,
+                "items": {
+                  "$ref": "#/components/schemas/IntakeResourceDisableCheck"
+                }
+              },
+              "summary": {
+                "$ref": "#/components/schemas/IntakeResourceDisableCheckSummary"
+              }
+            }
+          }
+        }
+      },
+      "oneOf": []
+    }
+  },
+  "materialFields": [
+    "resourceDisables",
+    "resourceDisableCount",
+    "resourceDisableSetDigest",
+    "baseReleaseSeq"
+  ],
+  "sourceConfirmationFields": [
+    "resourceDisableSetDigest"
+  ],
+  "qualityFields": [
+    "resourceDisablePlan",
+    "resourceDisableItems",
+    "resourceDisableChecks",
+    "resourceDisableChecksSummary"
+  ],
+  "publicationFields": [
+    "resourceDisableLineage"
+  ],
+  "rollbackFields": [
+    "retainedResourceDisableEventsDigest",
+    "newResourceDisableCount"
+  ],
+  "candidateMediaSelectors": [
+    "resourceDisableDigest",
+    "bindingReleaseId"
+  ],
+  "persistentTables": [
+    "content_intake.sop_resource_disables",
+    "content_intake.sop_resource_disable_quality_targets",
+    "content_intake.sop_resource_disable_quality_checks",
+    "content_intake.sop_resource_disable_publications",
+    "content_intake.sop_resource_disable_event_lineage"
+  ],
+  "continuationLifecycle": {
+    "authority": {
+      "sourceGitSha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "contractSetId": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "member": "openapi.v1.yaml",
+      "jsonPointers": {
+        "firstOpen": "/x-sop-graph-contract/actionCheck/description",
+        "invalidation": "/x-sop-graph-contract/actionCheck/invalidation/1",
+        "resume": "/x-sop-graph-contract/actionCheck/continuation/resume",
+        "restart": "/x-sop-graph-contract/actionCheck/continuation/end",
+        "rollback": "/x-sop-graph-contract/publication/rules/5",
+        "explicitDisable": "/x-sop-graph-contract/format/rules/8",
+        "rollbackScope": "/paths/~1v1~1intake~1rollback~1preview/post/description"
+      }
+    },
+    "disableEventScope": "since-continuation-opening",
+    "disableEventCutoff": "server-recorded-opening-release-sequence",
+    "originalGraphPublicationIsDisableCutoff": false,
+    "closedHandleMayReopen": false,
+    "firstOpenRequiresCurrent": true,
+    "firstOpenRequiresFreshValidation": true,
+    "validatedRollbackCurrentMayOpenNewHandle": true,
+    "rollbackRequiresNewSourceUpsert": false,
+    "ordinaryRollbackCreatesResourceDisableIntent": false,
+    "ordinaryRollbackNewResourceDisableCount": 0,
+    "newResourceDisableCountSource": "new-explicit-material-resourceDisables",
+    "retainedHistoryOrCatalogCopyCreatesNewSourceIntent": false
+  },
+  "queryContinuation": {
+    "schema": "customer-agent-sop-query-continuation/v1",
+    "selection": {
+      "strategy": "reuse-current-entitlement",
+      "approvedDesignSha256": "4a674297dbd04cf4814c7ab0d2f15d55b06175080d43c85e7a73557862a66052",
+      "openingProof": "immutable-resolvable-reference-and-digest",
+      "sqlMapping": "actual-exact-product87-consumer-owned"
+    },
+    "unicodeText": {
+      "fields": [
+        "query_text",
+        "context_generation",
+        "product_context.ref"
+      ],
+      "pattern": "^[^\\u0000\\uD800-\\uDFFF]*$",
+      "regexMode": "unicode",
+      "invalid": [
+        "NUL",
+        "unpaired-high-surrogate",
+        "unpaired-low-surrogate"
+      ],
+      "validAstralAllowed": true,
+      "httpStatus": 400,
+      "classification": "existing-request-validation",
+      "owner": "existing-HTTP-boundedString-and-request-schema",
+      "businessRestriction": false
+    },
+    "fields": {
+      "query": {
+        "schema": "MenokinSopQuerySopQueryRequest",
+        "field": "entitlement_id",
+        "required": true,
+        "ref": "#/components/schemas/IntakeId"
+      },
+      "actionCheck": {
+        "schema": "IntakeSopActionCheck",
+        "field": "queryRequestId",
+        "required": true,
+        "open": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "otherActions": {
+          "type": "null"
+        }
+      },
+      "unchanged": [
+        "IntakeSopContinuationRenew",
+        "IntakeSopContinuationClose",
+        "MenokinSopQuerySopReadyResponse"
+      ]
+    },
+    "entitlement": {
+      "owner": "existing-selection-and-entitlement-owner",
+      "queryMayIssueAnotherEntitlement": false,
+      "acceptedKind": "ordinary-current",
+      "continuationBoundHistoricalEntitlementAccepted": false,
+      "identity": [
+        "authenticated-actor",
+        "authenticated-current-product-session"
+      ],
+      "validate": [
+        "content_current",
+        "shop_id",
+        "full-original-productIds",
+        "full-original-scenarioIds",
+        "current-scope-and-revocation-generation",
+        "real-validUntil",
+        "source-content-approval-object-and-media"
+      ],
+      "selectionSource": "retained-entitlement-context",
+      "missingSelection": "blocked",
+      "productContext": {
+        "role": "optional-consistency-assertion",
+        "skuAndCategoryRef": "must-already-belong-to-entitlement-product-selection",
+        "storewide": "requires-corresponding-empty-product-selection",
+        "omittedOrNull": "preserves-full-selection",
+        "unresolvedExistingIdentity": "blocked",
+        "mayReplaceOrExpandSelection": false
+      },
+      "generations": {
+        "query": "opaque-string-preserved",
+        "entitlement": "existing-numeric-contextGeneration",
+        "conversionAllowed": false
+      },
+      "prohibitedPayloadFields": [
+        "OAuth-token",
+        "userId",
+        "arbitrary-authorization-scope"
+      ]
+    },
+    "readyProof": {
+      "owner": "existing-C-committed-ready-and-consumed-facts-owner",
+      "lookupKey": [
+        "authenticated-principal",
+        "original-product-session",
+        "selected-exact-view",
+        "queryRequestId"
+      ],
+      "immutableBindings": [
+        "queryRequestHash",
+        "original-entitlement",
+        "full-original-selection",
+        "release",
+        "FlowKey",
+        "graphDigest",
+        "exact-entries",
+        "exact-permissions",
+        "selected-media-and-dependencies",
+        "exact-consumed-facts-reference",
+        "query-lease-deadline"
+      ],
+      "factsReference": [
+        "factsCandidateId",
+        "factsCandidateVersion",
+        "factsVersion"
+      ],
+      "queryCommit": "ready-receipt-consumed-facts-binding-and-query-lease-commit-atomically-before-ready",
+      "nonReadyMayOpen": false,
+      "latestFactsFallback": false,
+      "snapshotOnlyMayOpen": false,
+      "distinctReadyVersions": "resolve-the-requested-Q-exactly-even-for-the-same-graphDigest",
+      "canonicalRequestIncludes": [
+        "entitlement_id",
+        "all-existing-query-fields"
+      ],
+      "sameQDifferentPayload": "IDEMPOTENCY_CONFLICT",
+      "sameQNewFactsAllowed": false,
+      "mutableAuthorityMayChangeLookupNamespace": false,
+      "queryReplayExtendsDeadline": false,
+      "lease": {
+        "maximumSeconds": 300,
+        "deadline": "minimum-of-real-entitlement-session-authorization-source-content-approval-media-and-facts-deadlines"
+      }
+    },
+    "firstOpen": {
+      "lookupExistingHandleFirst": true,
+      "queryRequestId": "original-C-request_id",
+      "requiresCommittedReady": true,
+      "requiresOriginalEntitlementAndSelection": true,
+      "requiresLiveQueryLease": true,
+      "requiresLiveOriginalEntitlement": true,
+      "requiresCurrentRelease": true,
+      "requiresExactGraphEntriesPermissionsAndFacts": true,
+      "requiresOriginalStartNode": true,
+      "currentAuthorizationAndContentRevalidated": true,
+      "atomicity": "locked-content-and-authority-validation-active-proof-binding-and-existing-narrow-issuer",
+      "mediaBoundary": "existing-two-phase-byte-and-fingerprint-recheck-before-commit"
+    },
+    "existingHandleReplay": {
+      "proof": "recorded-original-immutable-reference",
+      "requiresExactOriginalQAndBinding": true,
+      "requiresOriginalQueryLeaseStillLive": false,
+      "requiresOriginalEntitlementStillLive": false,
+      "requiresPinnedReleaseStillCurrent": false,
+      "currentAuthorizationAndContentRevalidated": true,
+      "latestQueryOrFactsReplacementAllowed": false,
+      "missingProof": "fail-closed-with-diagnostic",
+      "sameAccountNaturalSessionRebind": "preserve-v11-resume-and-immutable-original-session-proof",
+      "explicitLogoutRevocationDifferentAccount": "preserve-v11-denial",
+      "closedHandleMayReopen": false,
+      "mediaAccess": "existing-live-active-issuer-revalidates-original-bindings-and-issues-fresh-protected-access",
+      "expiredQueryPreviewHandlesReusable": false
+    },
+    "continuation": {
+      "renew": "existing-active-handle-and-new-numeric-contextGeneration-only",
+      "close": "existing-active-handle-only",
+      "currentGrantChainMayDiffer": true,
+      "riskAndCopyAuthority": "existing-exact-facts-and-live-action-check",
+      "newBusinessRiskOrCopyAuthority": false,
+      "lifecycle": "exact-v11-disable-since-opening-and-fresh-validated-rollback-current"
+    },
+    "storage": {
+      "owner": "existing-active-and-C-ready-owners",
+      "activeRelation": "content_intake.sop_active_uses",
+      "columns": {
+        "opening_query_request_id": "uuid",
+        "opening_query_proof": "closed-immutable-reference-jsonb",
+        "opening_query_proof_hash": "sha256-of-JCS-reference"
+      },
+      "openingProofReferenceSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "queryRequestHash",
+          "readyReceiptHash",
+          "originalSessionHash",
+          "selectedContractSetId",
+          "factsCandidateId",
+          "factsCandidateVersion",
+          "factsVersion",
+          "selectionBindingHash",
+          "queryLeaseExpiresAt"
+        ],
+        "properties": {
+          "schema": {
+            "const": "sop-opening-query-reference-v1"
+          },
+          "queryRequestHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "readyReceiptHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "originalSessionHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "selectedContractSetId": {
+            "type": "string",
+            "pattern": "^cs-ai-c11-openapi-1\\.30\\.1-schema-1\\.35-[0-9a-f]{12}$"
+          },
+          "factsCandidateId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "factsCandidateVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "factsVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "selectionBindingHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "queryLeaseExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "copiedGraphOrPermissionsPayload": false,
+      "parallelReadyRegistry": false,
+      "existingBindings": [
+        "principal_id",
+        "opened_entitlement_hash",
+        "release_id",
+        "source_id",
+        "flow_id",
+        "flow_version",
+        "graph_digest",
+        "started_at"
+      ],
+      "originalSelection": "resolve-retained-opening-entitlement-context",
+      "referenceDigests": {
+        "opening_query_proof_hash": "SHA256-UTF8-existing-JCS-of-the-complete-closed-reference-object",
+        "queryRequestHash": "existing-canonical-original-query-including-entitlement_id-and-all-request-fields",
+        "readyReceiptHash": "SHA256-UTF8-existing-JCS-of-the-original-committed-ready-receipt",
+        "selectionBindingHash": "SHA256-UTF8-existing-JCS-of-{shopId,productIds,scenarioIds}-with-existing-C-ASCII-sorted-unique-selection-arrays"
+      },
+      "oldRows": "all-three-null-without-inferred-backfill",
+      "v12FirstOpen": "all-three-required-by-the-restricted-owner",
+      "retention": "durably-resolvable-through-active-replay-and-lost-ack-window-even-after-query-lease-expiry",
+      "physicalLeaseForeignKeyInDelta": false,
+      "undefinedPrivateFactsForeignKey": false,
+      "logicalLeaseReference": "v11-content_intake.sop_query_leases-or-declared-equivalent-actual87-owner",
+      "consumerMapping": "inspect-actual-exact87-and-document-ready-facts-lease-reference-transaction-and-retention-mapping-before-product88",
+      "currentAuthorizationRetainedInProof": false
+    },
+    "acceptance": [
+      {
+        "id": "Q01",
+        "obligation": "full nonempty scenario and multiple-product selection",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q02",
+        "obligation": "optional product_context asserts membership without replacing selection",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q03",
+        "obligation": "actor/session/shop/current-release/deadline and ordinary entitlement",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q04",
+        "obligation": "two ready facts versions resolve by exact query UUID, snapshot-only denied",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q05",
+        "obligation": "canonical query idempotency, conflict and ready lost-ack",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q06",
+        "obligation": "first-open current, query/entitlement deadline and concurrent invalidation",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q07",
+        "obligation": "existing-handle immutable replay after query expiry and later publication",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q08",
+        "obligation": "same-account natural session rebind and explicit revocation denial",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q09",
+        "obligation": "concurrent open, transaction failure, lost-ack, close and narrow renew",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q10",
+        "obligation": "opening-scoped R1H1/R2disable/R3rollbackH2/R4disable",
+        "verification": "static-contract-and-consumer-runtime",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q11",
+        "obligation": "request conditions, UUID, strict headers, Unicode NUL/unpaired negatives and valid astral, all 306 schemas",
+        "verification": "static-schema",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q12",
+        "obligation": "immutable legacy14, closure, source regularity and actual patch replay",
+        "verification": "static-artifact",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q13",
+        "obligation": "PG15 cumulative reference and actual exact87 delta, FK/ACL/immutability",
+        "verification": "parent-scheduled-pg15",
+        "runtimeVerified": false
+      },
+      {
+        "id": "Q14",
+        "obligation": "Main/C/D normal entry points, original facts, media and copying",
+        "verification": "consumer-runtime",
+        "runtimeVerified": false
+      }
+    ],
+    "runtimeActivated": false,
+    "pgVerified": false
+  },
+  "runtimeActivated": false,
+  "pgVerified": false,
+  "integrationTarget": {
+    "expectedPredecessorPosition": 87,
+    "plannedPosition": 88,
+    "sourceDelta": "storage.source.sql",
+    "runnableProductMigration": false
+  }
+}

@@ -104,7 +104,8 @@ describe('continuation service with real C graph parsing and real synthetic obje
     expect(f.timeline.indexOf('OBJECT_IO')).toBeLessThan(f.timeline.findIndex(sql => sql.includes('SELECT content_intake.open_sop_active_use')));
     expect(JSON.stringify(f.sqlValues)).not.toContain(handle);
     const registration = f.timeline.findIndex(sql => sql.startsWith('INSERT INTO content_intake.entitlements('));
-    expect(f.sqlValues[registration]![9]).toBe(sopContinuationHash(handle));
+    expect(f.sqlValues[registration]![9]).toBe('graph');
+    expect(f.sqlValues[registration]![10]).toBe(sopContinuationHash(handle));
     expect(f.timeline.some(sql => sql.includes('INSERT INTO backend_review.receipts'))).toBe(false);
   });
 

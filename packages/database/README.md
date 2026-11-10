@@ -45,3 +45,11 @@ PG15 集成门禁需要 `pg_config` 解析到 PostgreSQL 15，或设置 `CUSTOME
 0033 后验覆盖运行/组织命名空间、七个角色边界、ACL、对象、函数安全属性和完整触发器定义（含 WHEN/延迟约束）。合成实际验证与正式环境未满足项见[接入证据](../../evidence/qa/intake-parallel-recovery/runtime-formal/README.md)。
 
 `0035_intake_legacy_check_acl_v1_25` 来自精确批准的 v4 完整十六件包，只有既有 NOLOGIN `intake_runtime_fn_owner` 获得八项纯 CHECK helper EXECUTE，其他用途/应用角色没有新增能力。旧schema1.24、CSV安装清单和全部运行依赖保留原字节；不重放完整参考DDL。安装器在0035同一事务内先以冻结34段账本和旧ACL摘要核对角色、membership、对象、函数正文及触发器，再执行增量和写账本，最后以新ACL摘要完整核验后才提交。生成SQL会临时设置search_path，因此后验恢复前验的会话路径，避免pg_get_*的名称限定差异被误判为结构漂移；不放宽任何摘要。COMMIT响应未知仍保留原账本恢复语义，不在提交异常后盲目回滚。具体红绿验证、权限精确差异与旧资料发布/回退见[本轮证据](../../evidence/qa/intake-legacy-acl-runtime/README.md)。
+
+## 0088 正常资源生命周期
+
+`overlays/0088_sop_resource_lifecycle.sql` 消费正式1.30.1/schema1.35修正版资源增量，生成器钉住其source SHA，并逐项保留前87段SQL与metadata。planner、runner、readiness与repair消费检查均识别精确88尾部。verifier的对象、函数、安全属性、触发器及ACL摘要来自真实PG15安装测量，恢复使用同一精确后验。
+
+五个资源关系保存显式停用记录、质量目标、归因检查、原发布及generic event谱系。表属主为 `intake_runtime_fn_owner`，四个运行能力角色通过受限函数工作。原publisher和rollback owner继续原子管理current、publication与永久receipt。`sop_active_uses`保留原Q的窄引用与摘要，C的原ready/facts/lease及opening entitlement提供可恢复的关系证明。
+
+资源停用覆盖截至锁定base序号的完整历史bindings。普通rollback复制目标目录、保留停用事件及closed终态，后续新handle按当前授权内容校验。`tests/sop-resource-generator.mjs`、`tests/migration-source-integrity.test.ts`和API正常资源专项分别验证生成闭包、旧前缀字节及真实消费。

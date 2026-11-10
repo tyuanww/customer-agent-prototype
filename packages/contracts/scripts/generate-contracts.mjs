@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
 import { parse, stringify } from 'yaml';
-import { verifyIngestedSopResourceDisableContractSet, verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
+import { verifyCurrentSopResourceDisableContractSet, verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const CODEGEN_SCHEMA = 'customer-agent-contract-codegen/v1';
 const RUNTIME_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
@@ -39,6 +39,7 @@ const SOP_RESOURCE_OUTPUTS = Object.freeze(Object.fromEntries(
   ).replace('/src/generated/', '/src/generated/sop-resource-disable/')]),
 ));
 const SOP_RESOURCE_LOCK = 'contracts/upstream/customer-agent/sop-resource-disable-contract-set.lock.json';
+const SOP_RESOURCE_CORRECTED_LOCK = 'contracts/upstream/customer-agent/sop-resource-disable-corrected-contract-set.lock.json';
 const SOP_CORRECTED_LOCK = 'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json';
 const NON_VALIDATION_SCHEMA_KEYS = new Set([
   'deprecated',
@@ -409,7 +410,7 @@ async function buildSnapshotViews(projectRoot, snapshot) {
       source_artifacts: { openapi: manifest.openapi, database: manifest.database, ...manifest.sopUnified },
     },
   });
-  const resource = existsSync(path.join(projectRoot, SOP_RESOURCE_LOCK))
+  const resource = (existsSync(path.join(projectRoot, SOP_RESOURCE_LOCK)) || existsSync(path.join(projectRoot, SOP_RESOURCE_CORRECTED_LOCK)))
     ? await buildResourceDisableView(projectRoot) : undefined;
   if (!resource && existsSync(path.join(projectRoot, path.dirname(SOP_RESOURCE_OUTPUTS.manifest)))) {
     throw new Error('SOP resource disable generated view requires its consumption lock');
@@ -425,7 +426,7 @@ async function buildSnapshotViews(projectRoot, snapshot) {
 }
 
 async function buildResourceDisableView(projectRoot) {
-  const verified = verifyIngestedSopResourceDisableContractSet({ projectRoot });
+  const verified = verifyCurrentSopResourceDisableContractSet({ projectRoot });
   const manifestBytes = readFileSync(path.join(verified.path, 'contract-set.json'));
   const manifest = JSON.parse(manifestBytes.toString('utf8'));
   const source = readFileSync(path.join(verified.path, manifest.openapi.file));

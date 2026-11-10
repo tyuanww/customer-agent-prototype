@@ -26,10 +26,13 @@ async function fixture(t) {
   rmSync(path.join(product,'contracts/upstream/customer-agent/repair-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,'contracts/upstream/customer-agent/sop-unified-contract-set.lock.json'),{force:true});
   rmSync(path.join(product,'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,'contracts/upstream/customer-agent/sop-resource-disable-contract-set.lock.json'),{force:true});
+  rmSync(path.join(product,'contracts/upstream/customer-agent/sop-resource-disable-corrected-contract-set.lock.json'),{force:true});
   const migrationManifest=path.join(product,'packages/database/migrations/manifest.generated.json');
   const priorManifest=JSON.parse(readFileSync(migrationManifest));
   delete priorManifest.compatibility.sop_unified_successor;
   delete priorManifest.compatibility.sop_lifecycle_overlay;
+  delete priorManifest.compatibility.sop_resource_overlay;
   writeFileSync(migrationManifest,json(priorManifest));
   await generateDatabaseMigrations({projectRoot:product});
   // All payload is invented; only the exact immutable predecessor comes from the repository.

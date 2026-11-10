@@ -1,3 +1,4 @@
+import { isSopView } from './contract-view.js';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { parseContractSchema, type ContractSchemaName, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
@@ -28,20 +29,32 @@ function query(raw: unknown, samples: boolean) {
     || ('cursor' in r && (typeof r.cursor !== 'string' || r.cursor.length < 1 || r.cursor.length > 512)))) return invalid();
   return { digest: r.digest, viewHash: r.viewHash as string, phase: r.phase as Phase, limit: limit as number, cursor: r.cursor as string | undefined };
 }
-function summary({ preview: p, progress: s, graphChecks }: Awaited<ReturnType<typeof readQualityView>>): C['IntakeQualityStatus'] {
+function resourceCheckSummary(checks: C['IntakeResourceDisableCheck'][]): C['IntakeResourceDisableCheckSummary'] {
+  const ordered = [...checks].sort((a, b) => {
+    const left = canonical([a.target.key.sourceId, a.target.key.resourceId]);
+    const right = canonical([b.target.key.sourceId, b.target.key.resourceId]);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+  return { checkedCount: ordered.length, defectCount: ordered.filter(check => check.defect).length,
+    checksDigest: digest(canonical(ordered)) };
+}
+function summary({ preview: p, progress: s, graphChecks, graph }: Awaited<ReturnType<typeof readQualityView>>): C['IntakeQualityStatus'] {
   const state = { key: s.key, state: s.state,
-    ...(intakeView() === 'graph' ? { canonicalEncodingVersion: s.canonicalEncodingVersion } : {}),
+    ...(isSopView() ? { canonicalEncodingVersion: s.canonicalEncodingVersion } : {}),
     plan: { policyVersion: 'intake-quality-v1' as const, ordinaryCount: p.ordinaryCount, mandatoryCount: p.mandatoryCount,
       withdrawalCount: p.withdrawals.length, initialTarget: p.initialTarget, expandedTarget: p.expandedTarget,
       initialCount: p.initialScriptIds.length, expandedCount: p.expandedScriptIds.length, seedHash: p.seedHash,
       populationManifestHash: p.populationManifestHash, selectionManifestHash: p.selectionManifestHash,
-      ...(s.sopPlan ? { sopPlan: s.sopPlan } : {}) },
+      ...(s.sopPlan ? { sopPlan: s.sopPlan } : {}),
+      ...(s.resourceDisablePlan ? { resourceDisablePlan: s.resourceDisablePlan } : {}) },
     frozen: s.frozenBy === null ? null : { principalId: s.frozenBy, factsVersion: s.frozenFactsVersion, recordedAt: s.frozenAt },
     rounds: s.rounds.map(r => ({ phase: r.phase, reviewer: { principalId: r.checkedBy, factsVersion: r.factsVersion, recordedAt: r.recordedAt },
       checkedCount: r.checks.length, defectCount: r.checks.filter(c => c.defect).length,
       ...(s.sopPlan ? { sopChecksSummary: { checkedCount: graphChecks.filter(c => c.phase === r.phase).length,
         defectCount: graphChecks.filter(c => c.phase === r.phase && c.check.defect).length,
-        checksDigest: digest(canonical(graphChecks.filter(c => c.phase === r.phase).map(c => c.check))) } } : {}) })) };
+        checksDigest: digest(canonical(graphChecks.filter(c => c.phase === r.phase).map(c => c.check))) } } : {}),
+      ...(graph?.resource ? { resourceDisableChecksSummary: resourceCheckSummary(
+        graph.resource.checks.filter(check => check.phase === r.phase).map(check => check.check)) } : {}) })) };
   return bounded('IntakeQualityStatus', { ...state, viewHash: digest(canonical(state)) }, QUALITY_LIMITS.summaryBytes);
 }
 
@@ -59,8 +72,9 @@ export function qualityReceipt(operationId: string, action: C['IntakeQualityRece
     phase = last.phase;
   }
   return bounded('IntakeQualityReceipt', { operationId, action, key: progress.key, state: progress.state, phase,
-    ...(intakeView() === 'graph' ? { canonicalEncodingVersion: progress.canonicalEncodingVersion ?? 'candidate-p1.1' } : {}),
-    ...(progress.sopPlan ? { sopPlan: progress.sopPlan } : {}) }, QUALITY_LIMITS.summaryBytes);
+    ...(isSopView() ? { canonicalEncodingVersion: progress.canonicalEncodingVersion ?? 'candidate-p1.1' } : {}),
+    ...(progress.sopPlan ? { sopPlan: progress.sopPlan } : {}),
+    ...(progress.resourceDisablePlan ? { resourceDisablePlan: progress.resourceDisablePlan } : {}) }, QUALITY_LIMITS.summaryBytes);
 }
 
 /** The existing quality state machine owns sampling and writes. This reader owns
@@ -101,7 +115,8 @@ export function createIntakeQualityAccess(run: ReturnType<typeof createIntakeTra
         }
         client.validUntil(deadline);
         const p = view.preview, ids = q.phase === 'initial' ? p.initialScriptIds : p.expandedScriptIds;
-        const total = ids.length + (view.graph?.targets.length ?? 0);
+        const graphEnd = ids.length + (view.graph?.targets.length ?? 0);
+        const total = graphEnd + (view.graph?.resource?.samples.length ?? 0);
         if (start > 0 && start >= total) return changed();
         const entries = new Map(p.entries.map(e => [e.scriptId, e.entry]));
         const population = new Map(p.population.map(r => [r.script_id, r]));
@@ -114,14 +129,26 @@ export function createIntakeQualityAccess(run: ReturnType<typeof createIntakeTra
         };
         const page = { key, viewHash: status.viewHash, phase: q.phase,
           selectionManifestHash: p.selectionManifestHash, items: [] as C['IntakeQualitySample'][], nextCursor: null as string | null,
-          ...(intakeView() === 'graph' ? { canonicalEncodingVersion: view.progress.canonicalEncodingVersion } : {}),
-          ...(view.graph ? { sopItems: [] as C['IntakeSopSopQualitySample'][] } : {}) };
+          ...(isSopView() ? { canonicalEncodingVersion: view.progress.canonicalEncodingVersion } : {}),
+          ...(view.graph ? { sopItems: [] as C['IntakeSopSopQualitySample'][] } : {}),
+          ...(view.graph?.resource ? { resourceDisableItems: [] as C['IntakeResourceDisableSample'][] } : {}) };
         // Reserve the maximum cursor and comma overhead once; complete entries
         // are measured individually so sizing stays linear even near 8 MiB.
         let bytes = Buffer.byteLength(JSON.stringify(page)) + 514;
         let end = start;
-        const limitBytes = intakeView() === 'graph' ? 1_048_576 : QUALITY_LIMITS.sampleBytes;
-        while (end < total && page.items.length + (page.sopItems?.length ?? 0) < q.limit) {
+        const limitBytes = isSopView() ? 1_048_576 : QUALITY_LIMITS.sampleBytes;
+        while (end < total && page.items.length + (page.sopItems?.length ?? 0) + (page.resourceDisableItems?.length ?? 0) < q.limit) {
+          if (end >= graphEnd && view.graph?.resource && page.resourceDisableItems) {
+            const sample = view.graph.resource.samples[end - graphEnd]!;
+            const check = view.graph.resource.checks.find(value => value.phase === q.phase
+              && value.check.target.disableDigest === sample.target.disableDigest)?.check
+              ?? (q.phase === 'expanded' ? view.graph.resource.checks.find(value => value.phase === 'initial'
+                && value.check.target.disableDigest === sample.target.disableDigest)?.check : null) ?? null;
+            const item = { ...sample, check }, added = Buffer.byteLength(JSON.stringify(item)) + 1;
+            if (added - 1 > 524_288) throw new IntakeRejection('FILE_LIMIT', 'VALIDATION');
+            if (bytes + added > limitBytes) break;
+            page.resourceDisableItems.push(item); bytes += added; end++; continue;
+          }
           if (end >= ids.length && view.graph && page.sopItems) {
             const target = view.graph.targets[end - ids.length]!;
             const check = view.graphChecks.find(c => c.phase === q.phase && canonical(c.check.key) === canonical(target.key))?.check

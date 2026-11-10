@@ -19,10 +19,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
-import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
+import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
-import { createSopResourceDisableProfile, SOP_RESOURCE_SCHEMA, SOP_RESOURCE_LOCK, SOP_RESOURCE_CONSUMPTION_SCHEMA } from './sop-resource-disable-contract.mjs';
+import { createSopResourceDisableProfile, SOP_RESOURCE_SCHEMA, SOP_RESOURCE_LOCK, SOP_RESOURCE_CONSUMPTION_SCHEMA,
+  SOP_RESOURCE_CORRECTED_SCHEMA, SOP_RESOURCE_CORRECTED_LOCK, SOP_RESOURCE_CORRECTED_CONSUMPTION_SCHEMA,
+  SOP_RESOURCE_CORRECTED_PROFILE } from './sop-resource-disable-contract.mjs';
 import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
@@ -100,7 +102,11 @@ const CONTRACT_SET_ID_PATTERN = /^cs-ai-c11-openapi-(\d+\.\d+\.\d+)-schema-(\d+\
 const sopUnified = createSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
 const sopCorrected = createCorrectedSopUnifiedProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
 const sopResourceDisable = createSopResourceDisableProfile({ assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit });
+const sopResourceCorrected = createSopResourceDisableProfile(
+  { assertExactKeys, validateDescriptor, readJson, sha256Bytes, runGit }, SOP_RESOURCE_CORRECTED_PROFILE);
+const resourceProfiles = new Map([[SOP_RESOURCE_SCHEMA, sopResourceDisable], [SOP_RESOURCE_CORRECTED_SCHEMA, sopResourceCorrected]]);
 const SOP_QUERY_PROFILES = new Map([
+  [SOP_RESOURCE_CORRECTED_SCHEMA, { name: 'sopResourceDisableCorrected', lock: SOP_RESOURCE_CORRECTED_LOCK, schema: SOP_RESOURCE_CORRECTED_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopResourcePredecessor }],
   [SOP_RESOURCE_SCHEMA, { name: 'sopResourceDisable', lock: SOP_RESOURCE_LOCK, schema: SOP_RESOURCE_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopResourcePredecessor }],
   [SOP_QUERY_CONTRACT_SET_SCHEMA, { name: 'sopGraph', lock: SOP_QUERY_LOCK, schema: SOP_QUERY_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopQueryPredecessor }],
   [SOP_UNIFIED_SCHEMA, { name: 'sopUnified', lock: SOP_UNIFIED_LOCK, schema: SOP_UNIFIED_CONSUMPTION_SCHEMA, verifyPredecessor: verifySopUnifiedPredecessor }],
@@ -196,7 +202,8 @@ function validateDescriptor(value, label) {
 }
 
 function validateManifest(rawManifest) {
-  if (rawManifest?.schema === SOP_RESOURCE_SCHEMA) return sopResourceDisable.validateManifest(rawManifest);
+  const resource = resourceProfiles.get(rawManifest?.schema);
+  if (resource) return resource.validateManifest(rawManifest);
   if (rawManifest?.schema === SOP_CORRECTED_SCHEMA) return sopCorrected.validateManifest(rawManifest);
   if (rawManifest?.schema === SOP_UNIFIED_SCHEMA) return sopUnified.validateManifest(rawManifest);
   const readinessProfile = rawManifest?.schema === READINESS_SCHEMA;
@@ -556,7 +563,7 @@ function verifySopUnifiedPredecessor(projectRoot) {
 
 function verifySopResourcePredecessor(projectRoot, directory, manifest) {
   const previous = verifyIngestedCorrectedSopUnifiedContractSet({ projectRoot });
-  sopResourceDisable.verifyPredecessor(directory, manifest, previous.path);
+  resourceProfiles.get(manifest.schema).verifyPredecessor(directory, manifest, previous.path);
 }
 
 function verifyCorrectedSopPredecessor(projectRoot, directory, manifest) {
@@ -696,7 +703,7 @@ export function verifyContractSetDirectory(directory) {
   verifyRuntimeReferences(resolvedDirectory, manifest);
   verifySopQueryReferences(resolvedDirectory, manifest);
   if (manifest.schema === SOP_UNIFIED_SCHEMA) sopUnified.verifyReferences(resolvedDirectory, manifest);
-  if (manifest.schema === SOP_RESOURCE_SCHEMA) sopResourceDisable.verifyReferences(resolvedDirectory, manifest);
+  resourceProfiles.get(manifest.schema)?.verifyReferences(resolvedDirectory, manifest);
   if (manifest.schema === SOP_CORRECTED_SCHEMA) sopCorrected.verifyReferences(resolvedDirectory, manifest);
   if (manifest.readiness) verifyReadinessReferences(resolvedDirectory, manifest);
   if (manifest.repair) verifyRepairReferences(resolvedDirectory, manifest);
@@ -720,8 +727,9 @@ function runGit(repositoryRoot, arguments_, encoding = 'buffer') {
  * Historical v1-v3 source SHAs remain valid after newer approvals exist. */
 function verifySourceApproval(repositoryRoot, manifest) {
   const source = relative => String(runGit(repositoryRoot, ['show', `${manifest.source_git_sha}:${relative}`], 'utf8'));
-  if (manifest.schema === SOP_RESOURCE_SCHEMA) {
-    sopResourceDisable.verifySource(repositoryRoot, manifest);
+  const resource = resourceProfiles.get(manifest.schema);
+  if (resource) {
+    resource.verifySource(repositoryRoot, manifest);
     return;
   }
   if (manifest.schema === SOP_CORRECTED_SCHEMA) {
@@ -951,13 +959,17 @@ function verifyRepairReferences(directory, manifest) {
 }
 
 function verifySopUnifiedMigrationTail(projectRoot, actual) {
-  if (actual.compatibility?.sop_continuation_overlay && actual.migrations.length !== 87) {
+  if (actual.migrations.length === 88 && !actual.compatibility?.sop_resource_overlay
+    || actual.compatibility?.sop_resource_overlay && actual.migrations.length !== 88) {
+    throw new Error('SOP resource lifecycle requires its exact 88-migration tail');
+  }
+  if (actual.compatibility?.sop_continuation_overlay && ![87, 88].includes(actual.migrations.length)) {
     throw new Error('SOP continuation implementation requires its exact 87-migration tail');
   }
-  if (actual.compatibility?.sop_query_overlay && ![86, 87].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_query_overlay && ![86, 87, 88].includes(actual.migrations.length)) {
     throw new Error('SOP query implementation requires its exact 86-migration tail');
   }
-  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86, 87].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86, 87, 88].includes(actual.migrations.length)) {
     throw new Error('SOP lifecycle implementation requires its exact 85-migration tail');
   }
   const lockPath = path.join(projectRoot, UPSTREAM_ROOT, SOP_CORRECTED_LOCK);
@@ -1029,7 +1041,7 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(queryPath, 'utf8') !== querySql) throw new Error('SOP query implementation migration bytes drift');
   }
 
-  if (actual.migrations.length === 87) {
+  if (actual.migrations.length >= 87) {
     if (sha256Bytes(Buffer.from(JSON.stringify(actual.migrations.slice(0, 86)))) !== '1e1e9619dbcb88214c006c0fb429639a0b10abab9c10003624877d582f643ddd') {
       throw new Error('SOP continuation requires the immutable 86-migration predecessor');
     }
@@ -1048,6 +1060,37 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(continuationPath, 'utf8') !== continuationSql) throw new Error('SOP continuation implementation migration bytes drift');
   }
 
+  if (actual.migrations.length === 88) {
+    if (sha256Bytes(Buffer.from(JSON.stringify(actual.migrations.slice(0, 87)))) !== '3d48f9989552918848421d2e2650d8da0bea80515cc728cdb790afcae4a1e8ae') {
+      throw new Error('SOP resource lifecycle requires the immutable 87-migration predecessor');
+    }
+    const resourceSchema = currentSopResourceSchema(projectRoot);
+    const resourceProfile = SOP_QUERY_PROFILES.get(resourceSchema);
+    const resourceLockPath = path.join(projectRoot, UPSTREAM_ROOT, resourceProfile.lock);
+    assertPathInsideRoot(projectRoot, resourceLockPath);
+    assertRegularFile(resourceLockPath, 'SOP resource contract lock');
+    const resourceLock = validateSopQueryConsumptionLock(readJson(resourceLockPath, 'SOP resource contract lock'), resourceProfile);
+    const resourceDirectory = path.join(projectRoot, UPSTREAM_ROOT, resourceLock.contract_set_id);
+    assertPathInsideRoot(projectRoot, resourceDirectory);
+    const resourceSet = verifyContractSetDirectory(resourceDirectory);
+    assertSopQueryLockMatchesContractSet(resourceLock, resourceSet);
+    const sourcePath = path.join(projectRoot, SOP_RESOURCE_SOURCE.file);
+    assertPathInsideRoot(projectRoot, sourcePath);
+    assertRegularFile(sourcePath, 'SOP resource lifecycle implementation source');
+    const { sql: resourceSql, ...resource } = renderSopResourceMigration({ manifest: resourceSet.manifest,
+      storage_source: readFileSync(path.join(resourceDirectory, resourceSet.manifest.resourceDisable.storage.file), 'utf8') },
+    readFileSync(sourcePath, 'utf8'));
+    if (!isDeepStrictEqual(actual.migrations[87], resource)
+      || !isDeepStrictEqual(actual.compatibility?.sop_resource_overlay, {
+        contract_set_id: resource.contract_set_id, source_git_sha: resource.source_git_sha,
+        source_schema_sha256: resource.source_schema_sha256, source_sha256: SOP_RESOURCE_SOURCE.sha256, migration_sha256: resource.sha256,
+      })) throw new Error('SOP resource lifecycle implementation metadata drift');
+    const resourcePath = path.join(migrationRoot, resource.file);
+    assertPathInsideRoot(projectRoot, resourcePath);
+    assertRegularFile(resourcePath, 'SOP resource lifecycle implementation migration');
+    if (readFileSync(resourcePath, 'utf8') !== resourceSql) throw new Error('SOP resource lifecycle implementation migration bytes drift');
+  }
+
 }
 
 // This is an upgrade over the exact installed generator closure, never a bootstrap.
@@ -1060,7 +1103,7 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
@@ -1142,7 +1185,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
@@ -1353,8 +1396,22 @@ export function verifyIngestedSopUnifiedContractSet(options) {
   return verifyIngestedSopCandidate(options, SOP_UNIFIED_SCHEMA);
 }
 
+function currentSopResourceSchema(projectRoot) {
+  return existsSync(path.join(projectRoot, UPSTREAM_ROOT, SOP_RESOURCE_CORRECTED_LOCK))
+    ? SOP_RESOURCE_CORRECTED_SCHEMA : SOP_RESOURCE_SCHEMA;
+}
+
+export function verifyCurrentSopResourceDisableContractSet(options = {}) {
+  const projectRoot = assertProjectRoot(options.projectRoot ?? defaultProjectRoot());
+  return verifyIngestedSopCandidate({ ...options, projectRoot }, currentSopResourceSchema(projectRoot));
+}
+
 export function verifyIngestedSopResourceDisableContractSet(options) {
   return verifyIngestedSopCandidate(options, SOP_RESOURCE_SCHEMA);
+}
+
+export function verifyIngestedCorrectedSopResourceDisableContractSet(options) {
+  return verifyIngestedSopCandidate(options, SOP_RESOURCE_CORRECTED_SCHEMA);
 }
 
 export function verifyIngestedCorrectedSopUnifiedContractSet(options) {
@@ -1632,13 +1689,13 @@ export function parseCliArguments(argv) {
     }
     options[match[1]] = match[2];
   }
-  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected', 'sopResourceDisable'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
+  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected', 'sopResourceDisable', 'sopResourceDisableCorrected'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
   return { command, options };
 }
 
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
-  const verifiers = { sopResourceDisable: verifyIngestedSopResourceDisableContractSet, sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
+  const verifiers = { sopResourceDisableCorrected: verifyIngestedCorrectedSopResourceDisableContractSet, sopResourceDisable: verifyIngestedSopResourceDisableContractSet, sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
   const result = command === 'ingest'
     ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],
