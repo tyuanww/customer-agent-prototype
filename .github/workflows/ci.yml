@@ -154,7 +154,8 @@ jobs:
       - if: needs.changes.outputs.mode != 'docs'
         env:
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}\electron-builder-cache
-        run: pnpm package:win
+        # Main's full gate uses an empty diff to select every map-owned Windows check.
+        run: node scripts/verification-policy.mjs run --base HEAD --head HEAD --lane windows
       - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Windows package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -105,6 +105,7 @@
     "overlay-electron": { "job": "electron", "command": [["pnpm","test:e2e:float"]] },
     "sop-query-electron": { "job": "electron", "command": [["pnpm","--filter","@customer-agent/desktop","build"],["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/sop-query.spec.ts"]] },
     "windows-package": { "job": "windows", "command": [["pnpm","package:win"]] },
+    "windows-owned-electron": { "job": "windows", "command": [["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/owned-electron-windows.spec.ts"]] },
     "linux-package": { "job": "linux", "command": [["pnpm","package:linux"]] }
   },
   "routes": [
@@ -242,12 +243,22 @@
       ],
       "checks": {
         "quick": ["lint", "typecheck", "architecture", "desktop-tests"],
-        "windows": ["windows-package"],
+        "windows": ["windows-package", "windows-owned-electron"],
         "linux": ["linux-package"]
       },
       "liveLanes": [],
       "databaseLanes": [],
       "packagingLanes": ["windows-local-unsigned", "linux-local-unsigned"],
+      "generatedInputs": []
+    },
+    {
+      "id": "desktop-windows-process-cleanup",
+      "owner": "desktop",
+      "paths": ["apps/desktop/tests/e2e/owned-electron-windows.spec.ts", "apps/desktop/tests/support/owned-electron.ts"],
+      "checks": { "quick": ["typecheck", "architecture"], "windows": ["windows-package", "windows-owned-electron"] },
+      "liveLanes": ["windows-process-cleanup"],
+      "databaseLanes": [],
+      "packagingLanes": ["windows-local-unsigned"],
       "generatedInputs": []
     },
     {
