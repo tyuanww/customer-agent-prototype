@@ -1,12 +1,11 @@
 // @vitest-environment node
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { rankScripts, type RetrievalScript } from '../../src/shared/hybrid-retrieve';
 
 const indexPath = process.env.CUSTOMER_AGENT_RETRIEVAL_INDEX
-  ?? join(homedir(), '.customer-agent-synthetic-stack', 'retrieval-index.json');
+  ?? fileURLToPath(new URL('../fixtures/retrieval-eval/corpus.json', import.meta.url));
 const enabled = existsSync(indexPath);
 
 describe.skipIf(!enabled)('hybrid retrieve against local index', () => {

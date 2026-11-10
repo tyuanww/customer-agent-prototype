@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import type { Client, PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { changeGrant, readGrant } from '../src/content-intake/authority.js';
@@ -18,10 +16,6 @@ import {
 } from './support/authorization-sources-fixture.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
-const overlay = fileURLToPath(new URL(
-  '../../../packages/database/overlays/0082_access_evaluator.sql',
-  import.meta.url,
-));
 
 function transaction(client: Client | PoolClient): IntakeTransaction {
   return Object.assign(client, {
@@ -39,7 +33,6 @@ describe.skipIf(!enabled)('database AccessEvaluator', () => {
     fixture = await createAuthorizationFixture('access_evaluator');
     await fixture.admin.query('BEGIN');
     try {
-      await fixture.admin.query(readFileSync(overlay, 'utf8'));
       await fixture.admin.query("CREATE ROLE access_evaluator_business LOGIN NOINHERIT");
       await fixture.admin.query('GRANT intake_business TO access_evaluator_business');
       await fixture.admin.query('COMMIT');

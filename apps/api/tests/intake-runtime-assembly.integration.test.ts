@@ -223,7 +223,13 @@ describe.skipIf(!enabled)('intake runtime purpose assembly (synthetic PG15)', ()
     await expect(business.query(`SELECT content_intake.preview_rollback('agent','rel_native_base','missing-target')`)).rejects.toMatchObject({ code: 'ZA003' });
     expect((await business.query(`SELECT content_intake.quality_state('missing',1) AS state`)).rows[0].state).toBe('not_frozen');
     expect((await business.query(`SELECT content_intake.authorization_deadline('agent','publish','scope-a','source-a',clock_timestamp()) AS until`)).rows[0].until).toBeNull();
-    expect((await business.query(`SELECT content_intake.authorization_deadline('enabler','publish','scope-a','source-a',clock_timestamp()) AS until`)).rows[0].until).toBeNull();
+    expect((await business.query(`SELECT content_intake.authorization_deadline('director','publish','scope-a','source-a',clock_timestamp()) AS until`)).rows[0].until).toBeNull();
+    const enablerFacts = await admin.query(`SELECT facts.valid_until
+      FROM content_intake.principals person JOIN content_intake.principal_facts facts
+        ON facts.principal_id=person.principal_id AND facts.facts_version=person.current_facts_version
+      WHERE person.principal_id='enabler'`);
+    expect((await business.query(`SELECT content_intake.authorization_deadline('enabler','publish','scope-a','source-a',clock_timestamp()) AS until`)).rows[0].until)
+      .toEqual(enablerFacts.rows[0].valid_until);
     await denied(business, `INSERT INTO content_intake.quality_plans(candidate_id,candidate_version,candidate_digest,policy_version,plan,frozen_by,facts_version)
       VALUES ('missing',1,repeat('c',64),'intake-quality-v1','{}'::jsonb,'agent',1)`);
     await denied(business, `INSERT INTO content_intake.grants(grant_id,kind,issuer_id,recipient_id,tenant_id,app_id,scope_id,action,starts_at,expires_at,reason,steward_id)

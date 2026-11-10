@@ -6,6 +6,7 @@ import { ProductAnnounce } from '../../src/main/product-announce';
 import { ProductHttp } from '../../src/main/product-http';
 import { ProductSearch } from '../../src/main/product-search';
 import { ProductSession } from '../../src/main/product-session';
+import { readProductClientId } from '../../src/main/product-client-id';
 
 export type DesktopAdapter = {
   session: ProductSession;
@@ -15,7 +16,12 @@ export type DesktopAdapter = {
   epoch: () => number;
 };
 
-export async function connectDesktopAdapter(apiOrigin: string, bindingId: string, clientId: string): Promise<DesktopAdapter> {
+export async function connectDesktopAdapter(
+  apiOrigin: string,
+  bindingId: string,
+  userDataDirectory: string,
+): Promise<DesktopAdapter> {
+  const clientId = readProductClientId(userDataDirectory);
   let stored: { access_token: string; expires_at: string } | null = null;
   const session = new ProductSession(new ProductHttp(apiOrigin), {
     read: () => stored,

@@ -2,6 +2,8 @@ import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
+import { feishuUserId } from '../src/feishu-admit.js';
+import { rosterPrincipalId } from '../src/project-roster-login.js';
 
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const BREAK = process.env.CUSTOMER_AGENT_STORE_SET_BREAK === '1';
@@ -242,17 +244,17 @@ describe.skipIf(!enabled)('store-set advance', () => {
     const mark = `sp${savepoint++}`;
     await admin.query(`SAVEPOINT ${mark}`);
     try {
-      await admin.query(`SELECT content_intake.project_feishu_roster(
-        $1,$2,$3,$4,'set',$1,ARRAY[$5],$6,'engineer',ARRAY['query']) AS status`,
-      [OPERATOR, 'usr-operator', TENANT, APP, DEPT, JOB]);
-      // projectRosterLogin calls both, in this order; the store-set advance lives in the
-      // second one, so a repro that stops at the first never reaches the defect.
-      // Issuance is idempotent while nothing is readable, so the answer is not asserted; what
-      // matters is that repeating it neither inserts a version nor raises.
-      await admin.query('SELECT content_intake.issue_roster_query($1,$2,$3)', [OPERATOR, TENANT, APP]);
-      // A second tick is what a timer does. Before 0064 this one threw on store_sets_pkey,
-      // because the first call had already inserted a version with no members.
-      await admin.query('SELECT content_intake.issue_roster_query($1,$2,$3)', [OPERATOR, TENANT, APP]);
+      const openId = 'ou_storeSetOperator01';
+      const grantsBefore = (await admin.query('SELECT count(*)::text AS count FROM content_intake.grants')).rows[0].count;
+      await admin.query('SELECT backend_identity.admit_feishu_agent($1)', [openId]);
+      const projection = `SELECT content_intake.project_feishu_roster(
+        $1,$2,$3,$4,'feishu-job-roster',$5,ARRAY[$6],$7,'engineer',ARRAY['query']) AS status`;
+      const parameters = [rosterPrincipalId(openId), feishuUserId(openId), TENANT, APP, openId, DEPT, JOB];
+      // Current login projects a verified identity and never calls the retired
+      // automatic grant issuer. Repeated projection must preserve the held set.
+      expect((await admin.query(projection, parameters)).rows[0].status).toBe('registered');
+      expect((await admin.query(projection, parameters)).rows[0].status).toBe('registered');
+      expect((await admin.query('SELECT count(*)::text AS count FROM content_intake.grants')).rows[0].count).toBe(grantsBefore);
       const sets = await admin.query<{ total: string; empty: string }>(`
         SELECT count(*)::text AS total,
           count(*) FILTER (WHERE NOT EXISTS (

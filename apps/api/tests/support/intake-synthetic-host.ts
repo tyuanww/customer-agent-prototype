@@ -21,6 +21,7 @@ import { createContentObjectStore } from '../../dist/content-object-store.js';
 import { createContentIntakeService } from '../../dist/content-intake/service.js';
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { createSeatServiceFromEnv } from '../../dist/content-intake/seats.js';
+import { seatPasswordFilePath } from '../../dist/content-intake/seat-password-file.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 import { sopContinuationRoutes } from '../../dist/sop-continuation-routes.js';
 import { createSopContinuationService } from '../../dist/sop-continuation.js';
@@ -70,6 +71,7 @@ type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
 type HostOptions = { afterSopAttachmentRead?: () => Promise<void>; includeSopContinuation?: boolean; includeSopQuery?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
+  includeSeats?: boolean;
   includeLegacySearch?: boolean;
   configureDatabase?: (client: Awaited<ReturnType<Pg15Harness['connect']>>) => Promise<void>;
   wrapBusinessPool?: (pool: IntakePool) => IntakePool; wrapUsagePool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
@@ -162,7 +164,7 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
-  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead'> = {}) {
+  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead' | 'includeSeats'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
   const pg = new Pg15Harness();
   const authLogin = profile === 'purpose-runtime' ? 'stack_backend_auth' : 'synthetic_intake_auth';
@@ -535,11 +537,11 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await app.register(contentIntakeManagementRoutes, {
       auth, pool, store, report,
       ...(terminalPool ? { terminalPool } : {}),
-      seatService: createSeatServiceFromEnv(pool, seatRoot, {
+      ...(hooks.includeSeats === false ? {} : { seatService: createSeatServiceFromEnv(pool, seatRoot, {
         SEAT_TENANT_ID: 'tenant-a',
         SEAT_APP_ID: 'app-a',
         SEAT_DEPARTMENT_ID: 'dept-a',
-      }),
+      }) }),
       // Every principal that can appear in the grant-recipient directory needs a label, or the
       // directory fails closed. The roster identities are added here for that reason only.
       principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
@@ -593,7 +595,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       throw new Error('Synthetic host identities lack current facts');
     }
     return {
-      apiOrigin, identityOrigin, root: pg.root, expiresAt: facts.rows[0].expires.toISOString(),
+      apiOrigin, identityOrigin, root: pg.root, seatPasswordAccountsFile: seatPasswordFilePath(seatRoot), expiresAt: facts.rows[0].expires.toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
       async writeSopQueryFacts(actor: IntakeSyntheticIdentity, input: { operationId: string; expectedVersion: number; source: RegisteredSyntheticSopFacts }) {
         if (!hooks.includeSopQuery || !auth) throw new Error('Synthetic SOP query registration is closed');

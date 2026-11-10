@@ -3,7 +3,10 @@
  * Real-stack proof that copy of a superseded release is STALE at ProductSearch.copy.
  * Skipped in ordinary `pnpm test`. `anomaly-check.ts` sets CUSTOMER_AGENT_STACK_ANOMALY=1.
  */
-import { expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, it, onTestFinished } from 'vitest';
 import { connectDesktopAdapter } from './stack-desktop-adapter';
 
 const enabled = process.env.CUSTOMER_AGENT_STACK_ANOMALY === '1';
@@ -11,7 +14,7 @@ const enabled = process.env.CUSTOMER_AGENT_STACK_ANOMALY === '1';
 it.skipIf(!enabled)('refuses copy of a rolled-back release through the desktop adapter', async () => {
   const { readProfile } = await import(
     new URL('../../../../scripts/synthetic-stack/profile.ts', import.meta.url).href
-  ) as { readProfile: () => { apiOrigin: string; clientId: string } | undefined };
+  ) as { readProfile: () => { apiOrigin: string } | undefined };
   const { loginAs, seedContent } = await import(
     new URL('../../../../scripts/synthetic-stack/seed.ts', import.meta.url).href
   ) as {
@@ -20,7 +23,9 @@ it.skipIf(!enabled)('refuses copy of a rolled-back release through the desktop a
   };
   const profile = readProfile();
   if (!profile) throw new Error('no running stack; start it before CUSTOMER_AGENT_STACK_ANOMALY=1');
-  const desktop = await connectDesktopAdapter(profile.apiOrigin, 'synthetic_agent', profile.clientId);
+  const directory = mkdtempSync(join(tmpdir(), 'stack-desktop-adapter-'));
+  onTestFinished(() => { rmSync(directory, { recursive: true, force: true }); });
+  const desktop = await connectDesktopAdapter(profile.apiOrigin, 'synthetic_agent', directory);
   try {
     const firstSearch = await desktop.search.search(1, {
       sessionEpoch: desktop.epoch(), generation: 1, queryText: '什么时候发货', platform: 'qianniu',

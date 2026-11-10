@@ -112,7 +112,7 @@ export async function seedQueryPrincipal(admin: Client, seed: QueryPrincipalSeed
              ELSE statement_timestamp() + interval '4 minutes 59 seconds' END,
            repeat('ab', 32))
          ON CONFLICT (principal_id, facts_version) DO NOTHING`,
-        [identity, DEPARTMENT, JOB, factsWindow]);
+        [identity, DEPARTMENT, JOB, identity === issuerId ? 'fresh' : factsWindow]);
     }
     // Read the versions once, after the role rule has recorded its policy bump. Passing them
     // as plain values avoids inferring one parameter as both a domain-typed column and text.

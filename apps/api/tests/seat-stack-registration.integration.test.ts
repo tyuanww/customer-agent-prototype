@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
     }
     try {
       delete process.env.CUSTOMER_AGENT_STACK_ROOT;
-      const unconfigured = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime' });
+      const unconfigured = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime', includeSeats: false });
       try {
         expect((await unconfigured.requestAs('roster-director', '/v1/intake/seats')).status).toBe(404);
       } finally {
@@ -48,9 +48,10 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
         expect(await created.json()).toMatchObject({ seat: { displayName: body.displayName, username: body.username, post: body.post, enabled: true } });
         const listed = await host.requestAs('roster-director', '/v1/intake/seats');
         expect(await listed.json()).toMatchObject({ seats: [{ displayName: body.displayName, username: body.username, post: body.post, enabled: true }] });
-        const accounts = loadPasswordAccounts(path.join(root, 'password-accounts.json'));
+        const accounts = loadPasswordAccounts(host.seatPasswordAccountsFile);
         const account = accounts.get(body.username);
         expect(account && passwordMatches(account, body.password)).toBe(true);
+        expect(existsSync(path.join(root, 'password-accounts.json'))).toBe(false);
       } finally {
         await host.close();
       }
