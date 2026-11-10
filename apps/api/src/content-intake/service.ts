@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createGraphMediaReader, freeze as freezeGraph, isGraphSource, makeMaterial, prepareImport, readBase, type GraphBase } from './sop-graph.js';
 import { withIntakeView, intakeView } from './contract-view.js';
 import { clock } from './transaction.js';
-import { ContractValidationError, parseContractSchema, type components } from './contract-view.js';
+import { isContractValidationError, parseContractSchema, type components } from './contract-view.js';
 import { createParseRunner } from '@customer-agent/content-intake/runner';
 import { adoptPreviews, cancelPreviewsAtVersion, discardPreviewRow, previewFromBytes, stagePreviews } from './linked-preview.js';
 import { INTAKE_POLICY, CSV_POLICY_VERSION, CSV_STRUCTURE_SHA256, SOP_TASK_FORMAT, SOP_TASK_SHEETS, SopTaskWorkbookFailure, failedParse, tryParseSopAsFaq, type ParseResult } from '@customer-agent/content-intake';
@@ -126,7 +126,7 @@ export function createContentIntakeService(pool: IntakePool, store: ContentObjec
       }, candidate);
       return frozen.ok ? frozen : terminal(frozen);
     } catch (error) {
-      const reason = error instanceof IntakeRejection ? error.reason : error instanceof ContractValidationError ? 'SOP_GRAPH_INVALID' : error instanceof Error
+      const reason = error instanceof IntakeRejection ? error.reason : isContractValidationError(error) ? 'SOP_GRAPH_INVALID' : error instanceof Error
         && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID', 'SOP_MEDIA_UNAVAILABLE', 'FILE_LIMIT'].includes(error.message)
         ? error.message as import('./transaction.js').Reason : 'FILE_INVALID';
       const diagnosticId = `intake_${randomUUID()}`;

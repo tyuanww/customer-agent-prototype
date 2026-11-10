@@ -18,6 +18,8 @@ import { createContentIntakeService } from '../../dist/content-intake/service.js
 import { generatedMigrationCatalogue } from '../../../../packages/database/dist/generated/migrations.generated.js';
 import { registerSopQueryRoute } from '../../dist/sop-query-routes.js';
 import { createUnifiedSopQueryOperation } from '../../dist/sop-unified-query-operation.js';
+import { createSopContinuationService } from '../../dist/sop-continuation.js';
+import { sopContinuationRoutes } from '../../dist/sop-continuation-routes.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
 
 const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
@@ -27,7 +29,7 @@ assert.match(input.database, /^dev_m0_intake_desktop_[0-9a-f]{8}$/);
 assert.match(input.user, /^[a-z_][a-z0-9_]*$/);
 const evidenceRoot = realpathSync(input.evidenceRoot);
 assert.equal(path.dirname(evidenceRoot), realpathSync(os.tmpdir()));
-assert.match(path.basename(evidenceRoot), /^sop-unified-(?:lifecycle-evidence|query-http)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(path.basename(evidenceRoot), /^sop-unified-(?:lifecycle-evidence|query-http|continuation-http)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const pgBin = process.env.CUSTOMER_AGENT_PG15_BIN ?? execFileSync('pg_config', ['--bindir'], { encoding: 'utf8' }).trim();
 const environment = { PATH: process.env.PATH, LC_ALL: 'C', PGCONNECT_TIMEOUT: '5' };
 const original = new Client({ host: input.host, port: input.port, user: input.user, database: input.database });
@@ -50,7 +52,8 @@ try {
       'sop_graph_release_lineage', 'sop_graph_release_media', 'sop_graph_disable_events', 'candidate_versions',
       'source_confirmations', 'quality_plans', 'quality_rounds', 'publications', 'sop_media_objects', 'objects', 'object_reservations',
       'sop_query_fact_versions','sop_unified_query_bindings','sop_query_previews','sop_query_leases',
-      'entitlements','entitlement_contexts','entitlement_scopes','backend_review.receipts'];
+      'entitlements','entitlement_contexts','entitlement_scopes','backend_review.receipts',
+      ...(input.continuationProbe ? ['sop_active_uses','backend_identity.sessions','public.snapshot_offline_leases'] : [])];
     const result = {};
     for (const table of tables) {
       const rows = (await client.query(`SELECT to_jsonb(t) AS row FROM ${table.includes('.') ? table : `content_intake.${table}`} t ORDER BY to_jsonb(t)::text COLLATE "C"`)).rows;
@@ -116,6 +119,8 @@ try {
   }, 'mock');
   usagePool = createIntakePurposePool({ host: input.host, port: input.port, user: 'synthetic_usage', database: restoredName, max: 2 }, 'usage');
   app = Fastify();
+  if (input.continuationProbe) await app.register(sopContinuationRoutes, { auth,
+    continuation: createSopContinuationService(usagePool, undefined, store) });
   let http;
   if (input.query) {
     for (const table of ['sop_query_fact_versions','sop_unified_query_bindings','sop_query_previews','sop_query_leases']) assert.ok(sourceFidelity[table].count>0);
@@ -160,6 +165,47 @@ try {
   assert.deepEqual(projection.sopFlows.map(flow => flow.graphDigest), input.graphDigests);
   assert.equal(projection.media.length, 3);
     http = { pageCount: pages.length, totals: pages[0].totals, snapshotDigest: pages[0].snapshotDigest };
+  }
+  if (input.continuationProbe) {
+    // Main-owned handles are supplied through stdin and excluded from persisted metadata.
+    const probe = JSON.parse(readFileSync(0, 'utf8'));
+    const origin = app.server.address();
+    assert.ok(origin && typeof origin === 'object');
+    const base = `http://127.0.0.1:${origin.port}`;
+    const headers = { authorization: input.agentAuthorization, 'X-Intake-Contract-Set': CONTRACT_PROVENANCE.contract_set_id,
+      'content-type': 'application/json' };
+    const activeCount = (await restored.query('SELECT count(*)::int count FROM content_intake.sop_active_uses WHERE closed_at IS NULL')).rows[0].count;
+    const closedCount = (await restored.query('SELECT count(*)::int count FROM content_intake.sop_active_uses WHERE closed_at IS NOT NULL AND session_hash IS NULL')).rows[0].count;
+    const boundCount = (await restored.query('SELECT count(*)::int count FROM content_intake.entitlements WHERE sop_continuation_hash IS NOT NULL')).rows[0].count;
+    assert.ok(activeCount > 0 && closedCount > 0 && boundCount > 0);
+    const renewed = await fetch(`${base}/v1/intake/sop/continuations/renew`, { method: 'POST', headers,
+      body: JSON.stringify({ continuationId: probe.active, contextGeneration: 909 }) });
+    const renewedBody = await renewed.json();
+    assert.equal(renewed.status, 200, JSON.stringify(renewedBody));
+    const receipt = parseContractSchema('IntakeSopContinuationReceipt', renewedBody);
+    assert.equal(receipt.entitlement.releaseId, probe.releaseId);
+    const query = new URLSearchParams({ ...probe.binding, entitlementId: receipt.entitlement.entitlementId });
+    const mediaResponse = await fetch(`${base}/v1/intake/sop/releases/${probe.releaseId}/media/${probe.objectId}?${query}`, {
+      headers: { ...headers, 'X-Sop-Continuation': probe.active } });
+    const mediaBody = await mediaResponse.json();
+    assert.equal(mediaResponse.status, 200, JSON.stringify(mediaBody));
+    const media = parseContractSchema('IntakeSopMediaPayload', mediaBody);
+    const bytes = Buffer.from(media.base64, 'base64');
+    assert.equal(digest(bytes), probe.sha256); assert.equal(bytes.length, media.bytes);
+    const refused = await fetch(`${base}/v1/intake/sop/continuations/renew`, { method: 'POST', headers,
+      body: JSON.stringify({ continuationId: probe.closed, contextGeneration: 910 }) });
+    assert.equal(refused.status, 409);
+    const denied = parseContractSchema('IntakeError', await refused.json());
+    assert.equal(denied.error.details.reason, 'SOP_RELEASE_CHANGED');
+    const repeated = await fetch(`${base}/v1/intake/sop/continuations/close`, { method: 'POST', headers,
+      body: JSON.stringify({ continuationId: probe.closed }) });
+    assert.equal(repeated.status, 204);
+    const originalPublication = (await restored.query(`SELECT pub.release_id FROM content_intake.sop_graph_release_lineage l
+      JOIN content_intake.publications pub ON pub.candidate_id=l.candidate_id AND pub.candidate_version=l.candidate_version
+      WHERE l.release_id=$1 AND l.source_id=$2 AND l.flow_id=$3`, [probe.releaseId,probe.binding.sourceId,probe.binding.flowId])).rows[0];
+    assert.ok(originalPublication);
+    http.continuation = { activeCount, closedCount, boundCount, restoredRenew: true, originalPublication: originalPublication.release_id,
+      historicalMedia: { bytes: bytes.length, sha256: digest(bytes), mime: media.mime }, closedRejected: true, repeatedClose: true };
   }
   const acl = (await restored.query(`SELECT p.oid::regprocedure::text AS function,owner.rolname AS owner,p.prosecdef,p.proconfig,
     EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public_exec

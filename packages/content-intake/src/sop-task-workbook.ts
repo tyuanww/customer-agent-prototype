@@ -72,6 +72,10 @@ export async function parseSopTaskWorkbook(bytes: Buffer): Promise<SopTaskWorkbo
       if (!['启用', '停用'].includes(values['维护状态'] ?? '') || !values['业务确认人']?.trim()
         || values['待确认事项'] !== '') throw new SopTaskWorkbookFailure({ code: 'SOP_MAPPING_REQUIRED', sheet: name,
           row: number, column: row.getCell(headers.length).address.replace(/[0-9]/g, ''), fix: '逐行明确维护状态、确认人及待确认事项' });
+      if (name === '资源与图片' && values['维护状态'] === '停用') throw new SopTaskWorkbookFailure({
+        code: 'SOP_MAPPING_REQUIRED', sheet: name, row: number, column: 'H',
+        fix: '冻结材料缺少可审阅的资源独立停用及对应质量目标，补齐合同后重新接收',
+      });
       if (name !== '场景目录' && name !== '客户话术' && values['维护状态'] === '停用') throw new IntakeFailure('SOP_MAPPING_REQUIRED');
       sheets[name].push({ row: number, values });
       if (name === '资源与图片') resourceRows.set(number, values['资源编号'] ?? '');

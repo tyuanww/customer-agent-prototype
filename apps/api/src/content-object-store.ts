@@ -50,6 +50,15 @@ export type ContentBatchReceipt = Readonly<{
 export type AttachmentMime = 'image/png' | 'image/jpeg' | 'image/gif';
 /** Internal descriptor from a durable reservation, never a client filename. */
 export type ReservedAttachment = Readonly<{ objectId: string; sha256: string; sizeBytes: number; mime: AttachmentMime }>;
+
+/** The same immutable byte proof is used on store reads, writes and after an
+ * authorized reader's lock-free I/O. The descriptor always belongs to storage. */
+export function contentAttachmentBytesMatch(expected: ReservedAttachment, bytes: Buffer): boolean {
+  if (bytes.length !== expected.sizeBytes || createHash('sha256').update(bytes).digest('hex') !== expected.sha256) return false;
+  if (expected.mime === 'image/png') return bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+  if (expected.mime === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  return expected.mime === 'image/gif' && ['GIF87a', 'GIF89a'].includes(bytes.subarray(0, 6).toString('ascii'));
+}
 export type LockedContentObject = Readonly<{
   persistAttachment: (expected: ReservedAttachment, bytes: Buffer) => Promise<ReservedAttachment>;
   readAttachment: (expected: ReservedAttachment) => Promise<Buffer>;
@@ -226,11 +235,6 @@ export function createContentObjectStore(rootDirectory: string): ContentAttachme
       || expected.sizeBytes < 1 || expected.sizeBytes > 5 * 1024 * 1024
       || !['image/png', 'image/jpeg', 'image/gif'].includes(expected.mime)) throw new Error('CONTENT_ATTACHMENT_INVALID');
   }
-  function imageMatches(bytes: Buffer, mime: AttachmentMime): boolean {
-    if (mime === 'image/png') return bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
-    if (mime === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-    return bytes.subarray(0, 6).toString('ascii') === 'GIF87a' || bytes.subarray(0, 6).toString('ascii') === 'GIF89a';
-  }
   async function readObject(id: string, exactBytes?: number): Promise<Buffer> {
     assertObjectId(id); privateDirectory(objectRoot);
     const file = await open(resolveInside(objectRoot, id), constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -246,8 +250,7 @@ export function createContentObjectStore(rootDirectory: string): ContentAttachme
   async function readAttachment(expected: ReservedAttachment): Promise<Buffer> {
     attachment(expected);
     const bytes = await readObject(expected.objectId, expected.sizeBytes);
-    if (bytes.length !== expected.sizeBytes || createHash('sha256').update(bytes).digest('hex') !== expected.sha256
-      || !imageMatches(bytes, expected.mime)) throw new Error('CONTENT_ATTACHMENT_INVALID');
+    if (!contentAttachmentBytesMatch(expected, bytes)) throw new Error('CONTENT_ATTACHMENT_INVALID');
     return bytes;
   }
   async function reclaimObject(id: string): Promise<'reclaimed' | 'retained'> {
@@ -284,8 +287,7 @@ export function createContentObjectStore(rootDirectory: string): ContentAttachme
       value = await work(Object.freeze({
         persistAttachment(expected: ReservedAttachment, bytes: Buffer) { return track(async () => {
           attachment(expected);
-          if (expected.objectId !== id || bytes.length !== expected.sizeBytes
-            || createHash('sha256').update(bytes).digest('hex') !== expected.sha256 || !imageMatches(bytes, expected.mime)) throw new Error('CONTENT_ATTACHMENT_INVALID');
+          if (expected.objectId !== id || !contentAttachmentBytesMatch(expected, bytes)) throw new Error('CONTENT_ATTACHMENT_INVALID');
           try { await readAttachment(expected); return expected; }
           catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
           // The lifecycle owner rechecked reserved state inside this scope. Only

@@ -130,6 +130,13 @@
       "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
       "source_sha256": "33e3c0aa4b3983062455ccf56283abdc44dd18e01384752a80fa9d5fbdc5cd2b",
       "migration_sha256": "1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc"
+    },
+    "sop_continuation_overlay": {
+      "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12",
+      "source_sha256": "aa8808e02893abe258d6f8f834b792444a321938fff5c8659f873b5ab338afc8",
+      "migration_sha256": "112136a8bd99270cc2494720338fc9955cca4143a3ff8deb6320c91748d50665"
     }
   },
   "migrations": [
@@ -1230,6 +1237,17 @@
       "source_ranges": [],
       "sha256": "1c2b58176f55aee09ca3d507a76094908db7ae71f00c41b93e1cba5205f152cc",
       "bytes": 31749,
+      "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
+      "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
+      "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12"
+    },
+    {
+      "position": 87,
+      "id": "0087_sop_unified_continuation",
+      "file": "0087_sop_unified_continuation.sql",
+      "source_ranges": [],
+      "sha256": "112136a8bd99270cc2494720338fc9955cca4143a3ff8deb6320c91748d50665",
+      "bytes": 58106,
       "contract_set_id": "cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f",
       "source_git_sha": "812a2e80584f08675fab8b7401ce8b4cd3ab5bca",
       "source_schema_sha256": "2ed15384fd2e1d0a4993dfebc40e68980b4ef8f4f1effe172b656f3c3c63cd12"

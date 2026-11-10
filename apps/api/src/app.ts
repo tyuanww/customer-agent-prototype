@@ -49,6 +49,8 @@ import { registerIterationTaskRoutes, type IterationTaskRouteDependencies } from
 import { registerOpsLoopRoutes, type OpsLoopRouteDependencies } from './ops-loop-routes.js';
 import { contentIntakeManagementRoutes } from './content-intake/management-http.js';
 import { contentIntakeUsageRoutes } from './content-intake/usage-http.js';
+import { sopContinuationRoutes } from './sop-continuation-routes.js';
+import { createSopContinuationService } from './sop-continuation.js';
 import { createContentIntakeService } from './content-intake/service.js';
 import { syntheticPrincipalLabels } from './content-intake/synthetic-principal-labels.js';
 import type { ContentObjectStore, ContentAttachmentStore } from './content-object-store.js';
@@ -281,6 +283,8 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
       intakeDependencies.usage, intakeDependencies.store, report, undefined, { requireProductSession: true },
     );
     void app.register(contentIntakeUsageRoutes, { auth: authService, usage, report });
+    void app.register(sopContinuationRoutes, { auth: authService,
+      continuation: createSopContinuationService(intakeDependencies.usage, report, intakeDependencies.store), report });
     void app.register(contentIntakeManagementRoutes, {
       auth: authService,
       pool: intakeDependencies.business,

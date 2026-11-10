@@ -74,8 +74,9 @@ export function parseSopQueryBundle(raw: unknown): { graphs: SopQueryGraphBundle
   return { graphs, validUntil: Date.parse(raw.validUntil) };
 }
 
-/** Checks the exact durable bytes for every graph media owner. Only a descriptor
- * obtained through the authorized SQL binding can reach the attachment store. */
+/** Every selected owner resolves through the authorized SQL binding. Required
+ * bytes gate ready/replay. Optional bytes are checked by the same bound media GET
+ * when consumed, so their failure leaves the flow usable. */
 export async function verifySopQueryMedia(client: IntakeTransaction,
   store: Partial<Pick<ContentAttachmentStore, 'readAttachment'>>,
   context: { principalId: string; entitlementHash: string }, graph: SopGraph): Promise<void> {
@@ -90,7 +91,7 @@ export async function verifySopQueryMedia(client: IntakeTransaction,
       throw new SopQueryIntegrityError('MEDIA_UNVERIFIED');
     }
     const descriptor: ReservedAttachment = { objectId: raw.objectId, sha256: binding.sha256, sizeBytes: binding.bytes, mime: binding.mime };
-    descriptors.push(descriptor);
+    if (binding.required) descriptors.push(descriptor);
   }
   try { await verifyGraphMedia(store, descriptors); }
   catch (error) {

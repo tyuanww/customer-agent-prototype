@@ -41,6 +41,30 @@ function appWith(value?: UnifiedSopQueryResponse) {
   registerSopQueryRoute(app, createMockAuthService(), { unifiedOperation: { execute } });
   return { app, execute };
 }
+
+describe('SOP query Unicode boundary', () => {
+  it('rejects unrepresentable text and preserves Chinese and paired astral characters', async () => {
+    const { app, execute } = appWith();
+    for (const text of ['合成\u0000', '合成\ud800', '合成\udfff']) {
+      for (const overrides of [
+        { query_text: text },
+        { context_generation: text },
+        { product_context: { type: 'sku', ref: text } },
+      ]) {
+        const result = await app.inject({ method: 'POST', url: '/v1/sop/query', headers,
+          payload: { ...queryRequest, ...overrides } });
+        expect(result.statusCode).toBe(400);
+      }
+    }
+    expect(execute).not.toHaveBeenCalled();
+    const result = await app.inject({ method: 'POST', url: '/v1/sop/query', headers,
+      payload: { ...queryRequest, query_text: '合成入口😀', context_generation: '中文代际😀',
+        product_context: { type: 'sku', ref: '合成商品😀' } } });
+    expect(result.statusCode).toBe(200);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+});
+
 function syntheticDocument(overrides: Record<string, unknown> = {}) {
   return { candidateId: 'synthetic-candidate', candidateVersion: 1, sourceId: 'synthetic-sop', flowId: 'flow-a',
     graphDigest: 'a'.repeat(64), sopGroup: queryRequest.sop_group, permissions: [], ...overrides };

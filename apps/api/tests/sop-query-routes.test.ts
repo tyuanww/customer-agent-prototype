@@ -219,6 +219,28 @@ describe('SOP query candidate transport', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('rejects unrepresentable text while retaining Chinese and paired astral characters', async () => {
+    const execute = vi.fn<SopQueryOperation['execute']>().mockResolvedValue(readyResponse());
+    const app = appWith({ execute });
+    for (const text of ['合成\u0000', '合成\ud800', '合成\udfff']) {
+      for (const overrides of [
+        { query_text: text },
+        { context_generation: text },
+        { product_context: { type: 'sku', ref: text } },
+      ]) {
+        const result = await app.inject({ method: 'POST', url: '/v1/sop/query', headers,
+          payload: request(overrides) });
+        expect(result.statusCode).toBe(400);
+      }
+    }
+    expect(execute).not.toHaveBeenCalled();
+    const result = await app.inject({ method: 'POST', url: '/v1/sop/query', headers,
+      payload: request({ query_text: '合成入口😀', context_generation: '中文代际😀',
+        product_context: { type: 'sku', ref: '合成商品😀' } }) });
+    expect(result.statusCode).toBe(200);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
   it('fails closed for unknown operation errors and invalid operation responses', async () => {
     const throws = appWith({ execute: async () => { throw new Error('DATABASE_URL secret'); } });
     const failed = await throws.inject({ method: 'POST', url: '/v1/sop/query', headers, payload: request() });
