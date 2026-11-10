@@ -9,6 +9,8 @@ const TENANT = 'tenant-restamp';
 const APP = 'app-restamp';
 const BRAND = 'brand-restamp';
 const ACTION = 'query';
+const SOURCE = `source-${TENANT}-presale`;
+const OTHER_SOURCE = 'source-restamp-other';
 
 /** Pins the invariant `0059_query_grant_restamp` owns: an approved set that advances must not
  *  silently de-authorize a grant whose source it still contains. The two cases differ only in
@@ -33,7 +35,7 @@ describe.skipIf(!enabled)('query grant follows the store set', () => {
       // The approved set advances with the same source still in it. This is what the roster
       // refresh does when the release lineage changes, and it is the moment a stamped grant
       // goes stale.
-      await advanceStoreSet(admin, 2);
+      await advanceStoreSet(admin, 2, [SOURCE]);
 
       await expect(authorized(admin)).resolves.toBe(1);
     } finally {
@@ -58,8 +60,16 @@ describe.skipIf(!enabled)('query grant follows the store set', () => {
       });
       await expect(authorized(admin)).resolves.toBe(1);
 
-      // The new set drops the source, so the grant must not survive on a stale stamp.
-      await advanceStoreSet(admin, 2, { members: false });
+      await admin.query('BEGIN');
+      await admin.query(`INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode)
+        SELECT $1,scope_id,1,'v2-preview' FROM content_intake.sources WHERE source_id=$2`, [OTHER_SOURCE, SOURCE]);
+      await admin.query(`INSERT INTO content_intake.source_mappings(
+          source_id,version,template_version,rule_version,mapping_version,structure_digest)
+        VALUES ($1,1,'faq-p1.1','intake-p1.1','faq-map',repeat('ab',32))`, [OTHER_SOURCE]);
+      await admin.query('COMMIT');
+      // 0062 retains the old pointer for an empty set. A nonempty replacement
+      // reaches the withdrawal branch without changing that retention guarantee.
+      await advanceStoreSet(admin, 2, [OTHER_SOURCE]);
 
       await expect(authorized(admin)).resolves.toBe(0);
     } finally {
@@ -71,21 +81,19 @@ describe.skipIf(!enabled)('query grant follows the store set', () => {
 
 /** Advance the approved set the way the roster refresh does, without needing a release in
  *  `content_current`: write the next version, its members, then move the pointer. */
-async function advanceStoreSet(admin: Client, version: number, options: { members?: boolean } = {}): Promise<void> {
-  const keepMembers = options.members ?? true;
+async function advanceStoreSet(admin: Client, version: number, sourceIds: readonly string[]): Promise<void> {
   await admin.query('BEGIN');
   try {
     await admin.query(`INSERT INTO content_intake.store_sets(tenant_id, app_id, version, approved_at, provenance)
       VALUES ($1,$2,$3,clock_timestamp(),'synthetic-advance')`, [TENANT, APP, version]);
-    if (keepMembers) {
-      await admin.query(`INSERT INTO content_intake.store_set_members(
-          tenant_id, app_id, version, scope_id, source_id, content_valid_until)
-        SELECT tenant_id, app_id, $3, scope_id, source_id, content_valid_until
-        FROM content_intake.store_set_members
-        WHERE tenant_id=$1 AND app_id=$2 AND version=$4`, [TENANT, APP, version, version - 1]);
-    }
-    await admin.query(`UPDATE content_intake.store_set_current SET version=$3
-      WHERE tenant_id=$1 AND app_id=$2`, [TENANT, APP, version]);
+    await admin.query(`INSERT INTO content_intake.store_set_members(
+        tenant_id, app_id, version, scope_id, source_id, content_valid_until)
+      SELECT scope.tenant_id,scope.app_id,$3,scope.scope_id,source.source_id,clock_timestamp()+interval '1 hour'
+      FROM content_intake.sources source JOIN content_intake.scopes scope USING(scope_id)
+      WHERE scope.tenant_id=$1 AND scope.app_id=$2 AND source.source_id=ANY($4::text[])`, [TENANT, APP, version, sourceIds]);
+    const moved = await admin.query(`UPDATE content_intake.store_set_current SET version=$3
+      WHERE tenant_id=$1 AND app_id=$2 RETURNING version`, [TENANT, APP, version]);
+    expect(moved.rows.map(row => Number(row.version))).toEqual([version]);
     await admin.query('COMMIT');
   } catch (error) {
     await admin.query('ROLLBACK');

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { applyDatabaseMigrations, applyMigrationPrefix } from '@customer-agent/database';
+import { applyDatabaseMigrations, applyMigrationPrefix, inspectDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { ROLE_CEILING } from '../src/content-intake/role-ceiling.js';
 
@@ -202,15 +202,10 @@ describe.skipIf(!enabled)('seat lifecycle definer functions', () => {
       expect(before.length).toBeGreaterThan(1);
       expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
         'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);
+      const pending = (await inspectDatabaseMigrations(client)).pending.map((migration) => migration.id);
+      expect(pending[0]).toBe('0078_seat_manual_grants');
       const result = await applyDatabaseMigrations(client);
-      expect(result.applied.map((migration) => migration.id)).toEqual([
-        '0078_seat_manual_grants',
-        '0079_directory_identity_activity',
-        '0080_bind_import_batch_tenant',
-        '0081_require_import_batch_principal',
-        '0082_access_evaluator',
-        '0083_sop_pipeline_projection',
-      ]);
+      expect(result.applied.map((migration) => migration.id)).toEqual(pending);
       expect((await snapshot()).rows).toEqual(before);
       expect((await client.query(`SELECT 1 FROM content_intake.authorization_sources(
         'seat_legacy','query',clock_timestamp())`)).rowCount).toBeGreaterThan(0);

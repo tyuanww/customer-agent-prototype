@@ -182,10 +182,20 @@ export function rankScripts(
   const queryTerms = termsOf(expandQuery(query, slots));
   if (queryTerms.length === 0) return Object.freeze([]);
   const head = rankLane(queryTerms, index, HEAD_WEIGHTS);
-  const body = dense && dense.length > 0
+  const hasDenseRanks = dense !== null && dense.length > 0;
+  const body = hasDenseRanks
     ? dense.map((row) => ({ id: row.scriptId, rank: row.rank }))
     : rankLane(queryTerms, index, ANSWER_WEIGHTS);
-  return materialize(fuseReciprocalRanks([head, body], RRF_K), scripts, limit);
+  const fused = fuseReciprocalRanks([head, body], RRF_K);
+  if (hasDenseRanks) return materialize(fused, scripts, limit);
+  const headRanks = new Map(head.map((row) => [row.id, row.rank]));
+  const missingHeadRank = head.length + 1;
+  // BM25-only ties retain the stronger title/question evidence before stable IDs.
+  const ordered = [...fused].sort((left, right) =>
+    right.score - left.score
+    || (headRanks.get(left.id) ?? missingHeadRank) - (headRanks.get(right.id) ?? missingHeadRank)
+    || left.id.localeCompare(right.id));
+  return materialize(ordered, scripts, limit);
 }
 
 export function rankScriptsMulti(

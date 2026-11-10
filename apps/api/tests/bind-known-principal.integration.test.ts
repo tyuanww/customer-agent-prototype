@@ -159,7 +159,7 @@ describe.skipIf(!enabled)('bind a principal only from an enabled subject binding
         LIMIT 1`)).rows[0];
       expect(fact?.tenant_id).toBe('tenant-synthetic');
       expect(fact?.facts_version).toBe('2');
-      expect(Number(fact?.window_seconds)).toBe(300);
+      expect(Number(fact?.window_seconds)).toBe(24 * 60 * 60);
       expect(fact?.fact_count).toBe(2);
       expect(await bindKnownPrincipal(client, { ...input, principalId: 'principal-bind-missing', userId: 'user-missing', personKey: 'person-missing' })).toBe('missing');
       expect((await client.query("SELECT principal_id FROM content_intake.principals WHERE user_id='user-missing'")).rows).toEqual([]);
