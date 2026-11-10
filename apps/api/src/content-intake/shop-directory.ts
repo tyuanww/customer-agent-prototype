@@ -1,4 +1,4 @@
-import { ContractValidationError, parseContractSchema } from './contract-view.js';
+import { isContractValidationError, parseContractSchema } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import { IntakeRejection, type createIntakeTransactions } from './transaction.js';
@@ -23,7 +23,7 @@ export function createIntakeShopDirectory(run: ReturnType<typeof createIntakeTra
   const decodeDirectory = (value: unknown) => {
     try { return parseContractSchema('IntakeShopDirectory',value); }
     catch (error) {
-      if (error instanceof ContractValidationError) throw new IntakeRejection('SHOP_DIRECTORY_UNAVAILABLE','OVERLOADED');
+      if (isContractValidationError(error)) throw new IntakeRejection('SHOP_DIRECTORY_UNAVAILABLE','OVERLOADED');
       throw error;
     }
   };

@@ -1,7 +1,7 @@
 import { IntakeCapacityCommitUnknown, type IntakeCapacity } from './capacity.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Readable } from 'node:stream';
-import { ContractValidationError, parseContractSchema, type components } from './contract-view.js';
+import { isContractValidationError, parseContractSchema, type components } from './contract-view.js';
 import { isParseResult, writeIssueReport, type ParseResult } from '@customer-agent/content-intake';
 import type { AuthenticatedUser } from '../auth-service.js';
 import type { ContentObjectStore, PersistedContentObject } from '../content-object-store.js';
@@ -32,7 +32,7 @@ export function createIntakeFiles(run: Run, store: ContentObjectStore, capacity:
     try { report(diagnosticId, error); } catch { /* Observational; never return a sink exception. */ }
     const message = error instanceof Error ? error.message : '';
     const rejection = error instanceof IntakeRejection ? error
-      : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
+      : isContractValidationError(error) ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
         : /^CONTENT_(UPLOAD|OBJECT_TYPE)/.test(message) ? new IntakeRejection(
           message.includes('TOO_LARGE') ? 'FILE_LIMIT' : 'FILE_INVALID', 'VALIDATION')
           : new IntakeRejection('FILE_INVALID', 'INTERNAL_ERROR');

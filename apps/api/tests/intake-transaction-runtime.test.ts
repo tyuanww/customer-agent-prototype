@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../src/product-auth-service.js', () => ({ authenticatedProductSession: (actor: { user_id: string }) => actor.user_id === 'synthetic-user' ? 'a'.repeat(64) : undefined }));
 import { createIntakeTransactions, IntakeRejection, lockProductSession, type IntakePool } from '../src/content-intake/transaction.js';
+import { parseContractSchema, withIntakeView } from '../src/content-intake/contract-view.js';
 const actor = { user_id: 'synthetic-user', role: 'owner', auth_mode: 'mock' } as const;
 
 describe('formal transaction lock and finalizer ownership', () => {
@@ -69,9 +70,17 @@ describe('formal transaction lock and finalizer ownership', () => {
   });
   it.each([
     ['ZA003', 'SOURCE_FORMAT_MISMATCH', 'VALIDATION', 'SOURCE_FORMAT_MISMATCH'],
+    ['ZA003', 'SOP_RELEASE_CHANGED', 'CONFLICT', 'SOP_RELEASE_CHANGED'],
+    ['ZA003', 'SOP_SNAPSHOT_INVALID', 'CONFLICT', 'SOP_SNAPSHOT_INVALID'],
+    ['ZA002', 'SCOPE_DENIED', 'NOT_FOUND', 'SCOPE_DENIED'],
+    ['ZA003', 'SESSION_UNAVAILABLE', 'UNAUTHORIZED', 'SCOPE_DENIED'],
+    ['ZA003', 'APPROVAL_UNAVAILABLE', 'FORBIDDEN', 'APPROVAL_UNAVAILABLE'],
+    ['42501', 'APPROVAL_UNAVAILABLE', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
+    ['42501', 'SESSION_UNAVAILABLE', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
+    ['42501', 'SOP_SNAPSHOT_INVALID', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
     ['42501', 'SOURCE_FORMAT_MISMATCH', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
     ['ZA003', 'OTHER_PRIVATE_FAILURE', 'INTERNAL_ERROR', 'COMMIT_UNKNOWN'],
-  ] as const)('normalizes only the frozen format rejection (%s/%s)', async (sqlstate, message, code, reason) => {
+  ] as const)('normalizes only declared SQL state and reason pairs (%s/%s)', async (sqlstate, message, code, reason) => {
     const f = fixture();
     const result = await f.run(actor, 'test', {}, 'format-operation', async () => { throw Object.assign(new Error(message), { code: sqlstate }); }, Boolean);
     expect(result).toMatchObject({ ok: false, code, reason, commit: 'rolled_back' });
@@ -83,5 +92,19 @@ describe('formal transaction lock and finalizer ownership', () => {
     const result = await f.run(actor, 'test', null, null, async client => { client.validUntil(2000); client.beforeCommit(async () => { f.advance(2000); }); return true; }, Boolean);
     expect(result).toMatchObject({ ok: false, reason: 'PERMISSION_CHANGED', code: 'FORBIDDEN', commit: 'rolled_back' });
     expect(f.events).not.toContain('COMMIT');
+  });
+  it.each(['legacy', 'graph'] as const)('maps the %s runtime validator failure before writes', async view => {
+    const f = fixture();
+    const result = await withIntakeView(view, () => f.run(actor, 'test', null, null,
+      async () => parseContractSchema('IntakeId', null), String));
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION', reason: 'FILE_INVALID', commit: 'rolled_back' });
+    expect(f.events.at(-1)).toBe('ROLLBACK');
+  });
+  it('keeps an unrelated error with a validator-like name private', async () => {
+    const f = fixture();
+    const result = await f.run(actor, 'test', null, null, async () => {
+      throw Object.assign(new Error('synthetic unrelated fault'), { name: 'ContractValidationError' });
+    }, Boolean);
+    expect(result).toMatchObject({ ok: false, code: 'INTERNAL_ERROR', reason: 'COMMIT_UNKNOWN' });
   });
 });

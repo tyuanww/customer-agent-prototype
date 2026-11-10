@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { ContractValidationError, type components } from './contract-view.js';
+import { isContractValidationError, type components } from './contract-view.js';
 import type { AuthenticatedUser } from '../auth-service.js';
 import { authenticatedProductSession } from '../product-auth-service.js';
 import { canonicalJson, type CanonicalJsonValue } from '../idempotency.js';
@@ -15,7 +15,7 @@ export class IntakeRejection extends Error {
 }
 export type IntakeResult<T> = { ok: true; value: T } | {
   ok: false; code: components['schemas']['IntakeFailure']['code']; reason: Reason;
-  commit: 'rolled_back' | 'unknown'; diagnosticId: string;
+  commit: 'committed' | 'rolled_back' | 'unknown'; diagnosticId: string;
 };
 export type IntakePool = Pick<Pool, 'connect'>;
 type Queryable = Pick<PoolClient, 'query'>;
@@ -218,13 +218,17 @@ export function createIntakeTransactions(pool: IntakePool,
       // Keep the public code/reason aligned with the unknown commit state.
       if (committing || broken) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       const rejection = error instanceof IntakeRejection ? error
+        : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SESSION_UNAVAILABLE'
+          ? new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED')
         : error instanceof Error && 'code' in error && error.code === 'ZA002' && error.message === 'SCOPE_DENIED'
           ? new IntakeRejection('SCOPE_DENIED', 'NOT_FOUND')
-        : error instanceof Error && 'code' in error && error.code === 'ZA003' && /^(SOP_MAPPING_REQUIRED|SOP_GRAPH_INVALID|SOP_DEPENDENCY_INVALID|SOP_MEDIA_UNAVAILABLE|MATERIAL_CHANGED|BASE_CHANGED|SOURCE_MISMATCH|PERMISSION_CHANGED|IDEMPOTENCY_CONFLICT)$/.test(error.message)
+        : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'APPROVAL_UNAVAILABLE'
+          ? new IntakeRejection('APPROVAL_UNAVAILABLE', 'FORBIDDEN')
+        : error instanceof Error && 'code' in error && error.code === 'ZA003' && /^(SOP_MAPPING_REQUIRED|SOP_GRAPH_INVALID|SOP_DEPENDENCY_INVALID|SOP_MEDIA_UNAVAILABLE|SOP_RELEASE_CHANGED|SOP_SNAPSHOT_INVALID|MATERIAL_CHANGED|BASE_CHANGED|SOURCE_MISMATCH|PERMISSION_CHANGED|IDEMPOTENCY_CONFLICT)$/.test(error.message)
           ? new IntakeRejection(error.message as Reason)
         : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SOURCE_FORMAT_MISMATCH'
           ? new IntakeRejection('SOURCE_FORMAT_MISMATCH', 'VALIDATION')
-          : error instanceof ContractValidationError ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
+          : isContractValidationError(error) ? new IntakeRejection('FILE_INVALID', 'VALIDATION')
           : new IntakeRejection('COMMIT_UNKNOWN', 'INTERNAL_ERROR');
       return { ok: false, code: rejection.code, reason: rejection.reason, commit: 'rolled_back', diagnosticId };
     } finally {

@@ -8,6 +8,19 @@ export const SOP_LIFECYCLE_SOURCE = Object.freeze({ position: 85, id: '0085_sop_
 export const SOP_QUERY_SOURCE = Object.freeze({ position: 86, id: '0086_sop_unified_query',
   file: 'packages/database/overlays/0086_sop_unified_query.sql', sha256: '33e3c0aa4b3983062455ccf56283abdc44dd18e01384752a80fa9d5fbdc5cd2b' });
 
+export const SOP_CONTINUATION_SOURCE = Object.freeze({ position: 87, id: '0087_sop_unified_continuation',
+  file: 'packages/database/overlays/0087_sop_unified_continuation.sql', sha256: 'aa8808e02893abe258d6f8f834b792444a321938fff5c8659f873b5ab338afc8' });
+
+export function renderSopContinuationMigration({ manifest }, source) {
+  if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'
+    || manifest.source_git_sha !== '812a2e80584f08675fab8b7401ce8b4cd3ab5bca'
+    || sha256(source) !== SOP_CONTINUATION_SOURCE.sha256) throw new Error('SOP continuation implementation source drifted');
+  return renderUpgradeMigration({ position: SOP_CONTINUATION_SOURCE.position, id: SOP_CONTINUATION_SOURCE.id,
+    version: `verified SOP continuation implementation; overlay_sha256=${SOP_CONTINUATION_SOURCE.sha256}`,
+    ranges: [], sourceBody: source.trimEnd() }, { contract_set_id: manifest.contract_set_id,
+    source_git_sha: manifest.source_git_sha, manifest });
+}
+
 export function renderSopQueryMigration({ manifest }, source) {
   if (manifest.contract_set_id !== 'cs-ai-c11-openapi-1.29.1-schema-1.33-812a2e80584f'
     || manifest.source_git_sha !== '812a2e80584f08675fab8b7401ce8b4cd3ab5bca'

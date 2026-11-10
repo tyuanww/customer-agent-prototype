@@ -22,6 +22,8 @@ import { createContentIntakeService } from '../../dist/content-intake/service.js
 import { contentIntakeManagementRoutes } from '../../dist/content-intake/management-http.js';
 import { createSeatServiceFromEnv } from '../../dist/content-intake/seats.js';
 import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.js';
+import { sopContinuationRoutes } from '../../dist/sop-continuation-routes.js';
+import { createSopContinuationService } from '../../dist/sop-continuation.js';
 import { createEventRepository } from '../../dist/event-repository.js';
 import { registerSearchRoute } from '../../dist/search-routes.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
@@ -67,7 +69,7 @@ export function createIntakeSyntheticCsv(options: SyntheticFileOptions = {}) {
 type HostState = Awaited<ReturnType<typeof startIntakeSyntheticHost>>;
 type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['IntakeObject'] };
 type SyntheticProfile = 'existing' | 'purpose-runtime';
-type HostOptions = { includeSopQuery?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
+type HostOptions = { afterSopAttachmentRead?: () => Promise<void>; includeSopContinuation?: boolean; includeSopQuery?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
   includeLegacySearch?: boolean;
   configureDatabase?: (client: Awaited<ReturnType<Pg15Harness['connect']>>) => Promise<void>;
   wrapBusinessPool?: (pool: IntakePool) => IntakePool; wrapUsagePool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
@@ -160,7 +162,7 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean
  * The returned control methods are local test/terminal controls, not HTTP
  * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
-  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery'> = {}) {
+  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
   const pg = new Pg15Harness();
   const authLogin = profile === 'purpose-runtime' ? 'stack_backend_auth' : 'synthetic_intake_auth';
@@ -523,6 +525,11 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
+    if (hooks.includeSopContinuation) await app.register(sopContinuationRoutes, {
+      auth, continuation: createSopContinuationService(usagePool, report, { async readAttachment(descriptor) {
+        const bytes = await store.readAttachment(descriptor); await hooks.afterSopAttachmentRead?.(); return bytes;
+      } }), report,
+    });
     const seatRoot = path.join(pg.root, 'seat-accounts');
     mkdirSync(seatRoot, { recursive: true });
     await app.register(contentIntakeManagementRoutes, {

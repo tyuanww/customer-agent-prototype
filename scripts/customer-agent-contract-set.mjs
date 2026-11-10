@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
-import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
+import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
 import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
@@ -935,10 +935,13 @@ function verifyRepairReferences(directory, manifest) {
 }
 
 function verifySopUnifiedMigrationTail(projectRoot, actual) {
-  if (actual.compatibility?.sop_query_overlay && actual.migrations.length !== 86) {
+  if (actual.compatibility?.sop_continuation_overlay && actual.migrations.length !== 87) {
+    throw new Error('SOP continuation implementation requires its exact 87-migration tail');
+  }
+  if (actual.compatibility?.sop_query_overlay && ![86, 87].includes(actual.migrations.length)) {
     throw new Error('SOP query implementation requires its exact 86-migration tail');
   }
-  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86, 87].includes(actual.migrations.length)) {
     throw new Error('SOP lifecycle implementation requires its exact 85-migration tail');
   }
   const lockPath = path.join(projectRoot, UPSTREAM_ROOT, SOP_CORRECTED_LOCK);
@@ -994,7 +997,7 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(lifecyclePath, 'utf8') !== lifecycleSql) throw new Error('SOP lifecycle implementation bytes drift');
   }
 
-  if (actual.migrations.length === 86) {
+  if (actual.migrations.length >= 86) {
     const sourcePath = path.join(projectRoot, SOP_QUERY_SOURCE.file);
     assertPathInsideRoot(projectRoot, sourcePath);
     assertRegularFile(sourcePath, 'SOP query implementation source');
@@ -1010,6 +1013,25 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(queryPath, 'utf8') !== querySql) throw new Error('SOP query implementation migration bytes drift');
   }
 
+  if (actual.migrations.length === 87) {
+    if (sha256Bytes(Buffer.from(JSON.stringify(actual.migrations.slice(0, 86)))) !== '1e1e9619dbcb88214c006c0fb429639a0b10abab9c10003624877d582f643ddd') {
+      throw new Error('SOP continuation requires the immutable 86-migration predecessor');
+    }
+    const sourcePath = path.join(projectRoot, SOP_CONTINUATION_SOURCE.file);
+    assertPathInsideRoot(projectRoot, sourcePath);
+    assertRegularFile(sourcePath, 'SOP continuation implementation source');
+    const { sql: continuationSql, ...continuation } = renderSopContinuationMigration({ manifest }, readFileSync(sourcePath, 'utf8'));
+    if (!isDeepStrictEqual(actual.migrations[86], continuation)
+      || !isDeepStrictEqual(actual.compatibility?.sop_continuation_overlay, {
+        contract_set_id: manifest.contract_set_id, source_git_sha: manifest.source_git_sha,
+        source_schema_sha256: manifest.database.sha256, source_sha256: SOP_CONTINUATION_SOURCE.sha256, migration_sha256: continuation.sha256,
+      })) throw new Error('SOP continuation implementation metadata drift');
+    const continuationPath = path.join(migrationRoot, continuation.file);
+    assertPathInsideRoot(projectRoot, continuationPath);
+    assertRegularFile(continuationPath, 'SOP continuation implementation migration');
+    if (readFileSync(continuationPath, 'utf8') !== continuationSql) throw new Error('SOP continuation implementation migration bytes drift');
+  }
+
 }
 
 // This is an upgrade over the exact installed generator closure, never a bootstrap.
@@ -1022,7 +1044,7 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
@@ -1104,7 +1126,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');

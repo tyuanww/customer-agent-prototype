@@ -2,11 +2,13 @@
 
 ## 当前代码与收尾状态（2026-11-10）
 
-产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。既有代码栈及查询回归经 PR #178 至 #183 合入，主干 `dca178283ccf6d43ed99e676d9fbcfa344d060b7` 的完整 CI 在第五次运行通过。Windows 下载故障的早期失败保留在运行历史中。[主干 CI](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42568094229)。
+产品源码版本由 `apps/desktop/package.json` 拥有，当前为 0.3.43。PR #178 至 #188 已合入，最新主干 `c1b228dfbf9913b948eee98634ea878f95436949` 的 CI 42779075531 全部6项通过。Windows 原生进程回收的两个既有用例已进入同一持续门禁，并在 Windows runner 实际通过。[主干 CI](https://github.com/tyuanww/customer-agent-prototype/actions/runs/42779075531)。
 
-独立 SOP 查询已有临时 PG15、HTTP、Main 与 SOP 窗口的合成消费链，覆盖逐字复制、重新登录恢复及撤权后清空。正式图导入、冻结、发布/回滚和安全媒体消费仍未完成。合同 `VERIFIED_NOT_ACTIVATED`，原表只用于仓外受控转换核对。六表转换通过不代表完整 Gate B、业务验收、真实运行或发布完成。真实身份、店铺授权、设备及发布条件需要各自证据。
+正常 SOP 图导入、冻结、来源确认、全量质量、发布及回滚已通过 0085 生命周期闭环。0086 查询事实登记和正常 HTTP 查询已合并，独立导出恢复后也能消费原查询。0087 增加服务端开、续、关及受控图片读取，固定原发布和事实，保留原 handle 终态，按当前身份与授权重新校验。可选图片仍保留完整绑定，其字节失败在读取时明确返回。对应验证入口和已知合同边界见[续用验证说明](docs/how-to-verify-sop-continuation.md)。桌面当前实现的真实后端联合消费、完整 Gate B 和最终安装包验收继续收尾。
 
-五组 SOP PostgreSQL 回归现在由 API `test:integration:sop` 统一执行，并纳入既有集成入口；桌面与独立 SOP 查询变更会选择 SOP 窗口回归。默认套件的 skip 数不能作为未覆盖总数，需与专项逐项对照。完整图写入的初版统一合同已按 `33fc543523b95b47c1236ef7bbfccd3f772c9d0d` 精确导出并接收。正常写链审查发现的旧版本协商头已通过独立 OpenAPI 1.29.1 修正版纠正，来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 14 文件已精确接收。数据库及两份兼容视图的字节与前序相同。foundation 已登记正常 `0084_sop_unified_storage` 和独立类型及 validator 视图，前 83 迁移与默认合同生成物保持原字节。后续工程继续补齐正常导入、全图质量、发布/回退、查询权限事实与媒体兑换。[统一合同接收说明](docs/reference-sop-unified-contract-intake.md)。
+当前正式输入为来源 `812a2e80584f08675fab8b7401ce8b4cd3ab5bca` 的 OpenAPI 1.29.1 / schema 1.33，14 文件精确接收，前 86 迁移保持原字节。v11 的首次 open 只能接受唯一已消费查询事实，完整场景选择和明确查询回执绑定，以及资源独立停用材料和质量，正在正式后继 OpenAPI 1.30.0 / schema 1.34 中补齐。后继须完成真实导出、独立接收和下一迁移验证。原表仅用于仓外受控核对，业务缺项继续 blocked。合同状态为 `VERIFIED_NOT_ACTIVATED`，真实身份、店铺授权、设备验收和发布各自需要实际证据。[统一合同接收说明](docs/reference-sop-unified-contract-intake.md)。
+
+SOP 八组 PostgreSQL 回归由 API `test:integration:sop` 串行执行，覆盖既有五专项及正常写入、查询、续用。默认套件的 skip 与专项结果按用例身份及源码输入核对。其余受控评测、设备与环境门继续各自保留。
 
 下面的历史版本、线上地址状态、发布编号和人员绑定仅代表原记录日期；没有本轮读回证据的内容不得作为当前状态使用。
 

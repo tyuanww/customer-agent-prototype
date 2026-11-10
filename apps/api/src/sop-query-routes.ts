@@ -41,8 +41,14 @@ function isRecord(value: unknown): value is RecordValue {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+// PostgreSQL JSONB cannot store NUL or lone surrogates. Unicode mode preserves
+// paired astral characters while rejecting either surrogate on its own.
+function isStorableText(value: string): boolean {
+  return !value.includes('\0') && !/[\uD800-\uDFFF]/u.test(value);
+}
+
 function boundedString(value: unknown, min: number, max: number): value is string {
-  return typeof value === 'string' && value.length >= min && value.length <= max;
+  return typeof value === 'string' && value.length >= min && value.length <= max && isStorableText(value);
 }
 
 function hasOnlyKeys(value: RecordValue, keys: readonly string[]): boolean {
@@ -133,7 +139,10 @@ export function registerSopQueryRoute(
     const contractHeader = request.headers['x-intake-contract-set'];
     if (contractHeader === SOP_UNIFIED_QUERY_CONTRACT_SET_ID && dependencies.unifiedOperation) {
       const parsed = validateContractSchema('MenokinSopQuerySopQueryRequest', request.body);
-      if (!parsed.ok) return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 SOP 查询合同', requestIdOf(request.body));
+      if (!parsed.ok || [parsed.value.query_text, parsed.value.context_generation, parsed.value.product_context?.ref]
+        .some(text => text !== undefined && !isStorableText(text))) {
+        return sendSopError(reply, 400, 'CONTRACT_UPGRADE_REQUIRED', '请求体不符合 SOP 查询合同', requestIdOf(request.body));
+      }
       try {
         const result = await dependencies.unifiedOperation.execute({ actor, request: parsed.value });
         if ('ok' in result) return sendOperationFailure(reply, result);

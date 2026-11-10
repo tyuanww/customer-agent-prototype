@@ -7,7 +7,11 @@ import type { IntakeResult } from './transaction.js';
 import { intakeView, selectIntakeView, withIntakeView, SOP_CONTRACT_SET } from './contract-view.js';
 
 declare module 'fastify' {
-  interface FastifyContextConfig { intakeFileLimitStatus?: 413 }
+  interface FastifyContextConfig {
+    intakeFileLimitStatus?: 413;
+    intakeGraphOnly?: true;
+    intakeLeaseExpiredStatus?: 410;
+  }
 }
 
 type Failure = components['schemas']['IntakeFailure'];
@@ -55,6 +59,7 @@ export function intakeFailure(reply: FastifyReply, code: Failure['code'], reason
   // Only the new quality contract opts into 413; preserve predecessor error wire.
   const status = intakeView() === 'graph' && ['SOP_MAPPING_REQUIRED', 'SOP_GRAPH_INVALID', 'SOP_DEPENDENCY_INVALID'].includes(reason) ? 422
     : intakeView() === 'graph' && reason === 'SOP_MEDIA_UNAVAILABLE' ? 503
+    : intakeView() === 'graph' && reason === 'LEASE_EXPIRED' && reply.request.routeOptions.config.intakeLeaseExpiredStatus === 410 ? 410
     : code === 'VALIDATION' && reason === 'FILE_LIMIT' ? intakeView() === 'graph' ? 413 : reply.request.routeOptions.config.intakeFileLimitStatus ?? STATUS[code] : STATUS[code];
   return reply.code(status).send(value);
 }
@@ -81,10 +86,12 @@ export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
       const view = selectIntakeView(headers);
       return withIntakeView(view, async () => {
         const graphBody = request.body && typeof request.body === 'object' && ('sopChecks' in request.body || 'materialDigest' in request.body);
-        if (negotiate && (view === 'unsupported' || view === 'legacy' && (graphBody || route.url.includes('/sop/media/')))) {
+        if (negotiate && (view === 'unsupported' || view === 'legacy' && (route.config?.intakeGraphOnly || graphBody || route.url.includes('/sop/media/')))) {
           const result = await negotiate(actors.get(request)!, request);
           if (!result.ok) return intakeFailure(reply, result.code, result.reason, result.diagnosticId);
-          if (view === 'legacy' && route.url.includes('/sop/media/')) return intakeFailure(reply, 'CONFLICT', 'UPGRADE_REQUIRED');
+          if (view === 'unsupported' || view === 'legacy' && (route.config?.intakeGraphOnly || route.url.includes('/sop/media/'))) {
+            return intakeFailure(reply, 'CONFLICT', 'UPGRADE_REQUIRED');
+          }
         }
         return handler.call(this, request, reply);
       });
@@ -109,9 +116,8 @@ export function intakeHttpBoundary(app: FastifyInstance, auth: AuthService,
     const diagnosticId = randomUUID();
     try { report?.(diagnosticId, error); }
     catch { /* Diagnostics cannot replace the fixed public error or disclose a sink exception. */ }
-    return request.routeOptions.url === '/v1/intake/shop-directory'
-      ? intakeFailure(reply, 'OVERLOADED', 'SHOP_DIRECTORY_UNAVAILABLE', diagnosticId)
-      : intakeFailure(reply, 'INTERNAL_ERROR', 'ORG_FACTS_UNAVAILABLE', diagnosticId);
+    if (request.routeOptions.url === '/v1/intake/shop-directory') return intakeFailure(reply, 'OVERLOADED', 'SHOP_DIRECTORY_UNAVAILABLE', diagnosticId);
+    return intakeFailure(reply, request.routeOptions.config.intakeGraphOnly ? 'OVERLOADED' : 'INTERNAL_ERROR', 'ORG_FACTS_UNAVAILABLE', diagnosticId);
   });
   return (request: FastifyRequest): AuthenticatedUser => actors.get(request)!;
 }

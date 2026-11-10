@@ -5,7 +5,9 @@ import * as graph from '@customer-agent/contracts/sop-unified';
 export type { components } from '@customer-agent/contracts/sop-unified';
 import type { components } from '@customer-agent/contracts/sop-unified';
 export type ContractSchemaName = keyof components['schemas'];
-export const ContractValidationError: typeof legacy.ContractValidationError = legacy.ContractValidationError;
+export function isContractValidationError(value: unknown): boolean {
+  return value instanceof legacy.ContractValidationError || value instanceof graph.ContractValidationError;
+}
 export const SOP_CONTRACT_SET = graph.CONTRACT_PROVENANCE.contract_set_id;
 export const LEGACY_CONTRACT_SET = 'cs-ai-c11-openapi-1.24.0-schema-1.29-75e1889efee9';
 export type IntakeView = 'legacy' | 'graph' | 'unsupported';

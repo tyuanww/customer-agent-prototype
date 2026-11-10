@@ -270,6 +270,27 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     }
     expect((await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_query_leases')).rows[0].count).toBe(count);
   });
+  it('rejects unrepresentable Unicode before persistence and accepts normal Chinese and emoji', async () => {
+    const before = (await admin.query(`SELECT
+      (SELECT count(*)::int FROM content_intake.sop_query_leases) AS leases,
+      (SELECT count(*)::int FROM content_intake.entitlements) AS entitlements`)).rows[0];
+    for (const text of ['合成\u0000', '合成\ud800', '合成\udfff']) {
+      for (const overrides of [
+        { query_text: text },
+        { context_generation: text },
+        { product_context: { type: 'sku', ref: text } },
+      ] satisfies Partial<UnifiedSopQueryRequest>[]) {
+        const response = await post('agent', '/v1/sop/query', query(overrides));
+        expect(response.status).toBe(400);
+        expect(parse('MenokinSopQuerySopErrorEnvelope', await response.json()).code).toBe('CONTRACT_UPGRADE_REQUIRED');
+      }
+    }
+    expect((await admin.query(`SELECT
+      (SELECT count(*)::int FROM content_intake.sop_query_leases) AS leases,
+      (SELECT count(*)::int FROM content_intake.entitlements) AS entitlements`)).rows[0]).toEqual(before);
+    expect((await readQuery(query({ query_text: '合成入口😀', context_generation: '中文代际😀' }))).status).toBe('ready');
+  });
+
   it('denies unregistered product references across the complete transport boundary without issuing a lease', async () => {
     const references = ['not-a-vocabulary-item', 'x'.repeat(128), 'x'.repeat(129), 'x'.repeat(256), '../unregistered'];
     const before = (await admin.query('SELECT count(*)::int AS count FROM content_intake.sop_query_leases')).rows[0].count;

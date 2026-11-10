@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('legacy candidate check verifies the complete 86 tail and preserves historical 83/84/85 artifacts', t => {
+test('legacy candidate check verifies the complete 87 tail and preserves historical 83/84/85 artifacts', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'sop-query-candidate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
@@ -26,9 +26,16 @@ test('legacy candidate check verifies the complete 86 tail and preserves histori
   const check = () => spawnSync(process.execPath, [path.join(candidateRoot, 'generate.mjs'), '--check'], { encoding: 'utf8' });
   let result = check();
   assert.equal(result.status, 0, result.stderr);
+  const queryPrefix = JSON.parse(original);
+  queryPrefix.migrations = queryPrefix.migrations.slice(0, 86);
+  delete queryPrefix.compatibility.sop_continuation_overlay;
+  writeFileSync(migrationManifest, JSON.stringify(queryPrefix));
+  result = check();
+  assert.equal(result.status, 0, result.stderr);
   const lifecyclePrefix = JSON.parse(original);
   lifecyclePrefix.migrations = lifecyclePrefix.migrations.slice(0, 85);
   delete lifecyclePrefix.compatibility.sop_query_overlay;
+  delete lifecyclePrefix.compatibility.sop_continuation_overlay;
   writeFileSync(migrationManifest, JSON.stringify(lifecyclePrefix));
   result = check();
   assert.equal(result.status, 0, result.stderr);
@@ -36,6 +43,7 @@ test('legacy candidate check verifies the complete 86 tail and preserves histori
   storage.migrations = storage.migrations.slice(0, 84);
   delete storage.compatibility.sop_lifecycle_overlay;
   delete storage.compatibility.sop_query_overlay;
+  delete storage.compatibility.sop_continuation_overlay;
   writeFileSync(migrationManifest, JSON.stringify(storage));
   result = check();
   assert.equal(result.status, 0, result.stderr);
@@ -44,6 +52,7 @@ test('legacy candidate check verifies the complete 86 tail and preserves histori
   delete prefix.compatibility.sop_unified_successor;
   delete prefix.compatibility.sop_lifecycle_overlay;
   delete prefix.compatibility.sop_query_overlay;
+  delete prefix.compatibility.sop_continuation_overlay;
   writeFileSync(migrationManifest, JSON.stringify(prefix));
   result = check();
   assert.equal(result.status, 0, result.stderr);
@@ -55,6 +64,11 @@ test('legacy candidate check verifies the complete 86 tail and preserves histori
   lifecycle.migrations[84].sha256 = '0'.repeat(64);
   writeFileSync(migrationManifest, JSON.stringify(lifecycle));
   assert.match(check().stderr, /lifecycle implementation metadata drift/);
+  writeFileSync(migrationManifest, original);
+  const invalidTail = JSON.parse(original);
+  invalidTail.migrations[86].sha256 = '0'.repeat(64);
+  writeFileSync(migrationManifest, JSON.stringify(invalidTail));
+  assert.match(check().stderr, /continuation implementation metadata drift/);
   writeFileSync(migrationManifest, original);
   const lastPrefix = path.join(root, 'packages/database/migrations/0083_sop_pipeline_projection.sql');
   writeFileSync(lastPrefix, `${readFileSync(lastPrefix, 'utf8')}\n-- drift`);

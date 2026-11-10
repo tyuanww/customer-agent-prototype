@@ -52,6 +52,7 @@ export type ExecutableMigrationCatalogue = Readonly<{
     sopUnifiedSuccessor?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
     sopLifecycleOverlay?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
     sopQueryOverlay?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
+    sopContinuationOverlay?: Readonly<MigrationProvenance & { migrationSha256: string }> | null;
   }>;
   migrations: readonly ExecutableDatabaseMigration[];
 }>;

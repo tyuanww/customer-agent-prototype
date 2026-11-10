@@ -19,6 +19,16 @@ describe('registered v1.1 six-table parser', () => {
     });
   });
 
+  it('blocks independent resource disable with an exact report location until its material and quality contract exists', async () => {
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await syntheticTaskGraphWorkbook() as unknown as ExcelJS.Buffer);
+    const resources = book.getWorksheet('资源与图片')!;
+    resources.getCell('H3').value = '停用';
+    await expect(parseSopTaskWorkbook(Buffer.from(await book.xlsx.writeBuffer()))).rejects.toMatchObject({
+      issue: { code: 'SOP_MAPPING_REQUIRED', sheet: '资源与图片', row: 3, column: 'H' },
+    });
+  });
+
   it('retains rich text and refuses formulas outside the explicit image column', async () => {
     const book = new ExcelJS.Workbook();
     await book.xlsx.load(await syntheticTaskGraphWorkbook() as unknown as ExcelJS.Buffer);

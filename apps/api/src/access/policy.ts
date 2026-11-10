@@ -128,6 +128,12 @@ export const PROTECTED_ROUTE_POLICIES = createRoutePolicyRegistry([
   ['GET /v1/intake/authorization', requires(...intakeRead)],
   ['GET /v1/intake/sources', requires(...intakeRead)],
   ['GET /v1/intake/policy', requires(...intakeRead)],
+  // Resource-scoped query authority belongs to the continuation transaction.
+  // Close remains available to its authenticated owner after grant withdrawal.
+  ['POST /v1/intake/sop/check', session()],
+  ['POST /v1/intake/sop/continuations/renew', session()],
+  ['POST /v1/intake/sop/continuations/close', session()],
+  ['GET /v1/intake/sop/releases/:releaseId/media/:mediaObjectId', session()],
 
   ['GET /v1/intake/sources/:sourceId/management-context', requires('import')],
   ['GET /v1/intake/principals', requires(...grantOrImport)],
