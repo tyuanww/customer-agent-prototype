@@ -256,7 +256,7 @@ test('packaging inputs select unsigned Windows and Linux package checks under th
 test('Windows process cleanup follows packaging through the map-owned Windows lane', () => {
   const commands = [
     ['pnpm', 'package:win'],
-    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/owned-electron-windows.spec.ts'],
+    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/owned-electron-windows.spec.ts', 'tests/e2e/sop-unified.spec.ts'],
   ];
   for (const file of ['apps/desktop/tests/e2e/owned-electron-windows.spec.ts', 'apps/desktop/tests/support/owned-electron.ts']) {
     const plan = verificationPlan([file], map);
@@ -269,6 +269,23 @@ test('Windows process cleanup follows packaging through the map-owned Windows la
   const windows = workflowJob(mainWorkflow, 'windows-feasibility');
   assert.match(windows, /verification-policy\.mjs run --base HEAD --head HEAD --lane windows/u);
   assert.doesNotMatch(windows, /run: pnpm package:win/u);
+});
+
+test('unified SOP source and decoder changes retain Linux and Windows Electron regressions', () => {
+  for (const file of [
+    'apps/desktop/src/main/sop-unified-runtime.ts',
+    'apps/desktop/src/main/sop-image-decoder.ts',
+    'apps/desktop/tests/e2e/sop-unified.spec.ts',
+  ]) {
+    const plan = verificationPlan([file], map);
+    assert.ok(plan.requiredJobs.includes('electron'), file);
+    assert.ok(plan.requiredJobs.includes('windows'), file);
+    assert.ok(planLaneCommands(plan, 'electron').some(command => command.includes('tests/e2e/sop-unified.spec.ts')), file);
+    assert.deepEqual(planLaneCommands(plan, 'windows'), [
+      ['pnpm', 'package:win'],
+      ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/owned-electron-windows.spec.ts', 'tests/e2e/sop-unified.spec.ts'],
+    ], file);
+  }
 });
 
 test('every source-code owner selects one deduplicated typecheck quick check', () => {
@@ -427,7 +444,7 @@ test('plan commands are lane-scoped and deduplicated', () => {
   assert.deepEqual(planLaneCommands(mixed, 'electron'), [
     ['pnpm', 'test:e2e:float'],
     ['pnpm', '--filter', '@customer-agent/desktop', 'build'],
-    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/sop-query.spec.ts'],
+    ['pnpm', '--filter', '@customer-agent/desktop', 'exec', 'playwright', 'test', 'tests/e2e/sop-query.spec.ts', 'tests/e2e/sop-unified.spec.ts'],
   ]);
   assert.throws(() => planLaneCommands(mixed, 'unknown'), /PLAN_LANE_INVALID/u);
 });

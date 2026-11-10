@@ -1,3 +1,4 @@
+import { isSopUnifiedCommand } from '../shared/sop-unified';
 import { isSopQueryCommand } from '../shared/sop-query';
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
@@ -51,6 +52,11 @@ function sopGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): SopWindowC
 }
 
 export function registerSopWindowIpc(host: SopWindowIpcHost): void {
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_UNIFIED_COMMAND, async (event, ...args: unknown[]): Promise<SopWindowResult> => {
+    const sop = sopGuard(event, host);
+    if (!sop || args.length !== 1 || !isSopUnifiedCommand(args[0])) return sopWindowFailure('INVALID', '流程参数无效');
+    return sop.unifiedCommand(args[0]);
+  });
   ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_QUERY_COMMAND, async (event, ...args: unknown[]): Promise<SopWindowResult> => {
     const sop = sopGuard(event, host);
     if (!sop || args.length !== 1 || !isSopQueryCommand(args[0])) return sopWindowFailure('INVALID', '流程参数无效');
@@ -101,8 +107,8 @@ export function registerSopWindowIpc(host: SopWindowIpcHost): void {
     sopGuard(event, host)?.close();
   });
 
-  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_END_FLOW, (event): void => {
-    sopGuard(event, host)?.endFlow();
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_END_FLOW, async (event): Promise<void> => {
+    await sopGuard(event, host)?.endFlow();
   });
 
   ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_RESTART, async (event): Promise<SopWindowResult> => {

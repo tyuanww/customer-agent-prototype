@@ -1,15 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema as parseSopSchema, type components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
+import { SOP_RESOURCE_CONTRACT } from '../shared/sop-unified';
 import type { IntakeQueryInvalidation } from '../shared/content-intake-query';
 
 type C = components['schemas'];
 type Selection = Pick<C['IntakeEntitlementRequest'], 'shopId' | 'productIds' | 'scenarioIds'>;
+export type IntakeQualification = {
+  selection: Selection;
+  entitlement: SopComponents['schemas']['IntakeEntitlement'];
+  isCurrent(): boolean;
+};
 /** Structural subset of ProductSession. Tokens and actor identity never cross this port. */
 export interface IntakeUsageSession {
   view(): { signedIn: boolean; sessionEpoch: number };
   subscribe(listener: () => void): () => void;
-  request(epoch: number, path: string, options: { body?: unknown; signal: AbortSignal; maxResponseBytes?: number }): Promise<{value: unknown}>;
+  request(epoch: number, path: string, options: {
+    body?: unknown;
+    signal: AbortSignal;
+    maxResponseBytes?: number;
+    headers?: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT };
+  }): Promise<{value: unknown}>;
 }
 import { ProductHttpError } from './product-http.ts';
 
@@ -113,6 +125,39 @@ export class ContentIntakeUsage {
   }
   /** Stop incomplete work without extending or revoking completed qualifications. */
   cancelRefresh() { this.request?.abort(); this.request = null; }
+  /** Main-only ordinary qualification for the current complete selection. */
+  async qualify(signal: AbortSignal, purpose: 'faq' | 'sop' = 'faq'): Promise<IntakeQualification> {
+    if (this.disposed || !this.selection) throw new IntakeUsageError('STALE');
+    const view = this.session.view();
+    if (!view.signedIn) throw new IntakeUsageError('UNAUTHORIZED');
+    const epoch = view.sessionEpoch;
+    const generation = this.generation;
+    const invalidation = this.invalidation;
+    const selection = structuredClone(this.selection);
+    const response = await this.session.request(epoch, '/v1/intake/entitlements', {
+      body: { ...selection, contextGeneration: generation, releaseId: null }, signal,
+      ...(purpose === 'sop' ? { headers: { 'x-intake-contract-set': SOP_RESOURCE_CONTRACT } } : {}),
+    });
+    signal.throwIfAborted();
+    const entitlement = purpose === 'sop'
+      ? parseSopSchema('IntakeEntitlement', response.value)
+      : parseContractSchema('IntakeEntitlement', response.value);
+    if (entitlement.shopId !== selection.shopId || entitlement.contextGeneration !== generation
+      || !entitlement.scopes.some(scope => scope.shopId === selection.shopId || (purpose === 'sop' && scope.shopId === null))
+      || entitlement.scopes.some(scope => scope.shopId !== null && scope.shopId !== selection.shopId)) {
+      throw new IntakeUsageError('FORBIDDEN');
+    }
+    const expires = Date.parse(entitlement.validUntil);
+    const deadline = this.monotonic() + Math.max(0, expires - this.now());
+    const isCurrent = () => {
+      const current = this.session.view();
+      return !this.disposed && !signal.aborted && current.signedIn && current.sessionEpoch === epoch
+        && this.generation === generation && this.invalidation === invalidation
+        && this.now() < expires && this.monotonic() < deadline;
+    };
+    if (!isCurrent()) throw new IntakeUsageError('STALE');
+    return { selection, entitlement, isCurrent };
+  }
   /** No partial snapshot escapes. Failure remains visible; an offline failure may
    * retain a previously completed handle only until its original deadline. */
   async refresh(): Promise<IntakeCatalog> {
@@ -120,7 +165,6 @@ export class ContentIntakeUsage {
     const view = this.session.view();
     if (!view.signedIn) { this.invalidate(); throw new IntakeUsageError('UNAUTHORIZED'); }
     const epoch = view.sessionEpoch, generation = this.generation, invalidation = this.invalidation;
-    const selection = this.selection;
     this.request?.abort(); const controller = new AbortController(); this.request = controller;
     const active = () => {
       const current = this.session.view();
@@ -132,14 +176,9 @@ export class ContentIntakeUsage {
       if (!active() || controller.signal.aborted || this.request !== controller) throw new IntakeUsageError('STALE');
     };
     try {
-      const result = await this.session.request(epoch, '/v1/intake/entitlements', {
-        body: { ...selection, contextGeneration: generation, releaseId: null }, signal: controller.signal,
-      });
+      const qualification = await this.qualify(controller.signal);
+      const entitlement = parseContractSchema('IntakeEntitlement', qualification.entitlement);
       assertRequest();
-      const entitlement = parseContractSchema('IntakeEntitlement', result.value);
-      if (entitlement.shopId !== selection.shopId || entitlement.contextGeneration !== generation
-        || !entitlement.scopes.some(s => s.shopId === selection.shopId)
-        || entitlement.scopes.some(s => s.shopId !== null && s.shopId !== selection.shopId)) throw new IntakeUsageError('FORBIDDEN');
       const expires = Date.parse(entitlement.validUntil);
       const monotonicDeadline = this.monotonic() + Math.max(0, expires - this.now());
       let expired = false;

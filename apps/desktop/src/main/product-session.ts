@@ -44,6 +44,12 @@ export class ProductSession {
   private operation: AbortController | null = null;
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(state: ProductSessionResult) => void>();
+  private logoutListeners = new Set<() => void>();
+  /** Fires before local credentials are cleared. Natural expiry is left to server renewal. */
+  onExplicitLogout(listener: () => void) {
+    this.logoutListeners.add(listener);
+    return () => { this.logoutListeners.delete(listener); };
+  }
   private job: SessionJobView | null = null;
   private jobObservation = 0;
   private acceptedJobObservation = 0;
@@ -160,7 +166,7 @@ export class ProductSession {
   /** Main-only capability. Credentials remain private; late responses cannot cross identities. */
   async request(epoch: number, path: string, options: {
     body?: unknown; form?: FormData; signal?: AbortSignal; method?: string; timeoutMs?: number; maxResponseBytes?: number; responseType?: 'xlsx';
-    headers?: Partial<Record<'x-client-id' | 'x-snapshot-lease' | 'if-none-match' | 'idempotency-key' | 'x-intake-contract-set', string>>;
+    headers?: Partial<Record<'x-client-id' | 'x-snapshot-lease' | 'if-none-match' | 'idempotency-key' | 'x-intake-contract-set' | 'x-sop-continuation', string>>;
   } = {}) {
     if (!this.view().signedIn || !this.token) throw new ProductHttpError('UNAUTHORIZED');
     if (epoch !== this.epoch) throw new ProductHttpError('STALE');
@@ -239,6 +245,12 @@ export class ProductSession {
     finally { clearTimeout(deadline); operation.abort(); if (this.operation === operation) this.operation = null; }
   }
   async logout(): Promise<ProductSessionResult> {
+    for (const listener of this.logoutListeners) {
+      try { listener(); } catch {
+        // Observer cleanup must never prevent local clear or remote revocation.
+        console.warn('[desktop] product-session logout observer failed');
+      }
+    }
     const token = this.token?.access_token; const local = this.invalidate();
     if (token) {
       try { await this.http.request('/v1/auth/logout', { token, method: 'POST' }); }

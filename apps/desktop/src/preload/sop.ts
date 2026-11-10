@@ -1,3 +1,4 @@
+import { isSopUnifiedCommand, isSopUnifiedProjection, type SopUnifiedProjection } from '../shared/sop-unified';
 import { isSopQueryProjection, isSopQueryCommand, type SopQueryProjection } from '../shared/sop-query';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
@@ -25,13 +26,13 @@ const REPORT_LAYOUT = 'sop-window:report-layout';
 const COPY_CURRENT = 'sop-window:copy-current';
 const PROJECTION = 'sop-window:projection';
 
-const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection | SopQueryProjection) => void>();
+const projectionListeners = new Set<(projection: SopProjection | SopPipelineProjection | SopQueryProjection | SopUnifiedProjection) => void>();
 // Main can publish before React subscribes. Retain only the latest validated
 // projection for this document; Main still owns state and invalidation.
-let latestProjection: SopProjection | SopPipelineProjection | SopQueryProjection | null = null;
+let latestProjection: SopProjection | SopPipelineProjection | SopQueryProjection | SopUnifiedProjection | null = null;
 
 ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
-  if (!isSopProjection(payload) && !isSopPipelineProjection(payload) && !isSopQueryProjection(payload)) {
+  if (!isSopProjection(payload) && !isSopPipelineProjection(payload) && !isSopQueryProjection(payload) && !isSopUnifiedProjection(payload)) {
     return;
   }
   latestProjection = payload;
@@ -43,6 +44,13 @@ ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
 const unavailable = { ok: false as const, code: 'UNAVAILABLE' as const, message: '过敏流程通道不可用' };
 
 const api: SopWindowApi = {
+  async unifiedCommand(command) {
+    if (!isSopUnifiedCommand(command)) return unavailable;
+    try {
+      const result: unknown = await ipcRenderer.invoke('sop-window:unified-command', command);
+      return isSopWindowResult(result) ? result : unavailable;
+    } catch { return unavailable; }
+  },
   async queryCommand(command) {
     if (!isSopQueryCommand(command)) return unavailable;
     try {

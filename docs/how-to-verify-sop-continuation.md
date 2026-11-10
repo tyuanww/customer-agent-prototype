@@ -52,3 +52,25 @@ pnpm test:backup:integration
 每次非空恢复使用独立临时目录。脚本先比较完整关系行及原publication FK，再通过88 verifier、当前图读、原Q回执重放、active续用、媒体字节和closed拒绝验证恢复结果。测试日志打印证据目录。原Q/E在授权换代后按原资格拒绝，active仍通过自己的原opening proof和新授权重放。opaque `context_generation` 与普通E numeric generation分属各自所有者。
 
 上述入口使用全合成显式事实。真实原表缺失的业务事实继续保留blocked，runtime activation保持false。Main的迟到结果丢弃、确认项进度和原生复制由桌面消费单元提供独立证据。
+
+## 桌面正常后端联合验证
+
+桌面 `menokin-sop-unified-v12` 仅在显式 loopback `faq-v2` 合成 profile 中启用，配置必须携带当前受锁合同的精确 `sopContractSet`。Main 从 Query 既有完整选择取得普通资格，保留商品及场景条件，分别绑定查询 Q、首开证明、continuation 和历史发布。renderer 只接收展示投影及短期动作句柄。
+
+以下入口创建自有临时 PG15、对象存储、正常 API 和合成身份服务，经正常六表上传、解析、来源确认、质量与发布后驱动实际 Electron 窗口。执行前需要本机已有 PG15、Node 24 和项目锁定的 pnpm。
+
+```sh
+pnpm build:services
+pnpm --filter @customer-agent/desktop build
+sop_evidence_dir="$(mktemp -d)"
+CUSTOMER_AGENT_SOP_V12_NORMAL=1 CUSTOMER_AGENT_SOP_V12_EVIDENCE="$sop_evidence_dir" pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/sop-v12-normal.spec.ts --workers=1
+printf '%s\n' "$sop_evidence_dir"
+```
+
+当前十四项覆盖完整选择与三个媒体 owner、原生剪贴板、query/open 提交后丢响应的原请求重试、在线及离线窗口销毁、多话术与完整图推进、必需图片延迟、自然过期重登、明确登出、撤权换链、迟到查询、可选图片迟到、发布停用回退及正常 C blocked。blocked 用例验证旧内容清空、零图片、无第二次成功首开及无新增原生复制。日志、每项 opening 与后台诊断写入指定证据目录。测试只读取本次写入的合成剪贴板内容，自有服务及临时库由 fixture 回收。
+
+GIF 在 Main 控制的隐藏 sandbox 文档中解码，该文档没有 preload 或 Node 权限，仅允许 data 图片，并在取消、完成或五秒截止时销毁。两个媒体工作者按 active、节点及工作身份丢弃迟到结果。可选图片允许明确失败，必需图片未就绪时阻止推进。明确资源停用终结旧 handle，普通新发布保留原历史 pin。
+
+`tests/e2e/sop-unified.spec.ts` 的合成 HTTP double 和组件、纯状态单元分别保留独立证据。上述正常后端用例证明合成运行链，完整 Gate B、最终 packaged 构建、真实设备和真实业务验收继续按各自矩阵记录。
+
+PG-free 的 `sop-unified.spec.ts` 由共享验证映射接入 Linux Electron 和 Windows 原生进程回收 lane，包含实际 GIF 解码、原生复制及窗口销毁。Windows 打包完成后再运行其 Electron 用例。正常 PG/HTTP 十四项通过上述显式入口执行，证据按用例及环境分别记录。

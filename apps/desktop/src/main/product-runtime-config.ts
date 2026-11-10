@@ -1,3 +1,4 @@
+import { SOP_RESOURCE_CONTRACT, SOP_UNIFIED_CONTRACT } from '../shared/sop-unified';
 import { readFileSync, lstatSync, writeFileSync, type Stats } from 'node:fs';
 import path from 'node:path';
 import { isAdjacentPortPair, isProductionRuntimePort } from '../shared/runtime-ports';
@@ -48,7 +49,8 @@ export type PackagedProductProfile = Readonly<{
   apiOrigin: string;
   identityOrigin: string;
   contentIntake?: 'faq-v2';
-  sopQuery?: 'menokin-sop-query-v1';
+  sopQuery?: 'menokin-sop-query-v1' | 'menokin-sop-unified-v11' | 'menokin-sop-unified-v12';
+  sopContractSet?: typeof SOP_UNIFIED_CONTRACT | typeof SOP_RESOURCE_CONTRACT;
 }>;
 
 export function projectIntakeShellLine(
@@ -174,7 +176,9 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if ('contentIntake' in record && record.contentIntake !== 'faq-v2') {
     return { ok: false, kind: 'invalid' };
   }
-  if ('sopQuery' in record && (record.sopQuery !== 'menokin-sop-query-v1' || record.mode !== MODE || record.contentIntake !== 'faq-v2')) return { ok: false, kind: 'invalid' };
+  if ('sopQuery' in record && (!['menokin-sop-query-v1', 'menokin-sop-unified-v11', 'menokin-sop-unified-v12'].includes(String(record.sopQuery)) || record.mode !== MODE || record.contentIntake !== 'faq-v2')) return { ok: false, kind: 'invalid' };
+  if (record.sopQuery === 'menokin-sop-unified-v12' ? record.sopContractSet !== SOP_RESOURCE_CONTRACT
+    : record.sopQuery === 'menokin-sop-unified-v11' ? record.sopContractSet !== SOP_UNIFIED_CONTRACT : 'sopContractSet' in record) return { ok: false, kind: 'invalid' };
   if (record.mode === OFFLINE_MODE) {
     const keys = Object.keys(record);
     if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
@@ -197,7 +201,9 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   }
   return { ok: true, profile: Object.freeze({ mode: MODE, apiOrigin, identityOrigin,
     ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
-    ...(record.sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}) }) };
+    ...(record.sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}),
+    ...(record.sopQuery === 'menokin-sop-unified-v12' ? { sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: SOP_RESOURCE_CONTRACT } : {}),
+    ...(record.sopQuery === 'menokin-sop-unified-v11' ? { sopQuery: 'menokin-sop-unified-v11' as const, sopContractSet: SOP_UNIFIED_CONTRACT } : {}) }) };
 }
 
 /** Read and validate the packaged profile. Missing or invalid files fail closed. Explicit offline mode returns undefined (S0), it is not a missing file. */
@@ -289,7 +295,10 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const identityOrigin = environment.CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN;
   const contentIntake = environment.CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE;
   const sopQuery = environment.CUSTOMER_AGENT_DESKTOP_SOP_QUERY;
-  if (sopQuery !== undefined && (sopQuery !== 'menokin-sop-query-v1' || contentIntake !== 'faq-v2')) throw new Error('SOP query requires explicit FAQ synthetic profile');
+  if (sopQuery !== undefined && (!['menokin-sop-query-v1', 'menokin-sop-unified-v11', 'menokin-sop-unified-v12'].includes(sopQuery) || contentIntake !== 'faq-v2')) throw new Error('SOP query requires explicit FAQ synthetic profile');
+  const sopContractSet = environment.CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET;
+  if (sopQuery === 'menokin-sop-unified-v12' ? sopContractSet !== SOP_RESOURCE_CONTRACT
+    : sopQuery === 'menokin-sop-unified-v11' ? sopContractSet !== SOP_UNIFIED_CONTRACT : sopContractSet !== undefined) throw new Error('SOP unified requires exact deployed contract set');
   const loopbackApi = loopbackOrigin(apiOrigin);
   const loopbackIdentity = loopbackOrigin(identityOrigin);
   if (contentIntake !== undefined && (contentIntake !== 'faq-v2'
@@ -309,5 +318,7 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   }
   return Object.freeze({ mode: httpsOrigin(api) ? REMOTE_MODE : MODE, apiOrigin: api, identityOrigin: identity,
     ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
-    ...(sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}) });
+    ...(sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}),
+    ...(sopQuery === 'menokin-sop-unified-v12' ? { sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: SOP_RESOURCE_CONTRACT } : {}),
+    ...(sopQuery === 'menokin-sop-unified-v11' ? { sopQuery: 'menokin-sop-unified-v11' as const, sopContractSet: SOP_UNIFIED_CONTRACT } : {}) });
 }

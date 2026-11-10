@@ -18,7 +18,8 @@ import { SYNTHETIC_SCRIPTS } from '../../src/renderer/data/synthetic-scripts';
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
 const mainEntry = path.join(desktopRoot, 'out/main/index.js');
-const screenshotDir = path.join(repositoryRoot, '.gstack/qa-reports/screenshots');
+const screenshotDir = process.env.CUSTOMER_AGENT_E2E_SCREENSHOT_DIR
+  ?? path.join(repositoryRoot, '.gstack/qa-reports/screenshots');
 const CLEANSER_QUERY = '澄芽氨基酸洁面怎么用';
 const VERBATIM_TAIL = '合成原文保留尾部空格与换行  \n\n';
 let launchSequence = 0;

@@ -83,10 +83,40 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
       .find(w => w.webContents.getURL().includes('role=query'))!.getBounds().height)).toBeGreaterThan(150);
     if (process.env.INTAKE_QUERY_SCREENSHOT) await query.screenshot({ path: process.env.INTAKE_QUERY_SCREENSHOT });
-    await query.getByTestId('copy-button-1').click();
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
+    await expect(query.getByTestId('copy-button-1')).toBeVisible();
+    const mainBeforeCopy = await app.evaluate(({ BrowserWindow }) => {
+      const harness: unknown = Reflect.get(globalThis, '__demoTest');
+      if (!harness || typeof harness !== 'object') throw new Error('Missing overlay harness');
+      const snapshot = Reflect.get(harness, 'getOverlaySnapshot');
+      const layout = Reflect.get(harness, 'queryLayoutDebug');
+      if (typeof snapshot !== 'function' || typeof layout !== 'function') throw new Error('Missing overlay diagnostics');
+      const win = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('role=query'));
+      return { snapshot: snapshot(), layout: layout(), focused: win?.isFocused(), bounds: win?.getBounds() };
+    });
+    console.info('FAQ_BEFORE_COPY_MAIN', JSON.stringify(mainBeforeCopy));
+    try {
+      await query.getByTestId('copy-button-1').click();
+    } catch (error) {
+      console.info('FAQ_COPY_RENDERER_FAILURE', await query.evaluate(() => {
+        const shell = document.querySelector('[data-testid=query-shell]');
+        const copy = document.querySelector('[data-testid=copy-button-1]');
+        return { phase: shell?.getAttribute('data-phase'), layoutReady: shell?.getAttribute('data-layout-ready'),
+          parked: shell?.getAttribute('data-parked'), opening: shell?.getAttribute('data-opening'),
+          closing: shell?.getAttribute('data-closing'), copyPresent: Boolean(copy), focused: document.hasFocus() };
+      }));
+      throw error;
+    }
     await expect(query.getByTestId('toast')).toContainText('已复制');
     expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(`shop-a ${wire.entries[0].answerText}`);
-    // Stop the success-dismiss timer by changing the query, then switch shops.
+    // Follow the completed-copy collapse before starting the next independent query.
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'true');
+    await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+    await waitForFocusedWindow(app, 'query');
+    await query.getByRole('button', { name: '筛选', exact: true }).click();
+    await expect(shop).toBeVisible();
     await query.getByTestId('question-input').fill('如何洁面');
     await shop.selectOption('shop-b'); await expect(shop).toHaveValue('shop-b');
     wire.state.ttl = 2000;
@@ -151,6 +181,17 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.evaluate(() => window.customerAgent!.product!.logout());
     await expect(shop).toHaveCount(0);
     await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
+  } catch (error) {
+    if (app) {
+      console.info('FAQ_FAILURE_MAIN', await app.evaluate(({ BrowserWindow }) => {
+        const harness: unknown = Reflect.get(globalThis, '__demoTest');
+        const snapshot = harness && typeof harness === 'object' ? Reflect.get(harness, 'getOverlaySnapshot') : null;
+        const win = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('role=query'));
+        return { snapshot: typeof snapshot === 'function' ? snapshot() : null,
+          visible: win?.isVisible(), focused: win?.isFocused(), bounds: win?.getBounds() };
+      }));
+    }
+    throw error;
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally {

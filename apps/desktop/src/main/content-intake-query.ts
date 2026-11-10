@@ -20,7 +20,8 @@ export class ContentIntakeQuery {
   private epoch: number;
   private disposed = false;
   private listeners = new Set<(event: IntakeQueryInvalidationEvent) => void>();
-  constructor(private readonly session: IntakeUsageSession, writeClipboard: (text: string) => void) {
+  constructor(private readonly session: IntakeUsageSession, writeClipboard: (text: string) => void,
+    private readonly sopDiscovery = false) {
     this.epoch = session.view().sessionEpoch;
     this.usage = new ContentIntakeUsage(session, writeClipboard);
     this.usage.subscribe(event => {
@@ -51,14 +52,15 @@ export class ContentIntakeQuery {
     this.discovery?.abort();
     const controller = new AbortController(); this.discovery = controller;
     try {
-      const access = await loadIntakeAccess(this.session, controller.signal);
+      const access = this.sopDiscovery ? await loadIntakeAccess(this.session, controller.signal, 'sop')
+        : await loadIntakeAccess(this.session, controller.signal);
       if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
       const selected = shopId ?? previous.shopId ?? (access.shops.length === 1 ? access.shops[0]! : null);
       if (access.shops.length === 0 || (selected !== null && !access.shops.includes(selected))) {
         throw new IntakeUsageError('NO_GRANT');
       }
       const menus = selected === null ? { products: [], scenarios: [] }
-        : await loadIntakeVocabulary(this.session, access, selected, controller.signal);
+        : await loadIntakeVocabulary(this.session, access, selected, controller.signal, this.sopDiscovery ? 'sop' : 'legacy');
       if (this.disposed || controller.signal.aborted || this.discovery !== controller) throw new IntakeUsageError('STALE');
       this.namesDeadline = access.shopNamesDeadline ?? 0;
       const namesFresh = this.namesDeadline>performance.now() && !!access.shopNamesValidUntil && Date.now()<Date.parse(access.shopNamesValidUntil);
@@ -84,6 +86,15 @@ export class ContentIntakeQuery {
     if (!this.context.validUntil || Date.now() >= Date.parse(this.context.validUntil) || performance.now() >= this.menuDeadline) {
       throw new IntakeUsageError('EXPIRED');
     }
+  }
+  /** Uses this Query owner's selection without sharing its FAQ display handles. */
+  async qualifySop(signal: AbortSignal) {
+    this.assertMenu();
+    const context = this.context;
+    const qualification = await this.usage.qualify(signal, 'sop');
+    const isCurrent = () => !this.disposed && !this.discovery && this.context === context && qualification.isCurrent();
+    if (!isCurrent()) throw new IntakeUsageError('STALE');
+    return { ...qualification, isCurrent };
   }
   async search(queryText: string, contextId: string = randomUUID()): Promise<IntakeQueryRow[]> {
     this.cancel();

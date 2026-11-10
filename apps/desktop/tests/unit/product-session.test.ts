@@ -50,6 +50,24 @@ describe('product session lifetime', () => {
     expect(await f.session.logout()).toMatchObject({ signedIn: false });
     expect(f.requests.filter(r => r.path.endsWith('/logout'))).toHaveLength(1);
   });
+  it('distinguishes natural expiry from explicit logout before credentials are cleared', async () => {
+    vi.useFakeTimers(); const f = fixture(); const observed: boolean[] = [];
+    f.session.onExplicitLogout(() => observed.push(f.session.view().signedIn));
+    await f.session.login(); await vi.advanceTimersByTimeAsync(900_000);
+    expect(f.session.view().signedIn).toBe(false); expect(observed).toEqual([]);
+    const second = fixture(); second.session.onExplicitLogout(() => observed.push(second.session.view().signedIn));
+    await second.session.login(); await second.session.logout(); expect(observed).toEqual([true]);
+  });
+  it('revokes a session even if an explicit logout observer fails', async () => {
+    const f = fixture(); await f.session.login();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    f.session.onExplicitLogout(() => { throw new Error('synthetic observer failure'); });
+    try {
+      expect(await f.session.logout()).toMatchObject({ signedIn: false });
+      expect(f.requests.some(request => request.path.endsWith('/logout'))).toBe(true);
+      expect(warning).toHaveBeenCalledWith('[desktop] product-session logout observer failed');
+    } finally { warning.mockRestore(); }
+  });
   it('drops late login after logout', async () => {
     const f = fixture(); let finish!: () => void;
     f.window.open.mockImplementation(() => new Promise(resolve => { finish = resolve; }));

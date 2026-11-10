@@ -1,16 +1,22 @@
 import { parseContractSchema, type components } from '@customer-agent/contracts';
+import { parseContractSchema as parseSopSchema, type components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
 import { intakeAccessDenial, IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
+import { SOP_RESOURCE_CONTRACT } from '../shared/sop-unified';
 
 type C = components['schemas'];
-export type IntakeAccess = {
+type S = SopComponents['schemas'];
+type Access<Source, Capability> = {
   validUntil: string;
   shops: string[];
   shopNames?: { id: string; label: string }[];
   shopNamesValidUntil?: string | null;
   shopNamesDeadline?: number;
-  sources: C['IntakeSource'][];
-  capabilities: C['IntakeAuthorization']['capabilities'];
+  sources: Source[];
+  capabilities: Capability[];
 };
+export type IntakeAccess = Access<C['IntakeSource'], C['IntakeAuthorization']['capabilities'][number]>;
+export type SopIntakeAccess = Access<S['IntakeSource'], S['IntakeAuthorization']['capabilities'][number]>;
+type AccessVersions = { factsVersion: number; policyVersion: number; revocationGeneration: number };
 
 export { intakeAccessDenial };
 
@@ -20,7 +26,11 @@ export { intakeAccessDenial };
  * Names use their own expiring read-only directory. Failure preserves IDs; neither
  * a name nor a brand-wide grant may introduce access to another shop.
  */
-export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess & { factsVersion: number; policyVersion: number; revocationGeneration: number }> {
+export function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal): Promise<IntakeAccess & AccessVersions>;
+export function loadIntakeAccess(session: IntakeUsageSession, signal: AbortSignal | undefined, view: 'sop'): Promise<SopIntakeAccess & AccessVersions>;
+export async function loadIntakeAccess(session: IntakeUsageSession, signal?: AbortSignal, view: 'legacy' | 'sop' = 'legacy'): Promise<SopIntakeAccess & AccessVersions> {
+  const headers: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT } | undefined = view === 'sop'
+    ? { 'x-intake-contract-set': SOP_RESOURCE_CONTRACT } : undefined;
   const initial = session.view(), controller = new AbortController();
   if (!initial.signedIn) throw new IntakeUsageError('UNAUTHORIZED');
   const abort = () => controller.abort();
@@ -40,7 +50,7 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
     assertActive();
     const query = new URLSearchParams({ limit: '100', ...(cursor ? { cursor } : {}) });
     const result = await session.request(initial.sessionEpoch, `/v1/intake/${path}?${query}`, {
-      signal: controller.signal, maxResponseBytes: MAX_BYTES - bytes,
+      signal: controller.signal, maxResponseBytes: MAX_BYTES - bytes, headers,
     });
     assertActive();
     bytes += Buffer.byteLength(JSON.stringify(result.value) ?? '');
@@ -48,11 +58,12 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
     return result.value;
   }
   async function authorizations() {
-    let cursor: string | null = null, meta: Omit<C['IntakeAuthorization'], 'capabilities' | 'nextCursor'> | null = null;
-    const cursors = new Set<string>(), ids = new Set<string>(), capabilities: C['IntakeAuthorization']['capabilities'] = [];
+    let cursor: string | null = null, meta: Omit<S['IntakeAuthorization'], 'capabilities' | 'nextCursor'> | null = null;
+    const cursors = new Set<string>(), ids = new Set<string>(), capabilities: S['IntakeAuthorization']['capabilities'] = [];
     do {
       if (cursors.size >= 50) throw new IntakeUsageError('LIMIT');
-      const page: C['IntakeAuthorization'] = parseContractSchema('IntakeAuthorization', await request('authorization', cursor));
+      const raw = await request('authorization', cursor);
+      const page = view === 'sop' ? parseSopSchema('IntakeAuthorization', raw) : parseContractSchema('IntakeAuthorization', raw);
       const { capabilities: rows, nextCursor, ...header } = page;
       if (meta && JSON.stringify(meta) !== JSON.stringify(header)) throw new IntakeUsageError('STALE');
       meta = header;
@@ -70,11 +81,12 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
   try {
     const before = await authorizations();
     const deadline = performance.now() + Math.max(0, Date.parse(before.validUntil) - Date.now());
-    const sources: C['IntakeSource'][] = [], ids = new Set<string>(), cursors = new Set<string>();
+    const sources: S['IntakeSource'][] = [], ids = new Set<string>(), cursors = new Set<string>();
     let cursor: string | null = null;
     do {
       if (cursors.size >= 50) throw new IntakeUsageError('LIMIT');
-      const page: C['IntakeSourceList'] = parseContractSchema('IntakeSourceList', await request('sources', cursor));
+      const raw = await request('sources', cursor);
+      const page = view === 'sop' ? parseSopSchema('IntakeSourceList', raw) : parseContractSchema('IntakeSourceList', raw);
       for (const src of page.items) {
         if (ids.has(src.scope.sourceId)) throw new IntakeUsageError('FORBIDDEN');
         ids.add(src.scope.sourceId); sources.push(src);
@@ -110,7 +122,7 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
           if (seen.size >= 50) throw new IntakeUsageError('LIMIT');
           const query = new URLSearchParams({ limit:'100', ...(nameCursor ? { cursor:nameCursor } : {}) });
           const response = await session.request(initial.sessionEpoch, `/v1/intake/shop-directory?${query}`,
-            { signal:controller.signal, maxResponseBytes:128*1024 });
+            { signal:controller.signal, maxResponseBytes:128*1024, headers });
           assertActive();
           const size = Buffer.byteLength(JSON.stringify(response.value) ?? ''); nameBytes += size;
           if (size > 128*1024 || nameBytes > 8*1024*1024) throw new IntakeUsageError('LIMIT');
@@ -154,7 +166,7 @@ export async function loadIntakeAccess(session: IntakeUsageSession, signal?: Abo
 
 /** Complete menu for the chosen shop; the entitlement endpoint remains the
  * authority. Do not discover options from a generic-only content snapshot. */
-export async function loadIntakeVocabulary(session: IntakeUsageSession, access: IntakeAccess, shopId: string, signal: AbortSignal) {
+export async function loadIntakeVocabulary(session: IntakeUsageSession, access: IntakeAccess | SopIntakeAccess, shopId: string, signal: AbortSignal, view: 'legacy' | 'sop' = 'legacy') {
   const initial = session.view(), started = performance.now();
   const budget = Math.max(0, Date.parse(access.validUntil) - Date.now());
   const check = () => {
@@ -165,7 +177,7 @@ export async function loadIntakeVocabulary(session: IntakeUsageSession, access: 
   const sources = access.sources.filter(s => s.contentIntakeMode === 'v2-preview' && allowed.has(s.scope.sourceId));
   const brands = new Set(sources.filter(s => s.scope.shopId === shopId).map(s => s.scope.brandId));
   const selected = sources.filter(s => brands.has(s.scope.brandId) && (s.scope.shopId === shopId || s.scope.shopId === null));
-  const terms = new Map<string, C['IntakeVocabulary']>();
+  const terms = new Map<string, S['IntakeVocabulary']>();
   let bytes = 0;
   for (const src of selected) {
     let cursor: string | null = null;
@@ -176,9 +188,10 @@ export async function loadIntakeVocabulary(session: IntakeUsageSession, access: 
       const query = new URLSearchParams({ limit: '100', ...(cursor ? { cursor } : {}) });
       const response = await session.request(initial.sessionEpoch,
         `/v1/intake/sources/${encodeURIComponent(src.scope.sourceId)}/vocabulary?${query}`,
-        { signal, maxResponseBytes: 8 * 1024 * 1024 - bytes });
+        { signal, maxResponseBytes: 8 * 1024 * 1024 - bytes,
+          ...(view === 'sop' ? { headers: { 'x-intake-contract-set': SOP_RESOURCE_CONTRACT } } : {}) });
       check(); bytes += Buffer.byteLength(JSON.stringify(response.value) ?? '');
-      const page = parseContractSchema('IntakeVocabularyList', response.value);
+      const page = view === 'sop' ? parseSopSchema('IntakeVocabularyList', response.value) : parseContractSchema('IntakeVocabularyList', response.value);
       for (const term of page.items) {
         const scope = term.scope;
         if (!term.active || seen.has(term.id) || scope.sourceId !== null

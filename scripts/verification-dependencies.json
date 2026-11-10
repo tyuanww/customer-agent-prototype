@@ -103,9 +103,9 @@
     "identity-database-integration": { "job": "database", "command": [["pnpm","test:identity:integration"]] },
     "api-database-e2e": { "job": "database", "command": [["pnpm","--filter","@customer-agent/api","test:e2e:backend"]] },
     "overlay-electron": { "job": "electron", "command": [["pnpm","test:e2e:float"]] },
-    "sop-query-electron": { "job": "electron", "command": [["pnpm","--filter","@customer-agent/desktop","build"],["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/sop-query.spec.ts"]] },
+    "sop-query-electron": { "job": "electron", "command": [["pnpm","--filter","@customer-agent/desktop","build"],["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/sop-query.spec.ts","tests/e2e/sop-unified.spec.ts"]] },
     "windows-package": { "job": "windows", "command": [["pnpm","package:win"]] },
-    "windows-owned-electron": { "job": "windows", "command": [["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/owned-electron-windows.spec.ts"]] },
+    "windows-owned-electron": { "job": "windows", "command": [["pnpm","--filter","@customer-agent/desktop","exec","playwright","test","tests/e2e/owned-electron-windows.spec.ts","tests/e2e/sop-unified.spec.ts"]] },
     "linux-package": { "job": "linux", "command": [["pnpm","package:linux"]] }
   },
   "routes": [
@@ -257,6 +257,16 @@
       "paths": ["apps/desktop/tests/e2e/owned-electron-windows.spec.ts", "apps/desktop/tests/support/owned-electron.ts"],
       "checks": { "quick": ["typecheck", "architecture"], "windows": ["windows-package", "windows-owned-electron"] },
       "liveLanes": ["windows-process-cleanup"],
+      "databaseLanes": [],
+      "packagingLanes": ["windows-local-unsigned"],
+      "generatedInputs": []
+    },
+    {
+      "id": "desktop-sop-unified-native",
+      "owner": "desktop",
+      "paths": ["apps/desktop/src/main/sop-unified*.ts", "apps/desktop/src/main/sop-image-decoder.ts", "apps/desktop/src/shared/sop-unified.ts", "apps/desktop/src/shared/sop-task-graph.ts", "apps/desktop/src/preload/sop.ts", "apps/desktop/src/renderer/SopUnifiedView.tsx", "apps/desktop/tests/e2e/sop-unified.spec.ts", "apps/desktop/tests/support/sop-unified-*.ts"],
+      "checks": { "quick": ["architecture"], "electron": ["sop-query-electron"], "windows": ["windows-package", "windows-owned-electron"] },
+      "liveLanes": ["sop-path", "windows-process-cleanup"],
       "databaseLanes": [],
       "packagingLanes": ["windows-local-unsigned"],
       "generatedInputs": []

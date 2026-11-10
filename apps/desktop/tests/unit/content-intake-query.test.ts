@@ -4,6 +4,8 @@ import * as retrieval from '@customer-agent/retrieval-core';
 import { ContentIntakeQuery } from '../../src/main/content-intake-query';
 import type { IntakeUsageSession } from '../../src/main/content-intake-usage';
 import { intakeQueryData } from '../fixtures/intake-query-data';
+import type { components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
+import { SOP_RESOURCE_CONTRACT } from '../../src/shared/sop-unified';
 function setup() {
   const wire = intakeQueryData(), callbacks = new Set<() => void>();
   const view = { signedIn: true, sessionEpoch: 1 };
@@ -270,4 +272,63 @@ it('rejects foreign/duplicate menu pages and an expired menu before issuing qual
     expect(()=>f.query.selectConditions({productIds:[],scenarioIds:[]})).toThrow('EXPIRED');
     await expect(f.query.search('洁面')).rejects.toMatchObject({code:'EXPIRED'});
   } finally { f.query.dispose(); }
+});
+
+it('invalidates an ordinary SOP qualification as soon as Query starts changing context', async () => {
+  const f = setup();
+  try {
+    await f.query.access('shop-a');
+    const qualification = await f.query.qualifySop(new AbortController().signal);
+    expect(qualification.isCurrent()).toBe(true);
+    const changing = f.query.access('shop-b');
+    const currentWhileChanging = qualification.isCurrent();
+    await changing;
+    expect(currentWhileChanging).toBe(false);
+    const replacement = await f.query.qualifySop(new AbortController().signal);
+    expect(replacement.selection.shopId).toBe('shop-b');
+  } finally { f.query.dispose(); }
+});
+
+it('discovers SOP products and scenarios through the exact v12 view before selecting them', async () => {
+  const validUntil = new Date(Date.now() + 60_000).toISOString();
+  const scope = {
+    tenantId: 'tenant', appId: 'app', brandId: 'brand', shopId: 'shop-a', domain: 'sop', sourceId: 'source-sop',
+  } satisfies SopComponents['schemas']['IntakeSource']['scope'];
+  const source: SopComponents['schemas']['IntakeSource'] = {
+    scope, version: 1, templateVersion: 'sop-manual-authoring-v1.1', ruleVersion: 'sop-task-graph-v2',
+    mappingVersion: 'sop-manual-to-task-graph-v2', structureDigest: 'a'.repeat(64),
+    contentIntakeMode: 'v2-preview', modeVersion: 1,
+  };
+  const session: IntakeUsageSession = {
+    view: () => ({ signedIn: true, sessionEpoch: 1 }),
+    subscribe: () => () => {},
+    request: vi.fn(async (_epoch, path, options) => {
+      expect(options.headers).toEqual({ 'x-intake-contract-set': SOP_RESOURCE_CONTRACT });
+      if (path.includes('/authorization?')) return { value: {
+        factsVersion: 1, revocationGeneration: 0, policyVersion: 1, validUntil, nextCursor: null,
+        capabilities: [{ scope, actions: ['query'], mayAllocate: [], mayDelegate: [], validUntil }],
+      } };
+      if (path.includes('/sources?')) return { value: { items: [source], nextCursor: null } };
+      if (path.includes('/shop-directory?')) return { value: {
+        items: [{ shopId: 'shop-a', displayName: '合成店铺', displayVersion: 1 }], validUntil, nextCursor: null,
+      } };
+      if (path.includes('/vocabulary?')) return { value: {
+        items: ['product', 'scenario'].map(kind => ({
+          id: kind, kind, displayVersion: 1, displayName: `合成${kind}`, meaningDigest: 'a'.repeat(64),
+          active: true, scope: { ...scope, shopId: null, sourceId: null },
+        })), nextCursor: null,
+      } };
+      throw new Error(`Unexpected discovery route ${path}`);
+    }),
+  };
+  const query = new ContentIntakeQuery(session, vi.fn(), true);
+  try {
+    expect(await query.access('shop-a')).toMatchObject({
+      products: [{ id: 'product', label: '合成product' }], scenarios: [{ id: 'scenario', label: '合成scenario' }],
+    });
+    expect(query.selectConditions({ productIds: ['product'], scenarioIds: ['scenario'] })).toMatchObject({
+      shopId: 'shop-a', productIds: ['product'], scenarioIds: ['scenario'],
+    });
+    expect(session.request).toHaveBeenCalledTimes(5);
+  } finally { query.dispose(); }
 });
