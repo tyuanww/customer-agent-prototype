@@ -611,6 +611,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
   });
 
   it('matches a fixed-seed pairwise applicability oracle across wildcard and interval-chain catalogs', async () => {
+    const started = performance.now();
     const database=harness.createDatabase('family_oracle');const client=await harness.connect(database.config);
     let seed=0x5eed0028;
     const random=(limit:number)=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%limit;};
@@ -653,6 +654,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
     }
     try {
       await applyDatabaseMigrations(client);
+      const oracleStarted = performance.now();
       for(const [index,rows] of matrices.entries()) {
         await client.query('BEGIN');
         try {
@@ -662,8 +664,10 @@ describe.sequential('PostgreSQL 15 immutable migration gate', () => {
           else await expect(result,`seed=0x5eed0028 matrix=${index}`).rejects.toMatchObject({code:'ZA003',message:'SOURCE_MISMATCH'});
         } finally {await client.query('ROLLBACK');}
       }
+      console.info(JSON.stringify({ probe: 'family-applicability-oracle', seed: '0x5eed0028', matrices: matrices.length,
+        bootstrapMs: oracleStarted - started, oracleMs: performance.now() - oracleStarted }));
     } finally {await client.end();}
-  });
+  }, 30_000);
 
   it('accepts a 24 hour principal fact and does not grant an empty store', async () => {
     const database = harness.createDatabase('fact_window');
