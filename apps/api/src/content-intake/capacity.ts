@@ -18,10 +18,12 @@ export class IntakeCapacityCommitUnknown extends IntakeRejection {
  * outside the existing content lock; releasing is a tombstone against adoption. */
 export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore,
   report: (error: unknown) => void) {
-  async function transaction<T>(work: (client: Query) => Promise<T>): Promise<T> {
+  class CleanupLockTimeout extends Error {}
+  async function transaction<T>(work: (client: Query) => Promise<T>, classifyCleanupLock = false): Promise<T> {
     const client = await pool.connect();
     let broken = false;
     let committing = false;
+    let outcome: { ok: true; value: T } | { ok: false; error: unknown };
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'");
@@ -29,7 +31,7 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
       const value = await work(client);
       committing = true;
       await client.query('COMMIT');
-      return value;
+      outcome = { ok: true, value };
     } catch (error) {
       broken = true;
       // A lost COMMIT response may have durably charged capacity. Do not issue
@@ -40,13 +42,31 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
         try { await client.query('ROLLBACK'); }
         catch (failure) { rollbackFailed = true; rollbackError = failure; }
       }
-      if (committing || rollbackFailed) throw new IntakeCapacityCommitUnknown(rollbackFailed
-        ? new AggregateError([error, rollbackError], 'capacity rollback failed') : error);
-      throw error;
-    } finally { client.release(broken); }
+      let failure: unknown = rollbackFailed ? new AggregateError([error, rollbackError], 'capacity rollback failed') : error;
+      if (committing || rollbackFailed) failure = new IntakeCapacityCommitUnknown(failure);
+      else if (classifyCleanupLock && error instanceof Error && 'code' in error && error.code === '55P03') {
+        failure = new CleanupLockTimeout('capacity cleanup lock timeout', { cause: error });
+      }
+      outcome = { ok: false, error: failure };
+    }
+    try { client.release(broken); }
+    catch (error) {
+      throw new IntakeCapacityCommitUnknown(outcome.ok ? error
+        : new AggregateError([outcome.error, error], 'capacity connection release failed'));
+    }
+    if (!outcome.ok) throw outcome.error;
+    return outcome.value;
   }
-  async function discard(objectId: string): Promise<void> {
-    const claimed = await transaction(async client => {
+  async function discard(objectId: string, retryLockTimeout = false): Promise<void> {
+    async function cleanupTransaction<T>(work: (client: Query) => Promise<T>): Promise<T> {
+      try { return await transaction(work, retryLockTimeout); }
+      catch (error) {
+        if (!(error instanceof CleanupLockTimeout)) throw error;
+        retryLockTimeout = false;
+        return transaction(work);
+      }
+    }
+    const claimed = await cleanupTransaction(async client => {
       // An adopted object protects all downstream candidate, approval, publication
       // and receipt references. Their retention policy is deliberately separate.
       const changed = await client.query(`UPDATE content_intake.object_reservations r
@@ -60,7 +80,7 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
     // Failed/retained deletion continues consuming the entire reservation. A
     // subsequent retry is safe; released is recorded only after disk confirms.
     if (await store.reclaim(objectId) !== 'reclaimed') return;
-    await transaction(async client => {
+    await cleanupTransaction(async client => {
       await client.query(`UPDATE content_intake.object_reservations SET state='released',updated_at=clock_timestamp()
         WHERE object_id=$1 AND state='releasing'`, [objectId]);
     });
@@ -110,7 +130,7 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
         // Only a definite rollback permits cleanup. A lost COMMIT or failed
         // ROLLBACK retains the file and its charge for uncertain-result recovery.
         if (!(error instanceof IntakeCapacityCommitUnknown)) {
-          try { await discard(object.objectId); } catch (cleanup) { report(cleanup); }
+          try { await discard(object.objectId, true); } catch (cleanup) { report(cleanup); }
         }
         throw error;
       }
@@ -128,7 +148,7 @@ export function createIntakeCapacity(pool: IntakePool, store: ContentObjectStore
       [object.objectId, object.sha256, object.sizeBytes]);
       if (changed.rowCount !== 1) throw new IntakeRejection('COMMIT_UNKNOWN');
     },
-    discard,
+    discard: (objectId: string) => discard(objectId),
   };
 }
 export type IntakeCapacity = ReturnType<typeof createIntakeCapacity>;
