@@ -77,7 +77,7 @@ describe('announce denial diagnostics', () => {
         const messages = log.mock.calls.flat().join(' ');
         expect(messages).toContain(stage === 'request_connect'
           ? 'ANNOUNCE_CONNECT_FAILED' : `ANNOUNCE_AUDIT_${stage.toUpperCase()}_FAILED`);
-        expect(messages).toContain('database_code=08006');
+        expect(messages).toMatch(/database_code=08006 at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/u);
         expect(messages).not.toContain('synthetic-secret');
         expect(messages).not.toContain('private driver');
         if (stage === 'begin' || stage === 'rollback') expect(release).toHaveBeenCalledWith(true);

@@ -57,5 +57,5 @@ export const reportApiRuntimeDiagnostic: ApiRuntimeDiagnosticSink = (diagnostic)
   const databaseSuffix = diagnostic.databaseCode
     ? ` database_code=${diagnostic.databaseCode}`
     : '';
-  console.error(`[api] diagnostic=${diagnostic.code}${databaseSuffix}`);
+  console.error(`[api] diagnostic=${diagnostic.code}${databaseSuffix} at=${new Date().toISOString()}`);
 };

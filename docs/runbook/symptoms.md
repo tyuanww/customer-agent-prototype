@@ -16,13 +16,13 @@
 
 ## 未处理的请求写出 diagnostic=API_REQUEST_FAILED
 
-`apps/api/src/runtime-diagnostics.ts` 把诊断写到标准错误。句子是 `[api] diagnostic=API_REQUEST_FAILED`。驱动错误的 `code` 匹配 `[0-9A-Z]{5}` 时，后面还有 ` database_code=` 和这五位。这五位是 SQLSTATE，可以含大写字母，不只是数字。`apps/api/src/app.ts` 的请求错误处理用代码 `API_REQUEST_FAILED` 调用它，再返回 `apps/api/src/contract-http-errors.ts` 里的内部错误。HTTP 状态是 500。正文的 `error.code` 是 `INTERNAL`。`error.message` 是 **服务内部错误**。异常原文不进入正文，也不进入这行诊断。
+`apps/api/src/runtime-diagnostics.ts` 将固定诊断码写到标准错误，行首为 `[api] diagnostic=`。可选的 `database_code` 是五位 SQLSTATE（`[0-9A-Z]{5}`）；`at` 是写出时的 UTC 时间，旧版可能没有。`apps/api/src/app.ts` 对请求异常输出 `API_REQUEST_FAILED`，返回 HTTP 500、`error.code=INTERNAL` 和 **服务内部错误**。异常原文不进入响应或诊断行。
 
-**先看。** 用访问日志里的 `requestId` 把标准错误和那一行 JSON 对上。读 `path`。有 `database_code` 时，读这五位。
+**先看。** 核对主机时钟，比较 `at` 与其他日志。没有 `at` 时事件时间未知；诊断不含 `requestId`，不能精确关联请求。
 
-**修复。** 按 `path` 上的这次失败处理。有 `database_code` 时，修数据库返回的这个码。没有这个码时，失败不是带五位码的驱动错误。修 `path` 对应的处理函数抛出的那次错误。
+**修复。** 结合其他证据和可用的 `database_code` 排查。
 
-**确认。** 同一 `path` 的下一次调用不再是 500。标准错误里不再出现这个 `requestId` 的 `API_REQUEST_FAILED`。
+**确认。** 重试受影响请求并检查响应；相邻日志不能证明某次请求恢复。
 
 ## 名册读取失败后职务接口仍返回没有权限，请找人开通
 
