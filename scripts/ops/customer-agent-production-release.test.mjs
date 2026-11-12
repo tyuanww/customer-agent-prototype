@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, chownSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, chownSync, existsSync, lchownSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
@@ -1121,6 +1121,32 @@ test('missing managed env restores trusted bytes and backup drift or symlink sti
   assert.equal(existsSync(f.backupFile), true);
 });
 
+test('rejects a pre-existing evidence directory accessible by other users', t => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'release-env-directory-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const stack = path.join(root, 'stack');
+  const evidence = path.join(root, 'evidence');
+  mkdirSync(stack);
+  mkdirSync(evidence, { mode: 0o755 });
+  chmodSync(evidence, 0o755);
+  writeFileSync(path.join(stack, 'api.env'), 'CUSTOMER_AGENT_BUILD_VERSION=0.3.42\n', { mode: 0o600 });
+  assert.throws(() => backupApiVersion(stack, evidence), { code: 'API_ENV_BACKUP_INVALID' });
+});
+
+test('rejects an evidence directory under a writable untrusted parent', t => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'release-env-parent-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const stack = path.join(root, 'stack');
+  const parent = path.join(root, 'writable');
+  const evidence = path.join(parent, 'evidence');
+  mkdirSync(stack);
+  mkdirSync(parent, { mode: 0o777 });
+  chmodSync(parent, 0o777);
+  mkdirSync(evidence, { mode: 0o700 });
+  writeFileSync(path.join(stack, 'api.env'), 'CUSTOMER_AGENT_BUILD_VERSION=0.3.42\n', { mode: 0o600 });
+  assert.throws(() => backupApiVersion(stack, evidence), { code: 'API_ENV_BACKUP_INVALID' });
+});
+
 test('root backup preserves the service owner and restores a missing env readable across UID', {
   skip: process.platform !== 'linux' || process.getuid?.() !== 0,
 }, t => {
@@ -1150,6 +1176,9 @@ test('root backup preserves the service owner and restores a missing env readabl
   assert.throws(() => readAsService(saved.backup), error => /EACCES/u.test(error.stderr.toString()));
   rmSync(file);
   const reference = { path: saved.backup, sha256: saved.sha256, version: saved.version };
+  chmodSync(evidence, 0o755);
+  assert.throws(() => readApiVersionBackup(stack, reference), { code: 'API_ENV_BACKUP_INVALID' });
+  chmodSync(evidence, 0o700);
   restoreApiVersion(readApiVersionBackup(stack, reference));
   const restored = lstatSync(file);
   assert.deepEqual([restored.uid, restored.gid, restored.mode & 0o777], [uid, gid, 0o600]);
@@ -1159,6 +1188,13 @@ test('root backup preserves the service owner and restores a missing env readabl
   restoreApiVersion(readApiVersionBackup(stack, reference));
   assert.deepEqual([lstatSync(file).uid, lstatSync(file).gid], [uid, gid]);
   assert.deepEqual(readAsService(file), original);
+  const safeParent = path.join(root, 'safe-parent');
+  mkdirSync(safeParent, { mode: 0o700 });
+  mkdirSync(path.join(safeParent, 'evidence'), { mode: 0o700 });
+  const untrustedLink = path.join(root, 'untrusted-link');
+  symlinkSync(safeParent, untrustedLink);
+  lchownSync(untrustedLink, uid, gid);
+  assert.throws(() => backupApiVersion(stack, path.join(untrustedLink, 'evidence')), { code: 'API_ENV_BACKUP_INVALID' });
 });
 
 

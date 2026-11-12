@@ -577,10 +577,7 @@ function atomicWrite(file, bytes, mode = 0o600, owner = undefined) {
 function appendAudit(file, entry) {
   const directory = path.dirname(file);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const directoryInfo = lstatSync(directory);
-  if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
-    fail('AUDIT_FILE_INVALID', 'audit directory must be a regular directory');
-  }
+  assertPrivateEvidenceDirectory(directory, 'AUDIT_FILE_INVALID');
   try {
     const info = lstatSync(file);
     if (!info.isFile() || info.isSymbolicLink()) {
@@ -724,13 +721,40 @@ function readApiVersion(stackRoot) {
   return Object.freeze({ file, info, bytes, ...parseApiVersion(bytes) });
 }
 
+function assertPrivateEvidenceDirectory(directory, code = 'API_ENV_BACKUP_INVALID') {
+  const uid = process.geteuid?.();
+  const checkPath = target => {
+    const absolute = path.resolve(target);
+    let current = path.parse(absolute).root;
+    const checkComponent = () => {
+      const info = lstatSync(current);
+      if (uid !== undefined && info.uid !== 0 && info.uid !== uid) throw new Error('untrusted path owner');
+      if (info.isSymbolicLink()) return;
+      if (!info.isDirectory() || ((info.mode & 0o022) !== 0 && (info.mode & 0o1000) === 0)) {
+        throw new Error('untrusted path permissions');
+      }
+    };
+    checkComponent();
+    for (const part of absolute.slice(current.length).split(path.sep).filter(Boolean)) {
+      current = path.join(current, part);
+      checkComponent();
+    }
+  };
+  try {
+    const info = lstatSync(directory);
+    if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o700
+      || (uid !== undefined && info.uid !== uid)) throw new Error('untrusted evidence directory');
+    checkPath(directory);
+    checkPath(realpathSync(directory));
+  } catch {
+    fail(code, 'release evidence directory is unsafe');
+  }
+}
+
 export function backupApiVersion(stackRoot, evidenceDirectory) {
   const apiEnv = readApiVersion(stackRoot);
   mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
-  const evidenceInfo = lstatSync(evidenceDirectory);
-  if (!evidenceInfo.isDirectory() || evidenceInfo.isSymbolicLink()) {
-    fail('API_ENV_BACKUP_INVALID', 'release evidence directory is unsafe');
-  }
+  assertPrivateEvidenceDirectory(evidenceDirectory);
   const backup = path.join(evidenceDirectory, `api.env.pre-${process.pid}-${randomUUID()}`);
   atomicWrite(backup, apiEnv.bytes, 0o600, apiEnv.info);
   return Object.freeze({
@@ -769,6 +793,7 @@ export function readApiVersionBackup(stackRoot, reference) {
     || typeof reference.version !== 'string' || !VERSION_PATTERN.test(reference.version)) {
     fail('API_ENV_BACKUP_INVALID', 'api.env backup reference is invalid');
   }
+  assertPrivateEvidenceDirectory(path.dirname(reference.path));
   const file = path.join(stackRoot, 'api.env');
   let info;
   try {

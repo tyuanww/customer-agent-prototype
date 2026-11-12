@@ -128,6 +128,7 @@ function fixture(t) {
   const envFile = path.join(stackRoot, 'api.env');
   writeFileSync(envFile, original, { mode: 0o600 });
   symlinkSync(previousRoot, path.join(root, 'current'), 'dir');
+  mkdirSync(path.join(root, 'release-evidence'), { mode: 0o700 });
   const evidenceFile = path.join(root, 'release-evidence/restore.json');
   const tenant = { schema: 'customer-agent-production-intake-tenancy/v1', ok: true, status: 'ready', blockers: [],
     activeBatchCount: 0, historicalDefaultBatchCount: 0 };
