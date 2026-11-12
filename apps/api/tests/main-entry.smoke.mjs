@@ -74,6 +74,7 @@ test('compiled main entry starts, serves both probes, and closes on SIGINT', asy
       version: '0.3.0-m1-main',
     });
 
+    const diagnosticStartedAt = Date.now();
     const readiness = await fetch(`${address}/ready`);
     assert.equal(readiness.status, 503);
     assert.deepEqual(await readiness.json(), {
@@ -92,8 +93,12 @@ test('compiled main entry starts, serves both probes, and closes on SIGINT', asy
     assert.equal(code, 0);
     assert.equal(signal, null);
     assert.match(output.stdout, /\[api\] closed after SIGINT/);
-    assert.equal(output.stderr, '[api] diagnostic=DATABASE_READINESS_PROBE_FAILED\n');
-    assert.doesNotMatch(output.stderr, /w5_main|postgresql:\/\//);
+    const diagnostic = output.stderr.match(/^\[api\] diagnostic=DATABASE_READINESS_PROBE_FAILED at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\n$/u);
+    assert.ok(diagnostic, `readiness diagnostic must contain a UTC event time: ${output.stderr}`);
+    assert.equal(new Date(diagnostic[1]).toISOString(), diagnostic[1]);
+    const eventAt = Date.parse(diagnostic[1]);
+    assert.ok(eventAt >= diagnosticStartedAt - 5_000 && eventAt <= Date.now() + 5_000, 'diagnostic time must match the request window');
+    assert.doesNotMatch(output.stderr, /w5_main|postgresql:\/\/|synthetic-idempotency-material-main|synthetic-log-hash-material-main-01/u);
   } finally {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   }
