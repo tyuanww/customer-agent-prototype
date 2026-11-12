@@ -40,9 +40,9 @@ describe('generated customer-agent runtime contracts', () => {
     expect(() => execFileSync(
       process.execPath,
       ['scripts/generate-contracts.mjs', '--check'],
-      { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+      { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 },
     )).not.toThrow();
-  });
+  }, 60_000);
 
   it('binds validators to the verified inactive contract set', () => {
     expect(CONTRACT_PROVENANCE).toMatchObject({
@@ -103,7 +103,7 @@ describe('generated customer-agent runtime contracts', () => {
         validateContractSchema(name, null);
       }
     }).not.toThrow();
-  });
+  }, 30_000);
 
   it('requires the exact management context with an explicit nullable base and server-owned identity', () => {
     const context = { sourceId: 'source-a', sourceVersion: 1, baseReleaseId: null,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ContractValidationError,
+  DOMAINS,
+  isDomain,
   OPERATION_TRANSITIONS,
   classifyOperationReuse,
   parseAccessDecision,
@@ -903,4 +905,33 @@ describe('Observability contracts', () => {
       /question|answer|candidateBody|sopMessage|filePath|userId|orderId|placeholderValue/u,
     );
   });
+});
+
+
+describe('source domains', () => {
+  it('owns the canonical source vocabulary independently of query intents', () => {
+    expect(DOMAINS).toEqual(['product', 'activity', 'after-sale', 'aftersale', 'general', 'sop']);
+    expect(DOMAINS.every(isDomain)).toBe(true);
+    for (const value of ['unknown', 'presale', null, {}, 1]) expect(isDomain(value)).toBe(false);
+  });
+  const decisionFor = (domain: string) => accessDecision({ allowedScopes: [{
+    scope: { kind: 'source', tenantId: 'tenant-a', appId: 'app-a', brandId: 'brand-a',
+      shopId: 'shop-a', domain, sourceId: 'source-a' },
+    actions: ['query'], validUntil: EXPIRES_AT,
+  }] });
+
+  it.each(['product', 'activity', 'after-sale', 'aftersale', 'general', 'sop'])(
+    'preserves the %s source domain in canonical decisions and projections', domain => {
+      const decision = parseAccessDecision(decisionFor(domain));
+      expect(decision.allowedScopes[0]?.scope.domain).toBe(domain);
+      expect(toQueryAccessView(decision).scopes[0]?.scope.domain).toBe(domain);
+    },
+  );
+
+  it.each(['unknown', 'unclassified', 'presale', 'campaign', 'sop-v2', ''])(
+    'rejects %s as a canonical source domain', domain => {
+      const result = validateAccessDecision(decisionFor(domain));
+      expect(result.ok).toBe(false);
+    },
+  );
 });
