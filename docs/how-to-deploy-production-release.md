@@ -13,6 +13,26 @@
 
 显式使用 `CUSTOMER_AGENT_QUERY_MODE=intake-compat` 的候选需要 v2 恢复证据。恢复预演传入同一 `--candidate-stack-root`，部署入口复核查询模式和配置摘要，并在重启后检查 `x-customer-agent-query-mode`。当前旧回退版本若拒绝追加迁移，发布保持阻塞，待完整恢复路径完成验收。
 
+## 固定控制器与完整配置切换
+
+`--controller-release` 启用 v3 预检。v3 发布及恢复命令从固定控制器目录执行。控制器使用独立目录，例如 `<root>/controllers/<controller-sha>`，目录名固定为已验证的完整 Git SHA，其 `stack.ts` 负责既有数据库证明、子进程监督和清理。systemd 的应用参数使用 `--runtime-release <root>/current`。控制器启动采用 `start --existing-database --foreground`，要求已有 profile、PG 集群和数据库，读取实际完整账本及物理前缀后再启动应用。应用自带迁移目录规定其最低 schema，尚缺前驱时在启动子进程前拒绝。该入口跳过迁移、fixture、测试授权、身份重绑及 profile 重写。
+
+```sh
+/usr/bin/node /controlled/releases/<controller-sha>/scripts/synthetic-stack/stack.ts \
+  start --existing-database --foreground \
+  --runtime-release /controlled/current
+```
+
+unit 使用 `Type=simple` 或 `Type=exec`，`Restart=on-failure` 或 `Restart=always`。准入核对完整 ExecStart、stack root、环境文件摘要以及实际主进程 argv。恢复前可以凭受锁 journal 校验 failed 服务的声明，恢复后必须再次核验 active 主进程。`api.env` 的字节归发布器备份与安装绑定，其他 unit 环境文件继续逐字节绑定。
+
+证据目录必须归发布器有效用户所有且权限为 `0700`；上级目录及符号链接必须由 root 或发布器拥有，上级目录不得允许其他用户改写，受信任的 sticky 目录除外。检查失败时停止，不自动修改已有目录权限。备份保留服务账号的文件所有权，因此必须依靠该私有目录阻止服务账号改写备份。
+
+完整模式切换额外提供 `--candidate-api-env /controlled/private/candidate.env`。该文件须为有界、owner 可读且仅 owner 有权限的普通文件，所有字节参与预检。候选和原配置各自经过对应 release 的 stack parser。发布器先持久化完整原配置备份和 journal，再应用完整候选迁移、原子安装候选配置、切换指针并重启。只提供控制器时保留既有构建版本更新路径。
+
+v3 将控制器的物理前缀证明、应用 API 就绪与协议解码能力分别记录。应用业务消费与 worker 接管仍需实际回归。旧 `3519d486` 在新 SOP 发布后出现资格校验失败与旧快照混入 SOP 正文，无法作为该数据状态的已验证回退基线。先建立经过正常业务链验证的兼容应用基线，再执行 v3 代码升级。旧库首次迁移的维护与恢复验收继续单独保留。
+
+未完成的 v3 journal 优先进入恢复检查。候选构建、候选配置或外部预检文件损坏后，恢复使用 journal、固定控制器、完整旧应用、原配置备份与实际已提交前缀。未知指针、漂移前缀、损坏控制器或旧应用均拒绝恢复。恢复成功须读回旧配置、实际服务启动和 readiness，之后才记录 `rolled_back`。已提交 schema 与当前数据继续由数据库拥有。
+
 生产 root 固定为 `/srv/customer-agent`。生产 apply 还要求 `--authorization` 或 `CUSTOMER_AGENT_PRODUCTION_RELEASE_APPROVAL` 等于完整候选 SHA。
 
 生产 apply 必须以 root 身份运行，因为入口需要重启 systemd unit。非 root 会在创建部署锁、应用迁移或写指针之前以 `DEPLOYMENT_PRIVILEGE_REQUIRED` 退出。只读 dry-run 可以由服务用户执行。候选和历史 release 的 Git 安全目录由入口按实际路径临时注入，不需要修改 root 的全局 Git 配置。
@@ -87,6 +107,8 @@ node <test-candidate-release>/scripts/ops/customer-agent-production-release.mjs 
   --backup-evidence <test-restore-evidence> \
   --tenant-report <test-tenant-report> \
   --unit customer-agent-test-stack.service \
+  --controller-release <test-controller-release> \
+  --candidate-api-env <private-candidate-env> \
   --apply
 ```
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -8,7 +8,8 @@ import {
   loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, parseStackProfile,
   stackApiEnvironment, stackPortPairForRoot, PG_PORT,
 } from '../synthetic-stack/profile.ts';
-import { readReleaseQueryProfile } from './release-query-profile.mjs';
+import { readCandidateApiEnvironment, readReleaseQueryProfile, readReleaseStartupConfiguration } from './release-query-profile.mjs';
+import { installCandidateApiEnvironment } from './customer-agent-production-release.mjs';
 
 function fixture(t, { legacyParser = false, legacyStack = false } = {}) {
   const root = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'query-profile-')));
@@ -194,4 +195,84 @@ test('a legacy candidate retains its unified v1 configuration path', async t => 
   assert.equal((await readReleaseQueryProfile(value.releaseRoot, value.stackRoot)).mode, 'unified');
   value.writeEnvironment('CUSTOMER_AGENT_QUERY_MODE=intake-compat\n');
   await assert.rejects(() => readReleaseQueryProfile(value.releaseRoot, value.stackRoot), /QUERY_PROFILE_MODE_INVALID/u);
+});
+
+
+test('candidate API env uses candidate stack parser and binds every byte without touching the active env', async t => {
+  const value = fixture(t);
+  const candidate = path.join(value.stackRoot, 'candidate.env');
+  const original = readFileSync(path.join(value.stackRoot, 'api.env'));
+  const text = 'CUSTOMER_AGENT_BUILD_VERSION=0.3.2\nCUSTOMER_AGENT_QUERY_MODE=intake-compat\nLOG_HASH_KEY=synthetic-private-material-000000000001\n';
+  writeFileSync(candidate, text, { mode: 0o600 });
+  const first = await readReleaseQueryProfile(value.releaseRoot, value.stackRoot, candidate);
+  assert.equal(first.apiEnvSha256, readCandidateApiEnvironment(candidate).sha256);
+  writeFileSync(candidate, text + '# synthetic comment\n');
+  const second = await readReleaseQueryProfile(value.releaseRoot, value.stackRoot, candidate);
+  assert.equal(second.configurationSha256, first.configurationSha256);
+  assert.notEqual(second.apiEnvSha256, first.apiEnvSha256);
+  assert.deepEqual(readFileSync(path.join(value.stackRoot, 'api.env')), original);
+  assert.equal(JSON.stringify(first).includes('synthetic-private-material'), false);
+  writeFileSync(candidate, text + 'DATABASE_URL=postgresql://synthetic.invalid/untrusted\n');
+  await assert.rejects(() => readReleaseQueryProfile(value.releaseRoot, value.stackRoot, candidate));
+});
+
+test('candidate env requires a bounded private regular file and atomic installation preserves the full bytes', async t => {
+  const value = fixture(t);
+  const candidate = path.join(value.stackRoot, 'candidate.env');
+  const bytes = Buffer.from('# synthetic comment\r\nCUSTOMER_AGENT_BUILD_VERSION=0.3.2\r\nCUSTOMER_AGENT_QUERY_MODE=intake-compat\r\n');
+  writeFileSync(path.join(value.stackRoot, 'api.env'), 'CUSTOMER_AGENT_BUILD_VERSION=0.3.1\n');
+  chmodSync(path.join(value.stackRoot, 'api.env'), 0o600);
+  writeFileSync(candidate, bytes, { mode: 0o600 });
+  const bound = await readReleaseQueryProfile(value.releaseRoot, value.stackRoot, candidate);
+  assert.throws(() => installCandidateApiEnvironment(value.stackRoot, candidate, '0'.repeat(64), '0.3.2'),
+    { code: 'CANDIDATE_API_ENV_CHANGED' });
+  assert.throws(() => installCandidateApiEnvironment(value.stackRoot, candidate, bound.apiEnvSha256, '0.3.3'),
+    { code: 'CANDIDATE_API_ENV_CHANGED' });
+  installCandidateApiEnvironment(value.stackRoot, candidate, bound.apiEnvSha256, '0.3.2');
+  assert.deepEqual(readFileSync(path.join(value.stackRoot, 'api.env')), bytes);
+  assert.equal(lstatSync(path.join(value.stackRoot, 'api.env')).mode & 0o777, 0o600);
+  chmodSync(candidate, 0o644);
+  assert.throws(() => readCandidateApiEnvironment(candidate), /CANDIDATE_API_ENV_INVALID/u);
+  chmodSync(candidate, 0o600);
+  const link = path.join(value.stackRoot, 'candidate-link.env');
+  symlinkSync(candidate, link);
+  assert.throws(() => readCandidateApiEnvironment(link), /CANDIDATE_API_ENV_INVALID/u);
+  assert.throws(() => readCandidateApiEnvironment('relative.env'), /CANDIDATE_API_ENV_INVALID/u);
+});
+
+test('an owner-readable immutable candidate environment remains consumable', async t => {
+  const value = fixture(t);
+  const candidate = path.join(value.stackRoot, 'readonly-candidate.env');
+  const bytes = Buffer.from('CUSTOMER_AGENT_QUERY_MODE=intake-compat\n');
+  writeFileSync(candidate, bytes, { mode: 0o400 });
+  const resolved = await readReleaseStartupConfiguration(value.releaseRoot, value.stackRoot, candidate);
+  assert.equal(resolved.environment.CUSTOMER_AGENT_QUERY_MODE, 'intake-compat');
+  assert.equal(resolved.queryProfile.apiEnvSha256, readCandidateApiEnvironment(candidate).sha256);
+  assert.equal(lstatSync(candidate).mode & 0o777, 0o400);
+});
+
+test('environment and profile describe the same bytes during an intervening file replacement', async t => {
+  const value = fixture(t);
+  const candidate = path.join(value.stackRoot, 'snapshot-candidate.env');
+  const original = 'CUSTOMER_AGENT_QUERY_MODE=intake-compat\n';
+  writeFileSync(candidate, original, { mode: 0o600 });
+  const stackModule = new URL('../synthetic-stack/profile.ts', import.meta.url).href;
+  writeFileSync(path.join(value.releaseRoot, 'scripts/synthetic-stack/profile.ts'), `
+    export * from ${JSON.stringify(stackModule)};
+    import { loadApiStackConfig as loadActual, parseApiEnvFile as parseActual } from ${JSON.stringify(stackModule)};
+    import { readFileSync, writeFileSync } from 'node:fs';
+    const candidate = ${JSON.stringify(candidate)};
+    function replaceDuring(read) {
+      const original = readFileSync(candidate);
+      writeFileSync(candidate, 'CUSTOMER_AGENT_QUERY_MODE=unified\\n');
+      try { return read(); } finally { writeFileSync(candidate, original); }
+    }
+    export function loadApiStackConfig(file) { return replaceDuring(() => loadActual(file)); }
+    export function parseApiEnvFile(contents) { return replaceDuring(() => parseActual(contents)); }
+  `);
+  const resolved = await readReleaseStartupConfiguration(value.releaseRoot, value.stackRoot, candidate);
+  assert.equal(resolved.environment.CUSTOMER_AGENT_QUERY_MODE, 'intake-compat');
+  assert.equal(resolved.queryProfile.mode, 'intake-compat');
+  assert.equal(resolved.queryProfile.apiEnvSha256, readCandidateApiEnvironment(candidate).sha256);
+  assert.equal(readFileSync(candidate, 'utf8'), original);
 });

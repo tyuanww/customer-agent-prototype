@@ -27,12 +27,20 @@ import pg from 'pg';
 import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseStackProfile } from '../synthetic-stack/profile.ts';
-import { readCandidateRelease, readRuntimeContentFingerprint } from './backup-set.mjs';
+import {
+  assertCandidateRuntimeUnchanged, assertControllerArtifactIsolation, readCandidateRelease, readRuntimeContentFingerprint,
+} from './backup-set.mjs';
 import {
   collectSnapshot,
   evaluateSnapshot,
   REPORT_SCHEMA as TENANT_REPORT_SCHEMA,
 } from './production-intake-tenancy.mjs';
+
+import {
+  RELEASE_PROOF_SCHEMA, assertReleaseProof, assertReleasePrefix, verifyReleaseDatabase,
+  assertControllerBinding, readServiceStartup,
+} from './release-proof.mjs';
+import { readCandidateApiEnvironment } from './release-query-profile.mjs';
 
 const DEFAULT_ROOT = '/srv/customer-agent';
 const DEFAULT_UNIT = 'customer-agent-stack.service';
@@ -222,33 +230,35 @@ function releaseEntryReady(releaseRoot) {
   }
 }
 
-function readRelease(root, sha, expectedVersion, requireClean) {
-  const releasesRoot = canonicalDirectory(path.join(root, 'releases'), 'RELEASE_ROOT_INVALID');
-  const requested = path.join(releasesRoot, sha);
+function readReleaseMetadataAt(requested, expectedVersion, requireClean = false) {
   const releaseRoot = canonicalDirectory(requested, 'RELEASE_INVALID');
-  if (releaseRoot !== requested) fail('RELEASE_INVALID', 'release directory escapes releases root');
+  if (releaseRoot !== requested) fail('RELEASE_INVALID', 'release directory must be canonical');
   const git = releaseGitState(releaseRoot, requireClean);
-  if (git.sha !== sha) fail('RELEASE_GIT_INVALID', 'release Git SHA does not match request');
   const version = releaseVersion(releaseRoot);
   if (expectedVersion !== null && version !== expectedVersion) {
     fail('RELEASE_VERSION_MISMATCH', 'release version does not match expected version');
   }
-  releaseEntryReady(releaseRoot);
-  const verifiedBuild = readCandidateRelease(releaseRoot, { verifyRuntime: requireClean });
-  if (verifiedBuild.gitSha !== sha || verifiedBuild.version !== version) {
-    fail('RELEASE_BUILD_INVALID', 'candidate database build is not bound to the release identity');
-  }
-  return Object.freeze({
-    root: releaseRoot,
-    sha,
-    version,
-    git,
-    manifest: readManifest(releaseRoot),
-    runtimeBuildSha256: verifiedBuild.runtimeBuildSha256,
-  });
+  return Object.freeze({ root: releaseRoot, sha: git.sha, version, git, manifest: readManifest(releaseRoot) });
 }
 
-function readCurrent(root) {
+function readReleaseMetadata(root, sha, expectedVersion, requireClean = false) {
+  const releasesRoot = canonicalDirectory(path.join(root, 'releases'), 'RELEASE_ROOT_INVALID');
+  const release = readReleaseMetadataAt(path.join(releasesRoot, sha), expectedVersion, requireClean);
+  if (release.sha !== sha) fail('RELEASE_GIT_INVALID', 'release Git SHA does not match request');
+  return release;
+}
+
+function readRelease(root, sha, expectedVersion, requireClean, verifyRuntime = requireClean) {
+  const release = readReleaseMetadata(root, sha, expectedVersion, requireClean);
+  releaseEntryReady(release.root);
+  const verifiedBuild = readCandidateRelease(release.root, { verifyRuntime });
+  if (verifiedBuild.gitSha !== sha || verifiedBuild.version !== release.version) {
+    fail('RELEASE_BUILD_INVALID', 'candidate database build is not bound to the release identity');
+  }
+  return Object.freeze({ ...release, runtimeBuildSha256: verifiedBuild.runtimeBuildSha256 });
+}
+
+function readCurrentIdentity(root) {
   const current = path.join(root, 'current');
   let targetText;
   let info;
@@ -261,25 +271,26 @@ function readCurrent(root) {
   if (!info.isSymbolicLink() || targetText.includes('\0') || targetText.includes('\n') || targetText.includes('\r')) {
     fail('CURRENT_INVALID', 'current release pointer is invalid');
   }
-  let releaseRoot;
-  try {
-    releaseRoot = realpathSync(path.resolve(path.dirname(current), targetText));
-  } catch {
-    fail('CURRENT_INVALID', 'current release target is missing');
-  }
   const releasesRoot = canonicalDirectory(path.join(root, 'releases'), 'RELEASE_ROOT_INVALID');
-  if (!releaseRoot.startsWith(`${releasesRoot}${path.sep}`)) {
+  const releaseRoot = path.resolve(path.dirname(current), targetText);
+  const sha = path.basename(releaseRoot);
+  if (path.dirname(releaseRoot) !== releasesRoot || !SHA_PATTERN.test(sha)) {
     fail('CURRENT_INVALID', 'current release target escapes releases root');
   }
-  const git = releaseGitState(releaseRoot, false);
-  return Object.freeze({
-    root: releaseRoot,
-    sha: git.sha,
-    version: releaseVersion(releaseRoot),
-    targetText,
-    git,
-    manifest: readManifest(releaseRoot),
-  });
+  let targetInfo;
+  try { targetInfo = lstatSync(releaseRoot); } catch (error) {
+    if (error.code !== 'ENOENT') fail('CURRENT_INVALID', 'current release identity is unreadable');
+  }
+  if (targetInfo && (!targetInfo.isDirectory() || targetInfo.isSymbolicLink())) {
+    fail('CURRENT_INVALID', 'current release identity is not a regular directory');
+  }
+  return Object.freeze({ root: releaseRoot, sha, targetText });
+}
+
+function readCurrent(root) {
+  const identity = readCurrentIdentity(root);
+  const release = readReleaseMetadata(root, identity.sha, null);
+  return Object.freeze({ ...release, targetText: identity.targetText });
 }
 
 function validatePrefix(current, next) {
@@ -323,8 +334,13 @@ function readBackupEvidence(file, next) {
     || !Number.isFinite(restoredAt)
     || restoredAt > Date.now() + 5 * 60_000
     || evidence.candidateGitSha !== next.sha || evidence.candidateVersion !== next.version
-    || !Number.isSafeInteger(evidence.migrationCount) || evidence.migrationCount !== next.manifest.length) {
+    || !Number.isSafeInteger(evidence.migrationCount) || evidence.migrationCount !== (evidence.deploymentChecks?.schema === RELEASE_PROOF_SCHEMA
+      ? evidence.deploymentChecks.targetMigrationCount : next.manifest.length)) {
     fail('BACKUP_EVIDENCE_INVALID', 'backup restore evidence does not cover this candidate');
+  }
+  if (evidence.deploymentChecks?.schema === RELEASE_PROOF_SCHEMA
+    && evidence.restoredMigrationCount !== evidence.deploymentChecks.sourceMigrationCount) {
+    fail('BACKUP_EVIDENCE_INVALID', 'restored source count differs from release proof');
   }
   return Object.freeze({
     path: path.resolve(file),
@@ -348,7 +364,7 @@ export function assertQueryProfileBinding(runtime, queryProfile) {
 }
 
 function assertQueryProfileEvidence(checks, queryProfile) {
-  if (checks?.schema === 'customer-agent-release-preflight/v2') {
+  if (['customer-agent-release-preflight/v2', RELEASE_PROOF_SCHEMA].includes(checks?.schema)) {
     assertQueryProfileBinding(checks.runtime, queryProfile);
   } else if (queryProfile?.mode === 'intake-compat') {
     fail('RELEASE_QUERY_PROFILE_REQUIRED', 'intake compatibility requires mode-bound restore evidence');
@@ -452,6 +468,8 @@ export function parseOptions(argv) {
         apply: { type: 'boolean', default: false },
         root: { type: 'string' },
         'stack-root': { type: 'string' },
+        'candidate-api-env': { type: 'string' },
+        'controller-release': { type: 'string' },
         sha: { type: 'string' },
         'expected-version': { type: 'string' },
         'backup-evidence': { type: 'string' },
@@ -468,6 +486,12 @@ export function parseOptions(argv) {
     fail('INVALID_ARGUMENTS', 'arguments are invalid');
   }
   if (parsed.values.help) return Object.freeze({ help: true });
+  const candidateApiEnv = parsed.values['candidate-api-env'];
+  const controllerRelease = parsed.values['controller-release'];
+  if ([candidateApiEnv, controllerRelease].some(value => value !== undefined && !path.isAbsolute(value))
+    || candidateApiEnv !== undefined && !controllerRelease) {
+    fail('INVALID_ARGUMENTS', 'New release features require an absolute controller release');
+  }
   const rootText = parsed.values.root ?? DEFAULT_ROOT;
   const root = path.resolve(rootText);
   const stackRoot = path.resolve(parsed.values['stack-root'] ?? path.join(root, 'stack'));
@@ -515,6 +539,7 @@ export function parseOptions(argv) {
   }
   return Object.freeze({
     help: false,
+    candidateApiEnv, controllerRelease,
     apply: parsed.values.apply,
     root,
     stackRoot,
@@ -552,10 +577,7 @@ function atomicWrite(file, bytes, mode = 0o600, owner = undefined) {
 function appendAudit(file, entry) {
   const directory = path.dirname(file);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const directoryInfo = lstatSync(directory);
-  if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
-    fail('AUDIT_FILE_INVALID', 'audit directory must be a regular directory');
-  }
+  assertPrivateEvidenceDirectory(directory, 'AUDIT_FILE_INVALID');
   try {
     const info = lstatSync(file);
     if (!info.isFile() || info.isSymbolicLink()) {
@@ -699,15 +721,42 @@ function readApiVersion(stackRoot) {
   return Object.freeze({ file, info, bytes, ...parseApiVersion(bytes) });
 }
 
-function backupApiVersion(stackRoot, evidenceDirectory) {
+function assertPrivateEvidenceDirectory(directory, code = 'API_ENV_BACKUP_INVALID') {
+  const uid = process.geteuid?.();
+  const checkPath = target => {
+    const absolute = path.resolve(target);
+    let current = path.parse(absolute).root;
+    const checkComponent = () => {
+      const info = lstatSync(current);
+      if (uid !== undefined && info.uid !== 0 && info.uid !== uid) throw new Error('untrusted path owner');
+      if (info.isSymbolicLink()) return;
+      if (!info.isDirectory() || ((info.mode & 0o022) !== 0 && (info.mode & 0o1000) === 0)) {
+        throw new Error('untrusted path permissions');
+      }
+    };
+    checkComponent();
+    for (const part of absolute.slice(current.length).split(path.sep).filter(Boolean)) {
+      current = path.join(current, part);
+      checkComponent();
+    }
+  };
+  try {
+    const info = lstatSync(directory);
+    if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o700
+      || (uid !== undefined && info.uid !== uid)) throw new Error('untrusted evidence directory');
+    checkPath(directory);
+    checkPath(realpathSync(directory));
+  } catch {
+    fail(code, 'release evidence directory is unsafe');
+  }
+}
+
+export function backupApiVersion(stackRoot, evidenceDirectory) {
   const apiEnv = readApiVersion(stackRoot);
   mkdirSync(evidenceDirectory, { recursive: true, mode: 0o700 });
-  const evidenceInfo = lstatSync(evidenceDirectory);
-  if (!evidenceInfo.isDirectory() || evidenceInfo.isSymbolicLink()) {
-    fail('API_ENV_BACKUP_INVALID', 'release evidence directory is unsafe');
-  }
+  assertPrivateEvidenceDirectory(evidenceDirectory);
   const backup = path.join(evidenceDirectory, `api.env.pre-${process.pid}-${randomUUID()}`);
-  atomicWrite(backup, apiEnv.bytes);
+  atomicWrite(backup, apiEnv.bytes, 0o600, apiEnv.info);
   return Object.freeze({
     file: apiEnv.file,
     backup,
@@ -729,20 +778,30 @@ function writeApiVersion(stackRoot, version) {
   return Object.freeze({ file: apiEnv.file, version, changed: true });
 }
 
-function readApiVersionBackup(stackRoot, reference) {
+export function installCandidateApiEnvironment(stackRoot, candidateFile, expectedDigest, version) {
+  const candidate = readCandidateApiEnvironment(candidateFile);
+  if (candidate.sha256 !== expectedDigest || parseApiVersion(candidate.bytes).version !== version) {
+    fail('CANDIDATE_API_ENV_CHANGED', 'candidate environment changed or has another build version');
+  }
+  const current = readApiVersion(stackRoot);
+  atomicWrite(current.file, candidate.bytes, 0o600, current.info);
+}
+
+export function readApiVersionBackup(stackRoot, reference) {
   if (!reference || typeof reference.path !== 'string' || !path.isAbsolute(reference.path)
     || typeof reference.sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(reference.sha256)
     || typeof reference.version !== 'string' || !VERSION_PATTERN.test(reference.version)) {
     fail('API_ENV_BACKUP_INVALID', 'api.env backup reference is invalid');
   }
+  assertPrivateEvidenceDirectory(path.dirname(reference.path));
   const file = path.join(stackRoot, 'api.env');
   let info;
   try {
     info = lstatSync(file);
-  } catch {
-    fail('API_ENV_INVALID', 'api.env is missing');
+  } catch (error) {
+    if (error.code !== 'ENOENT') fail('API_ENV_INVALID', 'api.env is unreadable');
   }
-  if (!info.isFile() || info.isSymbolicLink()) fail('API_ENV_INVALID', 'api.env must remain a regular file');
+  if (info && (!info.isFile() || info.isSymbolicLink())) fail('API_ENV_INVALID', 'api.env must remain a regular file');
   const bytes = readRegularFile(reference.path, MAX_JSON_BYTES, 'API_ENV_BACKUP_INVALID');
   let backupInfo;
   try {
@@ -756,12 +815,11 @@ function readApiVersionBackup(stackRoot, reference) {
   if (parseApiVersion(bytes).version !== reference.version) {
     fail('API_ENV_BACKUP_INVALID', 'api.env backup version changed');
   }
-  return Object.freeze({ file, backup: reference.path, bytes, version: reference.version });
+  return Object.freeze({ file, backup: reference.path, bytes, version: reference.version, owner: info ?? backupInfo });
 }
 
-function restoreApiVersion(backup) {
-  const owner = lstatSync(backup.file);
-  atomicWrite(backup.file, backup.bytes, 0o600, owner);
+export function restoreApiVersion(backup) {
+  atomicWrite(backup.file, backup.bytes, 0o600, backup.owner);
 }
 
 function readDeploymentState(file) {
@@ -780,6 +838,7 @@ function readDeploymentState(file) {
   }
   const state = readJson(file, 'DEPLOYMENT_STATE_INVALID');
   if (!state || state.schema !== DEPLOYMENT_STATE_SCHEMA
+    || state.action !== undefined
     || !['deploying', 'rolling_back', 'complete', 'rolled_back'].includes(state.status)
     || !SHA_PATTERN.test(state.candidateSha) || !VERSION_PATTERN.test(state.candidateVersion)
     || !SHA_PATTERN.test(state.previousSha) || !VERSION_PATTERN.test(state.previousVersion)
@@ -965,19 +1024,81 @@ export async function lockDeploymentContent(client, contentFingerprint) {
 
 function defaultDependencies(options) {
   assertApplyPrivilege(options.apply);
+  let verifiedController;
+  const observeStartup = (binding, declarationOnly = false) => {
+    if (!options.controllerRelease || !path.isAbsolute(options.controllerRelease)) {
+      fail('SERVICE_STARTUP_INVALID', 'an immutable controller release is required');
+    }
+    if (!verifiedController) {
+      const metadata = readReleaseMetadataAt(options.controllerRelease, null);
+      releaseEntryReady(metadata.root);
+      if (metadata.root === path.join(options.root, 'releases', options.sha)) {
+        fail('CONTROLLER_ARTIFACT_SHARED', 'Controller and candidate must have independent artifact roots');
+      }
+      const build = binding ?? readCandidateRelease(metadata.root, { verifyRuntime: true });
+      verifiedController = { ...metadata, runtimeBuildSha256: binding ? build.controllerBuildSha256 : build.runtimeBuildSha256 };
+    }
+    const controller = verifiedController;
+    assertCandidateRuntimeUnchanged({ root: controller.root, gitSha: controller.sha,
+      runtimeBuildSha256: controller.runtimeBuildSha256 });
+    if (controller.root !== options.controllerRelease) fail('SERVICE_STARTUP_INVALID', 'controller root differs');
+    return readServiceStartup({ controllerRoot: controller.root, controllerGitSha: controller.sha,
+      controllerBuildSha256: controller.runtimeBuildSha256, stackRoot: options.stackRoot,
+      runtimeRelease: path.join(options.root, 'current'), unit: options.unit }, undefined, undefined, { declarationOnly });
+  };
   return Object.freeze({
     readCurrent: async () => readCurrent(options.root),
-    readNext: async () => readRelease(options.root, options.sha, options.expectedVersion, true),
+    readCurrentIdentity: async () => readCurrentIdentity(options.root),
+    // Older v3 journals bind this historical digest without claiming a current candidate build.
+    readCandidateMetadata: async (state) => Object.freeze({
+      ...readReleaseMetadata(options.root, state.candidateSha, state.candidateVersion),
+      runtimeBuildSha256: state.releaseProof.runtimeBuildSha256,
+    }),
+    readNext: async () => {
+      const next = readRelease(options.root, options.sha, options.expectedVersion, true);
+      if (options.controllerRelease) {
+        const controller = readReleaseMetadataAt(options.controllerRelease, null);
+        assertControllerArtifactIsolation({ root: controller.root, gitSha: controller.sha },
+          { root: next.root, gitSha: next.sha });
+      }
+      return next;
+    },
     readEvidence: async (next) => readBackupEvidence(options.backupEvidence, next),
     readTenantReport: async () => readTenantReport(options.tenantReport),
     readProfile: async () => readProfile(options.stackRoot, options.environment),
     readQueryProfile: async (profile, next) => {
       const { readReleaseQueryProfile } = await import('./release-query-profile.mjs');
-      return readReleaseQueryProfile(next.root, profile.root);
+      if (options.candidateApiEnv && parseApiVersion(readCandidateApiEnvironment(options.candidateApiEnv).bytes).version !== next.version) {
+        fail('CANDIDATE_API_ENV_CHANGED', 'candidate environment build version differs');
+      }
+      return readReleaseQueryProfile(next.root, profile.root, options.candidateApiEnv);
+    },
+    readRollbackQueryProfile: async (profile, previous, reference) => {
+      const { readReleaseQueryProfile } = await import('./release-query-profile.mjs');
+      return readReleaseQueryProfile(previous.root, profile.root, reference?.path ?? path.join(profile.root, 'api.env'));
+    },
+    readCandidateApiEnvDigest: async (reference) => readCandidateApiEnvironment(
+      options.candidateApiEnv ?? reference?.path ?? path.join(options.stackRoot, 'api.env')).sha256,
+    verifyInstalledApiEnv: async (reference, expectedDigest, version) => {
+      const installed = readCandidateApiEnvironment(path.join(options.stackRoot, 'api.env'));
+      if (options.candidateApiEnv) {
+        if (installed.sha256 !== expectedDigest) fail('CANDIDATE_API_ENV_CHANGED', 'installed environment differs');
+      } else {
+        const backup = readApiVersionBackup(options.stackRoot, reference);
+        if (sha256(backup.bytes) !== expectedDigest) fail('CANDIDATE_API_ENV_CHANGED', 'source environment differs');
+        const bytes = backup.bytes.toString('utf8').replace(/^CUSTOMER_AGENT_BUILD_VERSION=.*$/mu,
+          `CUSTOMER_AGENT_BUILD_VERSION=${version}`);
+        if (sha256(bytes) !== installed.sha256) fail('CANDIDATE_API_ENV_CHANGED', 'installed environment differs');
+      }
+    },
+    readInstalledQueryProfile: async (profile, next) => {
+      const { readReleaseQueryProfile } = await import('./release-query-profile.mjs');
+      return readReleaseQueryProfile(next.root, profile.root,
+        options.candidateApiEnv ? path.join(profile.root, 'api.env') : undefined);
     },
     readState: async () => readDeploymentState(options.stateFile),
     writeState: async (state) => writeDeploymentState(options.stateFile, state),
-    readHistoricalRelease: async (sha, version) => readRelease(options.root, sha, version, false),
+    readHistoricalRelease: async (sha, version) => readRelease(options.root, sha, version, false, Boolean(options.controllerRelease)),
     audit: async (entry) => {
       if (options.apply) appendAudit(options.auditFile, entry);
     },
@@ -986,21 +1107,39 @@ function defaultDependencies(options) {
       if (canonicalRoot !== options.root) fail('RELEASE_ROOT_INVALID', 'release root must not be a symbolic path');
       return acquireDeploymentLock(path.join(canonicalRoot, 'deploy.lock'));
     },
-    inspectDatabase: async (profile, next) => withDatabase(profile, next, async (database, client) => (
-      migrationIds(await database.inspectDatabaseMigrations(client))
-    )),
+    readServiceStartup: async () => observeStartup(),
+    readServiceStartupDeclaration: async (binding) => observeStartup(binding, true),
+    inspectDatabase: async (profile, next) => withDatabase(profile, options.controllerRelease ? verifiedController : next, async (database, client) => {
+      if (options.controllerRelease) {
+        if (typeof database.verifyAppliedDatabaseMigrations !== 'function') {
+          fail('CONTROLLER_READER_REQUIRED', 'controller applied-prefix verification is unavailable');
+        }
+        const proof = await verifyReleaseDatabase(database, client);
+        if (proof.migrationCount > next.manifest.length) fail('DATABASE_PREFIX_MISMATCH', 'database exceeds the known candidate catalogue');
+        assertReleasePrefix(next.manifest.slice(0, proof.migrationCount), verifiedController.manifest);
+        return next.manifest.slice(0, proof.migrationCount).map(row => row.id);
+      }
+      return migrationIds(await database.inspectDatabaseMigrations(client));
+    }),
     inspectContentFingerprint: async (profile, next) => withDatabase(profile, next, (_database, client) => (
       readRuntimeContentFingerprint(client)
     )),
-    verifyRollbackDatabase: async (profile, previous) => withDatabase(profile, previous, async (database, client) => {
-      await database.inspectDatabaseMigrations(client);
-      const verification = await database.verifyDatabaseMigrations(client);
+    verifyRollbackDatabase: async (profile, previous) => withDatabase(profile, options.controllerRelease ? verifiedController : previous, async (database, client) => {
+      if (options.controllerRelease && typeof database.verifyAppliedDatabaseMigrations !== 'function') {
+        fail('CONTROLLER_READER_REQUIRED', 'controller applied-prefix verification is unavailable');
+      }
+      if (!options.controllerRelease) await database.inspectDatabaseMigrations(client);
+      const verification = options.controllerRelease
+        ? await verifyReleaseDatabase(database, client)
+        : await database.verifyDatabaseMigrations(client);
       if (verification.status !== 'PASS') fail('ROLLBACK_DATABASE_INCOMPATIBLE', 'rollback database verification failed');
     }),
     inspectTenancy: async (profile) => inspectLiveTenancy(profile),
     readApiVersion: async () => readApiVersion(options.stackRoot),
     backupApiVersion: async () => backupApiVersion(options.stackRoot, path.dirname(options.auditFile)),
     writeApiVersion: async (version) => writeApiVersion(options.stackRoot, version),
+    installCandidateApiEnv: async (expectedDigest, version) =>
+      installCandidateApiEnvironment(options.stackRoot, options.candidateApiEnv, expectedDigest, version),
     readApiVersionBackup: async (reference) => readApiVersionBackup(options.stackRoot, reference),
     applyDatabase: async (profile, next, contentFingerprint) => withDatabase(profile, next, async (database, client) => {
       await lockDeploymentContent(client, contentFingerprint);
@@ -1041,9 +1180,13 @@ export function assertApplyPrivilege(apply, getEffectiveUid = () => process.gete
   }
 }
 
-function createDeploymentState(next, previous, backupId) {
+function createDeploymentState(next, previous, backupId, releaseProof) {
   return Object.freeze({
     schema: DEPLOYMENT_STATE_SCHEMA,
+    ...(releaseProof === undefined ? {} : { releaseProof, candidateRelease: {
+      root: next.root, sha: next.sha, version: next.version, manifest: next.manifest,
+      runtimeBuildSha256: next.runtimeBuildSha256,
+    } }),
     status: 'deploying',
     candidateSha: next.sha,
     candidateVersion: next.version,
@@ -1068,6 +1211,7 @@ function assertPreviousTargetMatchesRelease(targetText, release) {
 }
 
 export async function runProductionRelease(options, suppliedDependencies) {
+  if (Object.hasOwn(options, 'action')) fail('INVALID_ARGUMENTS', 'Unsupported release option');
   const dependencies = suppliedDependencies ?? defaultDependencies(options);
   const releaseLock = options.apply ? await dependencies.lock() : () => {};
   const startedAt = Date.now();
@@ -1079,19 +1223,38 @@ export async function runProductionRelease(options, suppliedDependencies) {
   let liveTenantReport;
   let profile;
   let queryProfile;
+  let rollbackQueryProfile;
+  let candidateApiEnvSha256;
   let queryBinding;
   let databaseIds;
   let deploymentState;
   let phase = 'preflight';
+  let controller;
+  let modern = Boolean(options.controllerRelease) || Boolean(options.candidateApiEnv);
   let interrupted = false;
   let mutationStarted = false;
+  let rollbackAdmitted = false;
+  let auditEnabled = !modern;
   const onSignal = () => { interrupted = true; };
   const assertNotInterrupted = () => {
     if (interrupted) fail('INTERRUPTED', 'deployment received a termination signal');
   };
   const verifyQueryConfiguration = async () => {
     if (queryBinding !== undefined) {
-      assertQueryProfileBinding(queryBinding, await dependencies.readQueryProfile?.(profile, next));
+      const actual = await dependencies.readQueryProfile?.(profile, next);
+      assertQueryProfileBinding(queryBinding, actual);
+      if (modern && JSON.stringify(queryProfile) !== JSON.stringify(actual)) {
+        fail('RELEASE_QUERY_PROFILE_CHANGED', 'candidate environment changed');
+      }
+    }
+    if (modern) {
+      assertControllerBinding(controller, await dependencies.readServiceStartup());
+    }
+  };
+  const verifyInstalledConfiguration = async () => {
+    if (modern) await dependencies.verifyInstalledApiEnv(deploymentState.apiEnvBackup, candidateApiEnvSha256, next.version);
+    if (modern && JSON.stringify(queryProfile) !== JSON.stringify(await dependencies.readInstalledQueryProfile(profile, next))) {
+      fail('RELEASE_QUERY_PROFILE_CHANGED', 'installed environment differs from the admitted candidate');
     }
   };
   process.on('SIGINT', onSignal);
@@ -1107,16 +1270,43 @@ export async function runProductionRelease(options, suppliedDependencies) {
       ...fields,
     });
     events.push(entry);
-    await dependencies.audit(entry);
+    if (auditEnabled) await dependencies.audit(entry);
   };
 
+  const observeDeclaration = async (binding) => dependencies.readServiceStartupDeclaration
+    ? dependencies.readServiceStartupDeclaration(binding) : dependencies.readServiceStartup();
+  const verifyRollbackPrefix = async (state) => {
+    const ids = await dependencies.inspectDatabase(profile, next);
+    const { sourceMigrationCount: source, targetMigrationCount: target } = state.releaseProof;
+    if (ids.length < source || ids.length > target
+      || !sameIds(ids, next.manifest.slice(0, ids.length).map(row => row.id))) {
+      fail('DATABASE_PREFIX_MISMATCH', 'rollback database is outside the proven prefixes');
+    }
+  };
+  const verifyRecoveryPointer = async () => {
+    const identity = await (dependencies.readCurrentIdentity ?? dependencies.readCurrent)();
+    if (![previous, next].some(release => release.sha === identity.sha && release.root === identity.root)) {
+      fail('CURRENT_INVALID', 'current release matches neither the candidate nor rollback release');
+    }
+    return identity;
+  };
+  const readRollbackBackup = async (state) => {
+    if (state.releaseProof && (state.apiEnvBackup?.sha256 !== state.releaseProof.rollbackQueryProfile.apiEnvSha256
+      || state.apiEnvBackup.version !== previous.version)) {
+      fail('API_ENV_BACKUP_INVALID', 'journal backup differs from the proven rollback environment');
+    }
+    return state.apiEnvBackup ? dependencies.readApiVersionBackup(state.apiEnvBackup) : null;
+  };
   const rollback = async (state) => {
     if (!profile) fail('ROLLBACK_CONTEXT_MISSING', 'rollback profile is unavailable');
-    await dependencies.verifyRollbackDatabase(profile, previous);
-    let apiBackup = null;
-    if (state.apiEnvBackup) {
-      apiBackup = await dependencies.readApiVersionBackup(state.apiEnvBackup);
+    if (state.releaseProof) {
+      const identity = await verifyRecoveryPointer();
+      if (identity.sha === next.sha) state = { ...state, pointerSwitched: true };
+      assertControllerBinding(state.releaseProof.controller, await observeDeclaration(state.releaseProof.controller));
+      await verifyRollbackPrefix(state);
     }
+    await dependencies.verifyRollbackDatabase(profile, previous);
+    const apiBackup = await readRollbackBackup(state);
     if (state.pointerSwitched) {
       phase = 'rollback-pointer';
       await dependencies.restoreCurrent(previous);
@@ -1127,12 +1317,19 @@ export async function runProductionRelease(options, suppliedDependencies) {
       await dependencies.restoreApiVersion(apiBackup);
       await audit('api-version-restored');
     }
-    if (state.serviceStageReached) {
+    if (state.serviceStageReached || state.releaseProof) {
       phase = 'rollback-restart';
       await dependencies.restartService();
     }
     phase = 'rollback-readiness';
     await dependencies.waitForReady(profile, previous.version);
+    if (state.releaseProof) {
+      assertControllerBinding(state.releaseProof.controller, await dependencies.readServiceStartup());
+      const restored = await dependencies.readRollbackQueryProfile(profile, previous);
+      if (JSON.stringify(restored) !== JSON.stringify(state.releaseProof.rollbackQueryProfile)) {
+        fail('RELEASE_QUERY_PROFILE_CHANGED', 'restored environment differs from the proven rollback configuration');
+      }
+    }
     await audit('rollback-ready', { currentSha: previous.sha });
     deploymentState = Object.freeze({
       ...state,
@@ -1150,22 +1347,69 @@ export async function runProductionRelease(options, suppliedDependencies) {
   try {
     await audit('started', { apply: options.apply });
     assertNotInterrupted();
-    current = await dependencies.readCurrent();
-    next = await dependencies.readNext();
     deploymentState = options.apply ? await dependencies.readState() : null;
+    const requested = { sha: options.sha, version: options.expectedVersion };
+    const unfinished = deploymentState && ['deploying', 'rolling_back'].includes(deploymentState.status);
+    if (unfinished && !stateMatchesRelease(deploymentState, requested)) {
+      fail('DEPLOYMENT_STATE_CONFLICT', 'an unfinished deployment exists for another candidate');
+    }
+    if (deploymentState?.releaseProof && stateMatchesRelease(deploymentState, requested)) modern = true;
 
+    // Admit recovery from the locked journal before touching candidate execution or external evidence.
+    if (modern && unfinished) {
+      if (!options.controllerRelease || deploymentState.releaseProof?.schema !== RELEASE_PROOF_SCHEMA
+        || !deploymentState.apiEnvBackup) fail('DEPLOYMENT_STATE_INVALID', 'v3 journal lacks its recovery proof or backup');
+      next = deploymentState.candidateRelease ?? await dependencies.readCandidateMetadata(deploymentState);
+      if (next.sha !== requested.sha || next.version !== requested.version
+        || next.root !== path.join(options.root, 'releases', requested.sha)) {
+        fail('DEPLOYMENT_STATE_INVALID', 'journal candidate descriptor differs from the requested release');
+      }
+      assertReleasePrefix(next.manifest, next.manifest);
+      const historical = await dependencies.readHistoricalRelease(deploymentState.previousSha, deploymentState.previousVersion);
+      assertPreviousTargetMatchesRelease(deploymentState.previousTargetText, historical);
+      previous = Object.freeze({ ...historical, targetText: deploymentState.previousTargetText });
+      profile = await dependencies.readProfile();
+      controller = await observeDeclaration(deploymentState.releaseProof.controller);
+      assertReleaseProof(deploymentState.releaseProof, { previous, next, controller,
+        queryProfile: deploymentState.releaseProof.candidateQueryProfile,
+        rollbackQueryProfile: deploymentState.releaseProof.rollbackQueryProfile,
+        candidateApiEnvSha256: deploymentState.releaseProof.candidateApiEnvSha256,
+        contentFingerprint: deploymentState.releaseProof.contentFingerprint });
+      current = await verifyRecoveryPointer();
+      await readRollbackBackup(deploymentState);
+      const original = await dependencies.readRollbackQueryProfile(profile, previous, deploymentState.apiEnvBackup);
+      if (JSON.stringify(original) !== JSON.stringify(deploymentState.releaseProof.rollbackQueryProfile)) {
+        fail('RELEASE_QUERY_PROFILE_CHANGED', 'original environment differs from the proven rollback configuration');
+      }
+      await verifyRollbackPrefix(deploymentState);
+      rollbackAdmitted = true;
+      if (deploymentState.status === 'rolling_back') {
+        auditEnabled = true;
+        await rollback(deploymentState);
+        return Object.freeze({ status: 'rolled-back', previousSha: previous.sha, events: Object.freeze(events) });
+      }
+    }
+    // A healthy deploying retry still executes every normal candidate admission gate.
+    const executableCurrent = await dependencies.readCurrent();
+    const executableNext = await dependencies.readNext();
+    if (rollbackAdmitted && (executableNext.root !== next.root || executableNext.sha !== next.sha
+      || executableNext.version !== next.version || executableNext.runtimeBuildSha256 !== next.runtimeBuildSha256
+      || canonicalJson(executableNext.manifest) !== canonicalJson(next.manifest))) {
+      fail('RELEASE_RUNTIME_BUILD_CHANGED', 'candidate differs from the admitted journal');
+    }
+    current = executableCurrent;
+    next = executableNext;
     if (deploymentState && !stateMatchesRelease(deploymentState, next)
       && !['complete', 'rolled_back'].includes(deploymentState.status)) {
       fail('DEPLOYMENT_STATE_CONFLICT', 'an unfinished deployment exists for another candidate');
     }
     if (deploymentState && stateMatchesRelease(deploymentState, next)
       && deploymentState.status !== 'rolled_back') {
-      const historical = await dependencies.readHistoricalRelease(
-        deploymentState.previousSha,
-        deploymentState.previousVersion,
-      );
-      assertPreviousTargetMatchesRelease(deploymentState.previousTargetText, historical);
-      previous = Object.freeze({ ...historical, targetText: deploymentState.previousTargetText });
+      if (!previous) {
+        const historical = await dependencies.readHistoricalRelease(deploymentState.previousSha, deploymentState.previousVersion);
+        assertPreviousTargetMatchesRelease(deploymentState.previousTargetText, historical);
+        previous = Object.freeze({ ...historical, targetText: deploymentState.previousTargetText });
+      }
     } else {
       previous = current;
       deploymentState = null;
@@ -1183,9 +1427,28 @@ export async function runProductionRelease(options, suppliedDependencies) {
       fail('CURRENT_INVALID', 'current release matches neither the candidate nor rollback release');
     }
 
+    if (modern) {
+      if (!options.controllerRelease) fail('SERVICE_STARTUP_INVALID', 'controller-release is required');
+      if (!previous.runtimeBuildSha256) {
+        const historical = await dependencies.readHistoricalRelease(previous.sha, previous.version);
+        previous = Object.freeze({ ...historical, targetText: previous.targetText });
+      }
+      profile = await dependencies.readProfile();
+      controller = await dependencies.readServiceStartup();
+      if (deploymentState?.releaseProof) {
+        if (!deploymentState.apiEnvBackup) fail('DEPLOYMENT_STATE_INVALID', 'v3 journal lacks its original environment backup');
+        assertReleaseProof(deploymentState.releaseProof, { previous, next,
+          queryProfile: deploymentState.releaseProof.candidateQueryProfile, controller,
+          rollbackQueryProfile: deploymentState.releaseProof.rollbackQueryProfile,
+          candidateApiEnvSha256: deploymentState.releaseProof.candidateApiEnvSha256,
+          contentFingerprint: deploymentState.releaseProof.contentFingerprint });
+        rollbackAdmitted = true;
+      }
+    }
+
     backupEvidence = await dependencies.readEvidence(next);
     tenantReport = await dependencies.readTenantReport();
-    profile = await dependencies.readProfile();
+    profile ??= await dependencies.readProfile();
     queryProfile = await dependencies.readQueryProfile?.(profile, next);
     queryBinding = queryProfile === undefined ? undefined : {
       queryMode: queryProfile.mode,
@@ -1193,6 +1456,13 @@ export async function runProductionRelease(options, suppliedDependencies) {
       scope: queryProfile.mode === 'intake-compat'
         ? 'candidate-intake-catalog-readonly-gates' : 'candidate-query-runtime-readonly-initialization',
     };
+    if (modern !== (backupEvidence.deploymentChecks?.schema === RELEASE_PROOF_SCHEMA)) {
+      fail('RELEASE_PREFLIGHT_REQUIRED', 'release features and evidence schema differ');
+    }
+    if (modern) {
+      rollbackQueryProfile = await dependencies.readRollbackQueryProfile(profile, previous, deploymentState?.apiEnvBackup);
+      candidateApiEnvSha256 = await dependencies.readCandidateApiEnvDigest(deploymentState?.apiEnvBackup);
+    }
     liveTenantReport = await dependencies.inspectTenancy(profile);
     assertTenantReportMatches(tenantReport, liveTenantReport);
     const apiVersion = await dependencies.readApiVersion();
@@ -1208,7 +1478,14 @@ export async function runProductionRelease(options, suppliedDependencies) {
     databaseIds = await dependencies.inspectDatabase(profile, next);
     const previousIds = previous.manifest.map((migration) => migration.id);
     const nextIds = next.manifest.map((migration) => migration.id);
-    if (!sameIds(databaseIds, previousIds) && !sameIds(databaseIds, nextIds)) {
+    const checks = backupEvidence.deploymentChecks;
+    if (modern && deploymentState && deploymentState.backupId !== backupEvidence.backupId) {
+      fail('DEPLOYMENT_STATE_CONFLICT', 'retry backup differs from the admitted backup');
+    }
+    const knownPrefix = modern && databaseIds.length >= checks.sourceMigrationCount
+      && databaseIds.length <= checks.targetMigrationCount
+      && sameIds(databaseIds, nextIds.slice(0, databaseIds.length));
+    if (modern ? !knownPrefix : !sameIds(databaseIds, previousIds) && !sameIds(databaseIds, nextIds)) {
       fail('DATABASE_PREFIX_MISMATCH', 'database migrations match neither previous nor candidate release');
     }
 
@@ -1219,13 +1496,23 @@ export async function runProductionRelease(options, suppliedDependencies) {
     }
 
     const alreadyComplete = deploymentState?.status === 'complete' && current.sha === next.sha;
-    if (alreadyComplete) assertQueryProfileEvidence(backupEvidence.deploymentChecks, queryProfile);
+    if (alreadyComplete) {
+      if (!['customer-agent-release-preflight/v1', 'customer-agent-release-preflight/v2', RELEASE_PROOF_SCHEMA]
+        .includes(checks?.schema)) fail('RELEASE_PREFLIGHT_REQUIRED', 'completed deployment proof schema is unknown');
+      if (modern && !sameIds(databaseIds, nextIds.slice(0, checks.targetMigrationCount))) {
+        fail('DATABASE_PREFIX_MISMATCH', 'completed deployment no longer has its target prefix');
+      }
+      assertQueryProfileEvidence(checks, queryProfile);
+      if (modern) assertReleaseProof(checks, { previous, next, queryProfile, rollbackQueryProfile, candidateApiEnvSha256, controller,
+        contentFingerprint: checks.contentFingerprint });
+    }
     await dependencies.waitForReady(profile, current.version, assertNotInterrupted,
       alreadyComplete ? queryProfile?.mode ?? 'unified' : undefined,
-      alreadyComplete && backupEvidence.deploymentChecks?.schema !== 'customer-agent-release-preflight/v2');
+      alreadyComplete && !['customer-agent-release-preflight/v2', RELEASE_PROOF_SCHEMA].includes(backupEvidence.deploymentChecks?.schema));
     assertNotInterrupted();
 
     if (alreadyComplete) {
+      await verifyInstalledConfiguration();
       await verifyQueryConfiguration();
       await audit('already-complete', { currentSha: current.sha });
       return Object.freeze({
@@ -1236,13 +1523,23 @@ export async function runProductionRelease(options, suppliedDependencies) {
       });
     }
 
-    assertDeploymentChecks(backupEvidence.deploymentChecks, previous, next,
-      await dependencies.inspectContentFingerprint(profile, next), queryProfile);
+    const fingerprint = await dependencies.inspectContentFingerprint(profile, next);
+    if (modern) {
+      assertReleaseProof(checks, { previous, next, queryProfile, rollbackQueryProfile, candidateApiEnvSha256, controller, contentFingerprint: fingerprint });
+      assertQueryProfileEvidence(checks, queryProfile);
+      rollbackAdmitted = true;
+      if (deploymentState?.releaseProof && JSON.stringify(deploymentState.releaseProof) !== JSON.stringify(checks)) {
+        fail('DEPLOYMENT_STATE_CONFLICT', 'retry evidence differs from the admitted proof');
+      }
+    } else {
+      assertDeploymentChecks(checks, previous, next, fingerprint, queryProfile);
+    }
 
-    const pending = next.manifest.slice(databaseIds.length).map((migration) => migration.id);
+    const targetIds = nextIds;
+    const pending = next.manifest.slice(databaseIds.length, targetIds.length).map((migration) => migration.id);
     const plan = Object.freeze({
       status: options.apply ? 'ready-to-apply' : 'dry-run',
-      currentSha: current.sha,
+        currentSha: current.sha,
       currentVersion: current.version,
       rollbackSha: previous.sha,
       rollbackVersion: previous.version,
@@ -1264,44 +1561,59 @@ export async function runProductionRelease(options, suppliedDependencies) {
     if (!options.apply) return Object.freeze({ ...plan, events: Object.freeze(events) });
 
     if (!deploymentState) {
-      deploymentState = createDeploymentState(next, previous, backupEvidence.backupId);
-      await dependencies.writeState(deploymentState);
+      deploymentState = createDeploymentState(next, previous, backupEvidence.backupId, modern ? checks : undefined);
+      if (!modern) await dependencies.writeState(deploymentState);
+    }
+
+    const prepareApiBackup = async () => {
+      if (!deploymentState.apiEnvBackup) {
+        const prepared = await dependencies.backupApiVersion();
+        if (prepared.version !== previous.version
+          || modern && prepared.sha256 !== checks.rollbackQueryProfile.apiEnvSha256) {
+          fail('API_ENV_BACKUP_INVALID', 'api.env backup differs from the proven rollback environment');
+        }
+        deploymentState = Object.freeze({
+          ...deploymentState,
+          apiEnvBackup: Object.freeze({
+            path: prepared.backup,
+            sha256: prepared.sha256,
+            version: prepared.version,
+          }),
+        });
+        await dependencies.writeState(deploymentState);
+      }
+    };
+    if (modern) {
+      await prepareApiBackup();
+      auditEnabled = true;
+      for (const entry of events) await dependencies.audit(entry);
     }
 
     phase = 'migrate';
     assertNotInterrupted();
     await verifyQueryConfiguration();
     mutationStarted = true;
-    const migration = await dependencies.applyDatabase(profile, next, backupEvidence.deploymentChecks.contentFingerprint);
+    const migration = await dependencies.applyDatabase(profile, next, checks.contentFingerprint);
     assertNotInterrupted();
-    assertMigrationCompletion(databaseIds, nextIds, migration);
+    assertMigrationCompletion(databaseIds, targetIds, migration);
     await audit('migrations-applied', {
       appliedMigrationCount: migration.appliedIds.length,
       verifierStatus: migration.verifierStatus,
     });
 
     phase = 'api-version';
-    if (!deploymentState.apiEnvBackup) {
-      const prepared = await dependencies.backupApiVersion();
-      if (prepared.version !== previous.version) {
-        fail('API_ENV_BACKUP_INVALID', 'api.env backup does not contain the rollback version');
-      }
-      deploymentState = Object.freeze({
-        ...deploymentState,
-        apiEnvBackup: Object.freeze({
-          path: prepared.backup,
-          sha256: prepared.sha256,
-          version: prepared.version,
-        }),
-      });
-      await dependencies.writeState(deploymentState);
-    }
+    if (!modern) await prepareApiBackup();
     await dependencies.readApiVersionBackup(deploymentState.apiEnvBackup);
-    await dependencies.writeApiVersion(next.version);
+    if (options.candidateApiEnv) {
+      await dependencies.installCandidateApiEnv(queryProfile.apiEnvSha256, next.version);
+    } else {
+      await dependencies.writeApiVersion(next.version);
+    }
     assertNotInterrupted();
     await audit('api-version-updated');
 
     phase = 'switch';
+    await verifyInstalledConfiguration();
     await verifyQueryConfiguration();
     if (current.root !== next.root) {
       deploymentState = Object.freeze({ ...deploymentState, pointerSwitched: true });
@@ -1318,9 +1630,13 @@ export async function runProductionRelease(options, suppliedDependencies) {
     assertNotInterrupted();
     phase = 'readiness';
     await dependencies.waitForReady(profile, next.version, assertNotInterrupted,
-      queryProfile?.mode ?? 'unified', backupEvidence.deploymentChecks.schema !== 'customer-agent-release-preflight/v2');
+      queryProfile?.mode ?? 'unified', !['customer-agent-release-preflight/v2', RELEASE_PROOF_SCHEMA].includes(backupEvidence.deploymentChecks.schema));
     assertNotInterrupted();
     await verifyQueryConfiguration();
+    await verifyInstalledConfiguration();
+    if (modern && !sameIds(await dependencies.inspectDatabase(profile, next), targetIds)) {
+      fail('DATABASE_PREFIX_MISMATCH', 'database prefix changed during service restart');
+    }
     deploymentState = Object.freeze({ ...deploymentState, status: 'complete' });
     await dependencies.writeState(deploymentState);
     await audit('ready', {
@@ -1340,8 +1656,8 @@ export async function runProductionRelease(options, suppliedDependencies) {
       const interruptedMutation = deploymentState?.status === 'rolling_back'
         || mutationStarted
         || (deploymentState?.status === 'deploying'
-          && (deploymentState.pointerSwitched || deploymentState.serviceStageReached));
-      if (options.apply && deploymentState && previous && interruptedMutation
+          && (deploymentState.pointerSwitched || deploymentState.serviceStageReached || modern && deploymentState.apiEnvBackup));
+      if (options.apply && deploymentState && previous && interruptedMutation && (!modern || rollbackAdmitted)
         && deploymentState.status !== 'rolled_back') {
         deploymentState = Object.freeze({ ...deploymentState, status: 'rolling_back' });
         await dependencies.writeState(deploymentState);
@@ -1354,7 +1670,9 @@ export async function runProductionRelease(options, suppliedDependencies) {
       } catch { /* Preserve the original failure and rollback state. */ }
     }
     if (rollbackFailure) {
-      fail('ROLLBACK_FAILED', 'release failed and rollback did not recover readiness', rollbackFailure);
+      const failure = new ProductionReleaseError('ROLLBACK_FAILED', 'release failed and rollback did not recover readiness', { cause: error });
+      failure.rollbackError = rollbackFailure;
+      throw failure;
     }
     try { await audit('failed', { errorCode: error?.code ?? 'RELEASE_FAILED' }); } catch { /* Preserve primary failure. */ }
     throw error;
@@ -1377,6 +1695,7 @@ function main() {
     process.stdout.write([
       'Usage: node scripts/ops/customer-agent-production-release.mjs --sha <40-hex> --expected-version <x.y.z>',
       '  --backup-evidence <file> --tenant-report <file> [--apply --authorization <sha>]',
+      '  [--controller-release <immutable-release>] [--candidate-api-env <private-file>]',
       '  [--environment production|test] [--stack-root <dir>] [--unit <name>]',
       '',
       'Dry-run is the default. Apply requires --authorization equal to --sha.',

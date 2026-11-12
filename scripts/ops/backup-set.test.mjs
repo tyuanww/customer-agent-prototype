@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -26,6 +27,8 @@ import {
   OBJECTS_ARCHIVE_FILE,
   ROLES_FILE,
   createBackupSet,
+  assertCandidateBuildDigests,
+  assertCandidateRuntimeUnchanged,
   extractObjectArchive,
   inspectObjectArchive,
   inspectObjectStore,
@@ -690,6 +693,57 @@ for (const corruptIndex of [0, 1, 2]) test(`corrupt backup ${corruptIndex + 1} d
     assert.equal(result.removed, 0);
     assert.equal(result.preserved, 1);
     assert.deepEqual(readdirSync(root).sort(), ids);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test('verified runtime artifacts are rechecked for source, dist and workspace drift without rebuilding', () => {
+  const root = temporaryDirectory('candidate-runtime-recheck-');
+  let candidate = path.join(root, 'candidate');
+  const directories = ['packages/contracts', 'packages/retrieval-core', 'packages/job-roster',
+    'packages/unified-contracts', 'packages/content-intake', 'packages/database', 'apps/api'];
+  try {
+    mkdirSync(candidate);
+    writeFileSync(path.join(candidate, '.gitignore'), '**/dist/\n**/node_modules/\n');
+    copyFileSync(path.join(repositoryRoot, 'pnpm-lock.yaml'), path.join(candidate, 'pnpm-lock.yaml'));
+    for (const directory of directories) {
+      mkdirSync(path.join(candidate, directory, 'dist'), { recursive: true });
+      for (const file of ['package.json', 'tsconfig.json', 'tsconfig.build.json']) {
+        copyFileSync(path.join(repositoryRoot, directory, file), path.join(candidate, directory, file));
+      }
+      writeFileSync(path.join(candidate, directory, 'tracked-input.txt'), 'synthetic verified input\n');
+      writeFileSync(path.join(candidate, directory, 'dist/index.js'), 'export const synthetic = true;\n');
+    }
+    const git = (args, encoding) => execFileSync('git', ['-C', candidate, ...args], {
+      encoding, env: { ...process.env, GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: '1' },
+    });
+    git(['init', '-q']);
+    git(['add', '.']);
+    git(['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
+    const gitSha = git(['rev-parse', 'HEAD'], 'utf8').trim();
+    const destination = path.join(root, gitSha);
+    renameSync(candidate, destination);
+    candidate = realpathSync(destination);
+    for (const directory of directories) {
+      const scope = path.join(candidate, directory, 'node_modules/@customer-agent');
+      mkdirSync(scope, { recursive: true });
+      for (const dependency of directories) symlinkSync(path.join(candidate, dependency), path.join(scope, path.basename(dependency)), 'dir');
+    }
+    const digests = directories.map(directory => {
+      const dist = path.join(candidate, directory, 'dist');
+      return [directory, assertCandidateBuildDigests(dist, dist)];
+    });
+    const release = { root: candidate, gitSha, runtimeBuildSha256: sha256(JSON.stringify(digests)) };
+    assert.doesNotThrow(() => assertCandidateRuntimeUnchanged(release));
+    const output = path.join(candidate, 'apps/api/dist/index.js');
+    writeFileSync(output, 'export const synthetic = false;\n');
+    assert.throws(() => assertCandidateRuntimeUnchanged(release), { code: 'CANDIDATE_RUNTIME_BUILD_MISMATCH' });
+    writeFileSync(output, 'export const synthetic = true;\n');
+    git(['update-index', '--assume-unchanged', 'apps/api/tracked-input.txt']);
+    writeFileSync(path.join(candidate, 'apps/api/tracked-input.txt'), 'changed hidden input\n');
+    assert.throws(() => assertCandidateRuntimeUnchanged(release), { code: 'CANDIDATE_RELEASE_INVALID' });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
