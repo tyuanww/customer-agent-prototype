@@ -13,6 +13,11 @@
  *   node scripts/synthetic-stack/stack.ts start --foreground --no-seed
  *       production mode: keep identity, API and worker attached to this process;
  *       an unexpected child exit fails the service so systemd can restart the group.
+ *   node scripts/synthetic-stack/stack.ts start --existing-database [--foreground]
+ *       verify the existing applied prefix and start services with existing roles
+ *       and configuration. Profile, migrations, bindings and grants are retained.
+ *       --runtime-release <absolute-release> pins a clean SHA-named release's
+ *       API, identity and worker entries under this controller's supervision.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
  *   node scripts/synthetic-stack/stack.ts restart
  *   node scripts/synthetic-stack/stack.ts status    report readiness of each piece
@@ -37,9 +42,11 @@
  *   api.env      portable production secrets (profile name, HMAC material).
  *                Derived values - DSNs, paths, ports - are refused, not merged.
  */
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { closeSync, existsSync, openSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, openSync, readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { catalogReferences } from '../../apps/desktop/src/shared/synthetic-catalog.ts';
@@ -63,12 +70,9 @@ import {
 import { loginAs, seedContentIfMissing } from './seed.ts';
 import { anomalyStatus, revokeSessions, suspendSource } from './anomaly.ts';
 import { identityProcessEnvironment } from './identity-admission.ts';
+import { verifyAppliedDatabaseMigrations } from '../../packages/database/dist/index.js';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const API_ENTRY = path.join(repositoryRoot, 'apps/api/dist/main.js');
-const WORKER_ENTRY = path.join(repositoryRoot, 'apps/api/dist/content-worker-main.js');
-const IDENTITY_ENTRY = fileURLToPath(new URL('./identity-provider.ts', import.meta.url));
-const PASSWORD_IDENTITY_ENTRY = fileURLToPath(new URL('./password-identity-server.ts', import.meta.url));
 const FOREGROUND_PROCESS_NAME = 'stack-foreground';
 
 function log(message: string): void {
@@ -80,6 +84,7 @@ function fail(message: string): never {
 }
 
 type ProcessLaunchMode = 'detached' | 'foreground';
+type DatabaseStartMode = 'prepare' | 'existing-database';
 
 type ChildExit = Readonly<{
   code: number | null;
@@ -97,6 +102,7 @@ type SpawnedProcess = Readonly<{
 type StartProcessesResult = Readonly<{
   messages: readonly string[];
   children: readonly SpawnedProcess[];
+  ready: Record<string, unknown>;
 }>;
 
 function spawnLogged(
@@ -105,12 +111,13 @@ function spawnLogged(
   args: readonly string[],
   environment: NodeJS.ProcessEnv,
   mode: ProcessLaunchMode,
+  runtimeRoot: string,
 ): SpawnedProcess {
   ensureStackDirectories();
   const out = openSync(path.join(LOG_DIRECTORY, `${name}.log`), 'a');
   try {
     const child = spawn(command, [...args], {
-      cwd: repositoryRoot,
+      cwd: runtimeRoot,
       env: environment,
       stdio: ['ignore', out, out],
       detached: mode === 'detached',
@@ -150,12 +157,74 @@ async function readJson(url: string): Promise<Record<string, unknown>> {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
-function requireDist(): void {
-  for (const entry of [API_ENTRY, WORKER_ENTRY]) {
+function requireDist(runtimeRoot: string): void {
+  for (const relative of ['apps/api/dist/main.js', 'apps/api/dist/content-worker-main.js']) {
+    const entry = path.join(runtimeRoot, relative);
     if (!existsSync(entry)) {
-      fail(`Missing ${path.relative(repositoryRoot, entry)}. Run: pnpm build:services`);
+      fail(`Missing ${relative}. Run: pnpm build:services`);
     }
   }
+}
+
+/** The publisher binds build fingerprints and keeps the release immutable.
+ * Selecting application entries directly preserves existing authorizations
+ * while this controller pins the resolved runtime path for every child. */
+function resolveRuntimeRoot(requested: string | undefined): string {
+  if (requested === undefined) return repositoryRoot;
+  if (!path.isAbsolute(requested)) fail('--runtime-release requires an absolute release path');
+  const root = realpathSync(requested);
+  if (!lstatSync(root).isDirectory()) fail('Runtime release must be a directory');
+  const environment = { ...process.env };
+  for (const key of Object.keys(environment)) {
+    if (key.startsWith('GIT_')) delete environment[key];
+  }
+  Object.assign(environment, {
+    GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: '1', GIT_OPTIONAL_LOCKS: '0',
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: root,
+  });
+  const git = (...args: string[]): string => execFileSync('git', ['-C', root, ...args], {
+    encoding: 'utf8', env: environment, timeout: 15_000, stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+  const sha = git('rev-parse', '--verify', 'HEAD^{commit}');
+  if (!/^[0-9a-f]{40}$/u.test(sha) || path.basename(root) !== sha
+    || realpathSync(git('rev-parse', '--show-toplevel')) !== root) {
+    fail('Runtime release directory must match its full Git SHA');
+  }
+  if (git('status', '--porcelain=v1', '--untracked-files=all').length > 0) fail('Runtime release must be clean');
+  for (const relative of [
+    'apps/api/dist/main.js', 'apps/api/dist/content-worker-main.js',
+    'scripts/synthetic-stack/identity-provider.ts', 'scripts/synthetic-stack/password-identity-server.ts',
+  ]) {
+    const entry = path.join(root, relative);
+    if (!existsSync(entry) || !lstatSync(entry).isFile() || realpathSync(entry) !== entry) {
+      fail(`Runtime release entry must be a regular file inside the release: ${relative}`);
+    }
+  }
+  const pending = [path.join(root, 'apps/api')];
+  const visited = new Set<string>();
+  for (const directory of pending) {
+    if (visited.has(directory)) continue;
+    visited.add(directory);
+    const metadata: unknown = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
+    if (metadata === null || typeof metadata !== 'object') fail('Runtime package metadata is invalid');
+    if (!('dependencies' in metadata)) continue;
+    const dependencies = metadata.dependencies;
+    if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) fail('Runtime dependencies are invalid');
+    const require = createRequire(path.join(directory, 'package.json'));
+    for (const name of Object.keys(dependencies)) {
+      if (!name.startsWith('@customer-agent/')) continue;
+      if (!/^@customer-agent\/[a-z0-9][a-z0-9-]*$/u.test(name)) fail('Runtime workspace dependency name is invalid');
+      const target = path.join(root, 'packages', name.slice('@customer-agent/'.length));
+      const searchRoot = require.resolve.paths(name)?.find((entry) => existsSync(path.join(entry, name)));
+      if (!searchRoot || !existsSync(target) || realpathSync(target) !== target
+        || realpathSync(path.join(searchRoot, name)) !== target) {
+        fail(`Runtime workspace dependency escapes its release: ${name}`);
+      }
+      pending.push(target);
+    }
+  }
+  log(`runtime release: ${root} (Git ${sha})`);
+  return root;
 }
 
 async function resolvePort(port: number, name: 'api' | 'identity'): Promise<number> {
@@ -223,17 +292,26 @@ async function startProcesses(
   profile: StackProfile,
   content: ContentStackConfig | undefined,
   mode: ProcessLaunchMode,
+  runtimeRoot: string,
 ): Promise<StartProcessesResult> {
   const messages: string[] = [];
   const live = new Set(liveProcessNames());
   const spawned: string[] = [];
   const children: SpawnedProcess[] = [];
+  if (runtimeRoot !== repositoryRoot) {
+    for (const name of live) {
+      const command = readProcess(name)?.command;
+      if (!command?.startsWith(`${process.execPath} ${runtimeRoot}${path.sep}`)) {
+        fail(`Existing ${name} process belongs to another runtime release; stop it before changing releases`);
+      }
+    }
+  }
   if (mode === 'detached' && foregroundSupervisorLive()) {
     messages.push('foreground supervisor already running; leaving child ownership to systemd');
     for (const name of ['identity', 'api', 'worker']) {
       messages.push(live.has(name) ? `${name} already running` : `${name} restart delegated to systemd`);
     }
-    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children) });
+    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children), ready: await waitReady(profile.apiOrigin) });
   }
   if (mode === 'foreground' && live.size > 0) {
     fail(`foreground start cannot adopt existing processes: ${[...live].sort().join(', ')}`);
@@ -252,14 +330,14 @@ async function startProcesses(
     // api.env fails the start outright instead of leaving identity behind.
     const apiConfig = loadApiStackConfig();
     const environment = stackApiEnvironment({ profile, content, feishu, apiConfig });
-    const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
+    const identityEntry = path.join(runtimeRoot, 'scripts/synthetic-stack', feishu ? 'password-identity-server.ts' : 'identity-provider.ts');
     if (!live.has('identity')) {
       // Both identity servers resolve the accounts file from STACK_ROOT, which defaults
       // to ~/.customer-agent-synthetic-stack. Passing it explicitly matters when the
       // operator set CUSTOMER_AGENT_STACK_ROOT: the child would otherwise look in the
       // default home path (and, with no fallback password, refuse to start).
       const processInfo = spawnLogged('identity', process.execPath, [identityEntry, String(profile.identityPort)],
-        identityProcessEnvironment(process.env, STACK_ROOT), mode);
+        identityProcessEnvironment(process.env, STACK_ROOT), mode, runtimeRoot);
       if (mode === 'foreground') children.push(processInfo);
       spawned.push('identity');
       messages.push(`identity pid ${String(processInfo.pid)}${feishu ? ' (password)' : ''}`);
@@ -273,7 +351,7 @@ async function startProcesses(
     if (apiConfig) messages.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
 
     if (!live.has('api')) {
-      const processInfo = spawnLogged('api', process.execPath, [API_ENTRY], environment, mode);
+      const processInfo = spawnLogged('api', process.execPath, [path.join(runtimeRoot, 'apps/api/dist/main.js')], environment, mode, runtimeRoot);
       if (mode === 'foreground') children.push(processInfo);
       spawned.push('api');
       messages.push(`api pid ${String(processInfo.pid)}`);
@@ -283,14 +361,15 @@ async function startProcesses(
     await waitForHttp(`${profile.apiOrigin}/health`, { timeoutMs: 30_000 });
 
     if (!live.has('worker')) {
-      const processInfo = spawnLogged('worker', process.execPath, [WORKER_ENTRY], environment, mode);
+      const processInfo = spawnLogged('worker', process.execPath, [path.join(runtimeRoot, 'apps/api/dist/content-worker-main.js')], environment, mode, runtimeRoot);
       if (mode === 'foreground') children.push(processInfo);
       spawned.push('worker');
       messages.push(`worker pid ${String(processInfo.pid)}`);
     } else {
       messages.push('worker already running');
     }
-    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children) });
+    const ready = await waitReady(profile.apiOrigin);
+    return Object.freeze({ messages: Object.freeze(messages), children: Object.freeze(children), ready });
   } catch (error) {
     await cleanup();
     throw error;
@@ -370,8 +449,8 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
   return Object.freeze(hits);
 }
 
-async function runStart(foreground: boolean): Promise<void> {
-  requireDist();
+async function runStart(foreground: boolean, databaseMode: DatabaseStartMode, runtimeRoot: string): Promise<void> {
+  requireDist(runtimeRoot);
   // Read once: `resolveProfile` needs the database name and `stackApiEnvironment`
   // needs the content constants, and two reads could disagree if the file
   // changed between them - the profile would end up naming one catalog while the
@@ -381,41 +460,70 @@ async function runStart(foreground: boolean): Promise<void> {
   // prepared database the "already published" probe finds nothing, so the seed
   // would publish synthetic scripts as the live catalog. Everything that asserts
   // that catalog - the search self-check and the summary lines - goes with it.
-  const noSeed = !shouldSeedSyntheticCatalog(process.argv, content?.databaseName);
-  const skipReason = process.argv.includes('--no-seed') ? '--no-seed' : 'content.env names its own database';
-  const profile = await resolveProfile(content, { reuse: true });
-  writeProfile(profile);
+  const noSeed = databaseMode === 'existing-database' || !shouldSeedSyntheticCatalog(process.argv, content?.databaseName);
+  const skipReason = databaseMode === 'existing-database' ? '--existing-database'
+    : process.argv.includes('--no-seed') ? '--no-seed' : 'content.env names its own database';
+  const existingProfile = readProfile();
+  if (databaseMode === 'existing-database' && !existingProfile) fail(`no profile at ${PROFILE_FILE}; existing-database requires a provisioned stack`);
+  const profile = existingProfile ?? await resolveProfile(content, { reuse: true });
+  validateStackDatabaseConfig({ stackRoot: STACK_ROOT, content, profile });
+  if (databaseMode === 'prepare') writeProfile(profile);
   log(`stack root: ${profile.stackRoot}`);
   log(`api origin: ${profile.apiOrigin}  identity origin: ${profile.identityOrigin}`);
-  if (profile.environment !== 'production') {
+  if (databaseMode === 'prepare' && profile.environment !== 'production') {
     const packagedProfilePath = writeDesktopPackagedProfile(profile);
     log(`packaged desktop profile: ${packagedProfilePath}`);
   }
 
   const cluster = new SyntheticCluster();
+  if (databaseMode === 'existing-database') {
+    const marker = path.join(cluster.data, 'SYNTHETIC-STACK-MARKER');
+    if (cluster.state() === 'absent' || !existsSync(marker)
+      || !lstatSync(marker).isFile() || lstatSync(marker).isSymbolicLink()
+      || !readFileSync(marker, 'utf8').startsWith('This PostgreSQL 15 cluster belongs to scripts/synthetic-stack.\n')) {
+      fail('existing-database requires an existing stack-owned PostgreSQL cluster');
+    }
+  }
   cluster.ensureRunning();
-  writeClusterMarker();
+  if (databaseMode === 'prepare') writeClusterMarker();
   log(`postgres: running (version ${clusterVersionText()}, socket ${cluster.socket})`);
 
-  const admin = cluster.connect('postgres');
-  await admin.connect();
-  try { log(await ensureDatabase(cluster, profile.databaseName)); } finally { await admin.end(); }
+  if (databaseMode === 'prepare') {
+    const admin = cluster.connect('postgres');
+    await admin.connect();
+    try { log(await ensureDatabase(cluster, profile.databaseName)); } finally { await admin.end(); }
+  }
 
   const database = cluster.connect(profile.databaseName);
   await database.connect();
   try {
-    for (const step of await bootstrapDatabase(database, { syntheticReferenceData: !noSeed })) log(step);
-    const feishu = loadFeishuStackConfig();
-    if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
-    if (profile.databaseName !== 'customer_agent_formal') log(await bindMenokinTestIdentities(database, profile.databaseName));
+    if (databaseMode === 'existing-database') {
+      const report = await verifyAppliedDatabaseMigrations(database);
+      const manifest: unknown = JSON.parse(readFileSync(
+        path.join(runtimeRoot, 'packages/database/migrations/manifest.generated.json'), 'utf8'));
+      if (manifest === null || typeof manifest !== 'object' || !('migrations' in manifest)
+        || !Array.isArray(manifest.migrations) || manifest.migrations.length < 1
+        || manifest.migrations.some((row: unknown, index: number) => row === null || typeof row !== 'object'
+          || !('position' in row) || row.position !== index + 1)) {
+        fail('Runtime release migration manifest is invalid');
+      }
+      if (report.migrationCount < manifest.migrations.length) {
+        fail(`Runtime release requires ${String(manifest.migrations.length)} migrations; applied database has ${String(report.migrationCount)}`);
+      }
+      log(`applied database prefix: ${String(report.migrationCount)} (${report.status})`);
+    } else {
+      for (const step of await bootstrapDatabase(database, { syntheticReferenceData: !noSeed })) log(step);
+      const feishu = loadFeishuStackConfig();
+      if (feishu) log(await seedFeishuBindings(database, feishu.bindings));
+      if (profile.databaseName !== 'customer_agent_formal') log(await bindMenokinTestIdentities(database, profile.databaseName));
+    }
   } finally { await database.end(); }
 
-  log(await ensureLoginRoles(cluster, profile.databaseName));
+  if (databaseMode === 'prepare') log(await ensureLoginRoles(cluster, profile.databaseName));
 
-  const processes = await startProcesses(profile, content, foreground ? 'foreground' : 'detached');
+  const processes = await startProcesses(profile, content, foreground ? 'foreground' : 'detached', runtimeRoot);
   for (const step of processes.messages) log(step);
-  const ready = await waitReady(profile.apiOrigin);
-  log(`ready: ${JSON.stringify(ready.checks)}`);
+  log(`ready: ${JSON.stringify(processes.ready.checks)}`);
 
   if (noSeed) {
     log(`seed: skipped (${skipReason}); this stack serves a real catalog`);
@@ -442,15 +550,15 @@ async function runStart(foreground: boolean): Promise<void> {
   }
 }
 
-async function commandStart(): Promise<void> {
+async function commandStart(databaseMode: DatabaseStartMode, runtimeRoot: string): Promise<void> {
   const foreground = process.argv.includes('--foreground');
   if (!foreground) {
-    await runStart(false);
+    await runStart(false, databaseMode, runtimeRoot);
     return;
   }
   claimForegroundSupervisor();
   try {
-    await runStart(true);
+    await runStart(true, databaseMode, runtimeRoot);
   } finally {
     forgetProcess(FOREGROUND_PROCESS_NAME);
   }
@@ -574,10 +682,32 @@ async function commandAnomaly(action: string | undefined): Promise<void> {
 
 async function main(): Promise<void> {
   const command = process.argv[2];
+  const existingDatabase = process.argv.includes('--existing-database');
+  if (existingDatabase && command !== 'start') fail('--existing-database is only supported by start');
+  let runtimeRelease: string | undefined;
+  if (command === 'start' || command === 'restart') {
+    const allowed = new Set(['--no-seed', '--foreground', '--existing-database']);
+    const options = process.argv.slice(3)[Symbol.iterator]();
+    for (const option of options) {
+      if (option === '--runtime-release') {
+        const value = options.next().value;
+        if (!existingDatabase || runtimeRelease !== undefined || !value || value.startsWith('--')) {
+          fail('--runtime-release requires --existing-database and exactly one release path');
+        }
+        runtimeRelease = value;
+        continue;
+      }
+      if (!allowed.has(option)) fail(`Unknown start option: ${option}`);
+    }
+  } else if (process.argv.includes('--runtime-release')) {
+    fail('--runtime-release is only supported by start --existing-database');
+  }
+  const runtimeRoot = resolveRuntimeRoot(runtimeRelease);
+  const databaseMode = existingDatabase ? 'existing-database' : 'prepare';
   switch (command) {
-    case 'start': await commandStart(); break;
+    case 'start': await commandStart(databaseMode, runtimeRoot); break;
     case 'stop': await commandStop(); break;
-    case 'restart': await commandStop(); await commandStart(); break;
+    case 'restart': await commandStop(); await commandStart(databaseMode, runtimeRoot); break;
     case 'status': await commandStatus(); break;
     case 'destroy': await commandDestroy(); break;
     case 'desktop': commandDesktop(); break;
@@ -585,7 +715,7 @@ async function main(): Promise<void> {
     case 'migrate': await commandMigrate(); break;
     case 'anomaly': await commandAnomaly(process.argv[3]); break;
     default:
-      fail('Usage: node scripts/synthetic-stack/stack.ts <start [--no-seed] [--foreground]|stop|restart|status|destroy|desktop|packaged-profile|migrate|anomaly>');
+      fail('Usage: node scripts/synthetic-stack/stack.ts <start [--no-seed] [--foreground] [--existing-database [--runtime-release <absolute-release>]]|stop|restart|status|destroy|desktop|packaged-profile|migrate|anomaly>');
   }
 }
 

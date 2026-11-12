@@ -62,6 +62,16 @@ CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/candidate-restore-evidence
 
 结果写入 `deploymentChecks`，绑定候选与回退 SHA、当前内容指针、来源门禁和范围指纹，以及每个迁移前缀的结果。候选 API 及六个 workspace 运行依赖会从已提交源码独立重建，完整产物摘要随证据保存。Node 的实际 workspace 依赖解析必须指向对应的已验证产物。编译配置和依赖锁需要与执行工具对应。`unified` 的投影缺失、intake 发布门禁失败和回退版本不兼容都会使预检失败，数据库恢复及 verifier 的独立结果仍保留。此检查覆盖只读初始化，业务查询、登录及复制继续使用对应验收入口。
 
+## v3 配置与独立控制器预检
+
+恢复预演同时提供 `--controller-release <immutable-controller-release>`、`--candidate-stack-root <stack-root>`，完整配置切换还提供 `--candidate-api-env <private-candidate-env>`。显式候选配置由单次私有文件读取生成环境与摘要，预演与发布消费同一字节绑定。源配置另绑定回退应用及原文件全文摘要。
+
+控制器通过 `verifyAppliedDatabaseMigrations` 在一个 repeatable-read 只读事务中验证实际完整账本、出处与对应物理 schema。实际计数可以是其目录中的已知非空前缀。原完整目录 verifier 继续要求全部迁移完成。恢复预演从备份实际前缀开始，每提交一个新增段就重新证明物理前缀，回退应用须已具备自身完整迁移目录所需的 schema，再以其实际 `startApi` 在强制只读的临时端口执行 health、ready 与协议能力检查。候选仍执行完整迁移及所选查询模式初始化。
+
+v3 的 `deploymentChecks` 固定源与目标迁移数、两应用构建、原及候选配置、控制器启动绑定、内容指纹和逐前缀结果。独立应用的 workspace 依赖按实际 package 图确定，第三方依赖、锁定完整性和重建产物继续逐项校验。历史 release 可以缺少其自身未声明的后来 workspace 包。
+
+只读就绪与解码检查具有各自范围。正常 FAQ/SOP 发布、查询、复制许可、媒体、撤权、资源停用以及尚未完成任务的 worker 接管须由对应实际 HTTP/PG 回归验收。旧 `3519d486` 在新 SOP 发布后的混合消费存在实测反例，health/ready 成功不能关闭该缺口。
+
 ## 迁移旧定时任务
 
 脚本与 `backup-set.mjs`、编译后的数据库模块必须来自同一候选。新版 service 从 `current/scripts/ops/` 运行；仅复制 shell 到旧 `/srv/customer-agent/scripts/` 会缺少模块。核对 Node.js 24、PG15 路径、EnvironmentFile 和 `ReadWritePaths`，再按已批准发布流程安装单元并执行一次完整演练。

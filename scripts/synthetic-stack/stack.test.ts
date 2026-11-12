@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import os, { tmpdir } from 'node:os';
@@ -212,7 +213,7 @@ describe('stack profile', () => {
     const desktop = stack.slice(stack.indexOf('function commandDesktop()'));
     assert.ok(desktop.includes('writeDesktopPackagedProfile(profile)'), 'desktop handoff must refresh the packaged profile');
     assert.ok(stack.includes("case 'packaged-profile': commandPackagedProfile()"), 'packaged-profile must print the userData file path');
-    assert.match(stack, /<start(?: \[--no-seed\] \[--foreground\])?\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|migrate\|anomaly>/u);
+    assert.match(stack, /<start \[--no-seed\] \[--foreground\] \[--existing-database \[--runtime-release <absolute-release>\]\]\|stop\|restart\|status\|destroy\|desktop\|packaged-profile\|migrate\|anomaly>/u);
     assert.ok(written.includes('desktopPackagedProfilePath(locator)'), 'packaged profile path must be resolved at write time');
   });
 
@@ -1381,6 +1382,43 @@ describe('stack production wiring', () => {
 });
 
 describe('stack start modes', () => {
+  it('rejects invalid existing-database and runtime-release combinations before changing the stack', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'stack-invalid-start-'));
+    try {
+      for (const args of [
+        ['restart', '--existing-database'],
+        ['start', '--runtime-release', '/absent'],
+        ['stop', '--runtime-release', '/absent'],
+        ['start', '--existing-database', '--runtime-release'],
+        ['start', '--existing-database', '--runtime-release', '--foreground'],
+        ['start', '--existing-database', '--runtime-release', '/absent', '--runtime-release', '/other'],
+        ['start', '--existing-database', '--runtime-release', 'relative'],
+        ['start', '--existing-database', '--unknown'],
+      ]) {
+        const result = spawnSync(process.execPath, [new URL('./stack.ts', import.meta.url).pathname, ...args], {
+          env: { ...process.env, CUSTOMER_AGENT_STACK_ROOT: root }, encoding: 'utf8', timeout: 15_000,
+        });
+        assert.equal(result.status, 1, `${args.join(' ')}\n${result.stderr}`);
+        assert.match(result.stderr, /\[stack\] FAILED/u);
+        assert.equal(existsSync(path.join(root, 'profile.json')), false);
+        assert.equal(existsSync(path.join(root, 'data')), false);
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('refuses a missing existing profile through the normal CLI', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'stack-missing-profile-'));
+    try {
+      const result = spawnSync(process.execPath, [new URL('./stack.ts', import.meta.url).pathname, 'start', '--existing-database'], {
+        env: { ...process.env, CUSTOMER_AGENT_STACK_ROOT: root }, encoding: 'utf8', timeout: 15_000,
+      });
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, /existing-database requires a provisioned stack/u);
+      assert.equal(existsSync(path.join(root, 'profile.json')), false);
+      assert.equal(existsSync(path.join(root, 'data')), false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('can start without importing the synthetic catalog', () => {
     // Serving a real catalog must not import the demo CSV: on a freshly prepared
     // database the "already published" probe finds nothing, so the seed would

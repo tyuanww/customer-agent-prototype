@@ -93,6 +93,7 @@ async function verifyBuildIdentityInBackup(root, baseEnvironment) {
   cpSync(path.join(repositoryRoot, 'apps/desktop/scripts/write-build-identity.mjs'),
     path.join(desktopScripts, 'write-build-identity.mjs'));
   cpSync(path.join(testDirectory, 'backup-set.mjs'), path.join(backupScripts, 'backup-set.mjs'));
+  cpSync(path.join(testDirectory, 'release-proof.mjs'), path.join(backupScripts, 'release-proof.mjs'));
   writeFileSync(path.join(release, 'VERSION'), '1.2.3\n');
   writeFileSync(path.join(release, '.gitignore'), '/apps/desktop/build/\n/node_modules\n');
   writeFileSync(path.join(release, 'source.txt'), 'original\n');

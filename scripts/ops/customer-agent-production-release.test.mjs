@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, chownSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -8,11 +10,17 @@ import {
   assertApplyPrivilege,
   assertMigrationCompletion,
   assertQueryProfileBinding,
+  backupApiVersion,
   parseOptions,
   ProductionReleaseError,
   readinessMatches,
+  readApiVersionBackup,
+  restoreApiVersion,
+  installCandidateApiEnvironment,
   runProductionRelease,
 } from './customer-agent-production-release.mjs';
+
+import { createReleaseProof, readServiceStartup, ROLLBACK_RUNTIME_SCOPE, ROLLBACK_PROTOCOL_CAPABILITIES } from './release-proof.mjs';
 
 const OLD = 'a'.repeat(40);
 const NEXT = 'b'.repeat(40);
@@ -871,4 +879,365 @@ test('legacy readiness accepts its missing mode header and rejects an explicit c
   assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', null, true), true);
   assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', 'intake-compat', true), false);
   assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', null), false);
+});
+
+
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+
+function recoveryFixture(t, { status = 'rolling_back', count = 84, snapshot = true } = {}) {
+  const base = fixture();
+  t.after(() => rmSync(base.root, { recursive: true, force: true }));
+  const manifest = Array.from({ length: 88 }, (_, i) => migration(i + 1));
+  const previous = { ...base.current, manifest: manifest.slice(0, 81), runtimeBuildSha256: '1'.repeat(64) };
+  const next = { ...base.next, manifest, runtimeBuildSha256: '2'.repeat(64) };
+  const stackRoot = path.join(base.root, 'stack');
+  mkdirSync(stackRoot);
+  const envFile = path.join(stackRoot, 'api.env');
+  const candidateFile = path.join(base.root, 'candidate.env');
+  const backupFile = path.join(base.root, 'original.env');
+  const otherFile = path.join(base.root, 'supervisor.env');
+  const originalEnv = Buffer.from(`# original\r\nCUSTOMER_AGENT_BUILD_VERSION=${previous.version}\r\nCUSTOMER_AGENT_API_HOST=127.0.0.1\r\n`);
+  const candidateEnv = Buffer.from(`CUSTOMER_AGENT_BUILD_VERSION=${next.version}\nCUSTOMER_AGENT_API_HOST=0.0.0.0\n`);
+  for (const [file, bytes] of [[envFile, originalEnv], [candidateFile, candidateEnv], [backupFile, originalEnv], [otherFile, 'PRIVATE=synthetic\n']]) {
+    writeFileSync(file, bytes, { mode: 0o600 });
+  }
+  const expected = { controllerRoot: path.join(base.root, 'releases', 'c'.repeat(40)),
+    controllerGitSha: 'c'.repeat(40), controllerBuildSha256: '3'.repeat(64),
+    runtimeRelease: path.join(base.root, 'current'), stackRoot, unit: 'synthetic.service' };
+  const argv = ['/usr/bin/node', path.join(expected.controllerRoot, 'scripts/synthetic-stack/stack.ts'),
+    'start', '--foreground', '--existing-database', '--runtime-release', expected.runtimeRelease];
+  const properties = { ExecStart: `{ path=${argv[0]} ; argv[]=${argv.join(' ')} ; ignore_errors=no ; pid=123 ; code=(null) ; status=0/0 }`,
+    Environment: `CUSTOMER_AGENT_STACK_ROOT=${stackRoot}`, EnvironmentFiles: `${envFile} (ignore_errors=no) ${otherFile} (ignore_errors=no)`,
+    Type: 'simple', RemainAfterExit: 'no', Restart: 'always', MainPID: '123', ActiveState: 'active' };
+  const proc = new Map([
+    ['/proc/123/cmdline', Buffer.from(argv.join('\0') + '\0')],
+    ['/proc/123/environ', Buffer.from(properties.Environment + '\0')],
+  ]);
+  const execute = () => Object.entries(properties).map(([key, value]) => `${key}=${value}\n`).join('');
+  const read = file => file.startsWith('/proc/') ? proc.get(file) : readFileSync(file);
+  const startup = declarationOnly => readServiceStartup(expected, execute, read, { declarationOnly });
+  const controller = startup(false);
+  const queryProfile = { mode: 'intake-compat', configurationSha256: '4'.repeat(64), apiEnvSha256: hash(candidateEnv) };
+  const rollbackProfile = { mode: 'unified', configurationSha256: '5'.repeat(64), apiEnvSha256: hash(originalEnv) };
+  const proof = createReleaseProof({ sourceMigrationCount: 81, targetMigrationCount: 88, candidate: next, rollback: previous,
+    queryProfile, rollbackQueryProfile: rollbackProfile, candidateApiEnvSha256: hash(candidateEnv), controller,
+    contentFingerprint: 'f'.repeat(64),
+    runtime: { status: 'PASS', code: null, queryMode: queryProfile.mode, configurationSha256: queryProfile.configurationSha256,
+      scope: 'candidate-intake-catalog-readonly-gates' },
+    candidateDatabase: { status: 'PASS', code: null, migrationCount: 88 },
+    rollbackChecks: Array.from({ length: 8 }, (_, i) => ({ migrationCount: 81 + i, status: 'PASS', code: null,
+      database: { migrationCount: 81 + i, status: 'PASS', code: null, capability: 'applied-prefix', readerGitSha: expected.controllerGitSha },
+      runtime: { status: 'PASS', code: null, scope: ROLLBACK_RUNTIME_SCOPE, migrationCount: 81 + i,
+        queryMode: rollbackProfile.mode, protocolCapabilities: { ...ROLLBACK_PROTOCOL_CAPABILITIES },
+        applicationGitSha: previous.sha, runtimeBuildSha256: previous.runtimeBuildSha256, version: previous.version,
+        configurationSha256: rollbackProfile.configurationSha256, apiEnvSha256: rollbackProfile.apiEnvSha256 } })),
+  });
+  const state = { count, current: next, journal: status === null ? null : {
+    schema: 'customer-agent-production-release-state/v1', status,
+    candidateSha: next.sha, candidateVersion: next.version, previousSha: previous.sha, previousVersion: previous.version,
+    previousTargetText: previous.root, backupId: 'backup-001', pointerSwitched: true, serviceStageReached: true,
+    apiEnvBackup: { path: backupFile, sha256: hash(originalEnv), version: previous.version }, releaseProof: proof,
+    ...(snapshot ? { candidateRelease: next } : {}),
+  }, events: [], accepted: ['existing-grant', 'accepted-data'] };
+  if (status === null) state.current = previous;
+  else writeFileSync(envFile, candidateEnv);
+  const deps = { ...base.dependencies,
+    readState: async () => { state.events.push('journal'); return state.journal; },
+    writeState: async value => { state.journal = value; },
+    readCurrentIdentity: async () => { state.events.push('pointer-identity'); return { sha: state.current.sha, root: state.current.root }; },
+    readCurrent: async () => { state.events.push('current-executable'); return state.current; },
+    readNext: async () => { state.events.push('candidate-executable'); return next; },
+    readCandidateMetadata: async () => { state.events.push('candidate-metadata'); return next; },
+    readHistoricalRelease: async () => previous,
+    readProfile: async () => ({ root: stackRoot }),
+    readServiceStartupDeclaration: async () => { state.events.push('declaration'); return startup(true); },
+    readServiceStartup: async () => { state.events.push('running'); return startup(false); },
+    readEvidence: async () => { state.events.push('preflight'); return { backupId: 'backup-001', deploymentChecks: proof }; },
+    readQueryProfile: async () => { readFileSync(candidateFile); return queryProfile; },
+    readRollbackQueryProfile: async (_profile, _previous, reference) => {
+      assert.deepEqual(readFileSync(reference?.path ?? envFile), originalEnv);
+      return rollbackProfile;
+    },
+    readCandidateApiEnvDigest: async () => hash(readFileSync(candidateFile)),
+    readApiVersion: async () => ({ version: readFileSync(envFile, 'utf8').match(/CUSTOMER_AGENT_BUILD_VERSION=(.*)/u)[1].trim() }),
+    readApiVersionBackup: async reference => readApiVersionBackup(stackRoot, reference),
+    backupApiVersion: async () => ({ backup: backupFile, sha256: hash(originalEnv), version: previous.version }),
+    installCandidateApiEnv: async (digest, version) => installCandidateApiEnvironment(stackRoot, candidateFile, digest, version),
+    verifyInstalledApiEnv: async () => {
+      if (!readFileSync(envFile).equals(candidateEnv)) throw new ProductionReleaseError('CANDIDATE_API_ENV_CHANGED', 'installed environment differs');
+    },
+    readInstalledQueryProfile: async () => queryProfile,
+    inspectDatabase: async () => { state.events.push(`prefix-${state.count}`); return manifest.slice(0, state.count).map(row => row.id); },
+    verifyRollbackDatabase: async () => { state.events.push('old-database-verified'); },
+    applyDatabase: async () => {
+      const start = state.count;
+      state.count = 88;
+      state.events.push('migrate');
+      return { appliedIds: manifest.slice(start).map(row => row.id), finalIds: manifest.map(row => row.id), verifierStatus: 'PASS' };
+    },
+    switchCurrent: async () => { state.current = next; state.events.push('switch'); },
+    restoreCurrent: async () => { state.current = previous; state.events.push('restore-pointer'); },
+    restoreApiVersion: async backup => { restoreApiVersion(backup); state.events.push('restore-env'); },
+    restartService: async () => {
+      state.events.push('restart');
+      Object.assign(properties, { ActiveState: 'active', MainPID: '123' });
+    },
+    waitForReady: async (_profile, version) => {
+      assert.equal(state.current.version, version);
+      state.events.push(`ready-${version}`);
+    },
+  };
+  return { state, deps, next, previous, proof, properties, proc, originalEnv, candidateEnv, envFile, candidateFile, backupFile, otherFile,
+    options: { ...base.options, stackRoot, controllerRelease: expected.controllerRoot, candidateApiEnv: candidateFile } };
+}
+
+for (const count of [82, 83, 84, 85, 86, 87]) {
+  test(`recovery entrance restores prefix${count} with bad candidate, missing env/preflight and failed MainPID0`, async t => {
+    const f = recoveryFixture(t, { count });
+    Object.assign(f.properties, { ActiveState: 'failed', MainPID: '0' });
+    rmSync(f.candidateFile);
+    rmSync(f.envFile);
+    f.deps.readNext = async () => { throw new Error('candidate dist damaged'); };
+    f.deps.readCurrent = async () => { throw new Error('candidate source damaged'); };
+    f.deps.readEvidence = async () => { throw new Error('preflight deleted'); };
+    f.deps.readQueryProfile = async () => { throw new Error('candidate config deleted'); };
+    const result = await runProductionRelease(f.options, f.deps);
+    assert.equal(result.status, 'rolled-back');
+    assert.equal(f.state.current, f.previous);
+    assert.equal(f.state.count, count);
+    assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+    assert.deepEqual(f.state.accepted, ['existing-grant', 'accepted-data']);
+    assert.equal(f.state.journal.status, 'rolled_back');
+    assert.deepEqual(f.state.events.slice(-4), ['restore-env', 'restart', `ready-${f.previous.version}`, 'running']);
+    assert.equal(f.state.events[0], 'journal');
+    assert.equal(f.state.events.includes('candidate-executable'), false);
+    assert.equal(f.state.events.includes('preflight'), false);
+  });
+}
+
+for (const [label, failAt] of [
+  ['broken candidate build', 'readNext'], ['missing candidate env', 'readQueryProfile'],
+  ['deleted preflight', 'readEvidence'], ['failed candidate service', 'readServiceStartup'],
+]) {
+  test(`deploying retry recovers ${label} and preserves the first error`, async t => {
+    const f = recoveryFixture(t, { status: 'deploying' });
+    const primary = new Error(label);
+    const original = f.deps[failAt];
+    let attempts = 0;
+    f.deps[failAt] = async (...args) => {
+      if (attempts++ === 0) throw primary;
+      return original(...args);
+    };
+    await assert.rejects(() => runProductionRelease(f.options, f.deps), error => error === primary);
+    assert.equal(f.state.current, f.previous);
+    assert.equal(f.state.journal.status, 'rolled_back');
+    assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+    assert.equal(f.state.count, 84);
+  });
+}
+
+for (const [label, mutate, code] of [
+  ['other pointer', f => { f.state.current = { sha: 'e'.repeat(40), root: '/third-party' }; }, 'CURRENT_INVALID'],
+  ['wrong options SHA', f => { f.options.sha = 'e'.repeat(40); }, 'DEPLOYMENT_STATE_CONFLICT'],
+  ['bad controller', f => { f.deps.readServiceStartupDeclaration = async () => { throw Object.assign(new Error('controller damaged'), { code: 'CANDIDATE_RUNTIME_BUILD_MISMATCH' }); }; }, 'CANDIDATE_RUNTIME_BUILD_MISMATCH'],
+  ['other controller source', f => { f.properties.ExecStart = f.properties.ExecStart.replace('/scripts/synthetic-stack/stack.ts', '/scripts/wrong.ts'); }, 'SERVICE_STARTUP_INVALID'],
+  ['other controller root', f => { f.deps.readServiceStartupDeclaration = async () => ({ ...f.proof.controller, stackRoot: '/other' }); }, 'SERVICE_STARTUP_CHANGED'],
+  ['other environment file', f => { writeFileSync(f.otherFile, 'PRIVATE=changed\n'); }, 'SERVICE_STARTUP_CHANGED'],
+  ['mismatched old artifact', f => { f.deps.readHistoricalRelease = async () => ({ ...f.previous, runtimeBuildSha256: '9'.repeat(64) }); }, 'RELEASE_RUNTIME_BUILD_CHANGED'],
+  ['unknown prefix', f => { f.deps.inspectDatabase = async () => ['unknown']; }, 'DATABASE_PREFIX_MISMATCH'],
+  ['drifting prefix', f => { f.deps.inspectDatabase = async () => f.next.manifest.slice(0, 84).map((row, i) => i === 83 ? 'drift' : row.id); }, 'DATABASE_PREFIX_MISMATCH'],
+  ['unknown journal schema', f => { f.state.journal.releaseProof = { ...f.proof, schema: 'customer-agent-release-preflight/unknown' }; }, 'DEPLOYMENT_STATE_INVALID'],
+  ['damaged original backup', f => { writeFileSync(f.backupFile, 'wrong'); }, 'API_ENV_BACKUP_INVALID'],
+]) {
+  test(`recovery refuses ${label} before restoring pointer or environment`, async t => {
+    const f = recoveryFixture(t);
+    mutate(f);
+    await assert.rejects(() => runProductionRelease(f.options, f.deps), { code });
+    assert.equal(f.state.journal.status, 'rolling_back');
+    assert.equal(f.state.events.includes('restore-pointer'), false);
+    assert.equal(f.state.events.includes('restore-env'), false);
+    assert.equal(f.state.events.includes('restart'), false);
+  });
+}
+
+test('recovery success requires real startup argv and stack root after restart', async t => {
+  const f = recoveryFixture(t);
+  const primary = new Error('candidate build damaged');
+  f.state.journal.status = 'deploying';
+  f.deps.readNext = async () => { throw primary; };
+  const restart = f.deps.restartService;
+  f.deps.restartService = async () => {
+    await restart();
+    f.proc.set('/proc/123/environ', Buffer.from('CUSTOMER_AGENT_STACK_ROOT=/wrong\0'));
+  };
+  await assert.rejects(() => runProductionRelease(f.options, f.deps), error => {
+    assert.equal(error.code, 'ROLLBACK_FAILED');
+    assert.equal(error.cause, primary);
+    assert.equal(error.rollbackError.code, 'SERVICE_STARTUP_INVALID');
+    return true;
+  });
+  assert.equal(f.state.journal.status, 'rolling_back');
+});
+
+test('normal entry installs managed environment without controller drift and rechecks completion', async t => {
+  const f = recoveryFixture(t, { status: null, count: 81 });
+  assert.equal((await runProductionRelease(f.options, f.deps)).status, 'applied');
+  assert.deepEqual(readFileSync(f.envFile), f.candidateEnv);
+  assert.equal(f.state.count, 88);
+  assert.deepEqual(f.state.journal.candidateRelease, f.next);
+  f.state.events.length = 0;
+  assert.equal((await runProductionRelease(f.options, f.deps)).status, 'already-complete');
+  assert.equal(f.state.events.includes('migrate'), false);
+  writeFileSync(f.envFile, Buffer.from('CUSTOMER_AGENT_BUILD_VERSION=0.3.43\nCUSTOMER_AGENT_API_HOST=changed\n'));
+  await assert.rejects(() => runProductionRelease(f.options, f.deps), { code: 'CANDIDATE_API_ENV_CHANGED' });
+  assert.equal(f.state.journal.status, 'complete');
+});
+
+for (const snapshot of [false, true]) {
+  test(`healthy deploying resumes with historical candidate snapshot=${snapshot}`, async t => {
+    const f = recoveryFixture(t, { status: 'deploying', snapshot });
+    const result = await runProductionRelease(f.options, f.deps);
+    assert.equal(result.status, 'applied');
+    assert.equal(result.resuming, true);
+    assert.deepEqual(result.appliedMigrationIds, f.next.manifest.slice(84).map(row => row.id));
+    assert.equal(f.state.events.includes('candidate-metadata'), !snapshot);
+    assert.equal(f.state.events.includes('candidate-executable'), true);
+  });
+}
+
+test('missing managed env restores trusted bytes and backup drift or symlink still fail closed', async t => {
+  const f = recoveryFixture(t);
+  const reference = f.state.journal.apiEnvBackup;
+  rmSync(f.envFile);
+  const backup = readApiVersionBackup(f.options.stackRoot, reference);
+  restoreApiVersion(backup);
+  assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+  writeFileSync(f.envFile, 'corrupt current file');
+  restoreApiVersion(readApiVersionBackup(f.options.stackRoot, reference));
+  assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+  rmSync(f.envFile);
+  symlinkSync(f.backupFile, f.envFile);
+  assert.throws(() => readApiVersionBackup(f.options.stackRoot, reference), { code: 'API_ENV_INVALID' });
+  assert.equal(existsSync(f.backupFile), true);
+});
+
+test('root backup preserves the service owner and restores a missing env readable across UID', {
+  skip: process.platform !== 'linux' || process.getuid?.() !== 0,
+}, t => {
+  const account = process.env.CUSTOMER_AGENT_RELEASE_TEST_ACCOUNT ?? 'nobody';
+  const uid = Number(execFileSync('id', ['-u', account], { encoding: 'utf8' }).trim());
+  const gid = Number(execFileSync('id', ['-g', account], { encoding: 'utf8' }).trim());
+  assert.ok(uid > 0 && gid > 0);
+  const root = mkdtempSync(path.join(os.tmpdir(), 'release-env-owner-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  chmodSync(root, 0o755);
+  const stack = path.join(root, 'stack');
+  mkdirSync(stack, { mode: 0o755 });
+  const evidence = path.join(root, 'evidence');
+  const file = path.join(stack, 'api.env');
+  const original = Buffer.from('# synthetic private bytes\r\nCUSTOMER_AGENT_BUILD_VERSION=0.3.42\r\n');
+  writeFileSync(file, original, { mode: 0o600 });
+  chownSync(file, uid, gid);
+  const saved = backupApiVersion(stack, evidence);
+  const backupInfo = lstatSync(saved.backup);
+  assert.deepEqual([backupInfo.uid, backupInfo.gid, backupInfo.mode & 0o777], [uid, gid, 0o600]);
+  const directoryInfo = lstatSync(evidence);
+  assert.deepEqual([directoryInfo.uid, directoryInfo.mode & 0o777], [0, 0o700]);
+  assert.deepEqual(readFileSync(saved.backup), original);
+  const readAsService = target => execFileSync(process.execPath,
+    ['--input-type=module', '-e', 'import { readFileSync } from "node:fs"; process.stdout.write(readFileSync(process.argv[1]));', target],
+    { uid, gid, stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.throws(() => readAsService(saved.backup), error => /EACCES/u.test(error.stderr.toString()));
+  rmSync(file);
+  const reference = { path: saved.backup, sha256: saved.sha256, version: saved.version };
+  restoreApiVersion(readApiVersionBackup(stack, reference));
+  const restored = lstatSync(file);
+  assert.deepEqual([restored.uid, restored.gid, restored.mode & 0o777], [uid, gid, 0o600]);
+  assert.deepEqual(readAsService(file), original);
+  chownSync(saved.backup, 0, 0);
+  writeFileSync(file, 'damaged current env');
+  restoreApiVersion(readApiVersionBackup(stack, reference));
+  assert.deepEqual([lstatSync(file).uid, lstatSync(file).gid], [uid, gid]);
+  assert.deepEqual(readAsService(file), original);
+});
+
+
+test('completed legacy retry refuses unknown proof schemas', async t => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  await runProductionRelease(f.options, f.dependencies);
+  const evidence = await f.dependencies.readEvidence();
+  f.dependencies.readEvidence = async () => ({ ...evidence, deploymentChecks: {
+    ...evidence.deploymentChecks, schema: 'customer-agent-release-preflight/unknown',
+  } });
+  await assert.rejects(() => runProductionRelease(f.options, f.dependencies), { code: 'RELEASE_PREFLIGHT_REQUIRED' });
+  assert.equal(f.deploymentState.status, 'complete');
+});
+
+test('fresh release rejects source env bytes changed between preflight and backup', async t => {
+  const f = recoveryFixture(t, { status: null, count: 81 });
+  f.deps.backupApiVersion = async () => ({ backup: f.backupFile, sha256: hash('different bytes'), version: f.previous.version });
+  await assert.rejects(() => runProductionRelease(f.options, f.deps), { code: 'API_ENV_BACKUP_INVALID' });
+  assert.equal(f.state.journal, null);
+  assert.equal(f.state.events.includes('migrate'), false);
+  assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+});
+
+test('candidate env changes after admission fail its publisher byte binding while controller remains stable', async t => {
+  const f = recoveryFixture(t, { status: null, count: 81 });
+  const install = f.deps.installCandidateApiEnv;
+  f.deps.installCandidateApiEnv = async (...args) => {
+    writeFileSync(f.candidateFile, `CUSTOMER_AGENT_BUILD_VERSION=${f.next.version}\nCUSTOMER_AGENT_API_HOST=changed\n`);
+    await install(...args);
+  };
+  await assert.rejects(() => runProductionRelease(f.options, f.deps), { code: 'CANDIDATE_API_ENV_CHANGED' });
+  assert.equal(f.state.journal.status, 'rolled_back');
+  assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+  assert.equal(f.state.events.includes('running'), true);
+});
+
+for (const status of ['failed', 'inactive']) {
+  test(`deploying recovery tolerates actual ${status} MainPID0 declaration and requires running startup afterwards`, async t => {
+    const f = recoveryFixture(t, { status: 'deploying' });
+    Object.assign(f.properties, { ActiveState: status, MainPID: '0' });
+    await assert.rejects(() => runProductionRelease(f.options, f.deps), { code: 'SERVICE_STARTUP_INVALID' });
+    assert.equal(f.state.journal.status, 'rolled_back');
+    assert.equal(f.properties.ActiveState, 'active');
+    assert.equal(f.properties.MainPID, '123');
+    assert.deepEqual(f.state.events.slice(-4), ['restore-env', 'restart', `ready-${f.previous.version}`, 'running']);
+  });
+}
+
+test('older v3 journal uses metadata without executing a broken candidate build', async t => {
+  const f = recoveryFixture(t, { snapshot: false });
+  f.deps.readNext = async () => { throw new Error('candidate build must stay unused'); };
+  f.deps.readCurrent = async () => { throw new Error('candidate pointer executable must stay unused'); };
+  assert.equal((await runProductionRelease(f.options, f.deps)).status, 'rolled-back');
+  assert.equal(f.state.events.includes('candidate-metadata'), true);
+  assert.equal(f.state.events.includes('candidate-executable'), false);
+});
+
+for (const [pointerSwitched, currentIsCandidate] of [[false, true], [true, false]]) {
+  test(`recovery resolves actual pointer when intent=${pointerSwitched} candidate=${currentIsCandidate}`, async t => {
+    const f = recoveryFixture(t);
+    f.state.journal.pointerSwitched = pointerSwitched;
+    f.state.current = currentIsCandidate ? f.next : f.previous;
+    assert.equal((await runProductionRelease(f.options, f.deps)).status, 'rolled-back');
+    assert.equal(f.state.current, f.previous);
+    assert.deepEqual(readFileSync(f.envFile), f.originalEnv);
+  });
+}
+
+test('recovery does not claim completion after old readiness fails', async t => {
+  const f = recoveryFixture(t);
+  const failure = new Error('old application is not ready');
+  f.deps.waitForReady = async () => { throw failure; };
+  await assert.rejects(() => runProductionRelease(f.options, f.deps), error => {
+    assert.equal(error.code, 'ROLLBACK_FAILED');
+    assert.equal(error.cause, failure);
+    assert.equal(error.rollbackError, failure);
+    return true;
+  });
+  assert.equal(f.state.journal.status, 'rolling_back');
+  assert.equal(existsSync(f.backupFile), true);
 });

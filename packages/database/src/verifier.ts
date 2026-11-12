@@ -1432,3 +1432,34 @@ export function verifyMigrationPrefix(client: DatabaseQueryClient, migrationCoun
 export function verifyDatabaseMigrations(client: DatabaseClient): Promise<DatabaseVerificationReport> {
   return withExclusiveDatabaseClient(client, verifyMigrationCatalogue);
 }
+
+/**
+ * Prove the complete applied ledger is a nonempty, exact prefix known to this
+ * build, together with that prefix's physical schema and authority boundaries.
+ * The connected client must be idle. This operation owns one repeatable-read,
+ * read-only transaction. Report counts and compatibility describe the applied
+ * prefix, including when later migrations are pending in this build.
+ */
+export function verifyAppliedDatabaseMigrations(client: DatabaseClient): Promise<DatabaseVerificationReport> {
+  return withExclusiveDatabaseClient(client, async (lockedClient) => {
+    try {
+      await lockedClient.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const status = await inspectMigrationCatalogue(lockedClient, generatedMigrationCatalogue);
+      if (status.applied.length === 0) {
+        throw new DatabaseMigrationError('MIGRATION_VERIFY_FAILED', 'Applied migration proof requires a nonempty ledger');
+      }
+      const report = await verifyMigrationPrefix(lockedClient, status.applied.length);
+      await lockedClient.query('COMMIT');
+      return report;
+    } catch (error) {
+      try {
+        await lockedClient.query('ROLLBACK');
+      } catch (rollbackError) {
+        throw new DatabaseMigrationError('MIGRATION_ROLLBACK_FAILED',
+          'Applied migration verification failed and rollback could not be confirmed',
+          { cause: new AggregateError([error, rollbackError], 'verification and rollback both failed') });
+      }
+      throw error;
+    }
+  });
+}
