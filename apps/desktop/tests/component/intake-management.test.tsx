@@ -153,6 +153,7 @@ it('requires explicit human checks and blocks submitting an older saved judgment
     expect(submit).toBeDisabled();
     await f.user.type(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' }), '合成缺陷');
     await f.user.click(screen.getByRole('button', { name: '暂存本条判断' }));
+    await waitFor(() => expect(submit).toBeEnabled());
     await f.user.click(submit);
     expect(f.data.receipts.size).toBe(2); expect(f.data.samples[0].check).toMatchObject({ defect: true, reason: '合成缺陷' });
   } finally { f.main.dispose(); }
