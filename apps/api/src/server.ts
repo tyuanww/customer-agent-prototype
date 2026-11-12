@@ -43,32 +43,23 @@ import {
   createPostgresCurrentReleaseIdentityReader,
   createPostgresQueryReleaseLoader,
 } from './integration/release.js';
+import { inspectCurrentIntakeRelease } from './integration/intake-readiness.js';
 
-function intakeEnvPresent(): boolean {
-  return Boolean(process.env.INTAKE_BUSINESS_DATABASE_URL
-    || process.env.INTAKE_USAGE_DATABASE_URL
-    || process.env.INTAKE_WORKER_DATABASE_URL);
-}
-
-function intakeRoutes(objectStoreDir: string | undefined) {
-  const business = process.env.INTAKE_BUSINESS_DATABASE_URL;
-  const usage = process.env.INTAKE_USAGE_DATABASE_URL;
-  const worker = process.env.INTAKE_WORKER_DATABASE_URL;
-  if (!business && !usage && !worker) return undefined;
-  if (objectStoreDir === undefined || !business || !usage || !worker) {
-    throw new Error('Intake HTTP pools are incomplete');
-  }
+function intakeRoutes(bootstrap: ApiPrivateBootstrapConfig) {
+  const intake = bootstrap.query.intake;
+  if (intake === undefined) return undefined;
+  if (bootstrap.objectStoreDir === undefined) throw new Error('Intake object store is incomplete');
   const report = (error: unknown): void => {
     try { reportApiRuntimeDiagnostic(createApiRuntimeDiagnostic('DATABASE_IDLE_CLIENT_FAILED', error)); } catch { /* observational */ }
   };
-  const pool = (connectionString: string, purpose: 'business' | 'usage' | 'worker') => createIntakePurposePool(
-    { connectionString, max: 2, connectionTimeoutMillis: 2_000 }, purpose, report,
+  const pool = (database: ApiDatabaseBootstrapConfig, purpose: 'business' | 'usage' | 'worker') => createIntakePurposePool(
+    { connectionString: database.connectionString, max: database.poolMax, connectionTimeoutMillis: database.connectionTimeoutMs }, purpose, report,
   );
   return {
-    business: pool(business, 'business'),
-    usage: pool(usage, 'usage'),
-    worker: pool(worker, 'worker'),
-    store: createContentObjectStore(objectStoreDir),
+    business: pool(intake.business, 'business'),
+    usage: pool(intake.usage, 'usage'),
+    worker: pool(intake.worker, 'worker'),
+    store: createContentObjectStore(bootstrap.objectStoreDir),
   };
 }
 
@@ -97,66 +88,64 @@ export type StartApiOptions = Readonly<{
 export async function startApi(
   options: StartApiOptions = {},
 ): Promise<StartedApi> {
+  const environment = Object.freeze({ ...(options.environment ?? process.env) });
   return startApiWithFactory(
-    options,
+    { environment },
     async (config, repository, policyAdminRepository, bootstrap) => {
-      let auth;
+      let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
       let intake: ReturnType<typeof intakeRoutes> | undefined;
       let queryRuntime: ReturnType<typeof createApiQueryRuntime> | undefined;
       let accessEvaluator: ReturnType<typeof createPostgresAccessEvaluator> | undefined;
-      if (config.sessionMode !== 'product' && intakeEnvPresent()) {
-        throw new Error('Intake HTTP pools are incomplete');
-      }
-      if (config.sessionMode === 'product') {
-        if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
-        if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
-          throw new Error('Product identity bootstrap is incomplete');
-        }
-        const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
-        const identity = bootstrap.productIdentity;
-        const provider = identity.kind === 'feishu'
-          ? (identity.providerOrigin
-            ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
-            : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
-          : createSyntheticIdentityProvider(identity.providerOrigin, callback);
-        intake = intakeRoutes(bootstrap.objectStoreDir);
-        const business = intake?.business;
-        auth = await createProductAuthService(
-          bootstrap.productIdentity.database,
-          provider,
-          config.authMode,
-          async (openId) => {
-            if (!business) {
-              console.info('[api] roster projection skipped');
-              return;
-            }
-            const client = await business.connect();
-            try {
-              const reason = await projectRosterLogin(
-                client,
-                openId,
-                rosterHomeFromEnv(process.env),
-                rosterCandidateFromEnv(process.env),
-              );
-              if (reason !== 'registered') console.info(`[api] roster projection ${reason}`);
-            } finally { client.release(); }
-          },
-          async (bindingId) => {
-            if (!business) {
-              console.info('[api] seat projection skipped');
-              return;
-            }
-            const client = await business.connect();
-            try {
-              const projected = await client.query<{ status: string | null }>(
-                'SELECT content_intake.project_seat_login($1) AS status', [bindingId]);
-              const status = projected.rows[0]?.status ?? 'missing';
-              if (status !== 'projected') console.info(`[api] seat projection ${status}`);
-            } finally { client.release(); }
-          },
-        );
-      }
       try {
+        if (config.sessionMode === 'product') {
+          if (!bootstrap.productIdentity || config.port === 0) throw new Error('Product identity bootstrap is incomplete');
+          if ((config.authMode === 'feishu') !== (bootstrap.productIdentity.kind === 'feishu')) {
+            throw new Error('Product identity bootstrap is incomplete');
+          }
+          const callback = `http://${config.host}:${config.port}/v1/auth/callback`;
+          const identity = bootstrap.productIdentity;
+          const provider = identity.kind === 'feishu'
+            ? (identity.providerOrigin
+              ? createWorkforceIdentityProvider({ ...identity.feishu, observeJob: true }, identity.providerOrigin, callback)
+              : createFeishuIdentityProvider({ ...identity.feishu, observeJob: true }))
+            : createSyntheticIdentityProvider(identity.providerOrigin, callback);
+          intake = intakeRoutes(bootstrap);
+          const business = intake?.business;
+          auth = await createProductAuthService(
+            bootstrap.productIdentity.database,
+            provider,
+            config.authMode,
+            async (openId) => {
+              if (!business) {
+                console.info('[api] roster projection skipped');
+                return;
+              }
+              const client = await business.connect();
+              try {
+                const reason = await projectRosterLogin(
+                  client,
+                  openId,
+                  rosterHomeFromEnv(environment),
+                  rosterCandidateFromEnv(environment),
+                );
+                if (reason !== 'registered') console.info(`[api] roster projection ${reason}`);
+              } finally { client.release(); }
+            },
+            async (bindingId) => {
+              if (!business) {
+                console.info('[api] seat projection skipped');
+                return;
+              }
+              const client = await business.connect();
+              try {
+                const projected = await client.query<{ status: string | null }>(
+                  'SELECT content_intake.project_seat_login($1) AS status', [bindingId]);
+                const status = projected.rows[0]?.status ?? 'missing';
+                if (status !== 'projected') console.info(`[api] seat projection ${status}`);
+              } finally { client.release(); }
+            },
+          );
+        }
         const contentImport = bootstrap.objectStoreDir === undefined ? undefined : {
           service: createContentImportService(
             createContentObjectStore(bootstrap.objectStoreDir),
@@ -191,6 +180,8 @@ export async function startApi(
         };
         if (intake !== undefined) {
           accessEvaluator = createPostgresAccessEvaluator(intake.business);
+        }
+        if (intake !== undefined && accessEvaluator !== undefined && bootstrap.query.mode === 'unified') {
           queryRuntime = createApiQueryRuntime({
             loader: createPostgresQueryReleaseLoader(intake.usage),
             access: accessEvaluator,
@@ -202,6 +193,7 @@ export async function startApi(
           });
           await queryRuntime.initialize();
         }
+        const intakeUsage = intake?.usage;
         const app = createApiApp({
           config,
           repository,
@@ -209,6 +201,8 @@ export async function startApi(
           policyAdminRepository,
           ...(accessEvaluator === undefined ? {} : { accessEvaluator }),
           ...(queryRuntime === undefined ? {} : { queryRuntime }),
+          ...(intakeUsage !== undefined && bootstrap.query.mode === 'intake-compat'
+            ? { intakeOnlyQuery: { inspect: () => inspectCurrentIntakeRelease(intakeUsage) } } : {}),
           searchDependencies: { operation: { execute: (request) => queryRuntime === undefined
             ? repository.executeSearch(request)
             : repository.executeSearch(request, () => queryRuntime!.search(request)) },
@@ -237,11 +231,11 @@ export async function startApi(
           noticeDependencies: notice,
           intakeDependencies: intake,
         });
-        const environment = options.environment ?? process.env;
         const reviewPort = reviewLoginPort(environment, config.port);
-        if (config.profile === 'formal-dev' && auth?.kind === 'product' && reviewPort !== undefined) {
+        const productAuth = auth;
+        if (config.profile === 'formal-dev' && productAuth?.kind === 'product' && reviewPort !== undefined) {
           const reviewLogin = await startReviewLoginServer(
-            (bindingId) => auth.issueBoundSession(bindingId),
+            (bindingId) => productAuth.issueBoundSession(bindingId),
             reviewPort,
           );
           app.addHook('onClose', async () => {

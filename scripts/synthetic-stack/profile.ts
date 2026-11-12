@@ -385,6 +385,31 @@ export type StackProfile = Readonly<{
   clientId: string;
 }>;
 
+/** Shared database-source checks for profile resolution and API preflight. */
+export function validateStackDatabaseConfig({ stackRoot, content, profile }: Readonly<{
+  stackRoot: string;
+  content: ContentStackConfig | undefined;
+  profile: StackProfile | undefined;
+}>): void {
+  const environment = stackEnvironmentForRoot(stackRoot);
+  if (environment !== 'synthetic-local' && content?.databaseName === undefined) {
+    const label = environment === 'production' ? 'production' : 'test';
+    throw new Error(`${label} stack requires content.env with DATABASE_NAME`);
+  }
+  if (environment === 'production' && content?.databaseName !== 'customer_agent_formal') {
+    throw new Error('Production stack content.env must declare customer_agent_formal');
+  }
+  if (environment === 'wsl-test' && content?.databaseName === 'customer_agent_formal') {
+    throw new Error('Test stack content.env must not declare customer_agent_formal');
+  }
+  if (profile && content?.databaseName !== undefined && content.databaseName !== profile.databaseName) {
+    throw new Error(`Recorded profile database ${profile.databaseName} does not match content.env ${content.databaseName}`);
+  }
+  if (environment === 'production' && !profile) {
+    throw new Error('Production stack profile is missing; provision or review profile.json before starting');
+  }
+}
+
 /**
  * Where the packaged desktop client looks for its synthetic profile. Must match
  * Electron `app.getPath('userData')` after `app.setName`:
@@ -625,6 +650,40 @@ export function writeProfile(profile: StackProfile): void {
   const temporary = `${PROFILE_FILE}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
   renameSync(temporary, PROFILE_FILE);
+}
+
+/**
+ * Content defaults and reviewer precedence shared by API startup and preflight.
+ * Explicit content reviewers precede the Feishu owner binding. Equal resolved
+ * subjects omit the content-side manager override.
+ */
+function contentOverrides(
+  content: ContentStackConfig | undefined,
+  feishu: FeishuStackConfig | undefined,
+): Readonly<Record<string, string>> {
+  const owner = feishu?.bindings.find((binding) => binding.role === 'owner')?.openId;
+  const lead = content?.reviewLeadSubject ?? owner ?? 'synthetic_coach';
+  const manager = content?.reviewManagerSubject ?? owner ?? 'synthetic_owner';
+  const overrides: Record<string, string> = {
+    CONTENT_INTENT_TAXONOMY_VERSION: content?.intentTaxonomyVersion ?? 'itax_synthetic_stack_v1',
+    CONTENT_INTENT_ID: content?.intentId ?? 'intent_synthetic_stack_shipping',
+    CONTENT_REVIEW_LEAD_SUBJECT: lead,
+    CONTENT_REVIEW_EVIDENCE_ID: content?.reviewEvidenceId ?? 'EVD-STACK-REVIEW-001',
+  };
+  if (manager !== lead) overrides.CONTENT_REVIEW_MANAGER_SUBJECT = manager;
+  return overrides;
+}
+
+/** Compose loaded stack inputs for API and worker startup without starting services. */
+export function stackApiEnvironment({ profile, content, feishu, apiConfig }: Readonly<{
+  profile: StackProfile;
+  content: ContentStackConfig | undefined;
+  feishu: FeishuStackConfig | undefined;
+  apiConfig: ApiStackConfig | undefined;
+}>): NodeJS.ProcessEnv {
+  validateStackDatabaseConfig({ stackRoot: profile.stackRoot, content, profile });
+  const overrides = mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {});
+  return apiEnvironment(profile, overrides, feishu);
 }
 
 /** Environment for the API and worker processes. Secrets stay process-local. */

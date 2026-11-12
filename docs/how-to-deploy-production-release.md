@@ -11,6 +11,8 @@
 - `profile.json`：生产环境使用 `environment=production`、库 `customer_agent_formal` 和现有 stack root。
 - `api.env`：必须是 `0600` 普通文件，并且只包含一个 `CUSTOMER_AGENT_BUILD_VERSION`。
 
+显式使用 `CUSTOMER_AGENT_QUERY_MODE=intake-compat` 的候选需要 v2 恢复证据。恢复预演传入同一 `--candidate-stack-root`，部署入口复核查询模式和配置摘要，并在重启后检查 `x-customer-agent-query-mode`。当前旧回退版本若拒绝追加迁移，发布保持阻塞，待完整恢复路径完成验收。
+
 生产 root 固定为 `/srv/customer-agent`。生产 apply 还要求 `--authorization` 或 `CUSTOMER_AGENT_PRODUCTION_RELEASE_APPROVAL` 等于完整候选 SHA。
 
 生产 apply 必须以 root 身份运行，因为入口需要重启 systemd unit。非 root 会在创建部署锁、应用迁移或写指针之前以 `DEPLOYMENT_PRIVILEGE_REQUIRED` 退出。只读 dry-run 可以由服务用户执行。候选和历史 release 的 Git 安全目录由入口按实际路径临时注入，不需要修改 root 的全局 Git 配置。

@@ -336,13 +336,33 @@ function readBackupEvidence(file, next) {
   });
 }
 
-export function assertDeploymentChecks(checks, previous, next, contentFingerprint) {
-  if (!checks || checks.schema !== 'customer-agent-release-preflight/v1'
+export function assertQueryProfileBinding(runtime, queryProfile) {
+  const scope = queryProfile?.mode === 'intake-compat'
+    ? 'candidate-intake-catalog-readonly-gates' : 'candidate-query-runtime-readonly-initialization';
+  if (!queryProfile || !['unified', 'intake-compat'].includes(queryProfile.mode)
+    || !/^[0-9a-f]{64}$/u.test(queryProfile.configurationSha256)
+    || runtime?.scope !== scope || runtime?.queryMode !== queryProfile.mode
+    || runtime?.configurationSha256 !== queryProfile.configurationSha256) {
+    fail('RELEASE_QUERY_PROFILE_CHANGED', 'candidate query configuration differs from restore evidence');
+  }
+}
+
+function assertQueryProfileEvidence(checks, queryProfile) {
+  if (checks?.schema === 'customer-agent-release-preflight/v2') {
+    assertQueryProfileBinding(checks.runtime, queryProfile);
+  } else if (queryProfile?.mode === 'intake-compat') {
+    fail('RELEASE_QUERY_PROFILE_REQUIRED', 'intake compatibility requires mode-bound restore evidence');
+  }
+}
+
+export function assertDeploymentChecks(checks, previous, next, contentFingerprint, queryProfile) {
+  if (!checks || !['customer-agent-release-preflight/v1', 'customer-agent-release-preflight/v2'].includes(checks.schema)
     || checks.candidateGitSha !== next.sha || checks.rollbackGitSha !== previous.sha
     || !checks.runtime || !Array.isArray(checks.rollback)
     || checks.rollback.length !== next.manifest.length - previous.manifest.length + 1) {
     fail('RELEASE_PREFLIGHT_REQUIRED', 'restore evidence must cover this candidate and rollback release');
   }
+  assertQueryProfileEvidence(checks, queryProfile);
   if (checks.runtime.status !== 'PASS' || checks.runtime.code !== null) {
     fail('CANDIDATE_RUNTIME_NOT_READY', 'candidate runtime did not accept the restored content');
   }
@@ -784,7 +804,7 @@ function writeDeploymentState(file, state) {
   atomicWrite(file, `${JSON.stringify(state, null, 2)}\n`);
 }
 
-async function readResponseJson(url) {
+async function readResponseSnapshot(url) {
   let response;
   try {
     response = await fetch(url, {
@@ -819,28 +839,31 @@ async function readResponseJson(url) {
     return null;
   }
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return { body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+      queryMode: response.headers.get('x-customer-agent-query-mode') };
   } catch {
     return null;
   }
 }
 
-export function readinessMatches(health, ready, expectedVersion) {
+export function readinessMatches(health, ready, expectedVersion, expectedQueryMode, actualQueryMode, allowLegacyMode = false) {
   const checks = ready?.checks;
   return health?.status === 'ok' && health?.service === 'cs-ai-api' && health?.version === expectedVersion
     && ready?.status === 'ready' && checks && typeof checks === 'object'
     && Object.keys(checks).sort().join('\0') === [...READY_CHECKS].sort().join('\0')
-    && READY_CHECKS.every((name) => checks[name] === 'ok');
+    && READY_CHECKS.every((name) => checks[name] === 'ok')
+    && (expectedQueryMode === undefined || actualQueryMode === expectedQueryMode
+      || allowLegacyMode && expectedQueryMode === 'unified' && actualQueryMode === null);
 }
 
-async function waitForReady(apiOrigin, expectedVersion, assertActive = () => undefined) {
+async function waitForReady(apiOrigin, expectedVersion, assertActive = () => undefined, expectedQueryMode, allowLegacyMode = false) {
   for (let attempt = 0; attempt < READY_ATTEMPTS; attempt += 1) {
     assertActive();
     const [health, ready] = await Promise.all([
-      readResponseJson(`${apiOrigin}/health`),
-      readResponseJson(`${apiOrigin}/ready`),
+      readResponseSnapshot(`${apiOrigin}/health`),
+      readResponseSnapshot(`${apiOrigin}/ready`),
     ]);
-    if (readinessMatches(health, ready, expectedVersion)) return;
+    if (readinessMatches(health?.body, ready?.body, expectedVersion, expectedQueryMode, ready?.queryMode, allowLegacyMode)) return;
     if (attempt + 1 < READY_ATTEMPTS) {
       await new Promise((resolve) => setTimeout(resolve, READY_INTERVAL_MS));
     }
@@ -948,6 +971,10 @@ function defaultDependencies(options) {
     readEvidence: async (next) => readBackupEvidence(options.backupEvidence, next),
     readTenantReport: async () => readTenantReport(options.tenantReport),
     readProfile: async () => readProfile(options.stackRoot, options.environment),
+    readQueryProfile: async (profile, next) => {
+      const { readReleaseQueryProfile } = await import('./release-query-profile.mjs');
+      return readReleaseQueryProfile(next.root, profile.root);
+    },
     readState: async () => readDeploymentState(options.stateFile),
     writeState: async (state) => writeDeploymentState(options.stateFile, state),
     readHistoricalRelease: async (sha, version) => readRelease(options.root, sha, version, false),
@@ -1003,7 +1030,8 @@ function defaultDependencies(options) {
         timeout: 120_000,
       });
     },
-    waitForReady: async (profile, version, assertActive) => waitForReady(profile.apiOrigin, version, assertActive),
+    waitForReady: async (profile, version, assertActive, queryMode, allowLegacyMode) =>
+      waitForReady(profile.apiOrigin, version, assertActive, queryMode, allowLegacyMode),
   });
 }
 
@@ -1050,6 +1078,8 @@ export async function runProductionRelease(options, suppliedDependencies) {
   let tenantReport;
   let liveTenantReport;
   let profile;
+  let queryProfile;
+  let queryBinding;
   let databaseIds;
   let deploymentState;
   let phase = 'preflight';
@@ -1058,6 +1088,11 @@ export async function runProductionRelease(options, suppliedDependencies) {
   const onSignal = () => { interrupted = true; };
   const assertNotInterrupted = () => {
     if (interrupted) fail('INTERRUPTED', 'deployment received a termination signal');
+  };
+  const verifyQueryConfiguration = async () => {
+    if (queryBinding !== undefined) {
+      assertQueryProfileBinding(queryBinding, await dependencies.readQueryProfile?.(profile, next));
+    }
   };
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
@@ -1151,6 +1186,13 @@ export async function runProductionRelease(options, suppliedDependencies) {
     backupEvidence = await dependencies.readEvidence(next);
     tenantReport = await dependencies.readTenantReport();
     profile = await dependencies.readProfile();
+    queryProfile = await dependencies.readQueryProfile?.(profile, next);
+    queryBinding = queryProfile === undefined ? undefined : {
+      queryMode: queryProfile.mode,
+      configurationSha256: queryProfile.configurationSha256,
+      scope: queryProfile.mode === 'intake-compat'
+        ? 'candidate-intake-catalog-readonly-gates' : 'candidate-query-runtime-readonly-initialization',
+    };
     liveTenantReport = await dependencies.inspectTenancy(profile);
     assertTenantReportMatches(tenantReport, liveTenantReport);
     const apiVersion = await dependencies.readApiVersion();
@@ -1176,10 +1218,15 @@ export async function runProductionRelease(options, suppliedDependencies) {
       return Object.freeze({ status: 'rolled-back', previousSha: previous.sha, events: Object.freeze(events) });
     }
 
-    await dependencies.waitForReady(profile, current.version, assertNotInterrupted);
+    const alreadyComplete = deploymentState?.status === 'complete' && current.sha === next.sha;
+    if (alreadyComplete) assertQueryProfileEvidence(backupEvidence.deploymentChecks, queryProfile);
+    await dependencies.waitForReady(profile, current.version, assertNotInterrupted,
+      alreadyComplete ? queryProfile?.mode ?? 'unified' : undefined,
+      alreadyComplete && backupEvidence.deploymentChecks?.schema !== 'customer-agent-release-preflight/v2');
     assertNotInterrupted();
 
-    if (deploymentState?.status === 'complete' && current.sha === next.sha) {
+    if (alreadyComplete) {
+      await verifyQueryConfiguration();
       await audit('already-complete', { currentSha: current.sha });
       return Object.freeze({
         status: 'already-complete',
@@ -1190,7 +1237,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
     }
 
     assertDeploymentChecks(backupEvidence.deploymentChecks, previous, next,
-      await dependencies.inspectContentFingerprint(profile, next));
+      await dependencies.inspectContentFingerprint(profile, next), queryProfile);
 
     const pending = next.manifest.slice(databaseIds.length).map((migration) => migration.id);
     const plan = Object.freeze({
@@ -1206,6 +1253,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
       pendingMigrationIds: Object.freeze(pending),
       pointerChange: current.root !== next.root,
       resuming: deploymentState?.status === 'deploying',
+      ...(queryProfile === undefined ? {} : { queryMode: queryProfile.mode }),
     });
     await audit('preflight-passed', {
       currentSha: current.sha,
@@ -1222,6 +1270,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
 
     phase = 'migrate';
     assertNotInterrupted();
+    await verifyQueryConfiguration();
     mutationStarted = true;
     const migration = await dependencies.applyDatabase(profile, next, backupEvidence.deploymentChecks.contentFingerprint);
     assertNotInterrupted();
@@ -1253,6 +1302,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
     await audit('api-version-updated');
 
     phase = 'switch';
+    await verifyQueryConfiguration();
     if (current.root !== next.root) {
       deploymentState = Object.freeze({ ...deploymentState, pointerSwitched: true });
       await dependencies.writeState(deploymentState);
@@ -1267,8 +1317,10 @@ export async function runProductionRelease(options, suppliedDependencies) {
     await dependencies.restartService();
     assertNotInterrupted();
     phase = 'readiness';
-    await dependencies.waitForReady(profile, next.version, assertNotInterrupted);
+    await dependencies.waitForReady(profile, next.version, assertNotInterrupted,
+      queryProfile?.mode ?? 'unified', backupEvidence.deploymentChecks.schema !== 'customer-agent-release-preflight/v2');
     assertNotInterrupted();
+    await verifyQueryConfiguration();
     deploymentState = Object.freeze({ ...deploymentState, status: 'complete' });
     await dependencies.writeState(deploymentState);
     await audit('ready', {

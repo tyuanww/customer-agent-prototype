@@ -21,7 +21,7 @@ import {
   PID_DIRECTORY, PREFERRED_PORTS, STACK_ROOT, apiEnvironment, loadApiStackConfig, loadContentStackConfig,
   mergeStackOverrides, parseApiEnvFile, parseContentEnvFile, parseFeishuEnvFile,
   parseStackProfile, readProfile, shouldSeedSyntheticCatalog, stackEnvironmentForRoot,
-  stackPortOffset, stackPortPairForRoot,
+  stackApiEnvironment, stackPortOffset, stackPortPairForRoot, validateStackDatabaseConfig,
 } from './profile.ts';
 import { RUNTIME_PORT_PAIRS, isReservedSyntheticPort } from '../../apps/desktop/src/shared/runtime-ports.ts';
 import {
@@ -1085,6 +1085,144 @@ describe('stack production env', () => {
   });
 });
 
+describe('stack API environment composition', () => {
+  function profileFor(stackRoot: string, databaseName: string) {
+    const ports = stackPortPairForRoot(stackRoot);
+    return parseStackProfile({
+      version: 1, createdAt: '2026-11-12T00:00:00Z', stackRoot, databaseName,
+      apiOrigin: `http://127.0.0.1:${String(ports.api)}`,
+      identityOrigin: `http://127.0.0.1:${String(ports.identity)}`,
+      apiPort: ports.api, identityPort: ports.identity, pgPort: 43199,
+      pgSocketDirectory: path.join(stackRoot, 'data', 'pg15-socket'),
+      objectStoreDirectory: path.join(stackRoot, 'objects'), clientId: 'synthetic-client',
+    }, stackRoot);
+  }
+
+  const inputs = {
+    profile: profileFor(path.join(tmpdir(), 'stack-api-env-fixture'), 'synthetic_recorded'),
+    content: undefined,
+    feishu: undefined,
+    apiConfig: undefined,
+  };
+  const feishu = parseFeishuEnvFile([
+    'AUTH_MODE=feishu',
+    'FEISHU_APP_ID=cli_synthetic0001',
+    'FEISHU_APP_SECRET=synthetic-feishu-secret-material-0001',
+    'FEISHU_REDIRECT_URI=https://synthetic.example/v1/auth/callback',
+    'FEISHU_BINDINGS=ou_syntheticowner:owner',
+  ].join('\n'));
+
+  it('preserves the complete synthetic defaults and recorded database when optional files are absent', () => {
+    assert.deepEqual(stackApiEnvironment(inputs), apiEnvironment(inputs.profile, {
+      CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_stack_v1',
+      CONTENT_INTENT_ID: 'intent_synthetic_stack_shipping',
+      CONTENT_REVIEW_LEAD_SUBJECT: 'synthetic_coach',
+      CONTENT_REVIEW_MANAGER_SUBJECT: 'synthetic_owner',
+      CONTENT_REVIEW_EVIDENCE_ID: 'EVD-STACK-REVIEW-001',
+    }));
+    const content = parseContentEnvFile('CONTENT_INTENT_ID=intent_synthetic_custom');
+    const environment = stackApiEnvironment({ ...inputs, content });
+    assert.equal(environment.CONTENT_INTENT_ID, 'intent_synthetic_custom');
+    assert.equal(new URL(environment.DATABASE_URL ?? '').pathname, '/synthetic_recorded');
+  });
+
+  it('preserves content reviewer precedence, Feishu identity and portable API overrides', () => {
+    const content = parseContentEnvFile([
+      'DATABASE_NAME=synthetic_recorded',
+      'CONTENT_INTENT_TAXONOMY_VERSION=itax_synthetic_custom',
+      'CONTENT_INTENT_ID=intent_synthetic_custom',
+      'CONTENT_REVIEW_LEAD_SUBJECT=ou_syntheticlead',
+      'CONTENT_REVIEW_MANAGER_SUBJECT=ou_syntheticmanager',
+      'CONTENT_REVIEW_EVIDENCE_ID=EVD-SYNTHETIC-CUSTOM',
+    ].join('\n'));
+    const apiConfig = parseApiEnvFile('LOG_HASH_KEY=synthetic-portable-material-00000001');
+    const environment = stackApiEnvironment({ ...inputs, content, feishu, apiConfig });
+    assert.deepEqual(environment, apiEnvironment(inputs.profile, {
+      CONTENT_INTENT_TAXONOMY_VERSION: 'itax_synthetic_custom',
+      CONTENT_INTENT_ID: 'intent_synthetic_custom',
+      CONTENT_REVIEW_LEAD_SUBJECT: 'ou_syntheticlead',
+      CONTENT_REVIEW_MANAGER_SUBJECT: 'ou_syntheticmanager',
+      CONTENT_REVIEW_EVIDENCE_ID: 'EVD-SYNTHETIC-CUSTOM',
+      LOG_HASH_KEY: 'synthetic-portable-material-00000001',
+    }, feishu));
+  });
+
+  it('uses the Feishu owner fallback and leaves an omitted manager available to api.env', () => {
+    const environment = stackApiEnvironment({ ...inputs, feishu });
+    assert.equal(environment.CONTENT_REVIEW_LEAD_SUBJECT, 'ou_syntheticowner');
+    assert.equal(environment.CONTENT_REVIEW_MANAGER_SUBJECT, undefined);
+    const apiConfig = parseApiEnvFile('CONTENT_REVIEW_MANAGER_SUBJECT=ou_syntheticmanager');
+    assert.equal(stackApiEnvironment({ ...inputs, feishu, apiConfig }).CONTENT_REVIEW_MANAGER_SUBJECT, 'ou_syntheticmanager');
+    const content = parseContentEnvFile('CONTENT_REVIEW_LEAD_SUBJECT=ou_syntheticlead');
+    const withContent = stackApiEnvironment({ ...inputs, feishu, content });
+    assert.equal(withContent.CONTENT_REVIEW_LEAD_SUBJECT, 'ou_syntheticlead');
+    assert.equal(withContent.CONTENT_REVIEW_MANAGER_SUBJECT, 'ou_syntheticowner');
+  });
+
+  it('rejects legal api.env keys colliding with content defaults or explicit content, including equal values', () => {
+    const apiConfig = parseApiEnvFile('CONTENT_INTENT_ID=intent_synthetic_stack_shipping');
+    for (const content of [undefined, parseContentEnvFile('CONTENT_INTENT_ID=intent_synthetic_stack_shipping')]) {
+      assert.throws(
+        () => stackApiEnvironment({ ...inputs, content, apiConfig }),
+        /api\.env and content\.env both set CONTENT_INTENT_ID/u,
+      );
+    }
+  });
+
+  it('rejects a content database conflicting with the recorded profile', () => {
+    const content = parseContentEnvFile('DATABASE_NAME=synthetic_other');
+    assert.throws(
+      () => stackApiEnvironment({ ...inputs, content }),
+      /Recorded profile database synthetic_recorded does not match content\.env synthetic_other/u,
+    );
+  });
+
+  it('retains managed-root requirements while permitting content files with only DATABASE_NAME', () => {
+    const managedProfiles = [
+      { stackRoot: PRODUCTION_STACK_ROOT, databaseName: 'customer_agent_formal', label: 'production' },
+      { stackRoot: WSL_TEST_STACK_ROOT, databaseName: 'synthetic_test', label: 'test' },
+    ];
+    for (const { stackRoot, databaseName, label } of managedProfiles) {
+      const profile = profileFor(stackRoot, databaseName);
+      for (const content of [undefined, parseContentEnvFile('CONTENT_INTENT_ID=intent_synthetic_partial')]) {
+        assert.throws(
+          () => stackApiEnvironment({ ...inputs, profile, content }),
+          new RegExp(`${label} stack requires content\\.env with DATABASE_NAME`, 'u'),
+        );
+      }
+      const content = parseContentEnvFile(`DATABASE_NAME=${databaseName}`);
+      const environment = stackApiEnvironment({ ...inputs, profile, content });
+      assert.equal(new URL(environment.DATABASE_URL ?? '').pathname, `/${databaseName}`);
+      assert.equal(environment.CONTENT_INTENT_ID, 'intent_synthetic_stack_shipping');
+    }
+  });
+
+  it('retains database-source rules before a profile exists', () => {
+    validateStackDatabaseConfig({ stackRoot: inputs.profile.stackRoot, content: undefined, profile: undefined });
+    validateStackDatabaseConfig({
+      stackRoot: WSL_TEST_STACK_ROOT, content: parseContentEnvFile('DATABASE_NAME=synthetic_test'), profile: undefined,
+    });
+    assert.throws(
+      () => validateStackDatabaseConfig({
+        stackRoot: PRODUCTION_STACK_ROOT, content: parseContentEnvFile('DATABASE_NAME=customer_agent_formal'), profile: undefined,
+      }),
+      /Production stack profile is missing/u,
+    );
+    assert.throws(
+      () => validateStackDatabaseConfig({
+        stackRoot: PRODUCTION_STACK_ROOT, content: parseContentEnvFile('DATABASE_NAME=synthetic_other'), profile: undefined,
+      }),
+      /Production stack content\.env must declare customer_agent_formal/u,
+    );
+    assert.throws(
+      () => validateStackDatabaseConfig({
+        stackRoot: WSL_TEST_STACK_ROOT, content: parseContentEnvFile('DATABASE_NAME=customer_agent_formal'), profile: undefined,
+      }),
+      /Test stack content\.env must not declare customer_agent_formal/u,
+    );
+  });
+});
+
 describe('stack profile reuse', () => {
   const freshFile = (): string => path.join(mkdtempSync(path.join(tmpdir(), 'stack-profile-')), 'profile.json');
   const wellFormed = {
@@ -1220,8 +1358,12 @@ describe('stack production wiring', () => {
     const stack = readFileSync(new URL('./stack.ts', import.meta.url), 'utf8');
     assert.ok(stack.includes('loadApiStackConfig()'), 'start must read api.env');
     assert.ok(
-      stack.includes('mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {})'),
-      'both override files must be merged through the clash check',
+      stack.includes('const environment = stackApiEnvironment({ profile, content, feishu, apiConfig })'),
+      'startup must use the shared API environment owner',
+    );
+    assert.ok(
+      stack.includes('validateStackDatabaseConfig({ stackRoot: STACK_ROOT, content, profile: existing })'),
+      'profile resolution must reuse the database-source checks',
     );
     // content.env is read once and threaded through: two reads could disagree if
     // the file changed between them, leaving the profile naming one catalog and

@@ -56,9 +56,11 @@ CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/candidate-restore-evidence
 
 这次运行先从候选的 clean tracked `HEAD` 在临时目录重新编译数据库模块，逐文件比对候选自带的 `dist` 后才导入它。编译器来自执行恢复工具自身的 release，不从被检查的候选目录取可执行文件。随后在临时 PG15 中验证备份恢复的数据库、角色、ACL、对象和原迁移前缀，再应用追加迁移并运行候选 verifier。证据同时记录 `restoredMigrationCount`、最终 `migrationCount`、`appliedMigrationIds`、候选版本、源 verifier 和候选 verifier。候选目录名必须等于 release 的 Git `HEAD`，tracked 文件保持干净；构建产物可被 Git 忽略，但出现 symlink、额外文件或重建差异都会 fail-closed。该命令不连接生产服务，也不修改源备份。
 
-指定 `--rollback-release` 时，每次提交迁移后都会用回退版本读取账本并执行其数据库 verifier。候选迁移完成后，探针用候选的实际用途池加载 Query runtime，要求初始化和 readiness 均成功。相同迁移目录的代码发布也执行这些检查。
+指定 `--rollback-release` 时，每次提交迁移后都会用回退版本读取账本并执行其数据库 verifier。`unified` 候选迁移完成后，探针用候选的实际用途池加载 Query runtime，要求初始化和 readiness 均成功。相同迁移目录的代码发布也执行所选模式的探针及回退检查。
 
-结果写入 `deploymentChecks`，绑定候选与回退 SHA、当前内容指针、来源门禁和范围指纹，以及每个迁移前缀的结果。候选 API 及六个 workspace 运行依赖会从已提交源码独立重建，完整产物摘要随证据保存。Node 的实际 workspace 依赖解析必须指向对应的已验证产物。编译配置和依赖锁需要与执行工具对应。缺投影的历史目录和不兼容的回退版本会使预检失败，数据库恢复及 verifier 的独立结果仍保留。此检查覆盖只读初始化，业务查询、登录及复制继续使用对应验收入口。
+候选采用 `intake-compat` 时，在恢复预演中增加 `--candidate-stack-root /controlled/path/stack`。工具从候选的 stack 配置和 API parser 解析实际模式、三池用途和目标，写入 v2 证据。该模式通过共享 intake 目录读取器检查当前发布门禁，探针范围为 `candidate-intake-catalog-readonly-gates`。上线流程会核对配置摘要及重启后的模式头。先完成正常 HTTP 的登录、资格、SOP、分页和媒体消费验证，再按对应发布门推进。
+
+结果写入 `deploymentChecks`，绑定候选与回退 SHA、当前内容指针、来源门禁和范围指纹，以及每个迁移前缀的结果。候选 API 及六个 workspace 运行依赖会从已提交源码独立重建，完整产物摘要随证据保存。Node 的实际 workspace 依赖解析必须指向对应的已验证产物。编译配置和依赖锁需要与执行工具对应。`unified` 的投影缺失、intake 发布门禁失败和回退版本不兼容都会使预检失败，数据库恢复及 verifier 的独立结果仍保留。此检查覆盖只读初始化，业务查询、登录及复制继续使用对应验收入口。
 
 ## 迁移旧定时任务
 

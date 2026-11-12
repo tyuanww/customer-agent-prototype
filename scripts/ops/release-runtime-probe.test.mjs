@@ -15,7 +15,11 @@ const MODULES = {
       failAt('pool.' + purpose);
       const pool = {
         purpose,
-        async connect() { throw new Error('UNEXPECTED_DIRECT_CONNECT'); },
+        async connect() {
+          if (!config.intakeProbe) throw new Error('UNEXPECTED_DIRECT_CONNECT');
+          event('pool.connect', { purpose });
+          return { release() { event('pool.release', { purpose }); } };
+        },
         async end() {
           event('pool.end', { purpose });
           await Promise.resolve();
@@ -38,6 +42,14 @@ const MODULES = {
       };
       if (config.invalidAccess) delete access.evaluate;
       return access;
+    }
+  `,
+  'integration/intake-readiness.js': `
+    import { config, event, failAt } from '../fixture.js';
+    export async function inspectCurrentIntakeRelease(pool) {
+      event('intake.inspect', { purpose: pool.purpose });
+      failAt('intake');
+      return config.invalidIntake ? null : { releaseId: 'release-synthetic', validUntil: Date.now() + 60000 };
     }
   `,
   'integration/release.js': `
@@ -258,7 +270,7 @@ test('an idle pool failure reported during cleanup prevents PASS', async (t) => 
 });
 
 test('missing candidate modules or exports fail before any pool is created', async (t) => {
-  for (const file of Object.keys(MODULES)) {
+  for (const file of Object.keys(MODULES).filter(file => file !== 'integration/intake-readiness.js')) {
     const missing = await fixture(t);
     await rm(path.join(missing.dist, file));
     assert.deepEqual(await probeCandidateRuntime(missing.options), failure('ERR_MODULE_NOT_FOUND'));
@@ -303,4 +315,58 @@ test('invalid input fails before loading modules or falling back to implicit PG 
   ]) {
     assert.deepEqual(await probeCandidateRuntime(options), failure('RUNTIME_PROBE_INPUT_INVALID'));
   }
+});
+
+const QUERY_PROFILE = Object.freeze({
+  mode: 'intake-compat', configurationSha256: 'a'.repeat(64),
+  intakeLogins: { business: 'configured_business', usage: 'configured_usage', worker: 'configured_worker' },
+});
+
+test('intake compatibility probes the shared live catalog gates with configured purpose logins', async t => {
+  const candidate = await fixture(t, { intakeProbe: true });
+  const result = await probeCandidateRuntime({ ...candidate.options, queryProfile: QUERY_PROFILE });
+  assert.deepEqual(result, {
+    status: 'PASS', code: null, scope: 'candidate-intake-catalog-readonly-gates',
+    queryMode: QUERY_PROFILE.mode, configurationSha256: QUERY_PROFILE.configurationSha256,
+  });
+  const events = await candidate.events();
+  assert.deepEqual(events.filter(row => row.name === 'pool.create').map(row => row.connection.user),
+    ['configured_usage', 'configured_business', 'configured_worker']);
+  assert.deepEqual(events.filter(row => row.name === 'pool.connect').map(row => row.purpose), ['business', 'worker']);
+  assert.equal(events.some(row => row.name === 'intake.inspect' && row.purpose === 'usage'), true);
+  assert.equal(events.some(row => row.name === 'runtime.create'), false);
+  assert.deepEqual(events.filter(row => row.name === 'pool.end').map(row => row.purpose), ['worker', 'business', 'usage']);
+});
+
+test('intake gate failure and malformed results prevent a passing restore probe', async t => {
+  for (const [configuration, expected] of [
+    [{ intakeProbe: true, failures: { intake: { message: 'SOURCE_MISMATCH' } } }, 'SOURCE_MISMATCH'],
+    [{ intakeProbe: true, invalidIntake: true }, 'RUNTIME_PROBE_INTAKE_INVALID'],
+  ]) {
+    const candidate = await fixture(t, configuration);
+    const result = await probeCandidateRuntime({ ...candidate.options, queryProfile: QUERY_PROFILE });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.code, expected);
+    assert.equal((await candidate.events()).filter(row => row.name === 'pool.end').length, 3);
+  }
+});
+
+test('malformed query profiles fail before acquiring pools', async t => {
+  const candidate = await fixture(t);
+  for (const queryProfile of [null, {}, { ...QUERY_PROFILE, mode: 'automatic' },
+    { ...QUERY_PROFILE, configurationSha256: '' }, { ...QUERY_PROFILE, intakeLogins: null }]) {
+    const result = await probeCandidateRuntime({ ...candidate.options, queryProfile });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.code, 'RUNTIME_PROBE_PROFILE_INVALID');
+  }
+  assert.deepEqual(await candidate.events(), []);
+});
+
+test('a missing intake reader fails compatibility and closes every purpose pool', async t => {
+  const candidate = await fixture(t, { intakeProbe: true });
+  await rm(path.join(candidate.dist, 'integration/intake-readiness.js'));
+  const result = await probeCandidateRuntime({ ...candidate.options, queryProfile: QUERY_PROFILE });
+  assert.equal(result.status, 'FAIL');
+  assert.equal(result.code, 'ERR_MODULE_NOT_FOUND');
+  assert.equal((await candidate.events()).filter(row => row.name === 'pool.end').length, 3);
 });

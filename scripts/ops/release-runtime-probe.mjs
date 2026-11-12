@@ -32,15 +32,30 @@ function requireMethods(value, names, code) {
 export async function probeCandidateRuntime(options) {
   const cleanup = [];
   let code = null;
+  let scope = SCOPE;
+  let queryProfile;
+  let queryBinding;
   let fallback = 'RUNTIME_PROBE_INPUT_INVALID';
   try {
     const { releaseRoot, database } = options ?? {};
+    queryProfile = options?.queryProfile;
     if (typeof releaseRoot !== 'string' || releaseRoot.trim() === ''
       || typeof database?.host !== 'string' || database.host.trim() === ''
       || typeof database.database !== 'string' || database.database.trim() === ''
       || !Number.isInteger(database.port) || database.port < 1 || database.port > 65535) {
       throw new Error('RUNTIME_PROBE_INPUT_INVALID');
     }
+    if (queryProfile !== undefined && (
+      !['unified', 'intake-compat'].includes(queryProfile?.mode)
+      || !/^[0-9a-f]{64}$/u.test(queryProfile?.configurationSha256)
+      || !queryProfile.intakeLogins
+      || ['business', 'usage', 'worker'].some(purpose => typeof queryProfile.intakeLogins[purpose] !== 'string'
+        || queryProfile.intakeLogins[purpose].trim() === '')
+    )) throw new Error('RUNTIME_PROBE_PROFILE_INVALID');
+    if (queryProfile !== undefined) queryBinding = {
+      queryMode: queryProfile.mode, configurationSha256: queryProfile.configurationSha256,
+    };
+    if (queryProfile?.mode === 'intake-compat') scope = 'candidate-intake-catalog-readonly-gates';
 
     fallback = 'RUNTIME_PROBE_MODULE_LOAD_FAILED';
     const dist = path.resolve(releaseRoot, 'apps/api/dist');
@@ -66,36 +81,55 @@ export async function probeCandidateRuntime(options) {
     };
     fallback = 'RUNTIME_PROBE_POOL_FAILED';
     const usage = poolModule.createIntakePurposePool(
-      { ...config, user: 'stack_intake_usage' }, 'usage', reportFailure,
+      { ...config, user: queryProfile?.intakeLogins.usage ?? 'stack_intake_usage' }, 'usage', reportFailure,
     );
     cleanup.push(() => usage.end());
     requireMethods(usage, ['connect', 'end'], 'RUNTIME_PROBE_POOL_INVALID');
     const business = poolModule.createIntakePurposePool(
-      { ...config, user: 'stack_intake_business' }, 'business', reportFailure,
+      { ...config, user: queryProfile?.intakeLogins.business ?? 'stack_intake_business' }, 'business', reportFailure,
     );
     cleanup.push(() => business.end());
     requireMethods(business, ['connect', 'end'], 'RUNTIME_PROBE_POOL_INVALID');
 
-    fallback = 'RUNTIME_PROBE_RUNTIME_FAILED';
-    const access = accessModule.createPostgresAccessEvaluator(business);
-    requireMethods(access, ['evaluate'], 'RUNTIME_PROBE_ACCESS_INVALID');
-    const loader = releaseModule.createPostgresQueryReleaseLoader(usage);
-    if (typeof loader !== 'function') throw new Error('RUNTIME_PROBE_LOADER_INVALID');
-    const runtime = runtimeModule.createApiQueryRuntime({
-      access,
-      loader,
-      observer: { record() {} },
-      onActivationFailure: reportFailure,
-    });
-    cleanup.push(() => runtime.close());
-    requireMethods(runtime, ['initialize', 'readiness', 'close'], 'RUNTIME_PROBE_RUNTIME_INVALID');
-
-    fallback = 'RUNTIME_PROBE_INITIALIZE_FAILED';
-    if (await runtime.initialize() !== true) {
-      code ??= 'RUNTIME_PROBE_INITIALIZE_REJECTED';
+    if (queryProfile?.mode === 'intake-compat') {
+      const worker = poolModule.createIntakePurposePool(
+        { ...config, user: queryProfile.intakeLogins.worker }, 'worker', reportFailure,
+      );
+      cleanup.push(() => worker.end());
+      requireMethods(worker, ['connect', 'end'], 'RUNTIME_PROBE_POOL_INVALID');
+      for (const pool of [business, worker]) {
+        const client = await pool.connect();
+        client.release();
+      }
+      const intake = await import(pathToFileURL(path.join(dist, 'integration/intake-readiness.js')).href);
+      requireMethods(intake, ['inspectCurrentIntakeRelease'], 'RUNTIME_PROBE_MODULE_INVALID');
+      fallback = 'RUNTIME_PROBE_INTAKE_FAILED';
+      const current = await intake.inspectCurrentIntakeRelease(usage);
+      if (typeof current?.releaseId !== 'string' || current.releaseId.length === 0
+        || typeof current.validUntil !== 'number' || Number.isNaN(current.validUntil)
+        || current.validUntil <= Date.now()) throw new Error('RUNTIME_PROBE_INTAKE_INVALID');
     } else {
-      fallback = 'RUNTIME_PROBE_READINESS_FAILED';
-      if (await runtime.readiness() !== 'ok') code ??= 'RUNTIME_PROBE_NOT_READY';
+      fallback = 'RUNTIME_PROBE_RUNTIME_FAILED';
+      const access = accessModule.createPostgresAccessEvaluator(business);
+      requireMethods(access, ['evaluate'], 'RUNTIME_PROBE_ACCESS_INVALID');
+      const loader = releaseModule.createPostgresQueryReleaseLoader(usage);
+      if (typeof loader !== 'function') throw new Error('RUNTIME_PROBE_LOADER_INVALID');
+      const runtime = runtimeModule.createApiQueryRuntime({
+        access,
+        loader,
+        observer: { record() {} },
+        onActivationFailure: reportFailure,
+      });
+      cleanup.push(() => runtime.close());
+      requireMethods(runtime, ['initialize', 'readiness', 'close'], 'RUNTIME_PROBE_RUNTIME_INVALID');
+
+      fallback = 'RUNTIME_PROBE_INITIALIZE_FAILED';
+      if (await runtime.initialize() !== true) {
+        code ??= 'RUNTIME_PROBE_INITIALIZE_REJECTED';
+      } else {
+        fallback = 'RUNTIME_PROBE_READINESS_FAILED';
+        if (await runtime.readiness() !== 'ok') code ??= 'RUNTIME_PROBE_NOT_READY';
+      }
     }
   } catch (error) {
     code ??= failureCode(error, fallback);
@@ -108,5 +142,7 @@ export async function probeCandidateRuntime(options) {
       }
     }
   }
-  return { status: code === null ? 'PASS' : 'FAIL', code, scope: SCOPE };
+  return { status: code === null ? 'PASS' : 'FAIL', code, scope,
+    ...queryBinding,
+  };
 }

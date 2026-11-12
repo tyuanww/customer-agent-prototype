@@ -243,7 +243,7 @@ export async function issuePreparedIntakeEntitlement(client: IntakeTransaction, 
 /** Whole-release approval dependencies are checked even when some sources are
  * outside this shop. A revoked inherited approval invalidates the whole release.
  * This only consumes local facts; refresh/remote I/O belongs to evidence.ts. */
-async function releaseDeadline(client: IntakeTransaction, releaseId: string, tenant: string): Promise<number> {
+export async function releaseDeadline(client: Pick<IntakeTransaction, 'query'>, releaseId: string, tenant: string): Promise<number> {
   const release = await client.query<{ ready: boolean; revoked: boolean }>(`SELECT
     (gate.source_gate_ready AND public.owner_acceptance_release_content_ready(c.release_id)) AS ready,
     EXISTS (SELECT 1 FROM content_intake.release_revocations r WHERE r.release_id=c.release_id) AS revoked

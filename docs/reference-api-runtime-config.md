@@ -44,7 +44,7 @@
 | `DATABASE_URL` | 必填；runtime 登录 DSN，只接受 loopback PostgreSQL URL、非空登录名与数据库路径；不得带 fragment 或驱动控制参数 | 只保留在私有 bootstrap config，不回显原值 |
 | `CONTENT_ADMIN_DATABASE_URL` | 必填；独立 `app_content_admin` 登录 DSN，格式同上；DSN/登录名必须与 runtime 不同，但解析后的精确 host/port/database 目标必须相同（不把 `localhost` 与 `127.0.0.1` 猜成同一实例）。T4 发布/回退复用该池，不另开连接 | 同上 |
 | `DB_POOL_MAX` | 可省略，runtime 默认 `18`（product 会话模式为 `16`，再配置审核池时为 `12`）；只接受 `1..20` 正整数 | 不进入公开 config 或响应 |
-| `CONTENT_ADMIN_DB_POOL_MAX` | 可省略，admin 默认 `2`；只接受 `1..20`，且所有启用的 pool 合计不得超过 `20` | 同上 |
+| `CONTENT_ADMIN_DB_POOL_MAX` | 可省略，admin 默认 `2`；只接受 `1..20`，沿用 runtime/admin/auth/review 的总预算及 worker 预留检查 | 同上 |
 | `DB_CONNECTION_TIMEOUT_MS` | 可省略，默认 `2000`，范围 `1..10000`；只约束连接获取 | 不进入公开 config 或响应 |
 | `DB_READINESS_TIMEOUT_MS` | 可省略，默认 `2000`，范围 `1..10000`；约束 readiness 响应、query timeout 与 statement timeout | 不进入公开 config 或响应 |
 | `IDEMPOTENCY_HMAC_KEYS` | 必填；JSON object，1–4 个 `hmac-*` 版本映射到 32–128 UTF-8 byte 的私有密钥材料 | 不回显、不记录 |
@@ -56,6 +56,8 @@
 | `CONTENT_REVIEW_DB_POOL_MAX` | 可省略，默认 2；与 runtime/admin/auth 合计不得超过 18，给独立 worker 预留 2 | 不进入公开 config |
 | `CONTENT_WORKER_DATABASE_URL` | 可省略；独立无特权登录仅属于 app_backend_worker，与 runtime 同库且登录名不同。API 进程不打开该池；worker 进程使用它 | 仅私有 bootstrap |
 | `CONTENT_WORKER_DB_POOL_MAX` | 可省略，默认 2；worker 是独立进程，不计入 API 进程池合计 | 不进入公开 config |
+| `CUSTOMER_AGENT_QUERY_MODE` | 可省略，默认 `unified`；显式 `intake-compat` 使用现有 intake FAQ 和独立 SOP 查询，普通 search 返回 503；空白和未知值拒启 | 仅私有 bootstrap；`/ready` 模式头可读 |
+| `INTAKE_BUSINESS_DATABASE_URL` / `INTAKE_USAGE_DATABASE_URL` / `INTAKE_WORKER_DATABASE_URL` | 任一出现即要求三项齐全、product 身份和对象目录；`intake-compat` 必填。每项须与其他用途同库、登录独立，并通过既有 purpose guard。各池固定上限 2，连接超时沿用 `DB_CONNECTION_TIMEOUT_MS` | 仅私有 bootstrap，三池独立于上述传统连接预算 |
 | `CONTENT_INTENT_TAXONOMY_VERSION` / `CONTENT_INTENT_ID` | worker 进程使用的合成意图引用；缺省为合成 T3 固定值 | 不进入公开 config |
 | `CONTENT_REVIEW_LEAD_SUBJECT` / `CONTENT_REVIEW_MANAGER_SUBJECT` / `CONTENT_REVIEW_EVIDENCE_ID` | 合成预承诺：parked `content_hash` 必须等于 finalize 后的治理快照，因此 worker 把已知审核主体摘要与证据 ID 编入 hash，但不写入 parked JSON | 不进入公开 config |
 
@@ -66,7 +68,7 @@
 ```text
 process environment
   → parseApiRuntimeConfig（精确 profile / auth / bind / version）
-  → parseApiPrivateBootstrapConfig（两套私有 DSN / 双池总预算 / 两类 HMAC key domain）
+  → parseApiPrivateBootstrapConfig（私有用途 DSN、查询模式、连接预算和两类 HMAC key domain）
   → 任一失败：CONFIG_INVALID，pool 与 Fastify 尚未构造、零路由、零监听
   → 成功：分别创建 runtime pg.Pool 与 policy-admin pg.Pool
   → ServiceRepository + PolicyAdminRepository → createApiApp
@@ -83,9 +85,13 @@ process environment
 
 API startup 不运行 migration，也不读取私有 migration ledger。schema 安装与完整数据库后验仍由 `@customer-agent/database` 的 migration-owner 控制面负责；API 只重复请求路径必须实时证明的 runtime/admin capability 投影。
 
+`startApi` 对传入环境取一次快照，三池、产品身份和名单投影均使用该输入。`intake-compat` 的 `/ready` 每次读取当前 intake 目录，并复用资格发行的整版来源、family 和批准门禁。五项检查通过时返回 200，`x-customer-agent-query-mode` 为 `intake-compat`。每条 SOP 的事实、权限和媒体由正常查询事务继续校验。`unified` 沿用普通索引完整性及发布后刷新检查。
+
 ## 4. 失败输出
 
 配置失败统一为五段式 `CONFIG_INVALID`：Problem、Cause、Fix、Docs、Diagnostic。Cause 只能由字段名和稳定 reason 构成，禁止拼入输入值或原始异常消息。配置通过后若监听阶段失败，则改用 `STARTUP_FAILED`；已知本机资源错误归一为 `listen_address_in_use`、`listen_permission_denied`、`listen_address_unavailable`、`process_file_limit_reached` 或 `system_file_limit_reached`，其它错误为 `unclassified_startup_failure`。运行中 DB/query/idle-client/超时异常只降级 database/schema readiness，不进入 HTTP 正文；未捕获的请求异常统一返回合同化 `INTERNAL` 500。内部仅记录固定 runtime diagnostic code 与合法五位 PostgreSQL SQLSTATE，不记录 DSN、SQL、请求正文或异常 message。idle client 已由 pool 淘汰时只记诊断，下一次请求执行真实新探针，不额外制造一次假故障。SIGINT/SIGTERM 后若关闭失败则输出 `SHUTDOWN_FAILED` 与受控 signal reason，不静默吞错。所有路径都不回显原始异常正文或环境值，Diagnostic 只关联单次失败，不暗示已有外部日志系统。
+
+Intake 事务遇到 PostgreSQL `55P03` 内容锁等待失败，并完成回滚后，返回合同化 `503 OVERLOADED`。客户端按既有 `COMMIT_UNKNOWN` 恢复原请求。提交中断或回滚失败沿用结果未知的处理。
 
 当前稳定 reason：
 
