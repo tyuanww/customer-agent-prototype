@@ -24,6 +24,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const BACKUP_SET_SCHEMA = 'customer-agent-backup-set/v1';
@@ -1641,30 +1642,30 @@ function restoreClusterArguments(cluster) {
   ];
 }
 
-function regularFileDigests(root) {
+function regularFileDigests(root, code = 'CANDIDATE_RELEASE_INVALID') {
   const digests = new Map();
   let rootInfo;
   try {
     rootInfo = lstatSync(root);
   } catch {
-    fail('CANDIDATE_RELEASE_INVALID', 'Candidate build input is missing');
+    fail(code, 'Candidate build input is missing');
   }
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
-    fail('CANDIDATE_RELEASE_INVALID', 'Candidate build input is not a regular directory');
+    fail(code, 'Candidate build input is not a regular directory');
   }
   const visit = (directory, relativeDirectory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const absolute = path.join(directory, entry.name);
       const relative = path.posix.join(relativeDirectory, entry.name);
       if (entry.isSymbolicLink()) {
-        fail('CANDIDATE_RELEASE_INVALID', `Candidate build input contains a symbolic link: ${relative}`);
+        fail(code, `Candidate build input contains a symbolic link: ${relative}`);
       }
       if (entry.isDirectory()) {
         visit(absolute, relative);
       } else if (entry.isFile()) {
         digests.set(relative, sha256(readFileSync(absolute)));
       } else {
-        fail('CANDIDATE_RELEASE_INVALID', `Candidate build output has an unsupported entry: ${relative}`);
+        fail(code, `Candidate build output has an unsupported entry: ${relative}`);
       }
     }
   };
@@ -1684,20 +1685,34 @@ function candidateGitEnvironment(releaseRoot) {
   };
 }
 
-function materializeTrackedDatabaseSources(releaseRoot, gitSha, destination) {
-  const gitEnvironment = candidateGitEnvironment(releaseRoot);
+const RUNTIME_BUILD_PACKAGES = [
+  'packages/contracts',
+  'packages/retrieval-core',
+  'packages/job-roster',
+  'packages/unified-contracts',
+  'packages/content-intake',
+  'packages/database',
+  'apps/api',
+];
+
+function materializeTrackedBuildSources(releaseRoot, gitSha, destination, verifyRuntime = false) {
+  const packages = verifyRuntime ? RUNTIME_BUILD_PACKAGES : ['packages/database'];
+  const roots = verifyRuntime ? [...packages, 'pnpm-lock.yaml'] : packages;
   const listing = spawnSync(
     'git',
-    ['-C', releaseRoot, 'ls-tree', '-r', '-z', '--name-only', gitSha, '--', 'packages/database'],
-    { encoding: 'utf8', env: gitEnvironment, maxBuffer: 16 * 1024 * 1024 },
+    ['-C', releaseRoot, 'ls-tree', '-r', '-z', gitSha, '--', ...roots],
+    { encoding: 'utf8', env: candidateGitEnvironment(releaseRoot), maxBuffer: 16 * 1024 * 1024 },
   );
   if (listing.error || listing.status !== 0) {
     fail('CANDIDATE_RELEASE_INVALID', 'Candidate tracked source list is unreadable');
   }
-  const databaseRoot = path.join(destination, 'packages/database');
-  for (const relative of listing.stdout.split('\0').filter(Boolean)) {
-    if (!relative.startsWith('packages/database/')) {
-      fail('CANDIDATE_RELEASE_INVALID', 'Candidate tracked source escapes the database package');
+  for (const entry of listing.stdout.split('\0').filter(Boolean)) {
+    const [metadata, relative] = entry.split('\t');
+    const [mode, type, objectId] = metadata.split(' ');
+    if (!relative || !roots.some((root) => relative === root || relative.startsWith(`${root}/`))
+      || relative.split('/').some((part) => ['..', 'dist', 'node_modules'].includes(part))
+      || type !== 'blob' || !['100644', '100755'].includes(mode)) {
+      fail('CANDIDATE_RELEASE_INVALID', 'Candidate tracked source is not a regular build input');
     }
     const source = path.join(releaseRoot, relative);
     let info;
@@ -1712,62 +1727,151 @@ function materializeTrackedDatabaseSources(releaseRoot, gitSha, destination) {
     const target = path.join(destination, relative);
     mkdirSync(path.dirname(target), { recursive: true });
     copyFileSync(source, target);
+    const content = readFileSync(target);
+    // Also bind bytes to Git when status hides a file through assume-unchanged or skip-worktree.
+    const blobId = createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex');
+    if (blobId !== objectId) {
+      fail('CANDIDATE_RELEASE_INVALID', `Candidate tracked file differs from Git: ${relative}`);
+    }
   }
-  symlinkSync(path.join(REPOSITORY_ROOT, 'node_modules'), path.join(destination, 'node_modules'), 'dir');
-  symlinkSync(
-    path.join(REPOSITORY_ROOT, 'packages/database/node_modules'),
-    path.join(databaseRoot, 'node_modules'),
-    'dir',
-  );
-}
-
-function assertCandidateDatabaseBuild(releaseRoot, gitSha) {
-  const buildRoot = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-candidate-database-build-'));
-  const sourceRoot = path.join(buildRoot, 'source');
-  const buildDirectory = path.join(buildRoot, 'dist');
-  mkdirSync(sourceRoot);
-  try {
-    materializeTrackedDatabaseSources(releaseRoot, gitSha, sourceRoot);
-    const tsc = path.join(REPOSITORY_ROOT, 'packages/database/node_modules/.bin/tsc');
-    const build = spawnSync(tsc, [
-      '-p', 'packages/database/tsconfig.build.json',
-      '--outDir', buildDirectory,
-    ], {
-      cwd: sourceRoot,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        GIT_CONFIG_GLOBAL: os.devNull,
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_OPTIONAL_LOCKS: '0',
-      },
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: ['ignore', 'ignore', 'pipe'],
-      timeout: 120_000,
-    });
-    if (build.error || build.status !== 0) {
-      fail('CANDIDATE_RELEASE_BUILD_FAILED', 'Candidate database sources did not build');
+  if (!verifyRuntime) {
+    symlinkSync(path.join(REPOSITORY_ROOT, 'node_modules'), path.join(destination, 'node_modules'), 'dir');
+    symlinkSync(path.join(REPOSITORY_ROOT, 'packages/database/node_modules'),
+      path.join(destination, 'packages/database/node_modules'), 'dir');
+    return;
+  }
+  const lockPath = path.join(destination, 'pnpm-lock.yaml');
+  if (!existsSync(lockPath)) {
+    fail('CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH', 'Candidate tracked lockfile is missing');
+  }
+  const lockDigest = sha256(readFileSync(lockPath));
+  for (const relative of ['pnpm-lock.yaml', 'node_modules/.pnpm/lock.yaml']) {
+    if (!existsSync(path.join(REPOSITORY_ROOT, relative))
+      || lockDigest !== sha256(readFileSync(path.join(REPOSITORY_ROOT, relative)))) {
+      fail('CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH', 'Candidate lockfile differs from installed trusted tooling');
     }
-    // Build output is intentionally ignored by Git. Rebuilding it from the clean
-    // tracked revision is the evidence that the executable came from that revision.
-    const expected = regularFileDigests(buildDirectory);
-    const actual = regularFileDigests(path.join(releaseRoot, 'packages/database/dist'));
-    const expectedFiles = [...expected.keys()].sort();
-    const actualFiles = [...actual.keys()].sort();
-    if (canonicalJson(expectedFiles) !== canonicalJson(actualFiles)) {
-      fail('CANDIDATE_RELEASE_BUILD_MISMATCH', 'Candidate database build file set differs from its sources');
-    }
-    for (const file of expectedFiles) {
-      if (expected.get(file) !== actual.get(file)) {
-        fail('CANDIDATE_RELEASE_BUILD_MISMATCH', 'Candidate database build content differs from its sources');
+  }
+  linkRuntimeBuildDependencies(destination, '');
+  for (const directory of packages) {
+    // This verifier supports the trusted build configuration and dependency contract only.
+    // Config changes require matching tooling, rather than resolving paths into candidate dist.
+    for (const file of ['tsconfig.json', 'tsconfig.build.json']) {
+      const relative = path.join(directory, file);
+      if (canonicalJson(readJson(path.join(destination, relative), 'CANDIDATE_RUNTIME_BUILD_CONFIG_MISMATCH'))
+        !== canonicalJson(readJson(path.join(REPOSITORY_ROOT, relative), 'CANDIDATE_RUNTIME_BUILD_CONFIG_MISMATCH'))) {
+        fail('CANDIDATE_RUNTIME_BUILD_CONFIG_MISMATCH', `Unsupported candidate build configuration: ${relative}`);
       }
     }
+    const relative = path.join(directory, 'package.json');
+    const candidate = readJson(path.join(destination, relative), 'CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH');
+    const trusted = readJson(path.join(REPOSITORY_ROOT, relative), 'CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH');
+    for (const field of ['name', 'type', 'exports', 'imports', 'main', 'types', 'dependencies', 'devDependencies']) {
+      if (canonicalJson(candidate[field]) !== canonicalJson(trusted[field])) {
+        fail('CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH', `Unsupported candidate package contract: ${relative} ${field}`);
+      }
+    }
+    linkRuntimeBuildDependencies(destination, directory);
+  }
+}
+
+function linkRuntimeBuildDependencies(destination, directory) {
+  const modules = path.join(destination, directory, 'node_modules');
+  mkdirSync(modules, { recursive: true });
+  for (const entry of readdirSync(path.join(REPOSITORY_ROOT, directory, 'node_modules'))) {
+    if (entry.startsWith('.') || entry === '@customer-agent') continue;
+    symlinkSync(realpathSync(path.join(REPOSITORY_ROOT, directory, 'node_modules', entry)),
+      path.join(modules, entry), 'dir');
+  }
+  const scope = path.join(modules, '@customer-agent');
+  mkdirSync(scope);
+  for (const dependency of RUNTIME_BUILD_PACKAGES) {
+    symlinkSync(path.join(destination, dependency), path.join(scope, path.basename(dependency)), 'dir');
+  }
+}
+
+// Stable digest of the complete relative file set and bytes. Runtime verification
+// uses one mismatch code; the default preserves the database input-error code.
+export function assertCandidateBuildDigests(expectedRoot, actualRoot, code = 'CANDIDATE_RELEASE_BUILD_MISMATCH') {
+  const inputCode = code === 'CANDIDATE_RELEASE_BUILD_MISMATCH' ? 'CANDIDATE_RELEASE_INVALID' : code;
+  const expected = canonicalJson(Object.fromEntries(regularFileDigests(expectedRoot, inputCode)));
+  const actual = canonicalJson(Object.fromEntries(regularFileDigests(actualRoot, inputCode)));
+  if (expected !== actual) {
+    fail(code, 'Candidate build file set or content differs from its tracked sources');
+  }
+  return sha256(expected);
+}
+
+function assertCandidateBuild(releaseRoot, gitSha, verifyRuntime = false) {
+  const buildRoot = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-candidate-database-build-'));
+  const sourceRoot = path.join(buildRoot, 'source');
+  const packages = verifyRuntime ? RUNTIME_BUILD_PACKAGES : ['packages/database'];
+  const buildCode = verifyRuntime ? 'CANDIDATE_RUNTIME_BUILD_FAILED' : 'CANDIDATE_RELEASE_BUILD_FAILED';
+  const mismatchCode = verifyRuntime ? 'CANDIDATE_RUNTIME_BUILD_MISMATCH' : 'CANDIDATE_RELEASE_BUILD_MISMATCH';
+  mkdirSync(sourceRoot);
+  try {
+    materializeTrackedBuildSources(releaseRoot, gitSha, sourceRoot, verifyRuntime);
+    const tsc = path.join(REPOSITORY_ROOT, 'packages/database/node_modules/typescript/bin/tsc');
+    const digests = [];
+    for (const directory of packages) {
+      const buildDirectory = path.join(sourceRoot, directory, 'dist');
+      const build = spawnSync(process.execPath, [tsc,
+        '-p', `${directory}/tsconfig.build.json`, '--outDir', buildDirectory,
+      ], {
+        cwd: sourceRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_CONFIG_GLOBAL: os.devNull,
+          GIT_CONFIG_NOSYSTEM: '1',
+          GIT_OPTIONAL_LOCKS: '0',
+        },
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: ['ignore', 'ignore', 'pipe'],
+        timeout: 120_000,
+      });
+      if (build.error || build.status !== 0) {
+        fail(buildCode, `Candidate tracked sources did not build: ${directory}`);
+      }
+      const digest = assertCandidateBuildDigests(buildDirectory, path.join(releaseRoot, directory, 'dist'), mismatchCode);
+      digests.push([directory, digest]);
+    }
+    if (verifyRuntime) assertRuntimeWorkspaceResolution(releaseRoot, sourceRoot);
+    return sha256(canonicalJson(digests));
   } finally {
     rmSync(buildRoot, { recursive: true, force: true });
   }
 }
 
-export function readCandidateRelease(candidateRelease) {
+function assertRuntimeWorkspaceResolution(releaseRoot, rebuiltRoot) {
+  const directories = new Map(RUNTIME_BUILD_PACKAGES.map((directory) => [
+    readJson(path.join(rebuiltRoot, directory, 'package.json')).name, directory,
+  ]));
+  for (const directory of RUNTIME_BUILD_PACKAGES) {
+    const metadata = readJson(path.join(rebuiltRoot, directory, 'package.json'));
+    const requireFromRuntime = createRequire(path.join(releaseRoot, directory, 'dist/index.js'));
+    for (const dependency of Object.keys(metadata.dependencies ?? {})) {
+      if (!dependency.startsWith('@customer-agent/')) continue;
+      const searchRoot = requireFromRuntime.resolve.paths(dependency)?.find((entry) =>
+        existsSync(path.join(entry, dependency)));
+      const target = directories.get(dependency);
+      // Bind the package root as well as its dist. A foreign package can link its
+      // bare export to verified bytes while sending a subpath elsewhere.
+      if (!searchRoot || !target || realpathSync(path.join(searchRoot, dependency))
+        !== realpathSync(path.join(releaseRoot, target))) {
+        fail('CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH',
+          'Candidate workspace resolution differs from the verified package root');
+      }
+    }
+  }
+}
+
+// verifyRuntime adds runtimeBuildSha256 only after all seven dist trees match.
+// CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH rejects lock/package-contract drift.
+// CANDIDATE_RUNTIME_BUILD_CONFIG_MISMATCH rejects compiler-configuration drift.
+// CANDIDATE_RUNTIME_BUILD_FAILED reports tsc failure or timeout.
+// CANDIDATE_RUNTIME_BUILD_MISMATCH rejects missing/extra/changed/nonregular output.
+// Existing identity and tracked-source failures use CANDIDATE_RELEASE_INVALID.
+export function readCandidateRelease(candidateRelease, { verifyRuntime = false } = {}) {
   let releaseRoot;
   try {
     releaseRoot = realpathSync(candidateRelease);
@@ -1820,7 +1924,7 @@ export function readCandidateRelease(candidateRelease) {
       fail('CANDIDATE_RELEASE_INVALID', `Candidate release file is not regular: ${path.relative(releaseRoot, file)}`);
     }
   }
-  assertCandidateDatabaseBuild(releaseRoot, gitSha);
+  const runtimeBuildSha256 = assertCandidateBuild(releaseRoot, gitSha, verifyRuntime);
   const manifest = readJson(manifestPath, 'CANDIDATE_RELEASE_INVALID');
   if (!manifest || !Array.isArray(manifest.migrations) || manifest.migrations.length < 1) {
     fail('CANDIDATE_RELEASE_INVALID', 'Candidate migration manifest is empty');
@@ -1838,14 +1942,65 @@ export function readCandidateRelease(candidateRelease) {
     databaseModulePath,
     verifierModulePath,
     generatedModulePath,
+    ...(verifyRuntime ? { runtimeBuildSha256 } : {}),
   });
 }
 
-async function applyCandidateRelease(cluster, databaseName, manifest, candidate) {
+async function probeRollbackDatabase(config, rollback, migrationCount) {
+  const requireFromRollback = createRequire(path.join(rollback.root, 'packages/database/package.json'));
+  const { Client } = requireFromRollback('pg');
+  const client = new Client(config);
+  try {
+    await client.connect();
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    const database = await import(pathToFileURL(rollback.databaseModulePath).href);
+    const state = await database.inspectDatabaseMigrations(client);
+    if (state.state !== 'COMPLETE' || state.applied.length !== migrationCount) {
+      return Object.freeze({ migrationCount, status: 'FAIL', code: 'ROLLBACK_MIGRATION_INCOMPATIBLE' });
+    }
+    const verified = await database.verifyDatabaseMigrations(client);
+    return Object.freeze({ migrationCount, status: verified.status, code: verified.status === 'PASS' ? null : 'ROLLBACK_VERIFIER_FAILED' });
+  } catch (error) {
+    return Object.freeze({ migrationCount, status: 'FAIL',
+      code: typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]+$/u.test(error.code)
+        ? error.code : 'ROLLBACK_DATABASE_CHECK_FAILED' });
+  } finally {
+    await client.end();
+  }
+}
+
+export async function readRuntimeContentFingerprint(client) {
+  const result = await client.query(`
+    WITH timezone AS MATERIALIZED (SELECT set_config('TimeZone', 'UTC', true))
+    SELECT encode(public.digest(convert_to(jsonb_build_object(
+      'current', (SELECT to_jsonb(current) FROM public.content_current current WHERE id=1),
+      'sources', (SELECT jsonb_agg(to_jsonb(source) ORDER BY source_id COLLATE "C") FROM content_intake.sources source),
+      'scopes', (SELECT jsonb_agg(to_jsonb(scope) ORDER BY scope_id COLLATE "C") FROM content_intake.scopes scope),
+      'sourceGate', (SELECT to_jsonb(gate) FROM public.v_release_source_gate gate
+        JOIN public.content_current current ON current.current_release_id=gate.release_id WHERE current.id=1)
+    )::text, 'UTF8'), 'sha256'), 'hex') AS fingerprint FROM timezone
+  `);
+  const fingerprint = result.rows[0]?.fingerprint;
+  if (typeof fingerprint !== 'string' || !SHA256.test(fingerprint)) {
+    fail('RUNTIME_FINGERPRINT_INVALID', 'Current content identity could not be verified');
+  }
+  return fingerprint;
+}
+
+async function applyCandidateRelease(cluster, databaseName, manifest, candidate, rollback) {
   const sourceMigrations = manifest.database.migrations;
   const nextMigrations = candidate.manifest.migrations;
-  if (nextMigrations.length <= sourceMigrations.length) {
-    fail('CANDIDATE_RELEASE_NOT_FORWARD', 'Candidate release does not advance the restored migration prefix');
+  if (rollback && (rollback.manifest.migrations.length !== sourceMigrations.length
+    || rollback.manifest.migrations.some((migration, index) => {
+      const restored = sourceMigrations[index];
+      return migration.position !== restored.position || migration.id !== restored.migrationId
+        || migration.sha256 !== restored.sha256 || migration.contract_set_id !== restored.contractSetId
+        || migration.source_git_sha !== restored.sourceGitSha || migration.source_schema_sha256 !== restored.sourceSchemaSha256;
+    }))) {
+    fail('ROLLBACK_RELEASE_PREFIX_MISMATCH', 'Rollback release does not match the restored migration catalogue');
+  }
+  if (nextMigrations.length < sourceMigrations.length) {
+    fail('CANDIDATE_RELEASE_NOT_FORWARD', 'Candidate release is behind the restored migration prefix');
   }
   for (const [index, restored] of sourceMigrations.entries()) {
     const next = nextMigrations[index];
@@ -1884,17 +2039,33 @@ async function applyCandidateRelease(cluster, databaseName, manifest, candidate)
   if (!actualCatalogue || canonicalJson(actualCatalogue) !== canonicalJson(expectedCatalogue)) {
     fail('CANDIDATE_RELEASE_INVALID', 'Candidate compiled catalogue does not match its manifest');
   }
-  const client = new (await import('pg')).Client({
+  const requireFromCandidate = createRequire(path.join(candidate.root, 'packages/database/package.json'));
+  const { Client } = requireFromCandidate('pg');
+  const config = {
     host: cluster.socket,
     port: cluster.port,
     user: manifest.database.databaseOwner,
     database: databaseName,
-  });
+  };
+  const client = new Client(config);
   try {
     await client.connect();
+    const contentFingerprint = rollback ? await readRuntimeContentFingerprint(client) : null;
     let applied;
+    const rollbackChecks = [];
     try {
-      applied = await databaseModule.applyDatabaseMigrations(client);
+      if (rollback) {
+        rollbackChecks.push(await probeRollbackDatabase(config, rollback, sourceMigrations.length));
+        const migrations = [];
+        for (let count = sourceMigrations.length + 1; count <= nextMigrations.length; count += 1) {
+          const step = await databaseModule.applyMigrationPrefix(client, count);
+          migrations.push(...step.applied);
+          rollbackChecks.push(await probeRollbackDatabase(config, rollback, count));
+        }
+        applied = { applied: migrations };
+      } else {
+        applied = await databaseModule.applyDatabaseMigrations(client);
+      }
     } catch (cause) {
       throw new BackupSetError('CANDIDATE_MIGRATION_APPLY_FAILED', 'Candidate migrations failed on the restored backup', { cause });
     }
@@ -1912,6 +2083,22 @@ async function applyCandidateRelease(cluster, databaseName, manifest, candidate)
     if (verification.status !== 'PASS' || verification.migrationCount !== nextMigrations.length) {
       fail('CANDIDATE_VERIFIER_FAILED', 'Candidate verifier did not pass at the expected migration count');
     }
+    let deploymentChecks = null;
+    if (rollback) {
+      const { probeCandidateRuntime } = await import('./release-runtime-probe.mjs');
+      const runtime = await probeCandidateRuntime({ releaseRoot: candidate.root,
+        database: { host: cluster.socket, port: cluster.port, database: databaseName } });
+      deploymentChecks = Object.freeze({
+        schema: 'customer-agent-release-preflight/v1',
+        status: runtime.status === 'PASS' && rollbackChecks.every(check => check.status === 'PASS') ? 'PASS' : 'FAIL',
+        candidateGitSha: candidate.gitSha,
+        rollbackGitSha: rollback.gitSha,
+        runtimeBuildSha256: candidate.runtimeBuildSha256,
+        contentFingerprint,
+        runtime,
+        rollback: Object.freeze(rollbackChecks),
+      });
+    }
     return Object.freeze({
       candidateRelease: candidate.root,
       candidateGitSha: candidate.gitSha,
@@ -1922,6 +2109,7 @@ async function applyCandidateRelease(cluster, databaseName, manifest, candidate)
       appliedMigrationIds: Object.freeze(actualIds),
       verifierStatus: verification.status,
       verifierMode: 'candidate-complete',
+      deploymentChecks,
     });
   } finally {
     await client.end().catch(() => undefined);
@@ -2065,12 +2253,17 @@ export async function restoreDrill(options = {}) {
   const commandArguments = process.argv.slice(3);
   let commandBackupSet;
   let commandCandidateRelease;
+  let commandRollbackRelease;
   for (let index = 0; index < commandArguments.length; index += 1) {
     const value = commandArguments[index];
     if (value === '--candidate-release') {
       const next = commandArguments[++index];
       if (!next || commandCandidateRelease) fail('INVALID_ARGUMENTS', 'Pass one candidate release');
       commandCandidateRelease = next;
+    } else if (value === '--rollback-release') {
+      const next = commandArguments[++index];
+      if (!next || commandRollbackRelease) fail('INVALID_ARGUMENTS', 'Pass one rollback release');
+      commandRollbackRelease = next;
     } else if (value.startsWith('--')) {
       fail('INVALID_ARGUMENTS', `Unknown restore option: ${value}`);
     } else if (commandBackupSet) {
@@ -2082,6 +2275,8 @@ export async function restoreDrill(options = {}) {
   const requested = options.backupSet ?? commandBackupSet;
   if (!requested) fail('BACKUP_SET_REQUIRED', 'Pass a backup set directory');
   const candidateRelease = options.candidateRelease ?? commandCandidateRelease;
+  const rollbackRelease = options.rollbackRelease ?? commandRollbackRelease;
+  if (rollbackRelease && !candidateRelease) fail('INVALID_ARGUMENTS', 'Rollback verification requires a candidate release');
   const requestedCandidateRelease = candidateRelease ? path.resolve(candidateRelease) : null;
   const verified = await verifyBackupSet(path.resolve(requested), { pgBin });
   const started = Date.now();
@@ -2090,12 +2285,18 @@ export async function restoreDrill(options = {}) {
   let cluster = null;
   let restoredDatabase = null;
   let candidate = null;
+  let rollback = null;
   let sourceVerification = null;
   let evidence;
   let operationError;
   const keepForReview = process.env.CUSTOMER_AGENT_BACKUP_KEEP_SCRATCH_FOR_REVIEW === '1';
   try {
-    candidate = requestedCandidateRelease ? readCandidateRelease(requestedCandidateRelease) : null;
+    candidate = requestedCandidateRelease
+      ? readCandidateRelease(requestedCandidateRelease, { verifyRuntime: Boolean(rollbackRelease) }) : null;
+    if (rollbackRelease) {
+      const rollbackRoot = path.resolve(rollbackRelease);
+      rollback = candidate?.root === rollbackRoot ? candidate : readCandidateRelease(rollbackRoot);
+    }
     scratch = safeScratchRoot();
     const extractedStore = path.join(scratch, 'object-store');
     await extractObjectArchive(
@@ -2140,6 +2341,7 @@ export async function restoreDrill(options = {}) {
         restoredDatabase,
         verified.manifest,
         candidate,
+        rollback,
       )
       : null;
     const completedAt = utcNow();
@@ -2175,9 +2377,14 @@ export async function restoreDrill(options = {}) {
       verifierStatus: candidateVerification?.verifierStatus ?? sourceVerification.verifier.status,
       verifierMode: candidateVerification?.verifierMode ?? sourceVerification.verifierMode,
       metadataAndObjectFidelity: 'PASS',
+      deploymentChecks: candidateVerification?.deploymentChecks ?? null,
       scratchCleaned: false,
       dataClassification: 'metadata-only',
     });
+    if (evidence.deploymentChecks?.status === 'FAIL') {
+      evidence = Object.freeze({ ...evidence, status: 'FAIL', errorCode: 'RELEASE_PREFLIGHT_FAILED' });
+      operationError = new BackupSetError('RELEASE_PREFLIGHT_FAILED', 'Candidate runtime or rollback compatibility check failed');
+    }
   } catch (error) {
     operationError = error;
     evidence = Object.freeze({
