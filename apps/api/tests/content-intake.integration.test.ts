@@ -339,6 +339,411 @@ describe.skipIf(!enabled)('P2 sealed synthetic authority and durable candidates'
     await expect(store.readPayload(objectId)).rejects.toMatchObject({ code: 'ENOENT' });
   }, 40_000);
 
+  it('capacity: reclaims a definitively failed upload after transient cleanup lock contention', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, rollbacks = 0;
+    const chargedBefore = Number((await admin.query(`SELECT coalesce(sum(reserved_bytes),0) AS bytes
+      FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')`)).rows[0].bytes);
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const observed: IntakePool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held && ++rollbacks === 2) {
+            await admin.query('ROLLBACK'); held = false;
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    try {
+      await expect(createIntakeCapacity(observed, blockedStore, () => undefined)
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(rollbacks).toBe(2); expect(objectId).not.toBe('');
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'released' }]);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+    expect(Number((await admin.query(`SELECT coalesce(sum(reserved_bytes),0) AS bytes
+      FROM content_intake.object_reservations WHERE state IN ('reserved','persisted','releasing')`)).rows[0].bytes)).toBe(chargedBefore);
+    await expect(store.readPayload(objectId)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, 40_000);
+
+  it('capacity: preserves the cleanup lock error when releasing its connection also fails', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, rollbacks = 0, releaseFailed = false;
+    let postReleaseConnections = 0;
+    const lockErrors: unknown[] = [], diagnostics: unknown[] = [];
+    const releaseFailure = new Error('synthetic cleanup connection release failure');
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const observed: IntakePool = { async connect() {
+      if (releaseFailed) postReleaseConnections++;
+      const client = await pool.connect(); let cleanupTimeout = false;
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          try {
+            const result = await target.query(sql, args);
+            if (sql === 'ROLLBACK' && held && ++rollbacks === 2) {
+              await admin.query('ROLLBACK'); held = false;
+            }
+            return result;
+          } catch (error) {
+            if (sql === 'SELECT backend_review.lock_content()' && held) {
+              lockErrors.push(error); cleanupTimeout = lockErrors.length === 2;
+            }
+            throw error;
+          }
+        };
+        if (property === 'release') return (broken?: boolean) => {
+          target.release(broken);
+          if (cleanupTimeout && !releaseFailed) { releaseFailed = true; throw releaseFailure; }
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    let failure: unknown;
+    try { await createIntakeCapacity(observed, blockedStore, error => diagnostics.push(error))
+      .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length); }
+    catch (error) { failure = error; }
+    finally { if (held) await admin.query('ROLLBACK'); }
+    expect(rollbacks).toBe(2); expect(releaseFailed).toBe(true); expect(postReleaseConnections).toBe(0);
+    expect(lockErrors).toHaveLength(2);
+    expect(lockErrors[0]).toMatchObject({ code: '55P03' }); expect(lockErrors[1]).toMatchObject({ code: '55P03' });
+    expect(failure).toBe(lockErrors[0]);
+    expect(diagnostics).toEqual([expect.objectContaining({ reason: 'COMMIT_UNKNOWN', code: 'OVERLOADED' })]);
+    function includesError(value: unknown, wanted: unknown): boolean {
+      if (value === wanted) return true;
+      if (value instanceof AggregateError) return value.errors.some((error: unknown) => includesError(error, wanted));
+      return value instanceof Error && includesError(value.cause, wanted);
+    }
+    expect(includesError(diagnostics[0], lockErrors[1])).toBe(true);
+    expect(includesError(diagnostics[0], releaseFailure)).toBe(true);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'reserved' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: preserves the failed upload when cleanup lock contention persists', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false;
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(pool, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(objectId).not.toBe('');
+    expect(diagnostics).toEqual([expect.objectContaining({ code: '55P03' })]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'reserved' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: finishes cleanup after a transient lock timeout in the final release', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, rollbacks = 0, firstReclaim = true;
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist, async reclaim(id: string) {
+      const result = await store.reclaim(id);
+      if (firstReclaim) { firstReclaim = false; await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true; }
+      return result;
+    } };
+    const observed: IntakePool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) { rollbacks++; await admin.query('ROLLBACK'); held = false; }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(observed, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(rollbacks).toBe(2); expect(firstReclaim).toBe(false); expect(objectId).not.toBe('');
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'released' }]);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+    await expect(store.readPayload(objectId)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, 40_000);
+
+  it('capacity: does not retry a storage failure that resembles a database lock timeout', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, reclaimCalls = 0;
+    const storageFailure = Object.assign(new Error('synthetic storage failure'), { code: '55P03' });
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist, async reclaim(id: string) {
+      reclaimCalls++;
+      if (reclaimCalls === 1) throw storageFailure;
+      return store.reclaim(id);
+    } };
+    const observed: IntakePool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) { await admin.query('ROLLBACK'); held = false; }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(observed, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(objectId).not.toBe(''); expect(reclaimCalls).toBe(1); expect(diagnostics).toEqual([storageFailure]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'releasing' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: does not retry a pool connection failure that resembles a database lock timeout', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, failedOriginal = false, injected = false;
+    const poolFailure = Object.assign(new Error('synthetic pool connection failure'), { code: '55P03' });
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const failing: IntakePool = { async connect() {
+      if (failedOriginal && !injected) { injected = true; throw poolFailure; }
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) {
+            await admin.query('ROLLBACK'); held = false; failedOriginal = true;
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(failing, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(injected).toBe(true); expect(diagnostics).toEqual([poolFailure]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'reserved' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: does not retry a pool release failure that resembles a database lock timeout', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, injected = false;
+    const poolFailure = Object.assign(new Error('synthetic pool release failure'), { code: '55P03' });
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const failing: IntakePool = { async connect() {
+      const client = await pool.connect(); let releasing = false;
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) { await admin.query('ROLLBACK'); held = false; }
+          if (sql.includes("SET state='releasing'")) releasing = true;
+          return result;
+        };
+        if (property === 'release') return (broken?: boolean) => {
+          target.release(broken);
+          if (releasing && !injected) { injected = true; throw poolFailure; }
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(failing, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(injected).toBe(true);
+    expect(diagnostics).toEqual([expect.objectContaining({ reason: 'COMMIT_UNKNOWN', cause: poolFailure })]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'releasing' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: retains an upload when rollback acknowledgement is lost', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, lost = false;
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held && !lost) {
+            lost = true; await admin.query('ROLLBACK'); held = false;
+            throw new Error('synthetic lost rollback acknowledgement');
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    try {
+      await expect(createIntakeCapacity(uncertain, blockedStore, () => undefined)
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ reason: 'COMMIT_UNKNOWN', code: 'OVERLOADED' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(lost).toBe(true); expect(objectId).not.toBe('');
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'reserved' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: retains the file when cleanup commit acknowledgement is lost', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, lost = false;
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let releasing = false;
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held) { await admin.query('ROLLBACK'); held = false; }
+          if (sql.includes("SET state='releasing'")) releasing = true;
+          if (sql === 'COMMIT' && releasing && !lost) {
+            lost = true; throw new Error('synthetic lost cleanup commit acknowledgement');
+          }
+          return result;
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    const diagnostics: unknown[] = [];
+    try {
+      await expect(createIntakeCapacity(uncertain, blockedStore, error => diagnostics.push(error))
+        .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length))
+        .rejects.toMatchObject({ code: '55P03' });
+    } finally { if (held) await admin.query('ROLLBACK'); }
+    expect(lost).toBe(true); expect(objectId).not.toBe('');
+    expect(diagnostics).toEqual([expect.objectContaining({ reason: 'COMMIT_UNKNOWN' })]);
+    expect((await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows)
+      .toEqual([{ state: 'releasing' }]);
+    expect(await store.readPayload(objectId)).toEqual(bytes);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: retains an upload when persisted commit and pool release acknowledgements are lost', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', commitLost = false, releaseLost = false;
+    const observedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId; return object;
+    }) as typeof store.persist };
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let persisting = false, lost = false;
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql.includes("SET state='persisted'")) persisting = true;
+          if (sql === 'COMMIT' && persisting && !commitLost) {
+            commitLost = true; lost = true; throw new Error('synthetic lost persisted COMMIT acknowledgement');
+          }
+          return result;
+        };
+        if (property === 'release') return (broken?: boolean) => {
+          target.release(broken);
+          if (lost && !releaseLost) { releaseLost = true; throw new Error('synthetic pool release failure'); }
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    let failure: unknown;
+    try { await createIntakeCapacity(uncertain, observedStore, () => undefined)
+      .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length); }
+    catch (error) { failure = error; }
+    const rows = (await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows;
+    const fileExists = await store.verify(objectId, createHash('sha256').update(bytes).digest('hex'), bytes.length);
+    console.log(JSON.stringify({ probe: 'persisted-commit-and-release-unknown', commitLost, releaseLost, rows, fileExists,
+      failure: failure instanceof Error ? failure.message : String(failure) }));
+    expect(commitLost).toBe(true); expect(releaseLost).toBe(true); expect(objectId).not.toBe('');
+    expect(failure).toMatchObject({ reason: 'COMMIT_UNKNOWN', code: 'OVERLOADED' });
+    expect(rows).toEqual([{ state: 'persisted' }]); expect(fileExists).toBe(true);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
+  it('capacity: retains an upload when rollback and pool release acknowledgements are lost', async () => {
+    const bytes = await httpWorkbook(); let objectId = '', held = false, rollbackLost = false, releaseLost = false;
+    const blockedStore = { ...store, persist: (async (...args) => {
+      const object = await store.persist(...args); objectId = object.objectId;
+      await admin.query('BEGIN'); await admin.query('SELECT backend_review.lock_content()'); held = true;
+      return object;
+    }) as typeof store.persist };
+    const uncertain: IntakePool = { async connect() {
+      const client = await pool.connect(); let lost = false;
+      return new Proxy(client, { get(target, property) {
+        if (property === 'query') return async (sql: string, args?: unknown[]) => {
+          const result = await target.query(sql, args);
+          if (sql === 'ROLLBACK' && held && !rollbackLost) {
+            rollbackLost = true; lost = true; await admin.query('ROLLBACK'); held = false;
+            throw new Error('synthetic lost rollback acknowledgement');
+          }
+          return result;
+        };
+        if (property === 'release') return (broken?: boolean) => {
+          target.release(broken);
+          if (lost && !releaseLost) { releaseLost = true; throw new Error('synthetic pool release failure'); }
+        };
+        const member: unknown = Reflect.get(target, property); return typeof member === 'function' ? member.bind(target) : member;
+      } });
+    } };
+    let failure: unknown;
+    try { await createIntakeCapacity(uncertain, blockedStore, () => undefined)
+      .persist('user-enabler', 'source-a', 'input', (async function* () { yield bytes; })(), 'excel', bytes.length); }
+    catch (error) { failure = error; }
+    finally { if (held) await admin.query('ROLLBACK'); }
+    const rows = (await admin.query('SELECT state FROM content_intake.object_reservations WHERE object_id=$1', [objectId])).rows;
+    const fileExists = await store.verify(objectId, createHash('sha256').update(bytes).digest('hex'), bytes.length);
+    console.log(JSON.stringify({ probe: 'rollback-and-release-unknown', rollbackLost, releaseLost, rows, fileExists,
+      failure: failure instanceof Error ? failure.message : String(failure) }));
+    expect(rollbackLost).toBe(true); expect(releaseLost).toBe(true); expect(objectId).not.toBe('');
+    expect(failure).toMatchObject({ reason: 'COMMIT_UNKNOWN', code: 'OVERLOADED' });
+    expect(rows).toEqual([{ state: 'reserved' }]); expect(fileExists).toBe(true);
+    expect((await admin.query('SELECT count(*)::int n FROM content_intake.objects WHERE object_id=$1', [objectId])).rows[0].n).toBe(0);
+  }, 40_000);
+
   it('capacity: serializes tenfold admission before bytes, protects unknown commits, retries cleanup and consumes the dry-run CLI', async () => {
     const cap = createIntakeCapacity(pool, store, error => diagnostics.push(error));
     const filler = `obj_${'f'.repeat(64)}`;
