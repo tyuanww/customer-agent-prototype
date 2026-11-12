@@ -1,6 +1,7 @@
 import {
   parseAccessDecision,
   type AccessDecision,
+  type Domain,
   type Scope,
 } from '@customer-agent/unified-contracts';
 import type { AuthenticatedUser } from '../auth-service.js';
@@ -15,7 +16,7 @@ import {
 import type { AccessAction } from '../access/policy.js';
 import type { IntegrationPool } from './database.js';
 
-export type ArcScopeDomain = 'product' | 'activity' | 'after-sale' | 'aftersale' | 'general';
+export type ArcScopeDomain = Domain;
 export type ArcSourceScope = Readonly<{
   kind: 'source';
   tenantId: Scope['tenantId'];
@@ -35,6 +36,7 @@ const ARC_DOMAIN: Readonly<Record<string, ArcScopeDomain>> = Object.freeze({
   product: 'product',
   activity: 'activity',
   general: 'general',
+  sop: 'sop',
 });
 
 function canonical(value: unknown): string {
@@ -51,7 +53,7 @@ function canonical(value: unknown): string {
 }
 
 export function arcDomain(value: string): ArcScopeDomain {
-  const mapped = ARC_DOMAIN[value];
+  const mapped = Object.hasOwn(ARC_DOMAIN, value) ? ARC_DOMAIN[value] : undefined;
   if (mapped === undefined) throw new Error('RELEASE_SCOPE_DOMAIN_INVALID');
   return mapped;
 }
@@ -107,9 +109,6 @@ export function createPostgresAccessEvaluator(pool: IntegrationPool): AccessEval
 }
 
 function mappedRole(role: AccessRole): 'agent' | 'director' | 'enabler' | 'lead' | 'manager' | 'supervisor' {
-  // `engineer` has the database capability profile of manager, while the
-  // handwritten ARC enum has no engineer member. The database decision remains
-  // authoritative; this transport role does not grant any additional scope.
   return role === 'engineer' ? 'manager' : role;
 }
 

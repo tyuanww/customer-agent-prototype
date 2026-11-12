@@ -28,6 +28,7 @@ import {
   createIntakeSyntheticHost,
   type IntakeSyntheticHost,
   type IntakeSyntheticIdentity,
+  type DesktopSyntheticIdentity,
 } from './support/intake-synthetic-host.js';
 
 type G = GraphComponents['schemas'];
@@ -35,11 +36,13 @@ type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION === '1';
 const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-describe.skipIf(!enabled).sequential('complete SOP publication through actual intake-compat startApi HTTP', () => {
+describe.skipIf(!enabled).sequential.each(['product', 'sop'] as const)('complete %s source SOP publication through actual intake-compat startApi HTTP', (domain) => {
+  const sourceId = domain === 'sop' ? 'source-sop' : 'source-a';
+  const scopeId = domain === 'sop' ? 'scope-sop' : 'scope-a';
   let host: Omit<IntakeSyntheticHost, 'candidate' | 'object'>;
   let admin: Client;
   let started: StartedApi | undefined;
-  let authorization = '';
+  const authorizations = new Map<DesktopSyntheticIdentity, string>();
   let publication: Awaited<ReturnType<typeof publish>>;
   let factsVersion = 0;
   let sequence = 0;
@@ -59,14 +62,16 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     return parse(name, await json(response));
   }
 
-  function seedRequest(actor: IntakeSyntheticIdentity, url: string, init: RequestInit = {}) {
+  function managementRequest(actor: IntakeSyntheticIdentity, url: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);
     headers.set('x-intake-contract-set', GRAPH_PROVENANCE.contract_set_id);
-    return host.requestAs(actor, url, { ...init, headers });
+    headers.set('authorization', authorizations.get(actor) ?? '');
+    if (!started) throw new Error('Actual management HTTP server is unavailable');
+    return fetch(`${started.address}${url}`, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(15_000) });
   }
 
-  function seedPost(actor: IntakeSyntheticIdentity, url: string, body: unknown) {
-    return seedRequest(actor, url, {
+  function managementPost(actor: IntakeSyntheticIdentity, url: string, body: unknown) {
+    return managementRequest(actor, url, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     });
   }
@@ -74,7 +79,7 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
   function request(url: string, init: RequestInit = {}) {
     if (!started) throw new Error('Actual startApi HTTP server is unavailable');
     const headers = new Headers(init.headers);
-    headers.set('authorization', authorization);
+    headers.set('authorization', authorizations.get('agent') ?? '');
     headers.set('x-intake-contract-set', RESOURCE_PROVENANCE.contract_set_id);
     return fetch(`${started.address}${url}`, {
       ...init, headers, signal: AbortSignal.timeout(15_000), redirect: 'error',
@@ -92,10 +97,10 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     form.set('operationId', operation('upload'));
     const bytes = await syntheticTaskGraphWorkbook({ shopWide: true, sharedTaskImage: true, revision });
     form.set('file', new Blob([new Uint8Array(bytes)], { type: mime }), 'synthetic-runtime-sop.xlsx');
-    const object = await checked(await seedRequest('enabler', '/v1/intake/sources/source-a/objects', {
+    const object = await checked(await managementRequest('enabler', `/v1/intake/sources/${sourceId}/objects`, {
       method: 'POST', body: form,
     }), 'IntakeObject');
-    let job = await checked(await seedPost('enabler', '/v1/intake/sources/source-a/candidates', {
+    let job = await checked(await managementPost('enabler', `/v1/intake/sources/${sourceId}/candidates`, {
       operationId: operation('receive'), objectId: object.objectId, sourceVersion: 2, baseReleaseId,
       contributorDeclaration: { preparerPrincipalId: 'enabler', editorPrincipalIds: ['enabler'], confirmed: true },
       expectedPriorKey: null,
@@ -108,7 +113,7 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
       }
       await new Promise(resolve => setTimeout(resolve, 100));
       const diagnosticStart = diagnostics.length;
-      const response = await seedRequest('enabler', `/v1/intake/parse-jobs/${job.jobId}`, {
+      const response = await managementRequest('enabler', `/v1/intake/parse-jobs/${job.jobId}`, {
         signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, deadline - Date.now()))),
       });
       // The known job's read and parser freeze share the content lock. A GET can recover after that writer commits.
@@ -125,14 +130,14 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
       job = await checked(response, 'IntakeParseJob');
     }
     expect(job.state).toBe('validated');
-    const candidate = await checked(await seedRequest('enabler',
+    const candidate = await checked(await managementRequest('enabler',
       `/v1/intake/candidates/${job.candidateId}/versions/${job.candidateVersion}`), 'IntakeCandidate');
     const key = candidate.key;
     const pages: G['IntakeCandidatePage'][] = [];
     let cursor: string | null = null;
     do {
       const query = new URLSearchParams({ limit: '1', ...(cursor ? { cursor } : {}) });
-      const page: G['IntakeCandidatePage'] = await checked(await seedRequest('enabler',
+      const page: G['IntakeCandidatePage'] = await checked(await managementRequest('enabler',
         `${candidatePath(key)}/material?${query}`), 'IntakeCandidatePage');
       pages.push(page);
       cursor = page.nextCursor;
@@ -153,15 +158,15 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     const flow = graphMaterial.sopFlows[0];
     if (!flow) throw new Error('Synthetic native SOP flow is missing');
     const graph = graphFor(graphMaterial, flow);
-    const confirmed = await checked(await seedPost('enabler', `${candidatePath(key)}/source-confirmation`, {
+    const confirmed = await checked(await managementPost('enabler', `${candidatePath(key)}/source-confirmation`, {
       operationId: operation('confirm'), key, expectedEvidenceVersion: 0, confirmedVersionKind: 'opaque',
       confirmedVersionValue: `synthetic-runtime-sop-${revision}`, acquisition: 'controlled-synthetic-export',
       objectSha256: object.sha256, reason: '合成六表来源版本与原文件已显式核对',
     }), 'IntakeCandidate');
-    await checked(await seedPost('reviewer', `${candidatePath(key)}/quality/freeze`, {
+    await checked(await managementPost('reviewer', `${candidatePath(key)}/quality/freeze`, {
       operationId: operation('freeze'), key,
     }), 'IntakeQualityReceipt');
-    const status = await checked(await seedRequest('reviewer',
+    const status = await checked(await managementRequest('reviewer',
       `${candidatePath(key)}/quality?digest=${key.digest}`), 'IntakeQualityStatus');
     const faq: G['IntakeQualitySample'][] = [];
     const sop: G['IntakeSopSopQualitySample'][] = [];
@@ -169,7 +174,7 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     do {
       const query = new URLSearchParams({ digest: key.digest, viewHash: status.viewHash,
         phase: 'initial', limit: '1', ...(cursor ? { cursor } : {}) });
-      const page: G['IntakeQualitySamplePage'] = await checked(await seedRequest('reviewer',
+      const page: G['IntakeQualitySamplePage'] = await checked(await managementRequest('reviewer',
         `${candidatePath(key)}/quality/samples?${query}`), 'IntakeQualitySamplePage');
       faq.push(...page.items);
       sop.push(...page.sopItems ?? []);
@@ -177,13 +182,13 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     } while (cursor);
     expect(faq.length).toBeGreaterThan(0);
     expect(sop.length).toBeGreaterThan(0);
-    const quality = await checked(await seedPost('reviewer', `${candidatePath(key)}/quality/checks`, {
+    const quality = await checked(await managementPost('reviewer', `${candidatePath(key)}/quality/checks`, {
       operationId: operation('checks'), key, phase: 'initial', materialDigest: key.digest,
       checks: faq.map(item => ({ scriptId: item.scriptId, contentHash: item.contentHash, defect: false, reason: '' })),
       sopChecks: sop.map(item => ({ ...item.target, defect: false, reason: '' })),
     }), 'IntakeQualityReceipt');
     expect(quality.state).toBe('passed');
-    const receipt = await checked(await seedPost('director', `${candidatePath(key)}/publish`, {
+    const receipt = await checked(await managementPost('director', `${candidatePath(key)}/publish`, {
       operationId: operation('publish'), key, baseReleaseId, sourceEvidenceVersion: confirmed.sourceEvidenceVersion,
       title: '合成完整 SOP 发布', summary: '正常六表导入、人工质量检查和确认发布', confirmed: true,
     }), 'IntakeReceipt');
@@ -239,11 +244,39 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     host = await createIntakeSyntheticHost({
       prepareCandidate: false, profile: 'purpose-runtime', includeSopQuery: true, includeLegacySearch: false,
       observeSyntheticRequest: (actor, headers) => {
-        if (actor === 'agent') authorization = headers.get('authorization') ?? '';
+        authorizations.set(actor, headers.get('authorization') ?? '');
       },
       observeError: error => diagnostics.push(error instanceof Error ? error.stack ?? error.message : String(error)),
       configureDatabase: async client => {
         admin = client;
+        if (domain === 'sop') {
+          await admin.query('BEGIN');
+          try {
+            await admin.query('SET CONSTRAINTS ALL DEFERRED');
+            await admin.query("INSERT INTO content_intake.scopes VALUES('scope-sop','tenant-a','app-a','brand-a','shop-a','sop')");
+            await admin.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES('source-sop','scope-sop',2,'v2-preview')");
+            await admin.query(`INSERT INTO content_intake.grants SELECT (jsonb_populate_record(NULL::content_intake.grants,
+              to_jsonb(g)||jsonb_build_object('grant_id',grant_id||'-sop','scope_id','scope-sop',
+                'source_id',CASE WHEN source_id IS NULL THEN NULL ELSE 'source-sop' END,
+                'parent_grant_id',CASE WHEN parent_grant_id IS NULL THEN NULL ELSE parent_grant_id||'-sop' END))).*
+              FROM content_intake.grants g WHERE scope_id='scope-a'
+              ORDER BY CASE kind WHEN 'allocation' THEN 0 WHEN 'delegation' THEN 1 ELSE 2 END`);
+            await admin.query(`INSERT INTO content_intake.store_set_members(tenant_id,app_id,version,scope_id,source_id,content_valid_until)
+              SELECT tenant_id,app_id,version,'scope-sop','source-sop',content_valid_until
+              FROM content_intake.store_set_members WHERE source_id='source-a'`);
+            await admin.query(`INSERT INTO content_intake.source_mappings(
+              source_id,version,template_version,rule_version,mapping_version,structure_digest,graph_mapping)
+              VALUES('source-sop',2,$1,$2,$3,$4,$5::jsonb)`, [
+              SOP_TASK_FORMAT.templateVersion, SOP_TASK_FORMAT.ruleVersion, SOP_TASK_FORMAT.mappingVersion,
+              SOP_TASK_STRUCTURE_SHA256, JSON.stringify(syntheticGraphMapping(false, true)),
+            ]);
+            await admin.query('COMMIT');
+          } catch (error) {
+            await admin.query('ROLLBACK');
+            throw error;
+          }
+          return;
+        }
         await admin.query(`INSERT INTO content_intake.source_mappings(
           source_id,version,template_version,rule_version,mapping_version,structure_digest,graph_mapping)
           VALUES('source-a',2,$1,$2,$3,$4,$5::jsonb)`, [
@@ -253,10 +286,10 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
         await admin.query("UPDATE content_intake.sources SET current_mapping_version=2 WHERE source_id='source-a'");
       },
     });
-    publication = await publish('rel_native_base', 1);
-    factsVersion = await registerFacts(publication, { expectedVersion: 0, risk: 'low', copy: true });
-    await json(await host.requestAs('agent', '/v1/auth/me'));
-    expect(authorization).toMatch(/^Bearer \S+$/);
+    for (const actor of ['agent', 'enabler', 'reviewer', 'director'] as const) {
+      await json(await host.requestAs(actor, '/v1/auth/me'));
+      expect(authorizations.get(actor)).toMatch(/^Bearer \S+$/);
+    }
     await admin.query(`CREATE ROLE sop_compatibility_runtime LOGIN; GRANT app_runtime TO sop_compatibility_runtime;
       CREATE ROLE sop_compatibility_admin LOGIN; GRANT app_content_admin TO sop_compatibility_admin`);
     const databasePort = (await admin.query<{ port: string }>('SHOW port')).rows[0]?.port;
@@ -285,6 +318,8 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
       IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-idempotency-v1',
       LOG_HASH_KEY: 'synthetic-runtime-sop-log-hash-0001', LOG_HASH_KEY_VERSION: 'hmac-log-v1',
     } });
+    publication = await publish('rel_native_base', 1);
+    factsVersion = await registerFacts(publication, { expectedVersion: 0, risk: 'low', copy: true });
   }, 120_000);
 
   afterAll(async () => {
@@ -358,6 +393,23 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     expect([...owners].sort()).toEqual(['entry', 'knowledge', 'task']);
   }, 60_000);
 
+  it('projects only granted source domains and refuses an unrelated source upload', async () => {
+    const access = await json(await request('/v1/access/query'));
+    expect(access).toMatchObject({ state: 'allowed', scopes: domain === 'sop' ? [
+      { scope: { domain: 'product', sourceId: 'source-a' } },
+      { scope: { domain: 'sop', sourceId: 'source-sop' } },
+    ] : [{ scope: { domain: 'product', sourceId: 'source-a' } }] });
+    const form = new FormData();
+    form.set('operationId', operation('outside-source'));
+    const bytes = await syntheticTaskGraphWorkbook({ shopWide: true, sharedTaskImage: true });
+    form.set('file', new Blob([new Uint8Array(bytes)], { type: mime }), 'synthetic-outside-source.xlsx');
+    const response = await managementRequest('enabler', '/v1/intake/sources/source-b/objects', {
+      method: 'POST', body: form,
+    });
+    expect(response.status, await response.clone().text()).toBe(404);
+    expect(parseResource('IntakeError', await response.json()).error.details.reason).toBe('SCOPE_DENIED');
+  });
+
   it.each([
     { label: 'unclassified original risk', risk: 'unclassified', copy: true },
     { label: 'unknown original copy permission', risk: 'low', copy: null },
@@ -390,18 +442,42 @@ describe.skipIf(!enabled).sequential('complete SOP publication through actual in
     expect(current.result.entries.map(dep => dep.entry.answerText)).toEqual(['合成对客原文 A\n版本 2', '合成对客原文 B']);
   }, 60_000);
 
+  it('rejects existing and new SOP access while the principal is disabled', async () => {
+    const previous = await createQuery();
+    expect((await readQuery(previous.body)).status).toBe('ready');
+    await admin.query("UPDATE backend_identity.subject_bindings SET enabled=false WHERE binding_id='agent'");
+    try {
+      const response = await post('/v1/sop/query', previous.body);
+      expect(response.status, await response.text()).toBe(401);
+      const fresh = await post('/v1/intake/entitlements', {
+        shopId: 'shop-a', contextGeneration: ++contextGeneration, releaseId: publication.releaseId,
+        productIds: [], scenarioIds: [],
+      });
+      expect(fresh.status, await fresh.text()).toBe(401);
+    } finally {
+      await admin.query("UPDATE backend_identity.subject_bindings SET enabled=true WHERE binding_id='agent'");
+    }
+  });
+
   it('rejects the old query and a fresh query after parent query authority is revoked', async () => {
     const previous = await createQuery();
     expect((await readQuery(previous.body)).status).toBe('ready');
     const revoked = await admin.query(`UPDATE content_intake.grants
       SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成父查询授权撤销'
-      WHERE kind='allocation' AND action='query' AND parent_grant_id IS NULL AND scope_id='scope-a'
-      RETURNING grant_id`);
+      WHERE kind='allocation' AND action='query' AND parent_grant_id IS NULL AND scope_id=$1
+      RETURNING grant_id`, [scopeId]);
     expect(revoked.rowCount).toBeGreaterThan(0);
     for (const body of [previous.body, { ...previous.body, request_id: randomUUID() }]) {
       const response = await post('/v1/sop/query', body);
       expect(response.status, await response.clone().text()).toBe(403);
-      expect(parseResource('ForbiddenOrPolicyDeniedErrorEnvelope', await response.json()).error.code).toBe('FORBIDDEN');
+      const denied: unknown = await response.json();
+      if (domain === 'sop') expect(denied).toEqual({ code: 'SCOPE_DENIED', message: '当前主体没有该店铺或 SOP 查询资格' });
+      else expect(parseResource('ForbiddenOrPolicyDeniedErrorEnvelope', denied).error.code).toBe('FORBIDDEN');
+    }
+    if (domain === 'sop') {
+      expect(await json(await request('/v1/access/query'))).toMatchObject({
+        state: 'allowed', scopes: [{ scope: { domain: 'product', sourceId: 'source-a' } }],
+      });
     }
   });
 });

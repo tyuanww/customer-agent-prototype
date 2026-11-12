@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDomain, type Domain } from '@customer-agent/unified-contracts';
 import type { AccessAction } from './policy.js';
 
 export const ACCESS_ROLES = [
@@ -43,7 +44,7 @@ export type Scope =
       appId: AppId;
       brandId: BrandId;
       shopId?: ShopId;
-      domain: 'product' | 'activity' | 'after-sale' | 'aftersale' | 'general';
+      domain: Domain;
       sourceId: SourceId;
     }>;
 
@@ -167,7 +168,6 @@ const actionSet = new Set<string>([
   'candidate-cancel', 'rollback',
 ]);
 const roleSet = new Set<string>(ACCESS_ROLES);
-const domainSet = new Set(['product', 'activity', 'after-sale', 'aftersale', 'general']);
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -208,14 +208,14 @@ function sourceScope(value: unknown): Extract<Scope, { kind: 'source' }> {
   const item = record(value);
   if (!item) throw new Error('ACCESS_SNAPSHOT_INVALID');
   const domain = text(item.domain);
-  if (!domainSet.has(domain)) throw new Error('ACCESS_SNAPSHOT_INVALID');
+  if (!isDomain(domain)) throw new Error('ACCESS_SNAPSHOT_INVALID');
   return {
     kind: 'source',
     tenantId: text(item.tenantId) as TenantId,
     appId: text(item.appId) as AppId,
     brandId: text(item.brandId) as BrandId,
     ...(item.shopId === null ? {} : { shopId: text(item.shopId) as ShopId }),
-    domain: domain as Extract<Scope, { kind: 'source' }>['domain'],
+    domain,
     sourceId: text(item.sourceId) as SourceId,
   };
 }

@@ -53,7 +53,12 @@ export type AlertKind = (typeof ALERT_KINDS)[number];
 export type AccessRole = (typeof ACCESS_ROLES)[number];
 export type AccessAction = (typeof ACCESS_ACTIONS)[number];
 export type ScopeKind = 'tenant' | 'brand' | 'shop' | 'source';
-export type Domain = 'product' | 'activity' | 'after-sale' | 'aftersale' | 'general';
+export const DOMAINS = ['product', 'activity', 'after-sale', 'aftersale', 'general', 'sop'] as const;
+export type Domain = (typeof DOMAINS)[number];
+const domainSet = new Set<unknown>(DOMAINS);
+export function isDomain(value: unknown): value is Domain {
+  return domainSet.has(value);
+}
 
 export const ACCESS_ROLES = [
   'agent', 'director', 'enabler', 'engineer', 'lead', 'manager', 'supervisor',
@@ -486,7 +491,7 @@ function parseScope(value: unknown, path: string): ValidationResult<Scope> {
   for (const key of ['tenantId', 'appId'] as const) if (typeof value[key] !== 'string' || value[key].length === 0) return fail(`${path}.${key}`, 'required');
   const required: Record<ScopeKind, string[]> = { tenant: [], brand: ['brandId'], shop: ['brandId', 'shopId'], source: ['brandId', 'shopId', 'domain', 'sourceId'] };
   for (const key of required[kind]) if (typeof value[key] !== 'string' || value[key].length === 0) return fail(`${path}.${key}`, 'required for scope kind');
-  if (value.domain !== undefined && !['product', 'activity', 'after-sale', 'aftersale', 'general'].includes(value.domain as string)) return fail(`${path}.domain`, 'invalid domain');
+  if (value.domain !== undefined && !isDomain(value.domain)) return fail(`${path}.domain`, 'invalid domain');
   return ok(value as Scope);
 }
 
