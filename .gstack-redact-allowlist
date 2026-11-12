@@ -1,0 +1,2 @@
+# Synthetic invalid DSN credential span used by the startup-error redaction regression.
+postgresql://synthetic_intake:synthetic-private-password@db.example.invalid
