@@ -103,7 +103,7 @@ apply 的默认审计文件是 `<root>/release-evidence/production-release.jsonl
 | `DEPLOYMENT_PRIVILEGE_REQUIRED` | apply 不是以 root 运行，无法安全重启 systemd unit |
 | `DEPLOYMENT_LOCKED` | 另一个部署持有锁 |
 | `RELEASE_*` | 候选目录、Git、版本或入口无效 |
-| `MIGRATION_PREFIX_MISMATCH` | 当前和候选迁移目录不是严格前缀 |
+| `MIGRATION_PREFIX_MISMATCH` | 当前和候选迁移目录的对应项不一致 |
 | `BACKUP_EVIDENCE_INVALID` | 恢复 evidence 不覆盖该候选 |
 | `TENANT_REPORT_INVALID` | 租户预检未 ready |
 | `TENANT_REPORT_STALE` | 传入的 ready 报告与当前数据库聚合不一致 |

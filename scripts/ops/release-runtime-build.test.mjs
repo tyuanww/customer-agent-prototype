@@ -105,6 +105,11 @@ test('runtime read binds API and workspace builds while default read retains its
       { code: 'CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH' });
     rmSync(contentLink);
     symlinkSync(path.join(release, 'packages/content-intake'), contentLink, 'dir');
+    const shadow = path.join(release, 'apps/api/node_modules/@customer-agent/content-intake');
+    write(shadow, 'index.js', 'export const workbookMarker = "unverified-no-manifest";\n');
+    assert.throws(() => readCandidateRelease(release, { verifyRuntime: true }),
+      { code: 'CANDIDATE_RUNTIME_DEPENDENCIES_MISMATCH' });
+    rmSync(shadow, { recursive: true });
     assert.equal(readCandidateRelease(release, { verifyRuntime: true }).runtimeBuildSha256, runtimeBuildSha256);
     const apiFile = path.join(release, 'apps/api/dist/index.js');
     const original = readFileSync(apiFile);

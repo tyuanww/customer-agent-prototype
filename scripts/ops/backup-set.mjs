@@ -1852,7 +1852,7 @@ function assertRuntimeWorkspaceResolution(releaseRoot, rebuiltRoot) {
     for (const dependency of Object.keys(metadata.dependencies ?? {})) {
       if (!dependency.startsWith('@customer-agent/')) continue;
       const searchRoot = requireFromRuntime.resolve.paths(dependency)?.find((entry) =>
-        existsSync(path.join(entry, dependency, 'package.json')));
+        existsSync(path.join(entry, dependency)));
       const target = directories.get(dependency);
       // Bind the package root as well as its dist. A foreign package can link its
       // bare export to verified bytes while sending a subpath elsewhere.
