@@ -6,7 +6,7 @@
 
 - `--sha`：候选完整 40 位 Git SHA，目录必须位于 `<root>/releases/<sha>`，Git `HEAD` 必须等于目录名，tracked 文件必须干净。
 - `--expected-version`：必须与 release 根 `VERSION` 和 `apps/desktop/package.json` 一致。
-- `--backup-evidence`：恢复预演产出的 evidence。必须是 `PASS`、包含完整候选 SHA 和版本，并且最终迁移数等于候选迁移目录。
+- `--backup-evidence`：带 `--rollback-release` 的恢复预演证据。数据库保真、候选 runtime 和各迁移前缀的回退检查均须通过，候选与回退 SHA 必须对应本次发布。
 - `--tenant-report`：只读租户预检产出的 JSON。必须是 `ready`，且阻断码为空。
 - `profile.json`：生产环境使用 `environment=production`、库 `customer_agent_formal` 和现有 stack root。
 - `api.env`：必须是 `0600` 普通文件，并且只包含一个 `CUSTOMER_AGENT_BUILD_VERSION`。
@@ -53,7 +53,7 @@ node /srv/customer-agent/releases/<candidate-sha>/scripts/ops/customer-agent-pro
 
 1. 验证候选 Git、版本、数据库构建与源码重建一致、迁移前缀、备份 evidence、生产 profile 和当前服务 readiness。
 2. 重新执行实时租户快照，并要求它与传入报告一致。
-3. 确认数据库账本等于回滚 release 或候选 release。
+3. 确认数据库账本等于回滚 release 或候选 release，重建核对 runtime 产物，并核对预检绑定的当前内容指针、来源门禁和范围指纹。
 4. 在 `release-evidence/deployment-state.json` 持久化旧指针、旧版本、候选、备份 ID 和阶段。
 5. 用候选自带数据库模块应用追加迁移并运行候选 verifier。
 6. 先把原 `api.env` 备份放入 0600 evidence，再把备份索引写入部署状态，最后原子更新构建版本。
@@ -61,9 +61,15 @@ node /srv/customer-agent/releases/<candidate-sha>/scripts/ops/customer-agent-pro
 8. 重启 `customer-agent-stack.service`。
 9. 同时等待 `/health` 报告候选版本、`/ready` 的五个依赖检查全部 `ok`。
 
-任一步失败都会停止。迁移失败不改指针、不重启服务。指针切换、重启或 readiness 失败时，入口从持久化状态恢复上一指针和原 `api.env`，重启并等待上一版本重新 ready。进程被 SIGKILL 后重试会复用同一状态和原 env 备份；如果上次停在 rollback，下一次 apply 会先完成回滚。回滚 readiness 仍失败时以 `ROLLBACK_FAILED` 停止并保留现场。
+任一步失败都会停止。迁移失败后，入口先确认回退版本能读取实际账本并通过数据库 verifier，再恢复指针和配置。已经进入服务重启阶段时会重启回退版本；每次回退均检查服务 readiness，成功后才记录 `rolled_back`。进程被 SIGKILL 后重试会复用同一状态和原 env 备份；如果上次停在 rollback，下一次 apply 会先完成回滚。兼容检查或 readiness 失败时以 `ROLLBACK_FAILED` 停止并保留现场。
 
 数据库迁移已经提交后，代码回滚不会撤销 schema。需要回退 schema 时必须使用已验证的完整备份恢复，不能改写迁移账本。
+
+`RELEASE_PREFLIGHT_REQUIRED` 表示缺少绑定本次发布的完整预检。`CANDIDATE_RUNTIME_NOT_READY` 表示候选无法加载恢复后的目录。`ROLLBACK_INCOMPATIBLE` 表示回退版本不能读取至少一个可能提交的迁移前缀。`RELEASE_RUNTIME_BUILD_CHANGED` 表示 runtime 产物与预检不一致。`RELEASE_PREFLIGHT_STALE` 表示预检后的内容指针、来源门禁或范围发生变化，需要重新预演。上述检查在 live 迁移之前执行。
+
+应用迁移的数据库会话按既有顺序取得内容发布锁，并在锁内重查指纹。该会话持锁到迁移及其 verifier 完成，随后释放。来源撤销和内容发布通过同一锁与迁移串行。
+
+候选迁移目录与当前目录逐项相同时，可以发布新的代码版本。较短目录或任意来源、校验和变化继续被拒绝。
 
 ## 测试环境
 

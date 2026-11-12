@@ -45,15 +45,20 @@ CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/restore-evidence.json   sc
 
 核对证据中的 `status`、`verifierStatus`、迁移数、对象数、receipt 数、RPO、恢复耗时和 `scratchCleaned`。必须读取实际证据，不只看 shell 退出码。角色口令与服务环境配置另行恢复，应用启动、登录、查询、权限撤销和对象消费应继续在隔离环境验收。
 
-候选发布还必须从生产备份继续应用追加迁移。传入已构建、版本身份一致的候选 release：
+候选发布需要检查候选启动和回退兼容。传入已构建的候选，以及当前部署的回退 release。
 
 ```sh
 CUSTOMER_AGENT_RESTORE_EVIDENCE_FILE=/controlled/path/candidate-restore-evidence.json \
   scripts/ops/customer-agent-restore-drill.sh "$backup_set" \
-  --candidate-release /controlled/path/releases/<candidate-sha>
+  --candidate-release /controlled/path/releases/<candidate-sha> \
+  --rollback-release /controlled/path/releases/<current-sha>
 ```
 
 这次运行先从候选的 clean tracked `HEAD` 在临时目录重新编译数据库模块，逐文件比对候选自带的 `dist` 后才导入它。编译器来自执行恢复工具自身的 release，不从被检查的候选目录取可执行文件。随后在临时 PG15 中验证备份恢复的数据库、角色、ACL、对象和原迁移前缀，再应用追加迁移并运行候选 verifier。证据同时记录 `restoredMigrationCount`、最终 `migrationCount`、`appliedMigrationIds`、候选版本、源 verifier 和候选 verifier。候选目录名必须等于 release 的 Git `HEAD`，tracked 文件保持干净；构建产物可被 Git 忽略，但出现 symlink、额外文件或重建差异都会 fail-closed。该命令不连接生产服务，也不修改源备份。
+
+指定 `--rollback-release` 时，每次提交迁移后都会用回退版本读取账本并执行其数据库 verifier。候选迁移完成后，探针用候选的实际用途池加载 Query runtime，要求初始化和 readiness 均成功。相同迁移目录的代码发布也执行这些检查。
+
+结果写入 `deploymentChecks`，绑定候选与回退 SHA、当前内容指针、来源门禁和范围指纹，以及每个迁移前缀的结果。候选 API 及六个 workspace 运行依赖会从已提交源码独立重建，完整产物摘要随证据保存。Node 的实际 workspace 依赖解析必须指向对应的已验证产物。编译配置和依赖锁需要与执行工具对应。缺投影的历史目录和不兼容的回退版本会使预检失败，数据库恢复及 verifier 的独立结果仍保留。此检查覆盖只读初始化，业务查询、登录及复制继续使用对应验收入口。
 
 ## 迁移旧定时任务
 

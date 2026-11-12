@@ -27,7 +27,7 @@ import pg from 'pg';
 import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseStackProfile } from '../synthetic-stack/profile.ts';
-import { readCandidateRelease } from './backup-set.mjs';
+import { readCandidateRelease, readRuntimeContentFingerprint } from './backup-set.mjs';
 import {
   collectSnapshot,
   evaluateSnapshot,
@@ -234,7 +234,7 @@ function readRelease(root, sha, expectedVersion, requireClean) {
     fail('RELEASE_VERSION_MISMATCH', 'release version does not match expected version');
   }
   releaseEntryReady(releaseRoot);
-  const verifiedBuild = readCandidateRelease(releaseRoot);
+  const verifiedBuild = readCandidateRelease(releaseRoot, { verifyRuntime: requireClean });
   if (verifiedBuild.gitSha !== sha || verifiedBuild.version !== version) {
     fail('RELEASE_BUILD_INVALID', 'candidate database build is not bound to the release identity');
   }
@@ -244,6 +244,7 @@ function readRelease(root, sha, expectedVersion, requireClean) {
     version,
     git,
     manifest: readManifest(releaseRoot),
+    runtimeBuildSha256: verifiedBuild.runtimeBuildSha256,
   });
 }
 
@@ -282,8 +283,8 @@ function readCurrent(root) {
 }
 
 function validatePrefix(current, next) {
-  if (next.length <= current.length) {
-    fail('MIGRATION_NOT_FORWARD', 'candidate release does not advance the migration catalogue');
+  if (next.length < current.length) {
+    fail('MIGRATION_NOT_FORWARD', 'candidate release is behind the current migration catalogue');
   }
   for (let index = 0; index < current.length; index += 1) {
     const left = current[index];
@@ -314,7 +315,9 @@ function validateSameCatalogue(current, next) {
 function readBackupEvidence(file, next) {
   const evidence = readJson(path.resolve(file), 'BACKUP_EVIDENCE_INVALID');
   const restoredAt = Date.parse(evidence?.restoreCompletedAt);
-  if (!evidence || evidence.status !== 'PASS' || evidence.verifierStatus !== 'PASS'
+  const restorePassed = evidence?.status === 'PASS'
+    || (evidence?.status === 'FAIL' && evidence.errorCode === 'RELEASE_PREFLIGHT_FAILED');
+  if (!restorePassed || evidence.verifierStatus !== 'PASS'
     || evidence.metadataAndObjectFidelity !== 'PASS' || evidence.scratchCleaned !== true
     || typeof evidence.backupId !== 'string' || evidence.backupId.length < 1
     || !Number.isFinite(restoredAt)
@@ -329,7 +332,34 @@ function readBackupEvidence(file, next) {
     snapshotAt: evidence.backupSnapshotAt,
     restoredAt: evidence.restoreCompletedAt,
     migrationCount: evidence.migrationCount,
+    deploymentChecks: evidence.deploymentChecks,
   });
+}
+
+export function assertDeploymentChecks(checks, previous, next, contentFingerprint) {
+  if (!checks || checks.schema !== 'customer-agent-release-preflight/v1'
+    || checks.candidateGitSha !== next.sha || checks.rollbackGitSha !== previous.sha
+    || !checks.runtime || !Array.isArray(checks.rollback)
+    || checks.rollback.length !== next.manifest.length - previous.manifest.length + 1) {
+    fail('RELEASE_PREFLIGHT_REQUIRED', 'restore evidence must cover this candidate and rollback release');
+  }
+  if (checks.runtime.status !== 'PASS' || checks.runtime.code !== null) {
+    fail('CANDIDATE_RUNTIME_NOT_READY', 'candidate runtime did not accept the restored content');
+  }
+  if (typeof checks.runtimeBuildSha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(checks.runtimeBuildSha256)
+    || checks.runtimeBuildSha256 !== next.runtimeBuildSha256) {
+    fail('RELEASE_RUNTIME_BUILD_CHANGED', 'candidate runtime build differs from the preflight artifact');
+  }
+  if (checks.rollback.some((check, index) => !check
+    || check.migrationCount !== previous.manifest.length + index
+    || check.status !== 'PASS' || check.code !== null)) {
+    fail('ROLLBACK_INCOMPATIBLE', 'rollback release cannot read every committed migration prefix');
+  }
+  if (checks.status !== 'PASS') fail('RELEASE_PREFLIGHT_REQUIRED', 'release preflight did not pass');
+  if (typeof checks.contentFingerprint !== 'string' || !/^[0-9a-f]{64}$/u.test(checks.contentFingerprint)
+    || checks.contentFingerprint !== contentFingerprint) {
+    fail('RELEASE_PREFLIGHT_STALE', 'current content identity changed after the restore preflight');
+  }
 }
 
 function readTenantReport(file) {
@@ -894,9 +924,19 @@ export function assertMigrationCompletion(databaseIds, nextIds, migration) {
   if (!migration || migration.verifierStatus !== 'PASS'
     || !Array.isArray(migration.finalIds) || !Array.isArray(migration.appliedIds)
     || !sameIds(migration.finalIds, nextIds)
-    || (databaseIds.length < nextIds.length
-      && !sameIds(migration.appliedIds, nextIds.slice(databaseIds.length)))) {
+    || !sameIds(migration.appliedIds, nextIds.slice(databaseIds.length))) {
     fail('DATABASE_MIGRATION_APPLY_INVALID', 'database did not reach the verified candidate catalogue');
+  }
+}
+
+/** Holds the existing publication locks until the caller closes this database session. */
+export async function lockDeploymentContent(client, contentFingerprint) {
+  await client.query(`SET lock_timeout = '${PROBE_TIMEOUT_MS}ms'`);
+  await client.query('SELECT pg_advisory_lock(724019, 1)');
+  await client.query('SELECT pg_advisory_lock(724019, 19)');
+  await client.query("SELECT pg_advisory_lock(hashtext('cs_ai_content_publish'))");
+  if (await readRuntimeContentFingerprint(client) !== contentFingerprint) {
+    fail('RELEASE_PREFLIGHT_STALE', 'content changed before migration admission');
   }
 }
 
@@ -922,12 +962,21 @@ function defaultDependencies(options) {
     inspectDatabase: async (profile, next) => withDatabase(profile, next, async (database, client) => (
       migrationIds(await database.inspectDatabaseMigrations(client))
     )),
+    inspectContentFingerprint: async (profile, next) => withDatabase(profile, next, (_database, client) => (
+      readRuntimeContentFingerprint(client)
+    )),
+    verifyRollbackDatabase: async (profile, previous) => withDatabase(profile, previous, async (database, client) => {
+      await database.inspectDatabaseMigrations(client);
+      const verification = await database.verifyDatabaseMigrations(client);
+      if (verification.status !== 'PASS') fail('ROLLBACK_DATABASE_INCOMPATIBLE', 'rollback database verification failed');
+    }),
     inspectTenancy: async (profile) => inspectLiveTenancy(profile),
     readApiVersion: async () => readApiVersion(options.stackRoot),
     backupApiVersion: async () => backupApiVersion(options.stackRoot, path.dirname(options.auditFile)),
     writeApiVersion: async (version) => writeApiVersion(options.stackRoot, version),
     readApiVersionBackup: async (reference) => readApiVersionBackup(options.stackRoot, reference),
-    applyDatabase: async (profile, next) => withDatabase(profile, next, async (database, client) => {
+    applyDatabase: async (profile, next, contentFingerprint) => withDatabase(profile, next, async (database, client) => {
+      await lockDeploymentContent(client, contentFingerprint);
       const result = await database.applyDatabaseMigrations(client);
       if (!result || !Array.isArray(result.applied)) {
         fail('DATABASE_MIGRATION_APPLY_INVALID', 'candidate migration result is unreadable');
@@ -1027,6 +1076,8 @@ export async function runProductionRelease(options, suppliedDependencies) {
   };
 
   const rollback = async (state) => {
+    if (!profile) fail('ROLLBACK_CONTEXT_MISSING', 'rollback profile is unavailable');
+    await dependencies.verifyRollbackDatabase(profile, previous);
     let apiBackup = null;
     if (state.apiEnvBackup) {
       apiBackup = await dependencies.readApiVersionBackup(state.apiEnvBackup);
@@ -1042,13 +1093,12 @@ export async function runProductionRelease(options, suppliedDependencies) {
       await audit('api-version-restored');
     }
     if (state.serviceStageReached) {
-      if (!profile) fail('ROLLBACK_CONTEXT_MISSING', 'rollback profile is unavailable');
       phase = 'rollback-restart';
       await dependencies.restartService();
-      phase = 'rollback-readiness';
-      await dependencies.waitForReady(profile, previous.version);
-      await audit('rollback-ready', { currentSha: previous.sha });
     }
+    phase = 'rollback-readiness';
+    await dependencies.waitForReady(profile, previous.version);
+    await audit('rollback-ready', { currentSha: previous.sha });
     deploymentState = Object.freeze({
       ...state,
       status: 'rolled_back',
@@ -1139,6 +1189,9 @@ export async function runProductionRelease(options, suppliedDependencies) {
       });
     }
 
+    assertDeploymentChecks(backupEvidence.deploymentChecks, previous, next,
+      await dependencies.inspectContentFingerprint(profile, next));
+
     const pending = next.manifest.slice(databaseIds.length).map((migration) => migration.id);
     const plan = Object.freeze({
       status: options.apply ? 'ready-to-apply' : 'dry-run',
@@ -1170,7 +1223,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
     phase = 'migrate';
     assertNotInterrupted();
     mutationStarted = true;
-    const migration = await dependencies.applyDatabase(profile, next);
+    const migration = await dependencies.applyDatabase(profile, next, backupEvidence.deploymentChecks.contentFingerprint);
     assertNotInterrupted();
     assertMigrationCompletion(databaseIds, nextIds, migration);
     await audit('migrations-applied', {

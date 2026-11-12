@@ -45,6 +45,7 @@ function fixture({ apply = true, inspectIds } = {}) {
     sha: NEXT,
     version: NEXT_VERSION,
     manifest: nextManifest,
+    runtimeBuildSha256: '0'.repeat(64),
   });
   const events = [];
   const audit = [];
@@ -70,6 +71,15 @@ function fixture({ apply = true, inspectIds } = {}) {
       snapshotAt: '2026-11-05T00:00:00Z',
       restoredAt: '2026-11-05T00:01:00Z',
       migrationCount: 2,
+      deploymentChecks: {
+        schema: 'customer-agent-release-preflight/v1', status: 'PASS',
+        candidateGitSha: NEXT, rollbackGitSha: OLD,
+        runtimeBuildSha256: '0'.repeat(64),
+        runtime: { status: 'PASS', code: null },
+        contentFingerprint: 'f'.repeat(64),
+        rollback: [{ migrationCount: 1, status: 'PASS', code: null },
+          { migrationCount: 2, status: 'PASS', code: null }],
+      },
     }),
     readTenantReport: async () => Object.freeze({
       path: '/evidence/tenant.json',
@@ -96,6 +106,8 @@ function fixture({ apply = true, inspectIds } = {}) {
       historicalDefaultBatchCount: 0,
     }),
     inspectDatabase: async () => databaseIds,
+    inspectContentFingerprint: async () => 'f'.repeat(64),
+    verifyRollbackDatabase: async () => undefined,
     applyDatabase: async () => {
       events.push('migrate');
       databaseIds = nextManifest.map((item) => item.id);
@@ -266,7 +278,7 @@ test('migration failure leaves the pointer and service untouched', async () => {
       () => runProductionRelease(value.options, value.dependencies),
       (error) => error?.code === 'DATABASE_MIGRATION_APPLY_INVALID',
     );
-    assert.deepEqual(value.events, [`ready-${OLD_VERSION}`]);
+    assert.deepEqual(value.events, [`ready-${OLD_VERSION}`, `ready-${OLD_VERSION}`]);
     assert.equal(value.isLockReleased(), true);
   } finally {
     rmSync(value.root, { recursive: true, force: true });
@@ -325,6 +337,7 @@ test('symlink failure restores api.env without restarting the old service', asyn
       'switch-failed',
       'restore-current',
       'restore-api-version',
+      `ready-${OLD_VERSION}`,
     ]);
     assert.equal(value.isLockReleased(), true);
   } finally {
@@ -406,6 +419,7 @@ test('SIGINT after switch triggers rollback before the lock is released', async 
       'switch',
       'restore-current',
       'restore-api-version',
+      `ready-${OLD_VERSION}`,
     ]);
     assert.equal(value.isLockReleased(), true);
   } finally {
@@ -676,5 +690,75 @@ test('deployment lock reclaims a stale same-host owner but not an unreadable loc
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const [label, modify, expectedCode] of [
+  ['missing runtime evidence', () => undefined, 'RELEASE_PREFLIGHT_REQUIRED'],
+  ['wrong candidate', checks => ({ ...checks, candidateGitSha: OLD }), 'RELEASE_PREFLIGHT_REQUIRED'],
+  ['wrong rollback', checks => ({ ...checks, rollbackGitSha: NEXT }), 'RELEASE_PREFLIGHT_REQUIRED'],
+  ['missing committed prefix', checks => ({ ...checks, rollback: checks.rollback.slice(0, 1) }), 'RELEASE_PREFLIGHT_REQUIRED'],
+  ['unprojected content', checks => ({ ...checks, runtime: { status: 'FAIL', code: 'RELEASE_INDEX_ITEM_GAP' } }), 'CANDIDATE_RUNTIME_NOT_READY'],
+  ['incompatible rollback', checks => ({ ...checks, rollback: checks.rollback.map(row => row.migrationCount === 2
+    ? { ...row, status: 'FAIL', code: 'MIGRATION_LEDGER_DRIFT' } : row) }), 'ROLLBACK_INCOMPATIBLE'],
+  ['changed content', checks => ({ ...checks, contentFingerprint: 'e'.repeat(64) }), 'RELEASE_PREFLIGHT_STALE'],
+  ['changed runtime build', checks => ({ ...checks, runtimeBuildSha256: '1'.repeat(64) }), 'RELEASE_RUNTIME_BUILD_CHANGED'],
+]) {
+  test(`preflight rejects ${label} before any deployment write`, async () => {
+    const value = fixture();
+    const evidence = await value.dependencies.readEvidence();
+    value.dependencies.readEvidence = async () => ({ ...evidence, deploymentChecks: modify(evidence.deploymentChecks) });
+    try {
+      await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+        error => error?.code === expectedCode);
+      assert.equal(value.currentValue, value.current);
+      assert.equal(value.apiVersion, OLD_VERSION);
+      assert.equal(value.deploymentState, null);
+      assert.deepEqual(value.events, [`ready-${OLD_VERSION}`]);
+    } finally {
+      rmSync(value.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('code-only release accepts an identical migration catalogue', async () => {
+  const value = fixture();
+  const next = { ...value.next, manifest: value.current.manifest };
+  const evidence = await value.dependencies.readEvidence();
+  const checks = { ...evidence.deploymentChecks, rollback: evidence.deploymentChecks.rollback.slice(0, 1) };
+  value.dependencies.readNext = async () => next;
+  value.dependencies.readEvidence = async () => ({ ...evidence, migrationCount: 1, deploymentChecks: checks });
+  value.dependencies.applyDatabase = async () => ({
+    appliedIds: [], finalIds: [next.manifest[0].id], verifierStatus: 'PASS',
+  });
+  try {
+    const result = await runProductionRelease(value.options, value.dependencies);
+    assert.equal(result.status, 'applied');
+    assert.deepEqual(result.pendingMigrationIds, []);
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
+test('same-catalogue completion rejects unexpected applied migrations', () => {
+  assert.throws(() => assertMigrationCompletion(['0001_first'], ['0001_first'], {
+    verifierStatus: 'PASS', finalIds: ['0001_first'], appliedIds: ['0002_unexpected'],
+  }), error => error?.code === 'DATABASE_MIGRATION_APPLY_INVALID');
+});
+
+test('failed migration cannot record rollback success when the old database check fails', async () => {
+  const value = fixture();
+  value.dependencies.applyDatabase = async () => { throw new Error('migration failed after commit'); };
+  value.dependencies.verifyRollbackDatabase = async () => {
+    throw new ProductionReleaseError('MIGRATION_LEDGER_DRIFT', 'old reader rejects the committed prefix');
+  };
+  try {
+    await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+      error => error?.code === 'ROLLBACK_FAILED');
+    assert.equal(value.deploymentState.status, 'rolling_back');
+    assert.deepEqual(value.events, [`ready-${OLD_VERSION}`]);
+    assert.equal(value.audit.some(entry => entry.event === 'rollback-ready'), false);
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
   }
 });

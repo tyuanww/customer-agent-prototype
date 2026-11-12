@@ -4,6 +4,7 @@ All notable changes to this customer-agent product implementation repository are
 
 ## Unreleased
 
+- 发布前在完整备份恢复库中检查查询目录和每个迁移阶段的回退兼容性，核对实际运行依赖，并在迁移期间串行处理内容变更。回退成功须经过数据库和服务就绪验证。
 - 修复 SOP 窗口订阅晚于 Main 首次状态推送时可能停留空白的问题；新订阅只接收最新已校验状态，包括撤权后的清空状态。
 - 五组 SOP PostgreSQL 专项纳入持续集成，迁移数以当前目录为准；桌面与 SOP 查询改动自动运行独立 SOP 窗口回归。
 - 显式 SOP 合成 profile 可从临时 PostgreSQL 查询已发布图，在独立窗口按明确分支推进并复制获准话术；条件、会话、版本或租约失效会清除旧内容。

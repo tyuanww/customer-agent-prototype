@@ -23,6 +23,8 @@ import { Pg15Harness } from '../../packages/database/dist/testkit/index.js';
 import { applyMigrationPrefix } from '../../packages/database/dist/index.js';
 import { generatedMigrationCatalogue } from '../../packages/database/dist/generated/migrations.generated.js';
 import { verifyReadinessSuccessor } from '../../packages/database/dist/verifier.js';
+import { seedIntakeSyntheticHost } from '../../apps/api/tests/support/intake-synthetic-seed.ts';
+import { lockDeploymentContent } from './customer-agent-production-release.mjs';
 import {
   DATABASE_DUMP_FILE,
   ROLES_FILE,
@@ -33,6 +35,7 @@ import {
   createBackupSet,
   extractObjectArchive,
   verifyBackupSet,
+  readRuntimeContentFingerprint,
 } from './backup-set.mjs';
 
 const enabled = process.env.CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION === '1';
@@ -659,3 +662,85 @@ test('candidate rehearsal applies forward migrations to a restored 79-prefix bac
   skip: enabled ? false : 'set CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION=1',
   timeout: 20 * 60_000,
 }, async () => exerciseBackupSetForMigrationCount(79, true));
+
+test('deployment content admission detects source suspension and holds the publication lock', {
+  skip: enabled ? false : 'set CUSTOMER_AGENT_BACKUP_PG15_INTEGRATION=1',
+  timeout: 60_000,
+}, async () => {
+  const harness = new Pg15Harness();
+  const clients = [];
+  let publication;
+  let admission;
+  harness.start();
+  try {
+    const database = harness.createDatabase('deployment_content');
+    const owner = await harness.connect(database.config);
+    clients.push(owner);
+    await applyMigrationPrefix(owner, generatedMigrationCatalogue.migrations.length);
+    await seedIntakeSyntheticHost(owner);
+    const before = await readRuntimeContentFingerprint(owner);
+    await owner.query("SET TIME ZONE 'UTC'");
+    assert.equal(await readRuntimeContentFingerprint(owner), before);
+    await owner.query("SET TIME ZONE 'Asia/Shanghai'");
+    await owner.query(`SELECT public.suspend_authoritative_source(
+      'srcv_pub_product','SOURCE_REVOKED','EVD-DEPLOYMENT-CONTENT','synthetic_owner','owner')`);
+    const after = await readRuntimeContentFingerprint(owner);
+    assert.notEqual(after, before);
+    await assert.rejects(lockDeploymentContent(owner, before), { code: 'RELEASE_PREFLIGHT_STALE' });
+    await owner.end();
+    clients.pop();
+
+    const deployment = await harness.connect(database.config);
+    clients.push(deployment);
+    await lockDeploymentContent(deployment, after);
+    const writer = await harness.connect(database.config);
+    clients.push(writer);
+    const observer = await harness.connect(database.config);
+    clients.push(observer);
+    const pid = (await writer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    await writer.query('BEGIN');
+    publication = writer.query('SELECT backend_review.lock_content()');
+    const deadline = Date.now() + 5000;
+    let waiting = false;
+    while (!waiting && Date.now() < deadline) {
+      waiting = (await observer.query(
+        'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid=$1 AND NOT granted) AS waiting', [pid],
+      )).rows[0].waiting;
+      if (!waiting) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(waiting, true);
+    await deployment.end();
+    clients.splice(clients.indexOf(deployment), 1);
+    await publication;
+    publication = null;
+    await writer.query('ROLLBACK');
+
+    const nextDeployment = await harness.connect(database.config);
+    clients.push(nextDeployment);
+    const deploymentPid = (await nextDeployment.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    await writer.query('BEGIN');
+    await writer.query('SELECT pg_advisory_xact_lock(724019, 1)');
+    admission = lockDeploymentContent(nextDeployment, after).then(
+      () => ({ ok: true }), error => ({ ok: false, code: error.code }),
+    );
+    const admissionDeadline = Date.now() + 5000;
+    let admissionWaiting = false;
+    while (!admissionWaiting && Date.now() < admissionDeadline) {
+      admissionWaiting = (await observer.query(
+        'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid=$1 AND NOT granted) AS waiting', [deploymentPid],
+      )).rows[0].waiting;
+      if (!admissionWaiting) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(admissionWaiting, true);
+    // The real importer must acquire its second lock while deployment waits on its first.
+    await writer.query("SELECT public.assert_no_in_flight_content_import('synthetic_owner')");
+    await writer.query('ROLLBACK');
+    assert.deepEqual(await admission, { ok: true });
+    admission = null;
+  } finally {
+    await Promise.allSettled(clients.map(client => client.end()));
+    await publication?.catch(() => undefined);
+    await admission;
+    harness.stop();
+  }
+});
