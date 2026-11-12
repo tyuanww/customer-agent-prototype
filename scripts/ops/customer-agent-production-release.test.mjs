@@ -7,6 +7,7 @@ import {
   acquireDeploymentLock,
   assertApplyPrivilege,
   assertMigrationCompletion,
+  assertQueryProfileBinding,
   parseOptions,
   ProductionReleaseError,
   readinessMatches,
@@ -761,4 +762,113 @@ test('failed migration cannot record rollback success when the old database chec
   } finally {
     rmSync(value.root, { recursive: true, force: true });
   }
+});
+
+test('mode-bound restore evidence rejects configuration changes before deployment writes', async () => {
+  const value = fixture();
+  const evidence = await value.dependencies.readEvidence();
+  const queryProfile = { mode: 'intake-compat', configurationSha256: 'c'.repeat(64) };
+  value.dependencies.readQueryProfile = async () => queryProfile;
+  value.dependencies.readEvidence = async () => ({ ...evidence, deploymentChecks: {
+    ...evidence.deploymentChecks, schema: 'customer-agent-release-preflight/v2',
+    runtime: { status: 'PASS', code: null, queryMode: 'unified', configurationSha256: 'd'.repeat(64) },
+  } });
+  try {
+    await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+      error => error?.code === 'RELEASE_QUERY_PROFILE_CHANGED');
+    assert.equal(value.currentValue, value.current);
+    assert.equal(value.deploymentState, null);
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('intake compatibility cannot consume unbound v1 restore evidence', async () => {
+  const value = fixture();
+  value.dependencies.readQueryProfile = async () => ({ mode: 'intake-compat', configurationSha256: 'c'.repeat(64) });
+  try {
+    await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+      error => error?.code === 'RELEASE_QUERY_PROFILE_REQUIRED');
+    assert.equal(value.deploymentState, null);
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('query binding and configured mode remain mandatory when readiness is green', () => {
+  const profile = { mode: 'intake-compat', configurationSha256: 'c'.repeat(64) };
+  const runtime = { queryMode: profile.mode, configurationSha256: profile.configurationSha256,
+    scope: 'candidate-intake-catalog-readonly-gates' };
+  assert.doesNotThrow(() => assertQueryProfileBinding(runtime, profile));
+  for (const actual of [undefined, { ...profile, mode: 'unified' }, { ...profile, configurationSha256: 'd'.repeat(64) }]) {
+    assert.throws(() => assertQueryProfileBinding(runtime, actual), error => error?.code === 'RELEASE_QUERY_PROFILE_CHANGED');
+  }
+  const health = { status: 'ok', service: 'cs-ai-api', version: NEXT_VERSION };
+  const ready = { status: 'ready', checks: { database: 'ok', schema: 'ok', auth: 'ok', storage: 'ok', content: 'ok' } };
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'intake-compat', 'intake-compat'), true);
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'intake-compat', 'unified'), false);
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'intake-compat', null), false);
+});
+
+function bindIntakeEvidence(value) {
+  const queryProfile = { mode: 'intake-compat', configurationSha256: 'c'.repeat(64) };
+  const readEvidence = value.dependencies.readEvidence;
+  value.dependencies.readQueryProfile = async () => queryProfile;
+  value.dependencies.readEvidence = async () => {
+    const evidence = await readEvidence();
+    return { ...evidence, deploymentChecks: { ...evidence.deploymentChecks,
+      schema: 'customer-agent-release-preflight/v2', runtime: {
+        status: 'PASS', code: null, queryMode: queryProfile.mode,
+        configurationSha256: queryProfile.configurationSha256, scope: 'candidate-intake-catalog-readonly-gates',
+      } } };
+  };
+  return queryProfile;
+}
+
+test('valid mode-bound evidence reaches the normal dry-run consumer', async () => {
+  const value = fixture();
+  bindIntakeEvidence(value);
+  try {
+    const result = await runProductionRelease({ ...value.options, apply: false }, value.dependencies);
+    assert.equal(result.status, 'dry-run');
+    assert.equal(result.queryMode, 'intake-compat');
+    assert.equal(value.deploymentState, null);
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('completed retries revalidate the query configuration before returning success', async () => {
+  const value = fixture();
+  const original = bindIntakeEvidence(value);
+  const readEvidence = value.dependencies.readEvidence;
+  const evidence = await readEvidence();
+  value.dependencies.readEvidence = async () => evidence;
+  try {
+    assert.equal((await runProductionRelease(value.options, value.dependencies)).status, 'applied');
+    value.dependencies.readQueryProfile = async () => ({ ...original, mode: 'unified', configurationSha256: 'd'.repeat(64) });
+    await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+      error => error?.code === 'RELEASE_QUERY_PROFILE_CHANGED');
+    assert.equal(value.deploymentState.status, 'complete');
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('v1 deployments reject a mode change during migration before switching the pointer', async () => {
+  const value = fixture();
+  let queryProfile = { mode: 'unified', configurationSha256: 'c'.repeat(64) };
+  value.dependencies.readQueryProfile = async () => queryProfile;
+  const applyDatabase = value.dependencies.applyDatabase;
+  value.dependencies.applyDatabase = async (...args) => {
+    const result = await applyDatabase(...args);
+    queryProfile = { mode: 'intake-compat', configurationSha256: 'd'.repeat(64) };
+    return result;
+  };
+  try {
+    await assert.rejects(() => runProductionRelease(value.options, value.dependencies),
+      error => error?.code === 'RELEASE_QUERY_PROFILE_CHANGED');
+    assert.equal(value.currentValue, value.current);
+    assert.equal(value.deploymentState.status, 'rolled_back');
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('legacy readiness accepts its missing mode header and rejects an explicit compatibility response', () => {
+  const health = { status: 'ok', service: 'cs-ai-api', version: NEXT_VERSION };
+  const ready = { status: 'ready', checks: { database: 'ok', schema: 'ok', auth: 'ok', storage: 'ok', content: 'ok' } };
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', null, true), true);
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', 'intake-compat', true), false);
+  assert.equal(readinessMatches(health, ready, NEXT_VERSION, 'unified', null), false);
 });

@@ -72,6 +72,12 @@ export type ProductIdentityBootstrap = Readonly<{
   | { kind: 'feishu'; feishu: FeishuProviderBootstrap; providerOrigin?: string }
 )>;
 
+type IntakeDatabaseBootstrapConfig = Readonly<{
+  business: ApiDatabaseBootstrapConfig;
+  usage: ApiDatabaseBootstrapConfig;
+  worker: ApiDatabaseBootstrapConfig;
+}>;
+
 /** Private, process-local capability configuration. It must never cross the composition root. */
 export type ApiPrivateBootstrapConfig = Readonly<{
   productIdentity?: ProductIdentityBootstrap;
@@ -82,6 +88,10 @@ export type ApiPrivateBootstrapConfig = Readonly<{
   objectStoreDir?: string;
   contentReview?: Readonly<{ database: ApiDatabaseBootstrapConfig }>;
   contentWorker?: Readonly<{ database: ApiDatabaseBootstrapConfig }>;
+  query: Readonly<
+    | { mode: 'unified'; intake?: IntakeDatabaseBootstrapConfig }
+    | { mode: 'intake-compat'; intake: IntakeDatabaseBootstrapConfig }
+  >;
 }>;
 
 const DIAGNOSTIC_ID_PATTERN = /^diag_[0-9a-f]{32}$/;
@@ -190,6 +200,14 @@ export function parseApiPrivateBootstrapConfig(
   environment: ApiRuntimeEnvironment,
 ): ApiPrivateBootstrapConfig {
   const issues: ApiConfigIssue[] = [];
+  const queryMode = exactEnvironmentValue(environment, 'CUSTOMER_AGENT_QUERY_MODE', issues) ?? 'unified';
+  if (queryMode !== 'unified' && queryMode !== 'intake-compat') {
+    issues.push(issue('CUSTOMER_AGENT_QUERY_MODE', 'invalid'));
+  }
+  const wantsIntake = queryMode === 'intake-compat'
+    || environment.INTAKE_BUSINESS_DATABASE_URL !== undefined
+    || environment.INTAKE_USAGE_DATABASE_URL !== undefined
+    || environment.INTAKE_WORKER_DATABASE_URL !== undefined;
   const wantsReview = environment.CONTENT_REVIEW_DATABASE_URL !== undefined;
   const wantsWorker = environment.CONTENT_WORKER_DATABASE_URL !== undefined;
   const runtimeDefault = environment.AUTH_SESSION_MODE === 'product'
@@ -323,16 +341,59 @@ export function parseApiPrivateBootstrapConfig(
       contentWorker = Object.freeze({ database });
     }
   }
+  let intake: IntakeDatabaseBootstrapConfig | undefined;
+  if (wantsIntake) {
+    if (environment.AUTH_SESSION_MODE !== 'product') {
+      issues.push(issue('AUTH_SESSION_MODE', 'invalid'));
+    }
+    if (environment.CONTENT_OBJECT_STORE_DIR === undefined) {
+      issues.push(issue('CONTENT_OBJECT_STORE_DIR', 'missing'));
+    }
+    const business = parseDatabaseConfig(environment, {
+      connectionString: 'INTAKE_BUSINESS_DATABASE_URL', defaultPoolMax: 2,
+    }, issues);
+    const usage = parseDatabaseConfig(environment, {
+      connectionString: 'INTAKE_USAGE_DATABASE_URL', defaultPoolMax: 2,
+    }, issues);
+    const worker = parseDatabaseConfig(environment, {
+      connectionString: 'INTAKE_WORKER_DATABASE_URL', defaultPoolMax: 2,
+    }, issues);
+    const usedDatabases = [
+      runtimeDatabase, policyAdminDatabase, productIdentity?.database,
+      contentReview?.database, contentWorker?.database,
+    ];
+    for (const { field, database } of [
+      { field: 'INTAKE_BUSINESS_DATABASE_URL', database: business },
+      { field: 'INTAKE_USAGE_DATABASE_URL', database: usage },
+      { field: 'INTAKE_WORKER_DATABASE_URL', database: worker },
+    ]) {
+      if (!database) continue;
+      if (usedDatabases.some(other => other && (
+        postgresLoginName(database.connectionString) === postgresLoginName(other.connectionString)
+        || postgresDatabaseTarget(database.connectionString) !== postgresDatabaseTarget(other.connectionString)
+      ))) {
+        issues.push(issue(field, 'invalid'));
+      }
+      usedDatabases.push(database);
+    }
+    if (business && usage && worker) intake = Object.freeze({ business, usage, worker });
+  }
+  let query: ApiPrivateBootstrapConfig['query'] | undefined;
+  if (queryMode === 'unified') {
+    query = Object.freeze({ mode: queryMode, ...(intake ? { intake } : {}) });
+  } else if (queryMode === 'intake-compat' && intake) {
+    query = Object.freeze({ mode: queryMode, intake });
+  }
   if (idempotencyHmac && logHash
     && Object.values(idempotencyHmac.keys).includes(logHash.key)) {
     issues.push(issue('LOG_HASH_KEY', 'invalid'));
   }
 
   if (issues.length > 0 || !runtimeDatabase || !policyAdminDatabase
-    || !idempotencyHmac || !logHash) {
+    || !idempotencyHmac || !logHash || !query) {
     throw new ApiConfigError(issues);
   }
-  return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash,
+  return Object.freeze({ runtimeDatabase, policyAdminDatabase, idempotencyHmac, logHash, query,
     ...(productIdentity ? { productIdentity } : {}),
     ...(objectStoreDir ? { objectStoreDir } : {}),
     ...(contentReview ? { contentReview } : {}),

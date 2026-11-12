@@ -1987,7 +1987,7 @@ export async function readRuntimeContentFingerprint(client) {
   return fingerprint;
 }
 
-async function applyCandidateRelease(cluster, databaseName, manifest, candidate, rollback) {
+async function applyCandidateRelease(cluster, databaseName, manifest, candidate, rollback, queryProfile) {
   const sourceMigrations = manifest.database.migrations;
   const nextMigrations = candidate.manifest.migrations;
   if (rollback && (rollback.manifest.migrations.length !== sourceMigrations.length
@@ -2087,9 +2087,10 @@ async function applyCandidateRelease(cluster, databaseName, manifest, candidate,
     if (rollback) {
       const { probeCandidateRuntime } = await import('./release-runtime-probe.mjs');
       const runtime = await probeCandidateRuntime({ releaseRoot: candidate.root,
-        database: { host: cluster.socket, port: cluster.port, database: databaseName } });
+        database: { host: cluster.socket, port: cluster.port, database: databaseName },
+        ...(queryProfile === undefined ? {} : { queryProfile }) });
       deploymentChecks = Object.freeze({
-        schema: 'customer-agent-release-preflight/v1',
+        schema: queryProfile === undefined ? 'customer-agent-release-preflight/v1' : 'customer-agent-release-preflight/v2',
         status: runtime.status === 'PASS' && rollbackChecks.every(check => check.status === 'PASS') ? 'PASS' : 'FAIL',
         candidateGitSha: candidate.gitSha,
         rollbackGitSha: rollback.gitSha,
@@ -2254,6 +2255,7 @@ export async function restoreDrill(options = {}) {
   let commandBackupSet;
   let commandCandidateRelease;
   let commandRollbackRelease;
+  let commandCandidateStackRoot;
   for (let index = 0; index < commandArguments.length; index += 1) {
     const value = commandArguments[index];
     if (value === '--candidate-release') {
@@ -2264,6 +2266,10 @@ export async function restoreDrill(options = {}) {
       const next = commandArguments[++index];
       if (!next || commandRollbackRelease) fail('INVALID_ARGUMENTS', 'Pass one rollback release');
       commandRollbackRelease = next;
+    } else if (value === '--candidate-stack-root') {
+      const next = commandArguments[++index];
+      if (!next || commandCandidateStackRoot) fail('INVALID_ARGUMENTS', 'Pass one candidate stack root');
+      commandCandidateStackRoot = next;
     } else if (value.startsWith('--')) {
       fail('INVALID_ARGUMENTS', `Unknown restore option: ${value}`);
     } else if (commandBackupSet) {
@@ -2276,7 +2282,9 @@ export async function restoreDrill(options = {}) {
   if (!requested) fail('BACKUP_SET_REQUIRED', 'Pass a backup set directory');
   const candidateRelease = options.candidateRelease ?? commandCandidateRelease;
   const rollbackRelease = options.rollbackRelease ?? commandRollbackRelease;
+  const candidateStackRoot = options.candidateStackRoot ?? commandCandidateStackRoot;
   if (rollbackRelease && !candidateRelease) fail('INVALID_ARGUMENTS', 'Rollback verification requires a candidate release');
+  if (candidateStackRoot && !rollbackRelease) fail('INVALID_ARGUMENTS', 'Query profile verification requires candidate and rollback releases');
   const requestedCandidateRelease = candidateRelease ? path.resolve(candidateRelease) : null;
   const verified = await verifyBackupSet(path.resolve(requested), { pgBin });
   const started = Date.now();
@@ -2286,6 +2294,7 @@ export async function restoreDrill(options = {}) {
   let restoredDatabase = null;
   let candidate = null;
   let rollback = null;
+  let queryProfile;
   let sourceVerification = null;
   let evidence;
   let operationError;
@@ -2293,6 +2302,14 @@ export async function restoreDrill(options = {}) {
   try {
     candidate = requestedCandidateRelease
       ? readCandidateRelease(requestedCandidateRelease, { verifyRuntime: Boolean(rollbackRelease) }) : null;
+    if (candidateStackRoot) {
+      try {
+        const { readReleaseQueryProfile } = await import('./release-query-profile.mjs');
+        queryProfile = await readReleaseQueryProfile(candidate.root, path.resolve(candidateStackRoot));
+      } catch (cause) {
+        throw new BackupSetError('CANDIDATE_QUERY_PROFILE_INVALID', 'Candidate query configuration could not be resolved', { cause });
+      }
+    }
     if (rollbackRelease) {
       const rollbackRoot = path.resolve(rollbackRelease);
       rollback = candidate?.root === rollbackRoot ? candidate : readCandidateRelease(rollbackRoot);
@@ -2342,6 +2359,7 @@ export async function restoreDrill(options = {}) {
         verified.manifest,
         candidate,
         rollback,
+        queryProfile,
       )
       : null;
     const completedAt = utcNow();

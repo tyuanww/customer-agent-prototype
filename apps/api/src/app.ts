@@ -37,7 +37,7 @@ import type {
   ServiceReadinessChecks,
   ServiceRepository,
 } from './service-repository.js';
-import { registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
+import { createUnavailableSearchOperation, registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
 import { registerSopQueryRoute, type SopQueryRouteDependencies } from './sop-query-routes.js';
 import { createUnifiedSopQueryOperation } from './sop-unified-query-operation.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
@@ -110,6 +110,10 @@ export type ApiAppOptions = Readonly<{
   accessEvaluator?: AccessEvaluator | undefined;
   accessDenialAudit?: AccessDenialAudit | undefined;
   queryRuntime?: Pick<ApiQueryRuntime, 'afterReleaseMutation' | 'readiness' | 'close'> | undefined;
+  /** Explicit intake-only serving. Ordinary search is disabled before event receipt replay. */
+  intakeOnlyQuery?: Readonly<{
+    inspect: () => Promise<Readonly<{ releaseId: string; validUntil: number }>>;
+  }> | undefined;
   testPublicRoutes?: readonly string[] | undefined;
 }>;
 
@@ -128,7 +132,10 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   const diagnosticSink = options.diagnosticSink ?? reportApiRuntimeDiagnostic;
   const providedAuthService = options.authService;
   const policyAdminRepository = options.policyAdminRepository ?? createUnavailablePolicyAdminRepository();
-  const searchDependencies = options.searchDependencies;
+  const searchDependencies = options.searchDependencies === undefined ? undefined : {
+    ...options.searchDependencies,
+    ...(options.intakeOnlyQuery === undefined ? {} : { operation: createUnavailableSearchOperation() }),
+  };
   const sopQueryDependencies = options.sopQueryDependencies;
   const eventDependencies = options.eventDependencies;
   const contentImportDependencies = options.contentImportDependencies;
@@ -140,6 +147,10 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   const accessLog = options.accessLog;
   const noticeDependencies = options.noticeDependencies;
   const intakeDependencies = options.intakeDependencies;
+  if (options.intakeOnlyQuery !== undefined
+    && (options.queryRuntime !== undefined || intakeDependencies === undefined || config.sessionMode !== 'product')) {
+    throw new Error('Intake query readiness requires the exclusive product intake composition');
+  }
   if (options.testPublicRoutes !== undefined && config.profile !== 'test') {
     throw new Error('Test-only public routes require the test profile');
   }
@@ -331,8 +342,10 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
     const announcedContent = announceDependencies === undefined
       ? checks.content
       : await announceDependencies.service.readiness().catch(() => 'not_ready' as const);
+    const intakeReady = options.intakeOnlyQuery === undefined
+      || await options.intakeOnlyQuery.inspect().then(() => true, () => false);
     const content = announcedContent === 'ok'
-      && (options.queryRuntime?.readiness() ?? 'ok') === 'ok'
+      && intakeReady && (options.queryRuntime?.readiness() ?? 'ok') === 'ok'
       ? 'ok'
       : 'not_ready';
     const composedChecks = Object.freeze({
@@ -348,6 +361,7 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
       checks: composedChecks,
     });
     reply.header('cache-control', 'no-store');
+    reply.header('x-customer-agent-query-mode', options.intakeOnlyQuery === undefined ? 'unified' : 'intake-compat');
     if (!ready) {
       reply.header('retry-after', '1');
       reply.code(503);

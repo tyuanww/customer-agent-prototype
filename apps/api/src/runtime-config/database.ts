@@ -33,7 +33,7 @@ const DEFAULT_DB_READINESS_TIMEOUT_MS = 2_000;
 
 type DatabaseConfigFields = Readonly<{
   connectionString: string;
-  poolMax: string;
+  poolMax?: string;
   defaultPoolMax: number;
 }>;
 
@@ -125,13 +125,15 @@ export function parseDatabaseConfig(
     issues.push(issue(fields.connectionString, 'invalid'));
   }
 
-  const poolMax = parseBoundedPositiveInteger(
-    environment,
-    fields.poolMax,
-    fields.defaultPoolMax,
-    MAX_TOTAL_DB_POOL_CONNECTIONS,
-    issues,
-  );
+  const poolMax = fields.poolMax === undefined
+    ? fields.defaultPoolMax
+    : parseBoundedPositiveInteger(
+      environment,
+      fields.poolMax,
+      fields.defaultPoolMax,
+      MAX_TOTAL_DB_POOL_CONNECTIONS,
+      issues,
+    );
   const connectionTimeoutMs = parseBoundedPositiveInteger(
     environment,
     'DB_CONNECTION_TIMEOUT_MS',

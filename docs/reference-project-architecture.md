@@ -457,6 +457,12 @@ The API default OBS sink receives no raw question or answer. It receives stable 
 
 The current index projection reads the source-gated `release_items` that back the existing `SearchResponse` and `candidate_impressions` foreign keys. If the current intake lineage contains an upsert that has no corresponding `release_items` row, activation fails with `RELEASE_INDEX_ITEM_GAP` instead of serving a partial index. Mapping normalized intake entries into the ordinary SearchResponse and event candidate identity still needs an approved contract or migration change; INT-API does not invent those fields.
 
+`CUSTOMER_AGENT_QUERY_MODE=intake-compat` explicitly selects the existing intake FAQ and independent SOP APIs. The default mode is `unified`. The private bootstrap parser owns the mode and all three intake pool configurations. It validates product identity, object storage, database targets and separate purpose logins before pool construction. `startApi` resolves all of these values from one environment snapshot.
+
+In `intake-compat`, ordinary `/v1/search` returns the existing `503 OVERLOADED` after admission and request validation, before the event repository can replay a receipt. `/ready` describes the configured serving mode and includes `x-customer-agent-query-mode`. Its content check reads the current catalog through the same whole-release provenance, source, family and approval gates used when issuing an intake entitlement. User eligibility, SOP facts, media and per-query `ready` or `blocked` remain owned by the existing request transactions. Each readiness request reads current publication state.
+
+Restore evidence v2 binds the resolved query mode, purpose logins, database targets and pool limits to a non-secret configuration fingerprint. `release-query-profile.mjs` consumes the candidate's stack and API parsers. The runtime probe uses the same intake release reader as `/ready`. Deployment checks the configuration before migration and pointer switching, then matches the readiness mode header after restart. The rollback verifier still covers every committed migration prefix.
+
 ### 精确修复后继的版本接收（2026-10-12）
 
 治理 `export_customer_agent_repair_successor.mjs` 拥有批准记录、六件不可变冻结字节及 v6 八件导出包；累计 schema 只作参考，实际安装消费 upgrade。产品 `customer-agent-contract-set.mjs` 验证同一 Git 来源的批准/全部成员、39段前序及独立 `repair-contract-set.lock.json`，原主锁不变。合同生成器选择已验证 repair 快照；数据库生成器先重建并逐件比较原39段，再追加0040。runner 在0040事务内做前后物理校验及回执记账，COMMIT_UNKNOWN保留待恢复语义。治理来源提交379b793已正式导出，产品已接收独立repair锁与0040，生成合同的内容、ID、来源SHA及摘要统一取同一后继快照。接收状态VERIFIED_NOT_ACTIVATED；正式 HTTP/Main 和持久图片生产装配仍未开放。

@@ -219,6 +219,8 @@ export function createIntakeTransactions(pool: IntakePool,
       // Keep the public code/reason aligned with the unknown commit state.
       if (committing || broken) return { ok: false, code: 'OVERLOADED', reason: 'COMMIT_UNKNOWN', commit: 'unknown', diagnosticId };
       const rejection = error instanceof IntakeRejection ? error
+        : error instanceof Error && 'code' in error && error.code === '55P03'
+          ? new IntakeRejection('COMMIT_UNKNOWN', 'OVERLOADED')
         : error instanceof Error && 'code' in error && error.code === 'ZA003' && error.message === 'SESSION_UNAVAILABLE'
           ? new IntakeRejection('SCOPE_DENIED', 'UNAUTHORIZED')
         : error instanceof Error && 'code' in error && error.code === 'ZA002' && error.message === 'SCOPE_DENIED'

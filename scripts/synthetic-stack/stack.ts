@@ -48,12 +48,12 @@ import { bootstrapDatabase, seedFeishuBindings } from './bootstrap.ts';
 import { bindMenokinTestIdentities } from './menokin-test-binding.ts';
 import {
   DATABASE_NAME, LOG_DIRECTORY, OBJECT_STORE_DIRECTORY, PG_PORT, PG_SOCKET_DIRECTORY,
-  PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, apiEnvironment, ensureStackDirectories,
-  loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig, mergeStackOverrides,
+  PROFILE_FILE, STACK_ROOT, SYNTHETIC_IDENTITIES, ensureStackDirectories,
+  loadApiStackConfig, loadContentStackConfig, loadFeishuStackConfig,
   readProfile, shouldSeedSyntheticCatalog, stackEnvironmentForRoot, stackPortPairForRoot,
-  writeDesktopPackagedProfile, writeProfile,
+  stackApiEnvironment, validateStackDatabaseConfig, writeDesktopPackagedProfile, writeProfile,
 } from './profile.ts';
-import type { ContentStackConfig, FeishuStackConfig } from './profile.ts';
+import type { ContentStackConfig, StackProfile } from './profile.ts';
 import {
   SyntheticCluster, clusterVersionText, ensureDatabase, ensureLoginRoles, writeClusterMarker,
 } from './postgres.ts';
@@ -174,25 +174,8 @@ async function resolvePort(port: number, name: 'api' | 'identity'): Promise<numb
 async function resolveProfile(content: ContentStackConfig | undefined, { reuse }: { reuse: boolean }): Promise<StackProfile> {
   const existing = readProfile();
   const environment = stackEnvironmentForRoot(STACK_ROOT);
-  if (environment !== 'synthetic-local' && content?.databaseName === undefined) {
-    const label = environment === 'production' ? 'production' : 'test';
-    fail(`${label} stack requires content.env with DATABASE_NAME`);
-  }
-  if (environment === 'production' && content?.databaseName !== 'customer_agent_formal') {
-    fail('Production stack content.env must declare customer_agent_formal');
-  }
-  if (environment === 'wsl-test' && content?.databaseName === 'customer_agent_formal') {
-    fail('Test stack content.env must not declare customer_agent_formal');
-  }
-  if (existing) {
-    if (content?.databaseName !== undefined && content.databaseName !== existing.databaseName) {
-      fail(`Recorded profile database ${existing.databaseName} does not match content.env ${content.databaseName}`);
-    }
-    if (reuse) return existing;
-  }
-  if (environment === 'production' && !existing) {
-    fail('Production stack profile is missing; provision or review profile.json before starting');
-  }
+  validateStackDatabaseConfig({ stackRoot: STACK_ROOT, content, profile: existing });
+  if (existing && reuse) return existing;
   const rootEnvironment = environment;
   const rootPorts = stackPortPairForRoot(STACK_ROOT);
   const apiPort = await resolvePort(rootPorts.api, 'api');
@@ -236,34 +219,6 @@ function claimForegroundSupervisor(): void {
   recordProcess(FOREGROUND_PROCESS_NAME, process.pid, command);
 }
 
-/**
- * The content-side API environment. With no `content.env` and no Feishu config
- * these are exactly the constants the synthetic stack has always used, so the
- * synthetic path is byte-for-byte unchanged.
- *
- * The review lead comes from the Feishu owner binding rather than from the file,
- * matching `formal-dev-up.mjs`: the binding is the authority on who owns review,
- * and a second source could disagree with it. Our own synthetic identities are
- * not dual reviewers either, so when one real subject covers both sides the
- * manager is left unset instead of naming the same person twice.
- */
-function contentOverrides(
-  content: ContentStackConfig | undefined,
-  feishu: FeishuStackConfig | undefined,
-): Readonly<Record<string, string>> {
-  const owner = feishu?.bindings.find((binding) => binding.role === 'owner')?.openId;
-  const lead = content?.reviewLeadSubject ?? owner ?? 'synthetic_coach';
-  const manager = content?.reviewManagerSubject ?? owner ?? 'synthetic_owner';
-  const overrides: Record<string, string> = {
-    CONTENT_INTENT_TAXONOMY_VERSION: content?.intentTaxonomyVersion ?? 'itax_synthetic_stack_v1',
-    CONTENT_INTENT_ID: content?.intentId ?? 'intent_synthetic_stack_shipping',
-    CONTENT_REVIEW_LEAD_SUBJECT: lead,
-    CONTENT_REVIEW_EVIDENCE_ID: content?.reviewEvidenceId ?? 'EVD-STACK-REVIEW-001',
-  };
-  if (manager !== lead) overrides.CONTENT_REVIEW_MANAGER_SUBJECT = manager;
-  return overrides;
-}
-
 async function startProcesses(
   profile: StackProfile,
   content: ContentStackConfig | undefined,
@@ -296,7 +251,7 @@ async function startProcesses(
     // Both override files are read before anything is spawned, so a rejected
     // api.env fails the start outright instead of leaving identity behind.
     const apiConfig = loadApiStackConfig();
-    const overrides = mergeStackOverrides(contentOverrides(content, feishu), apiConfig ?? {});
+    const environment = stackApiEnvironment({ profile, content, feishu, apiConfig });
     const identityEntry = feishu ? PASSWORD_IDENTITY_ENTRY : IDENTITY_ENTRY;
     if (!live.has('identity')) {
       // Both identity servers resolve the accounts file from STACK_ROOT, which defaults
@@ -316,8 +271,6 @@ async function startProcesses(
     // Key names only: an operator checking "did production config land" needs the
     // list, and none of these keys' names are secret.
     if (apiConfig) messages.push(`api.env: ${Object.keys(apiConfig).sort().join(', ')}`);
-
-    const environment = apiEnvironment(profile, overrides, feishu);
 
     if (!live.has('api')) {
       const processInfo = spawnLogged('api', process.execPath, [API_ENTRY], environment, mode);
@@ -419,7 +372,7 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
 
 async function runStart(foreground: boolean): Promise<void> {
   requireDist();
-  // Read once: `resolveProfile` needs the database name and `contentOverrides`
+  // Read once: `resolveProfile` needs the database name and `stackApiEnvironment`
   // needs the content constants, and two reads could disagree if the file
   // changed between them - the profile would end up naming one catalog while the
   // overrides came from another.
