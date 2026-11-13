@@ -27,7 +27,11 @@ export CUSTOMER_AGENT_BACKUP_COPY_SCOPE=same-host
 /srv/customer-agent/current/scripts/ops/customer-agent-backup.sh
 ```
 
+如需保留本地和副本中的所有已有备份集，在同样配置下运行 `customer-agent-backup.sh --preserve-existing`。该选项仍创建和校验新备份与副本，但不执行旧备份清理。未知参数会以退出码 2 被拒绝，不触发备份故障告警。无此选项的既有定时任务仍按配置的保留数量清理，清理前须具备相应授权。
+
 没有副本时退出 3，仍会保留完整本地备份集。不要为得到退出 0 将同机目录标成 `offsite`。副本不可写或校验失败时退出 1，历史备份不被修剪。
+
+本地集与副本的清单摘要不一致时，备份失败且不修剪历史集。如果不一致是在两个新目录命名后发现，这两个目录可能保留；不要将它们当作一对成功备份，也不要自动删除，应先核查。
 
 默认产品版本取工具所在发布目录的 `VERSION`。Git SHA 优先取 `CUSTOMER_AGENT_BACKUP_GIT_SHA`，其次取版本匹配的 `apps/desktop/build/build-identity.json`；两者都没有时记录为 null，不执行 `git rev-parse`。正式备份应核对并记录实际应用 SHA。使用独立审查工具对既有生产备份时，必须显式填写经过核对的 `CUSTOMER_AGENT_BACKUP_PRODUCT_VERSION` 与 `CUSTOMER_AGENT_BACKUP_GIT_SHA`，避免把工具候选版本误记为生产应用版本。工具指纹单独记录。
 

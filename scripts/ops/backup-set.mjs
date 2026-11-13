@@ -1383,6 +1383,8 @@ export async function pruneVerifiedBackupSets(options) {
 }
 
 export async function createBackupSet(options = {}) {
+  const preserveExisting = options.preserveExisting === undefined ? false : options.preserveExisting;
+  if (typeof preserveExisting !== 'boolean') fail('BACKUP_ARGUMENT_INVALID', 'Invalid backup preservation option');
   const startedAt = utcNow();
   const stack = options.stack ?? loadStackProfile();
   const pgBin = options.pgBin ?? discoverPg15Bin();
@@ -1483,6 +1485,9 @@ export async function createBackupSet(options = {}) {
       const prepared = copySet(staged.directory, path.join(copyRoot, BACKUP_SETS_DIRECTORY), id);
       copyStaging = prepared.temporary;
       const verifiedCopy = await verifyBackupSet(copyStaging, { pgBin, expectedBackupId: id });
+      if (verifiedCopy.manifestSha256 !== staged.manifestSha256) {
+        fail('BACKUP_COPY_MISMATCH', 'Backup copy differs from the staged backup');
+      }
       const finalLocal = path.join(backupRoot, BACKUP_SETS_DIRECTORY, id);
       if (existsSync(finalLocal)) fail('BACKUP_ID_CONFLICT', 'Backup destination appeared while preparing publication');
       renameSync(copyStaging, prepared.final);
@@ -1498,23 +1503,30 @@ export async function createBackupSet(options = {}) {
         throw error;
       }
       const published = await verifyBackupSet(finalLocal, { pgBin });
-      await verifyBackupSet(prepared.final, { pgBin });
-      const localRetention = await pruneVerifiedBackupSets({
-        root: path.dirname(finalLocal),
-        databaseName: stack.databaseName,
-        keep,
-        currentBackupId: id,
-        pgBin,
-      });
-      const copyRetention = await pruneVerifiedBackupSets({
-        root: prepared.root,
-        databaseName: stack.databaseName,
-        keep,
-        currentBackupId: id,
-        pgBin,
-      });
+      const publishedCopy = await verifyBackupSet(prepared.final, { pgBin });
+      if (published.manifestSha256 !== staged.manifestSha256 || publishedCopy.manifestSha256 !== staged.manifestSha256) {
+        fail('BACKUP_COPY_MISMATCH', 'Published backup or copy differs from the staged backup');
+      }
+      let retentionMessage = 'retention preserved existing backup sets';
+      if (!preserveExisting) {
+        const localRetention = await pruneVerifiedBackupSets({
+          root: path.dirname(finalLocal),
+          databaseName: stack.databaseName,
+          keep,
+          currentBackupId: id,
+          pgBin,
+        });
+        const copyRetention = await pruneVerifiedBackupSets({
+          root: prepared.root,
+          databaseName: stack.databaseName,
+          keep,
+          currentBackupId: id,
+          pgBin,
+        });
+        retentionMessage = `retention local_removed=${localRetention.removed} local_preserved=${localRetention.preserved} copy_removed=${copyRetention.removed} copy_preserved=${copyRetention.preserved}`;
+      }
       log(`backup published backup_id=${id} replication=${replication.mode} durability=${replication.durability}`);
-      log(`retention local_removed=${localRetention.removed} local_preserved=${localRetention.preserved} copy_removed=${copyRetention.removed} copy_preserved=${copyRetention.preserved}`);
+      log(retentionMessage);
       result = Object.freeze({
         status: 'PASS',
         degraded: replication.mode !== 'offsite-declared',
@@ -2780,7 +2792,11 @@ async function main() {
   const command = process.argv[2];
   try {
     if (command === 'backup') {
-      const result = await createBackupSet();
+      const args = process.argv.slice(3);
+      if (args.length > 1 || (args.length === 1 && args[0] !== '--preserve-existing')) {
+        fail('BACKUP_ARGUMENT_INVALID', 'Expected no options or --preserve-existing');
+      }
+      const result = await createBackupSet({ preserveExisting: args.length === 1 });
       process.exitCode = result.degraded ? 3 : 0;
       return;
     }
@@ -2800,7 +2816,7 @@ async function main() {
     fail('COMMAND_INVALID', 'Expected backup, restore-drill, or verify');
   } catch (error) {
     printSafeError(error);
-    process.exitCode = 1;
+    process.exitCode = error instanceof BackupSetError && error.code === 'BACKUP_ARGUMENT_INVALID' ? 2 : 1;
   }
 }
 
