@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
-import { connect } from 'node:net';
+import { connect, createServer } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -234,6 +237,97 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
       request?.destroy();
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
       await waitWithin(exited, 'API cleanup');
+    }
+  });
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  test(`compiled content worker handles repeated ${signal} while connecting`, {
+    timeout: 35_000,
+    skip: process.platform === 'win32' ? 'Windows does not deliver Unix signals to child processes' : false,
+  }, async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'content-worker-signal-'));
+    const observer = path.join(directory, 'signal-observer.mjs');
+    const connections = new Set();
+    const server = createServer((connection) => { connections.add(connection); });
+    let serverError;
+    server.on('error', (error) => { serverError = error; });
+    let child;
+    let socket;
+    let exited;
+    try {
+      await writeFile(observer, `process.once(${JSON.stringify(signal)}, () => process.stdout.write('signal-observed\\n'));\n`);
+      const listening = once(server, 'listening');
+      server.listen(0, '127.0.0.1');
+      await waitWithin(listening, 'synthetic database listener');
+      const connected = new Promise((resolve) => server.once('connection', (connection) => resolve([connection])));
+      const serverFailure = new Promise((resolve) => server.once('error', resolve));
+      const port = server.address().port;
+      const db = (user) => `postgresql://${user}@127.0.0.1:${port}/synthetic`;
+      child = spawn(process.execPath, ['--import', observer, 'dist/content-worker-main.js'], {
+        cwd: apiDirectory,
+        env: {
+          PATH: process.env.PATH,
+          CUSTOMER_AGENT_PROFILE: 'test',
+          AUTH_MODE: 'mock',
+          DATABASE_URL: db('runtime'),
+          CONTENT_ADMIN_DATABASE_URL: db('admin'),
+          CONTENT_WORKER_DATABASE_URL: db('worker'),
+          CONTENT_OBJECT_STORE_DIR: directory,
+          DB_CONNECTION_TIMEOUT_MS: '10000',
+          IDEMPOTENCY_HMAC_KEYS: JSON.stringify({ 'hmac-idempotency-v1': 'synthetic-idempotency-material-main' }),
+          IDEMPOTENCY_HMAC_CURRENT_VERSION: 'hmac-idempotency-v1',
+          LOG_HASH_KEY: 'synthetic-log-hash-material-main-01',
+          LOG_HASH_KEY_VERSION: 'hmac-log-v1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      let errors = '';
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stderr.on('data', (chunk) => { errors += chunk; });
+      const observed = new Promise((resolve) => {
+        child.stdout.on('data', (chunk) => {
+          output += chunk;
+          if (output.includes('signal-observed\n')) resolve();
+        });
+      });
+      exited = once(child, 'exit');
+      const earlyFailure = exited.then(([code, exitSignal]) => {
+        throw new Error(`Worker exited early: code=${String(code)} signal=${String(exitSignal)} stderr=${errors}`);
+      });
+      const failedServer = serverFailure.then((error) => { throw error; });
+      [socket] = await waitWithin(Promise.race([connected, earlyFailure, failedServer]), 'worker connection', 15_000);
+      assert.equal(child.kill(signal), true);
+      await waitWithin(Promise.race([observed, earlyFailure, failedServer]), 'first signal', 15_000);
+      assert.equal(child.kill(signal), true);
+      const earlyExit = await Promise.race([
+        exited.then(([code, exitSignal]) => ({ code, signal: exitSignal })),
+        new Promise((resolve) => setTimeout(() => resolve(null), 500)),
+      ]);
+      assert.equal(earlyExit, null, 'repeated signal interrupted the worker');
+      socket.destroy();
+      const [code, exitSignal] = await waitWithin(exited, 'worker exit', 15_000);
+      assert.equal(code, 0);
+      assert.equal(exitSignal, null);
+      assert.equal(serverError, undefined);
+    } finally {
+      for (const connection of connections) connection.destroy();
+      try {
+        if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+        if (exited) await waitWithin(exited, 'worker cleanup', 15_000);
+      } finally {
+        try {
+          if (server.listening) {
+            await waitWithin(new Promise((resolve, reject) => {
+              server.close((error) => { if (error) reject(error); else resolve(); });
+            }), 'listener cleanup', 15_000);
+          }
+        } finally {
+          await rm(directory, { recursive: true, force: true });
+        }
+      }
     }
   });
 }
