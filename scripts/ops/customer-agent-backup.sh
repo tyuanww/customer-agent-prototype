@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-if node "$SCRIPT_DIR/backup-set.mjs" backup; then
+if node "$SCRIPT_DIR/backup-set.mjs" backup "$@"; then
   exit 0
 else
   status=$?

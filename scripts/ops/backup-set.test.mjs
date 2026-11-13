@@ -46,6 +46,58 @@ const databaseName = 'customer_agent_intake_test';
 const objectId = `obj_${'1'.repeat(64)}`;
 const otherObjectId = `obj_${'2'.repeat(64)}`;
 
+test('backup rejects a non-boolean preservation option before accessing the stack', async () => {
+  await assert.rejects(createBackupSet({ preserveExisting: 'true' }), { code: 'BACKUP_ARGUMENT_INVALID' });
+});
+
+test('backup rejects unknown options before accessing the stack', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-option-'));
+  try {
+    const backupRoot = path.join(root, 'backups');
+    const result = spawnSync(process.execPath, [path.join(testDirectory, 'backup-set.mjs'), 'backup', '--preserve-exisitng'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: { PATH: process.env.PATH, CUSTOMER_AGENT_STACK_ROOT: path.join(root, 'missing-profile'),
+        CUSTOMER_AGENT_BACKUP_ROOT: backupRoot, CUSTOMER_AGENT_PG15_BIN: path.join(root, 'missing-pg15') },
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /BACKUP_ARGUMENT_INVALID/);
+    assert.equal(existsSync(backupRoot), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('backup wrapper forwards and rejects unsupported options', { skip: process.platform === 'win32' }, () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-wrapper-option-'));
+  try {
+    const backupRoot = path.join(root, 'backups');
+    const wrapper = path.join(root, 'customer-agent-backup.sh');
+    const marker = path.join(root, 'alert-invoked');
+    copyFileSync(path.join(testDirectory, 'customer-agent-backup.sh'), wrapper);
+    copyFileSync(path.join(testDirectory, 'backup-set.mjs'), path.join(root, 'backup-set.mjs'));
+    copyFileSync(path.join(testDirectory, 'release-proof.mjs'), path.join(root, 'release-proof.mjs'));
+    writeFileSync(path.join(root, 'send-ops-alert.sh'), `#!/bin/sh\ntouch "$ALERT_MARKER"\n`, { mode: 0o755 });
+    const environment = { PATH: process.env.PATH, ALERT_MARKER: marker, FEISHU_ALERT_WEBHOOK: '',
+      CUSTOMER_AGENT_MONITOR_ENV: path.join(root, 'no-monitor-env'), CUSTOMER_AGENT_STACK_ROOT: path.join(root, 'missing-profile'),
+      CUSTOMER_AGENT_BACKUP_ROOT: backupRoot, CUSTOMER_AGENT_PG15_BIN: path.join(root, 'missing-pg15') };
+    for (const args of [['--preserve-exisitng'], ['--preserve-existing', '--preserve-existing']]) {
+      const result = spawnSync('bash', [wrapper, ...args], {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+        timeout: 30_000,
+        env: environment,
+      });
+      assert.equal(existsSync(marker), false);
+      assert.equal(result.status, 2);
+      assert.match(result.stderr, /BACKUP_ARGUMENT_INVALID/);
+      assert.equal(existsSync(backupRoot), false);
+    }
+    const failure = spawnSync('bash', [wrapper], { cwd: repositoryRoot, encoding: 'utf8', timeout: 30_000, env: environment });
+    assert.equal(failure.status, 1);
+    assert.equal(existsSync(marker), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 for (const wrapper of ['customer-agent-backup.sh', 'customer-agent-restore-drill.sh']) {
   test(`${wrapper} CLI refuses invalid input through a symbolic release path`, { skip: process.platform === 'win32' }, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'customer-agent-backup-cli-'));
@@ -55,6 +107,8 @@ for (const wrapper of ['customer-agent-backup.sh', 'customer-agent-restore-drill
       const child = spawnSync('/bin/bash', [path.join(current, wrapper)], {
         encoding: 'utf8', timeout: 30_000,
         env: { ...process.env,
+          FEISHU_ALERT_WEBHOOK: '',
+          CUSTOMER_AGENT_MONITOR_ENV: path.join(root, 'no-monitor-env'),
           CUSTOMER_AGENT_STACK_ROOT: path.join(root, 'missing-profile'),
           CUSTOMER_AGENT_BACKUP_ROOT: path.join(root, 'backups'),
           CUSTOMER_AGENT_BACKUP_COPY_TO: '',

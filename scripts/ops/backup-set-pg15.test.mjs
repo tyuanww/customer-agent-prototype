@@ -84,6 +84,76 @@ function backupSets(backupRoot) {
     .sort();
 }
 
+function backupSetDigests(directory) {
+  return Object.fromEntries(readdirSync(directory, { withFileTypes: true }).map((entry) => {
+    assert.equal(entry.isFile(), true);
+    return [entry.name, sha256(readFileSync(path.join(directory, entry.name)))];
+  }));
+}
+
+function createCopyMutationTools(root, copyRoot) {
+  const directory = path.join(root, 'mutating-pg-bin');
+  mkdirSync(directory);
+  for (const name of ['postgres', 'initdb', 'pg_ctl', 'createdb', 'psql', 'pg_dump', 'pg_dumpall']) {
+    const executable = JSON.stringify(path.join(pg15Bin(), name));
+    writeFileSync(path.join(directory, name), `#!/usr/bin/env node\nconst r = require('node:child_process').spawnSync(${executable}, process.argv.slice(2), { stdio: 'inherit' });\nif (r.error) throw r.error;\nprocess.exitCode = r.status === null ? 1 : r.status;\n`, { mode: 0o755 });
+  }
+  const wrapper = `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const { createHash } = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+const dump = args.find(value => value.endsWith('/database.dump'));
+const marker = ${JSON.stringify(path.join(root, 'copy-mutated'))};
+if (dump && path.dirname(dump).startsWith(${JSON.stringify(path.join(copyRoot, 'backup-sets') + '/.')}) && !fs.existsSync(marker)) {
+  const directory = path.dirname(dump);
+  const manifestFile = path.join(directory, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  manifest.application.gitSha = 'a'.repeat(40);
+  const raw = JSON.stringify(manifest, null, 2) + '\\n';
+  fs.writeFileSync(manifestFile, raw);
+  fs.writeFileSync(path.join(directory, 'manifest.sha256'), createHash('sha256').update(raw).digest('hex') + '  manifest.json\\n');
+  fs.writeFileSync(marker, 'mutated');
+}
+
+const result = spawnSync(${JSON.stringify(path.join(pg15Bin(), 'pg_restore'))}, args, { stdio: 'inherit' });
+if (result.error) throw result.error;
+process.exitCode = result.status === null ? 1 : result.status;
+`;
+  writeFileSync(path.join(directory, 'pg_restore'), wrapper, { mode: 0o755 });
+  return directory;
+}
+
+function createEarlyCopyMutation(root, copyRoot) {
+  const preload = path.join(root, 'mutate-copy-preload.mjs');
+  const marker = path.join(root, 'early-copy-mutated');
+  const source = `import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { syncBuiltinESMExports } from 'node:module';
+import path from 'node:path';
+const copy = fs.cpSync;
+const marker = ${JSON.stringify(marker)};
+fs.cpSync = (...args) => {
+  const result = copy(...args);
+  const target = String(args[1]);
+  if (target.startsWith(${JSON.stringify(path.join(copyRoot, 'backup-sets') + '/.')}) && !fs.existsSync(marker)) {
+    const manifestFile = path.join(target, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    manifest.application.gitSha = 'a'.repeat(40);
+    const raw = JSON.stringify(manifest, null, 2) + '\\n';
+    fs.writeFileSync(manifestFile, raw);
+    fs.writeFileSync(path.join(target, 'manifest.sha256'), createHash('sha256').update(raw).digest('hex') + '  manifest.json\\n');
+    fs.writeFileSync(marker, 'mutated');
+  }
+  return result;
+};
+syncBuiltinESMExports();
+`;
+  writeFileSync(preload, source);
+  return { preload, marker };
+}
+
 async function verifyBuildIdentityInBackup(root, baseEnvironment) {
   const release = path.join(root, 'identity-release');
   const desktopScripts = path.join(release, 'apps/desktop/scripts');
@@ -344,6 +414,8 @@ async function exerciseBackupSetForMigrationCount(migrationCount, withCandidateR
     `);
     const baseEnvironment = {
       ...process.env,
+      FEISHU_ALERT_WEBHOOK: '',
+      CUSTOMER_AGENT_MONITOR_ENV: path.join(root, 'no-monitor-env'),
       PGPASSWORD: credentialMarker,
       CUSTOMER_AGENT_STACK_ROOT: stackRoot,
       CUSTOMER_AGENT_BACKUP_ROOT: backupRoot,
@@ -377,11 +449,84 @@ async function exerciseBackupSetForMigrationCount(migrationCount, withCandidateR
     runCli(backupScript, [], copyEnvironment, [3]);
     const currentSets = backupSets(backupRoot);
     assert.equal(currentSets.length, 1);
-    const current = currentSets[0];
-    const currentId = path.basename(current);
+    let current = currentSets[0];
+    let currentId = path.basename(current);
     assert.notEqual(currentId, firstId);
-    const copySets = backupSets(copyRoot);
+    let copySets = backupSets(copyRoot);
     assert.deepEqual(copySets.map((entry) => path.basename(entry)), [currentId]);
+    if (migrationCount === generatedMigrationCatalogue.migrations.length) {
+      const earlyLocal = path.join(root, 'early-mismatch-local');
+      const earlyCopy = path.join(root, 'early-mismatch-copy');
+      mkdirSync(path.join(earlyLocal, 'backup-sets'), { recursive: true });
+      mkdirSync(path.join(earlyCopy, 'backup-sets'), { recursive: true });
+      cpSync(current, path.join(earlyLocal, 'backup-sets', currentId), { recursive: true });
+      cpSync(copySets[0], path.join(earlyCopy, 'backup-sets', currentId), { recursive: true });
+      const earlyLocalBefore = backupSetDigests(current);
+      const earlyCopyBefore = backupSetDigests(copySets[0]);
+      const injection = createEarlyCopyMutation(root, earlyCopy);
+      const earlyMismatch = runCli(backupScript, [], {
+        ...copyEnvironment,
+        CUSTOMER_AGENT_BACKUP_ROOT: earlyLocal,
+        CUSTOMER_AGENT_BACKUP_COPY_TO: earlyCopy,
+        NODE_OPTIONS: `--import=${injection.preload}`,
+      }, [1]);
+      assert.match(earlyMismatch.stderr, /BACKUP_COPY_MISMATCH/);
+      assert.equal(readFileSync(injection.marker, 'utf8'), 'mutated');
+      assert.deepEqual(backupSets(earlyLocal).map((entry) => path.basename(entry)), [currentId]);
+      assert.deepEqual(backupSets(earlyCopy).map((entry) => path.basename(entry)), [currentId]);
+      assert.deepEqual(backupSetDigests(path.join(earlyLocal, 'backup-sets', currentId)), earlyLocalBefore);
+      assert.deepEqual(backupSetDigests(path.join(earlyCopy, 'backup-sets', currentId)), earlyCopyBefore);
+      assert.equal(readdirSync(path.join(earlyLocal, 'backup-sets')).some((name) => name.endsWith('.partial')), false);
+      assert.equal(readdirSync(path.join(earlyCopy, 'backup-sets')).some((name) => name.endsWith('.partial')), false);
+      const mismatchLocal = path.join(root, 'mismatch-local');
+      const mismatchCopy = path.join(root, 'mismatch-copy');
+      mkdirSync(path.join(mismatchLocal, 'backup-sets'), { recursive: true });
+      mkdirSync(path.join(mismatchCopy, 'backup-sets'), { recursive: true });
+      cpSync(current, path.join(mismatchLocal, 'backup-sets', currentId), { recursive: true });
+      cpSync(copySets[0], path.join(mismatchCopy, 'backup-sets', currentId), { recursive: true });
+      const oldLocal = backupSetDigests(current);
+      const oldCopy = backupSetDigests(copySets[0]);
+      const mismatch = runCli(backupScript, [], {
+        ...copyEnvironment,
+        CUSTOMER_AGENT_BACKUP_ROOT: mismatchLocal,
+        CUSTOMER_AGENT_BACKUP_COPY_TO: mismatchCopy,
+        CUSTOMER_AGENT_PG15_BIN: createCopyMutationTools(root, mismatchCopy),
+      }, [1]);
+      assert.match(mismatch.stderr, /BACKUP_COPY_MISMATCH/);
+      const localAfterMismatch = backupSets(mismatchLocal);
+      const copyAfterMismatch = backupSets(mismatchCopy);
+      assert.equal(localAfterMismatch.length, 2);
+      assert.equal(copyAfterMismatch.length, 2);
+      assert.deepEqual(backupSetDigests(path.join(mismatchLocal, 'backup-sets', currentId)), oldLocal);
+      assert.deepEqual(backupSetDigests(path.join(mismatchCopy, 'backup-sets', currentId)), oldCopy);
+      const changedLocal = localAfterMismatch.find((entry) => path.basename(entry) !== currentId);
+      assert.ok(changedLocal);
+      const changedCopy = copyAfterMismatch.find((entry) => path.basename(entry) === path.basename(changedLocal));
+      assert.ok(changedCopy);
+      const validLocal = await verifyBackupSet(changedLocal, { pgBin: pg15Bin() });
+      const validCopy = await verifyBackupSet(changedCopy, { pgBin: pg15Bin() });
+      assert.notEqual(validLocal.manifestSha256, validCopy.manifestSha256);
+      const previousId = currentId;
+      const localBefore = backupSetDigests(current);
+      const copyBefore = backupSetDigests(copySets[0]);
+      const preserved = runCli(backupScript, ['--preserve-existing'], copyEnvironment, [3]);
+      assert.match(preserved.stdout, /retention preserved existing backup sets/u);
+      const localAfter = backupSets(backupRoot);
+      const copiesAfter = backupSets(copyRoot);
+      assert.equal(localAfter.length, 2);
+      assert.equal(copiesAfter.length, 2);
+      assert.deepEqual(backupSetDigests(path.join(backupRoot, 'backup-sets', previousId)), localBefore);
+      assert.deepEqual(backupSetDigests(path.join(copyRoot, 'backup-sets', previousId)), copyBefore);
+      current = localAfter.find((entry) => path.basename(entry) !== previousId);
+      assert.ok(current);
+      currentId = path.basename(current);
+      const newCopy = copiesAfter.find((entry) => path.basename(entry) === currentId);
+      assert.ok(newCopy);
+      const localVerified = await verifyBackupSet(current, { pgBin: pg15Bin() });
+      const copyVerified = await verifyBackupSet(newCopy, { pgBin: pg15Bin() });
+      assert.equal(localVerified.manifestSha256, copyVerified.manifestSha256);
+      copySets = [newCopy];
+    }
     let candidateRelease;
     let candidateSha;
     if (withCandidateRelease) {
