@@ -25,8 +25,8 @@ async function run(): Promise<void> {
           process.exitCode = 1;
         });
     };
-    process.once('SIGINT', () => close('SIGINT'));
-    process.once('SIGTERM', () => close('SIGTERM'));
+    process.on('SIGINT', () => close('SIGINT'));
+    process.on('SIGTERM', () => close('SIGTERM'));
   } catch (error: unknown) {
     console.error(formatApiStartupFailure(error));
     process.exitCode = 1;
