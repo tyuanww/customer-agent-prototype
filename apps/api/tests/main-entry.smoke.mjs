@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { connect, createServer } from 'node:net';
@@ -53,25 +53,84 @@ async function waitWithin(promise, label, timeoutMs = 5_000) {
   }
 }
 
-async function waitForListenerClose(address) {
+async function waitForListenerClose(address, {
+  connectSocket = connect,
+  timeoutMs = 5_000,
+  now = Date.now,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+} = {}) {
   const { hostname, port } = new URL(address);
-  const deadline = Date.now() + 5_000;
-  while (Date.now() < deadline) {
+  const deadline = now() + timeoutMs;
+  while (now() < deadline) {
     const open = await new Promise((resolve, reject) => {
-      const socket = connect({ host: hostname, port: Number(port) });
+      const socket = connectSocket({ host: hostname, port: Number(port) });
       socket.setTimeout(500);
       socket.once('connect', () => { socket.destroy(); resolve(true); });
       socket.once('error', (error) => {
         if (error.code === 'ECONNREFUSED') resolve(false);
+        else if (error.code === 'ECONNRESET') resolve(true);
         else reject(error);
       });
-      socket.once('timeout', () => { socket.destroy(); reject(new Error('Connection probe timed out')); });
+      socket.once('timeout', () => { socket.destroy(); resolve(true); });
     });
     if (!open) return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await wait(50);
   }
   throw new Error('API did not stop accepting connections');
 }
+
+function scriptedProbes(outcomes) {
+  let attempts = 0;
+  let elapsed = 0;
+  return {
+    options: {
+      now: () => elapsed,
+      wait: async (ms) => { elapsed += ms; },
+      connectSocket() {
+        const socket = new EventEmitter();
+        socket.setTimeout = () => socket;
+        socket.destroy = () => socket;
+        const outcome = outcomes[Math.min(attempts, outcomes.length - 1)];
+        attempts += 1;
+        queueMicrotask(() => {
+          if (outcome === 'timeout') socket.emit('timeout');
+          else if (outcome === 'connected') socket.emit('connect');
+          else socket.emit('error', Object.assign(new Error(outcome), { code: outcome }));
+        });
+        return socket;
+      },
+    },
+    attempts: () => attempts,
+  };
+}
+
+for (const transient of ['ECONNRESET', 'timeout']) {
+  test(`listener close probe retries ${transient} until refusal`, async () => {
+    const probes = scriptedProbes([transient, 'ECONNREFUSED']);
+    await waitForListenerClose('http://127.0.0.1:12345', { ...probes.options, timeoutMs: 150 });
+    assert.equal(probes.attempts(), 2);
+  });
+}
+
+for (const outcome of ['ECONNRESET', 'timeout', 'connected']) {
+  test(`listener close probe rejects persistent ${outcome}`, async () => {
+    const probes = scriptedProbes([outcome]);
+    await assert.rejects(
+      waitForListenerClose('http://127.0.0.1:12345', { ...probes.options, timeoutMs: 150 }),
+      /API did not stop accepting connections/,
+    );
+    assert.ok(probes.attempts() >= 2);
+  });
+}
+
+test('listener close probe rejects unexpected errors', async () => {
+  const probes = scriptedProbes(['EACCES']);
+  await assert.rejects(
+    waitForListenerClose('http://127.0.0.1:12345', { ...probes.options, timeoutMs: 150 }),
+    { code: 'EACCES' },
+  );
+  assert.equal(probes.attempts(), 1);
+});
 
 test('compiled main entry starts, serves both probes, and closes on SIGINT', async () => {
   const output = { stdout: '', stderr: '' };
