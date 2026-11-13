@@ -35,8 +35,8 @@ async function run(): Promise<void> {
   );
   let stopping = false;
   const stop = () => { stopping = true; };
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
   while (!stopping) {
     const result = await worker.runOnce().catch(() => 'idle' as const);
     if (result === 'idle') await new Promise((resolve) => { setTimeout(resolve, POLL_MS); });
