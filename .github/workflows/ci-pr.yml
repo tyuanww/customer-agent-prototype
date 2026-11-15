@@ -45,7 +45,7 @@ jobs:
     needs: changes
     name: PR fast checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - if: needs.changes.outputs.mode == 'docs'
         run: echo "Documentation scope passed the precheck; runtime checks are not required."

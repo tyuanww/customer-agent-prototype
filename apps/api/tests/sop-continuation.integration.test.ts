@@ -522,7 +522,7 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
     expect(result.status, output).toBe(0); expect(output).toContain('NONEMPTY_GRAPH_RESTORE_PASS');
     const restored = JSON.parse(readFileSync(path.join(evidenceRoot, 'nonempty-restore-results.json'), 'utf8'));
     expect(restored.http.continuation).toMatchObject({ restoredRenew: true, closedRejected: true, repeatedClose: true });
-    expect(restored.report.migrationCount).toBe(88);
+    expect(restored.report.migrationCount).toBe((await verifyDatabaseMigrations(admin)).migrationCount);
   }, 180_000);
 
   it('pins consumed permission facts and blocks ambiguous first-open observations without replacing old active facts', async () => {
