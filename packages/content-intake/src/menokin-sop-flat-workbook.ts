@@ -58,7 +58,22 @@ export type MenokinFlatSopWorkbookParseResult = Readonly<{
   ok: boolean;
   sourceSha256: string;
   sourceRows: readonly MenokinSourceRow[];
+  flatFacts: readonly MenokinFlatSopRowFact[];
   issues: readonly MenokinFlatSopWorkbookIssue[];
+}>;
+
+export type MenokinFlatSopColumn = typeof MENOKIN_FLAT_SOP_WORKBOOK_HEADERS[number];
+/** Physical identity and display text, without the legacy candidate's node interpretation. */
+export type MenokinFlatSopRowFact = Readonly<{
+  rowId: string;
+  sourceSha256: string;
+  sheetName: typeof MENOKIN_FLAT_SOP_WORKBOOK_SHEET_NAME;
+  rowNumber: number;
+  rowHash: string;
+  cells: readonly (Readonly<{ column: MenokinFlatSopColumn; normalizedText: string }> &
+    (Readonly<{ originalDisplayText: string; formulaSource?: string }>
+      | Readonly<{ originalDisplayText: null; formulaSource: string }>))[];
+  images: readonly Omit<MenokinSourceImage, 'targetNodeKey'>[];
 }>;
 
 export type MenokinFlatSopWorkbookOptions = Readonly<{
@@ -79,6 +94,9 @@ const GROUP_SET = new Set<string>(MENOKIN_SOP_SEVERITY_ORDER);
 const EXECUTION_KEY_SET = new Set<string>(MENOKIN_SOP_EXECUTION_KEYS);
 const TERMINAL_KEY_SET = new Set<string>(MENOKIN_SOP_TERMINAL_KEYS);
 const IMAGE_EXTENSIONS = new Set(['png', 'jpeg', 'gif']);
+const EMPTY_ITEM_COLUMNS = new Set<MenokinFlatSopColumn>([
+  '路径选择', '字段', '操作说明', '话术', '快捷语', '前提条件', '判断维度', '类型判断', '症状描述', '图片',
+]);
 
 const sha256 = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 
@@ -181,6 +199,22 @@ const readControlledImageReference = (value: ExcelJS.CellValue): ControlledImage
   return { ok: true, referenceHash: isAbsentImageText(text) ? null : sha256(text) };
 };
 
+/** Formula source remains opaque. Only an existing cache supplies display text. */
+function cellDisplayFact(cell: ExcelJS.Cell):
+  { originalDisplayText: string; formulaSource?: string } | { originalDisplayText: null; formulaSource: string } {
+  const raw = cell.value;
+  if (raw && typeof raw === 'object' && ('formula' in raw || 'sharedFormula' in raw)) {
+    // ExcelJS value omits falsy caches. Its result getter retains 0 and false.
+    const cached = cell.result;
+    const formulaSource = encodeOpaque(cached === undefined ? raw : { ...raw, result: cached });
+    if (formulaSource !== null) {
+      const display = typeof cached === 'boolean' ? String(cached) : readSopCellText(cached);
+      return { originalDisplayText: cached === undefined || display === undefined ? null : display, formulaSource };
+    }
+  }
+  return { originalDisplayText: readSopCellText(raw) ?? '' };
+}
+
 const issue = (
   code: string,
   row: number | null,
@@ -197,6 +231,7 @@ const failed = (
   ok: false,
   sourceSha256,
   sourceRows: [],
+  flatFacts: [],
   issues,
 });
 
@@ -455,15 +490,19 @@ export async function parseMenokinFlatSopWorkbook(
     if (issues.length > 0) return failed(sourceSha256, issues);
 
     const sourceRows: MenokinSourceRow[] = [];
+    const flatFacts: MenokinFlatSopRowFact[] = [];
     const parsedRowNumbers = new Set<number>();
     let normalizedTextCharacters = 0;
     for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
       const row = sheet.getRow(rowNumber);
       const values: string[] = [];
+      const displayValues: ReturnType<typeof cellDisplayFact>[] = [];
       let imageReferenceHash: string | null = null;
       let nonText = false;
       for (let column = 1; column <= MENOKIN_FLAT_SOP_WORKBOOK_HEADERS.length; column++) {
-        const raw = row.getCell(column).value;
+        const cell = row.getCell(column);
+        const raw = cell.value;
+        displayValues.push(cellDisplayFact(cell));
         if (column === 18) {
           if (wpsImagesByRow.has(rowNumber)) {
             const wpsImage = wpsImagesByRow.get(rowNumber)!;
@@ -602,6 +641,20 @@ export async function parseMenokinFlatSopWorkbook(
         images,
         knowledge: knowledgeEntries(values, targetNodeKey),
       });
+      flatFacts.push({
+        rowId: sourceEntryCode(sourceSha256, rowNumber),
+        sourceSha256,
+        sheetName: MENOKIN_FLAT_SOP_WORKBOOK_SHEET_NAME,
+        rowNumber,
+        rowHash: rowHash(MENOKIN_FLAT_SOP_WORKBOOK_HEADERS, values),
+        cells: MENOKIN_FLAT_SOP_WORKBOOK_HEADERS.map((column, index) => {
+          const display = displayValues[index] ?? { originalDisplayText: '' };
+          const absent = EMPTY_ITEM_COLUMNS.has(column) && display.formulaSource === undefined
+            && normalizeText(display.originalDisplayText ?? '') === '无';
+          return { column, ...display, normalizedText: absent ? '' : values[index] ?? '' };
+        }),
+        images: images.map(({ targetNodeKey: _target, ...image }) => image),
+      });
       parsedRowNumbers.add(rowNumber);
     }
 
@@ -636,6 +689,7 @@ export async function parseMenokinFlatSopWorkbook(
       ok: true,
       sourceSha256,
       sourceRows,
+      flatFacts,
       issues: [],
     };
   } catch (error) {

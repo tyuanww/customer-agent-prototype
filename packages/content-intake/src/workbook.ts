@@ -64,7 +64,15 @@ export {
   type MenokinFlatSopWorkbookIssue,
   type MenokinFlatSopWorkbookOptions,
   type MenokinFlatSopWorkbookParseResult,
+  type MenokinFlatSopColumn,
+  type MenokinFlatSopRowFact,
 } from './menokin-sop-flat-workbook.js';
+export { prepareMenokinSopReview, MENOKIN_SOP_REVIEW_VERSION,
+  type MenokinSopSelection, type MenokinSopExcerpt, type MenokinSopReviewedField,
+  type MenokinSopReviewedEntity, type MenokinSopRowDecision, type MenokinSopHold,
+  type MenokinSopReviewRecord, type MenokinSopReviewIssue, type MenokinSopAuthoringRow,
+  type MenokinSopAuthoringPlan, type MenokinSopReviewReport, type MenokinSopReviewPreparation,
+} from './menokin-sop-review.js';
 export { parseSopWorkbook, tryParseSopAsFaq, createSyntheticSopWorkbook, createSopTemplate, readSopCellText, repairEmptySharedStringMarkers, SOP_POLICY_VERSION, SOP_SHEET_NAMES,
   SOP_ENTRY_CODE_HEADER, isEntryCode,
   SOP_TEMPLATE_VERSION, SOP_RULE_VERSION, SOP_MAPPING_VERSION, SOP_STRUCTURE_SHA256,
