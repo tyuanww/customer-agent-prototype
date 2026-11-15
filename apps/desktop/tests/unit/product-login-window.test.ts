@@ -190,6 +190,29 @@ describe('createLoginWindow', () => {
     expect(JSON.stringify(mocks.loadURL.mock.calls)).not.toContain('/authorize');
   });
 
+  it.each([' synthetic-password ', 'x'.repeat(256), 'old'])('passes unchanged supported and legacy passwords to the identity provider', async (password) => {
+    const transport = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      if (String(input).endsWith('/password')) {
+        expect(JSON.parse(String(init?.body))).toEqual({ username: 'synthetic_agent', password });
+        return Response.json({ code: 'synthetic_agent' });
+      }
+      return new Response('ok', { status: 200 });
+    }) as unknown as typeof fetch;
+    const { opened, submit } = openWindow({ fetch: transport });
+    expect(await submit({ username: 'synthetic_agent', password })).toEqual({ ok: true });
+    await opened;
+  });
+
+  it.each(['', 'x'.repeat(257)])('rejects an unsupported password before a network request', async password => {
+    const transport = vi.fn();
+    const { opened, submit, cancel } = openWindow({ fetch: transport });
+    const cancelled = opened.catch(() => undefined);
+    expect(await submit({ username: 'synthetic_agent', password })).toEqual({ ok: false, code: 'INVALID' });
+    expect(transport).not.toHaveBeenCalled();
+    await cancel();
+    await cancelled;
+  });
+
   it('submits the account form in-process and GETs the callback instead of navigating the chooser', async () => {
     const openExternal = vi.fn(async () => undefined);
     const transport = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {

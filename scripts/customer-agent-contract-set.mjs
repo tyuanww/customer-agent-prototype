@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { READINESS_SCHEMA, READINESS_LOCK, READINESS_SOURCE, READINESS_APPROVAL, READINESS_MEMBERS, verifyReadinessReferences, composeReadiness } from './readiness-contract.mjs';
-import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
+import { renderReadinessMigration, renderRepairMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE, SEAT_DISPLAY_SOURCE } from '../packages/database/scripts/migration-artifact.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIFIED_CONSUMPTION_SCHEMA } from './sop-unified-contract.mjs';
 import { createSopResourceDisableProfile, SOP_RESOURCE_SCHEMA, SOP_RESOURCE_LOCK, SOP_RESOURCE_CONSUMPTION_SCHEMA,
@@ -959,17 +959,17 @@ function verifyRepairReferences(directory, manifest) {
 }
 
 function verifySopUnifiedMigrationTail(projectRoot, actual) {
-  if (actual.migrations.length === 88 && !actual.compatibility?.sop_resource_overlay
-    || actual.compatibility?.sop_resource_overlay && actual.migrations.length !== 88) {
+  if (actual.migrations.length >= 88 && !actual.compatibility?.sop_resource_overlay
+    || actual.compatibility?.sop_resource_overlay && ![88, 89].includes(actual.migrations.length)) {
     throw new Error('SOP resource lifecycle requires its exact 88-migration tail');
   }
-  if (actual.compatibility?.sop_continuation_overlay && ![87, 88].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_continuation_overlay && ![87, 88, 89].includes(actual.migrations.length)) {
     throw new Error('SOP continuation implementation requires its exact 87-migration tail');
   }
-  if (actual.compatibility?.sop_query_overlay && ![86, 87, 88].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_query_overlay && ![86, 87, 88, 89].includes(actual.migrations.length)) {
     throw new Error('SOP query implementation requires its exact 86-migration tail');
   }
-  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86, 87, 88].includes(actual.migrations.length)) {
+  if (actual.compatibility?.sop_lifecycle_overlay && ![85, 86, 87, 88, 89].includes(actual.migrations.length)) {
     throw new Error('SOP lifecycle implementation requires its exact 85-migration tail');
   }
   const lockPath = path.join(projectRoot, UPSTREAM_ROOT, SOP_CORRECTED_LOCK);
@@ -1060,7 +1060,7 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(continuationPath, 'utf8') !== continuationSql) throw new Error('SOP continuation implementation migration bytes drift');
   }
 
-  if (actual.migrations.length === 88) {
+  if (actual.migrations.length >= 88) {
     if (sha256Bytes(Buffer.from(JSON.stringify(actual.migrations.slice(0, 87)))) !== '3d48f9989552918848421d2e2650d8da0bea80515cc728cdb790afcae4a1e8ae') {
       throw new Error('SOP resource lifecycle requires the immutable 87-migration predecessor');
     }
@@ -1091,6 +1091,28 @@ function verifySopUnifiedMigrationTail(projectRoot, actual) {
     if (readFileSync(resourcePath, 'utf8') !== resourceSql) throw new Error('SOP resource lifecycle implementation migration bytes drift');
   }
 
+  if (actual.migrations.length === 89) {
+    if (sha256Bytes(Buffer.from(JSON.stringify(actual.migrations.slice(0, 88)))) !== SEAT_DISPLAY_SOURCE.predecessorSha256) {
+      throw new Error('Seat display projection requires the immutable 88-migration predecessor');
+    }
+    const entry = actual.migrations[88];
+    const sourcePath = path.join(projectRoot, SEAT_DISPLAY_SOURCE.file);
+    const migrationPath = path.join(migrationRoot, `${SEAT_DISPLAY_SOURCE.id}.sql`);
+    for (const file of [sourcePath, migrationPath]) {
+      assertPathInsideRoot(projectRoot, file); assertRegularFile(file, 'Seat display projection');
+    }
+    const source = readFileSync(sourcePath, 'utf8');
+    const sql = readFileSync(migrationPath, 'utf8');
+    if (!isDeepStrictEqual(entry, {
+      position: SEAT_DISPLAY_SOURCE.position, id: SEAT_DISPLAY_SOURCE.id, file: `${SEAT_DISPLAY_SOURCE.id}.sql`,
+      source_ranges: [], sha256: SEAT_DISPLAY_SOURCE.migrationSha256, bytes: Buffer.byteLength(sql),
+      contract_set_id: prefix[82].contract_set_id, source_git_sha: prefix[82].source_git_sha,
+      source_schema_sha256: prefix[82].source_schema_sha256,
+    }) || sha256(migrationPath) !== entry.sha256
+      || sha256(sourcePath) !== SEAT_DISPLAY_SOURCE.sha256 || !sql.includes(source.trimEnd())) {
+      throw new Error('Seat display projection migration/source drift');
+    }
+  }
 }
 
 // This is an upgrade over the exact installed generator closure, never a bootstrap.
@@ -1103,7 +1125,7 @@ function verifyRepairPredecessor(projectRoot, directory) {
   const actual = readJson(manifestPath, 'Migration manifest');
   // The accepted catalogue lengths grow by one per appended overlay; 0065 only rewrites
   // constraint definitions and appends no contract increment.
-  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
+  if (![39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89].includes(actual.migrations?.length)) throw new Error('Repair requires 39 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');
@@ -1185,7 +1207,7 @@ function verifyReadinessPredecessor(projectRoot, directory, manifest, repair) {
   const manifestPath = path.join(migrationRoot, 'manifest.generated.json');
   assertPathInsideRoot(projectRoot, manifestPath); assertRegularFile(manifestPath, 'Migration manifest');
   const actual = readJson(manifestPath, 'Migration manifest');
-  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
+  if (![40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89].includes(actual.migrations?.length)) throw new Error('Readiness requires 40 predecessor migrations');
   if (actual.migrations.length >= 84) verifySopUnifiedMigrationTail(projectRoot, actual);
   if (actual.migrations.length >= 83 && actual.migrations[82]?.id !== '0083_sop_pipeline_projection') throw new Error('Unrecognized SOP pipeline projection');
   if (actual.migrations.length >= 82 && actual.migrations[81]?.id !== '0082_access_evaluator') throw new Error('Unrecognized ACL access evaluator');

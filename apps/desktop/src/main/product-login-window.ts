@@ -188,8 +188,9 @@ function readCredentials(payload: unknown): { username: string; password: string
   const username = Reflect.get(payload, 'username');
   const password = Reflect.get(payload, 'password');
   if (typeof username !== 'string' || typeof password !== 'string') return undefined;
-  if (username.trim() !== username || password.trim() !== password) return undefined;
-  if (username.length < 1 || username.length > 128 || password.length < 1 || password.length > 128) return undefined;
+  if (username.trim() !== username) return undefined;
+  // Creation/reset accept 8..256 unchanged characters. Login also admits older short passwords.
+  if (username.length < 1 || username.length > 128 || password.length < 1 || password.length > 256) return undefined;
   return { username, password };
 }
 

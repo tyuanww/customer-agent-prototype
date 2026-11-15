@@ -2,6 +2,9 @@ import type { Client, ClientConfig } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyMigrationPrefix, inspectDatabaseMigrations, verifyAppliedDatabaseMigrations, verifyDatabaseMigrations } from '../src/index.js';
 import { Pg15Harness } from '../src/testkit/index.js';
+import { generatedMigrationCatalogue } from '../src/generated/migrations.generated.js';
+
+const migrationCount = generatedMigrationCatalogue.migrations.length;
 
 describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('applied prefix PostgreSQL 15 proof', () => {
   let harness: Pg15Harness;
@@ -82,13 +85,13 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('applied 
     }
   }, 60_000);
 
-  it.each([82, 83, 84, 85, 86, 87, 88])('proves the physical schema and exact ledger at committed prefix %i', async count => {
+  it.each(generatedMigrationCatalogue.migrations.slice(81).map((_, index) => index + 82))('proves the physical schema and exact ledger at committed prefix %i', async count => {
     await applyMigrationPrefix(client, count);
     const before = await inspectDatabaseMigrations(client);
     const report = await verifyAppliedDatabaseMigrations(client);
     expect(report).toMatchObject({ status: 'PASS', migrationCount: count });
     expect(await inspectDatabaseMigrations(client)).toEqual(before);
-    if (count < 88) {
+    if (count < migrationCount) {
       await expect(verifyDatabaseMigrations(client)).rejects.toMatchObject({ code: 'MIGRATION_VERIFY_FAILED' });
     } else {
       expect(await verifyDatabaseMigrations(client)).toMatchObject({ status: 'PASS', migrationCount: count });

@@ -18,9 +18,10 @@ html[data-role='login'] #root {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   height: 100%;
-  padding: 24px 28px;
+  overflow-y: auto;
+  padding: 20px 28px;
 }
 
 .login-header {
@@ -84,7 +85,7 @@ html[data-role='login'] #root {
 
 .login-form {
   display: flex;
-  min-height: 0;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 0;
 }
@@ -100,8 +101,8 @@ html[data-role='login'] #root {
 }
 
 .login-form .ant-alert {
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
   border-radius: 6px;
 }
 

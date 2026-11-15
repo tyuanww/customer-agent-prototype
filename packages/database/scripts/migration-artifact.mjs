@@ -11,6 +11,10 @@ export const SOP_QUERY_SOURCE = Object.freeze({ position: 86, id: '0086_sop_unif
 export const SOP_CONTINUATION_SOURCE = Object.freeze({ position: 87, id: '0087_sop_unified_continuation',
   file: 'packages/database/overlays/0087_sop_unified_continuation.sql', sha256: 'aa8808e02893abe258d6f8f834b792444a321938fff5c8659f873b5ab338afc8' });
 
+export const SEAT_DISPLAY_SOURCE = Object.freeze({ position: 89, id: '0089_seat_display_projection',
+  file: 'packages/database/overlays/0089_seat_display_projection.sql', sha256: '7b5ef02691545f51e8b80425e5769dda898b1cc248bf158dae50ee9397177cd4',
+  migrationSha256: '911fa2b2e393addd49d9fb6cf1b5b005194f7eee23bf4f22745554effa0edce8', predecessorSha256: 'cba49be5e1894decdb84221bda49c0c1a55656cd4ebbabc5af735d03f8293482' });
+
 export const SOP_RESOURCE_SOURCE = Object.freeze({ position: 88, id: '0088_sop_resource_lifecycle',
   file: 'packages/database/overlays/0088_sop_resource_lifecycle.sql', sha256: '9efa55bb15efcb33214e966a9b6eeac81157523acbe47281610cd5be55027c60' });
 

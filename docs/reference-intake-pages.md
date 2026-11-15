@@ -56,13 +56,19 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 `seats` 的每一项和 create 的 `seat` 都是 `displayName`、`username`、`post`、`enabled`。类型在 `apps/desktop/src/shared/seat-account-intent.ts`：`isSeatAccountIntent`、`seatAccountReply`、`SeatAccountApi`、`SeatAccountRecord`。`isSeatAccountIntent` 只核对字段形状和岗位是两种之一，不核对登录名正则。
 
-登录名必须匹配 `^[A-Za-z0-9_-]{1,64}$`，由 `seatUsername` 检查。不合规则、姓名为空或长于 256 字、重置或停用找不到人，错误都是 `missing-person`，文案是「没有可授权的人。」绑定 ID 是 `synthetic_` 加登录名。停用只把人员标成不可用，不删除。
+登录名必须匹配 `^[A-Za-z0-9_-]{1,64}$`，姓名为 1 至 256 字且不含控制字符。API 创建及重设接受 8 至 256 个字符的口令，前后空白原样保留；桌面登录保留旧账号的 1 至 7 字符口令兼容，并接受到 256 字符，不裁剪口令。绑定 ID 是 `synthetic_seat_` 加登录名。停用只把人员标成不可用，不删除。
 
 Main 把服务端的可操作拒绝映射为岗位、登录名、重名、权限或口令文件错误。回复形状不通过 `seatAccountReply`、IPC 输入或窗口校验失败时返回明确失败，不伪造保存成功。
 
 Electron 主进程把意图交给产品 API 的账号路由（`GET /v1/intake/seats/administration`、`GET`/`POST /v1/intake/seats`、`POST /v1/intake/seats/:username/password`、`DELETE /v1/intake/seats/:username`）。身份行由迁移 `0068` 引入的 `SECURITY DEFINER` 函数写入：`backend_identity.create_seat`、`list_seats`、`disable_seat`。它们的所有者是集群所有者，`EXECUTE` 只授给 `intake_business`，能力角色拿不到任何身份表的写权限。
 
 迁移 `0078` 将建席与业务授权分开。创建和登录只建立身份、岗位及其事实，不签发或恢复业务授权，也不要求存在已发布或可分配来源。管理员需另行人工授予查询权限。迁移不修改已有授权；已有自动授权需要按实际业务情况另行审查。
+
+迁移 `0089` 将初始 `app_users` 姓名投影和绑定、主体、岗位、事实放在同一个创建事务中，保持 256 字姓名合同。它按既有坐席与同租户绑定回填历史缺失姓名；已有角色及停用状态保持不变，不产生业务授权，也不扩大 `set_operator_display_name` 的调用角色。
+
+每次确认账号写入都由 Main 分配独立命令标识。控制面只对该标识、动作和登录名计算持久摘要，口令只在执行期间的内存和受控 HTTP 请求中使用。已完成历史不能代替后续新重设；操作的等待、取消和结果未知仍由控制面记录。同账号相同的执行中提交共享等待，不同提交会被阻止；未知结果在重启后仍阻止该账号的新写入，不从列表存在推断口令已保存。旧记录没有账号目标时保守阻止新的账号写入。当前服务端没有账号命令回执，无法自动证明未知重设完成，须由管理员受控核对和恢复。历史控制面摘要保留，升级不改写旧审计字段。
+
+创建、重设、停用的失败在当前弹窗中显示并保留输入。登录窗内容超出当前可用高度时可滚动，错误提示不会让登录按钮永久落在不可达区域。
 
 口令只以 salt 和 scrypt 哈希写入服务端 `CUSTOMER_AGENT_STACK_ROOT` 下的 `password-accounts.json`，由身份服务的 `/password` 每次重读，所以写入立即生效。明文密码不进页面、不进数据库、不进 git。
 

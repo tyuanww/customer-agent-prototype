@@ -27,7 +27,7 @@ test('resource lifecycle generation pins the actual source and preserves all 87 
   await withVerifiedContractSetSnapshot({ projectRoot }, snapshot => {
     const prior = buildDatabaseMigrationOutputs({ ...snapshot, sopUnified }, { projectRoot });
     const result = buildDatabaseMigrationOutputs({ ...snapshot, sopUnified, sopResource }, { projectRoot });
-    assert.equal(prior.migrations.length, 87); assert.equal(result.migrations.length, 88);
+    assert.equal(prior.migrations.length, 87); assert.equal(result.migrations.length, 89);
     assert.deepEqual(result.migrations.slice(0, 87), prior.migrations);
     assert.equal(hash(JSON.stringify(result.manifest.migrations.slice(0, 87))), '3d48f9989552918848421d2e2650d8da0bea80515cc728cdb790afcae4a1e8ae');
     const final = result.migrations[87];

@@ -94,6 +94,8 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     }).catch(() => { setProblem('账号暂不可用。'); });
   };
   const closeAll = () => {
+    if (flight.current) return;
+    setProblem('');
     setCreateOpen(false);
     setName('');
     setUsername('');
@@ -103,7 +105,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     setDisabling('');
   };
   return <section>
-    {problem && <p role="alert">{problem}</p>}
+    {problem && !createOpen && !resetting && !disabling && <p role="alert">{problem}</p>}
     <A11yTable<SeatAccountRecord>
       aria-label="账号"
       pagination={false}
@@ -116,27 +118,30 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
         { title: '岗位', dataIndex: 'post' },
         { title: '状态', dataIndex: 'enabled', render: (enabled: boolean) => <span className="state"><i className={`dot${enabled ? ' ok' : ''}`} />{enabled ? '使用中' : '已停用'}</span> },
         { title: '操作', key: 'ops', width: 170, render: (_value, row) => row.enabled ? <div className="acts">
-          <DeskButton type="text" disabled={blocked} onClick={() => { setResetting(row.username); setNextPassword(''); setDisabling(''); }}>重置密码</DeskButton>
-          <DeskButton type="text" danger disabled={blocked} onClick={() => { setDisabling(row.username); closeReset(); }}>停用</DeskButton>
+          <DeskButton type="text" disabled={blocked} onClick={() => { setProblem(''); setResetting(row.username); setNextPassword(''); setDisabling(''); }}>重置密码</DeskButton>
+          <DeskButton type="text" danger disabled={blocked} onClick={() => { setProblem(''); setDisabling(row.username); closeReset(); }}>停用</DeskButton>
         </div> : null },
       ]}
     />
     <Modal open={createOpen} title="新建账号" width={440} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeAll}>
+        {problem && <p role="alert">{problem}</p>}
         <fieldset className="fields" disabled={blocked} style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
           <label>姓名<Input aria-label="姓名" autoComplete="off" value={name} onChange={event => setName(event.target.value)} /></label>
           <label>登录名<Input aria-label="登录名" autoComplete="off" value={username} onChange={event => setUsername(event.target.value)} /></label>
           <label>密码<Input.Password aria-label="密码" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
           <label>岗位<Select<IntakePost> aria-label="坐席岗位" value={post} disabled={blocked} virtual={false} style={{ width: '100%' }} options={INTAKE_POSTS.map(item => ({ value: item, label: item }))} onChange={choose} /></label>
         </fieldset>
-        <footer><DeskButton onClick={closeAll}>取消</DeskButton>
-          <DeskButton type="primary" disabled={blocked || !name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存账号</DeskButton></footer>
+        <footer><DeskButton disabled={blocked} onClick={closeAll}>取消</DeskButton>
+          <DeskButton type="primary" loading={busy} disabled={blocked || !name.trim() || !username.trim() || password.length === 0} onClick={() => void create()}>保存账号</DeskButton></footer>
     </Modal>
     <Modal open={resetting !== ''} title="重置密码" width={440} footer={null} destroyOnHidden onCancel={closeAll}>
+        {problem && <p role="alert">{problem}</p>}
         <div className="fields"><label>新密码<Input.Password aria-label="新密码" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} /></label></div>
         <footer><DeskButton disabled={blocked} onClick={closeAll}>取消</DeskButton>
-          <DeskButton type="primary" disabled={blocked || nextPassword.length === 0} onClick={() => void reset(resetting)}>确认重置</DeskButton></footer>
+          <DeskButton type="primary" loading={busy} disabled={blocked || nextPassword.length === 0} onClick={() => void reset(resetting)}>确认重置</DeskButton></footer>
     </Modal>
     <Modal open={disabling !== ''} title="停用账号" closable={false} footer={null} destroyOnHidden onCancel={closeAll}>
+      {problem && <p role="alert">{problem}</p>}
       <p>停用后该账号无法再登录。</p>
       <footer>
         <DeskButton autoFocus disabled={blocked} onClick={closeAll}>取消</DeskButton>
