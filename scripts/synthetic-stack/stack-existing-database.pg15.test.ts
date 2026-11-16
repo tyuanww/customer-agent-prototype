@@ -7,11 +7,13 @@ import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { applyMigrationPrefix, verifyAppliedDatabaseMigrations } from '../../packages/database/dist/index.js';
+import { generatedMigrationCatalogue } from '../../packages/database/dist/generated/migrations.generated.js';
 import { buildAccount } from './identity-admission.ts';
 import { SYNTHETIC_SCRIPT_IDS } from './content.ts';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const entry = fileURLToPath(new URL('./stack.ts', import.meta.url));
+const currentMigrationCount = generatedMigrationCatalogue.migrations.length;
 
 function launch(args: string[], environment: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [entry, ...args], { env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -148,11 +150,11 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       const before = (await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
       const result = await run('start', '--existing-database');
       assert.equal(result.status, 1, result.output);
-      assert.match(result.output, /Runtime release requires 88 migrations; applied database has 81/u);
+      assert.match(result.output, new RegExp(`Runtime release requires ${currentMigrationCount} migrations; applied database has 81`, 'u'));
       assertNoChildren();
       assert.deepEqual((await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows, before);
     });
-    await applyMigrationPrefix(admin, 88);
+    await applyMigrationPrefix(admin, currentMigrationCount);
     const bindingsBefore = (await admin.query('SELECT * FROM backend_identity.subject_bindings ORDER BY binding_id')).rows;
     const ledgerBefore = (await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
     const grantsBefore = (await admin.query('SELECT * FROM content_intake.grants ORDER BY grant_id')).rows;
@@ -182,7 +184,7 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       cluster.stop();
       const result = await run('start', '--existing-database');
       assert.equal(result.status, 0, result.output);
-      assert.match(result.output, /applied database prefix: 88 \(PASS\)/u);
+      assert.match(result.output, new RegExp(`applied database prefix: ${currentMigrationCount} \\(PASS\\)`, 'u'));
       assert.equal((await fetch(`${profile.apiOrigin}/ready`)).status, 200);
       for (const name of ['identity', 'api', 'worker']) {
         const record = readProcess(name);
@@ -235,7 +237,7 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       assert.equal(drift.status, 1, drift.output);
       assertNoChildren();
       await admin.query('GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner');
-      assert.equal((await verifyAppliedDatabaseMigrations(admin)).migrationCount, 88);
+      assert.equal((await verifyAppliedDatabaseMigrations(admin)).migrationCount, currentMigrationCount);
     });
     await t.test('dirty and incomplete releases fail before launching children', async () => {
       const tracked = path.join(release, 'VERSION');
