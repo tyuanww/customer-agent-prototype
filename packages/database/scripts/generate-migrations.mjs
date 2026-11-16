@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE, SEAT_DISPLAY_SOURCE } from './migration-artifact.mjs';
+import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE, SEAT_DISPLAY_SOURCE, SOP_OWNER_REVIEW_SOURCE } from './migration-artifact.mjs';
 import { verifyIngestedCorrectedSopUnifiedContractSet, verifyCurrentSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
@@ -944,7 +944,10 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const seatDisplay = resource ? renderIntakeOverlay(projectRoot, snapshot, SEAT_DISPLAY_SOURCE.position, SEAT_DISPLAY_SOURCE.id) : null;
   if (seatDisplay && (sha256(readFileSync(path.join(projectRoot, SEAT_DISPLAY_SOURCE.file), 'utf8')) !== SEAT_DISPLAY_SOURCE.sha256
     || seatDisplay.sha256 !== SEAT_DISPLAY_SOURCE.migrationSha256)) throw new Error('Seat display projection source drifted');
-  const migrations = Object.freeze([...prefix, ...(resource ? [resource, seatDisplay] : [])]);
+  const ownerReview = resource ? renderIntakeOverlay(projectRoot, snapshot, SOP_OWNER_REVIEW_SOURCE.position, SOP_OWNER_REVIEW_SOURCE.id) : null;
+  if (ownerReview && (sha256(readFileSync(path.join(projectRoot, SOP_OWNER_REVIEW_SOURCE.file), 'utf8')) !== SOP_OWNER_REVIEW_SOURCE.sha256
+    || ownerReview.sha256 !== SOP_OWNER_REVIEW_SOURCE.migrationSha256)) throw new Error('Owner-reviewed SOP facts source drifted');
+  const migrations = Object.freeze([...prefix, ...(resource ? [resource, seatDisplay, ownerReview] : [])]);
   const manifest = Object.freeze({ ...prior.manifest,
     compatibility: Object.freeze({ ...prior.manifest.compatibility,
       ...(resource ? { sop_resource_overlay: Object.freeze({ contract_set_id: resource.contract_set_id,
@@ -975,6 +978,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   outputs.set(`packages/database/migrations/${continuation.file}`, continuation.sql);
   if (resource) outputs.set(`packages/database/migrations/${resource.file}`, resource.sql);
   if (seatDisplay) outputs.set(`packages/database/migrations/${seatDisplay.file}`, seatDisplay.sql);
+  if (ownerReview) outputs.set(`packages/database/migrations/${ownerReview.file}`, ownerReview.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

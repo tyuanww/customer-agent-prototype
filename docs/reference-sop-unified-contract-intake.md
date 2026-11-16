@@ -119,6 +119,14 @@ node scripts/customer-agent-contract-set.mjs verify --profile=sopUnified
 
 内部 `createSyntheticSopQueryFactWriter` 接受显式 synthetic 来源标识、版本与原字节，计算 SHA 并以 CAS 追加不可变事实。登记绑定原 candidate/version、完整 graph digest 和原 publication。原 sourceClaim、材料 risk、来源 confirmation 及 source_mappings 版本从原发布读取。逐 entry risk/copy/source_ref 由显式事实提供。合成来源别名及版本只接受字母、数字、点、下划线、冒号和连字符，source_ref 精确绑定别名@版本#entry ID。已知分组的缺事实只阻塞该候选，缺分组登记导致歧义时保持 blocked。
 
+`sop-owner-reviewed-query-facts.ts` 提供内部 `createOwnerReviewedSopQueryFactWriter`，消费负责人明确核对的本地文件事实。原字节是 UTF-8 JSON，包含 `kind=owner-reviewed-file`、原表 `originalSha256`、实际上传转换文件 `artifactSha256`、`reviewedByPrincipalId` 和完整 `document`。文档中的分组、每条风险及复制许可均为显式事实。未知风险使用 `unclassified`，未知复制许可使用 `null`，查询继续按原安全规则阻断。材料发布的 routine 风险与逐条话术风险各自保留。
+
+来源引用为 `owner-reviewed-file:<原表SHA-256>@<审核记录版本>#<条目ID>`。审核记录版本表示本地事实文件的版本。原表的上游版本仍按实际来源确认记录保存。转换文件摘要必须与原发布的来源声明及确认记录一致。`0090_owner_reviewed_sop_query_facts` 将精确审核字节、原件及转换件摘要保存为不可变私有记录，重算字节摘要并验证原发布、完整条目集合、事实版本 CAS 和永久回执。执行者须为当前有权的 director，且与文档确认人一致，持有该来源的 import、source-confirm 资格及有效产品会话。回执恢复前再次检查授权，提交前检查会话、身份与业务授权截止。
+
+该入口由受控内部调用方装配，查询继续使用既有 wire。实际原表、负责人事实确认、账号及部署按对应试点批准进入现场。合成验证使用显式构造的文件与审核事实。
+
+受控命令、文件检查与提交结果处理见[登记负责人确认的 SOP 使用资格](how-to-register-owner-reviewed-sop-facts.md)。
+
 `content-intake/sop-graph.ts` 继续拥有完整图闭包、digest 与媒体字节检查。`sop-unified-query-validation.ts` 集中补充 terminal outgoing、标题或正文过敏安全及 owner+ordinal 唯一性。C 先验证完整 original graph，再发送 B sop_graph_selection 产生的 selectedMedia，wire 保留 original graph_digest。合法不适用的媒体由 selection 排除。相同 resource/object 可被多个 owner 引用，每个完整 binding 独立 preview，不能借其他 owner 句柄。
 
 `read_sop_unified_query_bundle`、`read_sop_query_media` 和 `recheck_sop_unified_query` 是 current-only 入口。私有 `sop_query_publication_facts` 和 `sop_query_media_descriptor` 提供原发布事实与完整 tuple descriptor。D 历史 issuer 先锁 active 行取得 pinned release，再完成授权和截止检查。C 的 prepareIntakeUsage 包含 current release gate，历史 continuation 由 D 的窄 issuer 拥有。

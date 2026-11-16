@@ -9,7 +9,7 @@ const verified = verifyContractSetDirectory(fileURLToPath(new URL(`contracts/ups
 const manifest = JSON.parse(readFileSync(new URL('../../migrations/manifest.generated.json', dir)));
 const predecessor = manifest.migrations.slice(0, 83);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-if (![83, 84, 85, 86, 87, 88, 89].includes(manifest.migrations.length)
+if (![83, 84, 85, 86, 87, 88, 89, 90].includes(manifest.migrations.length)
   || sha256(JSON.stringify(predecessor)) !== '21bbce897e23f9f3e5fcdc8a0d52d1dadd42af7f22433b425f1c7c7eed676fae'
   || (manifest.migrations.length >= 84 && manifest.migrations[83].id !== '0084_sop_unified_storage')
   || (manifest.migrations.length >= 85 && manifest.migrations[84].id !== '0085_sop_unified_lifecycle')

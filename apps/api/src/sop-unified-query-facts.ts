@@ -94,6 +94,12 @@ export function parseSyntheticSopQueryFacts(source: RegisteredSyntheticSopFacts)
   let raw: unknown;
   try { raw = JSON.parse(source.bytes.toString('utf8')); }
   catch { throw new IntakeRejection('FILE_INVALID', 'VALIDATION'); }
+  return { sourceRef, sourceVersion, sourceSha256: digest(source.bytes),
+    document: parseSopQueryFactDocument(raw, { ref: sourceRef, version: sourceVersion }) };
+}
+
+/** Both registered source kinds bind every entry to their explicit source version. */
+export function parseSopQueryFactDocument(raw: unknown, source: { ref: string; version: string }): SopQueryFactDocument {
   const value = object(raw, ['candidateId', 'candidateVersion', 'sourceId', 'flowId', 'graphDigest', 'sopGroup', 'permissions']);
   const group = parseContractSchema('MenokinSopQuerySopQueryRequest', {
     sop_group: value.sopGroup, shop_id: 'synthetic-registration', query_text: 'synthetic',
@@ -106,18 +112,17 @@ export function parseSyntheticSopQueryFacts(source: RegisteredSyntheticSopFacts)
     const parsed = parseContractSchema('MenokinSopQuerySopEntryPermission', {
       ...fact, risk_level: risk === 'unclassified' ? 'low' : risk, copy_allowed: fact.copy_allowed === null ? false : fact.copy_allowed,
     });
-    if (parsed.source_ref !== `${sourceRef}@${sourceVersion}#${parsed.entry.businessEntryId}`) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
+    if (parsed.source_ref !== `${source.ref}@${source.version}#${parsed.entry.businessEntryId}`) throw new IntakeRejection('FILE_INVALID', 'VALIDATION');
     return { ...parsed, risk_level: risk === 'unclassified' ? 'unclassified' : parsed.risk_level,
       copy_allowed: fact.copy_allowed === null ? null : parsed.copy_allowed };
   });
-  const document: SopQueryFactDocument = {
+  return {
     candidateId: parseContractSchema('IntakeId', value.candidateId),
     candidateVersion: parseContractSchema('IntakeVersion', value.candidateVersion),
     sourceId: parseContractSchema('IntakeSopId', value.sourceId),
     flowId: parseContractSchema('IntakeSopId', value.flowId),
     graphDigest: parseContractSchema('IntakeSopHash', value.graphDigest), sopGroup: group, permissions,
   };
-  return { sourceRef, sourceVersion, sourceSha256: digest(source.bytes), document };
 }
 
 /** This is an internal synthetic registration entry, with no HTTP writer. The

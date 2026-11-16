@@ -35,6 +35,7 @@ import { registerAccessRoutes } from '../../dist/access/routes.js';
 import { registerSopQueryRoute } from '../../dist/sop-query-routes.js';
 import { createUnifiedSopQueryOperation } from '../../dist/sop-unified-query-operation.js';
 import { createSyntheticSopQueryFactWriter } from '../../dist/sop-unified-query-facts.js';
+import { createOwnerReviewedSopQueryFactWriter, type OwnerReviewedSopFactSource } from '../../dist/sop-owner-reviewed-query-facts.js';
 import type { RegisteredSyntheticSopFacts } from '../../src/sop-unified-query-facts.js';
 import { nativeOrganizationFixture } from './intake-organization-native.ts';
 import { seedIntakeSyntheticDirectory } from './intake-synthetic-directory.ts';
@@ -549,6 +550,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     usagePool = hooks.wrapUsagePool?.(usagePool) ?? usagePool;
     if (hooks.includeSopQuery) registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store, report) });
     const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
+    const ownerQueryFactWriter = createOwnerReviewedSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
     const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
     await app.register(contentIntakeUsageRoutes, { auth, usage, report });
     if (hooks.includeSopContinuation) await app.register(sopContinuationRoutes, {
@@ -635,6 +637,13 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         const authenticated = token ? await auth.authenticate({ authorization: `Bearer ${token}` }) : null;
         if (!authenticated) throw new Error('Synthetic SOP facts writer requires an existing product session');
         return queryFactWriter.write(authenticated, input);
+      },
+      async writeOwnerReviewedSopQueryFacts(actor: IntakeSyntheticIdentity, input: { operationId: string; expectedVersion: number; source: OwnerReviewedSopFactSource }) {
+        if (!hooks.includeSopQuery || !auth) throw new Error('Owner-reviewed SOP registration is closed');
+        const token = sessions.get(actor);
+        const authenticated = token ? await auth.authenticate({ authorization: `Bearer ${token}` }) : null;
+        if (!authenticated) throw new Error('Owner-reviewed SOP facts writer requires an existing product session');
+        return ownerQueryFactWriter.write(authenticated, input);
       },
       selectIdentity(value: DesktopSyntheticIdentity) {
         if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',

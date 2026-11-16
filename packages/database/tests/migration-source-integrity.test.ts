@@ -64,7 +64,7 @@ describe('verified product migration sources', () => {
   });
 
   it('keeps the exact ordered predecessor and resource lifecycle tail', () => {
-    expect(manifest.migrations.slice(-8).map(({ position, id }) => ({ position, id }))).toEqual([
+    expect(manifest.migrations.slice(-9).map(({ position, id }) => ({ position, id }))).toEqual([
       { position: 82, id: '0082_access_evaluator' },
       { position: 83, id: '0083_sop_pipeline_projection' },
       { position: 84, id: '0084_sop_unified_storage' },
@@ -73,6 +73,7 @@ describe('verified product migration sources', () => {
       { position: 87, id: '0087_sop_unified_continuation' },
       { position: 88, id: '0088_sop_resource_lifecycle' },
       { position: 89, id: '0089_seat_display_projection' },
+      { position: 90, id: '0090_owner_reviewed_sop_query_facts' },
     ]);
   });
 });

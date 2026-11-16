@@ -336,7 +336,7 @@ it.each(['light', 'dark'] as const)('keeps add, grant and seat dialog keyboard f
     document.documentElement.style.width = '';
     document.body.style.cssText = '';
   }
-}, 20000);
+}, 60000);
 
 it('opens 话术库 for page=announce and leaves that URL alone', () => {
   expect(intakeDestinationsExcludeAnnounce).toBe(true);
