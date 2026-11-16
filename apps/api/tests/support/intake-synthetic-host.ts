@@ -187,6 +187,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
   const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
   let apiOrigin = '', identityOrigin = '', selectedIdentity: DesktopSyntheticIdentity = 'enabler';
+  let seatPasswordIdentityOrigin: string | null = null;
   let portReservation: AdjacentLoopbackPortReservation | undefined;
   const loginCodes = new Map<string, { binding: DesktopSyntheticIdentity; expires: number }>();
   const sessions = new Map<DesktopSyntheticIdentity, string>();
@@ -194,6 +195,19 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   const requests: string[] = [];
   const identity = createHttpServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+    if (seatPasswordIdentityOrigin && request.headers.host === new URL(identityOrigin).host
+      && request.method === 'POST' && url.pathname === '/password') {
+      const upstream = rawHttpRequest(`${seatPasswordIdentityOrigin}/password`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, timeout: 3000,
+      }, result => {
+        response.writeHead(result.statusCode ?? 503, { 'content-type': 'application/json' });
+        result.pipe(response);
+      });
+      upstream.on('timeout', () => upstream.destroy());
+      upstream.on('error', () => { if (!response.headersSent) response.writeHead(503); response.end(); });
+      request.pipe(upstream);
+      return;
+    }
     if (request.headers.host !== new URL(identityOrigin).host || request.method !== 'GET'
       || url.pathname !== '/authorize' || [...url.searchParams.keys()].some(k => k !== 'state')
       || !/^[A-Za-z0-9_-]{43}$/.test(url.searchParams.get('state') ?? '')) {
@@ -489,6 +503,16 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
       poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000 }, {
       authorizeUrl: state => `${identityOrigin}/authorize?state=${state}`,
       exchange: async code => { const value = loginCodes.get(code); loginCodes.delete(code);
+        if (!value && seatPasswordIdentityOrigin && /^synthetic_seat_[A-Za-z0-9_-]{1,64}$/.test(code)) {
+          const response = await fetch(`${seatPasswordIdentityOrigin}/exchange`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }),
+            redirect: 'error', signal: AbortSignal.timeout(3000),
+          });
+          const identity: unknown = await response.json();
+          if (response.ok && identity && typeof identity === 'object'
+            && Reflect.get(identity, 'provider') === 'synthetic' && Reflect.get(identity, 'binding_id') === code) return code;
+          throw new IdentityFailure('LOGIN_INVALID');
+        }
         if (!value || value.expires <= Date.now()) throw new IdentityFailure('LOGIN_INVALID'); return value.binding; }, close: () => undefined,
     }, 'mock');
     app.addHook('onRequest', async (request, reply) => {
@@ -597,6 +621,14 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     return {
       apiOrigin, identityOrigin, root: pg.root, seatPasswordAccountsFile: seatPasswordFilePath(seatRoot), expiresAt: facts.rows[0].expires.toISOString(),
       candidate: prepared?.candidate ?? null, object: prepared?.object ?? null, requestAs,
+      useSeatPasswordIdentity(origin: string) {
+        const url = new URL(origin);
+        if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port
+          || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
+          throw new Error('Seat password fixture requires a local identity provider origin');
+        }
+        seatPasswordIdentityOrigin = url.origin;
+      },
       async writeSopQueryFacts(actor: IntakeSyntheticIdentity, input: { operationId: string; expectedVersion: number; source: RegisteredSyntheticSopFacts }) {
         if (!hooks.includeSopQuery || !auth) throw new Error('Synthetic SOP query registration is closed');
         const token = sessions.get(actor);

@@ -98,7 +98,7 @@ test('existing generation check rejects artifact drift and missing unified sourc
   assert.equal(readFileSync(target, 'utf8'), original);
 });
 
-test('snapshot consumption accepts only the locked formal 87 and its immutable predecessors', async t => {
+test('snapshot consumption accepts the exact 89 tail and locked formal 87/88 predecessors', async t => {
   const root = copyProduct(t);
   const migrationManifest = path.join(root, 'packages/database/migrations/manifest.generated.json');
   const originalManifest = readFileSync(migrationManifest, 'utf8');
@@ -107,6 +107,14 @@ test('snapshot consumption accepts only the locked formal 87 and its immutable p
     return 'verified';
   });
   assert.equal(await consume(), 'verified');
+  for (const count of [88, 87]) {
+    const previous = JSON.parse(originalManifest);
+    previous.migrations = previous.migrations.slice(0, count);
+    if (count === 87) delete previous.compatibility.sop_resource_overlay;
+    writeFileSync(migrationManifest, JSON.stringify(previous));
+    assert.equal(await consume(), 'verified');
+  }
+  writeFileSync(migrationManifest, originalManifest);
   const mutations = [
     value => { value.migrations.push(value.migrations[83]); },
     value => { value.migrations[83].id = '0084_sop_query_candidate'; },
@@ -118,7 +126,7 @@ test('snapshot consumption accepts only the locked formal 87 and its immutable p
     value => { value.compatibility.sop_unified_successor.storage_sha256 = '0'.repeat(64); },
     value => { value.compatibility.sop_unified_successor.migration_sha256 = '0'.repeat(64); },
     value => { value.migrations[82].source_git_sha = '0'.repeat(40); },
-    value => { value.migrations.pop(); },
+    value => { value.migrations.splice(86, 1); },
     value => { value.migrations[84].id = '0085_other'; },
     value => { value.migrations[84].sha256 = '0'.repeat(64); },
     value => { value.migrations[84].source_ranges = [{ start_line: 1, end_line: 1 }]; },
@@ -133,13 +141,24 @@ test('snapshot consumption accepts only the locked formal 87 and its immutable p
     value => { value.migrations[86].unexpected = true; },
     value => { value.compatibility.sop_continuation_overlay.source_sha256 = '0'.repeat(64); },
     value => { value.compatibility.sop_continuation_overlay.migration_sha256 = '0'.repeat(64); },
-
+    value => { value.migrations[87].sha256 = '0'.repeat(64); },
+    value => { value.compatibility.sop_resource_overlay.migration_sha256 = '0'.repeat(64); },
+    value => { value.migrations[88].position = 90; },
+    value => { value.migrations[88].id = '0089_other'; },
+    value => { value.migrations[88].file = '0089_other.sql'; },
+    value => { value.migrations[88].source_ranges = [{ start_line: 1, end_line: 1 }]; },
+    value => { value.migrations[88].bytes += 1; },
+    value => { value.migrations[88].sha256 = '0'.repeat(64); },
+    value => { value.migrations[88].contract_set_id = 'other'; },
+    value => { value.migrations[88].source_git_sha = '0'.repeat(40); },
+    value => { value.migrations[88].source_schema_sha256 = '0'.repeat(64); },
+    value => { value.migrations[88].unexpected = true; },
   ];
   for (const mutate of mutations) {
     const value = JSON.parse(originalManifest);
     mutate(value);
     writeFileSync(migrationManifest, `${JSON.stringify(value, null, 2)}\n`);
-    await assert.rejects(consume());
+    await assert.rejects(consume(), `mutation must fail: ${mutate}`);
     writeFileSync(migrationManifest, originalManifest);
   }
   const relativeFiles = [
@@ -151,6 +170,10 @@ test('snapshot consumption accepts only the locked formal 87 and its immutable p
     'packages/database/overlays/0086_sop_unified_query.sql',
     'packages/database/migrations/0087_sop_unified_continuation.sql',
     'packages/database/overlays/0087_sop_unified_continuation.sql',
+    'packages/database/migrations/0088_sop_resource_lifecycle.sql',
+    'packages/database/overlays/0088_sop_resource_lifecycle.sql',
+    'packages/database/migrations/0089_seat_display_projection.sql',
+    'packages/database/overlays/0089_seat_display_projection.sql',
     'contracts/upstream/customer-agent/sop-unified-contract-set.lock.json',
     'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json',
     `contracts/upstream/customer-agent/${manifest.contract_set_id}/storage.v1.sql`,

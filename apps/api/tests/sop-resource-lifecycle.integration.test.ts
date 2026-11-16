@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { verifyDatabaseMigrations } from '@customer-agent/database';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -655,7 +656,7 @@ describe.skipIf(!enabled).sequential('normal 88 resource lifecycle with full sel
     expect(result.status, output).toBe(0);
     expect(output).toContain('NONEMPTY_GRAPH_RESTORE_PASS');
     const restored = JSON.parse(readFileSync(path.join(evidenceRoot, 'nonempty-restore-results.json'), 'utf8'));
-    expect(restored.report.migrationCount).toBe(88);
+    expect(restored.report.migrationCount).toBe((await verifyDatabaseMigrations(admin)).migrationCount);
     expect(restored.http.continuation).toMatchObject({ restoredRenew: true, closedRejected: true, repeatedClose: true });
   }, 180_000);
 

@@ -38,7 +38,7 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
         expect(await allowed.json()).toEqual({ seats: [] });
         const denied = await host.requestAs('roster-query-only', '/v1/intake/seats');
         expect(denied.status).toBe(403);
-        const body = { displayName: '合成坐席', username: 'stack_seat', password: 'synthetic-seat-password', post: '客服' };
+        const body = { displayName: '合'.repeat(256), username: 'stack_seat', password: 'synthetic-seat-password', post: '客服' };
         const create = (identity: 'roster-director' | 'roster-query-only') => host.requestAs(identity, '/v1/intake/seats', {
           method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
         });
@@ -48,6 +48,9 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
         expect(await created.json()).toMatchObject({ seat: { displayName: body.displayName, username: body.username, post: body.post, enabled: true } });
         const listed = await host.requestAs('roster-director', '/v1/intake/seats');
         expect(await listed.json()).toMatchObject({ seats: [{ displayName: body.displayName, username: body.username, post: body.post, enabled: true }] });
+        const directory = await host.requestAs('roster-director', '/v1/intake/principals?sourceId=source-a&purpose=grant-recipient');
+        expect(directory.status).toBe(200);
+        expect(await directory.json()).toMatchObject({ items: expect.arrayContaining([expect.objectContaining({ principalId: 'seat_stack_seat', displayLabel: body.displayName })]) });
         const accounts = loadPasswordAccounts(host.seatPasswordAccountsFile);
         const account = accounts.get(body.username);
         expect(account && passwordMatches(account, body.password)).toBe(true);
@@ -64,3 +67,58 @@ describe.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('seat r
     }
   }, 180_000);
 });
+
+it.skipIf(process.env.CUSTOMER_AGENT_API_PG15_INTEGRATION !== '1')('finishes an admitted HTTP reset after revocation and refuses the next reset without changing the password', async () => {
+  let armed = false;
+  let admitted = false;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let revoke: () => Promise<void> = async () => { throw new Error('Synthetic authority was not configured'); };
+  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime',
+    configureDatabase: async client => {
+      revoke = async () => {
+        await client.query(`UPDATE content_intake.grants SET revoked_at=clock_timestamp(), version=version+1,
+          last_change_reason='合成请求时授权回归' WHERE grant_id='alloc-roster-review-only'`);
+      };
+    },
+    wrapBusinessPool: pool => ({ connect: async () => {
+      const client = await pool.connect();
+      return new Proxy(client, { get(target, key) {
+        if (key === 'query') return async (sql: string, values?: unknown[]) => {
+          const result = await target.query(sql, values);
+          if (armed && sql === 'SELECT content_intake.seat_administration_allowed($1) AS allowed' && result.rows[0]?.allowed === true) {
+            armed = false;
+            admitted = true;
+            await gate;
+          }
+          return result;
+        };
+        const value: unknown = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      } });
+    } }),
+  });
+  const passwordA = 'synthetic-request-time-A';
+  const passwordB = 'synthetic-request-time-B';
+  const reset = (password: string) => host.requestAs('roster-review-only', '/v1/intake/seats/request-time/password', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }),
+  });
+  try {
+    const created = await host.requestAs('roster-review-only', '/v1/intake/seats', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ displayName: '合成撤权坐席', username: 'request-time', password: passwordA, post: '客服' }),
+    });
+    expect(created.status).toBe(200);
+    armed = true;
+    const accepted = reset(passwordB);
+    await expect.poll(() => admitted).toBe(true);
+    await revoke();
+    release();
+    expect((await accepted).status).toBe(200);
+    expect((await reset('synthetic-forbidden-password')).status).toBe(403);
+    const account = loadPasswordAccounts(host.seatPasswordAccountsFile).get('request-time');
+    expect(account && passwordMatches(account, passwordB)).toBe(true);
+    expect(account && passwordMatches(account, passwordA)).toBe(false);
+    expect(account && passwordMatches(account, 'synthetic-forbidden-password')).toBe(false);
+  } finally { release(); await host.close(); }
+}, 120_000);

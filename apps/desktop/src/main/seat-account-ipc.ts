@@ -1,4 +1,5 @@
 import { app, ipcMain, type WebContents } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { isSeatAccountIntent, type SeatAccountIntent, type SeatAccountRecord, type SeatAccountReply } from '../shared/seat-account-intent';
 import { isTrustedMainFrameSender } from './sender-guard';
 import type { ProductSession } from './product-session';
@@ -29,6 +30,8 @@ const NOT_SAVED: SeatAccountReply = { ok: false, message: NOT_SAVED_MESSAGE };
 const INVALID: SeatAccountReply = { ok: false, message: '账号输入无效。' };
 const NO_SESSION: SeatAccountReply = { ok: false, message: WORKBENCH_EMPTY.intakeUnmounted };
 const DENIED: SeatAccountReply = { ok: false, message: '没有权限，请找人开通。' };
+const UNCONFIRMED: SeatAccountReply = { ok: false, message: '该账号的上一操作结果还未确认。请先确认原操作结果。' };
+const UNKNOWN: SeatAccountReply = { ok: false, message: '账号操作结果还未确认。请先确认原操作结果。' };
 
 function userDataDirectory(): string | null {
   try {
@@ -45,7 +48,7 @@ function seatOutcome(
   if (reply.ok) return { kind: 'committed', result: reply, resultRef: username };
   const failure = reply as { ok: false; message: string };
   if (failure.message === NOT_SAVED_MESSAGE) {
-    return { kind: 'unknown', result: reply };
+    return { kind: 'unknown', result: UNKNOWN };
   }
   return { kind: 'failed', result: reply, failureCode: 'FORBIDDEN' };
 }
@@ -64,6 +67,7 @@ const REFUSALS: Readonly<Record<string, string>> = Object.freeze({
   SEAT_USERNAME_INVALID: '登录名只能用字母、数字、下划线或连字符，最长 64 位。',
   SEAT_DISPLAY_NAME_INVALID: '姓名不能为空，最长 256 字，也不能含控制字符。',
   SEAT_POST_INVALID: '请选择岗位。',
+  SEAT_PASSWORD_INVALID: '密码须为 8 至 256 个字符，前后空格会保留。',
   SEAT_ROLE_NOT_IN_CEILING: '这个岗位在当前策略里没有对应角色，请先配置。',
   SEAT_HOME_UNKNOWN: '服务端没有这个租户的策略，账号没有保存。',
   SEAT_EXISTS: '这个登录名已经存在，请换一个或改用重置口令。',
@@ -75,6 +79,13 @@ const REFUSALS: Readonly<Record<string, string>> = Object.freeze({
 });
 
 type SeatRow = Readonly<{ displayName: string; username: string; post: string; enabled: boolean }>;
+
+/** Each confirmation is a new command, even when its desired password matches an old command. */
+type SeatCommandIdentity = Readonly<{
+  confirmationId: string;
+  action: Exclude<SeatAccountIntent['action'], 'list'>;
+  username: string;
+}>;
 
 function sameRow(value: unknown): SeatRow | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -112,6 +123,8 @@ export function registerSeatAccountIpc(
   const plane = session
     ? dashboardControlPlaneForSession(session, userDataDirectory())
     : null;
+  type SeatMutation = Exclude<SeatAccountIntent, { action: 'list' }>;
+  const flights = new Map<string, { intent: SeatMutation; result: Promise<SeatAccountReply> }>();
   async function request(
     epoch: number,
     path: string,
@@ -143,16 +156,23 @@ export function registerSeatAccountIpc(
         username: string,
       ): Promise<SeatAccountReply> => {
         if (!plane) return work();
+        const identity: SeatCommandIdentity = {
+          confirmationId: randomUUID(),
+          action: intent.action,
+          username,
+        };
         try {
           const run = await plane.submit({
             domain: 'accounts',
             command: 'accounts-manage',
             capability: `accounts:${intent.action}`,
             expectedVersion: 0,
-            intent,
+            // Only command identity reaches persistent hashes. Passwords stay in this execution.
+            intent: identity,
             authorize: (view) => view.accounts === 'open',
             execute: async (operation) => {
               try {
+                await operation.noteDomainRef(username);
                 return seatOutcome(await work(operation), username);
               } catch (error) {
                 if (operation.signal.aborted) throw error;
@@ -164,7 +184,7 @@ export function registerSeatAccountIpc(
                     failureCode: error instanceof ProductHttpError ? error.code : 'UNAVAILABLE',
                   };
                 }
-                return { kind: 'unknown', result: NOT_SAVED };
+                return { kind: 'unknown', result: UNKNOWN };
               }
             },
           });
@@ -222,7 +242,20 @@ export function registerSeatAccountIpc(
     if (!enabled()) return { ok: false, message: '账号还不能在这里改。' };
     if (!isSeatAccountIntent(intent)) return INVALID;
     if (!canManageAccounts()) return DENIED;
-    return perform(intent);
+    if (intent.action === 'list') return perform(intent);
+    const mutation = { ...intent, username: intent.username.trim() };
+    if (mutation.username.length < 1 || mutation.username.length > 64) return INVALID;
+    const pending = flights.get(mutation.username);
+    if (pending) {
+      return JSON.stringify(pending.intent) === JSON.stringify(mutation) ? pending.result : UNCONFIRMED;
+    }
+    const result = (async () => {
+      if (plane && await plane.unresolved('accounts', mutation.username)) return UNCONFIRMED;
+      return perform(mutation);
+    })();
+    flights.set(mutation.username, { intent: mutation, result });
+    try { return await result; }
+    finally { flights.delete(mutation.username); }
   });
   return { dispose: () => { ipcMain.removeHandler(CHANNEL); } };
 }

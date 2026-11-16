@@ -548,6 +548,17 @@ export class DashboardControlPlane {
     return this.currentSync();
   }
 
+  /** Legacy records without a target cannot prove that a new command is independent. */
+  async unresolved(domain: DashboardOperationDomain, reference: string): Promise<DashboardOperationView | null> {
+    await this.ready();
+    const userId = this.options.session.view().userId;
+    const candidate = [...this.records.values()].find((entry) => entry.domain === domain
+      && entry.status.userId === userId
+      && (entry.domainRef === reference || entry.domainRef === null)
+      && !TERMINAL.has(entry.status.state));
+    return candidate ? this.project(candidate) : null;
+  }
+
   registerRecovery(domain: DashboardOperationDomain, handler: RecoveryHandler): void {
     this.recoveryHandlers.set(domain, handler);
   }
@@ -860,6 +871,7 @@ export class DashboardControlPlane {
       } finally {
         this.active.delete(current.status.operationId);
       }
+      current = this.records.get(current.status.operationId) ?? current;
       if (controller.signal.aborted && outcome.kind === 'failed' && !commitStarted) {
         outcome = { kind: 'cancelled' };
       }

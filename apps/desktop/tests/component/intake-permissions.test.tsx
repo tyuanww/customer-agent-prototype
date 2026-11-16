@@ -678,3 +678,28 @@ it('uses the supplied server gate and clears details when that view is replaced'
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '新增授权' })).not.toBeInTheDocument();
 });
+
+it('keeps account refusal inside the open create and reset dialogs with inputs intact', async () => {
+  const user = userEvent.setup();
+  const message = '密码须为 8 至 256 个字符，前后空格会保留。';
+  window.dashboardSeats = { command: async intent => intent.action === 'list'
+    ? { ok: true, action: 'list', seats: [{ displayName: '合成坐席', username: 'synthetic-seat', post: '客服', enabled: true }] }
+    : { ok: false, message } };
+  render(<IntakePermissions canViewGrantSettings={false} canManageAccounts active />);
+  const table = await screen.findByRole('table', { name: '账号' });
+  await user.click(screen.getByRole('button', { name: '新建账号' }));
+  const create = screen.getByRole('dialog', { name: '新建账号' });
+  await user.type(within(create).getByLabelText('姓名'), '合成新坐席');
+  await user.type(within(create).getByLabelText('登录名'), 'synthetic-new');
+  setPassword(within(create).getByLabelText('密码'), 'short');
+  await user.click(within(create).getByRole('button', { name: '保存账号' }));
+  expect(await within(create).findByRole('alert')).toHaveTextContent(message);
+  expect(within(create).getByLabelText('密码')).toHaveValue('short');
+  await user.click(within(create).getByRole('button', { name: '取消' }));
+  await user.click(within(table).getByRole('button', { name: '重置密码' }));
+  const reset = screen.getByRole('dialog', { name: '重置密码' });
+  setPassword(within(reset).getByLabelText('新密码'), 'short');
+  await user.click(within(reset).getByRole('button', { name: '确认重置' }));
+  expect(await within(reset).findByRole('alert')).toHaveTextContent(message);
+  expect(within(reset).getByLabelText('新密码')).toHaveValue('short');
+});
