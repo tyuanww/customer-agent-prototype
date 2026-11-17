@@ -76,7 +76,9 @@ export class SopUnifiedRuntime {
       const view = port.session.view();
       if (!view.signedIn || view.sessionEpoch !== this.epoch) {
         this.epoch = view.sessionEpoch; this.shops.clear(); this.value.shops = [];
-        this.pause('登录状态需要确认，请重新登录后继续。');
+        this.pause(this.closing ? '结束结果尚未确认，请按原请求确认。'
+          : view.signedIn ? '登录已恢复，请重新确认后继续。' : '登录状态需要确认，请重新登录后继续。');
+        if (view.signedIn && !this.active && !this.pendingQuery && !this.closing) void this.open(this.value.sessionId);
       }
     }), port.session.onExplicitLogout(() => this.end('流程已结束。'))];
   }
@@ -103,7 +105,7 @@ export class SopUnifiedRuntime {
   }
   private pause(notice: string) {
     this.generation++; this.operation?.abort(); this.operation = null;
-    this.concealed(this.active ? 'paused' : 'idle', notice);
+    this.concealed(this.closing ? 'closing' : this.active || this.pendingQuery ? 'paused' : 'idle', notice);
   }
   private end(notice: string) {
     const active = this.active;
@@ -120,8 +122,9 @@ export class SopUnifiedRuntime {
   /** Window destruction is an explicit finish. Offline close cannot prove remote cleanup. */
   invalidate() { this.end('流程已结束。'); }
   async open(sessionId: number) {
+    if (this.disposed) return;
     this.value.sessionId = sessionId;
-    if (this.active) return;
+    if (this.active || this.pendingQuery || this.closing || !this.port.session.view().signedIn) return;
     await this.run(async signal => {
       const shops = await this.port.shops(signal);
       signal.throwIfAborted();

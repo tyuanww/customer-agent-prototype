@@ -72,6 +72,16 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
       const status = await query.evaluate(() => window.customerAgent!.product!.sessionStatus());
       return { signedIn: status.ok && status.signedIn, options: await shop.locator('option').count(), error: await query.locator('[role=alert]').allTextContents(), requests: [...requests] };
     }).toEqual({ signedIn: true, options: 3, error: [], requests: expect.any(Array) });
+    wire.state.empty = true;
+    await query.getByRole('button', { name: '刷新店铺', exact: true }).click();
+    const emptyShops = query.getByRole('alert').filter({ hasText: '请联系管理员确认可查询店铺和使用期限。' });
+    await expect(emptyShops).toBeVisible();
+    await query.getByRole('button', { name: '收起', exact: true }).click();
+    await expect(emptyShops).toBeVisible();
+    await query.getByRole('button', { name: '筛选', exact: true }).click();
+    wire.state.empty = false;
+    await query.getByRole('button', { name: '刷新店铺', exact: true }).click();
+    await expect(emptyShops).toHaveCount(0);
     await shop.selectOption('shop-a');
     await expect(shop).toHaveValue('shop-a');
     await query.getByTestId('question-input').fill('洁面');
