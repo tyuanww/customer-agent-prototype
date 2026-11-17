@@ -477,18 +477,137 @@ describe('Main unified SOP consumer over real loopback HTTP', () => {
     await h.runtime.command({ kind: 'copy', key: h.ready().node.scripts[1]!.key });
     expect(h.copies).toEqual([h.fixture.result.entries[1]!.entry.answerText]);
   });
+  it.each(['v11', 'v12'] as const)('restores idle shops after reauthentication without reopening the SOP window on %s', async version => {
+    const h = await setup(true, version);
+    const previousShop = h.runtime.projection().shops[0]!;
+    h.changeSession(false);
+    expect(h.runtime.projection()).toMatchObject({ state: 'idle', shops: [], node: null });
+    expect(h.runtime.projection().notice).toContain('请重新登录');
+    h.changeSession(true);
+    await vi.waitFor(() => expect(h.runtime.projection().shops.map(shop => shop.label)).toEqual([previousShop.label]));
+    expect(h.runtime.projection()).toMatchObject({ state: 'idle', sessionId: 1, node: null, busy: false });
+    expect(h.runtime.projection().notice).not.toContain('请重新登录');
+    expect((await h.runtime.command({ kind: 'query', shopKey: previousShop.key, group: '品质售后SOP', text: '合成完整流程' })).ok).toBe(false);
+    h.usage.select({ shopId: h.fixture.entitlement.shopId, productIds: ['product-b', 'product-a'], scenarioIds: ['scenario-b', 'scenario-a'] });
+    expect((await h.query()).ok).toBe(true);
+  });
+  it('discards a late shop response from a prior login after switching accounts', async () => {
+    const h = await setup();
+    h.changeSession(false);
+    let release!: () => void;
+    const delay = new Promise<void>(resolve => { release = resolve; });
+    let captured!: () => void;
+    const capturedResponse = new Promise<void>(resolve => { captured = resolve; });
+    const readShops = h.port.shops.bind(h.port);
+    const reads = vi.spyOn(h.port, 'shops').mockImplementationOnce(async signal => {
+      const shops = await readShops(signal);
+      captured();
+      await delay;
+      return shops;
+    });
+    try {
+      h.changeSession(true);
+      await vi.waitFor(() => expect(reads).toHaveBeenCalledTimes(1));
+      await capturedResponse;
+      h.fixture.entitlement.scopes[0]!.shopId = 'different-synthetic-shop';
+      h.changeSession(false);
+      h.changeSession(true, 'different-synthetic-user');
+      await vi.waitFor(() => expect(h.runtime.projection().shops.map(shop => shop.label)).toEqual(['different-synthetic-shop']));
+      release();
+      await reads.mock.results[0]!.value;
+      expect(h.runtime.projection().shops.map(shop => shop.label)).toEqual(['different-synthetic-shop']);
+      expect(h.runtime.projection().notice).not.toContain('请重新登录');
+    } finally {
+      release();
+    }
+  });
   it('keeps a natural-expiry continuation hidden until server-approved reauthentication', async () => {
     const h = await setup(); await h.query();
     await h.runtime.command({ kind: 'confirm', key: h.ready().node.requirements[0]!.key });
+    const oldCopy = h.ready().node.scripts[0]!.key;
     h.changeSession(false); expect(h.runtime.projection()).toMatchObject({ state: 'paused', node: null });
-    h.changeSession(true); expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(true);
+    h.changeSession(true);
+    expect(h.runtime.projection()).toMatchObject({ state: 'paused', node: null });
+    expect(h.runtime.projection().notice).not.toContain('请重新登录');
+    expect((await h.runtime.command({ kind: 'copy', key: oldCopy })).ok).toBe(false);
+    expect(h.copies).toEqual([]);
+    expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(true);
     expect(h.ready().node.requirements[0]!.confirmed).toBe(true);
     h.logout(); h.changeSession(true);
     expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(false);
     expect(h.runtime.projection().node).toBeNull();
   });
+  it('does not publish a delayed shop response after disposal', async () => {
+    const h = await setup();
+    h.changeSession(false);
+    let release!: () => void;
+    const delay = new Promise<void>(resolve => { release = resolve; });
+    let captured!: () => void;
+    const capturedResponse = new Promise<void>(resolve => { captured = resolve; });
+    const readShops = h.port.shops.bind(h.port);
+    const reads = vi.spyOn(h.port, 'shops').mockImplementationOnce(async signal => {
+      const shops = await readShops(signal);
+      captured();
+      await delay;
+      return shops;
+    });
+    try {
+      h.changeSession(true);
+      await vi.waitFor(() => expect(reads).toHaveBeenCalledTimes(1));
+      await capturedResponse;
+      await h.runtime.dispose();
+      const disposed = h.runtime.projection();
+      release();
+      await reads.mock.results[0]!.value;
+      await h.runtime.open(2);
+      expect(h.runtime.projection()).toEqual(disposed);
+      expect(h.runtime.projection()).toMatchObject({ state: 'ended', shops: [], node: null });
+    } finally {
+      release();
+    }
+  });
+  it('keeps an unknown open hidden across login and explicitly retries its original binding', async () => {
+    const h = await setup(true, 'v12');
+    h.state.dropOpen = true;
+    expect((await h.startQuery()).ok).toBe(false);
+    const original = h.requests.find(request => request.path.endsWith('/check'))!.body;
+    const count = h.requests.length;
+    const shops = vi.spyOn(h.port, 'shops');
+    h.changeSession(false); h.changeSession(true);
+    await h.runtime.open(1);
+    expect(h.runtime.projection()).toMatchObject({ state: 'paused', node: null, shops: [] });
+    expect(h.requests).toHaveLength(count);
+    expect(shops).not.toHaveBeenCalled();
+    h.state.dropOpen = false;
+    expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(true);
+    expect(h.requests.filter(request => request.path.endsWith('/check')).map(request => request.body)).toEqual([original, original]);
+    expect(h.requests.filter(request => request.path.endsWith('/renew'))).toHaveLength(0);
+    expect(h.requests.filter(request => request.path === '/v1/sop/query')).toHaveLength(1);
+  });
+  it('keeps an unknown close confirmable across login without automatic replay', async () => {
+    const h = await setup(true, 'v12'); await h.query();
+    h.state.dropClose = true;
+    expect((await h.runtime.finish()).ok).toBe(false);
+    const original = h.requests.find(request => request.path.endsWith('/continuations/close'))!.body;
+    const count = h.requests.length;
+    const shops = vi.spyOn(h.port, 'shops');
+    h.changeSession(false); h.changeSession(true);
+    await h.runtime.open(1);
+    expect(h.runtime.projection()).toMatchObject({ state: 'closing', node: null, shops: [] });
+    expect(h.runtime.projection().notice).toContain('请按原请求确认');
+    expect(h.requests).toHaveLength(count);
+    expect(shops).not.toHaveBeenCalled();
+    expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(false);
+    h.state.dropClose = false;
+    expect((await h.runtime.finish()).ok).toBe(true);
+    expect(h.requests.filter(request => request.path.endsWith('/continuations/close')).map(request => request.body)).toEqual([original, original]);
+    expect(h.runtime.projection()).toMatchObject({ state: 'idle', node: null });
+  });
   it('does not expose original content to a different account after login', async () => {
-    const h = await setup(); await h.query(); h.changeSession(false); h.changeSession(true, 'different-synthetic-user');
+    const h = await setup(); await h.query();
+    const oldCopy = h.ready().node.scripts[0]!.key;
+    h.changeSession(false); h.changeSession(true, 'different-synthetic-user');
+    expect((await h.runtime.command({ kind: 'copy', key: oldCopy })).ok).toBe(false);
     expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(false);
     expect(h.runtime.projection()).toMatchObject({ state: 'paused', node: null }); expect(h.copies).toEqual([]);
   });
@@ -653,6 +772,28 @@ describe('v12 Main query and continuation binding', () => {
     expect(h.requests.filter(request => request.path === '/v1/intake/entitlements')).toHaveLength(1);
     expect(h.queries.size).toBe(1);
     expect(h.ready().node.title).toBe(h.fixture.result.flow.nodes[0]!.body.title);
+  });
+
+  it('keeps an unknown query across login and retries its original request before rejecting stale qualification', async () => {
+    const h = await setup(true, 'v12');
+    h.state.dropQuery = true;
+    expect((await h.startQuery()).ok).toBe(false);
+    const original = h.requests.find(request => request.path === '/v1/sop/query')!.body;
+    const count = h.requests.length;
+    const shops = vi.spyOn(h.port, 'shops');
+    h.changeSession(false); h.changeSession(true);
+    await h.runtime.open(1);
+    expect(h.runtime.projection()).toMatchObject({ state: 'paused', node: null, shops: [] });
+    expect(h.requests).toHaveLength(count);
+    expect(shops).not.toHaveBeenCalled();
+    h.state.dropQuery = false;
+    expect((await h.runtime.command({ kind: 'refresh' })).ok).toBe(false);
+    expect(h.requests.filter(request => request.path === '/v1/sop/query').map(request => request.body)).toEqual([original, original]);
+    expect(h.requests.filter(request => request.path === '/v1/intake/entitlements')).toHaveLength(1);
+    expect(h.requests.filter(request => request.path.endsWith('/check'))).toHaveLength(0);
+    expect(h.queries.size).toBe(1);
+    expect(h.runtime.projection()).toMatchObject({ state: 'blocked', node: null });
+    expect(h.copies).toEqual([]);
   });
 
   it('replays a committed open using original Q and E after short expiry and a new publication', async () => {

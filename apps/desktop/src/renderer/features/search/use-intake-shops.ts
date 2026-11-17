@@ -18,7 +18,11 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
       const value = await (shopId ? api.selectShop({ shopId }) : api.access());
       if (request !== sequence.current) return;
       if (value.ok) setContext(value);
-      else setError(value.message);
+      else {
+        setError(value.code === 'NO_GRANT'
+          ? `${value.message}请联系管理员确认可查询店铺和使用期限。`
+          : value.message);
+      }
     } catch { if (request === sequence.current) setError('店铺读取失败，请重试。'); }
     finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
