@@ -33,7 +33,7 @@ CUSTOMER_AGENT_STACK_ROOT="${CONTROLLED_COPY_STACK_ROOT:?请指定隔离副本}"
 
 预览在只读事务中完成。取得目标环境的登记授权后，在相同命令末尾加 `--apply`。首次执行建立管理员主体、首条身份事实和固定岗位。在核验窗口内重试相同登记会保留原岗位及登录后已刷新的事实。如果其他主体在同一应用和部门已持有主账号岗位事实，登记会停止。已有其他主账号、账号被占用或已禁用、文件过期或与已审核摘要不符时，先复核原记录。
 
-口令与业务授权按下文分别办理。固定合成账号的 `mock` 身份服务只接纳预置账号和已登记的坐席。独立管理员登录需要部署支持主账号的身份入口。[合成登录入口](../scripts/synthetic-stack/identity-provider.ts)
+口令与业务授权按下文分别办理。试点使用测试目录库时，在测试 systemd 单元设置 `Environment=CUSTOMER_AGENT_PILOT_IDENTITY_MODE=password`。使用支持该设置的控制器执行 `start --existing-database`。本机隔离栈可将同一变量传给启动命令。切换前先停止运行中的栈。坐席和独立管理员在登录窗口选择「账号」。[栈启动入口](../scripts/synthetic-stack/stack.ts)
 
 ## 初始化前核对
 

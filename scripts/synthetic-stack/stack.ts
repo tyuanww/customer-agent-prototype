@@ -16,6 +16,7 @@
  *   node scripts/synthetic-stack/stack.ts start --existing-database [--foreground]
  *       verify the existing applied prefix and start services with existing roles
  *       and configuration. Profile, migrations, bindings and grants are retained.
+ *       CUSTOMER_AGENT_PILOT_IDENTITY_MODE=password selects the password service on a test stack.
  *       --runtime-release <absolute-release> pins a clean SHA-named release's
  *       API, identity and worker entries under this controller's supervision.
  *   node scripts/synthetic-stack/stack.ts stop      stop the processes this stack owns
@@ -293,6 +294,7 @@ async function startProcesses(
   content: ContentStackConfig | undefined,
   mode: ProcessLaunchMode,
   runtimeRoot: string,
+  passwordIdentity: boolean,
 ): Promise<StartProcessesResult> {
   const messages: string[] = [];
   const live = new Set(liveProcessNames());
@@ -306,7 +308,14 @@ async function startProcesses(
       }
     }
   }
-  if (mode === 'detached' && foregroundSupervisorLive()) {
+  const passwordEntry = path.join(runtimeRoot, 'scripts/synthetic-stack/password-identity-server.ts');
+  const delegated = mode === 'detached' && foregroundSupervisorLive();
+  const identityLive = live.has('identity');
+  if (passwordIdentity && (identityLive || delegated)
+    && (!identityLive || readProcess('identity')?.command !== `${process.execPath} ${passwordEntry} ${profile.identityPort}`)) {
+    fail('Changing the identity service requires stopping the existing stack');
+  }
+  if (delegated) {
     messages.push('foreground supervisor already running; leaving child ownership to systemd');
     for (const name of ['identity', 'api', 'worker']) {
       messages.push(live.has(name) ? `${name} already running` : `${name} restart delegated to systemd`);
@@ -330,7 +339,8 @@ async function startProcesses(
     // api.env fails the start outright instead of leaving identity behind.
     const apiConfig = loadApiStackConfig();
     const environment = stackApiEnvironment({ profile, content, feishu, apiConfig });
-    const identityEntry = path.join(runtimeRoot, 'scripts/synthetic-stack', feishu ? 'password-identity-server.ts' : 'identity-provider.ts');
+    const usePasswordIdentity = passwordIdentity || feishu !== undefined;
+    const identityEntry = usePasswordIdentity ? passwordEntry : path.join(runtimeRoot, 'scripts/synthetic-stack/identity-provider.ts');
     if (!live.has('identity')) {
       // Both identity servers resolve the accounts file from STACK_ROOT, which defaults
       // to ~/.customer-agent-synthetic-stack. Passing it explicitly matters when the
@@ -340,7 +350,7 @@ async function startProcesses(
         identityProcessEnvironment(process.env, STACK_ROOT), mode, runtimeRoot);
       if (mode === 'foreground') children.push(processInfo);
       spawned.push('identity');
-      messages.push(`identity pid ${String(processInfo.pid)}${feishu ? ' (password)' : ''}`);
+      messages.push(`identity pid ${String(processInfo.pid)}${usePasswordIdentity ? ' (password)' : ''}`);
     } else {
       messages.push('identity already running');
     }
@@ -449,7 +459,7 @@ async function verifySearch(apiOrigin: string): Promise<readonly string[]> {
   return Object.freeze(hits);
 }
 
-async function runStart(foreground: boolean, databaseMode: DatabaseStartMode, runtimeRoot: string): Promise<void> {
+async function runStart(foreground: boolean, databaseMode: DatabaseStartMode, runtimeRoot: string, passwordIdentity: boolean): Promise<void> {
   requireDist(runtimeRoot);
   // Read once: `resolveProfile` needs the database name and `stackApiEnvironment`
   // needs the content constants, and two reads could disagree if the file
@@ -521,7 +531,7 @@ async function runStart(foreground: boolean, databaseMode: DatabaseStartMode, ru
 
   if (databaseMode === 'prepare') log(await ensureLoginRoles(cluster, profile.databaseName));
 
-  const processes = await startProcesses(profile, content, foreground ? 'foreground' : 'detached', runtimeRoot);
+  const processes = await startProcesses(profile, content, foreground ? 'foreground' : 'detached', runtimeRoot, passwordIdentity);
   for (const step of processes.messages) log(step);
   log(`ready: ${JSON.stringify(processes.ready.checks)}`);
 
@@ -550,15 +560,15 @@ async function runStart(foreground: boolean, databaseMode: DatabaseStartMode, ru
   }
 }
 
-async function commandStart(databaseMode: DatabaseStartMode, runtimeRoot: string): Promise<void> {
+async function commandStart(databaseMode: DatabaseStartMode, runtimeRoot: string, passwordIdentity: boolean): Promise<void> {
   const foreground = process.argv.includes('--foreground');
   if (!foreground) {
-    await runStart(false, databaseMode, runtimeRoot);
+    await runStart(false, databaseMode, runtimeRoot, passwordIdentity);
     return;
   }
   claimForegroundSupervisor();
   try {
-    await runStart(true, databaseMode, runtimeRoot);
+    await runStart(true, databaseMode, runtimeRoot, passwordIdentity);
   } finally {
     forgetProcess(FOREGROUND_PROCESS_NAME);
   }
@@ -684,6 +694,13 @@ async function main(): Promise<void> {
   const command = process.argv[2];
   const existingDatabase = process.argv.includes('--existing-database');
   if (existingDatabase && command !== 'start') fail('--existing-database is only supported by start');
+  const pilotIdentity = process.env.CUSTOMER_AGENT_PILOT_IDENTITY_MODE;
+  const passwordIdentity = pilotIdentity === 'password';
+  if ((command === 'start' || command === 'restart') && pilotIdentity !== undefined) {
+    if (!passwordIdentity) fail('CUSTOMER_AGENT_PILOT_IDENTITY_MODE must be password');
+    if (!existingDatabase) fail('Pilot password identity requires start --existing-database');
+    if (stackEnvironmentForRoot(STACK_ROOT) === 'production') fail('Pilot password identity is only supported by test stacks');
+  }
   let runtimeRelease: string | undefined;
   if (command === 'start' || command === 'restart') {
     const allowed = new Set(['--no-seed', '--foreground', '--existing-database']);
@@ -705,9 +722,9 @@ async function main(): Promise<void> {
   const runtimeRoot = resolveRuntimeRoot(runtimeRelease);
   const databaseMode = existingDatabase ? 'existing-database' : 'prepare';
   switch (command) {
-    case 'start': await commandStart(databaseMode, runtimeRoot); break;
+    case 'start': await commandStart(databaseMode, runtimeRoot, passwordIdentity); break;
     case 'stop': await commandStop(); break;
-    case 'restart': await commandStop(); await commandStart(databaseMode, runtimeRoot); break;
+    case 'restart': await commandStop(); await commandStart(databaseMode, runtimeRoot, passwordIdentity); break;
     case 'status': await commandStatus(); break;
     case 'destroy': await commandDestroy(); break;
     case 'desktop': commandDesktop(); break;
