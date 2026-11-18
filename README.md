@@ -1,16 +1,16 @@
 # 客服 Agent 产品 · Menokin 试点当前实现基线
 
-当前版本是 0.3.32。坐席打开的是查询胶囊和工作台。工作台上的字只告诉坐席下一步。没有数字时写「暂无记录」。没有登录时写「请先登录」。不要把「未接入」「冻结合同」「运行模式」写给坐席。下载页和 GitHub Release 的最新包是 `v0.3.32`。杭州健康检查是 `0.3.32`。这次没有发布话术，指针仍是 `rel_27`。`v0.3.31` 的三个附件还在。
+桌面源码版本以 [桌面包清单](apps/desktop/package.json) 为准。已对外发布的安装包见 [GitHub Releases](https://github.com/tyuanww/customer-agent-prototype/releases)。Menokin 杭州首批试点的实机核验和剩余事项见 [TODOS](TODOS.md#menokin-杭州首批内部试点)。
 
-本仓是客服 Agent 的产品实施仓，用来开发、测试、打包和上线。桌面可运行基线使用本地合成数据，用来验证输入法式桌面浮窗：
+本仓是客服 Agent 的产品实施仓，用来开发、测试、打包和上线。默认开发配置使用合成数据，用来验证输入法式桌面浮窗：
 
 `狐狸头 / 快捷键 → 玻璃查询胶囊 → 本地合成 fixture → Top 3 原文 → 人工选择 → 安全复制`
 
 `查询胶囊 Dashboard 图标 / 狐狸右键 / 系统菜单栏 → 客服经理决策 Dashboard（交互式合成 BI 镜像，非生产系统）`
 
-Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.command)（或 `pnpm dev`）。要测最新已合入切片，用跟踪 `main` 的工作树，不要在正在跑 API 的登录目录里切分支。Windows 办公机首轮用未签名 `UNSIGNED.exe`，不要在 Mac 上安装 `.exe`。
+Mac 开发端日常双击仓根 [`启动客服Agent.command`](启动客服Agent.command)（或 `pnpm dev`）。要测最新已合入切片，用跟踪 `main` 的工作树，不要在正在跑 API 的登录目录里切分支。杭州 Windows 首批试点使用未签名候选。Windows 安装和核验入口见[办公机首轮验证](docs/how-to-office-machine-first-round.md)。
 
-**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。基线任务见[执行清单](docs/plans/2026-09-06-execution-goal.md)，本轮资料接入的批准与阶段证据见[资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md)，剩余范围见 [TODOS](TODOS.md)；模块实现查[架构参考](docs/reference-project-architecture.md)。桌面仍使用合成模式，复制只表示“已复制”，不代发。**
+**仓库身份与生命周期以 [PROJECT_CHARTER.md](PROJECT_CHARTER.md) 为准。基线任务见[执行清单](docs/plans/2026-09-06-execution-goal.md)，本轮资料接入的批准与阶段证据见[资料接入计划](docs/plans/2026-10-03-content-intake-requirements.md)，剩余范围见 [TODOS](TODOS.md)。模块实现查[架构参考](docs/reference-project-architecture.md)。复制只表示“已复制”，由坐席人工决定是否发送。**
 
 下文出现的 “Demo” 均指当前 v3 原型模式，不再代表整个仓库永远只做 Demo。项目进度、G0 / Ddev 和批准范围记录在独立的 `ai-赋能立项` 仓；产品源码、运行时和发布实现只在本仓演进。
 
