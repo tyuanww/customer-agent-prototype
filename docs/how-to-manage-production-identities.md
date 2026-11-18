@@ -9,6 +9,32 @@
 3. 主账号在权限页面预览后授予或撤销业务授权。
 4. Feishu OAuth 可以登记最低候选，但登录不会自动发出授权。
 
+## 首次登记独立管理账号
+
+库中尚无主账号时，数据库所有者可以用 `scripts/ops/register-first-production-admin.mjs` 登记一份经组织核验的独立管理身份。目标库必须已有该人的启用状态 owner 绑定和启用状态 owner 账号行。本人身份与管理用途由组织核验，可以由同一人分别使用独立管理账号和坐席。
+
+登记文件是私有 JSON。组织核验方交付原文件，并通过受控数据库配置将原始字节的 SHA-256 独立登记为目标数据库的 `customer_agent.first_admin_record_sha256`。命令从 PostgreSQL 的数据库级配置读取这一摘要。现场办理前应确认这份配置及身份记录的来源。摘要把程序消费的原文件绑定到已审核的决定，核验人对决定的真实性负责。
+
+| 字段 | 取值 |
+| --- | --- |
+| `purpose`、`version` | 固定为 `customer-agent:first-production-admin` 和数字 `1` |
+| `databaseName`、`tenantId`、`appId` | 本次登记的数据库、租户与应用 |
+| `bindingId`、`authorizationVersion` | 已核验的专用 owner 绑定及其当前版本，版本用正整数字符串 |
+| `departmentId` | 本次主账号岗位对应的受控部门 |
+| `verifiedAt`、`validUntil` | 身份核验时间和有效截止，使用带毫秒的 UTC 时间，窗口最长 24 小时 |
+
+登记文件的时间窗约束首次登记和首条身份事实。坐席的查询截止由业务授权另行指定。先在受控副本预览。下例中的两个变量指向已有、获准使用的本机副本和受控登记文件。
+
+```sh
+CUSTOMER_AGENT_STACK_ROOT="${CONTROLLED_COPY_STACK_ROOT:?请指定隔离副本}" \
+  node scripts/ops/register-first-production-admin.mjs \
+  --record "${VERIFIED_ADMIN_RECORD:?请指定受控登记文件的绝对路径}"
+```
+
+预览在只读事务中完成。取得目标环境的登记授权后，在相同命令末尾加 `--apply`。首次执行建立管理员主体、首条身份事实和固定岗位。在核验窗口内重试相同登记会保留原岗位及登录后已刷新的事实。如果其他主体在同一应用和部门已持有主账号岗位事实，登记会停止。已有其他主账号、账号被占用或已禁用、文件过期或与已审核摘要不符时，先复核原记录。
+
+口令与业务授权按下文分别办理。固定合成账号的 `mock` 身份服务只接纳预置账号和已登记的坐席。独立管理员登录需要部署支持主账号的身份入口。[合成登录入口](../scripts/synthetic-stack/identity-provider.ts)
+
 ## 初始化前核对
 
 数据库初始化人员先确认以下条件，再配置主账号：
