@@ -9,6 +9,7 @@ import {
   selectAuthoritativeFoxDockSnapshot,
   type FoxPeekIntent,
   type FoxVisualTransform,
+  type ShortcutStatus,
 } from '@shared/overlay-events';
 import type { OverlaySnapshotProjection } from '@shared/overlay-machine';
 import {
@@ -100,9 +101,10 @@ function foxAriaLabel(shortcutFailed: boolean, unread: boolean, hint: string): s
 }
 
 export function FoxApp() {
-  const [shortcutFailed, setShortcutFailed] = useState(false);
+  const [shortcutWarning, setShortcutWarning] = useState<string | null>(null);
+  const shortcutFailed = shortcutWarning !== null;
+  const hint = shortcutWarning ?? '点击打开查询，可拖拽移动';
   const [unread, setUnread] = useState(false);
-  const [hint, setHint] = useState('点击打开查询，可拖拽移动');
   const [dockEdge, setDockEdge] = useState<FoxDockEdge>('none');
   const [snapping, setSnapping] = useState(false);
   const [snapToken, setSnapToken] = useState(0);
@@ -563,18 +565,22 @@ export function FoxApp() {
     mountedRef.current = true;
     const api = window.customerAgent;
     if (!api) {
-      setShortcutFailed(true);
-      setHint('复制失败，请重试');
+      setShortcutWarning('复制失败，请重试');
       return;
     }
+    let disposed = false;
+    let receivedShortcutStatus = false;
+    const applyShortcutStatus = ({ registered, message }: ShortcutStatus) => {
+      setShortcutWarning(registered ? null : message || '全局快捷键不可用，请点击打开');
+    };
 
     void api
       .getWindowContext()
       .then((context) => {
         applyOverlaySnapshot(context.snapshot);
-        if (!context.shortcut.registered) {
-          setShortcutFailed(true);
-          setHint(context.shortcut.message || '全局快捷键不可用，请点击打开');
+        // A live command supersedes the snapshot captured by this earlier request.
+        if (!disposed && !receivedShortcutStatus) {
+          applyShortcutStatus(context.shortcut);
         }
       })
       .catch(() => {
@@ -586,9 +592,9 @@ export function FoxApp() {
         applyOverlaySnapshot(command.snapshot);
         return;
       }
-      if (command.type === 'shortcut-status' && !command.registered) {
-        setShortcutFailed(true);
-        setHint(command.message);
+      if (command.type === 'shortcut-status') {
+        receivedShortcutStatus = true;
+        applyShortcutStatus(command);
       }
       if (command.type === 'fox-drag-settled') {
         commitDragSettleAck(command);
@@ -667,6 +673,7 @@ export function FoxApp() {
       }
     });
     return () => {
+      disposed = true;
       mountedRef.current = false;
       dragGenerationRef.current += 1;
       nativeDragGenerationRef.current = 0;

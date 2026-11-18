@@ -20,6 +20,7 @@ import { observeSessionJob } from '../../src/shared/product-session';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayCommand,
+  type WindowContext,
 } from '../../src/shared/overlay-events';
 import { applyOverlayEvent, createInitialOverlayState, overlaySnapshot, type OverlayState } from '../../src/shared/overlay-machine';
 
@@ -2243,6 +2244,53 @@ describe('QueryApp', () => {
     });
     render(<QueryApp />);
     expect(await screen.findByTestId('shortcut-fallback')).toHaveTextContent('注册失败');
+  });
+
+  it('clears the shortcut fallback when Main reports successful registration', async () => {
+    const accelerator = 'CommandOrControl+Shift+Space';
+    getWindowContext.mockResolvedValue({
+      role: 'query', phase: 'SEARCH_INPUT', platform: 'darwin', testHarness: false,
+      shortcut: { registered: false, accelerator, message: '快捷键注册失败' },
+      snapshot: activeQuerySnapshot(),
+    });
+    render(<QueryApp />);
+    expect(await screen.findByTestId('shortcut-fallback')).toHaveTextContent('快捷键注册失败');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'shortcut-status', registered: true, accelerator, message: '' });
+      }
+    });
+    expect(screen.queryByTestId('shortcut-fallback')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toBeEnabled();
+    expect(screen.getByTestId('search-button')).toBeEnabled();
+  });
+
+  it.each([true, false])('keeps live shortcut registered=%s when the older context arrives', async (registered) => {
+    const context = deferred<WindowContext>();
+    getWindowContext.mockReturnValue(context.promise);
+    render(<QueryApp />);
+    const shortcut = {
+      registered,
+      accelerator: 'CommandOrControl+Shift+Space',
+      message: registered ? '' : '快捷键不可用，请点击打开',
+    };
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'shortcut-status', ...shortcut });
+      }
+    });
+    await act(async () => {
+      context.resolve({
+        role: 'query', phase: 'SEARCH_INPUT', platform: 'darwin', testHarness: false,
+        shortcut: { ...shortcut, registered: !registered, message: '旧状态' },
+        snapshot: activeQuerySnapshot(),
+      });
+    });
+    if (registered) {
+      expect(screen.queryByTestId('shortcut-fallback')).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByTestId('shortcut-fallback')).toHaveTextContent(shortcut.message);
+    }
   });
 
   it.each([

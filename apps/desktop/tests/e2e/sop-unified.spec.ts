@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { SOP_UNIFIED_CONTRACT } from '../../src/shared/sop-unified';
 import { intakeQueryData } from '../fixtures/intake-query-data';
 import { startUnifiedHost } from '../support/sop-unified-host';
@@ -52,10 +52,25 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     if (url.pathname.startsWith('/v1/intake/')) { try { return send(legacy.respond(req.url!, input)); } catch { return send({}, 403); } }
     return send({}, 404);
   });
-  const identity = createServer((req, res) => {
-    if (req.url?.startsWith('/authorize')) { res.writeHead(302, { location: `${apiOrigin}/v1/auth/callback?state=synthetic&code=synthetic` }); res.end(); }
-    else { res.statusCode = 404; res.end(); }
+  let authorizationReply = Promise.resolve();
+  const identity = createServer(async (req, res) => {
+    if (!req.url?.startsWith('/authorize')) { res.statusCode = 404; res.end(); return; }
+    await authorizationReply;
+    res.writeHead(302, { location: `${apiOrigin}/v1/auth/callback?state=synthetic&code=synthetic` });
+    res.end();
   });
+  async function clickFeishuLogin(page: Page): Promise<void> {
+    const button = page.getByRole('button', { name: '飞书登录' });
+    await expect(button).toBeEnabled();
+    let reply = () => {};
+    // Completing synthetic login can close the window before Playwright finishes the click.
+    authorizationReply = new Promise<void>((resolve) => { reply = resolve; });
+    try {
+      await button.click({ timeout: 4_000 });
+    } finally {
+      reply();
+    }
+  }
   await new Promise<void>(resolve => api.listen(0, '127.0.0.1', resolve));
   const port = (api.address() as AddressInfo).port;
   await new Promise<void>((resolve, reject) => { identity.once('error', reject); identity.listen(port + 1, '127.0.0.1', resolve); });
@@ -77,7 +92,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     const loginOpened = app.waitForEvent('window'); await query.getByRole('button', { name: '登录', exact: true }).click();
     const login = await loginOpened; await expect.poll(() => login.url()).toContain('role=login');
-    await login.getByRole('button', { name: '飞书登录' }).click();
+    await clickFeishuLogin(login);
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(true);
     await query.getByRole('button', { name: '打开 SOP 流程' }).click();
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
@@ -94,7 +109,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await query.getByRole('button', { name: '登录', exact: true }).click();
     const relogin = await reloginOpened;
     await expect.poll(() => relogin.url()).toContain('role=login');
-    await relogin.getByRole('button', { name: '飞书登录' }).click();
+    await clickFeishuLogin(relogin);
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(true);
     await expect(sop.getByText('synthetic-shop', { exact: true })).toBeVisible();
     await expect(sop.getByText(/请重新登录/)).toHaveCount(0);
