@@ -122,7 +122,8 @@ export async function verifySopQueryReplay(client: IntakeTransaction, store: Par
 /** Matching reads only authored terms. Each target counts once even if several
  * terms match, and ambiguity keeps the graph blocked. */
 export function sopQueryMatches(graph: SopGraph, query: string): 'match' | 'none' | 'ambiguous' {
-  const normalize = (text: string) => text.normalize('NFKC').toLowerCase().trim().replace(/\s+/gu, ' ');
+  const normalize = (text: string) =>
+    text.normalize('NFKC').toLowerCase().trim().replace(/\s+/gu, ' ').replace(/ *\/ */gu, '/');
   const input = normalize(query), matches = new Set<string>();
   const { header, edges } = graph.definition;
   if (header.entryTerms.some(term => typeof term === 'string' && input.includes(normalize(term)))) matches.add(header.startNodeId);

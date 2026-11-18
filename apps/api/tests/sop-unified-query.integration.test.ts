@@ -23,6 +23,7 @@ type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_SOP_QUERY_PG15_INTEGRATION === '1';
 const evidenceRoot = path.join(os.tmpdir(), `sop-unified-query-http-${randomUUID()}`);
 const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const spacedEntryTerm = '合成斜杠甲 / 乙';
 describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP and PostgreSQL', () => {
   let host: Pick<IntakeSyntheticHost, 'requestAs' | 'writeSopQueryFacts' | 'close' | 'root' | 'apiOrigin'>, admin: Client;
   let sequence = 0;
@@ -139,7 +140,15 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
   });
   async function publish(sourceId: string, base: string, revision = 1, effectiveTo?: string) {
     const form = new FormData(); form.set('operationId', operation('upload'));
-    form.set('file', new Blob([new Uint8Array(await syntheticTaskGraphWorkbook({ shopWide: true, revision, queryBudgetProbe: sourceId === 'source-query-large', sharedTaskImage: sourceId === 'source-a', narrowKnowledgeImage: sourceId === 'source-query-b', ...(effectiveTo ? { effectiveTo } : {}) }))], { type: mime }), 'synthetic-query.xlsx');
+    const workbook = await syntheticTaskGraphWorkbook({
+      shopWide: true, revision,
+      queryBudgetProbe: sourceId === 'source-query-large',
+      sharedTaskImage: sourceId === 'source-a',
+      narrowKnowledgeImage: sourceId === 'source-query-b',
+      additionalEntryTerms: sourceId === 'source-a' ? [spacedEntryTerm] : [],
+      ...(effectiveTo ? { effectiveTo } : {}),
+    });
+    form.set('file', new Blob([new Uint8Array(workbook)], { type: mime }), 'synthetic-query.xlsx');
     const object = await checked(await request('enabler', `/v1/intake/sources/${sourceId}/objects`, { method: 'POST', body: form }), 'IntakeObject');
     let job = await checked(await post('enabler', `/v1/intake/sources/${sourceId}/candidates`, {
       operationId: operation('receive'), objectId: object.objectId, sourceVersion: sourceId === 'source-a' ? 2 : 1, baseReleaseId: base,
@@ -257,6 +266,23 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     expect(ready.result.graph_digest).toBe(sopGraphDigest(first.graph));
     expect(ready.result.entries).toEqual(first.graph.entries);
     expect(ready.result.media.map(item => item.binding)).toEqual(first.graph.media);
+    const matchingFlow = {
+      status: 'ready',
+      result: { graph_digest: ready.result.graph_digest, flow: { header: { key: ready.result.flow.header.key } } },
+    };
+    for (const [text, expected] of [
+      [spacedEntryTerm, matchingFlow],
+      ['合成斜杠甲/乙', matchingFlow],
+      ['合成斜杠甲／乙', matchingFlow],
+      ['合成斜杠甲/丙', { status: 'no_match', result: { flow: null, entries: [], media: [], permissions: [] } }],
+      ['合成斜杠甲/乙 合成匹配 branch-known', {
+        status: 'blocked', reasons: [{ code: 'GRAPH_UNRESOLVED' }], result: null,
+      }],
+    ] as const) {
+      const response = await send('/v1/sop/query', { ...requested, query_text: text, request_id: randomUUID() });
+      expect(response.status, text).toBe(200);
+      expect(parseResource('MenokinSopQuerySopQueryResponse', await response.json()), text).toMatchObject(expected);
+    }
     const opening = { entitlementId: entitlement.entitlementId, releaseId: first.releaseId, contextGeneration: 100,
       key: ready.result.flow.header.key, graphDigest: ready.result.graph_digest, nodeId: ready.result.flow.header.startNodeId,
       action: 'open', edgeId: null, entry: null, continuationId: `sct_${randomBytes(32).toString('hex')}`, queryRequestId: requested.request_id };

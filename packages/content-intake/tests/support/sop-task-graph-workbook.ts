@@ -33,7 +33,7 @@ export async function readSyntheticQualityReport(bytes: Buffer): Promise<string[
 }
 
 export async function syntheticTaskGraphWorkbook(options: { qualityCount?: number; withoutTaskImages?: boolean; narrowKnowledgeImage?: boolean; sharedTaskImage?: boolean; effectiveTo?: string; queryBudgetProbe?: boolean; shopWide?: boolean; revision?: number; solo?: boolean; disable?: boolean;
-  missingUnknown?: boolean; unresolvedConfirmation?: boolean; wrongHeader?: boolean; longTaskId?: boolean } = {}) {
+  missingUnknown?: boolean; unresolvedConfirmation?: boolean; wrongHeader?: boolean; longTaskId?: boolean; additionalEntryTerms?: readonly string[] } = {}) {
   const { revision = 1, solo = false } = options;
   const book = new ExcelJS.Workbook();
   for (const name of SOP_TASK_SHEETS) book.addWorksheet(name).addRow([...SOP_TASK_HEADERS[name]]);
@@ -41,7 +41,7 @@ export async function syntheticTaskGraphWorkbook(options: { qualityCount?: numbe
     .map(header => ({ 维护状态: '启用', 业务确认人: '合成来源维护人', 待确认事项: '', ...values })[header] ?? ''));
   const flowId = solo ? 'flow-solo' : 'flow-main', scope = JSON.stringify(graphApplicability(solo, options.shopWide));
   row('场景目录', { 场景编号: flowId, 场景名称: `合成流程 ${revision}`, 适用范围: scope, 起始任务编号: 'task-a',
-    入口词: JSON.stringify(['合成入口', '明确流程']), 生效时间: '2020-01-01T00:00:00.000Z', 失效时间: options.effectiveTo ?? '2099-01-01T00:00:00.000Z',
+    入口词: JSON.stringify(['合成入口', '明确流程', ...(options.additionalEntryTerms ?? [])]), 生效时间: '2020-01-01T00:00:00.000Z', 失效时间: options.effectiveTo ?? '2099-01-01T00:00:00.000Z',
     维护状态: options.disable ? '停用' : '启用' });
   const task = (id: string, kind: string, fields: Record<string, string> = {}) => row('执行任务', { 记录类型: '任务', 任务编号: id, 场景编号: flowId,
     阶段: '合成阶段', 任务名称: `合成任务 ${id}`, 任务类型: kind, 操作要求: `合成操作原文 ${id} ${revision}`,
