@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -95,7 +96,9 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     pgSocketDirectory: cluster.socket, objectStoreDirectory: path.join(root, 'objects'), clientId: 'existing_synthetic_test',
   };
   const desktop = path.join(root, 'desktop');
-  const environment = { ...process.env, CUSTOMER_AGENT_STACK_ROOT: root, CUSTOMER_AGENT_DESKTOP_USERDATA: desktop };
+  const environment = { ...process.env, CUSTOMER_AGENT_PILOT_IDENTITY_MODE: undefined,
+    CUSTOMER_AGENT_STACK_ROOT: root, CUSTOMER_AGENT_DESKTOP_USERDATA: desktop };
+  const passwordEnvironment = { ...environment, CUSTOMER_AGENT_PILOT_IDENTITY_MODE: 'password' };
   writeProfile(profile);
   mkdirSync(desktop);
   const desktopFile = path.join(desktop, 'synthetic-stack.json');
@@ -105,8 +108,8 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
   const desktopBefore = readFileSync(desktopFile);
   let admin: ReturnType<typeof cluster.connect> | undefined;
   let supervisor: ReturnType<typeof launch> | undefined;
-  const run = async (...args: string[]) => {
-    const process = launch(args, environment);
+  const run = async (args: string[], childEnvironment: NodeJS.ProcessEnv = environment) => {
+    const process = launch(args, childEnvironment);
     const status = await process.exited;
     return { status, output: process.output() };
   };
@@ -117,8 +120,21 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     }
   };
   try {
+    await t.test('explicit password identity requires the existing database startup path', async () => {
+      const result = await run(['start'], passwordEnvironment);
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /requires start --existing-database/u);
+      assertNoChildren();
+    });
+    await t.test('invalid pilot identity mode is rejected before starting services', async () => {
+      const invalid = { ...environment, CUSTOMER_AGENT_PILOT_IDENTITY_MODE: 'invalid' };
+      const result = await run(['start', '--existing-database'], invalid);
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /CUSTOMER_AGENT_PILOT_IDENTITY_MODE must be password/u);
+      assertNoChildren();
+    });
     await t.test('missing PG is rejected without initialization', async () => {
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 1, result.output);
       assert.match(result.output, /existing stack-owned PostgreSQL cluster/u);
       assert.equal(existsSync(path.join(cluster.data, 'PG_VERSION')), false);
@@ -126,7 +142,7 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     cluster.ensureRunning();
     writeClusterMarker();
     await t.test('missing database is rejected without creation', async () => {
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 1, result.output);
       const owner = cluster.connect('postgres');
       await owner.connect();
@@ -148,13 +164,42 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     await t.test('a runtime requiring later migrations is rejected before launching children', async () => {
       assert.ok(admin);
       const before = (await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 1, result.output);
       assert.match(result.output, new RegExp(`Runtime release requires ${currentMigrationCount} migrations; applied database has 81`, 'u'));
       assertNoChildren();
       assert.deepEqual((await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows, before);
     });
     await applyMigrationPrefix(admin, currentMigrationCount);
+    const masterBinding = 'binding-pilot-master';
+    const masterUser = 'user-pilot-master';
+    await admin.query(`INSERT INTO backend_identity.subject_bindings
+      (binding_id,provider,tenant,subject,user_id,subject_hash,enabled,role,authorization_version)
+      VALUES ($1,'synthetic','tenant-a',$1,$2,repeat('c',64),true,'owner',1)`, [masterBinding, masterUser]);
+    await admin.query("INSERT INTO public.app_users(user_id,display_name,role) VALUES ($1,'Synthetic pilot master','owner')", [masterUser]);
+    const approved = Buffer.from(JSON.stringify({
+      purpose: 'customer-agent:first-production-admin', version: 1,
+      databaseName: profile.databaseName, tenantId: 'tenant-a', appId: 'app-a', departmentId: 'dept-a',
+      bindingId: masterBinding, authorizationVersion: '1',
+      verifiedAt: new Date(Date.now() - 1_000).toISOString(), validUntil: new Date(Date.now() + 60 * 60_000).toISOString(),
+    }));
+    const pin = createHash('sha256').update(approved).digest('hex');
+    await admin.query(`ALTER DATABASE ${admin.escapeIdentifier(profile.databaseName)}
+      SET customer_agent.first_admin_record_sha256 TO ${admin.escapeLiteral(pin)}`);
+    const { registerFirstProductionAdmin } = await import('../ops/register-first-production-admin.mjs');
+    assert.equal((await registerFirstProductionAdmin(admin, { recordBytes: approved, apply: true })).status, 'registered');
+
+    const seat = (await admin.query<{ out_binding_id: string; out_user_id: string }>(
+      `SELECT out_binding_id, out_user_id FROM backend_identity.create_seat(
+        'pilot-seat','Synthetic pilot seat','客服','tenant-a','app-a','dept-a','user-director')`,
+    )).rows[0];
+    assert.ok(seat);
+    const password = randomBytes(24).toString('hex');
+    const post = (url: string, body: Record<string, string>) => fetch(url, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const requestCode = (username: string) => post(`${profile.identityOrigin}/password`, { username, password });
+
     const bindingsBefore = (await admin.query('SELECT * FROM backend_identity.subject_bindings ORDER BY binding_id')).rows;
     const ledgerBefore = (await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position')).rows;
     const grantsBefore = (await admin.query('SELECT * FROM content_intake.grants ORDER BY grant_id')).rows;
@@ -169,12 +214,16 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       assert.deepEqual(readFileSync(desktopFile), desktopBefore);
     };
     await t.test('identity startup failure cleans newly launched processes', async () => {
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 1, result.output);
       assertNoChildren();
       await assertRetained();
     });
-    writeFileSync(path.join(root, 'password-accounts.json'), JSON.stringify([buildAccount('agent', 'synthetic_agent', 'synthetic-password-unique')]));
+    writeFileSync(path.join(root, 'password-accounts.json'), JSON.stringify([
+      buildAccount('pilot-seat', seat.out_binding_id, password),
+      buildAccount('pilot-master', masterBinding, password),
+      buildAccount('pilot-unregistered', 'binding-pilot-unregistered', password),
+    ]), { mode: 0o600 });
     const release = runtimeFixture(root);
     const current = path.join(root, 'current');
     symlinkSync(release, current, 'dir');
@@ -182,7 +231,7 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       await admin?.end();
       admin = undefined;
       cluster.stop();
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 0, result.output);
       assert.match(result.output, new RegExp(`applied database prefix: ${currentMigrationCount} \\(PASS\\)`, 'u'));
       assert.equal((await fetch(`${profile.apiOrigin}/ready`)).status, 200);
@@ -195,18 +244,24 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       await admin.connect();
       await assertRetained();
       const identities = ['identity', 'api', 'worker'].map((name) => readProcess(name)?.pid);
-      const repeated = await run('start', '--existing-database');
+      const repeated = await run(['start', '--existing-database']);
       assert.equal(repeated.status, 0, repeated.output);
       assert.deepEqual(['identity', 'api', 'worker'].map((name) => readProcess(name)?.pid), identities);
-      const differentRuntime = await run('start', '--existing-database', '--runtime-release', current);
+      assert.equal((await requestCode('pilot-seat')).status, 200);
+      assert.equal((await requestCode('pilot-master')).status, 401);
+      const switchWhileRunning = await run(['start', '--existing-database'], passwordEnvironment);
+      assert.equal(switchWhileRunning.status, 1, switchWhileRunning.output);
+      assert.match(switchWhileRunning.output, /requires stopping the existing stack/u);
+      assert.deepEqual(['identity', 'api', 'worker'].map((name) => readProcess(name)?.pid), identities);
+      const differentRuntime = await run(['start', '--existing-database', '--runtime-release', current]);
       assert.equal(differentRuntime.status, 1, differentRuntime.output);
       assert.match(differentRuntime.output, /belongs to another runtime release/u);
       assert.deepEqual(['identity', 'api', 'worker'].map((name) => readProcess(name)?.pid), identities);
       await assertRetained();
       for (const name of ['worker', 'api', 'identity']) await stopProcess(name);
     });
-    await t.test('selected runtime entries run under the new foreground controller and child exit fails the service', async () => {
-      supervisor = launch(['start', '--existing-database', '--runtime-release', current, '--foreground'], environment);
+    await t.test('opt-in password login through the supervised runtime preserves grants for both accounts', async () => {
+      supervisor = launch(['start', '--existing-database', '--runtime-release', current, '--foreground'], passwordEnvironment);
       await waitFor(() => supervisor?.output().includes('Foreground supervisor is active') === true || supervisor?.child.exitCode !== null,
         () => supervisor?.output() ?? 'supervisor missing');
       assert.equal(supervisor.child.exitCode, null, supervisor.output());
@@ -215,6 +270,35 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
         const record = readProcess(name);
         assert.ok(record && isOwnedProcessLive(record));
         assert.ok(record.command.startsWith(`${process.execPath} ${release}/`), record.command);
+      }
+      await assertRetained();
+      assert.equal((await requestCode('pilot-unregistered')).status, 401);
+      for (const [username, userId, role] of [
+        ['pilot-seat', seat.out_user_id, 'agent'],
+        ['pilot-master', masterUser, 'owner'],
+      ]) {
+        const verified = await requestCode(username);
+        assert.equal(verified.status, 200);
+        const { code } = await verified.json();
+        const verifier = randomBytes(32).toString('base64url');
+        const login = await post(`${profile.apiOrigin}/v1/auth/login-requests`, {
+          client_challenge: createHash('sha256').update(verifier).digest('base64url'), challenge_method: 'S256',
+        });
+        assert.equal(login.status, 201);
+        const { login_id: loginId, authorize_url: authorizeUrl } = await login.json();
+        const state = new URL(authorizeUrl).searchParams.get('state');
+        assert.ok(state);
+        const callback = new URL('/v1/auth/callback', profile.apiOrigin);
+        callback.search = new URLSearchParams({ state, code }).toString();
+        assert.equal((await fetch(callback)).status, 200);
+        const exchanged = await post(`${profile.apiOrigin}/v1/auth/login-requests/${loginId}/exchange`, { client_verifier: verifier });
+        assert.equal(exchanged.status, 200);
+        const { access_token: token } = await exchanged.json();
+        const me = await fetch(`${profile.apiOrigin}/v1/auth/me`, { headers: { authorization: `Bearer ${token}` } });
+        assert.equal(me.status, 200);
+        const account = await me.json();
+        assert.equal(account.user_id, userId);
+        assert.equal(account.role, role);
       }
       await assertRetained();
       await stopProcess('worker');
@@ -227,13 +311,13 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     await t.test('unknown ledger and physical drift fail before launching runtime children', async () => {
       assert.ok(admin);
       await admin.query("UPDATE customer_agent_meta.schema_migrations SET migration_sha256=repeat('0',64) WHERE position=81");
-      const result = await run('start', '--existing-database');
+      const result = await run(['start', '--existing-database']);
       assert.equal(result.status, 1, result.output);
       assertNoChildren();
       assert.equal((await admin.query('SELECT migration_sha256 FROM customer_agent_meta.schema_migrations WHERE position=81')).rows[0]?.migration_sha256, '0'.repeat(64));
       await admin.query('UPDATE customer_agent_meta.schema_migrations SET migration_sha256=$1 WHERE position=81', [ledgerBefore.find(row => row.position === 81)?.migration_sha256]);
       await admin.query('REVOKE EXECUTE ON FUNCTION public.content_question_hash(jsonb) FROM intake_runtime_fn_owner');
-      const drift = await run('start', '--existing-database');
+      const drift = await run(['start', '--existing-database']);
       assert.equal(drift.status, 1, drift.output);
       assertNoChildren();
       await admin.query('GRANT EXECUTE ON FUNCTION public.content_question_hash(jsonb) TO intake_runtime_fn_owner');
@@ -243,13 +327,13 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       const tracked = path.join(release, 'VERSION');
       const original = readFileSync(tracked);
       writeFileSync(tracked, 'dirty\n');
-      const dirty = await run('start', '--existing-database', '--runtime-release', current);
+      const dirty = await run(['start', '--existing-database', '--runtime-release', current]);
       assert.equal(dirty.status, 1, dirty.output);
       assert.match(dirty.output, /Runtime release must be clean/u);
       writeFileSync(tracked, original);
       const main = path.join(release, 'apps/api/dist/main.js');
       renameSync(main, `${main}.retained`);
-      const missing = await run('start', '--existing-database', '--runtime-release', current);
+      const missing = await run(['start', '--existing-database', '--runtime-release', current]);
       assert.equal(missing.status, 1, missing.output);
       assert.match(missing.output, /Runtime release entry must be a regular file/u);
       renameSync(`${main}.retained`, main);
@@ -259,14 +343,14 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
     await t.test('mismatched Git identity, symlinked entry and foreign workspace dependency fail closed', async () => {
       const wrongName = path.join(root, 'wrong-release-name');
       renameSync(release, wrongName);
-      const wrongGit = await run('start', '--existing-database', '--runtime-release', wrongName);
+      const wrongGit = await run(['start', '--existing-database', '--runtime-release', wrongName]);
       assert.equal(wrongGit.status, 1, wrongGit.output);
       assert.match(wrongGit.output, /Runtime release directory must match its full Git SHA/u);
       renameSync(wrongName, release);
       const main = path.join(release, 'apps/api/dist/main.js');
       renameSync(main, `${main}.retained`);
       symlinkSync(path.join(repository, 'apps/api/dist/main.js'), main);
-      const link = await run('start', '--existing-database', '--runtime-release', current);
+      const link = await run(['start', '--existing-database', '--runtime-release', current]);
       assert.equal(link.status, 1, link.output);
       assert.match(link.output, /Runtime release entry must be a regular file/u);
       rmSync(main);
@@ -274,7 +358,7 @@ test('existing database CLI enforces the runtime schema floor and preserves stat
       const dependency = path.join(release, 'apps/api/node_modules/@customer-agent/contracts');
       renameSync(dependency, `${dependency}.retained`);
       symlinkSync(path.join(repository, 'packages/contracts'), dependency, 'dir');
-      const foreign = await run('start', '--existing-database', '--runtime-release', current);
+      const foreign = await run(['start', '--existing-database', '--runtime-release', current]);
       assert.equal(foreign.status, 1, foreign.output);
       assert.match(foreign.output, /Runtime workspace dependency escapes its release/u);
       rmSync(dependency);
@@ -300,7 +384,7 @@ test('normal start and restart retain their preparation defaults', {
   skip: process.env.CUSTOMER_AGENT_STACK_PG15_INTEGRATION !== '1', timeout: 180_000,
 }, async () => {
   const root = realpathSync(mkdtempSync('/tmp/stack-prepare-'));
-  const environment = { ...process.env, CUSTOMER_AGENT_STACK_ROOT: root, CUSTOMER_AGENT_DESKTOP_USERDATA: path.join(root, 'desktop') };
+  const environment = { ...process.env, CUSTOMER_AGENT_PILOT_IDENTITY_MODE: undefined, CUSTOMER_AGENT_STACK_ROOT: root, CUSTOMER_AGENT_DESKTOP_USERDATA: path.join(root, 'desktop') };
   writeFileSync(path.join(root, 'password-accounts.json'), JSON.stringify([
     ...['agent', 'coach', 'quality', 'owner'].map((role) => buildAccount(role, `synthetic_${role}`, 'synthetic-normal-start-password')),
   ]));
