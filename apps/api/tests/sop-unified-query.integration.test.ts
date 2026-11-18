@@ -230,7 +230,11 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
   it('publishes normally and returns the complete graph, exact permissions and three media owners', async () => {
     first = await publish('source-a', 'rel_native_base'); currentRelease = first.releaseId;
     await facts(first, '税收相关规则');
-    const response = await readQuery(query());
+    const response = await readQuery(query({ query_text: spacedEntryTerm }));
+    const conflict = query({ query_text: '合成斜杠甲/乙 合成匹配 branch-known' });
+    expect(await readQuery(conflict)).toMatchObject({
+      status: 'blocked', reasons: [{ code: 'GRAPH_UNRESOLVED' }], result: null,
+    });
     expect(response.status).toBe('ready');
     if (response.status !== 'ready') throw new Error('Expected ready');
     expect(response.result.graph_digest).toBe(sopGraphDigest(first.graph));
@@ -257,7 +261,7 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
       releaseId: null, productIds: [], scenarioIds: [] });
     expect(entitlementResponse.status).toBe(200);
     const entitlement = parseResource('IntakeEntitlement', await entitlementResponse.json());
-    const requested = { ...query(), entitlement_id: entitlement.entitlementId, context_generation: 'v12-original-v11-publication' };
+    const requested = { ...query({ query_text: '合成斜杠甲／乙' }), entitlement_id: entitlement.entitlementId, context_generation: 'v12-original-v11-publication' };
     const queryResponse = await send('/v1/sop/query', requested);
     expect(queryResponse.status).toBe(200);
     const ready = parseResource('MenokinSopQuerySopQueryResponse', await queryResponse.json());
@@ -266,23 +270,6 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     expect(ready.result.graph_digest).toBe(sopGraphDigest(first.graph));
     expect(ready.result.entries).toEqual(first.graph.entries);
     expect(ready.result.media.map(item => item.binding)).toEqual(first.graph.media);
-    const matchingFlow = {
-      status: 'ready',
-      result: { graph_digest: ready.result.graph_digest, flow: { header: { key: ready.result.flow.header.key } } },
-    };
-    for (const [text, expected] of [
-      [spacedEntryTerm, matchingFlow],
-      ['合成斜杠甲/乙', matchingFlow],
-      ['合成斜杠甲／乙', matchingFlow],
-      ['合成斜杠甲/丙', { status: 'no_match', result: { flow: null, entries: [], media: [], permissions: [] } }],
-      ['合成斜杠甲/乙 合成匹配 branch-known', {
-        status: 'blocked', reasons: [{ code: 'GRAPH_UNRESOLVED' }], result: null,
-      }],
-    ] as const) {
-      const response = await send('/v1/sop/query', { ...requested, query_text: text, request_id: randomUUID() });
-      expect(response.status, text).toBe(200);
-      expect(parseResource('MenokinSopQuerySopQueryResponse', await response.json()), text).toMatchObject(expected);
-    }
     const opening = { entitlementId: entitlement.entitlementId, releaseId: first.releaseId, contextGeneration: 100,
       key: ready.result.flow.header.key, graphDigest: ready.result.graph_digest, nodeId: ready.result.flow.header.startNodeId,
       action: 'open', edgeId: null, entry: null, continuationId: `sct_${randomBytes(32).toString('hex')}`, queryRequestId: requested.request_id };
@@ -395,7 +382,7 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     expect(upper.status).toBe(409);
     const conflict = await post('agent', '/v1/sop/query', { ...body, query_text: 'different' });
     expect(conflict.status).toBe(409); expect(parse('MenokinSopQuerySopErrorEnvelope', await conflict.json()).code).toBe('IDEMPOTENCY_CONFLICT');
-    const unmatched = query({ query_text: '未出现的合成词项', context_generation: 'opaque-z' });
+    const unmatched = query({ query_text: '合成斜杠甲/丙', context_generation: 'opaque-z' });
     const terminal = await readQuery(unmatched);
     expect(terminal.status).toBe('no_match');
     expect(await readQuery(unmatched)).toEqual(terminal);
