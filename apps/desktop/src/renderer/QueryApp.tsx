@@ -34,6 +34,7 @@ import {
   type FoxVisualTransform,
   type QueryAnchor,
   type ResultCount,
+  type ShortcutStatus,
 } from '@shared/overlay-events';
 import type {
   OverlayPhase,
@@ -100,8 +101,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
   const [copiedRank, setCopiedRank] = useState<1 | 2 | 3 | null>(null);
-  const [shortcutHint, setShortcutHint] = useState('');
-  const [shortcutFailed, setShortcutFailed] = useState(false);
+  const [shortcutWarning, setShortcutWarning] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<QueryAnchor>('left');
   const [parked, setParked] = useState(true);
   const [opening, setOpening] = useState(false);
@@ -667,6 +667,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (!api) {
       return;
     }
+    let disposed = false;
+    let receivedShortcutStatus = false;
+    const applyShortcutStatus = ({ registered, message }: ShortcutStatus) => {
+      setShortcutWarning(registered ? null : message || '请点击狐狸头打开。');
+    };
 
     void api
       .getWindowContext()
@@ -683,9 +688,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         ) {
           applyOverlaySnapshot(context.snapshot);
         }
-        if (!context.shortcut.registered) {
-          setShortcutFailed(true);
-          setShortcutHint(context.shortcut.message);
+        // A live command supersedes the snapshot captured by this earlier request.
+        if (!disposed && !receivedShortcutStatus) {
+          applyShortcutStatus(context.shortcut);
         }
       })
       .catch(() => {
@@ -695,7 +700,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       .then((preference) => setSmartEnabled(preference.smartEnabled))
       .catch(() => undefined);
 
-    return api.onOverlayCommand((command) => {
+    const unsubscribe = api.onOverlayCommand((command) => {
       if (command.type === 'overlay-snapshot') {
         applyOverlaySnapshot(command.snapshot);
         return;
@@ -1015,11 +1020,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         });
         return;
       }
-      if (command.type === 'shortcut-status' && !command.registered) {
-        setShortcutFailed(true);
-        setShortcutHint(command.message);
+      if (command.type === 'shortcut-status') {
+        receivedShortcutStatus = true;
+        applyShortcutStatus(command);
       }
     });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, [
     intake,
     applyOverlaySnapshot,
@@ -2306,9 +2315,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           onSearch={runSearch}
         />
 
-        {shortcutFailed ? (
+        {shortcutWarning !== null ? (
           <p ref={shortcutBannerRef} className="shortcut-banner" data-testid="shortcut-fallback">
-            {shortcutHint || '请点击狐狸头打开。'}
+            {shortcutWarning}
           </p>
         ) : null}
         <QueryAnnounceBanner

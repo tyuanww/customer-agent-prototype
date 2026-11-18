@@ -5,7 +5,7 @@ import { QueryApp } from '../../src/renderer/QueryApp';
 import { splitDragDelta } from '../../src/renderer/lib/use-window-drag';
 import { FOX_RETRACT_DURATION_MS } from '../../src/shared/fox-motion';
 import { FOX_SLEEP_AFTER_MS } from '../../src/shared/fox-presence';
-import type { FoxDragSettleAck, OverlayCommand } from '../../src/shared/overlay-events';
+import type { FoxDragSettleAck, OverlayCommand, WindowContext } from '../../src/shared/overlay-events';
 import { IDENTITY_FOX_VISUAL_TRANSFORM } from '../../src/shared/overlay-events';
 import { createInitialOverlayState, overlaySnapshot } from '../../src/shared/overlay-machine';
 
@@ -139,6 +139,58 @@ describe('FoxApp', () => {
     expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'paused');
     expect(screen.getByTestId('fox-idle')).toHaveClass('is-halo-paused');
     expect(screen.getByTestId('shortcut-fallback-dot')).toBeInTheDocument();
+  });
+
+  it('clears the startup warning when Main reports that the shortcut registered', async () => {
+    const accelerator = 'CommandOrControl+Shift+Space';
+    getWindowContext.mockResolvedValue({
+      role: 'fox', phase: 'FOX_IDLE', platform: 'darwin',
+      shortcut: { registered: false, accelerator, message: '' },
+      testHarness: false,
+    });
+    render(<FoxApp />);
+    await act(async () => { await getWindowContext.mock.results[0]!.value; });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', 'true');
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'shortcut-status', registered: true, accelerator, message: '' });
+      }
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', 'false');
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-halo', 'purple-breathe');
+    expect(screen.queryByTestId('shortcut-fallback-dot')).not.toBeInTheDocument();
+    expect(screen.getByTestId('fox-button')).toHaveAttribute('title', '点击打开查询，可拖拽移动');
+  });
+
+  it.each([true, false])('keeps live shortcut registered=%s when the older context arrives', async (registered) => {
+    let resolveContext!: (context: WindowContext) => void;
+    getWindowContext.mockReturnValue(new Promise<WindowContext>((resolve) => {
+      resolveContext = resolve;
+    }));
+    render(<FoxApp />);
+    const shortcut = {
+      registered,
+      accelerator: 'CommandOrControl+Shift+Space',
+      message: registered ? '' : '快捷键不可用，请点击打开',
+    };
+    act(() => {
+      for (const listener of commandListeners) {
+        listener({ type: 'shortcut-status', ...shortcut });
+      }
+    });
+    await act(async () => {
+      resolveContext({
+        role: 'fox', phase: 'FOX_IDLE', platform: 'darwin', testHarness: false,
+        shortcut: { ...shortcut, registered: !registered, message: '旧状态' },
+        snapshot: overlaySnapshot(createInitialOverlayState({
+          sessionEpoch: 1, generation: 1, windowGeneration: 1, releaseId: 'rel_synthetic',
+        })),
+      });
+    });
+    expect(screen.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', String(!registered));
+    expect(screen.getByTestId('fox-button')).toHaveAttribute(
+      'title', registered ? '点击打开查询，可拖拽移动' : shortcut.message,
+    );
   });
 
   it('applies the authoritative snapshot and ignores an older window generation', () => {

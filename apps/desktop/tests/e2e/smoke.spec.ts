@@ -1363,9 +1363,11 @@ test('@float keeps native fox bounds still during local follow, sleep, and press
 test('@float honors reduced motion without adding a rectangular fox background', async () => {
   const app = await launchApp();
   try {
+    await waitForHarness(app);
     const fox = await waitForRole(app, 'fox');
     await fox.emulateMedia({ reducedMotion: 'reduce' });
     await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-fox-pose', 'static');
+    await expect(fox.getByTestId('fox-idle')).toHaveAttribute('data-fox-warning', 'false');
     const style = await fox.getByTestId('fox-button').evaluate((button) => {
       const head = button.querySelector<HTMLElement>('.fox-head');
       if (!head) {
