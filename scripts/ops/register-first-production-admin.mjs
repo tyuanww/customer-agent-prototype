@@ -11,9 +11,12 @@ import { isSeatBindingId } from '../synthetic-stack/identity-admission.ts';
 const PURPOSE = 'customer-agent:first-production-admin';
 const PIN_KEY = 'customer_agent.first_admin_record_sha256';
 const APPLICATION_NAME = 'first-production-admin-registration';
+const PILOT_DATABASE = 'customer_agent_intake_test';
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const RECORD_KEYS = ['purpose', 'version', 'databaseName', 'tenantId', 'appId', 'bindingId',
-  'authorizationVersion', 'departmentId', 'verifiedAt', 'validUntil'];
+const COMMON_RECORD_KEYS = ['purpose', 'version', 'databaseName', 'tenantId', 'appId',
+  'departmentId', 'verifiedAt', 'validUntil'];
+const BOUND_RECORD_KEYS = [...COMMON_RECORD_KEYS, 'bindingId', 'authorizationVersion'];
+const PILOT_RECORD_KEYS = [...COMMON_RECORD_KEYS, 'ownerSubjectSha256', 'ownerDisplayName'];
 const MAX_RECORD_BYTES = 16 * 1024;
 
 export class FirstAdminRegistrationError extends Error {
@@ -51,6 +54,22 @@ export function readEnrollmentRecord(file) {
   return readBoundedFile(file, MAX_RECORD_BYTES, 'RECORD_INVALID');
 }
 
+function pilotOwnerIdentity(record) {
+  if (typeof record.ownerSubjectSha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(record.ownerSubjectSha256)
+    || typeof record.ownerDisplayName !== 'string' || record.ownerDisplayName.trim() !== record.ownerDisplayName
+    || [...record.ownerDisplayName].length < 1 || [...record.ownerDisplayName].length > 64
+    || /\p{Cc}|\p{Cs}/u.test(record.ownerDisplayName)) fail('RECORD_INVALID');
+  const homeSubjectHash = createHash('sha256')
+    .update(JSON.stringify([record.tenantId, record.appId, record.ownerSubjectSha256])).digest('hex');
+  return Object.freeze({
+    bindingId: `pilot-owner-binding-${homeSubjectHash}`,
+    userId: `pilot-owner-user-${homeSubjectHash}`,
+    subject: `pilot-owner-${homeSubjectHash}`,
+    subjectHash: homeSubjectHash,
+    displayName: record.ownerDisplayName,
+  });
+}
+
 /** The raw bytes, including whitespace, are the externally approved artifact. */
 export function parseEnrollmentRecord(bytes) {
   if (!(bytes instanceof Uint8Array) || bytes.length < 1 || bytes.length > MAX_RECORD_BYTES) {
@@ -65,18 +84,23 @@ export function parseEnrollmentRecord(bytes) {
     fail('RECORD_INVALID');
   }
   if (!record || Array.isArray(record) || typeof record !== 'object'
-    || Object.keys(record).length !== RECORD_KEYS.length
-    || RECORD_KEYS.some(key => !Object.hasOwn(record, key))) fail('RECORD_INVALID');
-  // This schema is flat and its values cannot contain quotes. Counting parsed
-  // key tokens also rejects duplicate keys that JSON.parse would silently hide.
-  const keys = [...text.matchAll(/"((?:[^"\\]|\\.)*)"\s*:/gu)].map(match => {
-    try { return JSON.parse(`"${match[1]}"`); } catch { return null; }
-  });
-  if (keys.length !== RECORD_KEYS.length || new Set(keys).size !== RECORD_KEYS.length
-    || keys.some(key => !RECORD_KEYS.includes(key))
-    || record.purpose !== PURPOSE || record.version !== 1
-    || ['databaseName', 'tenantId', 'appId', 'bindingId', 'departmentId']
-      .some(key => typeof record[key] !== 'string' || !IDENTIFIER.test(record[key]))
+    || record.purpose !== PURPOSE || ![1, 2].includes(record.version)) fail('RECORD_INVALID');
+  const expectedKeys = record.version === 1 ? BOUND_RECORD_KEYS : PILOT_RECORD_KEYS;
+  if (Object.keys(record).length !== expectedKeys.length
+    || expectedKeys.some(key => !Object.hasOwn(record, key))) fail('RECORD_INVALID');
+  // Consume whole JSON string tokens, including values with escaped quotes.
+  // A flat record has exactly one key token per field.
+  const keys = [...text.matchAll(/("(?:[^"\\]|\\.)*")(\s*:)?/gu)]
+    .filter(match => match[2]).map(match => JSON.parse(match[1]));
+  if (keys.length !== expectedKeys.length || new Set(keys).size !== expectedKeys.length
+    || keys.some(key => !expectedKeys.includes(key))
+    || ['databaseName', 'tenantId', 'appId', 'departmentId']
+      .some(key => typeof record[key] !== 'string' || !IDENTIFIER.test(record[key]))) fail('RECORD_INVALID');
+  const pilotOwner = record.version === 2 ? pilotOwnerIdentity(record) : null;
+  if (pilotOwner) {
+    record.bindingId = pilotOwner.bindingId;
+    record.authorizationVersion = '1';
+  } else if (typeof record.bindingId !== 'string' || !IDENTIFIER.test(record.bindingId)
     || typeof record.authorizationVersion !== 'string'
     || !/^[1-9][0-9]{0,18}$/u.test(record.authorizationVersion)
     || BigInt(record.authorizationVersion) > 9223372036854775807n) fail('RECORD_INVALID');
@@ -88,7 +112,7 @@ export function parseEnrollmentRecord(bytes) {
   const lifetime = Date.parse(record.validUntil) - Date.parse(record.verifiedAt);
   if (lifetime <= 0 || lifetime > 24 * 60 * 60 * 1000) fail('RECORD_INVALID');
   const digest = createHash('sha256').update(bytes).digest('hex');
-  return Object.freeze({ record: Object.freeze(record), digest,
+  return Object.freeze({ record: Object.freeze(record), digest, pilotOwner,
     principalId: `prod_admin_${digest}`, assignedBy: `first-admin:${digest}` });
 }
 
@@ -111,6 +135,11 @@ export function parseArguments(argv) {
   return Object.freeze(result);
 }
 
+function requirePilotProfile(enrollment, environment, databaseName = enrollment.record.databaseName) {
+  if (enrollment.pilotOwner && (environment !== 'wsl-test' || databaseName !== PILOT_DATABASE
+    || enrollment.record.databaseName !== PILOT_DATABASE)) fail('PILOT_OWNER_PROFILE_REQUIRED');
+}
+
 async function authorizedContext(client, enrollment) {
   const { record, digest } = enrollment;
   const context = (await client.query(`SELECT database.datname,
@@ -131,15 +160,31 @@ async function authorizedContext(client, enrollment) {
   return context;
 }
 
+async function planPilotOwnerBinding(client, record, owner) {
+  const { occupied } = (await client.query(`SELECT EXISTS (
+      SELECT 1 FROM backend_identity.subject_bindings
+      WHERE user_id=$1 OR (provider='synthetic' AND tenant=$2 AND (role='owner' OR subject=$3))
+    ) OR EXISTS (SELECT 1 FROM public.app_users WHERE user_id=$1) AS occupied`,
+  [owner.userId, record.tenantId, owner.subject])).rows[0];
+  if (occupied) fail('PILOT_OWNER_CONFLICT');
+  return {
+    binding_id: owner.bindingId, user_id: owner.userId, provider: 'synthetic', tenant: record.tenantId,
+    subject: owner.subject, subject_hash: owner.subjectHash, role: 'owner', enabled: true,
+    authorization_version: record.authorizationVersion, account_role: 'owner', account_active: true,
+  };
+}
+
 async function inspectRegistration(client, enrollment) {
-  const { record, digest, principalId, assignedBy } = enrollment;
-  const binding = (await client.query(`SELECT binding.binding_id, binding.user_id, binding.provider,
+  const { record, digest, principalId, assignedBy, pilotOwner } = enrollment;
+  const existingBinding = (await client.query(`SELECT binding.binding_id, binding.user_id, binding.provider,
       binding.tenant, binding.role, binding.enabled, binding.authorization_version,
+      binding.subject, binding.subject_hash,
       account.role AS account_role,
       account.is_active AS account_active
     FROM backend_identity.subject_bindings AS binding
     LEFT JOIN public.app_users AS account ON account.user_id = binding.user_id
     WHERE binding.binding_id = $1`, [record.bindingId])).rows[0];
+  const binding = existingBinding ?? (pilotOwner && await planPilotOwnerBinding(client, record, pilotOwner));
   if (!binding || !binding.enabled || binding.provider !== 'synthetic' || binding.role !== 'owner'
     || binding.tenant !== record.tenantId
     || binding.authorization_version !== record.authorizationVersion
@@ -149,6 +194,8 @@ async function inspectRegistration(client, enrollment) {
     || /^usr_seat_[0-9a-f]{31}$/u.test(binding.user_id)
     || /^sys-query-user-[0-9a-f]{64}$/u.test(binding.user_id)) fail('BINDING_NOT_ELIGIBLE');
   if (binding.account_role !== 'owner' || binding.account_active !== true) fail('ACCOUNT_NOT_ELIGIBLE');
+  if (pilotOwner && (binding.user_id !== pilotOwner.userId || binding.subject !== pilotOwner.subject
+    || binding.subject_hash !== pilotOwner.subjectHash)) fail('PILOT_OWNER_CONFLICT');
   const policy = (await client.query(`SELECT version FROM content_intake.policy_versions
     WHERE tenant_id=$1 AND app_id=$2`, [record.tenantId, record.appId])).rows[0];
   if (!policy) fail('POLICY_REQUIRED');
@@ -174,7 +221,10 @@ async function inspectRegistration(client, enrollment) {
   [binding.user_id, principalId])).rows;
   const posts = (await client.query(`SELECT * FROM content_intake.seat_posts
     WHERE job_id='job-master-account' OR principal_id=$1`, [principalId])).rows;
-  if (!principals.length && !posts.length) return { exists: false, binding };
+  if (!principals.length && !posts.length) {
+    if (pilotOwner && existingBinding) fail('PILOT_OWNER_CONFLICT');
+    return { exists: false, binding, createPilotBinding: pilotOwner !== null };
+  }
   const principal = principals[0];
   const post = posts[0];
   if (principals.length !== 1 || principal.principal_id !== principalId
@@ -200,11 +250,12 @@ async function inspectRegistration(client, enrollment) {
   return { exists: true, binding };
 }
 
-/** Owns one idle DB-owner session. No account, binding, credential or grant write. */
-export async function registerFirstProductionAdmin(client, { recordBytes, apply = false }) {
+/** Owns one idle DB-owner session. V2 can initialize a pilot identity. Neither version writes credentials or grants. */
+export async function registerFirstProductionAdmin(client, { recordBytes, apply = false, environment }) {
   if (typeof apply !== 'boolean') fail('ARGUMENTS_INVALID');
   const enrollment = parseEnrollmentRecord(recordBytes);
-  const { record, digest, principalId, assignedBy } = enrollment;
+  const { record, digest, principalId, assignedBy, pilotOwner } = enrollment;
+  requirePilotProfile(enrollment, environment);
   await client.query(apply ? 'BEGIN ISOLATION LEVEL READ COMMITTED'
     : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
   try {
@@ -226,6 +277,14 @@ export async function registerFirstProductionAdmin(client, { recordBytes, apply 
     await authorizedContext(client, enrollment);
     const state = await inspectRegistration(client, enrollment);
     if (apply && !state.exists) {
+      if (state.createPilotBinding) {
+        await client.query(`INSERT INTO backend_identity.subject_bindings
+          (binding_id,provider,tenant,subject,user_id,subject_hash,role,enabled)
+          VALUES ($1,'synthetic',$2,$3,$4,$5,'owner',true)`,
+        [pilotOwner.bindingId, record.tenantId, pilotOwner.subject, pilotOwner.userId, pilotOwner.subjectHash]);
+        await client.query(`INSERT INTO public.app_users (user_id,display_name,role)
+          VALUES ($1,$2,'owner')`, [pilotOwner.userId, pilotOwner.displayName]);
+      }
       await client.query(`INSERT INTO content_intake.principals
         (principal_id,user_id,tenant_id,app_id,identity_scope,person_key,current_facts_version)
         VALUES ($1,$2,$3,$4,'production-admin',$5,1)`,
@@ -247,7 +306,8 @@ export async function registerFirstProductionAdmin(client, { recordBytes, apply 
       catch (error) { throw new FirstAdminRegistrationError('COMMIT_UNCONFIRMED', error); }
     } else await client.query('ROLLBACK');
     return Object.freeze({ status: state.exists ? 'already-registered' : apply ? 'registered' : 'preview',
-      recordSha256: digest, principalId, created: apply && !state.exists, wouldCreate: !state.exists });
+      recordSha256: digest, principalId, created: apply && !state.exists, wouldCreate: !state.exists,
+      ...(pilotOwner ? { bindingId: pilotOwner.bindingId } : {}) });
   } catch (error) {
     try { await client.query('ROLLBACK'); }
     catch (rollbackError) {
@@ -275,13 +335,14 @@ async function main() {
     profile = parseStackProfile(JSON.parse(readBoundedFile(profileFile, 256 * 1024, 'PROFILE_INVALID').toString('utf8')),
       root, profileFile);
   } catch (error) { throw new FirstAdminRegistrationError('PROFILE_INVALID', error); }
+  requirePilotProfile(parseEnrollmentRecord(recordBytes), profile.environment, profile.databaseName);
   const client = new pg.Client({ host: profile.pgSocketDirectory, port: profile.pgPort,
     database: profile.databaseName, user: 'stack_owner', application_name: APPLICATION_NAME,
     connectionTimeoutMillis: 15_000 });
   try {
     await client.connect();
     process.stdout.write(`${JSON.stringify(await registerFirstProductionAdmin(client,
-      { recordBytes, apply: options.apply }))}\n`);
+      { recordBytes, apply: options.apply, environment: profile.environment }))}\n`);
   } finally { await client.end(); }
 }
 
