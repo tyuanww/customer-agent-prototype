@@ -14,6 +14,7 @@ import { parseArguments, parseEnrollmentRecord, readEnrollmentRecord,
 
 const enabled = process.env.CUSTOMER_AGENT_STACK_PG15_INTEGRATION === '1';
 const PIN = 'customer_agent.first_admin_record_sha256';
+const PILOT_DATABASE = 'customer_agent_intake_test';
 let harness;
 let template;
 let control;
@@ -46,6 +47,14 @@ function record(databaseName, extra = {}) {
     authorizationVersion: '7', departmentId: 'dept-operations',
     verifiedAt: new Date(Date.now() - 60_000).toISOString(),
     validUntil: new Date(Date.now() + 60 * 60_000).toISOString(), ...extra };
+}
+
+function pilotRecord(extra = {}) {
+  const approved = record(PILOT_DATABASE);
+  delete approved.bindingId;
+  delete approved.authorizationVersion;
+  return { ...approved, version: 2, ownerSubjectSha256: '7'.repeat(64),
+    ownerDisplayName: 'Synthetic "pilot": administrator', ...extra };
 }
 
 async function connect(config) {
@@ -155,6 +164,29 @@ test('strict input accepts only the fixed purpose, exact fields, bounded UTF-8 a
   assert.throws(() => parseEnrollmentRecord(Buffer.alloc(16 * 1024 + 1)), { code: 'RECORD_INVALID' });
   assert.throws(() => parseEnrollmentRecord(Buffer.from(JSON.stringify(approved).replace('{', '{"version":1,'))),
     { code: 'RECORD_INVALID' });
+});
+
+test('test-owner records bind the approved subject and display name without accepting a supplied binding', () => {
+  const approved = pilotRecord();
+  const parsed = parseEnrollmentRecord(bytes(approved));
+  assert.equal(parsed.pilotOwner.displayName, approved.ownerDisplayName);
+  assert.equal(parsed.record.bindingId, parsed.pilotOwner.bindingId);
+  assert.equal(parsed.record.authorizationVersion, '1');
+  assert.equal(parseEnrollmentRecord(bytes(pilotRecord({
+    validUntil: new Date(Date.parse(approved.validUntil) + 1000).toISOString(),
+  }))).record.bindingId, parsed.record.bindingId);
+  assert.notEqual(parseEnrollmentRecord(bytes(pilotRecord({
+    ownerSubjectSha256: '8'.repeat(64),
+  }))).record.bindingId, parsed.record.bindingId);
+  for (const invalid of [
+    pilotRecord({ bindingId: 'existing-owner' }),
+    pilotRecord({ ownerSubjectSha256: 'not-a-hash' }),
+    pilotRecord({ ownerDisplayName: '  ' }),
+    pilotRecord({ ownerDisplayName: 'A\u0000B' }),
+    pilotRecord({ ownerDisplayName: '华'.repeat(65) }),
+  ]) assert.throws(() => parseEnrollmentRecord(bytes(invalid)), { code: 'RECORD_INVALID' });
+  const duplicate = JSON.stringify(approved).replace('{', '{"ownerDisplayName":"fabricated",');
+  assert.throws(() => parseEnrollmentRecord(Buffer.from(duplicate)), { code: 'RECORD_INVALID' });
 });
 
 test('CLI defaults to preview, cannot supply pin/identity overrides, and rejects duplicate options', () => {
@@ -451,6 +483,59 @@ test('PostgreSQL 15 first administrator enrollment boundary', { skip: !enabled }
       assert.equal(result.error?.code, changed === 'pin' ? 'APPROVAL_PIN_MISMATCH' : 'BINDING_NOT_ELIGIBLE');
     }
     assert.equal((await client.query('SELECT count(*)::int AS n FROM content_intake.principals')).rows[0].n, 0);
+  });
+
+  await t.test('a pinned test-owner record creates an independent identity and post once with zero grants', async () => {
+    await control.query(`CREATE DATABASE ${control.escapeIdentifier(PILOT_DATABASE)}
+      TEMPLATE ${control.escapeIdentifier(template.name)}`);
+    const client = await connect({ ...template.config, database: PILOT_DATABASE });
+    const approved = pilotRecord();
+    const recordBytes = bytes(approved);
+    const execute = (environment = 'wsl-test', apply = true) =>
+      registerFirstProductionAdmin(client, { recordBytes, apply, environment });
+    const empty = await snapshot(client);
+    await assert.rejects(execute(), { code: 'APPROVAL_PIN_MISMATCH' });
+    await pin(control, PILOT_DATABASE, recordBytes);
+    await assert.rejects(execute('production'), { code: 'PILOT_OWNER_PROFILE_REQUIRED' });
+    await assert.rejects(execute('synthetic-local'), { code: 'PILOT_OWNER_PROFILE_REQUIRED' });
+    await assert.rejects(execute(), { code: 'POLICY_REQUIRED' });
+    assert.deepEqual(await snapshot(client), empty);
+
+    await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
+      VALUES ($1,$2,1)`, [approved.tenantId, approved.appId]);
+    await client.query(`INSERT INTO backend_identity.subject_bindings
+      (binding_id,provider,tenant,subject,user_id,subject_hash,role,enabled)
+      VALUES ('previous-owner','synthetic',$1,'previous-owner','previous-owner',repeat('c',64),'owner',false)`,
+    [approved.tenantId]);
+    const withDisabledOwner = await snapshot(client);
+    await assert.rejects(execute(), { code: 'PILOT_OWNER_CONFLICT' });
+    assert.deepEqual(await snapshot(client), withDisabledOwner);
+    await client.query("DELETE FROM backend_identity.subject_bindings WHERE binding_id='previous-owner'");
+    const before = await snapshot(client);
+    const preview = await execute('wsl-test', false);
+    assert.equal(preview.status, 'preview');
+    assert.deepEqual(await snapshot(client), before);
+
+    await client.query(`ALTER TABLE content_intake.principal_facts
+      ADD CONSTRAINT pilot_test_reject_fact CHECK (job_id <> 'job-master-account')`);
+    await assert.rejects(execute(), { code: 'REGISTRATION_FAILED' });
+    assert.deepEqual(await snapshot(client), before);
+    await client.query('ALTER TABLE content_intake.principal_facts DROP CONSTRAINT pilot_test_reject_fact');
+
+    const created = await execute();
+    assert.equal(created.status, 'registered');
+    assert.equal(created.bindingId, preview.bindingId);
+    const afterApply = await snapshot(client);
+    assert.deepEqual(afterApply['content_intake.grants'], before['content_intake.grants']);
+    const row = (await client.query(`SELECT a.display_name, a.role, a.is_active, p.identity_scope,
+        content_intake.password_login_allowed(b.binding_id) AS can_login
+      FROM backend_identity.subject_bindings b JOIN public.app_users a ON a.user_id=b.user_id
+      JOIN content_intake.principals p ON p.user_id=b.user_id
+      WHERE b.binding_id=$1`, [created.bindingId])).rows[0];
+    assert.deepEqual(row, { display_name: approved.ownerDisplayName, role: 'owner', is_active: true,
+      identity_scope: 'production-admin', can_login: true });
+    assert.equal((await execute()).status, 'already-registered');
+    assert.deepEqual(await snapshot(client), afterApply);
   });
 
   await t.test('the real CLI previews then applies against an isolated stack profile', async () => {
