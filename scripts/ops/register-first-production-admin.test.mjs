@@ -485,7 +485,7 @@ test('PostgreSQL 15 first administrator enrollment boundary', { skip: !enabled }
     assert.equal((await client.query('SELECT count(*)::int AS n FROM content_intake.principals')).rows[0].n, 0);
   });
 
-  await t.test('a pinned test-owner record creates an independent identity and post once with zero grants', async () => {
+  await t.test('a pinned test-owner record registers once alongside the system query signer', async () => {
     await control.query(`CREATE DATABASE ${control.escapeIdentifier(PILOT_DATABASE)}
       TEMPLATE ${control.escapeIdentifier(template.name)}`);
     const client = await connect({ ...template.config, database: PILOT_DATABASE });
@@ -503,6 +503,8 @@ test('PostgreSQL 15 first administrator enrollment boundary', { skip: !enabled }
 
     await client.query(`INSERT INTO content_intake.policy_versions(tenant_id,app_id,version)
       VALUES ($1,$2,1)`, [approved.tenantId, approved.appId]);
+    assert.equal((await client.query(`SELECT content_intake.issue_roster_query($1,$2,$3) AS status`,
+      ['unregistered-pilot-recipient', approved.tenantId, approved.appId])).rows[0].status, 'registered');
     await client.query(`INSERT INTO backend_identity.subject_bindings
       (binding_id,provider,tenant,subject,user_id,subject_hash,role,enabled)
       VALUES ('previous-owner','synthetic',$1,'previous-owner','previous-owner',repeat('c',64),'owner',false)`,
@@ -512,6 +514,20 @@ test('PostgreSQL 15 first administrator enrollment boundary', { skip: !enabled }
     assert.deepEqual(await snapshot(client), withDisabledOwner);
     await client.query("DELETE FROM backend_identity.subject_bindings WHERE binding_id='previous-owner'");
     const before = await snapshot(client);
+    assert.equal(before['backend_identity.subject_bindings'].length, 1);
+    assert.equal(before['public.app_users'].length, 0);
+    assert.equal(before['content_intake.seat_posts'].length, 0);
+    assert.equal(before['content_intake.grants'].length, 0);
+
+    const signerUserId = before['backend_identity.subject_bindings'][0].value.user_id;
+    await client.query(`INSERT INTO public.app_users(user_id,display_name,role)
+      VALUES ($1,'Synthetic conflicting owner','owner')`, [signerUserId]);
+    const withSignerAccount = await snapshot(client);
+    await assert.rejects(execute(), { code: 'PILOT_OWNER_CONFLICT' });
+    assert.deepEqual(await snapshot(client), withSignerAccount);
+    await client.query('DELETE FROM public.app_users WHERE user_id=$1', [signerUserId]);
+    assert.deepEqual(await snapshot(client), before);
+
     const preview = await execute('wsl-test', false);
     assert.equal(preview.status, 'preview');
     assert.deepEqual(await snapshot(client), before);
@@ -526,6 +542,15 @@ test('PostgreSQL 15 first administrator enrollment boundary', { skip: !enabled }
     assert.equal(created.status, 'registered');
     assert.equal(created.bindingId, preview.bindingId);
     const afterApply = await snapshot(client);
+    for (const [table, id] of [
+      ['backend_identity.subject_bindings', 'binding_id'],
+      ['content_intake.principals', 'principal_id'],
+      ['content_intake.principal_facts', 'principal_id'],
+    ]) {
+      assert.equal(before[table].length, 1);
+      const [signer] = before[table];
+      assert.deepEqual(afterApply[table].filter(row => row.value[id] === signer.value[id]), [signer]);
+    }
     assert.deepEqual(afterApply['content_intake.grants'], before['content_intake.grants']);
     const row = (await client.query(`SELECT a.display_name, a.role, a.is_active, p.identity_scope,
         content_intake.password_login_allowed(b.binding_id) AS can_login
