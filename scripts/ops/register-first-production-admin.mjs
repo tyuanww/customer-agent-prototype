@@ -161,11 +161,32 @@ async function authorizedContext(client, enrollment) {
 }
 
 async function planPilotOwnerBinding(client, record, owner) {
-  const { occupied } = (await client.query(`SELECT EXISTS (
-      SELECT 1 FROM backend_identity.subject_bindings
-      WHERE user_id=$1 OR (provider='synthetic' AND tenant=$2 AND (role='owner' OR subject=$3))
+  // The retired issue_roster_query (0064) used an owner binding for its system principal.
+  const { occupied } = (await client.query(`WITH signer_home AS (
+      SELECT pg_catalog.encode(pg_catalog.sha256(
+        pg_catalog.convert_to($2::text || ':' || $4::text, 'UTF8')), 'hex') AS digest
+    )
+    SELECT EXISTS (
+      SELECT 1 FROM backend_identity.subject_bindings AS binding
+      WHERE binding.user_id=$1 OR (binding.provider='synthetic' AND binding.tenant=$2 AND (
+        binding.subject=$3 OR (binding.role='owner' AND NOT EXISTS (
+          SELECT 1 FROM content_intake.principals AS signer CROSS JOIN signer_home
+          WHERE binding.enabled
+            AND binding.binding_id=pg_catalog.left('sys-query-binding-' || signer_home.digest, 128)
+            AND binding.user_id=pg_catalog.left('sys-query-user-' || signer_home.digest, 128)
+            AND binding.subject=pg_catalog.left('content-intake-query-signer:' || $4, 256)
+            AND binding.subject_hash=pg_catalog.encode(pg_catalog.sha256(
+              pg_catalog.convert_to(binding.user_id, 'UTF8')), 'hex')
+            AND signer.user_id=binding.user_id
+            AND signer.tenant_id=binding.tenant AND signer.app_id=$4
+            AND signer.principal_id=pg_catalog.left('sys_query_' || signer_home.digest, 72)
+            AND signer.identity_scope='content-intake-system' AND signer.person_key='query-signer'
+            AND NOT EXISTS (SELECT 1 FROM public.app_users WHERE user_id=binding.user_id)
+            AND NOT EXISTS (SELECT 1 FROM content_intake.seat_posts WHERE principal_id=signer.principal_id)
+        ))
+      ))
     ) OR EXISTS (SELECT 1 FROM public.app_users WHERE user_id=$1) AS occupied`,
-  [owner.userId, record.tenantId, owner.subject])).rows[0];
+  [owner.userId, record.tenantId, owner.subject, record.appId])).rows[0];
   if (occupied) fail('PILOT_OWNER_CONFLICT');
   return {
     binding_id: owner.bindingId, user_id: owner.userId, provider: 'synthetic', tenant: record.tenantId,
