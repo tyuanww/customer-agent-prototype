@@ -96,21 +96,19 @@ function setup() {
   } };
 }
 
-it.each(['expired C', 'session loss'] as const)('destroys the candidate window on close after %s during renderer load', async reason => {
+it.each(['expired C', 'session loss'] as const)('discards the candidate window after %s during renderer load', async reason => {
   vi.useFakeTimers({ toFake: ['Date'] });
   const h = setup();
   const load = holdRendererLoad();
   try {
     const opening = h.manager.openCandidate(h.candidate);
-    const { controller, window, contents } = h.controller();
+    const { window, contents } = h.controller();
     if (reason === 'expired C') vi.setSystemTime(Date.now() + 1001);
     else h.loseSession();
     load();
-    await opening;
+    await expect(opening).resolves.toBe('unavailable');
     expect(h.request).not.toHaveBeenCalled();
     expect(h.manager.resumeEntries()).toEqual([]);
-    expect(window.isVisible()).toBe(true);
-    controller.close();
     expect(window.isDestroyed()).toBe(true);
     expect(h.manager.fromContents(contents)).toBeNull();
   } finally { load(); h.manager.destroy(); }
