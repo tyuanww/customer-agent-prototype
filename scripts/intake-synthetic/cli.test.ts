@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import test from 'node:test';
@@ -9,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const options = { skip: process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_TEST !== '1', timeout: 30_000 };
-function start(nodeArguments: string[] = [], environment = process.env) {
-  const child = spawn(process.execPath, [...nodeArguments, 'scripts/intake-synthetic/run.ts'], { cwd: root, env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
+function start(nodeArguments: string[] = [], environment = process.env, command = ['scripts/intake-synthetic/run.ts']) {
+  const child = spawn(process.execPath, [...nodeArguments, ...command], { cwd: root, env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
   const lines: string[] = []; let stderr = '';
   const input = createInterface({ input: child.stdout });
   input.on('line', line => { lines.push(line); }); child.stderr.on('data', chunk => { stderr += String(chunk); });
@@ -29,6 +30,52 @@ function start(nodeArguments: string[] = [], environment = process.env) {
   } };
 }
 type Ready = { hostDirectory: string; desktopProfile: string; expiresAt: string };
+
+for (const identity of ['agent', 'roster-nogrant'] as const) test(`W5 CLI selects ${identity} for HTTP login`, options, async () => {
+  const { parseContractSchema } = await import('../../packages/contracts/dist/index.js');
+  const probe = mkdtempSync('/tmp/w5-cli-');
+  const cli = start(['--experimental-transform-types'], { ...process.env, TMPDIR: probe }, [
+    'scripts/intake-synthetic/sop-candidates-host.ts', ...(identity === 'agent' ? [] : [`--identity=${identity}`]),
+  ]);
+  try {
+    const ready = JSON.parse(await cli.waitFor(line => line.includes('"status":"READY_SYNTHETIC_ONLY"')));
+    assert.equal(ready.identity, identity);
+    const { apiOrigin, identityOrigin } = JSON.parse(readFileSync(ready.profile, 'utf8'));
+    const request = (url: string | URL, init?: RequestInit) => fetch(url, { redirect: 'error', signal: AbortSignal.timeout(5_000), ...init });
+    const post = (route: string, body: unknown) => request(`${apiOrigin}${route}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const started = await post('/v1/auth/login-requests', { client_challenge: challenge, challenge_method: 'S256' });
+    const login = parseContractSchema('LoginCreated', await started.json());
+    const authorize = new URL(login.authorize_url);
+    assert.equal(authorize.origin, identityOrigin);
+    const authorized = await request(authorize, { redirect: 'manual' });
+    const location = authorized.headers.get('location');
+    assert.ok(location);
+    const callback = new URL(location);
+    assert.equal(callback.origin, apiOrigin);
+    assert.ok((await request(callback)).ok);
+    const exchanged = await post(`/v1/auth/login-requests/${login.login_id}/exchange`, { client_verifier: verifier });
+    const session = parseContractSchema('LoginSession', await exchanged.json());
+    const me = await request(`${apiOrigin}/v1/auth/me`, { headers: { authorization: `Bearer ${session.access_token}` } });
+    assert.equal(parseContractSchema('CurrentUserResponse', await me.json()).user_id, `user-${identity}`);
+  } finally { await cli.close(); rmSync(probe, { recursive: true, force: true }); }
+});
+
+test('W5 CLI refuses an unknown identity before preparing PG15 or writing a profile', options, async () => {
+  const probe = mkdtempSync('/tmp/w5-cli-');
+  const cli = start(['--experimental-transform-types'], { ...process.env, TMPDIR: probe, CUSTOMER_AGENT_PG15_BIN: probe }, [
+    'scripts/intake-synthetic/sop-candidates-host.ts', '--identity=unknown',
+  ]);
+  try {
+    assert.deepEqual(await cli.exit, [1, null]);
+    assert.match(cli.stderr(), /Specify --identity=agent or --identity=roster-nogrant/);
+    assert.deepEqual(cli.lines, []);
+    assert.deepEqual(readdirSync(probe), []);
+  } finally { await cli.close(); rmSync(probe, { recursive: true, force: true }); }
+});
 
 test('foreground CLI consumes fixed commands and cleans its host while retaining separately owned Electron profile', options, async () => {
   const cli = start(); let ready: Ready | undefined;

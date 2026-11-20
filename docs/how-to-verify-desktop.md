@@ -469,9 +469,20 @@ pnpm build
 CUSTOMER_AGENT_SOP_CANDIDATES_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/sop-candidates-real-stack.spec.ts
 ```
 
-人工验收使用同一份合成数据。在 macOS、Linux 或 Windows 的 WSL 中运行 `pnpm dev:sop-candidates:synthetic`，等到终端输出 `READY_SYNTHETIC_ONLY`。其中 `profile` 指向新建目录里的 `synthetic-stack.json`，包含 v12 及 W5 的精确合同集。保留宿主进程，在应用中登录合成坐席，选择 `shop-a` 对应的「合成示例店」，提交「合成入口」。应看到 FAQ 和两个 SOP 名称。点击其中一个进入办理，再查「洁面频次」，检查先前的办理进度。
+在 macOS、Linux 或 Windows 的 WSL 运行 `pnpm dev:sop-candidates:synthetic`，默认使用有查询权的 `agent`。另起无权会话时追加 `--identity=roster-nogrant`。等待 `READY_SYNTHETIC_ONLY` 并核对 `identity`，在 `expiresAt` 前验收。换身份或重跑时，完全退出应用并停止旧宿主，再启动新宿主并使用新的专用目录。
 
-Windows 先安装候选 EXE。将本次配置复制到一个新的 Windows 目录，核对从 Windows 能访问配置里的 loopback API 和身份端口，再用已安装的应用可执行文件启动专用配置。例如在 PowerShell 运行 `& $appExe "--user-data-dir=$testDir"`，其中 `$appExe` 为安装后的应用，`$testDir` 为含该配置的目录。设备记录包括安装包 SHA-256、Windows 版本、缩放和多屏行为。宿主到达输出的 `expiresAt` 时会关闭；重新运行可生成下一次验收所需的全新配置。
+NSIS 会卸载同应用的旧版本，另选目录也会触发。只在一次性 Windows VM 或确认无同应用安装的专用 Windows 环境运行向导。按 [W8](plans/2026-11-19-windows-customer-frontend-task-cards.md#w8--在同一个-windows-安装包验收) 核对 EXE 的 SHA-256 后安装，取消结束页的自动运行。把 `synthetic-stack.json` 复制到新目录 `$testDir`，在 Windows PowerShell 预检回环端口。
+
+```powershell
+$config = Get-Content -Raw -LiteralPath (Join-Path $testDir 'synthetic-stack.json') | ConvertFrom-Json
+curl.exe --noproxy '*' --max-time 5 -s -o NUL -w '%{http_code}\n' "$($config.apiOrigin)/v1/auth/me"
+curl.exe --noproxy '*' --max-time 5 -s -o NUL -w '%{http_code}\n' "$($config.identityOrigin)/authorize"
+```
+
+确认依次返回 `401` 和 `400`，再运行 `& $appExe "--user-data-dir=$testDir"`，其中 `$appExe` 指向安装后的应用。从狐狸打开 Query，未登录时提交「合成入口」。在独立窗口点「飞书登录」，经系统浏览器完成合成回跳后，核对原问句和焦点。
+
+- `agent` 选择「合成示例店」，提交「合成入口」并核对 FAQ 和两个 SOP 候选。点击候选办理后，再查「洁面频次」核对原进度。并行开启同一模板时，重新提交「合成入口」并点击同组候选。
+- `roster-nogrant` 登录后提交问句，应看到「查询权限或资料尚未就绪，请联系管理员核对。」
 
 ## FAQ 原生上传与报告
 
