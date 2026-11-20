@@ -99,6 +99,8 @@ export async function commitSopQueryReceipt(client: IntakeTransaction, request: 
 }
 
 export function sopQueryOperationFailure(result: Extract<IntakeResult<unknown>, { ok: false }>): SopQueryOperationFailure {
+  if (result.code === 'UNAUTHORIZED') return { ok: false, code: 'UNAUTHORIZED' };
+  if (result.code === 'OVERLOADED') return { ok: false, code: 'SOP_UNAVAILABLE' };
   if (result.reason === 'IDEMPOTENCY_CONFLICT') return { ok: false, code: 'IDEMPOTENCY_CONFLICT' };
   if (['SCOPE_DENIED', 'PERMISSION_CHANGED', 'ORG_FACTS_UNAVAILABLE'].includes(result.reason)) return { ok: false, code: 'SCOPE_DENIED' };
   if (result.reason === 'LEASE_EXPIRED' || result.reason === 'BASE_CHANGED') return { ok: false, code: 'SOP_STALE' };

@@ -32,6 +32,7 @@ describe.skipIf(!enabled && !candidatesEnabled).sequential('normal 86 SOP query 
   let sequence = 0;
   let agentAuthorization: string | null = null;
   let arm: 'facts' | 'query' | 'query-before' | 'discovery' | 'open' | null = null;
+  let refuseNextSessionLock = false;
   let corruptRead: 'digest' | 'allergy' | null = null;
   let refreshAtSourceStamp = false;
   let observedSourceStamp: string | null = null;
@@ -42,6 +43,10 @@ describe.skipIf(!enabled && !candidatesEnabled).sequential('normal 86 SOP query 
       let lose: typeof arm = null;
       return new Proxy(client, { get(target, key) {
         if (key === 'query') return async (sql: string, values?: unknown[]) => {
+          if (refuseNextSessionLock && sql.startsWith('SELECT intake_runtime.lock_product_session(')) {
+            refuseNextSessionLock = false;
+            throw Object.assign(new Error('SESSION_UNAVAILABLE'), { code: 'ZA003' });
+          }
           if (refreshAtSourceStamp && sql.startsWith('SELECT clock_timestamp()') && sql.endsWith(' AS at')) {
             refreshAtSourceStamp = false;
             const stamp = await target.query<{ at: Date | string; exact: string }>(`SELECT ${sql.includes('::text') ? 'instant::text' : 'instant'} AS at,
@@ -645,6 +650,13 @@ describe.skipIf(!enabled && !candidatesEnabled).sequential('normal 86 SOP query 
 
     const selection = { request_id: randomUUID().toUpperCase(), candidate_query_id: input.request_id,
       candidate_ref: found.candidates[0]!.candidate_ref, entitlement_id: e.entitlementId };
+    for (const request of [() => discover(input), () => select(selection)]) {
+      refuseNextSessionLock = true;
+      const expiredSession = await request();
+      expect(expiredSession.status).toBe(401);
+      expect(expiredSession.headers.get('www-authenticate')).toBe('Bearer');
+      expect(await expiredSession.json()).toMatchObject({ code: 'SCOPE_DENIED' });
+    }
     const { entitlement_id: _, ...withoutE } = selection;
     expect((await select(withoutE)).status).toBe(400);
     expect((await send('/v1/sop/candidate-selections', selection, v12)).status).toBe(409);

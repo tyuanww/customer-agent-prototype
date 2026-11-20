@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockAuthService } from '../src/auth-service.js';
+import { sopQueryOperationFailure } from '../src/sop-unified-query-operation.js';
 import { registerSopQueryRoute } from '../src/sop-query-routes.js';
 import { MENOKIN_SOP_QUERY_CONTRACT_SET_ID } from '../src/sop-query-model.js';
 import { SOP_UNIFIED_QUERY_CONTRACT_SET_ID, type SopGraph, type UnifiedSopQueryResponse } from '../src/sop-unified-query-model.js';
@@ -183,6 +184,10 @@ describe('unified SOP graph query boundary', () => {
 });
 
 describe('exact v11 query HTTP dispatch', () => {
+  it('preserves a transaction timeout as a retryable service failure', () => {
+    expect(sopQueryOperationFailure({ ok: false, code: 'OVERLOADED', reason: 'PERMISSION_CHANGED',
+      diagnosticId: 'synthetic-timeout', commit: 'rolled_back' })).toEqual({ ok: false, code: 'SOP_UNAVAILABLE' });
+  });
   it('authenticates before rejecting a missing or wrong header', async () => {
     const { app, execute } = appWith();
     const denied = await app.inject({ method: 'POST', url: '/v1/sop/query', payload: { userId: 'forged' } });

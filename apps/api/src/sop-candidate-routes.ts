@@ -27,8 +27,7 @@ export const sopCandidateRoutes: FastifyPluginAsync<{
     reply.header('cache-control', 'no-store');
     const actor = await authenticateRequestHeaders(auth, request.headers);
     if (!actor) {
-      reply.header('www-authenticate', 'Bearer');
-      return sendSopError(reply, 401, 'SCOPE_DENIED', '缺少或无法验证产品会话');
+      return sendOperationFailure(reply, { ok: false, code: 'UNAUTHORIZED' });
     }
     if (!exactContractHeader(request)) {
       return sendSopError(reply, 409, 'CONTRACT_UPGRADE_REQUIRED', '请求使用的合同集不受支持');
