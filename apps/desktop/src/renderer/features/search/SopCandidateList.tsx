@@ -1,21 +1,27 @@
 import { useState } from 'react';
 import type { IntakeSopCandidate, IntakeSopCandidatesEvent } from '@shared/content-intake-query';
 
+type CandidateState = { kind: 'idle' | 'opening' } | { kind: 'opened' | 'unavailable' | 'retry'; message: string };
+const retry = { kind: 'retry', message: '流程没有打开。请再次点击流程名称重试。' } satisfies CandidateState;
+
 function SopCandidateButton({ candidate }: { candidate: IntakeSopCandidate }) {
-  const [state, setState] = useState<'idle' | 'opening' | 'opened' | 'retry'>('idle');
+  const [state, setState] = useState<CandidateState>({ kind: 'idle' });
   const open = async () => {
-    setState('opening');
+    setState({ kind: 'opening' });
     try {
       const result = await window.customerAgent?.intakeQuery?.openSopCandidate?.({ key: candidate.key });
-      setState(result?.ok ? 'opened' : 'retry');
+      if (result?.ok) setState({ kind: 'opened', message: '流程窗口已打开。' });
+      else if (result?.code === 'SOP_CANDIDATE_UNAVAILABLE' || result?.code === 'STALE') {
+        setState({ kind: 'unavailable', message: result.message });
+      } else setState(retry);
     } catch {
-      setState('retry');
+      setState(retry);
     }
   };
   return <div>
-    <button type="button" className="retry-btn" disabled={state === 'opening' || state === 'opened'}
-      aria-busy={state === 'opening'} onClick={() => { void open(); }}>{candidate.label}</button>
-    {state === 'retry' ? <p role="status">流程没有打开。请再次点击流程名称重试。</p> : null}
+    <button type="button" className="retry-btn" disabled={state.kind !== 'idle' && state.kind !== 'retry'}
+      aria-busy={state.kind === 'opening'} onClick={() => { void open(); }}>{candidate.label}</button>
+    {'message' in state ? <p role="status">{state.message}</p> : null}
   </div>;
 }
 

@@ -194,7 +194,8 @@ export async function createSopCandidateDesktopFixture() {
   const fixture = await createSopV12NormalHost({ includeSopCandidates: true });
   try {
     await publishPreparedFaq(fixture.host, 'product');
-    await fixture.facts(await fixture.publish({ validImages: true }), '品质售后SOP');
+    const qualityCase = await fixture.publish({ validImages: true });
+    await fixture.facts(qualityCase, '品质售后SOP');
     await fixture.facts(await fixture.publish({ sourceId: 'source-solo' }), '税收相关规则');
     const desktopProfile = {
       mode: 'synthetic-local' as const, contentIntake: 'faq-v2' as const,
@@ -202,7 +203,7 @@ export async function createSopCandidateDesktopFixture() {
       sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: CONTRACT_PROVENANCE.contract_set_id,
       sopCandidateContractSet: SOP_CANDIDATE_CONTRACT_SET_ID,
     };
-    return { ...fixture, desktopProfile };
+    return { ...fixture, desktopProfile, qualityCase };
   } catch (error) {
     await fixture.host.close();
     throw error;

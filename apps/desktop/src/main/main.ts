@@ -358,7 +358,7 @@ if (!gotLock) {
         // Legacy Query context changes do not own the independent v11 continuation.
         sopQuery?.invalidate();
       }, instanceProfile, candidateProfile ? async candidate =>
-        await sopInstances?.openCandidate(candidate) ?? false : undefined);
+        await sopInstances?.openCandidate(candidate) ?? 'retry' : undefined);
     // The shared Fox still reads unread in FAQ mode. A null service supplies the
     // existing unavailable projection without creating legacy I/O or missing IPC.
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],

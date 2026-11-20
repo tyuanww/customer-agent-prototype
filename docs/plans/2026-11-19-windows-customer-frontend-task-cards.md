@@ -70,6 +70,7 @@ W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给
 - [x] **合同冻结。** 治理仓 `6124b4cc4e29` 已导出并核验 W5 合同。
 - [x] **产品接入。** 产品仓校验并消费冻结集 `cs-ai-c11-openapi-1.31.0-schema-1.36-6124b4cc4e29`。API 在显式合成配置中发现、选中，Main 保管原资格和服务端引用，Query 展示名称和本地点击句柄。两条新路径使用 W5 合同头，资格及首开沿用 v12。[模块归属](../reference-project-architecture.md#sop-pipeline-source-and-release-projection)
 - [x] **本机合成联验。** macOS Electron、Fastify 与 PG15 贯通仅 FAQ、仅 SOP、同时命中和均无命中。两个组各有一条可选，首次查询零选中和首开；连点和丢失 C/D 回执后的重试只开一单。下一题保留已勾选步骤，组内歧义时仍有 FAQ。仅 SOP 命中时提示选择流程，均无结果才提示升级。窗口加载中资格到期，关闭会释放该窗口；首开回执未知仍可恢复。定向用例覆盖换店、迟到、撤权与超时保留 FAQ 复制。[原生联验](../../apps/desktop/tests/e2e/sop-candidates-real-stack.spec.ts) · [Main 边界](../../apps/desktop/tests/unit/sop-candidate-query.test.ts)
+- [x] **0.3.44 审核回归。** 同轮两个候选中，一个缺少材料或版本已变时，原 FAQ 保留，另一单可直接打开。会话在事务开始前失效返回 401，事务超时可重试。[原生联验](../../apps/desktop/tests/e2e/sop-candidates-real-stack.spec.ts) · [HTTP 与 PG15](../../apps/api/tests/sop-unified-query.integration.test.ts)
 - [ ] **Windows 实机。** 以 W8 同一安装包核对一次输入、主动首开和并行办理。[验收入口](../how-to-verify-desktop.md#w5-候选与安装包联验)
 
 ## W6 · Query 与 SOP 都能自由缩放

@@ -3192,6 +3192,46 @@ describe('QueryApp', () => {
     expect(copy).toHaveBeenCalledExactlyOnceWith({ key: 'faq-key' });
   });
 
+  it('shows a failed SOP selection on its candidate and opens the other candidate in the same search', async () => {
+    const user = userEvent.setup();
+    connectProduct();
+    const first = '29454f4e-75cf-4d3c-a64a-90e8d161806e';
+    const second = 'b0238fcc-871d-41b9-934c-f9b153102c5b';
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [{ kind: 'intake', key: 'faq-key', rank: 1, title: '合成话术',
+      answerText: '合成话术正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    const openSopCandidate = vi.fn()
+      .mockResolvedValueOnce(intakeQueryFailure('SOP_CANDIDATE_UNAVAILABLE'))
+      .mockResolvedValueOnce({ ok: true, opened: true });
+    let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(), search, copy: vi.fn(),
+      cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+      onSopCandidates: listener => { receive = listener; return () => {}; },
+      openSopCandidate,
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问句' } });
+    await user.click(screen.getByTestId('search-button'));
+    await screen.findByTestId('copy-button-1');
+    act(() => receive({ contextId: search.mock.calls[0]![0].contextId,
+      candidates: [{ key: first, label: '合成核对候选' }, { key: second, label: '合成退换候选' }] }));
+    const firstButton = screen.getByRole('button', { name: '合成核对候选' });
+    const secondButton = screen.getByRole('button', { name: '合成退换候选' });
+
+    await user.click(firstButton);
+    expect(await screen.findByText('此流程暂不可用。')).toBeVisible();
+    expect(firstButton).toBeDisabled();
+    expect(secondButton).toBeEnabled();
+    expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    await user.click(secondButton);
+    expect(await screen.findByText('流程窗口已打开。')).toBeVisible();
+    expect(openSopCandidate.mock.calls).toEqual([[{ key: first }], [{ key: second }]]);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps FAQ notice visible, ignores stale results and lets a fresh query survive old expiry', async () => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,

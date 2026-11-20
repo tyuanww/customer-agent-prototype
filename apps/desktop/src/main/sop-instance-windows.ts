@@ -1,6 +1,7 @@
 import { screen, type WebContents } from 'electron';
 import { placeSopBesideWindows, placeSopBookmark } from '../shared/sop-geometry';
 import { sopWindowFailure, type SopWindowResult } from '../shared/sop-window';
+import type { OpenSopCandidate } from './sop-candidate-search';
 import type { SopWindowController, SopWindowControllerOptions } from './sop-window-controller';
 import type { SopCandidateOpening } from './sop-unified-runtime';
 import type { SopUnifiedSession } from './sop-unified-port';
@@ -28,11 +29,12 @@ export class SopInstanceWindows {
     return window.open(sceneId);
   }
 
-  async openCandidate(candidate: SopCandidateOpening): Promise<boolean> {
+  async openCandidate(candidate: SopCandidateOpening): ReturnType<OpenSopCandidate> {
     const window = this.registerWindow(candidate);
     const result = await window.open('sop-query');
-    if (!result.ok) this.remove(window);
-    return result.ok;
+    if (result.ok && window.hasInstance()) return 'opened';
+    this.remove(window);
+    return result.ok ? 'unavailable' : 'retry';
   }
 
   private registerWindow(candidate?: SopCandidateOpening) {

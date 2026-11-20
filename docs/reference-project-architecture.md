@@ -439,7 +439,7 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
 
-W5 的 `@customer-agent/contracts/sop-candidates` 从冻结的 OpenAPI 1.31.0 生成发现和选中的校验器。`sop-candidate-operation.ts` 在当前授权范围内匹配并保存短期候选，选中后复用 v12 的就绪回执。数据库的两个调用入口和临时记录只装入专用合成 PG15。Main 的 `SopCandidateSearch` 随 Query 的提交保管原资格和服务端引用，把显示名称和本地句柄发给 Query 主帧。选中成功后，v12 实例持有首开请求及后续进度。[W5 验证方法](how-to-verify-desktop.md#w5-候选与安装包联验)
+W5 的 `@customer-agent/contracts/sop-candidates` 从冻结的 OpenAPI 1.31.0 生成发现和选中的校验器。`sop-candidate-operation.ts` 在当前授权范围内匹配并保存短期候选，选中后复用 v12 的就绪回执。数据库的两个调用入口和临时记录只装入专用合成 PG15。Main 的 `SopCandidateSearch` 随 Query 的提交保管原资格和服务端引用，把显示名称和本地句柄发给 Query 主帧。选中返回 `SOP_STALE` 时，Main 用原发现请求确认整轮是否失效。选中成功后，v12 实例持有首开请求及后续进度。[W5 验证方法](how-to-verify-desktop.md#w5-候选与安装包联验)
 
 ### OBS-01 观测机制
 

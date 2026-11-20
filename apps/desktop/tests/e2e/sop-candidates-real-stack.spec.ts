@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication } from '@playwright/test';
 import { launchIntakeElectron } from '../support/intake-electron';
 import { closeOwnedElectron } from '../support/owned-electron';
-import { waitForFocusedWindow } from '../support/electron-focus';
+import { returnToQueryWindow, waitForFocusedWindow } from '../support/electron-focus';
 import { createSopCandidateDesktopFixture } from '../support/sop-v12-normal-host';
 
 test('one FAQ submission discovers SOPs and only a chosen candidate opens a case', async () => {
@@ -74,6 +74,7 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await expect.poll(() => sopWindows().length).toBe(1);
     const sop = sopWindows()[0]!;
     await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'paused');
+    await expect(query.getByText('流程窗口已打开。')).toBeVisible();
     await sop.getByRole('button', { name: '重新确认并继续' }).click();
     await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'ready');
     await expect(sop.getByText('合成对客原文 A\n版本 1', { exact: true })).toBeVisible();
@@ -96,6 +97,52 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await expect(query.getByTestId('no-hit')).toBeVisible();
     await expect(candidates).toHaveCount(0);
 
+    await submit('合成入口');
+    await expect(faq).toBeVisible();
+    await expect(candidates).toHaveCount(2);
+    const blocked = query.getByRole('button', { name: /品质售后SOP/ });
+    const available = query.getByRole('button', { name: /税收相关规则/ });
+    const { rows: [requiredMedia] } = await admin.query<{ payload_object_id: string }>(`
+      SELECT object.payload_object_id FROM content_intake.sop_graph_release_media media
+      JOIN public.content_current current ON current.current_release_id=media.release_id
+      JOIN content_intake.sop_graph_media_bindings binding USING
+        (candidate_id,candidate_version,source_id,flow_id,owner_kind,owner_id,resource_id,object_id)
+      JOIN content_intake.sop_media_objects object ON object.media_object_id=media.object_id
+      WHERE media.source_id='source-resource' AND binding.required
+      ORDER BY object.payload_object_id LIMIT 1`);
+    if (!requiredMedia) throw new Error('Expected required media for the synthetic candidate');
+    const mediaFile = path.join(host.root, 'objects', 'objects', requiredMedia.payload_object_id);
+    const hiddenFile = `${mediaFile}.synthetic-missing`;
+    renameSync(mediaFile, hiddenFile);
+    try {
+      await blocked.click();
+      await expect(query.getByText('此流程暂不可用。')).toBeVisible();
+      await expect(blocked).toBeDisabled();
+      await expect(available).toBeEnabled();
+      await expect(query.getByTestId('copy-button-1')).toBeEnabled();
+      expect(await counts()).toEqual({ selections: 1, openings: 1 });
+
+      await available.click();
+      await expect(query.getByText('流程窗口已打开。')).toBeVisible();
+      await expect.poll(() => sopWindows().length).toBe(2);
+      const second = sopWindows().find(page => page !== sop);
+      if (!second) throw new Error('Expected a window for the available candidate');
+      await expect(second.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'ready');
+    } finally { renameSync(hiddenFile, mediaFile); }
+
+    await returnToQueryWindow(running, query);
+    await submit('合成入口');
+    await expect(blocked).toBeEnabled();
+    await fixture.facts(fixture.qualityCase, '品质售后SOP', 1);
+    await blocked.click();
+    await expect(query.getByText('此流程暂不可用。', { exact: true })).toBeVisible();
+    await expect(blocked).toBeDisabled();
+    await expect(available).toBeEnabled();
+    await expect(faq).toBeVisible();
+    await available.click();
+    await expect.poll(counts).toEqual({ selections: 3, openings: 3 });
+    await returnToQueryWindow(running, query);
+
     await fixture.facts(await fixture.publish({ sourceId: 'source-optional', validImages: true }), '品质售后SOP');
     await submit('合成入口');
     await expect(faq).toBeVisible();
@@ -103,7 +150,7 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
       "SELECT count(*)::int AS n FROM w5_sop_candidate_draft.discovery WHERE status='ambiguous'",
     )).rows[0].n).toBe(1);
     await expect(candidates).toHaveCount(0);
-    expect(await counts()).toEqual({ selections: 1, openings: 1 });
+    expect(await counts()).toEqual({ selections: 3, openings: 3 });
   } finally {
     try { if (app) await closeOwnedElectron(app); }
     finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }

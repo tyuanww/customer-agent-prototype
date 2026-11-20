@@ -15,15 +15,17 @@ const discoverPath = '/v1/sop/candidate-queries';
 const selectPath = '/v1/sop/candidate-selections';
 const checkPath = '/v1/intake/sop/check';
 const candidateRef = `sdc_${'a'.repeat(64)}`;
+const otherCandidateRef = `sdc_${'b'.repeat(64)}`;
 const oldContext = '11111111-1111-4111-8111-111111111111';
 const newContext = '22222222-2222-4222-8222-222222222222';
 
-function setup(active = true) {
+function setup(active = true, multipleCandidates = false) {
   const wire = intakeQueryData(), fixture = unifiedFixture();
   fixture.result.media = [];
   const published: IntakeSopCandidatesEvent[] = [];
   const runtimeList: SopUnifiedRuntime[] = [];
-  const faults = { faq: false, c: false, d: false, revoked: false, ambiguous: false, discoveryTimeout: false };
+  const faults = { faq: false, c: false, d: false, openingExpired: false, revoked: false, ambiguous: false, discoveryTimeout: false, discoveryStale: false };
+  let selectionFailure: { status: number; code: string } | null = null;
   const stalledHttp = new ProductHttp('http://127.0.0.1:43110', (_url, options) => new Promise((_resolve, reject) => {
     const signal = options?.signal;
     if (!signal) { reject(new Error('missing transport deadline')); return; }
@@ -54,13 +56,20 @@ function setup(active = true) {
         discoveryCount++;
         if (heldDiscovery) await heldDiscovery;
         if (faults.discoveryTimeout) return stalledHttp.request(path, { ...options, timeoutMs: 50 });
+        if (faults.discoveryStale) return { status: 200, value: { status: 'stale', request_id: body.request_id } };
         if (faults.ambiguous) return { status: 200, value: { status: 'ambiguous', request_id: body.request_id } };
         return { status: 200, value: { status: 'candidates', request_id: body.request_id,
           release_id: entitlement.releaseId, expires_at: entitlement.validUntil,
-          candidates: [{ label: '合成核对候选', candidate_ref: candidateRef }] } };
+          candidates: [{ label: '合成核对候选', candidate_ref: candidateRef },
+            ...(multipleCandidates ? [{ label: '合成退换候选', candidate_ref: otherCandidateRef }] : [])] } };
       }
       if (heldSelection) await heldSelection;
       if (faults.revoked) throw new ProductHttpError('FORBIDDEN');
+      if (selectionFailure && 'candidate_ref' in body && body.candidate_ref === candidateRef) {
+        const { status, code } = selectionFailure;
+        const http = new ProductHttp('http://127.0.0.1:43110', async () => Response.json({ code }, { status }));
+        return http.request(path, options);
+      }
       if (faults.c) throw new ProductHttpError('UNAVAILABLE');
       return { status: 200, value: { status: 'ready', request_id: body.request_id, release_id: entitlement.releaseId,
         lease_expires_at: entitlement.validUntil, result: fixture.result, reasons: [] } };
@@ -69,6 +78,7 @@ function setup(active = true) {
       expect(header).toBe(SOP_RESOURCE_CONTRACT);
       const input = body as { continuationId: string; entitlementId: string; action: string };
       if (input.action !== 'open') return { status: 204, value: null };
+      if (faults.openingExpired) throw new ProductHttpError('CONFLICT', 'LEASE_EXPIRED');
       if (faults.d) throw new ProductHttpError('UNAVAILABLE');
       const entitlement = entitlements.get(input.entitlementId);
       if (!entitlement) throw new Error('missing original SOP entitlement');
@@ -86,12 +96,13 @@ function setup(active = true) {
     const runtime = new SopUnifiedRuntime(new SopUnifiedPort(session, () => false, 'v12'), vi.fn(), undefined, candidate);
     runtimeList.push(runtime);
     await runtime.open(1);
-    return true;
+    return runtime.hasInstance() ? 'opened' : 'unavailable';
   });
   const query = new ContentIntakeQuery(session, vi.fn(), true, active ? { publish: event => published.push(event), open } : undefined);
   const bodies = (path: string) => request.mock.calls.filter(([, url]) => url === path).map(([, , options]) => options?.body);
   return {
     query, published, runtimeList, faults, open, bodies, get discoveryCount() { return discoveryCount; },
+    rejectFirstCandidate(status: number, code: string) { selectionFailure = { status, code }; },
     holdDiscovery(promise: Promise<void> | null) { heldDiscovery = promise; },
     holdSelection(promise: Promise<void>) { heldSelection = promise; },
     async dispose() { query.dispose(); await Promise.all(runtimeList.map(runtime => runtime.dispose())); },
@@ -104,9 +115,10 @@ function hold() {
   return { promise, release };
 }
 
-function candidateKey(events: IntakeSopCandidatesEvent[], id: string) {
+function candidateKey(events: IntakeSopCandidatesEvent[], id: string, index = 0) {
   for (const event of events) {
-    if (event.contextId === id && 'candidates' in event && event.candidates.length) return event.candidates[0]!.key;
+    const candidate = event.contextId === id && 'candidates' in event ? event.candidates[index] : undefined;
+    if (candidate) return candidate.key;
   }
   throw new Error('missing candidate projection');
 }
@@ -151,6 +163,124 @@ it('projects only an opaque name and key, then replays the exact C and D after l
     expect(h.bodies(checkPath)).toEqual([firstD, firstD]);
     expect(h.open).toHaveBeenCalledTimes(1);
     expect(runtime.projection()).toMatchObject({ state: 'ready', instanceName: '合成完整任务图' });
+  } finally { await h.dispose(); }
+});
+
+it.each([[422, 'SOP_BLOCKED'], [409, 'SOP_STALE'], [409, 'IDEMPOTENCY_CONFLICT']] as const)(
+  'keeps the other candidate and FAQ available after a %i %s selection denial',
+  async (status, code) => {
+    const h = setup(true, true);
+    try {
+      await h.query.access('shop-a');
+      const [faq] = await h.query.search('如何洁面', oldContext);
+      if (!faq) throw new Error('Expected a FAQ result');
+      const first = candidateKey(h.published, oldContext);
+      const second = candidateKey(h.published, oldContext, 1);
+      h.rejectFirstCandidate(status, code);
+
+      await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'SOP_CANDIDATE_UNAVAILABLE' });
+      await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'SOP_CANDIDATE_UNAVAILABLE' });
+      expect(h.bodies(selectPath)).toHaveLength(1);
+      expect(h.open).not.toHaveBeenCalled();
+      expect(h.published.at(-1)).toMatchObject({ candidates: [{ key: first }, { key: second }] });
+      const discoveries = h.bodies(discoverPath);
+      expect(discoveries).toHaveLength(code === 'SOP_STALE' ? 2 : 1);
+      if (code === 'SOP_STALE') expect(discoveries[1]).toEqual(discoveries[0]);
+      await expect(h.query.openSopCandidate(second)).resolves.toEqual({ ok: true, opened: true });
+      expect(h.runtimeList[0]?.projection()).toMatchObject({ state: 'ready' });
+      expect(h.bodies(checkPath)).toHaveLength(1);
+      await expect(h.query.copy(faq.key)).resolves.toEqual({ copied: true });
+    } finally { await h.dispose(); }
+  },
+);
+
+it('clears the round after the discovery replay confirms it is stale', async () => {
+  const h = setup(true, true);
+  try {
+    await h.query.access('shop-a');
+    await h.query.search('如何洁面', oldContext);
+    const first = candidateKey(h.published, oldContext);
+    const second = candidateKey(h.published, oldContext, 1);
+    h.rejectFirstCandidate(409, 'SOP_STALE');
+    h.faults.discoveryStale = true;
+
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'STALE' });
+    expect(h.published.at(-1)).toEqual({ contextId: oldContext, status: 'stale' });
+    await expect(h.query.openSopCandidate(second)).resolves.toMatchObject({ code: 'STALE' });
+    expect(h.bodies(discoverPath)).toHaveLength(2);
+    expect(h.bodies(selectPath)).toHaveLength(1);
+  } finally { await h.dispose(); }
+});
+
+it('leaves both candidates actionable on an unknown conflict and retries only the failed selection', async () => {
+  const h = setup(true, true);
+  try {
+    await h.query.access('shop-a');
+    await h.query.search('如何洁面', oldContext);
+    const first = candidateKey(h.published, oldContext);
+    const second = candidateKey(h.published, oldContext, 1);
+    h.rejectFirstCandidate(409, 'UNRECOGNIZED_CONFLICT');
+
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'UNAVAILABLE' });
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'UNAVAILABLE' });
+    const [firstAttempt, retry] = h.bodies(selectPath);
+    expect(retry).toEqual(firstAttempt);
+    expect(h.discoveryCount).toBe(1);
+    await expect(h.query.openSopCandidate(second)).resolves.toEqual({ ok: true, opened: true });
+  } finally { await h.dispose(); }
+});
+
+it('keeps the other candidate actionable when discovery revalidation times out', async () => {
+  const h = setup(true, true);
+  try {
+    await h.query.access('shop-a');
+    await h.query.search('如何洁面', oldContext);
+    const first = candidateKey(h.published, oldContext);
+    const second = candidateKey(h.published, oldContext, 1);
+    h.rejectFirstCandidate(409, 'SOP_STALE');
+    h.faults.discoveryTimeout = true;
+
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'SOP_CANDIDATE_UNAVAILABLE' });
+    expect(h.published.at(-1)).toMatchObject({ candidates: [{ key: first }, { key: second }] });
+    await expect(h.query.openSopCandidate(second)).resolves.toEqual({ ok: true, opened: true });
+    expect(h.discoveryCount).toBe(2);
+  } finally { await h.dispose(); }
+});
+
+it('does not replay discovery for a stale selection reply after a replacement search', async () => {
+  const h = setup();
+  const gate = hold();
+  try {
+    await h.query.access('shop-a');
+    await h.query.search('如何洁面', oldContext);
+    const first = candidateKey(h.published, oldContext);
+    h.rejectFirstCandidate(409, 'SOP_STALE');
+    h.holdSelection(gate.promise);
+    const opening = h.query.openSopCandidate(first);
+    await h.query.search('下一问', newContext);
+    gate.release();
+    await expect(opening).resolves.toMatchObject({ code: 'STALE' });
+    expect(h.bodies(discoverPath)).toHaveLength(2);
+    expect(h.published.at(-1)).toMatchObject({ contextId: newContext, candidates: expect.any(Array) });
+  } finally { gate.release(); await h.dispose(); }
+});
+
+it('reports an expired first opening as unavailable while leaving the other candidate actionable', async () => {
+  const h = setup(true, true);
+  try {
+    await h.query.access('shop-a');
+    await h.query.search('如何洁面', oldContext);
+    const first = candidateKey(h.published, oldContext);
+    const second = candidateKey(h.published, oldContext, 1);
+    h.faults.openingExpired = true;
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'SOP_CANDIDATE_UNAVAILABLE' });
+    expect(h.runtimeList[0]?.projection()).toMatchObject({ state: 'ended', node: null });
+
+    h.faults.openingExpired = false;
+    await expect(h.query.openSopCandidate(first)).resolves.toMatchObject({ code: 'SOP_CANDIDATE_UNAVAILABLE' });
+    expect(h.bodies(checkPath)).toHaveLength(1);
+    await expect(h.query.openSopCandidate(second)).resolves.toEqual({ ok: true, opened: true });
+    expect(h.runtimeList[1]?.projection()).toMatchObject({ state: 'ready' });
   } finally { await h.dispose(); }
 });
 

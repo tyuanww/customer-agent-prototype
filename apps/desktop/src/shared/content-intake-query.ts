@@ -33,6 +33,7 @@ const messages = {
   NO_GRANT: '没有权限，请找人开通。',
   ROLE_UNKNOWN: '没有权限，请找人开通。',
   UNAVAILABLE: '查询服务暂不可用，请重试。',
+  SOP_CANDIDATE_UNAVAILABLE: '此流程暂不可用。',
   LIMIT: '资料超出读取限制，请联系管理员。',
   CLIPBOARD_FAILED: '复制失败，请重试。',
 } as const;

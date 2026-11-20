@@ -153,6 +153,8 @@ async function mapFailure(response: Response): Promise<{ code: ProductErrorCode;
     const parsed = JSON.parse(await readBounded(response)) as { code?: unknown; error?: { message?: unknown; details?: { reason?: unknown } } };
     if (typeof parsed?.error?.details?.reason === 'string') reason = parsed.error.details.reason;
     if (response.status === 422 && parsed?.code === 'SOP_BLOCKED') reason = parsed.code;
+    if (response.status === 409 && (parsed?.code === 'SOP_STALE' || parsed?.code === 'IDEMPOTENCY_CONFLICT'
+      || parsed?.code === 'CONTRACT_UPGRADE_REQUIRED')) reason = parsed.code;
     const notice = parsed?.error?.details && typeof parsed.error.details === 'object'
       ? Reflect.get(parsed.error.details, 'notice') : undefined;
     if (notice === 'current-required') mapped = 'CONSENT_REQUIRED';

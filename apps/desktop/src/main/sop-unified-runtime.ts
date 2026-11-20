@@ -185,7 +185,8 @@ export class SopUnifiedRuntime {
       return { ok: result !== false };
     } catch (error) {
       if (generation === this.generation) {
-        if (error instanceof ProductHttpError && TERMINAL_REASONS.has(error.reason ?? '')) {
+        if (error instanceof ProductHttpError && (TERMINAL_REASONS.has(error.reason ?? '')
+          || (this.value.entry === 'candidate' && this.active?.opening && error.reason === 'LEASE_EXPIRED'))) {
           this.end('流程已失效，请结束后重新查询。');
         } else {
           const selectionUnavailable = (error instanceof Error && error.message === 'SOP_SELECTION_REQUIRED')
