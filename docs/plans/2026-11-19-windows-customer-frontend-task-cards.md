@@ -84,7 +84,7 @@ W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给
 
 ## W8 · 在同一个 Windows 安装包验收
 
-- [x] 已构建含 W5 的 Windows x64 未签名工程包 0.3.43。直接从 NSIS 安装程序提取 app.asar，核对 Main、四个 preload 和 renderer 等 14 个构建文件，内容逐字节一致。EXE SHA-256 为 `0e2381c24caeb341845b7654a3ab8e057b00811d673bf3a428d8ff42db9224b5`。Git 印章为 `dirty`，来源基线 `91f404c1fc87`。
+- [x] 已构建含 W5 的 Windows x64 未签名工程包 0.3.43。直接从 NSIS 安装程序提取 app.asar，核对 Main、四个 preload 和 renderer 等 14 个构建文件，内容逐字节一致。EXE SHA-256 为 `1ccc50ca35cf3d57ed677f5de1d0f229189d208fec04e43ef0b0678f30e80972`。包内 `build-identity.json` 记录产品提交 `07949f09392bac168eefcde2b3a77c5b6a0fb38c`。
 - [ ] **记录环境。** 记提交、EXE SHA-256、系统版本、缩放和任务栏位置。合成栈依赖 Unix socket。先从 Windows 核验本机 loopback API 与身份入口，准备有查询权和无查询权会话。使用 W5 联验宿主生成新的专用配置，复核 `faq-v2`、`sopQuery`、`sopContractSet` 和 `sopCandidateContractSet`。[W5 打包配置](../how-to-verify-desktop.md#w5-候选与安装包联验) · [Windows 与 WSL 联调](../how-to-develop-content-intake.md#p2-独立-apipg-与桌面合成联调)
 - [ ] **登录与首查。** 未登录提交，成功后焦点回原问句。首查见 FAQ 和候选。用无查询权会话验证拒绝。复用 W0/W2 的请求证据。
 - [ ] **并行办理与窗口。** 点同模板开两单，命名并推进。缩放后换步，贴边后从狐狸恢复，结束一单后另一单仍可用，登出使旧内容失效。
