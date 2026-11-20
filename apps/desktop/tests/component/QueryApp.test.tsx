@@ -3055,6 +3055,7 @@ describe('QueryApp', () => {
     await waitFor(() => expect(access).toHaveBeenCalled());
     const input = screen.getByRole('textbox', { name: '客户问题' });
     const submit = screen.getByRole('button', { name: '查询' });
+    const scope = screen.getByRole('button', { name: '查询范围' });
     const spaces = '\u3000  ';
     await user.type(input, `${spaces}{Enter}`);
     expect(input).toHaveAccessibleDescription(EMPTY_QUERY_MESSAGE);
@@ -3081,15 +3082,29 @@ describe('QueryApp', () => {
     await user.keyboard('{Enter}');
     await waitFor(() => expect(search).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ queryText: valid })));
     await screen.findByTestId('no-hit');
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+    expect(scope).toHaveTextContent(/^查询范围$/);
 
     fireEvent.change(input, { target: { value: spaces } });
     await user.click(submit);
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
     expect(screen.queryByTestId('result-pane')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '查询范围' }));
+    await user.click(scope);
     await user.click(submit);
     expect(screen.getByTestId('intake-query-filters')).toHaveAttribute('data-open', 'true');
     expect(input).toHaveAccessibleDescription(EMPTY_QUERY_MESSAGE);
+    expect(search).toHaveBeenCalledOnce();
+
+    act(() => {
+      for (const listener of commandListeners) listener({ type: 'clear-content' });
+    });
+    expect(scope).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    await user.click(scope);
+    expect(scope).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: '当前店铺' })).toBeVisible();
+    expect(input).toHaveValue(spaces);
     expect(search).toHaveBeenCalledOnce();
   });
 
@@ -3186,6 +3201,11 @@ describe('QueryApp', () => {
     expect(input).toHaveValue('合成客户问题');
     expect(search).toHaveBeenCalledOnce();
 
+    sopOpen.mockRejectedValueOnce(new Error('Synthetic window open failure'));
+    await user.click(screen.getByRole('button', manual));
+    expect(await screen.findByText('流程没有打开，请重试。')).toBeVisible();
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: /· 退出$/ }));
     act(() => changeSession(logout));
     expect(screen.queryByTestId('session-notice-expired')).not.toBeInTheDocument();
@@ -3237,18 +3257,30 @@ describe('QueryApp', () => {
       render(<QueryApp intake />); activateQuery();
       await act(async () => {});
       const scope = screen.getByRole('button', { name: '查询范围' });
+      const input = screen.getByTestId('question-input');
+      fireEvent.change(input, { target: { value: '合成问句' } });
+      expect(scope).toHaveTextContent(/^查询范围$/);
+      expect(scope).toHaveAccessibleDescription('shop-a · 商品全部 · 场景全部');
       fireEvent.pointerDown(scope);
       fireEvent.click(scope);
       await act(async () => { await vi.advanceTimersByTimeAsync(20); });
-      expect(screen.getByRole('button', { name: '查询范围' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+      expect(scope).toHaveFocus();
+      expect(scope).toHaveAttribute('aria-expanded', 'true');
+      expect(document.getElementById(scope.getAttribute('aria-controls') ?? '')).toContainElement(screen.getByRole('combobox'));
       fireEvent.click(screen.getByText('商品 · 全部'));
       await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '合成商品' })); });
-      fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
-      expect(screen.getByTestId('intake-query-filters')).toHaveAttribute('data-open', 'false');
-      expect(screen.getByTestId('intake-filter-summary')).toHaveTextContent('商品 合成商品');
+      fireEvent.click(scope);
+      expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+      expect(scope).toHaveFocus();
+      expect(scope).toHaveAttribute('aria-expanded', 'false');
+      expect(scope).toHaveAttribute('data-selected', 'true');
+      expect(scope).toHaveTextContent('商品 合成商品');
+      expect(scope).toHaveAccessibleDescription('shop-a · 商品 合成商品 · 场景全部');
+      expect(input).toHaveValue('合成问句');
+      expect(search).not.toHaveBeenCalled();
 
-      const input = screen.getByTestId('question-input');
-      fireEvent.change(input, { target: { value: '合成问句' } });
       await act(async () => { fireEvent.click(screen.getByTestId('search-button')); });
       expect(search).toHaveBeenCalledOnce();
       await act(async () => { await vi.advanceTimersByTimeAsync(5_001); });
@@ -3409,6 +3441,14 @@ describe('QueryApp', () => {
     expect(pane.scrollTop).toBe(0);
     const shell = screen.getByTestId('query-shell');
     await waitFor(() => expect(shell).toHaveAttribute('data-layout-ready', 'true'));
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    await user.click(scope);
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    pane.scrollTop = 30;
+    await user.click(scope);
+    expect(pane.scrollTop).toBe(0);
+    expect(scope).toHaveFocus();
+    await waitFor(() => expect(shell).toHaveAttribute('data-layout-ready', 'true'));
     pane.scrollTop = 30;
     const contextId = search.mock.calls[0]![0].contextId;
     act(() => receive({ contextId, status: 'searching' }));
@@ -3437,6 +3477,57 @@ describe('QueryApp', () => {
     expect(await screen.findByText('SOP 候选暂不可用，请重新查询。')).toBeVisible();
     await user.click(copyButton);
     expect(copy).toHaveBeenCalledExactlyOnceWith({ key: 'faq-key-2' });
+  });
+
+  it('reveals the shop row inside a short pane after opening scope below five SOPs', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    search.mockResolvedValueOnce({ ok: true, rows: [{ kind: 'intake', key: 'first', rank: 1, title: '合成标题',
+      answerText: '合成正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
+    window.customerAgent!.intakeQuery!.onSopCandidates = listener => { receive = listener; return () => {}; };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    await user.type(screen.getByRole('textbox', { name: '客户问题' }), '合成客户问题{Enter}');
+    expect(await screen.findByTestId('script-card-1')).toBeVisible();
+    const contextId = search.mock.calls[0]![0].contextId;
+    act(() => receive({ contextId, candidates: Array.from({ length: 5 }, (_, index) => ({
+      key: `sop-${index}`, label: `合成售后办理流程 ${index + 1}`,
+    })) }));
+    const disclosure = screen.getByText('选择办理流程（5）');
+    const pane = screen.getByTestId('result-pane');
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    Object.defineProperties(pane, { clientHeight: { value: 151 }, clientTop: { value: 1 } });
+    const getRect = HTMLElement.prototype.getBoundingClientRect;
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === pane) return new DOMRect(0, 88, 360, 152);
+      if (this.classList.contains('intake-shop-control')) {
+        const top = disclosure.parentElement?.hasAttribute('open') ? 600 : 140;
+        return new DOMRect(12, top - pane.scrollTop, 324, 32);
+      }
+      return getRect.call(this);
+    });
+    try {
+      scope.focus();
+      await user.keyboard('{Enter}');
+      expect(await screen.findByRole('combobox', { name: '当前店铺' })).toBeVisible();
+      expect(pane.scrollTop).toBe(0);
+      await user.keyboard('{Enter}');
+      expect(screen.queryByRole('combobox', { name: '当前店铺' })).not.toBeInTheDocument();
+
+      await user.click(disclosure);
+      expect(disclosure.parentElement).toHaveAttribute('open');
+      scope.focus();
+      await user.keyboard('{Enter}');
+      expect(await screen.findByRole('combobox', { name: '当前店铺' })).toBeVisible();
+      await waitFor(() => expect(pane.scrollTop).toBe(392));
+      expect(scope).toHaveFocus();
+      expect(pane.firstElementChild).toBe(screen.getByRole('region', { name: '办理流程' }));
+      expect(disclosure.parentElement).toHaveAttribute('open');
+      expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    } finally {
+      rect.mockRestore();
+    }
   });
 
   it.each([2, 3, 5])('keeps %s SOP candidates in order and opens only the selected flow', async count => {

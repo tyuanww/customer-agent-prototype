@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -6,20 +5,20 @@ import {
   intakeQueryFailure,
   type IntakeQueryApi,
 } from '../../src/shared/content-intake-query';
-import { IntakeQueryFilters } from '../../src/renderer/features/search/IntakeQueryFilters';
+import { describeIntakeQueryScope, IntakeQueryFilters } from '../../src/renderer/features/search/IntakeQueryFilters';
 import { useIntakeShops } from '../../src/renderer/features/search/use-intake-shops';
 
 const reset = () => undefined;
 
-function Filters({ signedIn = true, initialOpen = false }: { signedIn?: boolean; initialOpen?: boolean }) {
+function Filters({ signedIn = true, open = false }: { signedIn?: boolean; open?: boolean }) {
   const state = useIntakeShops(true, signedIn, 0, reset);
-  const [open, setOpen] = useState(initialOpen);
   return (
     <IntakeQueryFilters
       state={state}
+      scope={describeIntakeQueryScope(state)}
       signedIn={signedIn}
       open={open}
-      onToggle={() => setOpen(current => !current)}
+      showError
       onLayoutChange={reset}
     />
   );
@@ -53,19 +52,19 @@ it.each([false, true])('shows NO_GRANT recovery guidance with filters open=%s an
       shopId: 'shop-synthetic',
     });
   installApi(access);
-  render(<Filters initialOpen={open} />);
+  const { rerender } = render(<Filters open={open} />);
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(message));
   expect(screen.getAllByRole('alert')).toHaveLength(1);
   expect(screen.getByRole('alert')).toHaveTextContent(message);
   expect(denial.message).toBe('没有权限，请找人开通。');
 
-  if (!open) fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
+  if (!open) rerender(<Filters open />);
   fireEvent.click(screen.getByRole('button', { name: '刷新店铺' }));
   expect(await screen.findByRole('option', { name: 'shop-synthetic' })).toBeVisible();
   await waitFor(() => expect(screen.getByRole('button', { name: '刷新店铺' })).toBeEnabled());
   expect(access).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole('alert')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
+  rerender(<Filters />);
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
@@ -74,12 +73,12 @@ it.each(['UNAVAILABLE', 'FACTS_EXPIRED', 'NO_PRINCIPAL', 'ROLE_UNKNOWN'] as cons
   async code => {
     const failure = intakeQueryFailure(code);
     installApi(vi.fn<IntakeQueryApi['access']>().mockResolvedValue(failure));
-    render(<Filters />);
+    const { rerender } = render(<Filters />);
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(failure.message);
-    fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
+    rerender(<Filters open />);
     expect(screen.getByRole('alert').textContent).toBe(failure.message);
-    fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
+    rerender(<Filters />);
     expect(screen.getByRole('alert').textContent).toBe(failure.message);
   },
 );
@@ -87,10 +86,8 @@ it.each(['UNAVAILABLE', 'FACTS_EXPIRED', 'NO_PRINCIPAL', 'ROLE_UNKNOWN'] as cons
 it('does not read shops or show a recovery error before login', () => {
   const access = vi.fn<IntakeQueryApi['access']>().mockResolvedValue(intakeQueryFailure('NO_GRANT'));
   installApi(access);
-  render(<Filters signedIn={false} />);
+  render(<Filters signedIn={false} open />);
   expect(access).not.toHaveBeenCalled();
-  expect(screen.queryByRole('alert')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.getByRole('button', { name: '刷新店铺' })).toBeDisabled();
 });

@@ -1,5 +1,5 @@
 import { SopQueryEntry, useManualSopEntry } from './features/search/SopQueryEntry';
-import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
+import { describeIntakeQueryScope, INTAKE_FILTER_PANEL_ID, IntakeQueryFilters } from './features/search/IntakeQueryFilters';
 import { PERMISSION_DENIAL_MESSAGE, productFailure, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
@@ -123,18 +123,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [smartEnabled, setSmartEnabled] = useState(true);
   const [layoutReady, setLayoutReady] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const restoreScopeFocusRef = useRef(false);
-  const attachScopeToggle = useCallback((node: HTMLButtonElement | null) => {
-    if (node && restoreScopeFocusRef.current) {
-      restoreScopeFocusRef.current = false;
-      node.focus({ preventScroll: true });
-    }
-  }, []);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
   const [queryWidth, setQueryWidth] = useState(QUERY_WIDTH);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultPaneRef = useRef<HTMLElement>(null);
+  const scopeShopRef = useRef<HTMLDivElement>(null);
+  const pendingScopeRevealRef = useRef(false);
   const resultContentRef = useRef<HTMLDivElement>(null);
   const shortcutBannerRef = useRef<HTMLParagraphElement>(null);
   const statusBannerRef = useRef<HTMLDivElement>(null);
@@ -285,7 +280,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     cancelScheduledResultFocus();
     resultFocusFrameRef.current = window.requestAnimationFrame(() => {
       resultFocusFrameRef.current = null;
-      if (intake && document.activeElement?.closest('[data-sop-entry], [data-query-context]')) return;
+      if (intake && document.activeElement?.closest('[data-sop-entry], [data-query-context], [data-query-scope-toggle]')) return;
       resultPaneRef.current?.focus();
     });
   }, [cancelScheduledResultFocus, intake]);
@@ -1374,7 +1369,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setErrorMessage('');
       if (!intake || wasSignedIn || source !== 'status') setInvalidMessage('');
       reportPhase('SEARCH_INPUT');
-      if (intake && wasSignedIn && resultPaneRef.current?.contains(document.activeElement)) {
+      if (intake && wasSignedIn && (resultPaneRef.current?.contains(document.activeElement)
+        || document.activeElement?.matches('[data-query-scope-toggle]'))) {
         focusQueryInput(false);
       }
     } else if (value.ok && value.signedIn) {
@@ -1625,6 +1621,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         sessionNoticeRef.current = null;
         setSessionNotice(null);
       }
+      pendingScopeRevealRef.current = false;
       if (resultPaneRef.current) resultPaneRef.current.scrollTop = 0;
       const generation = ++searchGenerationRef.current;
       intakeContextIdRef.current = request.contextId;
@@ -2099,8 +2096,23 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   };
 
   const expanded = isQueryContentLayoutPhase(phase) || phase === 'COPIED';
-  const hasScopeSelection = intakeShops.productIds.length > 0 || intakeShops.scenarioIds.length > 0
-    || (intakeShops.shops.length > 1 && intakeShops.shopId !== null);
+  useLayoutEffect(() => {
+    if (!expanded || !filtersOpen || parked || closing) {
+      pendingScopeRevealRef.current = false;
+    }
+    if (!pendingScopeRevealRef.current || !layoutReady || opening) return;
+    pendingScopeRevealRef.current = false;
+    const pane = resultPaneRef.current;
+    const shop = scopeShopRef.current;
+    if (!pane || !shop) return;
+
+    const paneBottom = pane.getBoundingClientRect().top + pane.clientTop + pane.clientHeight;
+    const overflow = shop.getBoundingClientRect().bottom - paneBottom;
+    if (overflow > 0) pane.scrollTop += Math.ceil(overflow);
+  }, [closing, expanded, filtersOpen, layoutReady, opening, parked]);
+
+  const intakeScope = intake ? describeIntakeQueryScope(intakeShops) : null;
+  const showIntakeFilterError = Boolean(intakeShops.error && (phase !== 'ERROR' || !errorMessage));
   const manualSopControl = manualSop ? <SopQueryEntry entry={manualSop} /> : null;
   const showQueryResizeGrip = expanded && phase !== 'COPIED' && !parked && !opening && !closing;
   const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
@@ -2366,13 +2378,26 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           intake={intake}
-          scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry"
-            ref={attachScopeToggle} disabled={!signedInSession} aria-expanded={false}
-            onClick={() => {
-              restoreScopeFocusRef.current = true;
-              setFiltersOpen(true);
-              reportPhase('RESULTS');
-            }}>查询范围</button> : null}
+          scopeControl={intakeScope ? {
+            context: intakeScope.context,
+            description: intakeScope.description,
+            panelId: INTAKE_FILTER_PANEL_ID,
+            open: filtersOpen && expanded,
+            onToggle: () => {
+              const nextOpen = !expanded || !filtersOpen;
+              pendingScopeRevealRef.current = nextOpen;
+              setFiltersOpen(nextOpen);
+              if (nextOpen && resultPaneRef.current) resultPaneRef.current.scrollTop = 0;
+              if (!expanded) {
+                reportPhase('RESULTS');
+              } else if (filtersOpen && phase === 'RESULTS' && !intakeContextIdRef.current
+                && !intakeShops.error && !intakeShops.busy) {
+                reportPhase('SEARCH_INPUT');
+              } else {
+                setLayoutReady(false);
+              }
+            },
+          } : undefined}
           manualSopControl={!expanded ? manualSopControl : null}
           manualSopError={!expanded ? manualSopError : undefined}
           productControl={showProductSession ? (
@@ -2440,18 +2465,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
-              toggleRef={attachScopeToggle}
-              showError={phase !== 'ERROR' || !errorMessage}
-              onToggle={() => {
-                setFiltersOpen(!filtersOpen);
-                if (filtersOpen && phase === 'RESULTS' && !intakeContextIdRef.current
-                  && !hasScopeSelection && !intakeShops.error && !intakeShops.busy) {
-                  restoreScopeFocusRef.current = true;
-                  reportPhase('SEARCH_INPUT');
-                } else setLayoutReady(false);
-              }}
-              onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
+            contextControls={intakeScope ? (filtersOpen || showIntakeFilterError ? (
+              <IntakeQueryFilters state={intakeShops} scope={intakeScope} signedIn={signedInSession !== null}
+                open={filtersOpen} shopControlRef={scopeShopRef} showError={showIntakeFilterError} onLayoutChange={() => setLayoutReady(false)} />
+            ) : undefined) : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
                 values={placeholderValues}
