@@ -28,6 +28,10 @@
       "types": "./src/sop-unified.ts",
       "import": "./dist/sop-unified.js"
     },
+    "./sop-candidates": {
+      "types": "./src/sop-candidates.ts",
+      "import": "./dist/sop-candidates.js"
+    },
     "./sop-resource-disable": {
       "types": "./src/sop-resource-disable.ts",
       "import": "./dist/sop-resource-disable.js"
@@ -38,10 +42,10 @@
     "check:generated": "node scripts/generate-contracts.mjs --check",
     "typecheck": "tsc --noEmit",
     "build:runtime": "tsc -p tsconfig.build.json",
-    "test:package": "pnpm build:runtime && node --test --test-concurrency=1 ../../scripts/sop-resource-disable-contract.test.mjs tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs tests/sop-resource-disable-entry.smoke.mjs",
+    "test:package": "pnpm build:runtime && node --test --test-concurrency=1 ../../scripts/sop-resource-disable-contract.test.mjs tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs tests/sop-resource-disable-entry.smoke.mjs tests/sop-candidates-entry.smoke.mjs",
     "test": "vitest run && pnpm test:package",
     "build": "pnpm check:generated && pnpm build:runtime",
-    "test:package:built": "node --test --test-concurrency=1 ../../scripts/sop-resource-disable-contract.test.mjs tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs tests/sop-resource-disable-entry.smoke.mjs",
+    "test:package:built": "node --test --test-concurrency=1 ../../scripts/sop-resource-disable-contract.test.mjs tests/package-entry.smoke.mjs tests/sop-unified-entry.smoke.mjs tests/sop-resource-disable-entry.smoke.mjs tests/sop-candidates-entry.smoke.mjs",
     "test:built": "vitest run && pnpm test:package:built",
     "generate:sop-resource-disable": "node scripts/generate-contracts.mjs --profile=sopResourceDisable",
     "check:sop-resource-disable": "node scripts/generate-contracts.mjs --profile=sopResourceDisable --check"

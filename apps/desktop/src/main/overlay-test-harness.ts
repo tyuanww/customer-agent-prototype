@@ -27,7 +27,7 @@ export type OverlayTestHarnessHost = {
   dashboardSnapshot(): unknown;
   isDashboardTrusted(): boolean;
   queryLayoutDebugState(): unknown;
-  resizeQueryHeight(request: QueryResizeRequest): unknown;
+  resizeQuery(request: QueryResizeRequest): unknown;
   reportUiPhase(
     phase: ReportablePhase,
     resultCount: ResultCount,
@@ -149,9 +149,9 @@ export function attachTestHarness(controller: OverlayTestHarnessHost): void {
     },
     getOverlaySnapshot: () => controller.getOverlaySnapshot(),
     queryLayoutDebug: () => controller.queryLayoutDebugState(),
-    resizeQueryHeight: (request: QueryResizeRequest) => {
+    resizeQuery: (request: QueryResizeRequest) => {
       const snapshot = controller.getOverlaySnapshot();
-      return controller.resizeQueryHeight({
+      return controller.resizeQuery({
         ...request,
         identity: {
           sessionEpoch: snapshot.contract.sessionEpoch,

@@ -1,4 +1,4 @@
-import { emptyIntakeQueryContext } from '../../src/shared/content-intake-query';
+import { emptyIntakeQueryContext, intakeQueryFailure, type IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +33,7 @@ const reportUiPhase = vi.fn();
 const reportHandoffMilestone = vi.fn();
 const reportOverlayEvent = vi.fn();
 const reportQueryLayout = vi.fn();
-const resizeQueryHeight = vi.fn();
+const resizeQuery = vi.fn();
 const moveFoxBy = vi.fn();
 const setFoxPeek = vi.fn();
 const sopOpen = vi.fn();
@@ -118,7 +118,7 @@ describe('QueryApp', () => {
     reportHandoffMilestone.mockReset();
     reportOverlayEvent.mockReset();
     reportQueryLayout.mockReset();
-    resizeQueryHeight.mockReset();
+    resizeQuery.mockReset();
     moveFoxBy.mockReset();
     setFoxPeek.mockReset();
     sopOpen.mockReset();
@@ -141,15 +141,17 @@ describe('QueryApp', () => {
       phase: request.phase,
       resultCount: request.resultCount,
       height: 312,
+      width: 600,
       resizeEdge: 'bottom',
     }));
-    resizeQueryHeight.mockImplementation(async (request: { sessionId: number; sequence: number }) => ({
+    resizeQuery.mockImplementation(async (request: { sessionId: number; sequence: number }) => ({
       ok: true,
       sessionId: request.sessionId,
       sequence: request.sequence,
       phase: 'RESULTS',
       resultCount: 3,
       height: 360,
+      width: 600,
       resizeEdge: 'bottom',
     }));
     commandListeners.clear();
@@ -191,7 +193,7 @@ describe('QueryApp', () => {
       reportHandoffMilestone,
       reportOverlayEvent,
       reportQueryLayout,
-      resizeQueryHeight,
+      resizeQuery,
       moveFoxBy,
       commitFoxDragSettle: vi.fn(),
       setFoxPeek,
@@ -376,7 +378,7 @@ describe('QueryApp', () => {
         ackSequence: 1,
         handoffId: 2,
         desiredHeight: 420,
-        appliedHeight: 420,
+        appliedSize: { width: 600, height: 420 },
       },
     });
     act(() => {
@@ -624,7 +626,7 @@ describe('QueryApp', () => {
     // 收起（隐藏）状态下到达：横幅被记住，但不排已读计时。
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     fire(['presale']);
@@ -767,7 +769,7 @@ describe('QueryApp', () => {
     expect(dismiss).toHaveBeenCalled();
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     expect(f.recordTerminal).toHaveBeenCalledTimes(1);
@@ -1138,6 +1140,7 @@ describe('QueryApp', () => {
           anchor: 'right',
           handoffCenterX: 600,
           handoffCenterY: 44,
+          viewport: { width: 600, height: 88 },
           foxVisualTransform: clickedTransform,
         });
       }
@@ -1185,6 +1188,7 @@ describe('QueryApp', () => {
           animate: true,
           handoffCenterX: 600,
           handoffCenterY: 44,
+          viewport: { width: 600, height: 88 },
         });
       }
     });
@@ -1216,6 +1220,7 @@ describe('QueryApp', () => {
           anchor: 'right',
           handoffCenterX: 600,
           handoffCenterY: 44,
+          viewport: { width: 600, height: 88 },
           foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
         });
       }
@@ -1284,6 +1289,7 @@ describe('QueryApp', () => {
             anchor: 'right',
             handoffCenterX: 600,
             handoffCenterY: 44,
+            viewport: { width: 600, height: 88 },
             foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
           });
           listener({ type: 'overlay-snapshot', snapshot: after });
@@ -1363,7 +1369,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: true, handoffCenterX: 600, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: true, handoffCenterX: 600, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     expect(shell).toHaveAttribute('data-opening', 'false');
@@ -1499,7 +1505,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
         listener({ type: 'activate-search', anchor: 'left', animate: true });
       }
     });
@@ -1652,7 +1658,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
 
@@ -1723,7 +1729,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     copyText.mockClear();
@@ -2100,6 +2106,7 @@ describe('QueryApp', () => {
           animate: false,
           handoffCenterX: 44,
           handoffCenterY: 44,
+          viewport: { width: 600, height: 88 },
         });
       }
     });
@@ -2124,7 +2131,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
 
@@ -2175,7 +2182,7 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
         listener({ type: 'activate-search', anchor: 'left', animate: true });
       }
     });
@@ -2201,7 +2208,7 @@ describe('QueryApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: false, handoffCenterX: 556, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'none', animate: false, handoffCenterX: 556, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
         listener({ type: 'activate-search', anchor: 'right', animate: true });
       }
     });
@@ -2652,6 +2659,7 @@ describe('QueryApp', () => {
           anchor: 'left',
           handoffCenterX: 44,
           handoffCenterY: 44,
+          viewport: { width: 600, height: 88 },
           foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
         });
       }
@@ -2694,6 +2702,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 620,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2718,6 +2727,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 620,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2733,6 +2743,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 430,
+          width: 600,
           resizeEdge: 'top',
         });
       }
@@ -2746,7 +2757,7 @@ describe('QueryApp', () => {
 
   it('rejects a second resize pointer, rolls back cancel after height changes, then allows another drag', async () => {
     let liveHeight = 312;
-    resizeQueryHeight.mockImplementation(async (request: {
+    resizeQuery.mockImplementation(async (request: {
       type: string;
       sessionId: number;
       sequence: number;
@@ -2765,6 +2776,7 @@ describe('QueryApp', () => {
         phase: 'RESULTS' as const,
         resultCount: 3 as const,
         height: liveHeight,
+        width: 600,
         resizeEdge: 'bottom' as const,
       };
     });
@@ -2795,14 +2807,14 @@ describe('QueryApp', () => {
     });
 
     fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 3, screenY: 400 });
-    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
+    expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
     fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 4, screenY: 410 });
-    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
+    expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(1);
 
     fireEvent.pointerMove(grip, { buttons: 1, pointerId: 3, screenY: 460, clientY: 460 });
     expect(pendingFrame).not.toBeNull();
     act(() => pendingFrame?.(performance.now()));
-    await waitFor(() => expect(resizeQueryHeight).toHaveBeenCalledWith(
+    await waitFor(() => expect(resizeQuery).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'update' }),
     ));
     await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '400'));
@@ -2813,8 +2825,27 @@ describe('QueryApp', () => {
 
     fireEvent.blur(window);
     fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 5, screenY: 400 });
-    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
+    expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
     raf.mockRestore();
+  });
+
+  it('includes the final two-axis pointer movement even when the resize frame has not run', async () => {
+    const user = userEvent.setup();
+    render(<QueryApp />);
+    openQuerySession(4);
+    await searchCleanser(user);
+    const corner = screen.getByTestId('query-resize-bottom-right');
+    function firePointer(type: string, x: number, y: number, buttons: number) {
+      const event = new MouseEvent(type, { bubbles: true, screenX: x, screenY: y, buttons });
+      Object.defineProperty(event, 'pointerId', { value: 8 });
+      fireEvent(corner, event);
+    }
+    firePointer('pointerdown', 630, 410, 1);
+    firePointer('pointermove', 670, 440, 1);
+    firePointer('pointerup', 675, 446, 0);
+    expect(resizeQuery).toHaveBeenCalledWith(expect.objectContaining({ type: 'begin', direction: 'bottom-right' }));
+    expect(resizeQuery).toHaveBeenCalledWith(expect.objectContaining({ type: 'end', deltaX: 45, deltaY: 36 }));
+    expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'end')).toHaveLength(1);
   });
 
   it('applies a matching fallback ACK then lets the next natural layout succeed', async () => {
@@ -2848,6 +2879,7 @@ describe('QueryApp', () => {
           phase: 'EMPTY',
           resultCount: 0,
           height: 240,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2863,6 +2895,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 430,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2881,6 +2914,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 620,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2896,6 +2930,7 @@ describe('QueryApp', () => {
           phase: 'RESULTS',
           resultCount: 3,
           height: 340,
+          width: 600,
           resizeEdge: 'bottom',
         });
       }
@@ -2914,6 +2949,7 @@ describe('QueryApp', () => {
       phase: request.phase,
       resultCount: request.resultCount,
       height: 480,
+      width: 600,
       resizeEdge: 'bottom' as const,
     }));
     await user.click(screen.getByTestId('search-button'));
@@ -2927,7 +2963,7 @@ describe('QueryApp', () => {
 
   it('cancels immediately on lostpointercapture even when buttons is still 1', async () => {
     let liveHeight = 312;
-    resizeQueryHeight.mockImplementation(async (request: {
+    resizeQuery.mockImplementation(async (request: {
       type: string;
       sessionId: number;
       sequence: number;
@@ -2945,6 +2981,7 @@ describe('QueryApp', () => {
         phase: 'RESULTS' as const,
         resultCount: 3 as const,
         height: liveHeight,
+        width: 600,
         resizeEdge: 'bottom' as const,
       };
     });
@@ -2980,15 +3017,43 @@ describe('QueryApp', () => {
     await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '312'));
     fireEvent.pointerUp(grip, { pointerId: 8, buttons: 0 });
     fireEvent.blur(window);
-    expect(resizeQueryHeight.mock.calls.filter((call) => (
+    expect(resizeQuery.mock.calls.filter((call) => (
       call[0].type === 'cancel' || call[0].type === 'end'
     ))).toHaveLength(1);
     expect(captured.has(8)).toBe(false);
 
     fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 9, screenY: 400 });
-    expect(resizeQueryHeight.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
+    expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
     raf.mockRestore();
   });
+  it('refreshes failed FAQ shop discovery without submitting the question again', async () => {
+    const user = userEvent.setup();
+    connectProduct();
+    const context = { ok: true as const, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' };
+    const access = vi.fn()
+      .mockResolvedValueOnce({ ok: false, code: 'FORBIDDEN', message: '店铺读取失败。' })
+      .mockResolvedValue(context);
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [] });
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn(), access, selectConditions: vi.fn(), selectShop: vi.fn(), search,
+      copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+    };
+    render(<QueryApp intake />);
+    activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    const input = screen.getByTestId('question-input');
+    await user.type(input, '合成客户问题{Enter}');
+    const error = await screen.findByTestId('error-state');
+    expect(error).toHaveTextContent('店铺读取失败。');
+    await user.click(within(error).getByRole('button', { name: '刷新店铺' }));
+    await waitFor(() => expect(access).toHaveBeenCalledTimes(2));
+    expect(search).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    expect(input).toHaveValue('合成客户问题');
+    await user.click(screen.getByTestId('search-button'));
+    await waitFor(() => expect(search).toHaveBeenCalledOnce());
+  });
+
   it.each(['success', 'rejected', 'thrown'] as const)('settles FAQ filter waits after %s and permits an explicit recovered query', async outcome => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
@@ -3010,7 +3075,7 @@ describe('QueryApp', () => {
       copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
     };
     render(<QueryApp intake />); activateQuery();
-    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toHaveClass('intake-filter-toggle'));
+    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '筛选' }));
     await user.click(await screen.findByText('商品 · 全部'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成客户问题' } });
@@ -3038,6 +3103,93 @@ describe('QueryApp', () => {
     expect(screen.getByTestId('search-button')).toBeEnabled();
     await user.click(screen.getByTestId('search-button'));
     await waitFor(() => expect(search).toHaveBeenCalledWith(expect.objectContaining({ queryText: '合成客户问题' })));
+  });
+
+
+  it.each(['FAQ failed', 'FAQ empty'] as const)('keeps SOP actionable when %s', async outcome => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const faq = deferred<unknown>();
+    const search = vi.fn().mockReturnValue(faq.promise);
+    const open = vi.fn().mockResolvedValue({ ok: true, opened: true });
+    let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn(), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn(), decideNotice: vi.fn(),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(), search, copy: vi.fn(),
+      cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+      onSopCandidates: listener => { receive = listener; return () => {}; },
+      openSopCandidate: open,
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问句' } });
+    await user.click(screen.getByTestId('search-button'));
+    const contextId = search.mock.calls[0]![0].contextId;
+    const key = '29454f4e-75cf-4d3c-a64a-90e8d161806e';
+    if (outcome === 'FAQ empty') {
+      act(() => receive({ contextId, status: 'searching' }));
+      await act(async () => faq.resolve({ ok: true, rows: [] }));
+      expect(await screen.findByText('正在查找 SOP 候选…')).toBeVisible();
+      expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+    }
+    act(() => receive({ contextId, candidates: [{ key, label: '合成换货流程' }] }));
+    const candidate = await screen.findByRole('button', { name: '合成换货流程' });
+    expect(candidate).toBeEnabled();
+    expect(open).not.toHaveBeenCalled();
+    if (outcome === 'FAQ failed') {
+      await act(async () => faq.resolve(intakeQueryFailure('UNAVAILABLE')));
+      expect(await screen.findByText('查询未完成')).toBeVisible();
+    } else {
+      expect(await screen.findByText('没有匹配的 FAQ 话术，可选择下方 SOP 办理。')).toBeVisible();
+      expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+    }
+    expect(candidate).toBeVisible();
+    await user.click(candidate);
+    expect(open).toHaveBeenCalledExactlyOnceWith({ key });
+
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '下一问' } });
+    act(() => receive({ contextId, candidates: [{ key, label: '旧问句的迟到结果' }] }));
+    expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
+  });
+
+  it('shows FAQ before SOP and keeps its copy action after candidate discovery fails', async () => {
+    const user = userEvent.setup();
+    const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
+      userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
+      expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [{ kind: 'intake', key: 'faq-key', rank: 1, title: '合成话术',
+      answerText: '合成话术正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    const copy = vi.fn().mockResolvedValue({ ok: true, copied: true });
+    let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
+    window.customerAgent!.product = {
+      sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn(), logout: vi.fn(), onSessionChanged: () => () => {},
+      currentNotice: vi.fn(), decideNotice: vi.fn(),
+    };
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
+      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
+      selectConditions: vi.fn(), selectShop: vi.fn(), search, copy,
+      cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+      onSopCandidates: listener => { receive = listener; return () => {}; },
+    };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问句' } });
+    await user.click(screen.getByTestId('search-button'));
+    const copyButton = await screen.findByTestId('copy-button-1');
+    expect(copyButton).toBeVisible();
+    expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
+    act(() => receive({ contextId: search.mock.calls[0]![0].contextId, status: 'unavailable' }));
+    expect(await screen.findByText('SOP 候选暂不可用，请重新查询。')).toBeVisible();
+    await user.click(copyButton);
+    expect(copy).toHaveBeenCalledExactlyOnceWith({ key: 'faq-key' });
   });
 
   it('keeps FAQ notice visible, ignores stale results and lets a fresh query survive old expiry', async () => {

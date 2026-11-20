@@ -48,6 +48,7 @@ import { isTestHarnessEnabled } from './overlay-test-harness';
 import { registerClipboardIpc } from './clipboard-ipc';
 import { registerOverlayIpc } from './overlay-ipc';
 import { SopWindowController } from './sop-window-controller';
+import { SopInstanceWindows } from './sop-instance-windows';
 import { registerSopWindowIpc } from './sop-window-ipc';
 import { sopWorkAreaForQuery } from '../shared/sop-geometry';
 import { applySessionSecurity } from './window-security';
@@ -108,7 +109,8 @@ if (!gotLock) {
   const shuttingDown = createShutdownFence();
   let controller: OverlayController | null = null;
   let sopController: SopWindowController | null = null;
-  let sopQuery: SopQueryRuntime | SopUnifiedRuntime | null = null;
+  let sopInstances: SopInstanceWindows | null = null;
+  let sopQuery: SopQueryRuntime | null = null;
   let desktopShell: DesktopShell | null = null;
   let controllerReady = false;
   let productSession: ProductSession | null = null;
@@ -178,6 +180,7 @@ if (!gotLock) {
     desktopShell = null;
     outgoing?.dispose();
     sopController = null;
+    sopInstances = null;
   };
 
   app.on('second-instance', () => {
@@ -222,12 +225,14 @@ if (!gotLock) {
     const testAccelerator = isTestHarnessEnabled()
       ? process.env.DEMO_E2E_ACCELERATOR
       : undefined;
-    sopController = new SopWindowController({
+    const instanceProfile = productProfile?.sopQuery === 'menokin-sop-unified-v12';
+    const candidateProfile = instanceProfile && productProfile.sopCandidateContractSet !== undefined;
+    const sopWindowOptions: ConstructorParameters<typeof SopWindowController>[0] = {
       legacyEnabled: productProfile === undefined,
       rendererDevServerUrl: () => controller?.rendererDevServerUrl,
       queryBounds: () => controller?.queryWindowBounds() ?? null,
-      workArea: () => sopWorkAreaForQuery(
-        controller?.queryWindowBounds() ?? null,
+      workArea: reference => sopWorkAreaForQuery(
+        reference ?? controller?.queryWindowBounds() ?? null,
         screen.getPrimaryDisplay().workArea,
         (query) => screen.getDisplayMatching(query).workArea,
       ),
@@ -235,15 +240,22 @@ if (!gotLock) {
         const view = productSession?.view();
         return view?.ok && view.signedIn ? view.role : null;
       },
-    });
+    };
+    if (!instanceProfile) sopController = new SopWindowController(sopWindowOptions);
     const next = new OverlayController({
       dashboardEnabled: true,
       fence: shuttingDown,
       rendererDevServerUrl,
       runningPoint: runningPointFromResolvedSession(productProfile, app.isPackaged),
       ...(testAccelerator ? { accelerator: testAccelerator } : {}),
-      onDispose: () => sopController?.destroy(),
-      onDashboardShown: () => sopController?.hideRememberingProgress(),
+      onDispose: () => {
+        sopInstances?.destroy();
+        sopController?.destroy();
+      },
+      onDashboardShown: () => {
+        sopInstances?.hide();
+        sopController?.hideRememberingProgress();
+      },
     });
     controller = next;
     registerClipboardIpc(
@@ -255,7 +267,9 @@ if (!gotLock) {
     registerOverlayIpc(() => controller);
     registerSopWindowIpc({
       getOverlay: () => controller,
-      getSop: () => sopController,
+      getSop: () => sopInstances ?? sopController,
+      getSopForContents: (contents) => sopInstances?.fromContents(contents)
+        ?? (sopController?.isSopContents(contents) ? sopController : null),
     });
     const identityOrigin = productProfile?.identityOrigin;
     if (productProfile) {
@@ -282,15 +296,24 @@ if (!gotLock) {
       );
       await productSession.restore();
       if (productProfile.sopQuery && productProfile.mode === 'synthetic-local') {
-        sopQuery = productProfile.sopQuery !== 'menokin-sop-query-v1'
-          ? new SopUnifiedRuntime(new SopUnifiedPort(productSession, decodeSopImage,
-            productProfile.sopQuery === 'menokin-sop-unified-v12' ? 'v12' : 'v11'), text => clipboard.writeText(text), signal => {
-            const contents = controller?.trustedContents().find(value => controller?.overlayRoleOf(value) === 'query');
-            if (!intakeQuery || !contents) throw new Error('SOP_SELECTION_REQUIRED');
-            return intakeQuery.qualifySop(contents, signal);
-          })
-          : new SopQueryRuntime(productSession, text => clipboard.writeText(text));
-        sopController.setQueryRuntime(sopQuery);
+        const writeClipboard = (text: string) => clipboard.writeText(text);
+        if (instanceProfile) {
+          const port = new SopUnifiedPort(productSession, decodeSopImage, 'v12');
+          sopInstances = new SopInstanceWindows(productSession, (instance, candidate) => {
+            const window = new SopWindowController({ ...sopWindowOptions, instance });
+            window.setQueryRuntime(new SopUnifiedRuntime(port, writeClipboard, signal => {
+              const contents = controller?.trustedContents().find(value => controller?.overlayRoleOf(value) === 'query');
+              if (!intakeQuery || !contents) throw new Error('SOP_SELECTION_REQUIRED');
+              return intakeQuery.qualifySop(contents, signal);
+            }, candidate));
+            return window;
+          });
+        } else if (productProfile.sopQuery === 'menokin-sop-query-v1') {
+          sopQuery = new SopQueryRuntime(productSession, writeClipboard);
+          sopController?.setQueryRuntime(sopQuery);
+        } else {
+          sopController?.setQueryRuntime(new SopUnifiedRuntime(new SopUnifiedPort(productSession, decodeSopImage), writeClipboard));
+        }
       }
     }
     if (productSession) {
@@ -333,8 +356,9 @@ if (!gotLock) {
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl, () => {
         // Legacy Query context changes do not own the independent v11 continuation.
-        if (sopQuery instanceof SopQueryRuntime) sopQuery.invalidate();
-      }, productProfile?.sopQuery === 'menokin-sop-unified-v12');
+        sopQuery?.invalidate();
+      }, instanceProfile, candidateProfile ? async candidate =>
+        await sopInstances?.openCandidate(candidate) ?? false : undefined);
     // The shared Fox still reads unread in FAQ mode. A null service supplies the
     // existing unavailable projection without creating legacy I/O or missing IPC.
     registerProductAnnounceIpc(productAnnounce, () => controller?.trustedContents() ?? [],
@@ -410,6 +434,7 @@ if (!gotLock) {
     }
     desktopShell = installDesktopShell({
       controller: next,
+      sopResume: sopInstances ?? undefined,
       quit: () => {
         app.quit();
       },

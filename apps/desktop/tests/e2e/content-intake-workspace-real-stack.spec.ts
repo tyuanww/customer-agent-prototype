@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication } from '@playwright/test';
 import { waitForFocusedWindow } from '../support/electron-focus';
 import { closeOwnedElectron } from '../support/owned-electron';
+import { publishPreparedFaq } from '../support/publish-prepared-faq';
 import { launchIntakeElectron } from '../support/intake-electron';
 
 const domains = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
@@ -13,7 +14,6 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
   test(`unified workspace reads the qualified ${domain} publication without legacy content adapters or Query selection coupling`, async () => {
     test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit synthetic PG15/Electron gate');
     test.setTimeout(120_000);
-    const { parseContractSchema } = await import('../../../../packages/contracts/dist/index.js');
     const { createIntakeSyntheticHost, INTAKE_SYNTHETIC_FAQ } = await import('../../../api/tests/support/intake-synthetic-host.ts');
     const host = await createIntakeSyntheticHost({ profile: 'purpose-runtime', domain });
     const directory = mkdtempSync(path.join(tmpdir(), 'intake-workspace-electron-'));
@@ -22,29 +22,8 @@ for (const [domain, label] of Object.entries(domains) as [keyof typeof domains, 
     mkdirSync(evidence, { recursive: true });
     let app: ElectronApplication | undefined;
     const errors: string[] = [];
-    async function json(response: Response) {
-      const value: unknown = await response.json(); expect(response.ok, JSON.stringify(value)).toBe(true); return value;
-    }
-    const url = `/v1/intake/candidates/${host.candidate.key.candidateId}/versions/${host.candidate.key.version}`;
-    const post = async (suffix: string, body: unknown) => json(await host.requestAs('enabler', `${url}/${suffix}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-    }));
     try {
-      const key = host.candidate.key;
-      // The producer uses real HTTP and the formal restricted business pool.
-      // This case tests the published downstream artifact, not new publication UI.
-      await post('source-confirmation', { operationId: 'workspace-source', key, expectedEvidenceVersion: 0,
-        confirmedVersionKind: 'opaque', confirmedVersionValue: 'synthetic-workspace-export', acquisition: 'controlled-synthetic-export',
-        objectSha256: host.object.sha256, reason: '合成工作台验收来源' });
-      await post('quality/freeze', { operationId: 'workspace-freeze', key });
-      const quality = parseContractSchema('IntakeQualityStatus', await json(await host.requestAs('enabler', `${url}/quality?digest=${key.digest}`)));
-      const samples = parseContractSchema('IntakeQualitySamplePage', await json(await host.requestAs('enabler', `${url}/quality/samples?${new URLSearchParams({ digest: key.digest, viewHash: quality.viewHash, phase: 'initial', limit: '100' })}`)));
-      expect(samples.nextCursor).toBeNull(); expect(samples.items).toHaveLength(3);
-      await post('quality/checks', { operationId: 'workspace-checks', key, phase: 'initial',
-        checks: samples.items.map(row => ({ scriptId: row.scriptId, contentHash: row.contentHash, defect: false, reason: '' })) });
-      const receipt = parseContractSchema('IntakeReceipt', await post('publish', { operationId: 'workspace-publish', key,
-        baseReleaseId: 'rel_native_base', sourceEvidenceVersion: 1, confirmed: true, title: '合成工作台发布', summary: domain }));
-      expect(receipt.state).toBe('published');
+      await publishPreparedFaq(host, domain);
       host.selectIdentity('agent');
       app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
         apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });

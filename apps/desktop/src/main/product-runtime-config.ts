@@ -1,3 +1,4 @@
+import { SOP_CANDIDATE_CONTRACT_SET_ID } from '@customer-agent/contracts/sop-candidates';
 import { SOP_RESOURCE_CONTRACT, SOP_UNIFIED_CONTRACT } from '../shared/sop-unified';
 import { readFileSync, lstatSync, writeFileSync, type Stats } from 'node:fs';
 import path from 'node:path';
@@ -51,6 +52,7 @@ export type PackagedProductProfile = Readonly<{
   contentIntake?: 'faq-v2';
   sopQuery?: 'menokin-sop-query-v1' | 'menokin-sop-unified-v11' | 'menokin-sop-unified-v12';
   sopContractSet?: typeof SOP_UNIFIED_CONTRACT | typeof SOP_RESOURCE_CONTRACT;
+  sopCandidateContractSet?: typeof SOP_CANDIDATE_CONTRACT_SET_ID;
 }>;
 
 export function projectIntakeShellLine(
@@ -179,6 +181,8 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
   if ('sopQuery' in record && (!['menokin-sop-query-v1', 'menokin-sop-unified-v11', 'menokin-sop-unified-v12'].includes(String(record.sopQuery)) || record.mode !== MODE || record.contentIntake !== 'faq-v2')) return { ok: false, kind: 'invalid' };
   if (record.sopQuery === 'menokin-sop-unified-v12' ? record.sopContractSet !== SOP_RESOURCE_CONTRACT
     : record.sopQuery === 'menokin-sop-unified-v11' ? record.sopContractSet !== SOP_UNIFIED_CONTRACT : 'sopContractSet' in record) return { ok: false, kind: 'invalid' };
+  if ('sopCandidateContractSet' in record && (record.sopQuery !== 'menokin-sop-unified-v12'
+    || record.sopCandidateContractSet !== SOP_CANDIDATE_CONTRACT_SET_ID)) return { ok: false, kind: 'invalid' };
   if (record.mode === OFFLINE_MODE) {
     const keys = Object.keys(record);
     if (keys.length !== 1 || keys[0] !== 'mode') return { ok: false, kind: 'invalid' };
@@ -203,6 +207,7 @@ function parsePackagedProductProfile(userDataDirectory: string): PackagedProfile
     ...(record.contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
     ...(record.sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}),
     ...(record.sopQuery === 'menokin-sop-unified-v12' ? { sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: SOP_RESOURCE_CONTRACT } : {}),
+    ...(record.sopCandidateContractSet === SOP_CANDIDATE_CONTRACT_SET_ID ? { sopCandidateContractSet: SOP_CANDIDATE_CONTRACT_SET_ID } : {}),
     ...(record.sopQuery === 'menokin-sop-unified-v11' ? { sopQuery: 'menokin-sop-unified-v11' as const, sopContractSet: SOP_UNIFIED_CONTRACT } : {}) }) };
 }
 
@@ -299,6 +304,9 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
   const sopContractSet = environment.CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET;
   if (sopQuery === 'menokin-sop-unified-v12' ? sopContractSet !== SOP_RESOURCE_CONTRACT
     : sopQuery === 'menokin-sop-unified-v11' ? sopContractSet !== SOP_UNIFIED_CONTRACT : sopContractSet !== undefined) throw new Error('SOP unified requires exact deployed contract set');
+  const sopCandidateContractSet = environment.CUSTOMER_AGENT_DESKTOP_SOP_CANDIDATE_CONTRACT_SET;
+  if (sopCandidateContractSet !== undefined && (sopQuery !== 'menokin-sop-unified-v12'
+    || sopCandidateContractSet !== SOP_CANDIDATE_CONTRACT_SET_ID)) throw new Error('SOP candidates require the exact W5 contract set and v12 profile');
   const loopbackApi = loopbackOrigin(apiOrigin);
   const loopbackIdentity = loopbackOrigin(identityOrigin);
   if (contentIntake !== undefined && (contentIntake !== 'faq-v2'
@@ -320,5 +328,6 @@ export function developmentProductProfile(environment: NodeJS.ProcessEnv): Packa
     ...(contentIntake === 'faq-v2' ? { contentIntake: 'faq-v2' as const } : {}),
     ...(sopQuery === 'menokin-sop-query-v1' ? { sopQuery: 'menokin-sop-query-v1' as const } : {}),
     ...(sopQuery === 'menokin-sop-unified-v12' ? { sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: SOP_RESOURCE_CONTRACT } : {}),
+    ...(sopCandidateContractSet === SOP_CANDIDATE_CONTRACT_SET_ID ? { sopCandidateContractSet } : {}),
     ...(sopQuery === 'menokin-sop-unified-v11' ? { sopQuery: 'menokin-sop-unified-v11' as const, sopContractSet: SOP_UNIFIED_CONTRACT } : {}) });
 }

@@ -15,9 +15,11 @@ import {
   type Rect,
   type Size,
 } from './overlay-geometry';
+import { isWindowResizeDirection, resizeRectFromEdge, type WindowResizeDirection } from './window-resize-geometry';
 
 export const QUERY_LAYOUT_MIN_HEIGHT = QUERY_PANEL_MIN_HEIGHT;
 export const QUERY_LAYOUT_MAX_HEIGHT = QUERY_PANEL_MAX_HEIGHT;
+export const QUERY_LAYOUT_MIN_WIDTH = 360;
 export const QUERY_RESIZE_STEP = 8;
 export const QUERY_RESIZE_STEP_LARGE = 24;
 export const QUERY_CONTENT_BLANK_TOLERANCE_PX = 12;
@@ -31,6 +33,7 @@ const QUERY_LAYOUT_ACK_KEYS = [
   'phase',
   'resultCount',
   'height',
+  'width',
   'resizeEdge',
 ] as const;
 const QUERY_LAYOUT_ACK_COMMAND_KEYS = [
@@ -40,20 +43,19 @@ const QUERY_LAYOUT_ACK_COMMAND_KEYS = [
   'phase',
   'resultCount',
   'height',
+  'width',
   'resizeEdge',
 ] as const;
-const QUERY_RESIZE_BEGIN_KEYS = ['type', 'sessionId', 'sequence', 'identity'] as const;
-const QUERY_RESIZE_UPDATE_KEYS = ['type', 'sessionId', 'sequence', 'deltaY', 'identity'] as const;
-const QUERY_RESIZE_KEYBOARD_KEYS = ['type', 'sessionId', 'sequence', 'key', 'shiftKey', 'identity'] as const;
+const QUERY_RESIZE_KEYS = ['type', 'sessionId', 'sequence', 'identity'] as const;
 
 function hasExactKeys(value: object, keys: readonly string[]): boolean {
   const actual = Object.keys(value);
   return actual.length === keys.length && keys.every((key) => actual.includes(key));
 }
 
-export type QueryResizeEdge = 'top' | 'bottom';
+export type QueryResizeEdge = Extract<WindowResizeDirection, 'top' | 'bottom'>;
 export type QueryChromeHandoffMode = 'preparing-open' | 'opening' | 'closing' | null;
-export type QueryResizeKey = 'ArrowUp' | 'ArrowDown' | 'Home' | 'End';
+export type QueryResizeKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';
 
 export type QueryLayoutRequest = {
   sessionId: number;
@@ -70,6 +72,7 @@ type QueryLayoutAckFields = {
   phase: ReportablePhase;
   resultCount: ResultCount;
   height: number;
+  width: number;
   resizeEdge: QueryResizeEdge;
 };
 
@@ -84,37 +87,25 @@ export type QueryLayoutAckCommand = {
   phase: ReportablePhase;
   resultCount: ResultCount;
   height: number;
+  width: number;
   resizeEdge: QueryResizeEdge;
 };
 
-export type QueryResizeRequest =
-  | {
-      type: 'begin';
-      sessionId: number;
-      sequence: number;
-      identity: OverlayReportIdentity;
-    }
-  | {
-      type: 'update';
-      sessionId: number;
-      sequence: number;
-      deltaY: number;
-      identity: OverlayReportIdentity;
-    }
-  | {
-      type: 'end' | 'cancel';
-      sessionId: number;
-      sequence: number;
-      identity: OverlayReportIdentity;
-    }
-  | {
-      type: 'keyboard';
-      sessionId: number;
-      sequence: number;
-      key: QueryResizeKey;
-      shiftKey: boolean;
-      identity: OverlayReportIdentity;
-    };
+export type QueryResizeDelta = { deltaX: number; deltaY: number };
+
+export type QueryResizeRequest = {
+  sessionId: number;
+  sequence: number;
+  identity: OverlayReportIdentity;
+} & (
+  | { type: 'begin'; direction: WindowResizeDirection }
+  | ({ type: 'update' | 'end' } & QueryResizeDelta)
+  | { type: 'cancel' }
+  | ({ type: 'keyboard'; shiftKey: boolean } & (
+      | { axis: 'height'; key: 'ArrowUp' | 'ArrowDown' | 'Home' | 'End' }
+      | { axis: 'width'; key: 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End' }
+    ))
+);
 
 export function isQueryResizeEdge(value: unknown): value is QueryResizeEdge {
   return value === 'top' || value === 'bottom';
@@ -161,57 +152,38 @@ export function isQueryResizeRequest(value: unknown): value is QueryResizeReques
   if (!value || typeof value !== 'object') {
     return false;
   }
-  const record = value as { type?: unknown };
+  const request = value as Record<string, unknown>;
   if (
-    record.type === 'begin' ||
-    record.type === 'end' ||
-    record.type === 'cancel'
+    !isQueryLayoutSessionId(request.sessionId)
+    || !isQueryLayoutSequence(request.sequence)
+    || !isOverlayReportIdentity(request.identity)
   ) {
-    const request = value as { sessionId?: unknown; sequence?: unknown; identity?: unknown };
-    return (
-      hasExactKeys(value, QUERY_RESIZE_BEGIN_KEYS) &&
-      isQueryLayoutSessionId(request.sessionId) &&
-      isQueryLayoutSequence(request.sequence) &&
-      isOverlayReportIdentity(request.identity)
-    );
+    return false;
   }
-  if (record.type === 'update') {
-    const request = value as {
-      sessionId?: unknown;
-      sequence?: unknown;
-      deltaY?: unknown;
-      identity?: unknown;
-    };
-    return (
-      hasExactKeys(value, QUERY_RESIZE_UPDATE_KEYS) &&
-      isQueryLayoutSessionId(request.sessionId) &&
-      isQueryLayoutSequence(request.sequence) &&
-      isFiniteQueryInteger(request.deltaY) &&
-      Math.abs(request.deltaY) <= 4096 &&
-      isOverlayReportIdentity(request.identity)
-    );
+  switch (request.type) {
+    case 'begin':
+      return hasExactKeys(value, [...QUERY_RESIZE_KEYS, 'direction'])
+        && isWindowResizeDirection(request.direction);
+    case 'update':
+    case 'end':
+      return hasExactKeys(value, [...QUERY_RESIZE_KEYS, 'deltaX', 'deltaY'])
+        && isQueryResizeDelta(request.deltaX)
+        && isQueryResizeDelta(request.deltaY);
+    case 'cancel':
+      return hasExactKeys(value, QUERY_RESIZE_KEYS);
+    case 'keyboard':
+      return hasExactKeys(value, [...QUERY_RESIZE_KEYS, 'axis', 'key', 'shiftKey'])
+        && typeof request.shiftKey === 'boolean'
+        && (request.axis === 'width'
+          ? request.key === 'ArrowLeft' || request.key === 'ArrowRight' || request.key === 'Home' || request.key === 'End'
+          : request.axis === 'height' && (request.key === 'ArrowUp' || request.key === 'ArrowDown' || request.key === 'Home' || request.key === 'End'));
+    default:
+      return false;
   }
-  if (record.type === 'keyboard') {
-    const request = value as {
-      sessionId?: unknown;
-      sequence?: unknown;
-      key?: unknown;
-      shiftKey?: unknown;
-      identity?: unknown;
-    };
-    return (
-      hasExactKeys(value, QUERY_RESIZE_KEYBOARD_KEYS) &&
-      isQueryLayoutSessionId(request.sessionId) &&
-      isQueryLayoutSequence(request.sequence) &&
-      (request.key === 'ArrowUp' ||
-        request.key === 'ArrowDown' ||
-        request.key === 'Home' ||
-        request.key === 'End') &&
-      typeof request.shiftKey === 'boolean' &&
-      isOverlayReportIdentity(request.identity)
-    );
-  }
-  return false;
+}
+
+function isQueryResizeDelta(value: unknown): value is number {
+  return isFiniteQueryInteger(value) && Math.abs(value) <= 4096;
 }
 
 export function acceptQueryLayoutSequence(current: number, incoming: number): boolean {
@@ -243,7 +215,8 @@ export function isQueryLayoutAck(value: unknown): value is QueryLayoutAck {
       record.resultCount === 3) &&
     isFiniteQueryInteger(record.height) &&
     record.height > 0 &&
-    record.height <= 4096 &&
+    isFiniteQueryInteger(record.width) &&
+    record.width > 0 &&
     isQueryResizeEdge(record.resizeEdge)
   );
 }
@@ -360,7 +333,11 @@ export function clampQueryDesiredHeight(
   desiredHeight: number,
   availableHeight: number,
 ): number {
-  const maxHeight = Math.max(1, Math.min(QUERY_LAYOUT_MAX_HEIGHT, Math.floor(availableHeight)));
+  return clampQueryHeight(desiredHeight, Math.min(availableHeight, QUERY_LAYOUT_MAX_HEIGHT));
+}
+
+function clampQueryHeight(desiredHeight: number, availableHeight: number): number {
+  const maxHeight = Math.max(1, Math.floor(availableHeight));
   const minHeight = Math.min(QUERY_LAYOUT_MIN_HEIGHT, maxHeight);
   if (!Number.isFinite(desiredHeight)) {
     return minHeight;
@@ -386,9 +363,9 @@ export function fallbackQuerySizeForPhase(
 export function effectiveQuerySize(input: {
   phase: OverlayPhase;
   resultCount?: ResultCount;
-  workArea?: Pick<Rect, 'height'>;
+  workArea?: Size;
   measuredHeight?: number | null;
-  manualHeight?: number | null;
+  manualSize?: Size | null;
 }): Size {
   if (input.phase === 'FOX_IDLE') {
     return preferredQuerySizeForPhase(input.phase);
@@ -397,14 +374,45 @@ export function effectiveQuerySize(input: {
     return preferredQuerySizeForPhase(input.phase);
   }
   const available = input.workArea ? availableOverlayHeight(input.workArea) : QUERY_LAYOUT_MAX_HEIGHT;
-  const chosen = input.manualHeight ?? input.measuredHeight;
-  if (typeof chosen === 'number' && Number.isFinite(chosen)) {
+  if (input.manualSize) {
+    return {
+      width: clampQueryDesiredWidth(input.manualSize.width, input.workArea ? availableQueryWidth(input.workArea) : Infinity),
+      height: clampQueryHeight(input.manualSize.height, available),
+    };
+  }
+  if (typeof input.measuredHeight === 'number' && Number.isFinite(input.measuredHeight)) {
     return {
       width: QUERY_WIDTH,
-      height: clampQueryDesiredHeight(chosen, available),
+      height: clampQueryDesiredHeight(input.measuredHeight, available),
     };
   }
   return fallbackQuerySizeForPhase(input.phase, input.resultCount ?? 0, input.workArea);
+}
+
+function availableQueryWidth(workArea: Pick<Size, 'width'>): number {
+  return Math.max(1, workArea.width - SCREEN_MARGIN * 2);
+}
+
+export function clampQueryDesiredWidth(desiredWidth: number, availableWidth: number): number {
+  const maxWidth = Math.max(1, Math.floor(availableWidth));
+  return Math.round(Math.min(maxWidth, Math.max(Math.min(QUERY_LAYOUT_MIN_WIDTH, maxWidth), desiredWidth)));
+}
+
+/** Resizing one edge retains the position of the opposite edge. Deltas are from pointer down. */
+export function applyQueryResize(
+  baseline: Rect,
+  direction: WindowResizeDirection,
+  delta: QueryResizeDelta,
+  workArea: Rect,
+): Rect {
+  return resizeRectFromEdge({
+    baseline,
+    bounds: workArea,
+    direction,
+    ...delta,
+    minSize: { width: QUERY_LAYOUT_MIN_WIDTH, height: QUERY_LAYOUT_MIN_HEIGHT },
+    maxSize: { width: availableQueryWidth(workArea), height: availableOverlayHeight(workArea) },
+  });
 }
 
 export function resolveQueryResizeEdge(
@@ -451,7 +459,7 @@ export function applyQueryVerticalResize(
     return {
       x: query.x,
       y: Math.round(y),
-      width: QUERY_WIDTH,
+      width: query.width,
       height,
     };
   }
@@ -463,7 +471,7 @@ export function applyQueryVerticalResize(
   return {
     x: query.x,
     y: query.y,
-    width: QUERY_WIDTH,
+    width: query.width,
     height,
   };
 }
@@ -479,7 +487,7 @@ export function queryResizeDeltaForKey(
     return 'max';
   }
   const step = shiftKey ? QUERY_RESIZE_STEP_LARGE : QUERY_RESIZE_STEP;
-  return key === 'ArrowDown' ? step : -step;
+  return key === 'ArrowDown' || key === 'ArrowRight' ? step : -step;
 }
 
 export function queryHandoffCenterFromBounds(
@@ -503,6 +511,7 @@ export function acceptedQueryLayoutAck(
   resizeEdge: QueryResizeEdge,
   phase: ReportablePhase,
   resultCount: ResultCount,
+  width = QUERY_WIDTH,
 ): QueryLayoutAck {
   return {
     ok: true,
@@ -511,6 +520,7 @@ export function acceptedQueryLayoutAck(
     phase,
     resultCount,
     height,
+    width,
     resizeEdge,
   };
 }
@@ -522,6 +532,7 @@ export function queryLayoutAckCommand(
   resultCount: ResultCount,
   height: number,
   resizeEdge: QueryResizeEdge,
+  width = QUERY_WIDTH,
 ): QueryLayoutAckCommand {
   return {
     type: 'query-layout-ack',
@@ -530,6 +541,7 @@ export function queryLayoutAckCommand(
     phase,
     resultCount,
     height,
+    width,
     resizeEdge,
   };
 }
@@ -541,6 +553,7 @@ export function rejectedQueryLayoutAck(
   resizeEdge: QueryResizeEdge = 'bottom',
   phase: ReportablePhase = 'SEARCH_INPUT',
   resultCount: ResultCount = 0,
+  width = QUERY_WIDTH,
 ): QueryLayoutAck {
   return {
     ok: false,
@@ -549,6 +562,7 @@ export function rejectedQueryLayoutAck(
     phase,
     resultCount,
     height,
+    width,
     resizeEdge,
   };
 }

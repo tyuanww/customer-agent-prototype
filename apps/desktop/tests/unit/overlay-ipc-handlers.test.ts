@@ -80,6 +80,7 @@ function acceptedAck(
     phase: 'RESULTS',
     resultCount: 3,
     height,
+    width: 600,
     resizeEdge: 'bottom',
   };
 }
@@ -96,7 +97,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
   const reportQueryLayout = vi.fn((request: QueryLayoutRequest) =>
     acceptedAck(request.sessionId, request.sequence, request.desiredHeight),
   );
-  const resizeQueryHeight = vi.fn((request: QueryResizeRequest) =>
+  const resizeQuery = vi.fn((request: QueryResizeRequest) =>
     acceptedAck(request.sessionId, request.sequence, 360),
   );
   const openDashboard = vi.fn<() => Promise<OpenDashboardResult>>().mockResolvedValue({ ok: true });
@@ -125,7 +126,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     trustedContents: () => [query.sender, fox.sender, dashboard.sender],
     overlayRoleOf: (sender: WebContents) => roleById.get(sender.id) ?? null,
     reportQueryLayout,
-    resizeQueryHeight,
+    resizeQuery,
     openDashboard,
     moveBy,
     commitFoxDragSettle,
@@ -144,7 +145,7 @@ function createControllerFixture(options: { testHarness?: boolean } = {}) {
     fox,
     query,
     reportQueryLayout,
-    resizeQueryHeight,
+    resizeQuery,
     openDashboard,
     moveBy,
     commitFoxDragSettle,
@@ -414,7 +415,7 @@ describe('overlay query layout IPC handlers', () => {
     expect(result).toEqual(acceptedAck(11, 3, 344));
     expect(fixture.reportQueryLayout).toHaveBeenCalledOnce();
     expect(fixture.reportQueryLayout).toHaveBeenCalledWith(request);
-    expect(fixture.resizeQueryHeight).not.toHaveBeenCalled();
+    expect(fixture.resizeQuery).not.toHaveBeenCalled();
   });
 
   it('forwards a valid resize request from the trusted query main frame', () => {
@@ -424,18 +425,19 @@ describe('overlay query layout IPC handlers', () => {
       type: 'update',
       sessionId: 11,
       sequence: 4,
+      deltaX: 0,
       deltaY: 24,
       identity: REPORT_IDENTITY,
     };
 
-    const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
+    const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY)(
       fixture.query.event,
       request,
     );
 
     expect(result).toEqual(acceptedAck(11, 4, 360));
-    expect(fixture.resizeQueryHeight).toHaveBeenCalledOnce();
-    expect(fixture.resizeQueryHeight).toHaveBeenCalledWith(request);
+    expect(fixture.resizeQuery).toHaveBeenCalledOnce();
+    expect(fixture.resizeQuery).toHaveBeenCalledWith(request);
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
   });
 
@@ -463,7 +465,7 @@ describe('overlay query layout IPC handlers', () => {
 
     expectRejectedAck(result, { sessionId: 21, sequence: 8 });
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
-    expect(fixture.resizeQueryHeight).not.toHaveBeenCalled();
+    expect(fixture.resizeQuery).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -479,15 +481,16 @@ describe('overlay query layout IPC handlers', () => {
     registerOverlayIpc(() => fixture.controller);
     const request: QueryResizeRequest = {
       type: 'begin',
+      direction: 'bottom-right',
       sessionId: 22,
       sequence: 9,
       identity: REPORT_IDENTITY,
     };
 
-    const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(eventFor(fixture), request);
+    const result = capturedHandler(IPC_CHANNELS.RESIZE_QUERY)(eventFor(fixture), request);
 
     expectRejectedAck(result, { sessionId: 22, sequence: 9 });
-    expect(fixture.resizeQueryHeight).not.toHaveBeenCalled();
+    expect(fixture.resizeQuery).not.toHaveBeenCalled();
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
   });
 
@@ -496,23 +499,25 @@ describe('overlay query layout IPC handlers', () => {
     registerOverlayIpc(() => fixture.controller);
 
     for (const deltaY of [-4096, 4096]) {
-      fixture.resizeQueryHeight.mockClear();
-      const accepted = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
+      fixture.resizeQuery.mockClear();
+      const accepted = capturedHandler(IPC_CHANNELS.RESIZE_QUERY)(
         fixture.query.event,
         {
           type: 'update',
           sessionId: 30,
           sequence: 11,
+          deltaX: 0,
           deltaY,
           identity: REPORT_IDENTITY,
         },
       );
       expect(accepted).toEqual(acceptedAck(30, 11, 360));
-      expect(fixture.resizeQueryHeight).toHaveBeenCalledOnce();
-      expect(fixture.resizeQueryHeight).toHaveBeenCalledWith({
+      expect(fixture.resizeQuery).toHaveBeenCalledOnce();
+      expect(fixture.resizeQuery).toHaveBeenCalledWith({
         type: 'update',
         sessionId: 30,
         sequence: 11,
+        deltaX: 0,
         deltaY,
         identity: REPORT_IDENTITY,
       });
@@ -537,18 +542,19 @@ describe('overlay query layout IPC handlers', () => {
     expect(fixture.reportQueryLayout).not.toHaveBeenCalled();
 
     for (const deltaY of [-4097, -0.5, 0.5, 4097, Number.POSITIVE_INFINITY, Number.NaN, '12']) {
-      const resizeResult = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(
+      const resizeResult = capturedHandler(IPC_CHANNELS.RESIZE_QUERY)(
         fixture.query.event,
         {
           type: 'update',
           sessionId: 30,
           sequence: 11,
+          deltaX: 0,
           deltaY,
         },
       );
       expectRejectedAck(resizeResult, { sessionId: 0, sequence: 0 });
     }
-    expect(fixture.resizeQueryHeight).not.toHaveBeenCalled();
+    expect(fixture.resizeQuery).not.toHaveBeenCalled();
   });
 
   it('returns protocol-valid rejected acknowledgements while the controller is unavailable', () => {
@@ -562,8 +568,9 @@ describe('overlay query layout IPC handlers', () => {
       desiredHeight: 360,
         identity: REPORT_IDENTITY,
     });
-    const resize = capturedHandler(IPC_CHANNELS.RESIZE_QUERY_HEIGHT)(query.event, {
+    const resize = capturedHandler(IPC_CHANNELS.RESIZE_QUERY)(query.event, {
       type: 'begin',
+      direction: 'bottom-right',
       sessionId: 40,
       sequence: 13,
       identity: REPORT_IDENTITY,

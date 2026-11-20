@@ -6,7 +6,7 @@ import {
   canCopyText,
   canReportQueryLayout,
   canReportUiPhase,
-  canResizeQueryHeight,
+  canResizeQuery,
   isTrustedQuerySender,
 } from '../../src/shared/query-ipc-access';
 
@@ -20,7 +20,7 @@ describe('trusted query IPC access', () => {
     expect(canReportUiPhase({ trusted: true, role: 'query' })).toBe(true);
     expect(canCopyText({ trusted: true, role: 'query' })).toBe(true);
     expect(canReportQueryLayout({ trusted: true, role: 'query' })).toBe(true);
-    expect(canResizeQueryHeight({ trusted: true, role: 'query' })).toBe(true);
+    expect(canResizeQuery({ trusted: true, role: 'query' })).toBe(true);
   });
 
   it('fails closed for fox, dashboard, unknown, or untrusted senders', () => {
@@ -34,7 +34,7 @@ describe('trusted query IPC access', () => {
       expect(canReportUiPhase(denied)).toBe(false);
       expect(canCopyText(denied)).toBe(false);
       expect(canReportQueryLayout(denied)).toBe(false);
-      expect(canResizeQueryHeight(denied)).toBe(false);
+      expect(canResizeQuery(denied)).toBe(false);
       expect(isTrustedQuerySender(denied)).toBe(false);
     }
   });
@@ -44,10 +44,10 @@ describe('trusted query IPC access', () => {
     expect(overlayIpc).toContain('isTrustedMainFrameSender(');
     expect(overlayIpc).toContain('controller.rendererDevServerUrl');
     expect(overlayIpc).toContain('canReportQueryLayout({ trusted, role })');
-    expect(overlayIpc).toContain('canResizeQueryHeight({ trusted, role })');
+    expect(overlayIpc).toContain('canResizeQuery({ trusted, role })');
     expect(overlayIpc).toContain('IPC_CHANNELS.REPORT_UI_PHASE');
     expect(overlayIpc).toContain('IPC_CHANNELS.REPORT_QUERY_LAYOUT');
-    expect(overlayIpc).toContain('IPC_CHANNELS.RESIZE_QUERY_HEIGHT');
+    expect(overlayIpc).toContain('IPC_CHANNELS.RESIZE_QUERY');
     expect(clipboardIpc).toContain('canCopyText({ trusted, role })');
     expect(clipboardIpc).toContain('IPC_CHANNELS.COPY_TEXT');
     expect(clipboardIpc).not.toContain('GET_PLATFORM');

@@ -65,6 +65,24 @@ export function isIntakeSearchRequest(value: unknown): value is { queryText: str
   return exactKeys(value, ['queryText', 'contextId']) && contextId(value.contextId) && typeof value.queryText === 'string'
     && value.queryText.trim().length > 0 && [...value.queryText].length <= 500;
 }
+export type IntakeSopCandidate = { key: string; label: string };
+export type IntakeSopCandidatesEvent = { contextId: string } & (
+  | { candidates: IntakeSopCandidate[] }
+  | { status: 'searching' | 'unavailable' | 'stale' }
+);
+export function isIntakeSopCandidatesEvent(value: unknown): value is IntakeSopCandidatesEvent {
+  if (exactKeys(value, ['contextId', 'status'])) {
+    return contextId(value.contextId) && (value.status === 'searching' || value.status === 'unavailable' || value.status === 'stale');
+  }
+  return exactKeys(value, ['contextId', 'candidates']) && contextId(value.contextId)
+    && Array.isArray(value.candidates) && value.candidates.length <= 5
+    && value.candidates.every(candidate => exactKeys(candidate, ['key', 'label']) && contextId(candidate.key)
+      && typeof candidate.label === 'string' && candidate.label.trim().length > 0 && [...candidate.label].length <= 512)
+    && new Set(value.candidates.map(candidate => candidate.key)).size === value.candidates.length;
+}
+export function isIntakeSopCandidateRequest(value: unknown): value is { key: string } {
+  return exactKeys(value, ['key']) && contextId(value.key);
+}
 export function isIntakeCopyRequest(value: unknown): value is { key: string } {
   return exactKeys(value, ['key']) && isIntakeText(value.key);
 }
@@ -98,6 +116,9 @@ export type IntakeQueryApi = {
   selectConditions(request: IntakeQuerySelection): Promise<IntakeQueryResult<IntakeQueryContext>>;
   search(request: { queryText: string; contextId: string }): Promise<IntakeQueryResult<{ rows: IntakeQueryRow[] }>>;
   copy(request: { key: string }): Promise<IntakeQueryResult<{ copied: true }>>;
-  cancel(): Promise<IntakeQueryResult<{ cancelled: true }>>;
+  /** A visibility handoff clears FAQ work without changing another SOP window's context. */
+  cancel(reason?: 'overlay-handoff'): Promise<IntakeQueryResult<{ cancelled: true }>>;
+  openSopCandidate?(request: { key: string }): Promise<IntakeQueryResult<{ opened: true }>>;
+  onSopCandidates?(listener: (event: IntakeSopCandidatesEvent) => void): () => void;
   onInvalidated(listener: (event: IntakeQueryInvalidationEvent) => void): () => void;
 };

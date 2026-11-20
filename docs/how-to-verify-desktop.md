@@ -135,7 +135,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 两条命令都只创建私有临时 data directory / Unix socket / database，结束后清理；不连接共享或生产数据库。前者证明 migration/catalogue/ledger，后者证明 runtime readiness、runtime/admin 角色隔离、策略函数完整性和失败关闭。普通桌面/UI 改动无需反复运行这些重门禁。
 
-探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
+探头 / 缩回、Query 边角缩放，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 边角缩放和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
 
 ---
 
@@ -458,6 +458,20 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 前者验证 Main 资格、取消、超限与 renderer 告知/迟到结果；后者使用真实 Electron Main/preload、登录窗口和系统剪贴板，HTTP 为自有合成 wire。新 profile 的 Windows GUI、安装包和真实飞书未因此获得证据。
 
+
+### W5 候选与安装包联验
+
+在 Node.js 24、项目锁定的 pnpm 和 PostgreSQL 15 环境运行。以下用例通过真实 Electron、loopback API 和临时 PG15 发布 FAQ 及两个名称相同的 SOP，核对发现前后回执数量、组名、点击首开和原请求恢复。
+
+```sh
+pnpm contracts:verify --profile=sopCandidates
+pnpm build
+CUSTOMER_AGENT_SOP_CANDIDATES_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/sop-candidates-real-stack.spec.ts
+```
+
+人工验收使用同一份合成数据。在 macOS、Linux 或 Windows 的 WSL 中运行 `pnpm dev:sop-candidates:synthetic`，等到终端输出 `READY_SYNTHETIC_ONLY`。其中 `profile` 指向新建目录里的 `synthetic-stack.json`，包含 v12 及 W5 的精确合同集。保留宿主进程，在应用中登录合成坐席，选择 `shop-a` 对应的「合成示例店」，提交「合成入口」。应看到 FAQ 和两个 SOP 名称。点击其中一个进入办理，再查「洁面频次」，检查先前的办理进度。
+
+Windows 先安装候选 EXE。将本次配置复制到一个新的 Windows 目录，核对从 Windows 能访问配置里的 loopback API 和身份端口，再用已安装的应用可执行文件启动专用配置。例如在 PowerShell 运行 `& $appExe "--user-data-dir=$testDir"`，其中 `$appExe` 为安装后的应用，`$testDir` 为含该配置的目录。设备记录包括安装包 SHA-256、Windows 版本、缩放和多屏行为。宿主到达输出的 `expiresAt` 时会关闭；重新运行可生成下一次验收所需的全新配置。
 
 ## FAQ 原生上传与报告
 

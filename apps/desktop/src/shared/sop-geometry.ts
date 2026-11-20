@@ -1,6 +1,7 @@
 import { QUERY_INPUT_HEIGHT, clampRectToWorkArea, type Rect, type Size } from './overlay-geometry';
 
 export const SOP_WIDTH = 600;
+export const SOP_MIN_WIDTH = 360;
 export const SOP_OPEN_HEIGHT = 240;
 export const SOP_MIN_HEIGHT = 240;
 export const SOP_MAX_HEIGHT = 620;
@@ -10,6 +11,10 @@ export const SOP_COPY_FEEDBACK_MS = 1200;
 export const SOP_LAYOUT_TIMEOUT_MS = 180;
 export const SOP_CHROME_HEIGHT = 40;
 export const SOP_CAPSULE_BAND = QUERY_INPUT_HEIGHT;
+export const SOP_BOOKMARK_EDGE_DISTANCE = 18;
+const SOP_BOOKMARK_WIDTH = 182;
+const SOP_BOOKMARK_HEIGHT = 32;
+const SOP_BOOKMARK_GAP = 6;
 
 export function clampSopHeight(desiredHeight: number, availableHeight: number): number {
   const maxHeight = Math.max(1, Math.min(SOP_MAX_HEIGHT, Math.floor(availableHeight)));
@@ -130,6 +135,52 @@ export function placeSopNearQuery(
   return avoidQueryCapsule(nudgeOffQueryOrigin(clamped, query, workArea), query, workArea);
 }
 
+export function placeSopBesideWindows(
+  preferred: Rect,
+  occupied: readonly Rect[],
+  query: Rect | null,
+  workArea: Rect,
+): Rect {
+  const blocked = query ? [...occupied, queryCapsuleBand(query)] : occupied;
+  const available = (bounds: Rect) => fitsInWorkArea(bounds, workArea)
+    && !blocked.some(other => rectsOverlap(bounds, other));
+  if (available(preferred)) return preferred;
+  for (const other of blocked) {
+    const side = [
+      { ...preferred, x: other.x + other.width + SOP_OFFSET_X },
+      { ...preferred, x: other.x - preferred.width - SOP_OFFSET_X },
+      { ...preferred, y: other.y + other.height + SOP_OFFSET_Y },
+      { ...preferred, y: other.y - preferred.height - SOP_OFFSET_Y },
+    ].find(available);
+    if (side) return side;
+  }
+  const fallback = clampRectToWorkArea({ ...preferred, y: preferred.y + occupied.length * SOP_OFFSET_Y }, workArea);
+  return query ? avoidQueryCapsule(fallback, query, workArea) : fallback;
+}
+
+export function placeSopLeftCenter(workArea: Rect, size: Size = sopOpeningSize()): Rect {
+  return clampRectToWorkArea({
+    x: workArea.x + SOP_OFFSET_X,
+    y: workArea.y + (workArea.height - size.height) / 2,
+    ...size,
+  }, workArea);
+}
+
+export function placeSopBookmark(workArea: Rect, occupied: readonly Rect[]): Rect | null {
+  const height = Math.min(SOP_BOOKMARK_HEIGHT, workArea.height);
+  const width = Math.min(SOP_BOOKMARK_WIDTH, workArea.width);
+  const step = height + SOP_BOOKMARK_GAP;
+  const count = Math.floor((workArea.height + SOP_BOOKMARK_GAP) / step);
+  const top = Math.round(workArea.y + (workArea.height - (count * step - SOP_BOOKMARK_GAP)) / 2);
+  const center = Math.floor(count / 2);
+  for (let offset = 0; offset < count; offset++) {
+    const index = offset % 2 === 0 ? center + offset / 2 : center - (offset + 1) / 2;
+    const candidate = { x: workArea.x, y: top + index * step, width, height };
+    if (!occupied.some(other => rectsOverlap(candidate, other))) return candidate;
+  }
+  return null;
+}
+
 export function applySopDrag(
   current: Rect,
   dx: number,
@@ -146,7 +197,7 @@ export function applySopHeight(current: Rect, nextHeight: number, workArea: Rect
   const height = clampSopHeight(nextHeight, workArea.height);
   const maxY = workArea.y + workArea.height - height;
   const y = Math.min(Math.max(current.y, workArea.y), maxY);
-  return clampRectToWorkArea({ ...current, y, height, width: SOP_WIDTH }, workArea);
+  return clampRectToWorkArea({ ...current, y, height }, workArea);
 }
 
 export function sopLayoutNeedsProjection(
@@ -157,7 +208,8 @@ export function sopLayoutNeedsProjection(
   if (shellState !== 'ready') {
     return true;
   }
-  return current.x !== next.x || current.y !== next.y || current.height !== next.height;
+  return current.x !== next.x || current.y !== next.y
+    || current.width !== next.width || current.height !== next.height;
 }
 
 export function sopWorkAreaForQuery(

@@ -94,7 +94,16 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     const login = await loginOpened; await expect.poll(() => login.url()).toContain('role=login');
     await clickFeishuLogin(login);
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(true);
-    await query.getByRole('button', { name: '打开 SOP 流程' }).click();
+    const openSopFromQuery = async () => {
+      await query.evaluate(() => window.customerAgent!.openSearch());
+      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+      const entry = query.getByRole('button', { name: '打开 SOP 流程' });
+      const filters = query.getByRole('button', { name: '筛选', exact: true });
+      await expect(entry.or(filters).first()).toBeVisible();
+      if (!await entry.isVisible()) await filters.click();
+      await entry.click();
+    };
+    await openSopFromQuery();
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
     const sop = app.windows().find(window => window.url().includes('role=sop'))!;
     await expect(sop.getByText('synthetic-shop', { exact: true })).toBeVisible();
@@ -154,7 +163,18 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await expect(sop.getByRole('checkbox', { name: '1. 先核对合成型号' })).toBeChecked();
     expect(host.continuations.get(oldContinuation)?.releaseId).toBe('synthetic-release-1');
     await sop.getByRole('button', { name: '下一步', exact: true }).click();
-    await expect(sop.getByText('判断依据 合成记录明确包含标记')).toBeVisible();
+    const currentStep = sop.getByText('判断依据 合成记录明确包含标记');
+    await expect(currentStep).toBeVisible();
+    const close = sop.getByRole('button', { name: '收起流程，保留进度' });
+    const isSopVisible = () => app!.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('role=sop'))?.isVisible());
+    for (const hide of [() => close.click(), () => close.press('Enter')]) {
+      await hide();
+      await expect.poll(isSopVisible).toBe(false);
+      await openSopFromQuery();
+      await expect.poll(isSopVisible).toBe(true);
+      await expect(currentStep).toBeVisible();
+    }
     await expect(sop.getByRole('img', { name: '合成复用资源判断图' })).toBeVisible();
     await expect(sop.locator('figure')).toHaveCount(1);
     await expect(sop.getByRole('img', { name: '合成图片1', exact: true })).toHaveCount(0);
@@ -171,9 +191,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await sop.getByRole('button', { name: '结束并清除进度' }).click();
     await expect.poll(() => host.continuations.get(oldContinuation)?.dead).toBe(true);
     for (const media of host.fixture.result.media) media.binding.required = false;
-    await query.evaluate(() => window.customerAgent!.openSearch());
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-    await query.getByRole('button', { name: '打开 SOP 流程' }).click();
+    await openSopFromQuery();
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
     const optional = app.windows().find(window => window.url().includes('role=sop'))!;
     await expect(optional.getByText('synthetic-shop', { exact: true })).toBeVisible();
@@ -200,9 +218,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await optional.getByRole('button', { name: '结束并清除进度' }).click();
     await expect.poll(() => host.continuations.get(optionalContinuation)?.dead).toBe(true);
     for (const unavailable of [false, true]) {
-      await query.evaluate(() => window.customerAgent!.openSearch());
-      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-      await query.getByRole('button', { name: '打开 SOP 流程' }).click();
+      await openSopFromQuery();
       await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
       const destroyed = app.windows().find(window => window.url().includes('role=sop'))!;
       await expect(destroyed.getByText('synthetic-shop', { exact: true })).toBeVisible();
@@ -225,9 +241,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
       if (!unavailable) await expect.poll(() => host.continuations.get(old)?.dead).toBe(true);
       else expect(host.continuations.get(old)?.dead).toBe(false);
       host.state.closeUnavailable = false;
-      await query.evaluate(() => window.customerAgent!.openSearch());
-      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-      await query.getByRole('button', { name: '打开 SOP 流程' }).click();
+      await openSopFromQuery();
       await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
       const reopened = app.windows().find(window => window.url().includes('role=sop'))!;
       await expect(reopened.getByText('synthetic-shop', { exact: true })).toBeVisible();

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { parseContractSchema as parseSopSchema, type components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
+import type { SOP_CANDIDATE_CONTRACT_SET_ID } from '@customer-agent/contracts/sop-candidates';
 import { SOP_RESOURCE_CONTRACT } from '../shared/sop-unified';
 import type { IntakeQueryInvalidation } from '../shared/content-intake-query';
 
@@ -20,7 +21,7 @@ export interface IntakeUsageSession {
     body?: unknown;
     signal: AbortSignal;
     maxResponseBytes?: number;
-    headers?: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT };
+    headers?: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT | typeof SOP_CANDIDATE_CONTRACT_SET_ID };
   }): Promise<{value: unknown}>;
 }
 import { ProductHttpError } from './product-http.ts';
@@ -152,7 +153,10 @@ export class ContentIntakeUsage {
     const isCurrent = () => {
       const current = this.session.view();
       return !this.disposed && !signal.aborted && current.signedIn && current.sessionEpoch === epoch
-        && this.generation === generation && this.invalidation === invalidation
+        && this.generation === generation
+        // A FAQ snapshot refusal revokes FAQ handles. SOP has its own E and
+        // rechecks its authority at discovery, selection, and first open.
+        && (purpose === 'sop' || this.invalidation === invalidation)
         && this.now() < expires && this.monotonic() < deadline;
     };
     if (!isCurrent()) throw new IntakeUsageError('STALE');

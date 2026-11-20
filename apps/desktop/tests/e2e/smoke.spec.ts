@@ -2248,6 +2248,68 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
   }
 });
 
+test('restores the committed Query size across search and copy handoff', async () => {
+  const app = await launchApp();
+  try {
+    const fox = await waitForRole(app, 'fox');
+    const query = await waitForRole(app, 'query');
+    await waitForHarness(app);
+    const open = async () => {
+      await fox.getByTestId('fox-button').click();
+      await waitForInteractiveQuery(app, query);
+      await expect.poll(async () => (await windowSnapshot(app)).find((item) => item.role === 'query'))
+        .toMatchObject({ width: 600, height: 88, visible: true });
+    };
+    const search = async (text: string) => {
+      const input = query.getByTestId('question-input');
+      await input.fill(text);
+      await input.press('Enter');
+      await expect(query.getByTestId('script-card-1')).toBeVisible();
+      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
+    };
+    await open();
+    await search(CLEANSER_QUERY);
+    const before = (await windowSnapshot(app)).find((item) => item.role === 'query');
+    if (!before) throw new Error('Query window missing');
+    const ack = await query.evaluate(async () => {
+      const api = window.customerAgent;
+      if (!api?.resizeQuery) throw new Error('Query resize unavailable');
+      const { snapshot } = await api.getWindowContext();
+      const request = {
+        sessionId: snapshot.handoff.id,
+        sequence: snapshot.layout.sequence + 1,
+        identity: {
+          sessionEpoch: snapshot.contract.sessionEpoch,
+          generation: snapshot.contract.generation,
+          windowGeneration: snapshot.windowGeneration,
+          contentRevision: snapshot.contentRevision,
+        },
+      };
+      const begun = await api.resizeQuery({ ...request, type: 'begin', direction: 'bottom-right' });
+      if (!begun.ok) throw new Error('Query resize begin rejected');
+      return api.resizeQuery({ ...request, sequence: request.sequence + 1, type: 'end', deltaX: -64, deltaY: -36 });
+    });
+    const size = { width: before.width - 64, height: Math.max(240, before.height - 36) };
+    expect(ack).toMatchObject({ ok: true, ...size });
+    const expectSized = async () => {
+      await expect.poll(async () => (await windowSnapshot(app)).find((item) => item.role === 'query'))
+        .toMatchObject(size);
+      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-query-width', String(size.width));
+    };
+    await expectSized();
+    await search('面膜过敏怎么办');
+    await expect(query.getByTestId('script-card-2')).toHaveCount(0);
+    await expectSized();
+    await query.getByTestId('copy-button-1').click();
+    await expect.poll(async () => (await windowSnapshot(app)).find((item) => item.role === 'fox')?.visible).toBe(true);
+    await open();
+    await search(CLEANSER_QUERY);
+    await expectSized();
+  } finally {
+    await app.close();
+  }
+});
+
 test('rejects a second query resize begin and settles the session on COPIED', async () => {
   const app = await launchApp();
   try {
@@ -2288,10 +2350,12 @@ test('rejects a second query resize begin and settles the session on COPIED', as
       const harness = (
         globalThis as {
           __demoTest?: {
-            resizeQueryHeight: (request: {
+            resizeQuery: (request: {
               type: 'begin' | 'keyboard' | 'end';
               sessionId: number;
               sequence: number;
+              direction?: 'bottom';
+              axis?: 'height';
               key?: 'Home';
               shiftKey?: boolean;
             }) => ResizeAck;
@@ -2299,8 +2363,9 @@ test('rejects a second query resize begin and settles the session on COPIED', as
         }
       ).__demoTest;
       if (!harness) throw new Error('DEMO_E2E harness missing');
-      return harness.resizeQueryHeight({
+      return harness.resizeQuery({
         type: 'begin',
+        direction: 'bottom',
         sessionId: input.handoffId,
         sequence: input.lastSequence + 1,
       });
@@ -2310,10 +2375,12 @@ test('rejects a second query resize begin and settles the session on COPIED', as
       const harness = (
         globalThis as {
           __demoTest?: {
-            resizeQueryHeight: (request: {
+            resizeQuery: (request: {
               type: 'begin' | 'keyboard' | 'end';
               sessionId: number;
               sequence: number;
+              direction?: 'bottom';
+              axis?: 'height';
               key?: 'Home';
               shiftKey?: boolean;
             }) => ResizeAck;
@@ -2323,15 +2390,17 @@ test('rejects a second query resize begin and settles the session on COPIED', as
       ).__demoTest;
       if (!harness) throw new Error('DEMO_E2E harness missing');
       return {
-        begin: harness.resizeQueryHeight({
+        begin: harness.resizeQuery({
           type: 'begin',
+          direction: 'bottom',
           sessionId: input.handoffId,
           sequence: input.sequence + 1,
         }),
-        keyboard: harness.resizeQueryHeight({
+        keyboard: harness.resizeQuery({
           type: 'keyboard',
           sessionId: input.handoffId,
           sequence: input.sequence + 2,
+          axis: 'height',
           key: 'Home',
           shiftKey: false,
         }),
@@ -2347,8 +2416,10 @@ test('rejects a second query resize begin and settles the session on COPIED', as
         globalThis as {
           __demoTest?: {
             reportUiPhase: (phase: 'COPIED', resultCount: 3) => void;
-            resizeQueryHeight: (request: {
+            resizeQuery: (request: {
               type: 'end';
+              deltaX: number;
+              deltaY: number;
               sessionId: number;
               sequence: number;
             }) => ResizeAck;
@@ -2358,8 +2429,10 @@ test('rejects a second query resize begin and settles the session on COPIED', as
       ).__demoTest;
       if (!harness) throw new Error('DEMO_E2E harness missing');
       harness.reportUiPhase('COPIED', 3);
-      const lateEnd = harness.resizeQueryHeight({
+      const lateEnd = harness.resizeQuery({
         type: 'end',
+        deltaX: 0,
+        deltaY: 0,
         sessionId: input.handoffId,
         sequence: input.sequence + 3,
       });

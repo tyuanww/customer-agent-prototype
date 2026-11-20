@@ -1,0 +1,292 @@
+# GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root.
+openapi: 3.1.1
+info:
+  title: CS-AI-C11 Customer Service Agent API
+  version: 1.31.0
+  license:
+    name: Proprietary - internal use only
+    identifier: LicenseRef-Proprietary
+  summary: 客服 Agent 一期 HTTP API 的机器可校验合同
+  description: Resource-disable and complete query-to-continuation technical successor selected under the continuing SOP closeout delegation. Source confirmation, human quality, publication and live authorization remain owned by their existing boundaries.
+  x-source-document: 39-API合同与发布状态机-v1.md
+  x-phase: Phase1
+  x-stable-details-reason-schema: "#/components/schemas/SourceContractReason"
+  x-source-denial-audit:
+    storage: source_denial_audits
+    coreStorageFunction: record_source_denial_audit
+    runtimeFunction: record_runtime_source_denial_audit
+    adminFunction: record_admin_source_denial_audit
+    allowedOperations:
+      - content_import
+      - content_publish
+      - content_rollback
+      - search
+      - announce_current
+      - announce_snapshot
+      - announce_ack
+      - source_suspend
+    applies-to-reasons:
+      - SOURCE_NOT_REGISTERED
+      - SOURCE_NOT_ELIGIBLE
+      - SOURCE_SUSPENDED
+      - SOURCE_DOMAIN_MISMATCH
+      - SOURCE_SNAPSHOT_MISMATCH
+      - SOURCE_SET_INCOMPLETE
+      - SOURCE_BASE_RELEASE_STALE
+      - SOURCE_BINDING_HASH_MISMATCH
+      - SOURCE_GATE_NOT_READY
+      - OFFLINE_LEASE_INVALID
+      - OFFLINE_LEASE_EXPIRED
+      - OFFLINE_LEASE_BINDING_MISMATCH
+    non-allowlisted-reason-audit: standard-controlled-change-or-error-audit
+    never-write-reasons:
+      - CONTENT_CONTRACT_INVALID
+      - GOVERNANCE_HASH_MISMATCH
+      - QUALITY_GATE_NOT_PASSED
+    transaction: independent-after-rollback
+    commitBeforeHttpResponse: true
+    idempotencyKey: HMAC(operation|request-id|reason-code)
+    safeFields:
+      - denial_key
+      - operation
+      - reason_code
+      - actor_subject_hash
+      - hash_key_version
+      - actor_role
+      - release_id
+      - source_version_id
+      - source_binding_hash
+      - diagnostic_id
+    forbiddenFields:
+      - query_text
+      - source_ref
+      - internal_url
+      - token
+      - stack_trace
+    description: |
+      先回滚被拒业务事务，再用新连接/新事务调用对应 workload 包装函数并 commit，最后才返回
+      HTTP denial。禁止在注定回滚的主事务中写审计；同 denial_key 异体必须 409。
+      `record_source_denial_audit` 仅是内部存储 writer，不授予应用角色；
+      content_import/search/current/snapshot/ack 只能调用 `record_runtime_source_denial_audit`，
+      publish/rollback/source_suspend 只能调用 `record_admin_source_denial_audit`。
+      仅当 operation 与 reason 同时命中上述 SQL 白名单，且端点
+      `x-rejection-audit.applies-to-reasons` 显式包含该 reason 时，
+      `x-source-denial-audit-required: true` 才要求写 `source_denial_audits`。
+      任何白名单外 reason（尤其 CONTENT_CONTRACT_INVALID、
+      GOVERNANCE_HASH_MISMATCH、QUALITY_GATE_NOT_PASSED）只走标准受控
+      change/error audit，不得写入 source_denial_audits。
+  x-offline-snapshot-lease:
+    storage: snapshot_offline_leases
+    issueFunction: issue_snapshot_offline_lease
+    validateFunction: validate_snapshot_offline_lease
+    ttlSeconds:
+      default: 600
+      minimum: 60
+      maximum: 900
+    binding:
+      - client_id
+      - user_id
+      - release_id
+      - source_binding_hash
+    tokenStorage: sha256-only
+    ackRenewsLease: false
+    expiredBehavior: fail-closed
+  x-content-governance:
+    decision: DEC-042
+    executionClosure: schema.v1.12
+    hash: SHA-256(JCS(normalized-governance-snapshot))
+    timestampCanonicalization: UTC fixed-width microseconds with Z
+    scopedSearchDbFunction: search_recommendable_scripts(platform, product_context_type, product_context_ref)
+    runtimeDirectSelectBackingViews: false
+    allowedPlaceholderKeys:
+      - order_id
+      - date
+    placeholderValuesPersisted: false
+    questionIdentity:
+      primaryKey:
+        - question_id
+        - question_version
+      hashFunction: content_question_hash
+      originFingerprint: HMAC with origin_fingerprint_key_version
+      taxonomyBinding:
+        - intent_taxonomy_version
+        - intent_id
+      historyOverwriteAllowed: false
+    riskCategories:
+      - refund_compensation
+      - price_discount
+      - campaign_rules
+      - efficacy_safety_claim
+      - account_privacy
+      - complaint_escalation
+      - legal_commitment
+    dualReview:
+      requiredWhen: risk_level=high OR has_conflict=true
+      primaryRole: ROLE-CONTENT-LEAD
+      secondaryRole: ROLE-CS-MANAGER
+      sameReviewerForbidden: true
+      storage: content_review_decisions
+      recordFunction: record_content_review_decision
+      reviewerSubjectInPublicResponse: false
+    qualityReview:
+      planStorage: content_quality_review_plans
+      evidenceStorage: content_quality_review_evidence
+      freezePlanFunction: freeze_content_quality_review_plan
+      recordEvidenceFunction: record_content_quality_review_evidence
+      thresholds:
+        upTo500: full-review
+        over500Initial: 10-percent-min100-max300
+        expandWhenDefectRate: greater-than-2-percent-up-to-5-percent
+        expandedSample: 30-percent
+        blockWhenDefectRate: greater-than-5-percent
+        highRiskOrConflict: full-review
+    normalImportWorkerMayAssertReviewDecision: false
+    normalImportWorkerMayAssertQualityConclusion: false
+    batchFatalClasses:
+      - structure
+      - security
+      - source
+    publishableQuality:
+      status: clean
+      qualityGatePassed: true
+  x-public-wire-mapping:
+    mode: explicit-field-allowlist
+    db-row-spread: forbidden
+    internal-object-spread: forbidden
+  x-runtime-status:
+    implementation: not-started
+    ddev: empty
+    true-postgresql-evidence: not-certified
+    n-n-minus-1-evidence: not-certified
+  x-http-json-body-max-bytes: 32768
+  x-phase1-invariants:
+    rewrite: false
+    auto_send: false
+    onlineReviewApi: false
+    publicTrainingApi: false
+    nativePlatformIntegration: false
+    ownerOnlyWrites:
+      - POST /v1/content/rollback
+      - POST /v1/policy/flags
+  x-successor-status:
+    status: DRAFT
+    proposedVersion: true
+    freezeApproved: false
+    exportApproved: false
+    intakeApproved: false
+    productionConsumerReady: false
+  x-business-contract-set-id: menokin-sop-query-v1
+paths: {}
+components:
+  schemas:
+    W5SopCandidateId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: ^[A-Za-z0-9._:-]+$
+    W5SopCandidateUuid:
+      type: string
+      format: uuid
+    W5SopCandidateContextGeneration:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: ^(?=[\s\S]*\S)[^\u0000\uD800-\uDFFF]+$
+    W5SopCandidateQueryText:
+      type: string
+      minLength: 1
+      maxLength: 500
+      pattern: ^(?=[\s\S]*\S)[^\u0000\uD800-\uDFFF]+$
+    W5SopCandidateCandidateRef:
+      type: string
+      pattern: ^sdc_[0-9a-f]{64}$
+    W5SopCandidateDiscoverRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - request_id
+        - query_text
+        - context_generation
+        - entitlement_id
+      properties:
+        request_id:
+          $ref: "#/components/schemas/W5SopCandidateUuid"
+        query_text:
+          $ref: "#/components/schemas/W5SopCandidateQueryText"
+        context_generation:
+          $ref: "#/components/schemas/W5SopCandidateContextGeneration"
+        entitlement_id:
+          $ref: "#/components/schemas/W5SopCandidateId"
+    W5SopCandidateCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_ref
+        - label
+      properties:
+        candidate_ref:
+          $ref: "#/components/schemas/W5SopCandidateCandidateRef"
+        label:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^(?=[\s\S]*\S)[^\u0000\uD800-\uDFFF]+$
+    W5SopCandidateDiscoverResponse:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - request_id
+            - release_id
+            - expires_at
+            - candidates
+          properties:
+            status:
+              const: candidates
+            request_id:
+              $ref: "#/components/schemas/W5SopCandidateUuid"
+            release_id:
+              $ref: "#/components/schemas/W5SopCandidateId"
+            expires_at:
+              type: string
+              format: date-time
+            candidates:
+              type: array
+              minItems: 1
+              maxItems: 5
+              uniqueItems: true
+              items:
+                $ref: "#/components/schemas/W5SopCandidateCandidate"
+              x-unique-by: candidate_ref
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - request_id
+          properties:
+            status:
+              enum:
+                - no_match
+                - ambiguous
+                - stale
+                - unavailable
+            request_id:
+              $ref: "#/components/schemas/W5SopCandidateUuid"
+    W5SopCandidateSelectRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - request_id
+        - candidate_query_id
+        - candidate_ref
+        - entitlement_id
+      properties:
+        request_id:
+          $ref: "#/components/schemas/W5SopCandidateUuid"
+        candidate_query_id:
+          $ref: "#/components/schemas/W5SopCandidateUuid"
+        candidate_ref:
+          $ref: "#/components/schemas/W5SopCandidateCandidateRef"
+        entitlement_id:
+          $ref: "#/components/schemas/W5SopCandidateId"

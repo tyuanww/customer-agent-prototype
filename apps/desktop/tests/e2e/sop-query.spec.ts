@@ -63,8 +63,16 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
     const loginOpened=app.waitForEvent('window');await query.getByRole('button',{name:'登录',exact:true}).click();
     const login=await loginOpened;await expect.poll(()=>login.url()).toContain('role=login');await login.getByRole('button',{name:'飞书登录'}).click();
     await expect.poll(()=>query.evaluate(async()=>{const v=await window.customerAgent!.product!.sessionStatus();return v.ok&&v.signedIn;})).toBe(true);
-    // Check the shipped Query entry, not an injected renderer projection.
-    await query.getByRole('button',{name:'打开 SOP 流程'}).click();
+    const openSopFromQuery = async () => {
+      await query.evaluate(() => window.customerAgent!.openSearch());
+      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+      const entry = query.getByRole('button', { name: '打开 SOP 流程' });
+      const filters = query.getByRole('button', { name: '筛选', exact: true });
+      await expect(entry.or(filters).first()).toBeVisible();
+      if (!await entry.isVisible()) await filters.click();
+      await entry.click();
+    };
+    await openSopFromQuery();
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=sop'))).toBe(true);
     const sop=app.windows().find(w=>w.url().includes('role=sop'))!;
     await expect(sop.getByRole('combobox',{name:'店铺'}).locator('option')).toHaveCount(3);
@@ -73,7 +81,43 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
     await sop.getByRole('button',{name:'查询流程'}).click();
     await expect(sop.getByTestId('sop-query-shell')).toHaveAttribute('data-state','ready');
     await sop.getByRole('button',{name:'已确认',exact:true}).click();
-    await expect(sop.getByText('这是合成原文甲。\n保留换行。')).toBeVisible();
+    const currentStep = sop.getByText('这是合成原文甲。\n保留换行。');
+    await expect(currentStep).toBeVisible();
+    const close = sop.getByRole('button', { name: '收起流程，保留进度' });
+    const windowState = () => app!.evaluate(({ BrowserWindow, screen }) => {
+      const win = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('role=sop'));
+      if (!win) throw new Error('Expected an owned SOP window');
+      const bounds = win.getBounds();
+      const { x, width } = screen.getDisplayMatching(bounds).workArea;
+      return { ...bounds, visible: win.isVisible(), dragDx: bounds.x + bounds.width + 32 <= x + width ? 24 : -24 };
+    });
+    for (const hide of [() => close.click(), () => close.press('Enter')]) {
+      await hide();
+      await expect.poll(async () => (await windowState()).visible).toBe(false);
+      await openSopFromQuery();
+      await expect.poll(async () => (await windowState()).visible).toBe(true);
+      await expect(currentStep).toBeVisible();
+    }
+    const title = await sop.getByText('SOP 流程', { exact: true }).boundingBox();
+    if (!title) throw new Error('Expected a visible SOP title');
+    const { x, dragDx } = await windowState();
+    await sop.mouse.move(title.x + title.width / 2, title.y + title.height / 2);
+    await sop.mouse.down();
+    await sop.mouse.move(title.x + title.width / 2 + dragDx, title.y + title.height / 2);
+    await sop.mouse.up();
+    await expect.poll(windowState).toMatchObject({ x: x + dragDx, visible: true });
+    await expect(currentStep).toBeVisible();
+    const rightGrip = await sop.locator('.sop-resize-handles [data-edge="right"]').boundingBox();
+    if (!rightGrip) throw new Error('Expected a SOP resize grip');
+    const initialBounds = await windowState();
+    const mouseX = rightGrip.x + rightGrip.width / 2;
+    const mouseY = rightGrip.y + rightGrip.height / 2;
+    await sop.mouse.move(mouseX, mouseY);
+    await sop.mouse.down();
+    await sop.mouse.move(mouseX - 48, mouseY);
+    await sop.mouse.up();
+    const manualSize = { width: initialBounds.width - 48, height: initialBounds.height };
+    await expect.poll(windowState).toMatchObject(manualSize);
     const copies=sop.getByRole('button',{name:'复制话术'});await expect(copies.nth(1)).toBeDisabled();await copies.first().click();
     await expect(sop.getByRole('status').filter({hasText:'已复制'})).toBeVisible();
     expect(await app.evaluate(({clipboard})=>clipboard.readText()==='这是合成原文甲。\n保留换行。')).toBe(true);
@@ -81,6 +125,10 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
     revoked=true;await copies.first().click();await expect(sop.getByTestId('sop-query-shell')).toHaveAttribute('data-state','stale');await expect(sop.getByText('这是合成原文甲。\n保留换行。')).toHaveCount(0);
     revoked=false;
     for(const next of ['blocked','stale','no_match']) {state=next;await sop.getByRole('button',{name:'查询流程'}).click();await expect(sop.getByTestId('sop-query-shell')).toHaveAttribute('data-state',next);}
+    await close.click();
+    await expect.poll(windowState).toMatchObject({ visible: false });
+    await openSopFromQuery();
+    await expect.poll(windowState).toMatchObject({ ...manualSize, visible: true });
     expect(requests.filter(p=>p==='/v1/sop/query').length).toBeGreaterThanOrEqual(7);
     expect(requests).not.toContain('/v1/search');
   } finally {

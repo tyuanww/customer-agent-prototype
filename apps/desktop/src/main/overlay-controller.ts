@@ -9,6 +9,7 @@ import { IPC_CHANNELS } from '../shared/contracts';
 import {
   FOX_EDGE_PEEK_TRAVEL_PX,
   FOX_SIZE,
+  FOX_VISUAL_SIZE,
   QUERY_INPUT_HEIGHT,
   QUERY_WIDTH,
   advanceFoxDockDragSession,
@@ -30,18 +31,18 @@ import {
   settleQueryDragGesture,
   type FoxDockDragSession,
   type Rect,
+  type Size,
 } from '../shared/overlay-geometry';
 import {
   acceptedQueryLayoutAck,
+  applyQueryResize,
   applyQueryVerticalResize,
-  clampQueryDesiredHeight,
-  pickQueryResizeEdgeForHeight,
   effectiveQuerySize,
   fallbackQuerySizeForPhase,
   isQueryContentLayoutPhase,
+  pickQueryResizeEdgeForHeight,
   queryResizeDeltaForKey,
   rejectedQueryLayoutAck,
-  resolveQueryResizeEdge,
   type QueryLayoutAck,
   type QueryLayoutRequest,
   type QueryResizeEdge,
@@ -416,6 +417,7 @@ export class OverlayController {
           }
           if (effect.target === 'query' && this.live(this.query)) {
             const prepared = this.query.getBounds();
+            this.armBlurGrace();
             this.setQueryFocusable(true);
             this.query.webContents.invalidate();
             this.query.show();
@@ -523,19 +525,10 @@ export class OverlayController {
           this.overlayWork.clearContent();
           break;
         case 'APPLY_QUERY_LAYOUT': {
-          const workArea = this.currentWorkArea();
-          const natural = clampQueryDesiredHeight(
-            effect.desiredHeight,
-            this.availableQueryHeight(workArea),
-          );
-          if (this.overlayState.layout.resize === null) {
-            const result = this.applyQueryHeight(
-              natural,
-              this.overlayState.layout.resizeEdge,
-              true,
-            );
+          const result = this.applyQueryContentLayout(effect.desiredHeight);
+          if (result) {
             this.commitNativeLayout(
-              result.height,
+              result.size,
               result.edge,
               this.overlayState.layout.sequence,
             );
@@ -549,26 +542,32 @@ export class OverlayController {
           ) {
             break;
           }
-          const height = this.applyFallbackQueryHeight();
-          if (height !== null) {
+          const workArea = this.currentWorkArea();
+          const fallback = fallbackQuerySizeForPhase(this.overlayState.contentPhase, this.resultCount, workArea);
+          const result = this.applyQueryContentLayout(fallback.height);
+          if (result) {
             this.dispatchOverlayEvent({
               type: 'LAYOUT_FALLBACK_APPLIED',
               ...this.overlayEventGuard(),
               handoffId: effect.handoffId,
               sequence: effect.sequence,
-              height,
+              size: result.size,
+              resizeEdge: result.edge,
               contentRevision: this.overlayState.contentRevision,
             });
           }
           break;
         }
         case 'APPLY_RESIZE': {
-          const result = this.applyQueryHeight(effect.height, effect.edge);
-          this.commitNativeLayout(
-            result.height,
-            result.edge,
-            this.overlayState.layout.sequence,
-          );
+          const bounds = this.applyQueryBounds(effect.bounds);
+          if (bounds) {
+            this.commitNativeLayout(
+              { width: bounds.width, height: bounds.height },
+              this.overlayState.layout.resizeEdge,
+              this.overlayState.layout.sequence,
+              effect.manual,
+            );
+          }
           break;
         }
         case 'REFRESH_QUERY_SHADOW':
@@ -607,7 +606,7 @@ export class OverlayController {
     this.sendToQuery(command);
   }
 
-  private commitNativeLayout(height: number, edge: QueryResizeEdge, sequence: number): void {
+  private commitNativeLayout(size: Size, edge: QueryResizeEdge, sequence: number, manual = false): void {
     if (sequence <= 0 || this.overlayState.phase !== 'active') {
       return;
     }
@@ -616,8 +615,9 @@ export class OverlayController {
       ...this.overlayEventGuard(),
       handoffId: this.overlayState.handoff.id,
       sequence,
-      height,
+      size,
       resizeEdge: edge,
+      manual,
       contentPhase: this.overlayState.contentPhase,
       resultCount: this.overlayState.resultCount,
       contentRevision: this.overlayState.contentRevision,
@@ -769,7 +769,7 @@ export class OverlayController {
       return;
     }
     const queryBounds = this.live(this.query) ? this.query.getBounds() : null;
-    const foxVisualCenter = this.currentFoxVisualCenter({ includePeek: false });
+    const foxVisualCenter = queryBounds ? this.collapseFoxVisualCenter(queryBounds) : this.currentFoxVisualCenter({ includePeek: false });
     const animate = Boolean(
       queryBounds
       && this.isWindowVisible(this.query)
@@ -783,6 +783,9 @@ export class OverlayController {
       animate,
       handoffCenterX: queryBounds ? foxVisualCenter.x - queryBounds.x : 44,
       handoffCenterY: queryBounds ? foxVisualCenter.y - queryBounds.y : 44,
+      viewport: queryBounds
+        ? { width: queryBounds.width, height: queryBounds.height }
+        : { width: QUERY_WIDTH, height: QUERY_INPUT_HEIGHT },
     });
   }
 
@@ -1069,117 +1072,84 @@ export class OverlayController {
     return this.acceptedLayoutAck(request.sessionId, request.sequence);
   }
 
-  resizeQueryHeight(request: QueryResizeRequest): QueryLayoutAck {
-    if (this.isInactive()) {
+  resizeQuery(request: QueryResizeRequest): QueryLayoutAck {
+    const query = this.query;
+    if (this.isInactive() || !this.live(query)) {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
     if (!this.matchesReportIdentity(request.identity)) {
       this.staleRendererReports += 1;
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
-    if (request.type === 'end' || request.type === 'cancel') {
-      const transition = applyOverlayEvent(this.overlayState, {
-        type: 'RESIZE_END',
-        sessionEpoch: request.identity.sessionEpoch,
-        generation: request.identity.generation,
-        windowGeneration: request.identity.windowGeneration,
-        contentRevision: request.identity.contentRevision,
-        handoffId: request.sessionId,
-        sequence: request.sequence,
-        height: this.currentQueryHeight(),
-        commit: request.type === 'end',
-      });
-      if (transition.decision !== 'applied') {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
+
+    const identity = { ...request.identity, handoffId: request.sessionId, sequence: request.sequence };
+    const resize = this.overlayState.layout.resize;
+    const workArea = this.currentWorkArea();
+    let event: OverlayEvent;
+    switch (request.type) {
+      case 'begin':
+        event = {
+          type: 'RESIZE_BEGIN',
+          ...identity,
+          baselineBounds: query.getBounds(),
+          direction: request.direction,
+        };
+        break;
+      case 'keyboard': {
+        const bounds = query.getBounds();
+        const delta = queryResizeDeltaForKey(request.key, request.shiftKey);
+        if (request.axis === 'width') {
+          const edge = this.sessionQueryAnchor() === 'right' ? 'left' : 'right';
+          const width = delta === 'natural' ? QUERY_WIDTH
+            : delta === 'max' ? workArea.width
+            : bounds.width + delta;
+          event = {
+            type: 'RESIZE_KEYBOARD',
+            ...identity,
+            bounds: applyQueryResize(bounds, edge, {
+              deltaX: (width - bounds.width) * (edge === 'left' ? -1 : 1),
+              deltaY: 0,
+            }, workArea),
+          };
+        } else {
+          const edge = this.overlayState.layout.resizeEdge;
+          const natural = this.overlayState.layout.desiredHeight
+            ?? fallbackQuerySizeForPhase(this.overlayState.contentPhase, this.resultCount, workArea).height;
+          const height = delta === 'natural' ? natural
+            : delta === 'max' ? this.availableQueryHeight(workArea)
+            : bounds.height + delta;
+          event = {
+            type: 'RESIZE_KEYBOARD',
+            ...identity,
+            bounds: applyQueryResize(bounds, edge, {
+              deltaX: 0,
+              deltaY: (height - bounds.height) * (edge === 'top' ? -1 : 1),
+            }, workArea),
+          };
+        }
+        break;
       }
-      this.startCommandObservation('layout', request.sequence, request.identity);
-      this.commitAppliedTransition(transition);
-      return this.acceptedLayoutAck(request.sessionId, request.sequence);
+      default:
+        if (!resize) {
+          return this.rejectedLayoutAck(request.sessionId, request.sequence);
+        }
+        if (request.type === 'cancel') {
+          event = { type: 'RESIZE_END', ...identity, bounds: null };
+        } else {
+          const bounds = applyQueryResize(resize.baselineBounds, resize.direction, request, workArea);
+          event = request.type === 'update'
+            ? { type: 'RESIZE_UPDATE', ...identity, bounds }
+            : { type: 'RESIZE_END', ...identity, bounds };
+        }
     }
 
-    if (request.type === 'begin') {
-      const query = this.query;
-      if (!this.live(query)) {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
-      }
-      const bounds = query.getBounds();
-      const edge = this.queryResizeEdgeForCurrent(this.currentWorkArea());
-      const transition = applyOverlayEvent(this.overlayState, {
-        type: 'RESIZE_BEGIN',
-        sessionEpoch: request.identity.sessionEpoch,
-        generation: request.identity.generation,
-        windowGeneration: request.identity.windowGeneration,
-        contentRevision: request.identity.contentRevision,
-        handoffId: request.sessionId,
-        sequence: request.sequence,
-        baselineHeight: bounds.height,
-        edge,
-      });
-      if (transition.decision !== 'applied') {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
-      }
-      this.startCommandObservation('layout', request.sequence, request.identity);
-      this.commitAppliedTransition(transition);
-      return this.acceptedLayoutAck(request.sessionId, request.sequence, bounds.height, edge);
-    }
-
-    if (request.type === 'keyboard') {
-      const workArea = this.currentWorkArea();
-      const delta = queryResizeDeltaForKey(request.key, request.shiftKey);
-      const currentHeight = this.currentQueryHeight();
-      const natural = this.overlayState.layout.desiredHeight ?? fallbackQuerySizeForPhase(
-        this.overlayState.contentPhase,
-        this.resultCount,
-        workArea,
-      ).height;
-      const nextHeight =
-        delta === 'natural'
-          ? natural
-          : delta === 'max'
-            ? this.availableQueryHeight(workArea)
-            : currentHeight + delta;
-      const transition = applyOverlayEvent(this.overlayState, {
-        type: 'RESIZE_KEYBOARD',
-        sessionEpoch: request.identity.sessionEpoch,
-        generation: request.identity.generation,
-        windowGeneration: request.identity.windowGeneration,
-        contentRevision: request.identity.contentRevision,
-        handoffId: request.sessionId,
-        sequence: request.sequence,
-        height: nextHeight,
-        edge: this.queryResizeEdgeForCurrent(workArea),
-      });
-      if (transition.decision !== 'applied') {
-        return this.rejectedLayoutAck(request.sessionId, request.sequence);
-      }
-      this.startCommandObservation('layout', request.sequence, request.identity);
-      this.commitAppliedTransition(transition);
-      return this.acceptedLayoutAck(request.sessionId, request.sequence);
-    }
-
-    if (request.type !== 'update') {
-      return this.rejectedLayoutAck(request.sessionId, request.sequence);
-    }
-    const edge = this.overlayState.layout.resize?.edge ?? this.queryResizeEdgeForCurrent(this.currentWorkArea());
-    const baseline = this.overlayState.layout.resize?.baselineHeight ?? this.currentQueryHeight();
-    const signed = edge === 'top' ? -request.deltaY : request.deltaY;
-    const transition = applyOverlayEvent(this.overlayState, {
-      type: 'RESIZE_UPDATE',
-      sessionEpoch: request.identity.sessionEpoch,
-      generation: request.identity.generation,
-      windowGeneration: request.identity.windowGeneration,
-      contentRevision: request.identity.contentRevision,
-      handoffId: request.sessionId,
-      sequence: request.sequence,
-      height: baseline + signed,
-      edge,
-    });
+    const transition = applyOverlayEvent(this.overlayState, event);
     if (transition.decision !== 'applied') {
       return this.rejectedLayoutAck(request.sessionId, request.sequence);
     }
     this.startCommandObservation('layout', request.sequence, request.identity);
     this.commitAppliedTransition(transition);
-    return this.acceptedLayoutAck(request.sessionId, request.sequence, this.currentQueryHeight(), edge);
+    return this.acceptedLayoutAck(request.sessionId, request.sequence);
   }
 
   reportHandoffMilestone(
@@ -1868,80 +1838,85 @@ export class OverlayController {
     });
   }
 
-  private currentQuerySize(workArea: Rect) {
+  private currentQuerySize(workArea: Rect): Size {
     return effectiveQuerySize({
       phase: this.overlayState.contentPhase,
       resultCount: this.resultCount,
       workArea,
       measuredHeight: this.overlayState.layout.desiredHeight,
-      manualHeight: this.overlayState.layout.appliedHeight,
+      manualSize: this.overlayState.layout.manualSize,
     });
-  }
-
-  private currentQueryHeight(): number {
-    if (this.live(this.query)) {
-      return this.query.getBounds().height;
-    }
-    return this.currentQuerySize(this.currentWorkArea()).height;
   }
 
   private availableQueryHeight(workArea: Rect): number {
     return availableOverlayHeight(workArea);
   }
 
-  private queryResizeEdgeForCurrent(workArea: Rect): QueryResizeEdge {
-    return this.live(this.query)
-      ? resolveQueryResizeEdge(this.query.getBounds(), workArea)
-      : this.overlayState.layout.resizeEdge;
-  }
-
-  private applyQueryHeight(
-    nextHeight: number,
-    edge: QueryResizeEdge,
-    allowFlip = false,
-  ): { height: number; edge: QueryResizeEdge } {
+  private applyQueryBounds(bounds: Rect): Rect | null {
     const query = this.query;
     if (!this.live(query)) {
-      return { height: nextHeight, edge };
+      return null;
+    }
+    const current = query.getBounds();
+    if (bounds.x !== current.x || bounds.y !== current.y || bounds.width !== current.width || bounds.height !== current.height) {
+      query.setBounds(bounds);
+    }
+    return query.getBounds();
+  }
+
+  private applyQueryContentLayout(desiredHeight: number): { size: Size; edge: QueryResizeEdge } | null {
+    const query = this.query;
+    if (!this.live(query) || this.overlayState.layout.resize) {
+      return null;
     }
     const workArea = this.currentWorkArea();
     const current = query.getBounds();
-    const chosen = allowFlip
-      ? pickQueryResizeEdgeForHeight(current, nextHeight, workArea, edge)
-      : edge;
-    const next = applyQueryVerticalResize(current, nextHeight, chosen, workArea);
-    query.setBounds(next);
-    return { height: next.height, edge: chosen };
+    const { manualSize, resizeEdge } = this.overlayState.layout;
+    const size = effectiveQuerySize({
+      phase: this.overlayState.contentPhase,
+      workArea,
+      measuredHeight: desiredHeight,
+      manualSize,
+    });
+    const edge = manualSize ? resizeEdge : pickQueryResizeEdgeForHeight(current, size.height, workArea, resizeEdge);
+    const next = manualSize
+      ? clampRectToWorkArea({
+          ...size,
+          x: this.sessionQueryAnchor() === 'right' ? current.x + current.width - size.width : current.x,
+          y: edge === 'top' ? current.y + current.height - size.height : current.y,
+        }, workArea, 0)
+      : applyQueryVerticalResize(current, size.height, edge, workArea);
+    const bounds = this.applyQueryBounds(next);
+    return bounds ? { size: { width: bounds.width, height: bounds.height }, edge } : null;
   }
 
   private reportablePhase(): ReportablePhase {
     return this.overlayState.contentPhase;
   }
 
-  private acceptedLayoutAck(
-    sessionId: number,
-    sequence: number,
-    height = this.currentQueryHeight(),
-    resizeEdge = this.overlayState.layout.resizeEdge,
-  ): QueryLayoutAck {
+  private acceptedLayoutAck(sessionId: number, sequence: number): QueryLayoutAck {
+    const size = this.live(this.query) ? this.query.getBounds() : this.currentQuerySize(this.currentWorkArea());
     return acceptedQueryLayoutAck(
       sessionId,
       sequence,
-      height,
-      resizeEdge,
+      size.height,
+      this.overlayState.layout.resizeEdge,
       this.reportablePhase(),
       this.resultCount,
+      size.width,
     );
   }
 
   private rejectedLayoutAck(sessionId: number, sequence: number): QueryLayoutAck {
+    const size = this.live(this.query) ? this.query.getBounds() : this.currentQuerySize(this.currentWorkArea());
     return rejectedQueryLayoutAck(
       sessionId,
       sequence,
-      this.currentQueryHeight(),
+      size.height,
       this.overlayState.layout.resizeEdge,
       this.reportablePhase(),
       this.resultCount,
+      size.width,
     );
   }
 
@@ -2014,24 +1989,6 @@ export class OverlayController {
     };
   }
 
-  private applyFallbackQueryHeight(): number | null {
-    if (this.overlayState.layout.appliedHeight !== null || this.overlayState.layout.resize) {
-      return null;
-    }
-    const workArea = this.currentWorkArea();
-    const fallback = fallbackQuerySizeForPhase(
-      this.overlayState.contentPhase,
-      this.resultCount,
-      workArea,
-    );
-    const result = this.applyQueryHeight(
-      fallback.height,
-      this.queryResizeEdgeForCurrent(workArea),
-      true,
-    );
-    return result.height;
-  }
-
   private currentWorkArea(): Rect {
     const point = {
       x: Math.round(this.foxOrigin.x + FOX_SIZE / 2),
@@ -2054,6 +2011,29 @@ export class OverlayController {
         ? FOX_EDGE_PEEK_TRAVEL_PX
         : 0;
     return foxVisualCenterForNativeRect(fullFoxRect, this.overlayState.fox.edge, peekOffset);
+  }
+
+  private collapseFoxVisualCenter(queryBounds: Rect): { x: number; y: number } {
+    const center = this.currentFoxVisualCenter({ includePeek: false });
+    const halfFox = FOX_VISUAL_SIZE / 2;
+    if (
+      center.x >= queryBounds.x && center.x <= queryBounds.x + queryBounds.width
+      && center.y >= queryBounds.y + halfFox && center.y <= queryBounds.y + queryBounds.height - halfFox
+    ) {
+      return center;
+    }
+    const fox = this.fox;
+    if (!this.live(fox) || fox.isVisible()) {
+      return center;
+    }
+    // A leading resize edge can leave the fox's old center outside Query's
+    // drawable area. Seat the hidden fox before calculating the closing frame.
+    const workArea = this.currentWorkArea();
+    const { fox: placed, dockEdge } = settleQueryDragGesture(queryBounds, workArea, this.sessionQueryAnchor());
+    fox.setBounds(dockFoxNativeRect(placed, workArea, dockEdge));
+    this.syncFoxOriginFromNativeBounds(fox);
+    this.resetFoxPeekLifecycle(dockEdge);
+    return this.currentFoxVisualCenter({ includePeek: false });
   }
 
   private registerShortcut(): void {
@@ -2164,6 +2144,7 @@ export class OverlayController {
     if (
       this.isInactive()
       || (this.overlayState.phase !== 'opening' && this.overlayState.phase !== 'active')
+      || this.overlayState.handoff.mode === 'preparing-open'
       || !this.isWindowVisible(this.query)
     ) {
       this.clearPendingQueryBlur();
@@ -2204,9 +2185,10 @@ export class OverlayController {
     }
     this.pendingQueryBlur = false;
     this.blurRecheckIdentity = null;
+    const query = this.query;
     if (
       (this.overlayState.phase === 'opening' || this.overlayState.phase === 'active')
-      && this.isWindowVisible(this.query)
+      && this.live(query) && query.isVisible() && !query.isFocused()
     ) {
       this.dismiss(true);
     }

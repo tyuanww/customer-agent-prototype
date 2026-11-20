@@ -34,7 +34,21 @@ export default defineConfig({
     // product-session pulls the roster through workbench-job. Bundle it.
     // A bare require fails in the unsigned package, and the query window
     // then never receives the open command.
-    plugins: [externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster', '@customer-agent/unified-contracts'] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ['@customer-agent/job-roster', '@customer-agent/unified-contracts'] }),
+      {
+        name: 'standalone-sandboxed-preloads',
+        generateBundle(_options, bundle) {
+          for (const output of Object.values(bundle)) {
+            if (output.type !== 'chunk') continue;
+            const internalImports = [...output.imports, ...output.dynamicImports].filter(name => Object.hasOwn(bundle, name));
+            if (internalImports.length) {
+              this.error(`Sandboxed preload ${output.fileName} imports bundled chunks (${internalImports.join(', ')}).`);
+            }
+          }
+        },
+      },
+    ],
     resolve: {
       conditions: ['source'],
     },

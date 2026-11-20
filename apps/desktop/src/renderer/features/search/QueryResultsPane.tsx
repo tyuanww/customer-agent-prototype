@@ -6,9 +6,12 @@ import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
 import { isIntakeRow, type QueryResult, type RankedScript } from './types';
 import { IntakeFaqCard } from './IntakeFaqCard';
+import { SopCandidateList } from './SopCandidateList';
+import type { IntakeSopCandidatesEvent } from '@shared/content-intake-query';
 
 type QueryResultsPaneProps = {
   contextControls?: ReactNode;
+  sopCandidates?: IntakeSopCandidatesEvent | null;
   phase: OverlayPhase;
   resultPaneRef: Ref<HTMLElement>;
   statusBannerRef: Ref<HTMLDivElement>;
@@ -24,6 +27,7 @@ type QueryResultsPaneProps = {
   sopEntryResume?: boolean;
   onOpenSop?: () => void;
   onRetry: () => void;
+  retryLabel?: string;
   onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
   reportError?: string;
@@ -35,6 +39,7 @@ type QueryResultsPaneProps = {
 
 export function QueryResultsPane({
   contextControls,
+  sopCandidates,
   phase,
   resultPaneRef,
   statusBannerRef,
@@ -50,6 +55,7 @@ export function QueryResultsPane({
   sopEntryResume = false,
   onOpenSop,
   onRetry,
+  retryLabel = '重试',
   onCopy,
   reportedScriptIds,
   reportError,
@@ -67,7 +73,12 @@ export function QueryResultsPane({
             tabIndex={-1}
           >
             {contextControls ? <div data-query-context>{contextControls}</div> : null}
-            {phase === 'EMPTY' ? (
+            {phase === 'EMPTY' && sopCandidates ? (
+              <div ref={statusBannerRef} className="status-banner" role="status">
+                {'candidates' in sopCandidates ? '没有匹配的 FAQ 话术，可选择下方 SOP 办理。' : '没有匹配的 FAQ 话术。'}
+              </div>
+            ) : null}
+            {phase === 'EMPTY' && !sopCandidates ? (
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到可用话术</strong>
@@ -89,10 +100,12 @@ export function QueryResultsPane({
                 <strong>查询未完成</strong>
                 <span>{errorMessage || '请重试。'}</span>
                 <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
-                  重试
+                  {retryLabel}
                 </button>
               </div>
             ) : null}
+
+            {sopCandidates ? <SopCandidateList key={sopCandidates.contextId} event={sopCandidates} /> : null}
 
             {phase === 'RESULTS' || phase === 'COPIED' || (phase === 'ERROR' && results.length > 0) ? (
               <div className="result-content" data-testid="result-content" ref={resultContentRef}>

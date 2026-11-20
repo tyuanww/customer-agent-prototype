@@ -178,6 +178,7 @@ describe('authoritative overlay reducer', () => {
         anchor: 'right',
         handoffCenterX: 500,
         handoffCenterY: 44,
+        viewport: { width: 600, height: 88 },
         foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
       },
     });
@@ -283,7 +284,7 @@ describe('authoritative overlay reducer', () => {
         type: 'QUERY_LAYOUT_ACK',
         handoffId: opened.handoffId,
         sequence: closed.layout.sequence + 1,
-        height: 420,
+        size: { width: 600, height: 420 },
         resizeEdge: 'bottom',
         contentPhase: 'RESULTS',
         resultCount: 3,
@@ -483,8 +484,8 @@ describe('authoritative overlay reducer', () => {
       type: 'RESIZE_BEGIN',
       handoffId: results.handoff.id,
       sequence: results.layout.sequence + 1,
-      baselineHeight: 320,
-      edge: 'bottom',
+      baselineBounds: { x: 0, y: 0, width: 600, height: 320 },
+      direction: 'bottom',
       contentRevision: results.contentRevision,
     }));
     expect(begun.decision).toBe('applied');
@@ -498,21 +499,20 @@ describe('authoritative overlay reducer', () => {
     }));
     expect(copied.decision).toBe('applied');
     expect(copied.state.layout).toMatchObject({
-      appliedHeight: 320,
+      appliedSize: { width: 600, height: 320 },
       resize: null,
     });
     expect(copied.effects).toContainEqual({
       type: 'APPLY_RESIZE',
-      height: 320,
-      edge: 'bottom',
+      bounds: { x: 0, y: 0, width: 600, height: 320 },
+      manual: false,
     });
 
     const lateEnd = applyOverlayEvent(copied.state, at(copied.state, {
       type: 'RESIZE_END',
       handoffId: copied.state.handoff.id,
       sequence: copied.state.layout.sequence + 1,
-      height: 360,
-      commit: true,
+      bounds: { x: 0, y: 0, width: 600, height: 360 },
       contentRevision: copied.state.contentRevision,
     }));
     expect(lateEnd.decision).toBe('rejected');
@@ -647,7 +647,8 @@ describe('authoritative overlay reducer', () => {
       type: 'LAYOUT_FALLBACK_APPLIED',
       handoffId: timedOut.state.handoff.id,
       sequence: timedOut.state.layout.sequence,
-      height: 420,
+      size: { width: 600, height: 420 },
+      resizeEdge: 'bottom',
       contentRevision: timedOut.state.contentRevision,
     }));
     expect(fallbackApplied.effects).toEqual([
@@ -751,8 +752,6 @@ describe('authoritative overlay reducer', () => {
         'QUERY_FOCUSED',
         'QUERY_BLURRED',
         'LAYOUT_REQUESTED',
-        'RESIZE_BEGIN',
-        'RESIZE_KEYBOARD',
         'FOX_DRAG_MOVED',
         'DISPLAY_CHANGED',
         'FOX_EDGE_SYNCED',
@@ -849,7 +848,7 @@ describe('authoritative overlay reducer', () => {
         case 'OPEN_REQUESTED':
           return at(state);
         case 'DISMISS_REQUESTED':
-          return { type, ...base, restorePreviousApp: true, animate: false, handoffCenterX: 44, handoffCenterY: 44 };
+          return { type, ...base, restorePreviousApp: true, animate: false, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } };
         case 'TOGGLE_REQUESTED':
         case 'QUERY_SUBSCRIBED':
         case 'WINDOW_RECREATED':
@@ -907,7 +906,7 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            height: 420,
+            size: { width: 600, height: 420 },
             resizeEdge: 'bottom',
             contentPhase: state.contentPhase,
             resultCount: state.resultCount,
@@ -927,7 +926,8 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            height: 420,
+            size: { width: 600, height: 420 },
+            resizeEdge: 'bottom',
             contentRevision: state.contentRevision,
           };
         case 'RESIZE_BEGIN':
@@ -936,8 +936,8 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            baselineHeight: 320,
-            edge: 'bottom',
+            baselineBounds: { x: 0, y: 0, width: 600, height: 320 },
+            direction: 'bottom',
             contentRevision: state.contentRevision,
           };
         case 'RESIZE_UPDATE':
@@ -946,8 +946,7 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            height: 360,
-            edge: 'bottom',
+            bounds: { x: 0, y: 0, width: 600, height: 360 },
             contentRevision: state.contentRevision,
           };
         case 'RESIZE_END':
@@ -956,8 +955,7 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            height: 360,
-            commit: true,
+            bounds: { x: 0, y: 0, width: 600, height: 360 },
             contentRevision: state.contentRevision,
           };
         case 'RESIZE_KEYBOARD':
@@ -966,8 +964,7 @@ describe('authoritative overlay reducer', () => {
             ...base,
             handoffId: state.handoff.id,
             sequence: state.layout.sequence + 1,
-            height: 360,
-            edge: 'bottom',
+            bounds: { x: 0, y: 0, width: 600, height: 360 },
             contentRevision: state.contentRevision,
           };
         case 'FOX_DRAG_MOVED':

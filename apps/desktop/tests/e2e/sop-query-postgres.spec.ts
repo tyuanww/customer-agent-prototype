@@ -46,6 +46,7 @@ test('temporary PG SOP release reaches Electron and parent revocation removes co
         const status = await window.customerAgent!.product!.sessionStatus();
         return status.ok && status.signedIn;
       })).toBe(true);
+      await query.getByRole('button', { name: '筛选', exact: true }).click();
       await query.getByRole('button', { name: '打开 SOP 流程' }).click();
       await expect(sop.getByRole('combobox', { name: '店铺' }).locator('option')).toHaveCount(2);
       await sop.getByRole('combobox', { name: '店铺' }).selectOption({ label: 'shop-a' });

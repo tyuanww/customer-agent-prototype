@@ -1,7 +1,7 @@
 import { IntakeAntdTheme } from './features/dashboard/intake-antd';
 import { Button, Checkbox, Input, Select } from 'antd';
 import { useEffect, useState, type RefObject } from 'react';
-import { SOP_QUERY_GROUPS, type SopUnifiedCommand, type SopUnifiedProjection } from '@shared/sop-unified';
+import { SOP_INSTANCE_NAME_MAX_LENGTH, SOP_QUERY_GROUPS, type SopUnifiedCommand, type SopUnifiedProjection } from '@shared/sop-unified';
 import type { SopQueryGroup } from '@shared/sop-query';
 import type { useWindowDrag } from './lib/use-window-drag';
 
@@ -19,6 +19,7 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   const [text, setText] = useState('');
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState('');
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
   const busy = waiting || projection.busy;
   useEffect(() => {
     if (!projection.shops.some(shop => shop.key === shopKey)) setShop(projection.shops.length === 1 ? projection.shops[0]!.key : '');
@@ -27,19 +28,34 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
     setWaiting(true); setError('');
     try {
       const result = await window.sopWindow?.unifiedCommand?.(intent);
-      if (!result?.ok) setError(result && !result.ok ? result.message : '操作未完成，请重试。');
+      if (result?.ok) return true;
+      setError(result && !result.ok ? result.message : '操作未完成，请重试。');
     } catch { setError('操作未完成，请重试。'); }
     finally { setWaiting(false); }
+    return false;
   };
   const node = projection.state === 'ready' ? projection.node : null;
-  return <IntakeAntdTheme><div className="sop-shell query-shell sop-unified" data-testid="sop-unified-shell" data-state={projection.state} data-busy={busy} ref={shellRef}>
+  const canPark = Boolean(projection.instanceName && !busy && nameDraft === null);
+  return <IntakeAntdTheme><div className="sop-shell query-shell sop-unified" data-testid="sop-unified-shell" data-state={projection.state} data-busy={busy} ref={shellRef}
+    onPointerLeave={event => {
+      const goingToResize = event.relatedTarget instanceof Element && event.relatedTarget.closest('.sop-resize-handles');
+      if (canPark && event.buttons === 0 && !goingToResize && !event.currentTarget.querySelector('input:focus, textarea:focus, [contenteditable]:focus')) {
+        void window.sopWindow?.bookmark?.('park-after-edge-drag');
+      }
+    }}>
     <div className="glass-shell"><div className="glass-surface" aria-hidden="true" />
-      <header className="sop-chrome" {...drag}>
-        <strong>{projection.title || 'SOP 流程'}</strong>
+      <header className="sop-chrome">
+        <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
+        <div className="sop-chrome-title"><strong>{projection.instanceName || projection.title || 'SOP 流程'}</strong></div>
+        {projection.instanceName && window.sopWindow?.bookmark ? <Button type="text" className="sop-park" disabled={!canPark} onClick={() => {
+          void window.sopWindow?.bookmark?.('park').then(result => {
+            if (!result.ok) setError(result.message);
+          });
+        }}>贴边暂放</Button> : null}
         <Button type="text" className="sop-close" aria-label="收起流程，保留进度" onClick={() => { void window.sopWindow?.close(); }}>×</Button>
       </header>
       <div className="sop-body">
-        {!node && projection.state !== 'paused' && projection.state !== 'closing' ? <form className="sop-unified-query" onSubmit={event => {
+        {!node && projection.entry !== 'candidate' && projection.state !== 'paused' && projection.state !== 'closing' ? <form className="sop-unified-query" onSubmit={event => {
           event.preventDefault(); void command({ kind: 'query', shopKey, group, text });
         }}>
           <label>店铺<Select aria-label="店铺" value={shopKey || undefined} placeholder="请选择" disabled={busy} onChange={setShop} options={projection.shops.map(shop => ({ value: shop.key, label: shop.label }))} /></label>
@@ -52,6 +68,18 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
         {projection.state === 'paused' ? <Button loading={busy} onClick={() => { void command({ kind: 'refresh' }); }}>重新确认并继续</Button> : null}
         {projection.state === 'closing' ? <Button loading={busy} onClick={() => { void command({ kind: 'clear' }); }}>按原请求确认结束</Button> : null}
         {node ? <>
+          {projection.instanceName && (nameDraft === null
+            ? <div><Button disabled={busy} onClick={() => setNameDraft(projection.instanceName ?? '')}>重命名</Button></div>
+            : <form className="sop-unified-query" onSubmit={event => {
+              event.preventDefault();
+              if (nameDraft.trim() && !busy) void command({ kind: 'rename', name: nameDraft }).then(saved => {
+                if (saved) setNameDraft(null);
+              });
+            }}>
+              <label>流程名称<Input autoFocus aria-label="流程名称" value={nameDraft} maxLength={SOP_INSTANCE_NAME_MAX_LENGTH} disabled={busy} onChange={event => setNameDraft(event.target.value)} /></label>
+              <Button htmlType="submit" disabled={busy || !nameDraft.trim()}>保存名称</Button>
+              <Button disabled={busy} onClick={() => setNameDraft(null)}>取消</Button>
+            </form>)}
           <p className="sop-stage">{node.stage}</p>
           <h2>{node.title}</h2>
           <p className="sop-prompt">{node.instruction}</p>

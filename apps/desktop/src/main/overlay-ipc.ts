@@ -8,7 +8,7 @@ import {
 import {
   canReportQueryLayout,
   canReportUiPhase,
-  canResizeQueryHeight,
+  canResizeQuery,
 } from '../shared/query-ipc-access';
 import { IPC_CHANNELS } from '../shared/contracts';
 import {
@@ -232,7 +232,7 @@ export function registerOverlayIpc(getController: () => OverlayController | null
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.RESIZE_QUERY_HEIGHT,
+    IPC_CHANNELS.RESIZE_QUERY,
     (event, payload: unknown): QueryLayoutAck => {
       const controller = getController();
       if (!controller) {
@@ -244,13 +244,13 @@ export function registerOverlayIpc(getController: () => OverlayController | null
         controller.rendererDevServerUrl,
       );
       const role = controller.overlayRoleOf(event.sender);
-      if (!canResizeQueryHeight({ trusted, role }) || !isQueryResizeRequest(payload)) {
+      if (!canResizeQuery({ trusted, role }) || !isQueryResizeRequest(payload)) {
         return rejectedQueryLayoutAck(
           isQueryResizeRequest(payload) ? payload.sessionId : 0,
           isQueryResizeRequest(payload) ? payload.sequence : 0,
         );
       }
-      return controller.resizeQueryHeight(payload);
+      return controller.resizeQuery(payload);
     },
   );
 

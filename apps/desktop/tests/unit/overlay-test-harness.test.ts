@@ -69,7 +69,7 @@ describe('attachTestHarness without a Fox window', () => {
       dashboardSnapshot: vi.fn(() => null),
       isDashboardTrusted: vi.fn(() => false),
       queryLayoutDebugState: vi.fn(() => null),
-      resizeQueryHeight: vi.fn(),
+      resizeQuery: vi.fn(),
       reportUiPhase: vi.fn(),
       getOverlaySnapshot: vi.fn(() => overlaySnapshot(createInitialOverlayState({
         sessionEpoch: 1,

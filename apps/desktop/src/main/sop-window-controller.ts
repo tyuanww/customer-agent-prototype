@@ -10,19 +10,24 @@ import {
   type SopClipboardPayload,
 } from '../shared/sop-pipeline';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
-import { sanitizeDragDelta, type Rect } from '../shared/overlay-geometry';
+import { SCREEN_MARGIN, clampRectToWorkArea, sanitizeDragDelta, type Rect, type Size } from '../shared/overlay-geometry';
 import { ALLERGY_SOP_SCENE_ID } from '../shared/sop-entry';
 import {
   SOP_COPY_FEEDBACK_MS,
+  SOP_BOOKMARK_EDGE_DISTANCE,
   SOP_LAYOUT_TIMEOUT_MS,
+  SOP_MIN_HEIGHT,
+  SOP_MIN_WIDTH,
   SOP_OPEN_HEIGHT,
   SOP_WIDTH,
   applySopDrag,
   applySopHeight,
+  placeSopLeftCenter,
   placeSopNearQuery,
   sopLayoutNeedsProjection,
   sopOpeningSize,
 } from '../shared/sop-geometry';
+import { resizeRectFromEdge, type WindowResizeDirection } from '../shared/window-resize-geometry';
 import {
   advanceSopNext,
   canCopySopNode,
@@ -45,8 +50,11 @@ import {
   type SopLayoutAck,
   type SopLayoutRequest,
   type SopProjection,
+  type SopBookmarkIntent,
+  type SopResizeRequest,
   type SopShellState,
   type SopWindowErrorCode,
+  type SopWindowChrome,
   type SopWindowResult,
 } from '../shared/sop-window';
 import { GuardedScheduler } from './guarded-scheduler';
@@ -59,10 +67,16 @@ export type SopWindowControllerOptions = {
   legacyEnabled?: boolean;
   rendererDevServerUrl?: () => string | undefined;
   queryBounds: () => Rect | null;
-  workArea: () => Rect;
+  workArea: (reference?: Rect) => Rect;
   sessionRole: () => SopViewerRole;
   publishedScriptIds?: () => SopPublishSet;
   writeClipboard?: (text: string) => void;
+  instance?: {
+    place: (bounds: Rect, workArea: Rect, query: Rect | null) => Rect;
+    placeBookmark: (workArea: Rect) => Rect | null;
+    onClosed: () => void;
+    onProjectionChanged: () => void;
+  };
 };
 
 /** INT-DESKTOP calls this with bytes already resolved by Main. Electron receives
@@ -82,6 +96,7 @@ export function writeSopClipboardNative(payload: SopClipboardPayload): void {
 export class SopWindowController {
   private window: BrowserWindow | null = null;
   private queryRuntime: SopQueryRuntime | SopUnifiedRuntime | null = null;
+  private unsubscribeRuntime: (() => void) | null = null;
   private readonly legacyEnabled: boolean;
   private tree: SopTree | null = null;
   private progress: SopProgress | null = null;
@@ -92,6 +107,11 @@ export class SopWindowController {
   private opening: Promise<SopWindowResult> | null = null;
   private sessionId = 0;
   private lastLayoutSequence = 0;
+  private lastResizeSequence = 0;
+  private manualSize: Size | null = null;
+  private resizing: { baseline: Rect; area: Rect; direction: WindowResizeDirection } | null = null;
+  private parkedFrom: Rect | null = null;
+  private dockArmed = false;
   private disposed = false;
   private readonly scheduler = new GuardedScheduler();
   private layoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -99,10 +119,11 @@ export class SopWindowController {
   private readonly preloadPath: string;
   private readonly rendererDevServerUrl?: () => string | undefined;
   private readonly queryBounds: () => Rect | null;
-  private readonly workArea: () => Rect;
+  private readonly workArea: SopWindowControllerOptions['workArea'];
   private readonly sessionRole: () => SopViewerRole;
   private readonly publishedScriptIds: () => SopPublishSet;
   private readonly writeClipboard: (text: string) => void;
+  private readonly instance: SopWindowControllerOptions['instance'];
 
   constructor(options: SopWindowControllerOptions) {
     this.legacyEnabled = options.legacyEnabled ?? true;
@@ -113,6 +134,7 @@ export class SopWindowController {
     this.sessionRole = options.sessionRole;
     this.publishedScriptIds = options.publishedScriptIds ?? (() => 'fixture');
     this.writeClipboard = options.writeClipboard ?? ((text) => clipboard.writeText(text));
+    this.instance = options.instance;
   }
 
   isSopContents(contents: WebContents): boolean {
@@ -132,17 +154,49 @@ export class SopWindowController {
 
   setQueryRuntime(runtime: SopQueryRuntime | SopUnifiedRuntime): void {
     this.queryRuntime = runtime;
-    runtime.subscribe(() => this.pushProjection());
+    this.unsubscribeRuntime = runtime.subscribe(() => {
+      this.pushProjection();
+      this.instance?.onProjectionChanged();
+    });
+  }
+
+  hasInstance(): boolean {
+    return this.queryRuntime instanceof SopUnifiedRuntime && this.queryRuntime.hasInstance();
+  }
+
+  instanceMenuLabel(): string | null {
+    const runtime = this.queryRuntime;
+    if (!(runtime instanceof SopUnifiedRuntime) || !runtime.canResumeInstance()) return null;
+    return runtime.instanceName() ?? '恢复 SOP 流程';
+  }
+
+  bounds(visibleOnly = false): Rect | null {
+    const win = this.liveWindow();
+    return win && (!visibleOnly || win.isVisible()) ? win.getBounds() : null;
+  }
+
+  reconcileBookmark(): void {
+    const win = this.liveWindow();
+    if (!win?.isVisible() || !this.parkedFrom) return;
+    const area = this.workArea(this.parkedFrom);
+    const next = this.instance?.placeBookmark(area);
+    if (next) win.setBounds(next);
+    else win.hide();
+  }
+
+  resumeInstance(): void {
+    if (this.instanceMenuLabel()) this.revealExisting();
   }
 
   async unifiedCommand(command: SopUnifiedCommand): Promise<SopWindowResult> {
     if (!(this.queryRuntime instanceof SopUnifiedRuntime)) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
+    if (command.kind === 'clear' && this.instance) return this.endFlow();
     const result = await this.queryRuntime.command(command);
     return result.ok ? { ok: true } : sopWindowFailure('FAILED', '操作未完成，请查看流程提示');
   }
 
   async queryCommand(command: SopQueryCommand): Promise<SopWindowResult> {
-    if (!this.queryRuntime) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
+    if (!this.queryRuntime || this.instance) return sopWindowFailure('UNAVAILABLE', '流程尚未开放');
     const result = await this.queryRuntime.command(command);
     return result.ok ? { ok: true } : sopWindowFailure('FAILED', '操作未完成，请查看流程提示');
   }
@@ -207,13 +261,24 @@ export class SopWindowController {
     if (!win) {
       return;
     }
+    this.cancelResize(win);
+    this.dockArmed = false;
     win.hide();
     win.webContents.setBackgroundThrottling(false);
+    const runtime = this.queryRuntime;
+    if (this.instance && runtime instanceof SopUnifiedRuntime) {
+      const projection = runtime.projection();
+      // A candidate without an active continuation has no reopen entry.
+      const discard = projection.state === 'ended' || (projection.entry === 'candidate' && !runtime.hasInstance());
+      if (discard && !win.isDestroyed()) win.destroy();
+    }
   }
 
-  async endFlow(): Promise<void> {
+  async endFlow(): Promise<SopWindowResult> {
     if (this.queryRuntime instanceof SopUnifiedRuntime) {
-      if (!(await this.queryRuntime.finish()).ok) return;
+      if (!(await this.queryRuntime.finish()).ok) {
+        return sopWindowFailure('FAILED', '结束结果尚未确认，请按原请求确认。');
+      }
     } else this.queryRuntime?.invalidate();
     this.clearLayoutTimer();
     this.scheduler.clear(this.copyTimer);
@@ -229,6 +294,7 @@ export class SopWindowController {
     if (win && !win.isDestroyed()) {
       win.destroy();
     }
+    return { ok: true };
   }
 
   async restart(): Promise<SopWindowResult> {
@@ -282,7 +348,7 @@ export class SopWindowController {
 
   moveBy(dx: unknown, dy: unknown, finished?: unknown): void {
     const win = this.liveWindow();
-    if (!win) {
+    if (!win || this.resizing || this.parkedFrom) {
       return;
     }
     const delta = sanitizeDragDelta(dx, dy);
@@ -292,18 +358,94 @@ export class SopWindowController {
     if (finished !== undefined && typeof finished !== 'boolean') {
       return;
     }
-    win.setBounds(applySopDrag(win.getBounds(), delta.dx, delta.dy, this.workArea()));
+    const area = this.workArea();
+    const next = applySopDrag(win.getBounds(), delta.dx, delta.dy, area);
+    win.setBounds(next);
+    this.dockArmed = finished === true && next.x <= area.x + SOP_BOOKMARK_EDGE_DISTANCE;
+  }
+
+  bookmark(intent: SopBookmarkIntent): SopWindowResult {
+    const win = this.liveWindow();
+    if (!win?.isVisible() || !this.instance || !(this.queryRuntime instanceof SopUnifiedRuntime)) {
+      return sopWindowFailure('UNAVAILABLE', '当前流程不可贴边');
+    }
+    if (intent === 'restore' || intent === 'restore-hover') {
+      if (this.parkedFrom) this.restoreBookmark(win, intent === 'restore');
+      return { ok: true };
+    }
+    if (this.parkedFrom || (intent === 'park-after-edge-drag' && !this.dockArmed)) return { ok: true };
+    const projection = this.queryRuntime.projection();
+    const name = projection.instanceName;
+    if (!name || projection.busy || this.resizing || !this.instanceMenuLabel()) {
+      return sopWindowFailure('UNAVAILABLE', '当前流程不可贴边');
+    }
+    const current = win.getBounds();
+    const bookmark = this.instance.placeBookmark(this.workArea(current));
+    if (!bookmark) return sopWindowFailure('UNAVAILABLE', '当前屏幕没有可用的贴边位置');
+    this.dockArmed = false;
+    this.parkedFrom = current;
+    this.showChrome(win, { kind: 'parked', name });
+    win.setBounds(bookmark);
+    return { ok: true };
+  }
+
+  resize(request: SopResizeRequest): void {
+    const win = this.liveWindow();
+    if (!win?.isVisible() || this.parkedFrom || request.sessionId !== this.sessionId) return;
+    if (request.type === 'begin') {
+      if (request.sequence <= this.lastResizeSequence) return;
+      this.cancelResize(win);
+      this.dockArmed = false;
+      this.lastResizeSequence = request.sequence;
+      const workArea = this.workArea(win.getBounds());
+      const base = clampRectToWorkArea(win.getBounds(), workArea);
+      const area = {
+        x: workArea.x + SCREEN_MARGIN, y: workArea.y + SCREEN_MARGIN,
+        width: Math.max(1, workArea.width - 2 * SCREEN_MARGIN),
+        height: Math.max(1, workArea.height - 2 * SCREEN_MARGIN),
+      };
+      this.resizing = { baseline: base, area, direction: request.direction };
+      return;
+    }
+    if (!this.resizing || request.sequence !== this.lastResizeSequence) return;
+    if (request.type === 'cancel') {
+      this.cancelResize(win);
+      return;
+    }
+    const { baseline, area, direction } = this.resizing;
+    const next = resizeRectFromEdge({
+      baseline, bounds: area, direction, deltaX: request.deltaX, deltaY: request.deltaY,
+      minSize: { width: SOP_MIN_WIDTH, height: SOP_MIN_HEIGHT }, maxSize: area,
+    });
+    const current = win.getBounds();
+    if (sopLayoutNeedsProjection('ready', current, next)) win.setBounds(next);
+    if (request.type === 'end') {
+      this.resizing = null;
+      const actual = win.getBounds();
+      if (actual.width !== baseline.width || actual.height !== baseline.height) {
+        this.manualSize = { width: actual.width, height: actual.height };
+      }
+    }
+  }
+
+  private cancelResize(win: BrowserWindow): void {
+    if (!this.resizing) return;
+    const { baseline } = this.resizing;
+    this.resizing = null;
+    win.setBounds(clampRectToWorkArea(baseline, this.workArea(baseline)));
   }
 
   reportLayout(request: SopLayoutRequest): SopLayoutAck {
     const win = this.liveWindow();
-    if (!win || request.sessionId !== this.sessionId || request.sequence <= this.lastLayoutSequence) {
+    if (!win || this.parkedFrom || request.sessionId !== this.sessionId || request.sequence <= this.lastLayoutSequence) {
       return rejectedSopLayoutAck(request.sessionId, request.sequence, SOP_OPEN_HEIGHT);
     }
     this.lastLayoutSequence = request.sequence;
     this.clearLayoutTimer();
     const current = win.getBounds();
-    const next = applySopHeight(current, request.desiredHeight, this.workArea());
+    const next = this.manualSize || this.resizing
+      ? current
+      : applySopHeight(current, request.desiredHeight, this.workArea(current));
     const shouldProject = sopLayoutNeedsProjection(this.shellState, current, next);
     if (sopLayoutNeedsProjection('ready', current, next)) {
       win.setBounds(next);
@@ -314,11 +456,13 @@ export class SopWindowController {
     if (shouldProject) {
       this.pushProjection();
     }
+    const actual = win.getBounds();
     return {
       ok: true,
       sessionId: request.sessionId,
       sequence: request.sequence,
-      height: next.height,
+      width: actual.width,
+      height: actual.height,
     };
   }
 
@@ -354,11 +498,13 @@ export class SopWindowController {
   }
 
   destroy(): void {
-    this.queryRuntime?.dispose();
     if (this.disposed) {
       return;
     }
     this.disposed = true;
+    this.unsubscribeRuntime?.();
+    this.unsubscribeRuntime = null;
+    this.queryRuntime?.dispose();
     this.clearLayoutTimer();
     this.scheduler.clear(this.copyTimer);
     this.copyTimer = null;
@@ -380,10 +526,16 @@ export class SopWindowController {
         await this.queryRuntime!.open(this.sessionId);
         return { ok: true } as const;
       }
-      this.sessionId++; this.lastLayoutSequence = 0;
+      this.sessionId++; this.lastLayoutSequence = 0; this.lastResizeSequence = 0; this.manualSize = null;
       const win = createOverlayChromeWindow(this.preloadPath, { width: SOP_WIDTH, height: SOP_OPEN_HEIGHT, title: 'SOP 合成流程', backgroundThrottling: false });
       lockRendererWindow(win); this.window = win;
-      win.on('closed', () => { if (this.window === win) { this.window = null; this.queryRuntime?.invalidate(); } });
+      win.on('closed', () => {
+        if (this.window === win) {
+          this.window = null;
+          if (!this.instance) this.queryRuntime?.invalidate();
+        }
+        this.instance?.onClosed();
+      });
       this.placeWindow(win, sopOpeningSize());
       try {
         const loaded = await loadRenderer(win, 'sop', this.rendererDevServerUrl?.(), () => this.disposed);
@@ -416,6 +568,7 @@ export class SopWindowController {
     this.failMessage = null;
     this.sessionId += 1;
     this.lastLayoutSequence = 0;
+    this.lastResizeSequence = 0;
 
     const existing = this.liveWindow();
     if (existing) {
@@ -480,7 +633,16 @@ export class SopWindowController {
     if (!win) {
       return;
     }
-    this.placeWindow(win, { width: SOP_WIDTH, height: win.getBounds().height });
+    if (this.parkedFrom) {
+      this.restoreBookmark(win, true);
+      return;
+    }
+    if (this.manualSize) {
+      const current = win.getBounds();
+      win.setBounds(clampRectToWorkArea({ ...current, ...this.manualSize }, this.workArea(current)));
+    } else if (!this.instance) {
+      this.placeWindow(win, { width: SOP_WIDTH, height: win.getBounds().height });
+    }
     if (!win.isVisible()) {
       win.show();
     }
@@ -488,8 +650,35 @@ export class SopWindowController {
     win.focus();
   }
 
+  private restoreBookmark(win: BrowserWindow, focus: boolean): void {
+    this.clearBookmark(win);
+    if (!win.isVisible()) win.showInactive();
+    if (focus) {
+      win.moveTop();
+      win.focus();
+    }
+  }
+
+  private clearBookmark(win: BrowserWindow): void {
+    if (!this.parkedFrom) return;
+    const bounds = this.parkedFrom;
+    this.parkedFrom = null;
+    const area = this.workArea(win.getBounds());
+    win.setBounds(clampRectToWorkArea(bounds, area));
+    this.showChrome(win, { kind: 'expanded' });
+  }
+
+  private showChrome(win: BrowserWindow, chrome: SopWindowChrome): void {
+    if (!win.webContents.isDestroyed()) win.webContents.send(IPC_CHANNELS.SOP_WINDOW_CHROME, chrome);
+  }
+
   private placeWindow(win: BrowserWindow, size: { width: number; height: number }): void {
-    win.setBounds(placeSopNearQuery(this.queryBounds(), this.workArea(), size));
+    const query = this.queryBounds();
+    const workArea = this.workArea();
+    const bounds = this.instance
+      ? placeSopLeftCenter(workArea, size)
+      : placeSopNearQuery(query, workArea, size);
+    win.setBounds(this.instance ? this.instance.place(bounds, workArea, query) : bounds);
   }
 
   private armLayoutTimeout(): void {
@@ -544,7 +733,18 @@ export class SopWindowController {
   private pushProjection(): void {
     const win = this.liveWindow();
     if (win && this.queryRuntime && !win.webContents.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.SOP_WINDOW_PROJECTION, this.queryRuntime.projection()); return;
+      const projection = this.queryRuntime.projection();
+      if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+      if (this.parkedFrom && (projection.projectionVersion !== 'sop-unified-v11' || !projection.instanceName)) {
+        win.hide();
+        this.clearBookmark(win);
+      }
+      if (this.instance && projection.state === 'ended' && !win.isVisible()) {
+        win.destroy();
+        return;
+      }
+      win.webContents.send(IPC_CHANNELS.SOP_WINDOW_PROJECTION, projection);
+      return;
     }
     if (!win || !this.tree || !this.progress || win.webContents.isDestroyed()) {
       return;

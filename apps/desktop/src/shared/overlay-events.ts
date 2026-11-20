@@ -4,6 +4,7 @@ import {
   isOverlayReportIdentity,
   isPositiveOverlayIdentityInteger,
 } from './overlay-report';
+import type { Size } from './overlay-geometry';
 import { isQueryLayoutAckCommand, type QueryLayoutAckCommand } from './query-layout';
 
 export type OverlayRole = 'fox' | 'query';
@@ -41,6 +42,7 @@ export type OverlayCommand =
       anchor: QueryAnchor;
       handoffCenterX: number;
       handoffCenterY: number;
+      viewport: Size;
       foxVisualTransform: FoxVisualTransform;
     }
   | { type: 'activate-search'; anchor: QueryAnchor; animate: boolean; handoffId?: number }
@@ -52,6 +54,7 @@ export type OverlayCommand =
       handoffId?: number;
       handoffCenterX: number;
       handoffCenterY: number;
+      viewport: Size;
     }
   | QueryLayoutAckCommand
   | { type: 'fox-edge'; edge: FoxDockEdge; epoch: number }
@@ -269,7 +272,13 @@ export function isFoxVisualTransform(value: unknown): value is FoxVisualTransfor
 }
 
 function isHandoffCoordinate(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 4096;
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isHandoffViewport(value: unknown): value is Size {
+  return typeof value === 'object' && value !== null
+    && 'width' in value && isPositiveOverlayIdentityInteger(value.width)
+    && 'height' in value && isPositiveOverlayIdentityInteger(value.height);
 }
 
 export function canRequestFoxPeek(
@@ -291,6 +300,7 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       anchor?: unknown;
       handoffCenterX?: unknown;
       handoffCenterY?: unknown;
+      viewport?: unknown;
       foxVisualTransform?: unknown;
     };
     return (
@@ -298,6 +308,7 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       (command.anchor === 'left' || command.anchor === 'right') &&
       isHandoffCoordinate(command.handoffCenterX) &&
       isHandoffCoordinate(command.handoffCenterY) &&
+      isHandoffViewport(command.viewport) &&
       isFoxVisualTransform(command.foxVisualTransform)
     );
   }
@@ -309,6 +320,7 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       handoffId?: unknown;
       handoffCenterX?: unknown;
       handoffCenterY?: unknown;
+      viewport?: unknown;
     };
     return (
       (command.anchor === 'left' || command.anchor === 'right') &&
@@ -316,7 +328,8 @@ export function isOverlayCommand(value: unknown): value is OverlayCommand {
       typeof command.animate === 'boolean' &&
       (command.handoffId === undefined || isHandoffId(command.handoffId)) &&
       isHandoffCoordinate(command.handoffCenterX) &&
-      isHandoffCoordinate(command.handoffCenterY)
+      isHandoffCoordinate(command.handoffCenterY) &&
+      isHandoffViewport(command.viewport)
     );
   }
   if (record.type === 'query-layout-ack') {
@@ -441,6 +454,7 @@ export function prepareSearchCommand(input: {
   anchor: QueryAnchor;
   handoffCenterX: number;
   handoffCenterY: number;
+  viewport: Size;
   foxVisualTransform: FoxVisualTransform;
 }): Extract<OverlayCommand, { type: 'prepare-search' }> {
   return {
@@ -449,6 +463,7 @@ export function prepareSearchCommand(input: {
     anchor: input.anchor,
     handoffCenterX: input.handoffCenterX,
     handoffCenterY: input.handoffCenterY,
+    viewport: input.viewport,
     foxVisualTransform: input.foxVisualTransform,
   };
 }
@@ -470,6 +485,7 @@ export function collapseQueryCommand(input: {
   animate: boolean;
   handoffCenterX: number;
   handoffCenterY: number;
+  viewport: Size;
 }): Extract<OverlayCommand, { type: 'collapse' }> {
   return {
     type: 'collapse',
@@ -479,6 +495,7 @@ export function collapseQueryCommand(input: {
     animate: input.animate,
     handoffCenterX: input.handoffCenterX,
     handoffCenterY: input.handoffCenterY,
+    viewport: input.viewport,
   };
 }
 

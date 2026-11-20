@@ -20,7 +20,11 @@ export function SopQueryView({projection,shellRef,drag}: {projection:SopQueryPro
   };
   return <div className="sop-shell query-shell" data-testid="sop-query-shell" data-state={projection.state} ref={shellRef}>
     <div className="glass-shell"><div className="glass-surface" aria-hidden="true" />
-      <header className="sop-chrome" {...drag}><strong>SOP 流程</strong><button type="button" className="sop-close" aria-label="收起流程，保留进度" onClick={()=>void window.sopWindow?.close()}>×</button></header>
+      <header className="sop-chrome">
+        <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
+        <strong>SOP 流程</strong>
+        <button type="button" className="sop-close" aria-label="收起流程，保留进度" onClick={()=>void window.sopWindow?.close()}>×</button>
+      </header>
       <div className="sop-body">
         <form onSubmit={event=> {event.preventDefault();void command({kind:'query',shopKey:shop,group,text});}}>
           <label>店铺<select aria-label="店铺" value={shop} onChange={e=>{setShop(e.target.value);clear();}}><option value="">请选择</option>{projection.shops.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}</select></label>

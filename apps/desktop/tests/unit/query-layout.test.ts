@@ -8,6 +8,7 @@ import {
   isQueryLayoutAck,
   isQueryLayoutAckCommand,
   isQueryContentLayoutPhase,
+  applyQueryResize,
   applyQueryVerticalResize,
   clampQueryDesiredHeight,
   pickQueryResizeEdgeForHeight,
@@ -74,7 +75,7 @@ describe('query content-hugging layout', () => {
     expect(clampQueryDesiredHeight(240, 180)).toBe(180);
   });
 
-  it('uses measured or manual height before the old 340/430/620 buckets', () => {
+  it('restores both manual dimensions and keeps the initial input compact', () => {
     expect(effectiveQuerySize({
       phase: 'RESULTS',
       resultCount: 3,
@@ -86,11 +87,30 @@ describe('query content-hugging layout', () => {
       resultCount: 3,
       workArea,
       measuredHeight: 312,
-      manualHeight: 410,
-    }).height).toBe(410);
+      manualSize: { width: 690, height: 710 },
+    })).toEqual({ width: 690, height: 710 });
     expect(fallbackQuerySizeForPhase('RESULTS', 3).height).toBe(620);
     expect(fallbackQuerySizeForPhase('RESULTS', 1).height).toBe(340);
-    expect(effectiveQuerySize({ phase: 'SEARCH_INPUT' }).height).toBe(88);
+    expect(effectiveQuerySize({ phase: 'SEARCH_INPUT', manualSize: { width: 690, height: 710 } }))
+      .toEqual({ width: 600, height: 88 });
+  });
+
+  it.each([
+    ['top', { x: 300, y: 210, width: 600, height: 450 }],
+    ['bottom', { x: 300, y: 250, width: 600, height: 370 }],
+    ['left', { x: 250, y: 250, width: 650, height: 410 }],
+    ['right', { x: 300, y: 250, width: 550, height: 410 }],
+    ['top-left', { x: 250, y: 210, width: 650, height: 450 }],
+    ['top-right', { x: 300, y: 210, width: 550, height: 450 }],
+    ['bottom-left', { x: 250, y: 250, width: 650, height: 370 }],
+    ['bottom-right', { x: 300, y: 250, width: 550, height: 370 }],
+  ] as const)('keeps the opposite edge fixed for %s', (direction, expected) => {
+    expect(applyQueryResize(
+      { x: 300, y: 250, width: 600, height: 410 },
+      direction,
+      { deltaX: -50, deltaY: -40 },
+      workArea,
+    )).toEqual(expected);
   });
 
   it('fails closed on malicious layout payloads and stale sequences', () => {
@@ -135,6 +155,7 @@ describe('query content-hugging layout', () => {
         type: 'update',
         sessionId: 2,
         sequence: 1,
+        deltaX: 0,
         deltaY,
         identity: REPORT_IDENTITY,
       })).toBe(true);
@@ -144,6 +165,7 @@ describe('query content-hugging layout', () => {
         type: 'update',
         sessionId: 2,
         sequence: 1,
+        deltaX: 0,
         deltaY,
         identity: REPORT_IDENTITY,
       })).toBe(false);
@@ -152,6 +174,7 @@ describe('query content-hugging layout', () => {
       type: 'update',
       sessionId: 2,
       sequence: 1,
+      deltaX: 0,
       deltaY: 12,
       unexpected: true,
     })).toBe(false);
@@ -162,6 +185,7 @@ describe('query content-hugging layout', () => {
       phase: 'RESULTS' as const,
       resultCount: 3 as const,
       height: 430,
+      width: 600,
       resizeEdge: 'bottom' as const,
     };
     expect(isQueryLayoutAck(validAck)).toBe(true);
@@ -179,7 +203,8 @@ describe('query content-hugging layout', () => {
       sequence: 0,
     })).toBe(false);
     expect(isQueryLayoutAck(rejectedQueryLayoutAck(0, 0))).toBe(true);
-    expect(isQueryLayoutAck({ ...validAck, width: 800 })).toBe(false);
+    expect(isQueryLayoutAck({ ...validAck, width: 800 })).toBe(true);
+    expect(isQueryLayoutAck({ ...validAck, x: 800 })).toBe(false);
     expect(isQueryLayoutAckCommand({
       type: 'query-layout-ack',
       sessionId: 4,
@@ -187,6 +212,7 @@ describe('query content-hugging layout', () => {
       phase: 'RESULTS',
       resultCount: 3,
       height: 430,
+      width: 600,
       resizeEdge: 'bottom',
     })).toBe(true);
     expect(isQueryLayoutAckCommand({
@@ -194,6 +220,7 @@ describe('query content-hugging layout', () => {
       sessionId: 4,
       sequence: 2,
       height: 430,
+      width: 600,
       resizeEdge: 'bottom',
     })).toBe(false);
     expect(acceptQueryLayoutAck({
@@ -267,28 +294,16 @@ describe('query content-hugging layout', () => {
     });
   });
 
-  it('rejects resize payloads that try to move x/y/width', () => {
-    expect(isQueryResizeRequest({
-      type: 'update',
-      sessionId: 1,
-      sequence: 2,
-      deltaY: 12,
-      identity: REPORT_IDENTITY,
-    })).toBe(true);
-    expect(isQueryResizeRequest({
-      type: 'update',
-      sessionId: 1,
-      sequence: 2,
-      deltaY: Number.NaN,
-    })).toBe(false);
-    expect(isQueryResizeRequest({
-      type: 'begin',
-      sessionId: 1,
-      sequence: 2,
-      x: 10,
-      y: 10,
-      width: 800,
-    })).toBe(false);
+  it('limits manual resize to allowlisted directions and bounded relative deltas', () => {
+    const identity = { sessionId: 1, sequence: 2, identity: REPORT_IDENTITY };
+    const begin = { ...identity, type: 'begin', direction: 'bottom-right' };
+    const update = { ...identity, type: 'update', deltaX: 40, deltaY: 12 };
+    expect(isQueryResizeRequest(begin)).toBe(true);
+    expect(isQueryResizeRequest(update)).toBe(true);
+    expect(isQueryResizeRequest({ ...begin, direction: 'center' })).toBe(false);
+    expect(isQueryResizeRequest({ ...update, deltaX: 4097 })).toBe(false);
+    expect(isQueryResizeRequest({ ...update, deltaY: Number.NaN })).toBe(false);
+    expect(isQueryResizeRequest({ ...update, x: 10, y: 10, width: 800 })).toBe(false);
   });
 });
 
@@ -318,6 +333,7 @@ describe('main query layout policy', () => {
       phase: 'RESULTS',
       resultCount: 3,
       height: 312,
+      width: 600,
       resizeEdge: 'bottom',
     });
     expect(queryLayoutAckCommand(2, 4, 'RESULTS', 3, 312, 'bottom')).toEqual({
@@ -327,6 +343,7 @@ describe('main query layout policy', () => {
       phase: 'RESULTS',
       resultCount: 3,
       height: 312,
+      width: 600,
       resizeEdge: 'bottom',
     });
     expect(controller).toContain('this.overlayState.layout.sequence');

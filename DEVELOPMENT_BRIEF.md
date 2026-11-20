@@ -34,7 +34,7 @@ Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Gi
 
 - Electron + React + TypeScript。
 - 两个 overlay `BrowserWindow`：闲置狐狸头 + 查询/结果窗；观感上是同一控件展开。
-- 狐狸头窗口约 88px（含动效留白）；查询胶囊约 600×88，原生 `resizable: false`。正常结果路径按 DOM 实测 hug（capsule 88 + banner + result-content + chrome + grip），经 typed query-only layout / 纵向 resize IPC 上报；Main 只接受受信 Query sender、合法枚举 / 0..3 / 有限整数 / 当前 sequence，钳制 `240..min(620, availableHeight)` 后一次 `setBounds` 并 ACK。旧分档 240 / 340 / 430 / 620 只作异常 fallback。不开放 width / x / y / bounds IPC，不用 CSS `resize`。collapse 使用 Main 计算的真实狐狸屏幕中心。小屏只压缩结果区，胶囊 88 不缩。
+- 狐狸头窗口约 88px（含动效留白）；查询胶囊约 600×88，原生 `resizable: false`。正常结果路径按 DOM 实测 hug（capsule 88 + banner + result-content + chrome + grip），经 typed query-only layout / 边角缩放 IPC 上报；Main 只接受受信 Query sender、合法枚举 / 0..3 / 有限整数 / 当前 sequence，钳制 `240..min(620, availableHeight)` 后一次 `setBounds` 并 ACK。旧分档 240 / 340 / 430 / 620 只作异常 fallback。缩放只提交方向与相对位移，Main 应用并确认尺寸。手动展开尺寸跨狐狸交接保留。不接受 renderer 指定宽高、坐标或 bounds，不用 CSS `resize`。collapse 使用 Main 计算的真实狐狸屏幕中心。小屏只压缩结果区，胶囊 88 不缩。
 - **不再使用固定 520×760 普通工作台窗口。**
 - 透明、无边框、置顶、跳过任务栏；窗口尺寸贴合可见控件。
 - 狐狸没有方形底板。共享透明客服狐狸用于 64px Float / Query 与 18px Tray：有机非对称旧帽子、宽紫帽檐遮眼、下半脸严格 `#F9D6C5`、唯一中央椭圆眼 `#A45C4A` 加短竖线、客服耳麦。禁止对称头盔、白点眼、双侧短弧眼、U 形舌。Dashboard 浅色复用该视觉，深色使用同几何白 / 浅灰耳麦专属 PNG，品牌尺寸固定 40px。耳罩和短麦杆必须进入外轮廓并在各尺寸可辨识。待机 2.8–3.2s、3–4px、约 2°、scale ≤ 1.04。紫色呼吸光晕拆到独立层（约 76px / 84px，opacity `.52–.60→.92–.95`，周期 3.0–3.4s），只动画 opacity；FoxHead 只保留很轻静态 drop-shadow。贴边与非贴边统一紫光，无白 glint、无白点眼、无闭合蓝圆。默认主题键盘焦点只由 `data-fox-keyboard-focus` 显示双耳外侧紫色短弧；pointerdown 同步清除；press / drag / session / settling / handoff 隐藏。贴边重播 420–560ms 方向性吸附；稳定半露时以 `.fox-head` transform 做镜像 inward-ready 动效（内移 3px、上抬 2px、内倾 5°、scale 1.035）；88px 原生窗始终完整留在工作区，由 renderer 做等效 44px 裁切，使 64px 狐狸视觉各露一半。悬停 / 聚焦时以 420ms 镜像动效探头到等效 80px 裁切，离开后以 300ms 反向动效缩回。禁止动画负责裁切的 `.fox-idle` 根节点，禁止把透明窗放到屏外或用循环原生 `setBounds` 做动画。
@@ -43,7 +43,7 @@ Menokin 四域材料已存在于企业受控空间，但尚未授权进入本 Gi
 - 闲置狐狸单击打开查询；查询胶囊里的狐狸单击收起查询，拖拽仍只移动。打开 / 收起采用两阶段共享元素交接：隐藏 Query 先按点击瞬间 Fox 的真实屏幕中心、同尺寸 64px 与当前 2D 姿态矩阵准备代理并回执，Main 才交换原生窗可见性、完成 App / BrowserWindow / WebContents 聚焦并启动 CSS；关闭反向等待 renderer 末帧回执。贴边 Query 必须与物理工作区边缘齐平，保持 32px 半露轮廓连续。最终 bounds 每阶段只提交一次，外壳以 `clip-path` 展开约 260ms、收起约 200ms，玻璃只淡入淡出；不得先闪完整面板、双狐狸错位、靠正常路径固定计时猜结束或出现两窗同时不可见。
 - 查询胶囊中的狐狸按 `SEARCHING / RESULTS / EMPTY / COPIED` 给出明显但不阻塞操作的原创反馈，业务状态优先于待机动效，并完整支持 reduced motion。Fox idle 另有 renderer-only 三层姿态：structural `handoff > snap > peek > retract > dragging`，transient `none | pressed | dragging | annoyed-drag`，ambient `awake | following-local | drowsy | sleeping`；warning 暂停 ambient。不把 ambient 塞进 OverlayPhase / IPC，不新增 preload。指针只在 88px Fox 窗内做整头局部跟随（≤1.75px / ≤2°，rAF 合帧）；睡眠用 deadline / token，活动 / fox-edge / 打开 / 隐藏即唤醒。约 8s 困倦、14s 睡眠时，只在 Float 为同一中央棕眼叠加逐步闭合表情，并用趴睡 transform、展开的地面影和 inward `Zzz` 表意；不改批准 PNG、Query、Dashboard、Tray 或 Dock。主键按下约 110ms squash，超过既有 4px 后进入拖拽方向反应，同一眼区改为棕色 `><`；长拖后 ≤1.2s 一次性烦躁拖拽。局部跟随或刚唤醒可播放两轮有限耳机声波；睡眠 / 拖拽 / warning / structural pose / handoff / reduced motion 必须停波。现有贴边半露 + peek / retract 即本项目 mini mode。禁止全局鼠标轮询、真实 free-roam、逐帧 setBounds、双击延迟；首击必须立即打开 Query。页面 hidden 时暂停 ambient sleep clock，visible 后 wake 并重新计时。drag-settle IPC 若超时由 generation-guarded watchdog 恢复，旧 ACK 不得覆盖新 drag。整头局部 follow 保留；不得称全局 eye tracking，也不得画白点眼 / 双侧短弧 / 卡通大眼。
 - renderer 安全基线：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。
-- preload 只暴露类型化、枚举化的最小 API：复制、平台、窗口上下文、打开/收起、打开 Dashboard、上报 UI 阶段、上报 query layout / 纵向 resize、上报有限 handoff milestone、拖拽位移、订阅 overlay 命令。handoff 回执只接受受信 Query sender、正整数 epoch 与固定枚举，不暴露任意窗口控制。
+- preload 只暴露类型化、枚举化的最小 API：复制、平台、窗口上下文、打开/收起、打开 Dashboard、上报 UI 阶段、上报 query layout / 边角缩放、上报有限 handoff milestone、拖拽位移、订阅 overlay 命令。handoff 回执只接受受信 Query sender、正整数 epoch 与固定枚举，不暴露任意窗口控制。
 - 禁止暴露通用 `send/on/invoke`、任意 channel、任意尺寸或文件系统。
 - IPC handler 校验 sender 来源；阻止新窗口、外部导航和权限请求。
 
@@ -143,7 +143,7 @@ scripts/                      仓级合同接收与 workspace 卫生门
       |
       +-- copy request --> [typed preload API] --> [Main clipboard]
       |
-      +-- DOM hug measure --> report-query-layout / resize-query-height
+      +-- DOM hug measure --> report-query-layout / resize-query
                trusted Query main-frame + session/sequence/phase gate
                clamp 240..min(620, availableHeight) --> one setBounds --> ACK
                stale/mismatch --> 240/340/430/620 fallback only
@@ -197,7 +197,7 @@ scripts/                      仓级合同接收与 workspace 卫生门
 12. 左右贴边原生窗口都稳定留在工作区、renderer 等效裁出 44px 窗区且狐狸视觉都露 32px；稳定半露态以 `.fox-head` transform 做镜像 inward-ready 动效（峰值内移 3px、上抬 2px、内倾 5°、scale 1.035），探头到等效 80px，吸附 / ready / 探头动画左右镜像且每次可重播；不得动画负责裁切的根节点，reduced motion 关闭持续位移、ready、声波和吸附变形。约 8s / 14s 分别可见困倦 / 闭眼趴睡 + `Zzz`，拖拽跨过 4px 后同一眼区显示 `><`，耳机声波只播放有限两轮且与睡眠 / 拖拽 / warning / handoff 互斥。台前调度下若 WindowServer 接受边界不同于 workArea，连续 hover / retract 只改变 renderer crop，实际 native x 不得往返理论 x0。整头局部 follow / 睡眠 / press / drag reaction 不得改变 88px native bounds，不得新增第三条持续动画循环，也不得污染 Query 业务动画。
 13. 拖拽松手、取消、失焦或 capture 丢失后只完成一次，后续无按键移动不再改变窗口或误触 click。Ctrl+主键走原生 context menu；右键 / 非主键不触发 reaction；键盘 click `detail=0` 仍立即打开且仅一次。
 14. Dashboard：IPC 仍 query-only，原生菜单 / Tray / macOS 程序坞可直接调用 Main；单例、关闭重建、最小化恢复、无 customerAgent、五个模块可浏览（管理概览、话术库、SOP、内容管理、系统同步）；滚轮 / 原生滚动条与最小窗口响应式可用，鼠标拖动不滚页；侧栏可折叠且以稳定 `data-nav-phase` 收口，同一 toggle 不放在 Logo 上，193/192 折叠阈值、208 滞回展开阈值与 lastExpandedWidth 恢复成立，折叠态可拖宽预览且阈值前平滑弹回（含 lostcapture 即使 buttons===1、回滚后 aria-valuenow=平台折叠宽度），跨阈值必须先提交当前 raw 帧再进入 expanding，titlebar/sidebar/main/divider 由唯一 renderedNavWidth 驱动且误差 ≤1（mac 折叠稳态 120，toggle.right≤112；native 折叠 72）；没有产品会话时写「未接入」，Owner 发布走导入 staged 再 publish（组织审核在飞书文档）。macOS 为 hiddenInset 一体 chrome，原生标题文字不可见，交通灯与 drag / no-drag 安全；Windows / Linux 保持原生窗控；选中导航无左侧紫色竖线，hover 灰、selected 淡紫；主题为单 trigger / menu；980 / 1180 / 1440 无页面级横溢出；main light/dark alpha 1 且无 blur。
-15. Electron smoke：启动狐狸头、左右停靠 / drag-settle、台前调度边界采纳、反复展开 / 收起且无双窗同时不可见、共享狐狸首帧中心 / 64px 尺寸 / 姿态矩阵连续、关闭后不点击页面即可直接键入、点击胶囊狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复。探头 / 缩回、Query 纵向拖拽及 Dashboard 导航 / 主题 / 筛选 / 模块交互使用 unit/component 测试作为默认门禁，避免让 macOS draggable region 或透明 overlay 下不确定的 CDP 长鼠标链阻塞交付。真实 OS 的应用激活、BrowserWindow / WebContents 键盘投递、Cmd+W / Dock 外观、折叠侧栏与 Query 纵向拖拽、贴边 hover / retract 命中仍需实机。Query 只保证当前 Space 唤起，不再承诺跨 Space / 覆盖全屏。自动化使用 `--demo-e2e` / `DEMO_E2E=1` 的 main harness 验证同一状态机与 `app.dock.isVisible()` 程序证据。
+15. Electron smoke：启动狐狸头、左右停靠 / drag-settle、台前调度边界采纳、反复展开 / 收起且无双窗同时不可见、共享狐狸首帧中心 / 64px 尺寸 / 姿态矩阵连续、关闭后不点击页面即可直接键入、点击胶囊狐狸收起、内容贴合高度、数字键复制、自动收起，以及 Dashboard 的可信入口、单例、安全隔离与程序坞恢复。探头 / 缩回、Query 边角缩放及 Dashboard 导航 / 主题 / 筛选 / 模块交互使用 unit/component 测试作为默认门禁，避免让 macOS draggable region 或透明 overlay 下不确定的 CDP 长鼠标链阻塞交付。真实 OS 的应用激活、BrowserWindow / WebContents 键盘投递、Cmd+W / Dock 外观、折叠侧栏与 Query 边角缩放、贴边 hover / retract 命中仍需实机。Query 只保证当前 Space 唤起，不再承诺跨 Space / 覆盖全屏。自动化使用 `--demo-e2e` / `DEMO_E2E=1` 的 main harness 验证同一状态机与 `app.dock.isVisible()` 程序证据。
 16. 桌面入口：图标按钮具备可访问名称；应用菜单含原生 fileMenu/close，Tray 菜单包含查询 / Dashboard / 退出；Fox / Query 原生右键菜单可用且不扩展 IPC 白名单，Query 可编辑区域保留标准编辑项。
 
 ## 7. 完成定义

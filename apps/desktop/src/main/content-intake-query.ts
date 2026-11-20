@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { buildBm25Index, characterUnigramBigramTerms, rankBm25 } from '@customer-agent/retrieval-core';
-import { emptyIntakeQueryContext, isIntakeSelection, type IntakeQuerySelection, type IntakeQueryContext, type IntakeQueryRow, type IntakeQueryInvalidationEvent } from '../shared/content-intake-query';
+import { emptyIntakeQueryContext, isIntakeSelection, type IntakeQuerySelection, type IntakeQueryContext, type IntakeQueryRow, type IntakeQueryInvalidationEvent, type IntakeSopCandidatesEvent } from '../shared/content-intake-query';
+import { SopCandidateSearch, type OpenSopCandidate } from './sop-candidate-search';
 import { loadIntakeAccess, loadIntakeVocabulary } from './content-intake-access';
 import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUsageSession } from './content-intake-usage';
 
@@ -9,6 +10,7 @@ import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUs
  * Top 3 keys may copy, and the catalog rechecks server authority before writing. */
 export class ContentIntakeQuery {
   private readonly usage: ContentIntakeUsage;
+  private readonly sopCandidates?: SopCandidateSearch;
   private readonly unsubscribe: () => void;
   private generation = 0;
   private discovery: AbortController | null = null;
@@ -21,9 +23,13 @@ export class ContentIntakeQuery {
   private disposed = false;
   private listeners = new Set<(event: IntakeQueryInvalidationEvent) => void>();
   constructor(private readonly session: IntakeUsageSession, writeClipboard: (text: string) => void,
-    private readonly sopDiscovery = false) {
+    private readonly sopDiscovery = false,
+    candidates?: { publish: (event: IntakeSopCandidatesEvent) => void; open: OpenSopCandidate }) {
     this.epoch = session.view().sessionEpoch;
     this.usage = new ContentIntakeUsage(session, writeClipboard);
+    if (candidates) {
+      this.sopCandidates = new SopCandidateSearch(session, signal => this.qualifySop(signal), candidates.publish, candidates.open);
+    }
     this.usage.subscribe(event => {
       if (event === 'updated') return;
       const affected = this.shown;
@@ -43,6 +49,7 @@ export class ContentIntakeQuery {
   subscribe(listener: (event: IntakeQueryInvalidationEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   cancel() {
     this.generation++;
+    this.sopCandidates?.cancel();
     this.copyRequest?.abort(); this.copyRequest = null;
     this.usage.cancelRefresh(); this.shown = null;
   }
@@ -91,15 +98,19 @@ export class ContentIntakeQuery {
   async qualifySop(signal: AbortSignal) {
     this.assertMenu();
     const context = this.context;
+    const menuDeadline = this.menuDeadline;
+    const menuValidUntil = Date.parse(context.validUntil ?? '');
     const qualification = await this.usage.qualify(signal, 'sop');
-    const isCurrent = () => !this.disposed && !this.discovery && this.context === context && qualification.isCurrent();
+    const isCurrent = () => !this.disposed && !this.discovery && this.context === context
+      && Date.now() < menuValidUntil && performance.now() < menuDeadline && qualification.isCurrent();
     if (!isCurrent()) throw new IntakeUsageError('STALE');
-    return { ...qualification, isCurrent };
+    return { ...qualification, isCurrent, menuDeadline, menuValidUntil };
   }
   async search(queryText: string, contextId: string = randomUUID()): Promise<IntakeQueryRow[]> {
     this.cancel();
     this.assertMenu();
     const generation = this.generation;
+    void this.sopCandidates?.discover(queryText, contextId);
     const catalog = await this.usage.refresh();
     if (this.disposed || generation !== this.generation) throw new IntakeUsageError('STALE');
     const snapshot = catalog.read();
@@ -129,6 +140,10 @@ export class ContentIntakeQuery {
     if (!catalog.read()) throw new IntakeUsageError('EXPIRED');
     this.shown = { catalog, keys: new Set(rows.map(row => row.key)), contextId };
     return rows;
+  }
+  openSopCandidate(key: string) {
+    if (!this.sopCandidates) throw new IntakeUsageError('UNAVAILABLE');
+    return this.sopCandidates.select(key);
   }
   async copy(key: string) {
     const shown = this.shown;

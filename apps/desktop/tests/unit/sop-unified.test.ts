@@ -135,9 +135,15 @@ describe('unified graph semantics', () => {
   });
   it('validates narrow commands and concealed projections', () => {
     expect(isSopUnifiedCommand({ kind: 'confirm', key: 'opaque' })).toBe(true);
+    expect(isSopUnifiedCommand({ kind: 'rename', name: '合成办理甲' })).toBe(true);
+    for (const name of [' ', '甲'.repeat(81), '甲\n乙']) {
+      expect(isSopUnifiedCommand({ kind: 'rename', name })).toBe(false);
+    }
+    expect(isSopUnifiedCommand({ kind: 'rename', name: '合成办理甲', instanceId: 'another-window' })).toBe(false);
     for (const value of [{ kind: 'confirm', key: 'opaque', token: 'bad' }, { kind: 'next' }, { kind: 'media', key: 'opaque', url: 'https://example.invalid' }]) expect(isSopUnifiedCommand(value)).toBe(false);
     const projection = { projectionVersion: 'sop-unified-v11', sessionId: 1, shops: [], notice: '', busy: false, copied: false, state: 'paused', title: '', node: null };
     expect(isSopUnifiedProjection(projection)).toBe(true);
     expect(isSopUnifiedProjection({ ...projection, node: { instruction: 'protected' } })).toBe(false);
+    expect(isSopUnifiedProjection({ ...projection, instanceName: '合成办理甲' })).toBe(false);
   });
 });

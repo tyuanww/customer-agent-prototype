@@ -8,7 +8,9 @@ import path from 'node:path';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseContractSchema as parse, type ContractSchemaName, type components } from '@customer-agent/contracts/sop-unified';
+import { parseContractSchema as parseLegacy } from '@customer-agent/contracts';
 import { parseContractSchema as parseResource, CONTRACT_PROVENANCE as RESOURCE_PROVENANCE } from '@customer-agent/contracts/sop-resource-disable';
+import { SOP_CANDIDATE_CONTRACT_SET_ID, parseContractSchema as parseCandidate } from '@customer-agent/contracts/sop-candidates';
 import { SOP_TASK_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import { syntheticGraphMapping, syntheticTaskGraphWorkbook } from '../../../packages/content-intake/tests/support/sop-task-graph-workbook.js';
 import type { IntakePool } from '../src/content-intake/transaction.js';
@@ -21,14 +23,15 @@ import { parseUnifiedSopQueryResponse, sopGraphDigest } from '../src/sop-unified
 
 type C = components['schemas'];
 const enabled = process.env.CUSTOMER_AGENT_API_SOP_QUERY_PG15_INTEGRATION === '1';
+const candidatesEnabled = process.env.CUSTOMER_AGENT_API_SOP_CANDIDATES_PG15_INTEGRATION === '1';
 const evidenceRoot = path.join(os.tmpdir(), `sop-unified-query-http-${randomUUID()}`);
 const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const spacedEntryTerm = '合成斜杠甲 / 乙';
-describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP and PostgreSQL', () => {
+describe.skipIf(!enabled && !candidatesEnabled).sequential('normal 86 SOP query through actual HTTP and PostgreSQL', () => {
   let host: Pick<IntakeSyntheticHost, 'requestAs' | 'writeSopQueryFacts' | 'close' | 'root' | 'apiOrigin'>, admin: Client;
   let sequence = 0;
   let agentAuthorization: string | null = null;
-  let arm: 'facts' | 'query' | 'query-before' | null = null;
+  let arm: 'facts' | 'query' | 'query-before' | 'discovery' | 'open' | null = null;
   let corruptRead: 'digest' | 'allergy' | null = null;
   let refreshAtSourceStamp = false;
   let observedSourceStamp: string | null = null;
@@ -70,6 +73,8 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
           }
           if (arm === 'facts' && sql.startsWith('SELECT to_jsonb(content_intake.write_sop_query_facts')) lose = arm;
           if ((arm === 'query' || arm === 'query-before') && sql.startsWith('SELECT content_intake.complete_sop_unified_query')) lose = arm;
+          if (arm === 'discovery' && sql.startsWith('SELECT w5_sop_candidates.record_discovery') && values?.[4] !== null) lose = arm;
+          if (arm === 'open' && sql.startsWith('SELECT content_intake.open_sop_active_use')) lose = arm;
           if (lose === 'query-before') { arm = null; lose = null; throw new Error('SYNTHETIC_FAILURE_BEFORE_COMMIT'); }
           if (sql === 'COMMIT' && lose && arm === lose) { arm = null; throw new Error('SYNTHETIC_RESPONSE_LOST_AFTER_COMMIT'); }
           return result;
@@ -96,6 +101,7 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
   beforeAll(async () => {
     mkdirSync(evidenceRoot, { recursive: true });
     host = await createIntakeSyntheticHost({ prepareCandidate: false, profile: 'purpose-runtime', includeSopQuery: true, includeSopContinuation: true, includeLegacySearch: false,
+      includeSopCandidates: candidatesEnabled,
       wrapBusinessPool: uncertain, wrapUsagePool: uncertain,
       observeSyntheticRequest: (actor, headers) => { if (actor === 'agent') agentAuthorization = headers.get('authorization'); },
       observeError: error => diagnostics.push(error instanceof Error ? `${error.stack}\n${JSON.stringify(error, ['code', 'detail', 'where'])}` : String(error)),
@@ -565,4 +571,192 @@ describe.skipIf(!enabled).sequential('normal 86 SOP query through actual HTTP an
     expect((await post('agent', '/v1/sop/query', query())).status).toBe(403);
     expect((await admin.query("SELECT count(*)::int AS count FROM content_intake.grants WHERE kind='business' AND action='query' AND recipient_id='agent' AND revoked_at IS NOT NULL")).rows[0].count).toBe(0);
   });
+  it.skipIf(!candidatesEnabled)('W5 candidates negotiate separately, discover without C/D and open only the selected C', async () => {
+    const one = await publish('source-a', 'rel_native_base');
+    await facts(one, '税收相关规则');
+    const two = await publish('source-query-b', one.releaseId);
+    await facts(two, '品质售后SOP');
+    const w5 = { 'x-intake-contract-set': SOP_CANDIDATE_CONTRACT_SET_ID, 'content-type': 'application/json' };
+    const v12 = { ...w5, 'x-intake-contract-set': RESOURCE_PROVENANCE.contract_set_id };
+    const legacy = { 'content-type': 'application/json' };
+    const send = (route: string, body: unknown, headers: Record<string, string> = w5, actor: IntakeSyntheticIdentity = 'agent') =>
+      host.requestAs(actor, route, { method: 'POST', headers, body: JSON.stringify(body) });
+    const issue = async (contextGeneration: number) => {
+      const granted = await send('/v1/intake/entitlements', { shopId: 'shop-a', contextGeneration,
+        releaseId: null, productIds: [], scenarioIds: [] }, v12);
+      expect(granted.status, await granted.clone().text()).toBe(200);
+      return parseResource('IntakeEntitlement', await granted.json());
+    };
+    const count = async () => (await admin.query<{ c: number; d: number }>(`
+      SELECT (SELECT count(*)::int FROM content_intake.sop_query_leases) AS c,
+        (SELECT count(*)::int FROM content_intake.sop_active_uses) AS d`)).rows[0]!;
+    const discover = (body: unknown, headers: Record<string, string> = w5) => send('/v1/sop/candidate-queries', body, headers);
+    const select = (body: unknown, actor: IntakeSyntheticIdentity = 'agent') => send('/v1/sop/candidate-selections', body, w5, actor);
+    const before = await count();
+    const e = await issue(701), differentE = await issue(701);
+    const input = { request_id: randomUUID(), query_text: '合成入口 W5-search-synthetic-sentinel',
+      context_generation: 'candidate-701', entitlement_id: e.entitlementId };
+
+    const unauthenticated = await fetch(new URL('/v1/sop/candidate-queries', host.apiOrigin), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
+    });
+    expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.headers.get('www-authenticate')).toBe('Bearer');
+    expect((await discover(input, v12)).status).toBe(409);
+    expect((await send('/v1/sop/candidate-queries', input, legacy)).status).toBe(409);
+    expect((await send('/v1/intake/entitlements', { shopId: 'shop-a', contextGeneration: 701,
+      releaseId: null, productIds: [], scenarioIds: [] })).status).toBe(409);
+    expect((await send('/v1/sop/query', query())).status).toBe(409);
+    const malformed = await host.requestAs('agent', '/v1/sop/candidate-queries', { method: 'POST', headers: w5, body: '{' });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({ code: 'CONTRACT_UPGRADE_REQUIRED' });
+    expect((await discover({ ...input, query_text: '\u0000' })).status).toBe(400);
+    const duplicateStatus = await new Promise<number | undefined>((resolve, reject) => {
+      const url = new URL('/v1/sop/candidate-queries', host.apiOrigin);
+      const raw = JSON.stringify(input);
+      const req = rawHttpRequest(url, { method: 'POST', headers: [
+        'host', url.host, 'authorization', agentAuthorization ?? '', 'content-type', 'application/json',
+        'content-length', String(Buffer.byteLength(raw)), 'x-intake-contract-set', SOP_CANDIDATE_CONTRACT_SET_ID,
+        'X-Intake-Contract-Set', SOP_CANDIDATE_CONTRACT_SET_ID,
+      ] }, res => { res.resume(); resolve(res.statusCode); });
+      req.on('error', reject);
+      req.end(raw);
+    });
+    expect(duplicateStatus).toBe(409);
+
+    arm = 'discovery';
+    const discoveryRace = await Promise.all([discover(input), discover(input)]);
+    expect(discoveryRace.map(response => response.status).sort()).toEqual([200, 503]);
+    const discovery = discoveryRace.find(response => response.ok)!;
+    expect(discovery.headers.get('x-intake-contract-set')).toBe(SOP_CANDIDATE_CONTRACT_SET_ID);
+    expect(discovery.headers.get('cache-control')).toBe('no-store');
+    const found = parseCandidate('W5SopCandidateDiscoverResponse', await discovery.json());
+    expect(found).toMatchObject({ status: 'candidates', request_id: input.request_id, release_id: two.releaseId });
+    if (found.status !== 'candidates') throw new Error('W5 candidate names unavailable');
+    expect(found.candidates).toHaveLength(2);
+    expect(found.candidates.every(candidate => Object.keys(candidate).sort().join(',') === 'candidate_ref,label')).toBe(true);
+    expect(found.candidates.map(candidate => candidate.label)).toEqual([
+      `${two.graph.definition.header.title}（品质售后SOP）`, `${one.graph.definition.header.title}（税收相关规则）`,
+    ]);
+    expect(await (await discover(input)).json()).toEqual(found);
+    expect(await (await discover({ ...input, query_text: '合成不同问法' })).json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    const unmatched = { ...input, request_id: randomUUID().toUpperCase(), query_text: '没有作者词项的合成问题' };
+    expect(await (await discover(unmatched)).json()).toEqual({ status: 'no_match', request_id: unmatched.request_id });
+
+    const selection = { request_id: randomUUID().toUpperCase(), candidate_query_id: input.request_id,
+      candidate_ref: found.candidates[0]!.candidate_ref, entitlement_id: e.entitlementId };
+    const { entitlement_id: _, ...withoutE } = selection;
+    expect((await select(withoutE)).status).toBe(400);
+    expect((await send('/v1/sop/candidate-selections', selection, v12)).status).toBe(409);
+    expect((await select({ ...selection, entitlement_id: differentE.entitlementId })).status).toBe(403);
+    expect((await select({ ...selection, candidate_ref: `sdc_${randomBytes(32).toString('hex')}` })).status).toBe(403);
+    expect((await select(selection, 'reviewer')).status).toBe(403);
+    expect(await count()).toEqual(before);
+
+    arm = 'query';
+    const selectionRace = await Promise.all([select(selection), select(selection)]);
+    expect(selectionRace.map(response => response.status).sort()).toEqual([200, 503]);
+    const successful = selectionRace.find(response => response.ok)!;
+    expect(successful.headers.get('x-intake-contract-set')).toBe(SOP_CANDIDATE_CONTRACT_SET_ID);
+    const selected = parseResource('MenokinSopQuerySopReadyResponse', await successful.json());
+    expect(selected.request_id).toBe(selection.request_id);
+    expect(selected.result.graph_digest).toBe(sopGraphDigest(two.graph));
+    expect(Date.parse(selected.lease_expires_at)).toBeLessThanOrEqual(Date.parse(found.expires_at));
+    expect(await (await select(selection)).json()).toEqual(selected);
+    expect(await count()).toEqual({ c: before.c + 1, d: before.d });
+    const evidence = (await admin.query(`SELECT row_to_json(discovery) FROM w5_sop_candidate_draft.discovery WHERE request_id=$1::uuid
+      UNION ALL SELECT response::json FROM backend_review.receipts WHERE operation='intake:sop-query-v12' AND response->>'request_id'=$2`,
+    [input.request_id, selection.request_id])).rows;
+    expect(evidence).toHaveLength(2);
+    for (const privateValue of [input.query_text, e.entitlementId, selection.candidate_ref]) expect(JSON.stringify(evidence)).not.toContain(privateValue);
+
+    const another = await select({ ...selection, candidate_ref: found.candidates[1]!.candidate_ref });
+    expect(another.status).toBe(409);
+    expect(await another.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    const opening = { entitlementId: e.entitlementId, releaseId: selected.release_id, contextGeneration: e.contextGeneration,
+      key: selected.result.flow.header.key, graphDigest: selected.result.graph_digest, nodeId: selected.result.flow.header.startNodeId,
+      action: 'open', edgeId: null, entry: null, continuationId: `sct_${randomBytes(32).toString('hex')}`, queryRequestId: selection.request_id };
+    expect((await send('/v1/intake/sop/check', opening)).status).toBe(409);
+    expect((await send('/v1/intake/sop/check', { ...opening, queryRequestId: input.request_id }, v12)).status).toBe(409);
+    arm = 'open';
+    expect((await send('/v1/intake/sop/check', opening, v12)).status).toBe(503);
+    const acceptedOpen = await send('/v1/intake/sop/check', opening, v12);
+    expect(acceptedOpen.status, await acceptedOpen.clone().text()).toBe(200);
+    expect(await count()).toEqual({ c: before.c + 1, d: before.d + 1 });
+
+    const object = (await admin.query<{ payload_object_id: string }>(`SELECT object.payload_object_id FROM content_intake.sop_graph_release_media media
+      JOIN content_intake.sop_media_objects object ON object.media_object_id=media.object_id
+      WHERE media.release_id=$1 AND media.source_id='source-query-b' LIMIT 1`, [two.releaseId])).rows[0]!;
+    const mediaFile = path.join(host.root, 'objects', 'objects', object.payload_object_id), backup = `${mediaFile}.synthetic-missing`;
+    renameSync(mediaFile, backup);
+    try {
+      expect((await select(selection)).status).toBe(422);
+      expect((await select({ ...selection, request_id: randomUUID() })).status).toBe(422);
+      expect(await count()).toEqual({ c: before.c + 1, d: before.d + 1 });
+    } finally { renameSync(backup, mediaFile); }
+
+    await facts(two, '品质售后SOP', 'unclassified', null, 1);
+    expect(await (await discover(input)).json()).toEqual(found);
+    const oneReady = parseCandidate('W5SopCandidateDiscoverResponse', await (await discover({ ...input, request_id: randomUUID() })).json());
+    expect(oneReady).toMatchObject({ status: 'candidates', candidates: [{ label: one.graph.definition.header.title }] });
+    expect(await (await select(selection)).json()).toEqual(selected);
+    const changedFacts = await select({ ...selection, request_id: randomUUID() });
+    expect(changedFacts.status).toBe(409);
+    expect(await changedFacts.json()).toMatchObject({ code: 'SOP_STALE' });
+    await admin.query(`UPDATE w5_sop_candidate_draft.discovery SET issued_at=clock_timestamp()-interval '2 seconds',
+      expires_at=clock_timestamp()-interval '1 second' WHERE request_id=$1::uuid`, [input.request_id]);
+    expect(await (await discover(input)).json()).toEqual({ status: 'stale', request_id: input.request_id });
+    expect((await select(selection)).status).toBe(409);
+    expect(await count()).toEqual({ c: before.c + 1, d: before.d + 1 });
+
+    const manualConflict = await send('/v1/sop/query', query({ entitlement_id: e.entitlementId, request_id: selection.request_id }), v12);
+    expect(manualConflict.status).toBe(409);
+    expect(await manualConflict.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    const legacyManual = await send('/v1/sop/query', query({ entitlement_id: e.entitlementId }), v12);
+    expect(legacyManual.status, await legacyManual.clone().text()).toBe(200);
+    expect(parseResource('MenokinSopQuerySopQueryResponse', await legacyManual.json()).status).toBe('ready');
+
+    const unknown = await publish('source-query-short', two.releaseId);
+    const currentE = await issue(702);
+    const updated = { ...input, request_id: randomUUID(), entitlement_id: currentE.entitlementId };
+    expect(await (await discover(input)).json()).toEqual({ status: 'stale', request_id: input.request_id });
+    expect(await (await discover(updated)).json()).toEqual({ status: 'unavailable', request_id: updated.request_id });
+    const ambiguousWithUnknown = { ...updated, request_id: randomUUID(), query_text: '合成斜杠甲/乙 合成匹配 branch-known' };
+    expect(await (await discover(ambiguousWithUnknown)).json()).toEqual({ status: 'ambiguous', request_id: ambiguousWithUnknown.request_id });
+    await facts(unknown, '品质售后SOP');
+    const ambiguous = await discover(updated);
+    expect(ambiguous.status, await ambiguous.clone().text()).toBe(200);
+    const empty = { status: 'ambiguous', request_id: updated.request_id };
+    expect(await ambiguous.json()).toEqual(empty);
+    expect(await (await discover(updated)).json()).toEqual(empty);
+    expect((await admin.query(`SELECT count(*)::int n FROM w5_sop_candidate_draft.candidate
+      WHERE discovery_request_id=$1`, [updated.request_id])).rows[0].n).toBe(0);
+
+    const faqGrant = await send('/v1/intake/entitlements', { shopId: 'shop-a', contextGeneration: 702,
+      releaseId: null, productIds: [], scenarioIds: [] }, legacy);
+    expect(faqGrant.status, await faqGrant.clone().text()).toBe(200);
+    const faqE = parseResource('IntakeEntitlement', await faqGrant.json());
+    const faq = await host.requestAs('agent', '/v1/intake/snapshot?' + new URLSearchParams({ entitlementId: faqE.entitlementId, limit: '5' }));
+    expect(faq.status, await faq.clone().text()).toBe(200);
+    const faqSnapshot = parseLegacy('IntakeSnapshot', await faq.json());
+    expect(faqSnapshot.releaseId).toBe(unknown.releaseId);
+    expect(faqSnapshot.faq.length).toBeGreaterThan(0);
+    expect(await count()).toEqual({ c: before.c + 2, d: before.d + 1 });
+
+    const beforeRevocation = { ...updated, request_id: randomUUID(), query_text: spacedEntryTerm };
+    const readyBeforeRevocation = parseCandidate('W5SopCandidateDiscoverResponse', await (await discover(beforeRevocation)).json());
+    if (readyBeforeRevocation.status !== 'candidates') throw new Error('Expected authorized W5 candidate');
+    const selectedBeforeRevocation = { request_id: randomUUID(), candidate_query_id: beforeRevocation.request_id,
+      candidate_ref: readyBeforeRevocation.candidates[0]!.candidate_ref, entitlement_id: currentE.entitlementId };
+    expect((await select(selectedBeforeRevocation)).status).toBe(200);
+    await admin.query(`UPDATE content_intake.grants SET revoked_at=clock_timestamp(),version=version+1,last_change_reason='合成父授权撤销'
+      WHERE kind='allocation' AND action='query' AND parent_grant_id IS NULL AND scope_id IN ('scope-a','scope-query-b')`);
+    expect((await discover(updated)).status).toBe(403);
+    expect((await discover(beforeRevocation)).status).toBe(403);
+    expect((await select(selectedBeforeRevocation)).status).toBe(403);
+    expect(await count()).toEqual({ c: before.c + 3, d: before.d + 1 });
+    expect(JSON.stringify(diagnostics)).not.toContain(input.query_text);
+    expect(JSON.stringify(diagnostics)).not.toContain(e.entitlementId);
+  }, 120_000);
+
 });

@@ -401,6 +401,21 @@ describe('synthetic product identity bootstrap', () => {
       }
     });
 
+    it('enables W5 only in the explicitly synthetic local intake composition', () => {
+      const localW5 = { ...intakeEnvironment, ...FORMAL_DEV_ENV, CUSTOMER_AGENT_QUERY_MODE: 'intake-compat',
+        CUSTOMER_AGENT_SOP_CANDIDATES: 'synthetic' };
+      expect(parseApiPrivateBootstrapConfig(localW5).query).toMatchObject({ mode: 'intake-compat', sopCandidates: 'synthetic' });
+      for (const patch of [
+        { CUSTOMER_AGENT_PROFILE: 'production' },
+        { AUTH_MODE: 'feishu' },
+        { AUTH_SESSION_MODE: undefined },
+        { CUSTOMER_AGENT_QUERY_MODE: 'unified' },
+        { CUSTOMER_AGENT_SOP_CANDIDATES: 'enabled' },
+      ]) expectPrivateConfigIssue({ ...localW5, ...patch }, 'CUSTOMER_AGENT_SOP_CANDIDATES', 'invalid');
+      expect(parseApiPrivateBootstrapConfig({ ...localW5, CUSTOMER_AGENT_SOP_CANDIDATES: undefined }).query)
+        .not.toHaveProperty('sopCandidates');
+    });
+
     it('keeps intake pools fixed and consumes the existing timeout settings', () => {
       const config = parseApiPrivateBootstrapConfig({
         ...intakeEnvironment,

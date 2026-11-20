@@ -1,17 +1,42 @@
 import { isSopUnifiedCommand } from '../shared/sop-unified';
 import { isSopQueryCommand } from '../shared/sop-query';
-import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
-import { SOP_OPEN_FAILURE_MESSAGE, isSopLayoutRequest, rejectedSopLayoutAck, sopWindowFailure, type SopCopyResult, type SopLayoutAck, type SopWindowResult } from '../shared/sop-window';
+import { SOP_OPEN_FAILURE_MESSAGE, isSopBookmarkIntent, isSopLayoutRequest, rejectedSopLayoutAck, sopWindowFailure, type SopCopyResult, type SopLayoutAck, type SopResizeRequest, type SopWindowResult } from '../shared/sop-window';
 import { canControlSopWindow, canQueryOpenSop, canQueryReadSopEntry } from '../shared/sop-ipc-access';
+import { isWindowResizeDirection } from '../shared/window-resize-geometry';
 import { isTrustedMainFrameSender } from './sender-guard';
 import type { OverlayController } from './overlay-controller';
 import type { SopWindowController } from './sop-window-controller';
 
 export type SopWindowIpcHost = {
   getOverlay: () => OverlayController | null;
-  getSop: () => SopWindowController | null;
+  getSop: () => Pick<SopWindowController, 'open' | 'entryAvailable' | 'resumeAvailable'> | null;
+  getSopForContents: (contents: WebContents) => SopWindowController | null;
 };
+
+function isSopResizeRequest(value: unknown): value is SopResizeRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const request = value as Record<string, unknown>;
+  if (![request.sessionId, request.sequence].every(
+    field => typeof field === 'number' && Number.isSafeInteger(field) && field > 0,
+  )) return false;
+  const base = ['type', 'sessionId', 'sequence'];
+  const hasKeys = (keys: string[]) => Object.keys(request).length === keys.length
+    && keys.every(key => Object.hasOwn(request, key));
+  switch (request.type) {
+    case 'begin':
+      return hasKeys([...base, 'direction']) && isWindowResizeDirection(request.direction);
+    case 'update':
+    case 'end':
+      return hasKeys([...base, 'deltaX', 'deltaY'])
+        && [request.deltaX, request.deltaY].every(delta => typeof delta === 'number' && Math.abs(delta) <= 16_384);
+    case 'cancel':
+      return hasKeys(base);
+    default:
+      return false;
+  }
+}
 
 function queryGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): OverlayController | null {
   const overlay = host.getOverlay();
@@ -32,7 +57,7 @@ function queryGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): OverlayC
 
 function sopGuard(event: IpcMainInvokeEvent, host: SopWindowIpcHost): SopWindowController | null {
   const overlay = host.getOverlay();
-  const sop = host.getSop();
+  const sop = host.getSopForContents(event.sender);
   if (!overlay || !sop) {
     return null;
   }
@@ -147,6 +172,16 @@ export function registerSopWindowIpc(host: SopWindowIpcHost): void {
       sopGuard(event, host)?.moveBy(dx, dy, finished);
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_RESIZE, (event, ...args: unknown[]): void => {
+    const sop = sopGuard(event, host);
+    if (sop && args.length === 1 && isSopResizeRequest(args[0])) sop.resize(args[0]);
+  });
+  ipcMain.handle(IPC_CHANNELS.SOP_WINDOW_BOOKMARK, (event, ...args: unknown[]): SopWindowResult => {
+    const sop = sopGuard(event, host);
+    if (!sop || args.length !== 1 || !isSopBookmarkIntent(args[0])) return sopWindowFailure('INVALID', '流程窗口不可用');
+    return sop.bookmark(args[0]);
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT,

@@ -46,7 +46,8 @@ import {
 import { inspectCurrentIntakeRelease } from './integration/intake-readiness.js';
 
 function intakeRoutes(bootstrap: ApiPrivateBootstrapConfig) {
-  const intake = bootstrap.query.intake;
+  const { query } = bootstrap;
+  const intake = query.intake;
   if (intake === undefined) return undefined;
   if (bootstrap.objectStoreDir === undefined) throw new Error('Intake object store is incomplete');
   const report = (error: unknown): void => {
@@ -60,6 +61,7 @@ function intakeRoutes(bootstrap: ApiPrivateBootstrapConfig) {
     usage: pool(intake.usage, 'usage'),
     worker: pool(intake.worker, 'worker'),
     store: createContentObjectStore(bootstrap.objectStoreDir),
+    ...(query.mode === 'intake-compat' && query.sopCandidates !== undefined ? { sopCandidates: query.sopCandidates } : {}),
   };
 }
 

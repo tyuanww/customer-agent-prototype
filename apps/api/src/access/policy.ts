@@ -82,6 +82,9 @@ export const PROTECTED_ROUTE_POLICIES = createRoutePolicyRegistry([
   ['POST /v1/policy/flags', session()],
   ['POST /v1/search', requires('query')],
   ['POST /v1/sop/query', requires('query')],
+  // W5 owns the session envelope and validates the original E before any decision or replay.
+  ['POST /v1/sop/candidate-queries', Object.freeze({ kind: 'token' })],
+  ['POST /v1/sop/candidate-selections', Object.freeze({ kind: 'token' })],
   ['POST /v1/events/adoption', requires('query')],
   ['POST /v1/events/escalate', requires('query')],
   ['GET /v1/announce/current', requires('query')],
