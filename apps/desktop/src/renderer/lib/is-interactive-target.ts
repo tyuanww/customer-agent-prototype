@@ -1,4 +1,3 @@
-const INTERACTIVE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A']);
 const INTERACTIVE_ROLES = new Set([
   'button',
   'link',
@@ -23,12 +22,8 @@ export function isInteractiveTarget(target: EventTarget | null): boolean {
     return true;
   }
 
-  const tagged = target.closest('input, textarea, select, button, a');
+  const tagged = target.closest('input, textarea, select, button, a, summary');
   if (tagged) {
-    return true;
-  }
-
-  if (INTERACTIVE_TAGS.has(target.tagName)) {
     return true;
   }
 

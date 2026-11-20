@@ -884,7 +884,9 @@ export function FoxApp() {
         if (settlingRef.current) {
           abortDragSettle(dragGenerationRef.current);
         }
-        dragGenerationRef.current += 1;
+        dragGenerationRef.current = Math.max(
+          dragGenerationRef.current, overlaySnapshotRef.current?.drag.generation ?? 0,
+        ) + 1;
         clearSettleWatchdog();
         pointerFocusLockRef.current = true;
         flushSync(() => {

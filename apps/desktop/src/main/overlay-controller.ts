@@ -1013,6 +1013,7 @@ export class OverlayController {
     phase: ReportablePhase,
     resultCount: ResultCount,
     identity: OverlayReportIdentity,
+    startsSearch?: true,
   ): void {
     if (this.isInactive()) {
       return;
@@ -1030,6 +1031,7 @@ export class OverlayController {
       contentRevision: identity.contentRevision,
       contentPhase: phase,
       resultCount,
+      startsSearch,
     });
     if (transition?.decision !== 'applied') {
       this.staleRendererReports += 1;
@@ -1291,6 +1293,12 @@ export class OverlayController {
         return null;
       }
     }
+    const drag = this.overlayState.drag;
+    const queryDrag = drag.session?.target === 'query' ? drag.session : null;
+    if (target === this.query && finished && !queryDrag) {
+      return null;
+    }
+    const dragGeneration = foxGeneration ?? queryDrag?.generation ?? drag.generation + 1;
     const nativeBounds = target.getBounds();
     const sessionWorkArea = this.testHarness
       ? screen.getDisplayNearestPoint({
@@ -1429,7 +1437,7 @@ export class OverlayController {
         const moved = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_MOVED',
           ...this.overlayEventGuard(),
-          dragGeneration: Math.max(1, this.overlayState.drag.generation),
+          dragGeneration,
           target: 'query',
           dx: delta.dx,
           dy: delta.dy,
@@ -1443,7 +1451,7 @@ export class OverlayController {
         const ended = this.dispatchOverlayEvent({
           type: 'FOX_DRAG_ENDED',
           ...this.overlayEventGuard(),
-          dragGeneration: Math.max(1, this.overlayState.drag.generation),
+          dragGeneration,
           target: 'query',
           settledBounds: next,
           edge: resolveFoxDockAfterDrag(
@@ -1462,7 +1470,7 @@ export class OverlayController {
       const transition = this.dispatchOverlayEvent({
         type: 'FOX_DRAG_MOVED',
         ...this.overlayEventGuard(),
-        dragGeneration: foxGeneration ?? Math.max(1, this.overlayState.drag.generation),
+        dragGeneration,
         target: target === this.fox ? 'fox' : 'query',
         dx: delta.dx,
         dy: delta.dy,
@@ -1878,15 +1886,18 @@ export class OverlayController {
       measuredHeight: desiredHeight,
       manualSize,
     });
-    const edge = manualSize ? resizeEdge : pickQueryResizeEdgeForHeight(current, size.height, workArea, resizeEdge);
-    const next = manualSize
-      ? clampRectToWorkArea({
-          ...size,
-          x: this.sessionQueryAnchor() === 'right' ? current.x + current.width - size.width : current.x,
-          y: edge === 'top' ? current.y + current.height - size.height : current.y,
-        }, workArea, 0)
-      : applyQueryVerticalResize(current, size.height, edge, workArea);
-    const bounds = this.applyQueryBounds(next);
+    const compact = this.overlayState.contentPhase === 'SEARCH_INPUT';
+    const edge = compact ? 'bottom'
+      : manualSize ? resizeEdge : pickQueryResizeEdgeForHeight(current, size.height, workArea, resizeEdge);
+    const resized = {
+      ...current,
+      x: this.sessionQueryAnchor() === 'right' ? current.x + current.width - size.width : current.x,
+      width: size.width,
+    };
+    const next = manualSize || compact
+      ? { ...resized, height: size.height, y: edge === 'top' ? current.y + current.height - size.height : current.y }
+      : applyQueryVerticalResize(resized, size.height, edge, workArea);
+    const bounds = this.applyQueryBounds(clampRectToWorkArea(next, workArea, 0));
     return bounds ? { size: { width: bounds.width, height: bounds.height }, edge } : null;
   }
 

@@ -1,7 +1,7 @@
 import { IntakeAntdTheme } from './features/dashboard/intake-antd';
 import { Button, Checkbox, Input, Select } from 'antd';
-import { useEffect, useState, type RefObject } from 'react';
-import { SOP_INSTANCE_NAME_MAX_LENGTH, SOP_QUERY_GROUPS, type SopUnifiedCommand, type SopUnifiedProjection } from '@shared/sop-unified';
+import { useEffect, useId, useState, type RefObject } from 'react';
+import { SOP_INSTANCE_NAME_MAX_LENGTH, SOP_QUERY_GROUPS, type SopUnifiedCommand, type SopUnifiedNode, type SopUnifiedProjection } from '@shared/sop-unified';
 import type { SopQueryGroup } from '@shared/sop-query';
 import type { useWindowDrag } from './lib/use-window-drag';
 
@@ -20,6 +20,7 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState('');
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const guidanceId = useId();
   const busy = waiting || projection.busy;
   useEffect(() => {
     if (!projection.shops.some(shop => shop.key === shopKey)) setShop(projection.shops.length === 1 ? projection.shops[0]!.key : '');
@@ -36,6 +37,23 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   };
   const node = projection.state === 'ready' ? projection.node : null;
   const canPark = Boolean(projection.instanceName && !busy && nameDraft === null);
+  const requiredMedia = node?.media.filter(item => item.required) ?? [];
+  const missingMedia = requiredMedia.filter(item => item.state !== 'ready');
+  const pendingConfirmations = node?.requirements.filter(item => !item.confirmed).map(item => item.label).join('、');
+  const advanceGuidance = node && node.kind !== 'terminal' && !node.canAdvance ? guidanceId : undefined;
+  const renderMedia = (item: SopUnifiedNode['media'][number]) => (
+    <figure className="sop-unified-media" key={item.key}>
+      <figcaption>{owners[item.owner]} / {item.alt}</figcaption>
+      {item.state === 'loading' ? <p role="status">图片正在读取。</p> : item.state === 'ready' ?
+        <img src={item.image} alt={item.alt} onError={event => {
+          event.currentTarget.hidden = true;
+          void command({ kind: 'media-failed', key: item.key });
+        }} /> : <>
+          <p>图片暂不可用。</p>
+          <Button disabled={busy} onClick={() => { void command({ kind: 'media', key: item.key }); }}>重试图片</Button>
+        </>}
+    </figure>
+  );
   return <IntakeAntdTheme><div className="sop-shell query-shell sop-unified" data-testid="sop-unified-shell" data-state={projection.state} data-busy={busy} ref={shellRef}
     onPointerLeave={event => {
       const goingToResize = event.relatedTarget instanceof Element && event.relatedTarget.closest('.sop-resize-handles');
@@ -47,6 +65,8 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
       <header className="sop-chrome">
         <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
         <div className="sop-chrome-title"><strong>{projection.instanceName || projection.title || 'SOP 流程'}</strong></div>
+        {node && projection.instanceName && nameDraft === null ? <Button type="text" className="sop-park"
+          disabled={busy} onClick={() => setNameDraft(projection.instanceName ?? '')}>重命名</Button> : null}
         {projection.instanceName && window.sopWindow?.bookmark ? <Button type="text" className="sop-park" disabled={!canPark} onClick={() => {
           void window.sopWindow?.bookmark?.('park').then(result => {
             if (!result.ok) setError(result.message);
@@ -54,7 +74,7 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
         }}>贴边暂放</Button> : null}
         <Button type="text" className="sop-close" aria-label="收起流程，保留进度" onClick={() => { void window.sopWindow?.close(); }}>×</Button>
       </header>
-      <div className="sop-body">
+      <div className="sop-body"><div className="sop-unified-content">
         {!node && projection.entry !== 'candidate' && projection.state !== 'paused' && projection.state !== 'closing' ? <form className="sop-unified-query" onSubmit={event => {
           event.preventDefault(); void command({ kind: 'query', shopKey, group, text });
         }}>
@@ -63,14 +83,12 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
           <label>问题<Input aria-label="问题" value={text} maxLength={2048} disabled={busy} onChange={event => setText(event.target.value)} /></label>
           <Button htmlType="submit" type="primary" loading={busy} disabled={!shopKey || !text.trim()}>查询流程</Button>
         </form> : null}
-        {projection.notice ? <p role="status">{projection.notice}</p> : null}
+        {!node && projection.notice ? <p role="status">{projection.notice}</p> : null}
         {error ? <p role="alert">{error}</p> : null}
         {projection.state === 'paused' ? <Button loading={busy} onClick={() => { void command({ kind: 'refresh' }); }}>重新确认并继续</Button> : null}
         {projection.state === 'closing' ? <Button loading={busy} onClick={() => { void command({ kind: 'clear' }); }}>按原请求确认结束</Button> : null}
         {node ? <>
-          {projection.instanceName && (nameDraft === null
-            ? <div><Button disabled={busy} onClick={() => setNameDraft(projection.instanceName ?? '')}>重命名</Button></div>
-            : <form className="sop-unified-query" onSubmit={event => {
+          {projection.instanceName && nameDraft !== null ? <form className="sop-unified-query" onSubmit={event => {
               event.preventDefault();
               if (nameDraft.trim() && !busy) void command({ kind: 'rename', name: nameDraft }).then(saved => {
                 if (saved) setNameDraft(null);
@@ -79,22 +97,31 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
               <label>流程名称<Input autoFocus aria-label="流程名称" value={nameDraft} maxLength={SOP_INSTANCE_NAME_MAX_LENGTH} disabled={busy} onChange={event => setNameDraft(event.target.value)} /></label>
               <Button htmlType="submit" disabled={busy || !nameDraft.trim()}>保存名称</Button>
               <Button disabled={busy} onClick={() => setNameDraft(null)}>取消</Button>
-            </form>)}
+            </form> : null}
           <p className="sop-stage">{node.stage}</p>
           <h2>{node.title}</h2>
           <p className="sop-prompt">{node.instruction}</p>
           {node.requirements.length ? <section aria-label="本步确认项" className="sop-unified-requirements">
+            <h3>本步确认项</h3>
             {node.requirements.map(item => <Checkbox key={item.key} checked={item.confirmed} disabled={busy || item.confirmed} onChange={() => { void command({ kind: 'confirm', key: item.key }); }}>{item.ordinal}. {item.label}</Checkbox>)}
-            {!node.canAdvance ? <p>完成本步确认项并核对必需图片后才能继续。</p> : null}
           </section> : null}
-          {node.knowledge.map((item, index) => <section className="sop-internal-banner" aria-label="相关知识" key={index}>
-            <strong>{item.title}</strong><p>{item.body}</p>
-            {item.resource ? <p>{item.owner === 'task' ? '任务' : '知识'}资料 {item.resource}</p> : null}
-          </section>)}
-          {node.media.map(item => <figure className="sop-unified-media" key={item.key}>
-            <figcaption>{owners[item.owner]} / {item.alt}{item.required ? ' / 必需' : ''}</figcaption>
-            {item.state === 'loading' ? <p role="status">图片正在读取。</p> : item.image ? <img src={item.image} alt={item.alt} onError={event => { event.currentTarget.hidden = true; void command({ kind: 'media-failed', key: item.key }); }} /> : <><p>图片暂不可用。</p><Button disabled={busy} onClick={() => { void command({ kind: 'media', key: item.key }); }}>重试图片</Button></>}
-          </figure>)}
+          {advanceGuidance ? <div className="sop-unified-guidance" role="status" id={advanceGuidance}>
+            {pendingConfirmations ? <p>待确认：{pendingConfirmations}</p> : null}
+            {missingMedia.map(item => <p key={item.key}>必需图片「{item.alt}」{item.state === 'loading' ? '正在读取。' : '暂不可用。'}</p>)}
+            {!pendingConfirmations && !missingMedia.length ? <p>{projection.notice || '当前无法继续。'}</p> : null}
+          </div> : null}
+          {requiredMedia.length ? <section aria-label="必需图片" className="sop-unified-required-media">
+            <h3>必需图片</h3>
+            {requiredMedia.map(renderMedia)}
+          </section> : null}
+          {node.knowledge.length ? <details className="sop-unified-knowledge">
+            <summary>补充资料与知识</summary>
+            {node.knowledge.map((item, index) => <section className="sop-internal-banner" aria-label="相关知识" key={index}>
+              <strong>{item.title}</strong><p>{item.body}</p>
+              {item.resource ? <p>{item.owner === 'task' ? '任务' : '知识'}资料 {item.resource}</p> : null}
+            </section>)}
+          </details> : null}
+          {node.media.filter(item => !item.required).map(renderMedia)}
           {node.scripts.some(script => script.risk === 'high' || script.risk === 'critical') ? <p>本步只给话术，不建单、不指令仓配。</p> : null}
           {node.scripts.map(script => <article className="script-card" key={script.key}>
             <strong>{script.title}</strong><span className="risk-chip">{risks[script.risk]}</span>
@@ -103,18 +130,21 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
             <Button disabled={busy || !script.canCopy} onClick={() => { void command({ kind: 'copy', key: script.key }); }}>复制话术</Button>
             {!script.canCopy ? <p>当前不能复制这条话术。</p> : null}
           </article>)}
-          {node.kind === 'action' ? <Button type="primary" disabled={busy || !node.canAdvance} onClick={() => { void command({ kind: 'next', key: node.nextKey }); }}>下一步</Button> : null}
           {node.kind === 'decision' ? <section className="sop-branches" aria-label="判断分支">
             {node.choices.map(choice => <div key={choice.key}>
               <p>判断依据 {choice.criterion}</p>
-              <Button disabled={busy || !node.canAdvance} onClick={() => { void command({ kind: 'choose', key: choice.key }); }}>{choice.label}{choice.unableToDetermine ? ' / 无法判断' : ''}</Button>
+              <Button aria-describedby={advanceGuidance} disabled={busy || !node.canAdvance} onClick={() => { void command({ kind: 'choose', key: choice.key }); }}>{choice.label}{choice.unableToDetermine ? ' / 无法判断' : ''}</Button>
             </div>)}
           </section> : null}
           {node.kind === 'terminal' ? <p>流程已到最后一步，请人工确认处理结果。</p> : null}
           {projection.copied ? <p aria-live="polite">已复制</p> : null}
         </> : null}
-        <Button className="sop-end" data-sop-end="true" disabled={busy} onClick={() => { void window.sopWindow?.endFlow(); }}>结束并清除进度</Button>
-      </div>
+      </div></div>
+      <footer className="sop-unified-actions">
+        <Button type="text" className="sop-end" data-sop-end="true" disabled={busy} onClick={() => { void window.sopWindow?.endFlow(); }}>结束并清除进度</Button>
+        {node?.kind === 'action' ? <Button type="primary" aria-describedby={advanceGuidance}
+          disabled={busy || !node.canAdvance} onClick={() => { void command({ kind: 'next', key: node.nextKey }); }}>下一步</Button> : null}
+      </footer>
     </div>
   </div></IntakeAntdTheme>;
 }

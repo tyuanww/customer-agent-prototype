@@ -52,7 +52,7 @@ export function QueryResizeGrip({
         onPointerMove={onPointerMove}
         onPointerUp={(event) => onFinish('end', event)}
         onPointerCancel={(event) => onFinish('cancel', event)}
-        onLostPointerCapture={(event) => onFinish('cancel', event, true)}
+        onLostPointerCapture={(event) => onFinish(event.buttons === 0 ? 'end' : 'cancel', event, true)}
         onKeyDown={keyboardAxis ? (event) => onKeyDown(event, keyboardAxis) : undefined}
       />
     );

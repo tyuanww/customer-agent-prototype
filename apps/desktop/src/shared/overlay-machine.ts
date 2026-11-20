@@ -15,7 +15,7 @@ import {
   isOverlayCommand,
   shortcutStatusCommand,
 } from './overlay-events';
-import { resolveSessionQueryAnchor, type Rect, type Size } from './overlay-geometry';
+import { QUERY_INPUT_HEIGHT, resolveSessionQueryAnchor, type Rect, type Size } from './overlay-geometry';
 import { isQueryContentLayoutPhase, type QueryResizeEdge } from './query-layout';
 import { isWindowResizeDirection, type WindowResizeDirection } from './window-resize-geometry';
 import {
@@ -179,6 +179,7 @@ export type OverlayEvent =
       type: 'CONTENT_CHANGED';
       contentPhase: ReportablePhase;
       resultCount: ResultCount;
+      startsSearch?: true;
       contentRevision: number;
     } & EventGuard)
   | ({ type: 'SESSION_CHANGED'; releaseId: string } & EventGuard)
@@ -1329,20 +1330,25 @@ export function applyOverlayEvent(
         return rejected(state, 'invalid-phase');
       }
       const cancelledResize = state.layout.resize;
+      const compacting = event.contentPhase === 'SEARCH_INPUT'
+        && (state.contentPhase !== 'SEARCH_INPUT' || cancelledResize !== null);
+      const newLayout = event.startsSearch || (event.contentPhase === 'ERROR' && event.resultCount === 0);
       return applied(
         {
           ...state,
           contentPhase: event.contentPhase,
           resultCount: event.resultCount,
           contentRevision: event.contentRevision,
-          layout: cancelledResize
-            ? {
-                ...state.layout,
-                ackSequence: cancelledResize.lastSequence,
-                appliedSize: sizeOfBounds(cancelledResize.baselineBounds),
-                resize: null,
-              }
-            : state.layout,
+          layout: {
+            ...state.layout,
+            ...(newLayout ? { manualSize: null, desiredHeight: null, appliedSize: null } : {}),
+            ...(cancelledResize ? {
+              ackSequence: cancelledResize.lastSequence,
+              appliedSize: sizeOfBounds(cancelledResize.baselineBounds),
+              resize: null,
+            } : {}),
+            ...(compacting ? { appliedSize: null, desiredHeight: null } : {}),
+          },
         },
         [
           { type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: state.handoff.id },
@@ -1353,6 +1359,7 @@ export function applyOverlayEvent(
                 manual: false,
               }]
             : []),
+          ...(compacting ? [{ type: 'APPLY_QUERY_LAYOUT' as const, desiredHeight: QUERY_INPUT_HEIGHT }] : []),
         ],
       );
     }
@@ -1387,6 +1394,7 @@ export function applyOverlayEvent(
         layout: {
           ...reset.layout,
           handoffId: state.handoff.id,
+          manualSize: null,
         },
         drag: {
           ...state.drag,
@@ -1421,6 +1429,9 @@ export function applyOverlayEvent(
         const next = { ...sessionChanged, focusIntent: 'query' as const };
         const effects: NativeEffect[] = [
           ...cancelling,
+          ...(state.phase === 'active' && state.contentPhase !== 'SEARCH_INPUT'
+            ? [{ type: 'APPLY_QUERY_LAYOUT' as const, desiredHeight: QUERY_INPUT_HEIGHT }]
+            : []),
           { type: 'FOCUS_WINDOW', target: 'query', sessionEpoch: event.sessionEpoch, windowGeneration: state.windowGeneration },
         ];
         if (state.phase === 'opening' && state.handoff.mode !== 'none') {

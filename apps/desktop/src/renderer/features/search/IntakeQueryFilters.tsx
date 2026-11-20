@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Ref } from 'react';
 import type { IntakeQueryOption } from '@shared/content-intake-query';
 import type { useIntakeShops } from './use-intake-shops';
 
@@ -12,7 +12,7 @@ function Terms({ label, options, selected, disabled, onChange, onLayoutChange }:
   return <details className="intake-terms" onToggle={onLayoutChange}>
     <summary>{label} · {selected.length ? `已选 ${selected.length}` : '全部'}</summary>
     <fieldset disabled={disabled}>
-      <legend className="sr-only">{label}筛选</legend>
+      <legend className="sr-only">{label}查询范围</legend>
       <input aria-label={`查找${label}`} value={text} onChange={event => { setText(event.target.value); onLayoutChange(); }} placeholder={`查找${label}`} />
       <button type="button" className="retry-btn" onClick={() => onChange([])} disabled={!selected.length}>清除{label}</button>
       <div className="intake-term-options">
@@ -55,8 +55,9 @@ function filterSummary(state: IntakeFilterState, names: Map<string, string>, rep
   ].join(' · ');
 }
 
-export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutChange }: {
-  state: IntakeFilterState; signedIn: boolean; open: boolean; onToggle: () => void; onLayoutChange: () => void;
+export function IntakeQueryFilters({ state, signedIn, open, toggleRef, showError = true, onToggle, onLayoutChange }: {
+  state: IntakeFilterState; signedIn: boolean; open: boolean; toggleRef?: Ref<HTMLButtonElement>; showError?: boolean;
+  onToggle: () => void; onLayoutChange: () => void;
 }) {
   const disabled = state.busy || !signedIn;
   const names = new Map(state.shopNamesValidUntil && Date.parse(state.shopNamesValidUntil)>Date.now()
@@ -68,11 +69,11 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutCh
   return <div className="intake-query-filters" data-testid="intake-query-filters" data-open={open ? 'true' : 'false'}>
     <div className="intake-filter-bar">
       <p className="intake-filter-summary" data-testid="intake-filter-summary">{filterSummary(state, names, repeats)}</p>
-      <button type="button" className="intake-filter-toggle" aria-expanded={open} aria-controls="intake-filter-body" onClick={onToggle}>
-        {open ? '收起' : '筛选'}
+      <button type="button" className="intake-filter-toggle" ref={toggleRef} aria-expanded={open} aria-controls="intake-filter-body" onClick={onToggle}>
+        查询范围
       </button>
     </div>
-    {!open && state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
+    {!open && showError && state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
     {open ? <div className="intake-filter-body" id="intake-filter-body">
       <div className="intake-shop-control">
         <label htmlFor="intake-shop">当前店铺</label>
@@ -91,7 +92,7 @@ export function IntakeQueryFilters({ state, signedIn, open, onToggle, onLayoutCh
           onChange={scenarioIds => { void state.selectConditions({ productIds: state.productIds, scenarioIds }); }} />
       </div>
       <p role="status">未选条件时查询全部授权话术。请点击查询。</p>
-      {state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
+      {showError && state.error ? <p role="alert" className="validation-error">{state.error}</p> : null}
     </div> : null}
   </div>;
 }

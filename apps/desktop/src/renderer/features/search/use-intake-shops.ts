@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { emptyIntakeQueryContext, type IntakeQuerySelection, type IntakeQueryContext } from '@shared/content-intake-query';
 
 /** Menu intent state only. Main must authorize even IDs returned by this hook. */
-export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: number, reset: () => void) {
+export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: number, reset: (expiredError?: string) => void) {
   const [context, setContext] = useState<IntakeQueryContext>(emptyIntakeQueryContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -39,14 +39,18 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
       if (value.ok) setContext(value);
       else { setContext(emptyIntakeQueryContext()); setError(value.message); }
     } catch {
-      if (request === sequence.current) { setContext(emptyIntakeQueryContext()); setError('筛选条件更新失败，请刷新店铺。'); }
+      if (request === sequence.current) { setContext(emptyIntakeQueryContext()); setError('查询范围更新失败，请刷新店铺。'); }
     } finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
   useEffect(() => {
     if (!context.validUntil) return;
     const timer = setTimeout(() => {
-      sequence.current++; resetRef.current(); setContext(emptyIntakeQueryContext()); setBusy(false);
-      setError('筛选资格已到期，请刷新店铺。');
+      const message = '查询范围资格已到期，请刷新店铺。';
+      sequence.current++;
+      resetRef.current(message);
+      setContext(emptyIntakeQueryContext());
+      setBusy(false);
+      setError(message);
     }, Math.max(0, Math.min(2_147_483_647, Date.parse(context.validUntil) - Date.now())));
     return () => clearTimeout(timer);
   }, [context.validUntil]);

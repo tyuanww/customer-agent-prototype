@@ -12,6 +12,8 @@ import {
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
   scopeControl?: React.ReactNode;
+  manualSopControl?: React.ReactNode;
+  manualSopError?: string;
   intake?: boolean;
   foxVisualState: QueryFoxVisualState;
   foxDrag: ReturnType<typeof useWindowDrag>;
@@ -39,6 +41,8 @@ type QueryCapsuleProps = {
 export function QueryCapsule({
   productControl,
   scopeControl,
+  manualSopControl,
+  manualSopError,
   intake = false,
   foxVisualState,
   foxDrag,
@@ -62,8 +66,11 @@ export function QueryCapsule({
   onToggleSmartRetrieval,
   onSearch,
 }: QueryCapsuleProps) {
+  const sessionHint = sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired'
+    || sessionNotice.kind === 'waiting' || (intake && sessionNotice.kind === 'success')) ? sessionNotice : null;
+
   return (
-        <div className="query-capsule">
+        <div className="query-capsule" data-intake={intake ? true : undefined}>
           <button
             type="button"
             className="capsule-fox"
@@ -86,7 +93,7 @@ export function QueryCapsule({
                 className="capsule-input"
                 data-testid="question-input"
                 value={query}
-                maxLength={MAX_QUERY_CHARS}
+                maxLength={intake ? undefined : MAX_QUERY_CHARS}
                 autoComplete="off"
                 aria-describedby={invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired' || sessionNotice.kind === 'waiting')) ? 'query-guidance' : undefined}
                 aria-invalid={invalidMessage ? true : undefined}
@@ -113,26 +120,26 @@ export function QueryCapsule({
               {deepThinkingDescription}
             </span> : null}
             <div className="capsule-meta">
-              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired'
-                || sessionNotice.kind === 'waiting' || (intake && sessionNotice.kind === 'success'))) ? (
+              {invalidMessage || sessionHint || manualSopError ? (
               <p
                 id="query-guidance"
                 className="capsule-hint"
+                title={intake ? invalidMessage || sessionHint?.text || manualSopError : undefined}
                 aria-live="polite"
               >
                 {invalidMessage ? (
                   <span className="validation-error" data-testid="validation-error">
                     {invalidMessage}
                   </span>
-                ) : (
+                ) : sessionHint ? (
                   <span
-                    className={`session-notice is-${sessionNotice!.kind}`}
-                    data-testid={`session-notice-${sessionNotice!.kind}`}
+                    className={`session-notice is-${sessionHint.kind}`}
+                    data-testid={`session-notice-${sessionHint.kind}`}
                     role="status"
                   >
-                    {sessionNotice!.text}
+                    {sessionHint.text}
                   </span>
-                )}
+                ) : <span className="validation-error" role="status">{manualSopError}</span>}
               </p>
               ) : null}
               <div className="capsule-tools">
@@ -175,28 +182,31 @@ export function QueryCapsule({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            className="search-btn"
-            data-testid="search-button"
-            onClick={onSearch}
-            disabled={searching || scopePending}
-            aria-busy={searching || scopePending}
-            title={scopePending ? '正在更新查询范围，请稍后查询。' : undefined}
-          >
-            {searching ? (
-              <span className="searching-label" data-testid="searching-indicator">
-                <span className="searching-dots" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
+          <div className="capsule-action-stack">
+            {manualSopControl}
+            <button
+              type="button"
+              className="search-btn"
+              data-testid="search-button"
+              onClick={onSearch}
+              disabled={searching || scopePending}
+              aria-busy={searching || scopePending}
+              title={scopePending ? '正在更新查询范围，请稍后查询。' : undefined}
+            >
+              {searching ? (
+                <span className="searching-label" data-testid="searching-indicator">
+                  <span className="searching-dots" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  检索中
                 </span>
-                检索中
-              </span>
-            ) : (
-              scopePending ? '更新中' : '查询'
-            )}
-          </button>
+              ) : (
+                scopePending ? '更新中' : '查询'
+              )}
+            </button>
+          </div>
         </div>
   );
 }

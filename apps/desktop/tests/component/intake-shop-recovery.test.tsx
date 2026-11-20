@@ -59,13 +59,13 @@ it.each([false, true])('shows NO_GRANT recovery guidance with filters open=%s an
   expect(screen.getByRole('alert')).toHaveTextContent(message);
   expect(denial.message).toBe('没有权限，请找人开通。');
 
-  if (!open) fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+  if (!open) fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
   fireEvent.click(screen.getByRole('button', { name: '刷新店铺' }));
   expect(await screen.findByRole('option', { name: 'shop-synthetic' })).toBeVisible();
   await waitFor(() => expect(screen.getByRole('button', { name: '刷新店铺' })).toBeEnabled());
   expect(access).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole('alert')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '收起' }));
+  fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
@@ -77,9 +77,9 @@ it.each(['UNAVAILABLE', 'FACTS_EXPIRED', 'NO_PRINCIPAL', 'ROLE_UNKNOWN'] as cons
     render(<Filters />);
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(failure.message);
-    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
     expect(screen.getByRole('alert').textContent).toBe(failure.message);
-    fireEvent.click(screen.getByRole('button', { name: '收起' }));
+    fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
     expect(screen.getByRole('alert').textContent).toBe(failure.message);
   },
 );
@@ -90,7 +90,7 @@ it('does not read shops or show a recovery error before login', () => {
   render(<Filters signedIn={false} />);
   expect(access).not.toHaveBeenCalled();
   expect(screen.queryByRole('alert')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+  fireEvent.click(screen.getByRole('button', { name: '查询范围' }));
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.getByRole('button', { name: '刷新店铺' })).toBeDisabled();
 });

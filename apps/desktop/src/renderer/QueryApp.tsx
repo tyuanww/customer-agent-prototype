@@ -1,6 +1,6 @@
-import { SopQueryEntry } from './features/search/SopQueryEntry';
+import { SopQueryEntry, useManualSopEntry } from './features/search/SopQueryEntry';
 import { IntakeQueryFilters } from './features/search/IntakeQueryFilters';
-import { PERMISSION_DENIAL_MESSAGE, type ProductSessionResult } from '@shared/product-session';
+import { PERMISSION_DENIAL_MESSAGE, productFailure, type ProductSessionResult } from '@shared/product-session';
 import type { ProductAnnounceResult } from '@shared/product-announce';
 import type { HelpAction, HelpStatus } from '@shared/product-help';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -81,7 +81,7 @@ import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
 import { compactQueryText } from '@shared/query-analyze';
 import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
 import type { LibraryDomain } from '@shared/library-delta';
-import { intakeQueryFailure, type IntakeSopCandidatesEvent } from '@shared/content-intake-query';
+import { intakeQueryFailure, isIntakeSearchRequest, type IntakeSopCandidatesEvent } from '@shared/content-intake-query';
 import {
   adoptedPlaceholderValues,
   announceInvalidationEffect,
@@ -89,10 +89,11 @@ import {
   rankedScriptsFromProductCandidates,
 } from './features/search/query-view-model';
 
-type QueryError = string | { message: string; recovery: 'refresh-shops' };
+type QueryError = string | { message: string; recovery: 'refresh-shops' | 'none' };
 
 export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
+  const signedInSession = productState?.ok && productState.signedIn ? productState : null;
   const [sessionBusy, setSessionBusy] = useState(false);
   const productEpochRef = useRef(0);
   const [phase, setPhase] = useState<OverlayPhase>('SEARCH_INPUT');
@@ -104,7 +105,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const signedInRef = useRef(false);
   const [queryError, setErrorMessage] = useState<QueryError>('');
   const errorMessage = typeof queryError === 'string' ? queryError : queryError.message;
-  const refreshShopsOnRetry = typeof queryError !== 'string' && queryError.recovery === 'refresh-shops';
+  const errorRecovery = typeof queryError === 'string' ? 'retry' : queryError.recovery;
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
   const [copiedRank, setCopiedRank] = useState<1 | 2 | 3 | null>(null);
@@ -122,6 +123,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [smartEnabled, setSmartEnabled] = useState(true);
   const [layoutReady, setLayoutReady] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const restoreScopeFocusRef = useRef(false);
+  const attachScopeToggle = useCallback((node: HTMLButtonElement | null) => {
+    if (node && restoreScopeFocusRef.current) {
+      restoreScopeFocusRef.current = false;
+      node.focus({ preventScroll: true });
+    }
+  }, []);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
   const [queryWidth, setQueryWidth] = useState(QUERY_WIDTH);
@@ -150,7 +158,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const searchInFlightRef = useRef(false);
   const preferenceWriteRef = useRef(Promise.resolve());
   const dashboardOpenFailedRef = useRef(false);
-  const sessionBusyRef = useRef(false);
+  const sessionActionRef = useRef<'login' | 'logout' | null>(null);
   const sessionGenerationRef = useRef(0);
   const pendingDashboardOpenRef = useRef(false);
   const openDashboardWindowRef = useRef<() => void>(() => undefined);
@@ -158,6 +166,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const searchGenerationRef = useRef(0);
   const intakeContextIdRef = useRef<string | null>(null);
   const [sopCandidates, setSopCandidates] = useState<IntakeSopCandidatesEvent | null>(null);
+  const manualSop = useManualSopEntry(intake && !parked && signedInSession !== null, productState?.sessionEpoch ?? 0);
+  const hasManualSop = manualSop !== null;
+  const manualSopError = manualSop?.error;
+  const measuredSopRef = useRef<{
+    candidates: IntakeSopCandidatesEvent | null;
+    manual: boolean;
+    error?: string;
+  } | null>(null);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const [announceInvalid, setAnnounceInvalid] = useState(false);
@@ -225,6 +241,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const finishCollapseContent = useCallback(() => {
     setPhase('SEARCH_INPUT');
     setResults([]);
+    setFiltersOpen(false);
     setReportedScriptIds(new Set());
     setReportError('');
     setCopying(false);
@@ -268,9 +285,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     cancelScheduledResultFocus();
     resultFocusFrameRef.current = window.requestAnimationFrame(() => {
       resultFocusFrameRef.current = null;
+      if (intake && document.activeElement?.closest('[data-sop-entry], [data-query-context]')) return;
       resultPaneRef.current?.focus();
     });
-  }, [cancelScheduledResultFocus]);
+  }, [cancelScheduledResultFocus, intake]);
 
   const focusQueryInput = useCallback((selectExistingText = true) => {
     cancelScheduledInputFocus();
@@ -494,9 +512,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       (sessionChanged || windowChanged)
       && (snapshot.contract.phase === 'active' || snapshot.contract.phase === 'opening')
     ) {
-      window.requestAnimationFrame(() => focusQueryInput(false));
+      cancelScheduledInputFocus();
+      inputFocusFrameRef.current = window.requestAnimationFrame(() => {
+        inputFocusFrameRef.current = null;
+        focusQueryInput(false);
+      });
     }
-  }, [focusQueryInput, reportOverlayEvent]);
+  }, [cancelScheduledInputFocus, focusQueryInput, reportOverlayEvent]);
 
   const reportHandoffMilestone = useCallback(
     (
@@ -552,7 +574,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
   }, [focusQueryInput, reportHandoffMilestone]);
 
-  const reportPhase = useCallback((next: OverlayPhase, resultCount: ResultCount = 0) => {
+  const reportPhase = useCallback((next: OverlayPhase, resultCount: ResultCount = 0, startsSearch?: true) => {
     setPhase(next);
     resultCountRef.current = resultCount;
     if (next === 'SEARCH_INPUT') {
@@ -563,7 +585,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (next !== 'FOX_IDLE') {
       const identity = overlayReportIdentity(++contentRevisionRef.current);
       if (identity) {
-        void window.customerAgent?.reportUiPhase(next, resultCount, identity);
+        if (startsSearch) void window.customerAgent?.reportUiPhase(next, resultCount, identity, startsSearch);
+        else void window.customerAgent?.reportUiPhase(next, resultCount, identity);
       }
     }
   }, [overlayReportIdentity]);
@@ -592,16 +615,19 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const capsule = shell?.querySelector<HTMLElement>('.query-capsule');
     const lastCard = pane?.querySelector<HTMLElement>('.script-card:last-of-type');
     const lastCopy = lastCard?.querySelector<HTMLElement>('.copy-btn');
-    const lastContentBottom = maxContentBottom([
+    const sopEntry = pane?.querySelector<HTMLElement>('[data-sop-entry]');
+    const paneContentBottom = maxContentBottom([
       lastCard,
       lastCopy,
-      shortcutBanner,
       statusBanner,
-      contentBanner,
       content?.lastElementChild ?? null,
       pane?.querySelector('[data-query-context]') ?? null,
-      pane?.querySelector('[data-sop-candidates]') ?? null,
+      sopEntry,
     ]);
+    const lastContentBottom = Math.max(
+      maxContentBottom([capsule, shortcutBanner, contentBanner]),
+      paneContentBottom > 0 ? paneContentBottom + (pane?.scrollTop ?? 0) : 0,
+    );
     const panePad = pane
       ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
       : 0;
@@ -610,7 +636,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       : 0;
     const intrinsic = composeQueryDesiredHeight({
       capsuleHeight: capsule?.offsetHeight ?? QUERY_INPUT_HEIGHT,
-      bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0) + (contentBanner?.offsetHeight ?? 0),
+      bannerHeight: (shortcutBanner?.offsetHeight ?? 0) + (statusBanner?.offsetHeight ?? 0)
+        + (contentBanner?.offsetHeight ?? 0) + (sopEntry?.offsetHeight ?? 0),
       contentScrollHeight: content?.scrollHeight ?? 0,
       chromeExtra: paneBorder + QUERY_CONTENT_BLANK_TOLERANCE_PX,
     });
@@ -669,6 +696,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       });
     }).catch(() => undefined);
   }, [closing, opening, overlayReportIdentity, reportOverlayEvent]);
+
+  const handleSopLayoutChange = useCallback(() => {
+    if (layoutReady) requestQueryLayout(phaseRef.current, resultCountRef.current);
+  }, [layoutReady, requestQueryLayout]);
 
   useEffect(() => {
     const api = window.customerAgent;
@@ -1067,14 +1098,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     if (!isQueryContentLayoutPhase(phase)) {
       hugPassRef.current = 0;
+      measuredSopRef.current = null;
       return undefined;
     }
-    if (layoutReady) {
+    const measured = measuredSopRef.current;
+    if (layoutReady && measured?.candidates === sopCandidates
+      && measured.manual === hasManualSop && measured.error === manualSopError) {
       return undefined;
     }
     hugPassRef.current = 1;
     layoutFrameRef.current = window.requestAnimationFrame(() => {
       layoutFrameRef.current = null;
+      measuredSopRef.current = { candidates: sopCandidates, manual: hasManualSop, error: manualSopError };
       requestQueryLayout(phase, results.length as ResultCount);
     });
     return () => {
@@ -1083,7 +1118,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         layoutFrameRef.current = null;
       }
     };
-  }, [closing, layoutReady, opening, phase, requestQueryLayout, results.length, sopCandidates]);
+  }, [closing, hasManualSop, layoutReady, manualSopError, opening, phase, requestQueryLayout, results.length, sopCandidates]);
 
   useEffect(() => {
     if (!layoutReady || opening || closing) {
@@ -1265,7 +1300,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setAnnounce(null);
       if (!searchInFlightRef.current) {
         setErrorMessage('');
-        setAnnounceInvalid(!sessionBusyRef.current);
+        setAnnounceInvalid(!sessionActionRef.current);
         reportPhase('SEARCH_INPUT');
         return result;
       }
@@ -1313,11 +1348,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     productEpochRef.current = value.sessionEpoch;
     setProductState(value);
-    const nextNotice = sessionNoticeForResult({
+    const wasSignedIn = signedInRef.current;
+    const previousNotice = sessionNoticeRef.current;
+    const unsigned = value.ok && value.enabled && !value.signedIn;
+    const noticeSource = intake && source === 'status' && unsigned && sessionActionRef.current === 'logout'
+      ? 'logout'
+      : source;
+    const nextNotice = intake && noticeSource === 'status' && unsigned && previousNotice?.kind === 'expired'
+      ? previousNotice : sessionNoticeForResult({
       value,
-      source,
-      wasSignedIn: signedInRef.current,
-      previous: sessionNoticeRef.current,
+      source: noticeSource,
+      wasSignedIn,
+      previous: previousNotice,
     });
     signedInRef.current = Boolean(value.ok && value.signedIn);
     sessionNoticeRef.current = nextNotice;
@@ -1325,18 +1367,26 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (source === 'login' && value.ok && value.signedIn) {
       setInvalidMessage('');
     }
-    if (!value.ok || (value.enabled && !value.signedIn)) {
+    if (!value.ok || unsigned) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setAnnounceInvalid(false);
+      setFiltersOpen(false);
+      setErrorMessage('');
+      if (!intake || wasSignedIn || source !== 'status') setInvalidMessage('');
       reportPhase('SEARCH_INPUT');
+      if (intake && wasSignedIn && resultPaneRef.current?.contains(document.activeElement)) {
+        focusQueryInput(false);
+      }
     } else if (value.ok && value.signedIn) {
-      if (!(sessionBusyRef.current && source === 'status')) {
+      if (!(sessionActionRef.current && source === 'status')) {
         void refreshAnnounce(value.sessionEpoch);
       }
     }
   }, [
+    intake,
     cancelPendingSearch,
     cancelPendingCopy,
+    focusQueryInput,
     refreshAnnounce,
     overlayReportIdentity,
     reportOverlayEvent,
@@ -1356,7 +1406,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       lastProductQueryRef.current = null; setHelpStatus('待核实');
       const invalidation = announceInvalidationEffect({
         reason: value.reason,
-        sessionBusy: sessionBusyRef.current,
+        sessionBusy: sessionActionRef.current !== null,
         searchInFlight: searchInFlightRef.current,
         showingQueryContent,
       });
@@ -1456,14 +1506,14 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     const product = window.customerAgent?.product;
     if (!product) return null;
     const signingOut = Boolean(productState?.ok && productState.signedIn);
-    if (sessionBusyRef.current && (signingOut || !options?.replace)) return null;
+    if (sessionActionRef.current && (signingOut || !options?.replace)) return null;
     const generation = ++sessionGenerationRef.current;
     if (!signingOut) {
       const waiting = { kind: 'waiting' as const, text: SESSION_NOTICE_TEXT.waiting };
       sessionNoticeRef.current = waiting;
       setSessionNotice(waiting);
     }
-    sessionBusyRef.current = true;
+    sessionActionRef.current = signingOut ? 'logout' : 'login';
     setSessionBusy(true);
     try {
       const result = await (signingOut ? product.logout() : product.login());
@@ -1488,15 +1538,21 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return null;
     } finally {
       if (generation === sessionGenerationRef.current) {
-        sessionBusyRef.current = false;
+        sessionActionRef.current = null;
         setSessionBusy(false);
       }
     }
   }, [acceptProductSession, focusQueryInput, intake, productState]);
 
-  const resetIntakeView = useCallback(() => {
-    cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
-    if (isQueryContentLayoutPhase(phaseRef.current)) reportPhase('RESULTS');
+  const resetIntakeView = useCallback((expiredError?: string) => {
+    cancelPendingSearch(); cancelPendingCopy(); setResults([]);
+    if (expiredError && signedInRef.current && queryInteractiveRef.current) {
+      setErrorMessage({ message: expiredError, recovery: 'refresh-shops' });
+      reportPhase('ERROR');
+    } else {
+      setErrorMessage('');
+      if (isQueryContentLayoutPhase(phaseRef.current) || phaseRef.current === 'COPIED') reportPhase('RESULTS');
+    }
   }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
   const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
     productState?.sessionEpoch ?? 0, resetIntakeView);
@@ -1518,12 +1574,25 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     return window.customerAgent?.intakeQuery?.onSopCandidates?.(event => {
       if (event.contextId !== intakeContextIdRef.current) return;
       setSopCandidates('candidates' in event && event.candidates.length === 0 ? null : event);
-      setLayoutReady(false);
     });
   }, [intake]);
 
   const runSearch = useCallback(() => {
     if (intake) {
+      if (composingRef.current || searchInFlightRef.current) return;
+      const queryText = (inputRef.current?.value ?? query).trim();
+      const request = { queryText, contextId: crypto.randomUUID() };
+      const showQuestionError = (message: string) => {
+        cancelScheduledResultFocus();
+        setErrorMessage('');
+        setInvalidMessage(message);
+        reportPhase(filtersOpen && productState?.ok && productState.signedIn ? 'RESULTS' : 'SEARCH_INPUT');
+        focusQueryInput(false);
+      };
+      if (!isIntakeSearchRequest(request)) {
+        showQuestionError(queryText ? intakeQueryFailure('VALIDATION').message : EMPTY_QUERY_MESSAGE);
+        return;
+      }
       if (!(productState?.ok && productState.signedIn)) {
         if (!(productState?.ok && !productState.enabled)) void sessionAction();
         return;
@@ -1535,18 +1604,17 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
         // Trust the projection's own sentence: it distinguishes a closed facts window from a
         // missing grant, and those tell the operator to do different things.
-        setResults([]); setErrorMessage(productState.job.notice ?? PERMISSION_DENIAL_MESSAGE);
+        setResults([]);
+        setErrorMessage({ message: productState.job.notice ?? PERMISSION_DENIAL_MESSAGE, recovery: 'none' });
         reportPhase('ERROR'); return;
       }
-      const text = (inputRef.current?.value ?? query).trim();
-      const validText = text.length > 0 && [...text].length <= 500;
-      const blocked: QueryError | null = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
-        : !validText ? '请输入最多 500 字的客户问题。'
-          : intakeShops.shopId ? null
-            : intakeShops.error ? { message: intakeShops.error, recovery: 'refresh-shops' }
-              : '请先选择有权限的店铺。';
+      const blocked: QueryError | null = intakeShops.busy
+        ? { message: '正在更新查询范围，请稍后查询。', recovery: 'none' }
+        : intakeShops.shopId ? null
+          : intakeShops.error ? { message: intakeShops.error, recovery: 'refresh-shops' }
+            : { message: '请先选择有权限的店铺。', recovery: 'none' };
       if (blocked) {
-        if (!intakeShops.busy && validText && !intakeShops.shopId && intakeShops.shops.length > 1) {
+        if (!intakeShops.busy && !intakeShops.shopId && intakeShops.shops.length > 1) {
           setFiltersOpen(true);
           setLayoutReady(false);
         }
@@ -1557,15 +1625,35 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         sessionNoticeRef.current = null;
         setSessionNotice(null);
       }
+      if (resultPaneRef.current) resultPaneRef.current.scrollTop = 0;
       const generation = ++searchGenerationRef.current;
-      const contextId = crypto.randomUUID(); intakeContextIdRef.current = contextId;
-      searchInFlightRef.current = true; setSearching(true); reportPhase('RESULTS');
-      void api.search({ queryText: text, contextId }).then(result => {
+      intakeContextIdRef.current = request.contextId;
+      searchInFlightRef.current = true; setSearching(true); reportPhase('RESULTS', 0, true);
+      void api.search(request).then(result => {
         if (generation !== searchGenerationRef.current) return;
         if (!result.ok) {
-          setErrorMessage(result.code === 'FORBIDDEN'
-            ? { message: result.message, recovery: 'refresh-shops' }
-            : result.message);
+          switch (result.code) {
+            case 'VALIDATION':
+              showQuestionError(result.message);
+              return;
+            case 'EXPIRED':
+              setErrorMessage({ message: '查询资格已到期，请刷新店铺。', recovery: 'refresh-shops' });
+              break;
+            case 'FORBIDDEN':
+              setErrorMessage({ message: result.message, recovery: 'refresh-shops' });
+              break;
+            case 'UNAUTHORIZED':
+              acceptProductSession(productFailure('UNAUTHORIZED', productEpochRef.current));
+              return;
+            case 'NO_PRINCIPAL':
+            case 'NO_GRANT':
+            case 'ROLE_UNKNOWN':
+            case 'LIMIT':
+              setErrorMessage({ message: result.message, recovery: 'none' });
+              break;
+            default:
+              setErrorMessage(result.message);
+          }
           reportPhase('ERROR'); return;
         }
         setResults(result.rows); reportPhase(result.rows.length ? 'RESULTS' : 'EMPTY', result.rows.length as ResultCount);
@@ -1600,7 +1688,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setReportedScriptIds(new Set());
       setReportError('');
       const generation = ++searchGenerationRef.current; const sessionEpoch = productEpochRef.current;
-      searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT');
+      searchInFlightRef.current = true; setSearching(true); reportPhase('SEARCH_INPUT', 0, true);
       const search = () => preferenceWriteRef.current.then(() => api.search({
         sessionEpoch, generation, queryText, platform: 'all', platformSource: 'manual',
         productContextType: null, productContextRef: null, productUnscoped: false, parentQueryId: null,
@@ -1653,7 +1741,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setErrorMessage('');
     cancelPendingCopy();
     cancelScheduledResultFocus();
-    reportPhase('SEARCH_INPUT');
+    reportPhase('SEARCH_INPUT', 0, true);
     searchInFlightRef.current = true;
     setSearching(true);
     setResults([]);
@@ -1696,7 +1784,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce,
+  }, [acceptProductSession, cancelPendingCopy, cancelScheduledResultFocus, filtersOpen, focusQueryInput, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce,
     intake, intakeShops.shopId, intakeShops.busy, intakeShops.error, intakeShops.shops.length, sessionAction]);
 
   const copyScript = useCallback(
@@ -1889,9 +1977,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
   const loadIntakeShops = intakeShops.load;
   const retry = useCallback(() => {
-    if (refreshShopsOnRetry) {
+    if (errorRecovery === 'refresh-shops') {
       setFiltersOpen(true);
       void loadIntakeShops();
+      focusQueryInput(false);
       return;
     }
     if (dashboardOpenFailedRef.current) {
@@ -1903,7 +1992,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return;
     }
     runSearch();
-  }, [copyScript, errorMessage, loadIntakeShops, openDashboard, refreshShopsOnRetry, runSearch]);
+  }, [copyScript, errorMessage, errorRecovery, focusQueryInput, loadIntakeShops, openDashboard, runSearch]);
 
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss(true);
@@ -1941,16 +2030,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     dismiss();
   }, [dismiss, recordNoHitExit]);
 
-  const drag = useWindowDrag(
-    (dx, dy, finished) => {
-      const identity = overlayReportIdentity();
-      if (!identity) {
-        return;
-      }
-      void window.customerAgent?.moveFoxBy(dx, dy, finished, undefined, identity);
-    },
-    dismiss,
-  );
+  const moveQuery = (dx: number, dy: number, finished: boolean) => {
+    const identity = overlayReportIdentity();
+    if (identity) void window.customerAgent?.moveFoxBy(dx, dy, finished, undefined, identity);
+  };
+  const drag = useWindowDrag(moveQuery, dismiss);
+  const surfaceDrag = useWindowDrag(moveQuery, () => {});
+  const noteQueryInteraction = () => {
+    cancelScheduledInputFocus();
+    if (openingRef.current) openingUserInteractionRef.current = true;
+  };
 
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
@@ -2010,6 +2099,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   };
 
   const expanded = isQueryContentLayoutPhase(phase) || phase === 'COPIED';
+  const hasScopeSelection = intakeShops.productIds.length > 0 || intakeShops.scenarioIds.length > 0
+    || (intakeShops.shops.length > 1 && intakeShops.shopId !== null);
+  const manualSopControl = manualSop ? <SopQueryEntry entry={manualSop} /> : null;
   const showQueryResizeGrip = expanded && phase !== 'COPIED' && !parked && !opening && !closing;
   const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
   const showScopeFields = Boolean(
@@ -2018,7 +2110,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     && productState.enabled
     && scopeKeys.length > 0,
   );
-  const signedInSession = productState?.ok && productState.signedIn ? productState : null;
   const showProductSession = Boolean(
     window.customerAgent?.product && !(productState?.ok && !productState.enabled),
   );
@@ -2099,7 +2190,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     const request = { sessionId: activeHandoffIdRef.current, sequence: ++layoutSequenceRef.current, identity };
     const operation = kind === 'end'
-      ? { ...request, type: kind, ...(pointer ? queryResizeDelta(pointer) : resizeDeltaRef.current) }
+      ? { ...request, type: kind, ...(pointer && !alreadyLost ? queryResizeDelta(pointer) : resizeDeltaRef.current) }
       : { ...request, type: kind };
     void window.customerAgent?.resizeQuery?.(operation)
       .then((ack) => applyQueryResizeAck(ack, request, identity))
@@ -2231,16 +2322,21 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       data-query-height={queryHeight}
       data-query-width={queryWidth}
       aria-busy={searching}
-      onPointerDownCapture={() => {
-        if (openingRef.current) {
-          openingUserInteractionRef.current = true;
-        }
+      onPointerDownCapture={noteQueryInteraction}
+      onKeyDownCapture={noteQueryInteraction}
+      onPointerDown={event => {
+        const target = event.target;
+        if (!queryInteractiveRef.current || !(target instanceof Element)
+          || target.closest('button, input, textarea, select, a, summary, label, .answer-text, .query-resize-grip')
+          || isInteractiveTarget(target)) return;
+        const pane = resultPaneRef.current;
+        if (pane && target === pane && event.clientX - pane.getBoundingClientRect().left >= pane.clientWidth) return;
+        surfaceDrag.onPointerDown(event);
       }}
-      onKeyDownCapture={() => {
-        if (openingRef.current) {
-          openingUserInteractionRef.current = true;
-        }
-      }}
+      onPointerMove={surfaceDrag.onPointerMove}
+      onPointerUp={surfaceDrag.onPointerUp}
+      onPointerCancel={surfaceDrag.onPointerCancel}
+      onLostPointerCapture={surfaceDrag.onLostPointerCapture}
     >
       <div
         className="glass-shell"
@@ -2270,8 +2366,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         <div className="glass-surface" aria-hidden="true" />
         <QueryCapsule
           intake={intake}
-          scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry" disabled={!signedInSession}
-            onClick={() => { setFiltersOpen(true); setLayoutReady(false); reportPhase('RESULTS', Math.min(3, results.length) as ResultCount); }}>筛选</button> : null}
+          scopeControl={intake && !expanded ? <button type="button" className="capsule-session-entry"
+            ref={attachScopeToggle} disabled={!signedInSession} aria-expanded={false}
+            onClick={() => {
+              restoreScopeFocusRef.current = true;
+              setFiltersOpen(true);
+              reportPhase('RESULTS');
+            }}>查询范围</button> : null}
+          manualSopControl={!expanded ? manualSopControl : null}
+          manualSopError={!expanded ? manualSopError : undefined}
           productControl={showProductSession ? (
             <QuerySessionControl
               busy={sessionBusy}
@@ -2337,9 +2440,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
 
         {expanded ? (
           <QueryResultsPane
-            contextControls={intake ? <><SopQueryEntry /><IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
-              onToggle={() => { setFiltersOpen(current => !current); setLayoutReady(false); }}
-              onLayoutChange={() => setLayoutReady(false)} /></> : showScopeFields ? (
+            contextControls={intake ? <IntakeQueryFilters state={intakeShops} signedIn={signedInSession !== null} open={filtersOpen}
+              toggleRef={attachScopeToggle}
+              showError={phase !== 'ERROR' || !errorMessage}
+              onToggle={() => {
+                setFiltersOpen(!filtersOpen);
+                if (filtersOpen && phase === 'RESULTS' && !intakeContextIdRef.current
+                  && !hasScopeSelection && !intakeShops.error && !intakeShops.busy) {
+                  restoreScopeFocusRef.current = true;
+                  reportPhase('SEARCH_INPUT');
+                } else setLayoutReady(false);
+              }}
+              onLayoutChange={() => setLayoutReady(false)} /> : showScopeFields ? (
               <QueryScopeFields
                 keys={scopeKeys}
                 values={placeholderValues}
@@ -2349,7 +2461,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
                 }}
               />
             ) : undefined}
-            sopCandidates={sopCandidates}
+            intakeSop={intake ? { event: sopCandidates, manualEntry: manualSopControl, manualError: manualSopError,
+              onLayoutChange: handleSopLayoutChange } : undefined}
             phase={phase}
             resultPaneRef={resultPaneRef}
             statusBannerRef={statusBannerRef}
@@ -2410,8 +2523,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               }
               markLocal();
             }}
-            onRetry={retry}
-            retryLabel={refreshShopsOnRetry ? '刷新店铺' : undefined}
+            onRetry={errorRecovery === 'none' ? undefined : retry}
+            retryLabel={errorRecovery === 'refresh-shops' ? '刷新店铺' : undefined}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);
             }}

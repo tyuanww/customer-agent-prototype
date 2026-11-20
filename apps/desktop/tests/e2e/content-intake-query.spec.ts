@@ -87,9 +87,9 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await query.getByRole('button', { name: '刷新店铺', exact: true }).click();
     const emptyShops = query.getByRole('alert').filter({ hasText: '请联系管理员确认可查询店铺和使用期限。' });
     await expect(emptyShops).toBeVisible();
-    await query.getByRole('button', { name: '收起', exact: true }).click();
+    await query.getByRole('button', { name: '查询范围', exact: true }).click();
     await expect(emptyShops).toBeVisible();
-    await query.getByRole('button', { name: '筛选', exact: true }).click();
+    await query.getByRole('button', { name: '查询范围', exact: true }).click();
     wire.state.empty = false;
     await query.getByRole('button', { name: '刷新店铺', exact: true }).click();
     await expect(emptyShops).toHaveCount(0);
@@ -136,7 +136,7 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
     await waitForFocusedWindow(app, 'query');
-    await query.getByRole('button', { name: '筛选', exact: true }).click();
+    await query.getByRole('button', { name: '查询范围', exact: true }).click();
     await expect(shop).toBeVisible();
     await query.getByTestId('question-input').fill('如何洁面');
     await shop.selectOption('shop-b'); await expect(shop).toHaveValue('shop-b');
@@ -208,7 +208,7 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     expect(requests.some(p => p.startsWith('/v1/announce') || p === '/v1/search')).toBe(false);
     await query.evaluate(() => window.customerAgent!.product!.logout());
     await expect(shop).toHaveCount(0);
-    await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
+    await expect(query.getByRole('button', { name: '查询范围', exact: true })).toBeDisabled();
   } catch (error) {
     if (app) {
       console.info('FAQ_FAILURE_MAIN', await app.evaluate(({ BrowserWindow }) => {

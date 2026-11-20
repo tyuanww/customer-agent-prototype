@@ -30,6 +30,9 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     const query = running.windows().find(page => page.url().includes('role=query'))!;
     await returnToQueryWindow(running, query);
     const question = query.getByTestId('question-input');
+    const shell = query.getByTestId('query-shell');
+    const manual = query.getByRole('button', { name: '手动找流程', exact: true });
+    const scope = query.getByRole('button', { name: '查询范围', exact: true });
     const submit = async (text: string) => {
       await question.fill(text);
       await query.getByTestId('search-button').click();
@@ -47,7 +50,17 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await expect(question).toHaveValue('合成入口');
     await expect(question).toBeFocused();
     await waitForFocusedWindow(running, 'query');
-    await query.getByRole('button', { name: '筛选', exact: true }).click();
+    for (const text of ['', '问'.repeat(501)]) {
+      await question.fill(text);
+      await question.press('Enter');
+      await expect(query.getByTestId('validation-error')).toBeInViewport({ ratio: 1 });
+      await expect(manual).toBeInViewport({ ratio: 1 });
+      await expect(scope).toBeInViewport({ ratio: 1 });
+      await expect(shell).toHaveAttribute('data-query-height', '88');
+    }
+    await scope.click();
+    await expect(shell).toHaveAttribute('data-layout-ready', 'true');
+    await expect(scope).toBeFocused();
     const shop = query.getByRole('combobox', { name: '当前店铺', exact: true });
     await shop.selectOption('shop-a');
     await expect(shop).toHaveValue('shop-a');
@@ -57,6 +70,28 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await submit('合成入口');
     await expect(faq).toBeVisible();
     await expect(candidates).toHaveCount(2);
+    const matched = query.getByRole('region', { name: '办理流程' });
+    const viewport = await matched.evaluate(entry => {
+      const pane = entry.closest('.result-pane');
+      const rect = (element: Element | null) => element?.getBoundingClientRect().toJSON();
+      return { viewport: [window.innerWidth, window.innerHeight], scrollTop: pane?.scrollTop,
+        pane: rect(pane), entry: rect(entry), actions: [...entry.querySelectorAll('button')].map(rect) };
+    });
+    await test.info().attach('first-result-viewport', { body: JSON.stringify(viewport), contentType: 'application/json' });
+    expect(viewport.scrollTop).toBe(0);
+    await expect(candidates.first()).toBeInViewport({ ratio: 1 });
+    await expect(candidates.last()).toBeInViewport({ ratio: 1 });
+    await expect(manual).toBeInViewport({ ratio: 1 });
+    const [capsuleBounds, matchedBounds, filterBounds] = await Promise.all([
+      query.locator('.query-capsule').boundingBox(),
+      matched.boundingBox(),
+      query.getByTestId('intake-query-filters').boundingBox(),
+    ]);
+    if (!capsuleBounds || !matchedBounds || !filterBounds) throw new Error('Expected Query, SOP matches and expanded filters');
+    const gap = matchedBounds.y - (capsuleBounds.y + capsuleBounds.height);
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(4);
+    expect(matchedBounds.y + matchedBounds.height).toBeLessThanOrEqual(filterBounds.y);
     expect(await counts()).toEqual({ selections: 0, openings: 0 });
     expect(sopWindows()).toHaveLength(0);
     await query.screenshot({ path: test.info().outputPath('faq-and-sop.png') });
@@ -87,7 +122,7 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await submit('鹭鸶');
     await expect(candidates).toHaveCount(2);
     await expect(faq).toHaveCount(0);
-    await expect(query.getByText('没有匹配的 FAQ 话术，可选择下方 SOP 办理。')).toBeVisible();
+    await expect(query.getByText('没有匹配的 FAQ 话术，可从上方选择流程办理。')).toBeVisible();
     await expect(query.getByTestId('no-hit')).toHaveCount(0);
     await expect(confirmation).toBeChecked();
 
@@ -144,13 +179,47 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     await expect.poll(counts).toEqual({ selections: 3, openings: 3 });
     await returnToQueryWindow(running, query);
 
-    await fixture.facts(await fixture.publish({ sourceId: 'source-optional', validImages: true }), '品质售后SOP');
+    const optionalCase = await fixture.publish({ sourceId: 'source-optional', validImages: true });
+    await fixture.facts(optionalCase, '少错破SOP');
+    await submit('合成入口');
+    const disclosure = matched.getByText('选择办理流程（3）', { exact: true });
+    await expect(disclosure).toBeVisible();
+    await expect(manual).toHaveCount(1);
+    await expect(candidates).toHaveCount(0);
+    const clipboardProbe = '__sopCandidateShortcutClipboard';
+    await running.evaluate(({ clipboard }, key) => {
+      const probe = { writes: 0 };
+      clipboard.writeText = () => { probe.writes += 1; };
+      Reflect.set(globalThis, key, probe);
+    }, clipboardProbe);
+    await disclosure.press('1');
+    await expect(query.getByTestId('toast')).toHaveCount(0);
+    await disclosure.press('Enter');
+    await expect(disclosure).toBeFocused();
+    await expect(candidates).toHaveText([
+      /（品质售后SOP）$/, /（少错破SOP）$/, /（税收相关规则）$/,
+    ]);
+    expect(await running.evaluate((_, key) => Reflect.get(globalThis, key)?.writes, clipboardProbe)).toBe(0);
+    expect(await counts()).toEqual({ selections: 3, openings: 3 });
+    await query.screenshot({ path: test.info().outputPath('faq-and-three-sops.png') });
+    const resize = query.getByRole('separator', { name: '调整查询窗宽度', exact: true });
+    for (let width = 576; width >= 360; width -= 24) {
+      await resize.press('Shift+ArrowLeft');
+      await expect(resize).toHaveAttribute('aria-valuenow', String(width));
+    }
+    await expect(disclosure).toBeInViewport({ ratio: 1 });
+    await expect(manual).toBeInViewport({ ratio: 1 });
+
+    await fixture.facts(optionalCase, '品质售后SOP', 1);
     await submit('合成入口');
     await expect(faq).toBeVisible();
     await expect.poll(async () => (await admin.query(
       "SELECT count(*)::int AS n FROM w5_sop_candidate_draft.discovery WHERE status='ambiguous'",
     )).rows[0].n).toBe(1);
     await expect(candidates).toHaveCount(0);
+    await expect(query.locator('[data-sop-candidates]')).toHaveCount(0);
+    await expect(manual).toBeVisible();
+    await expect(disclosure).toHaveCount(0);
     expect(await counts()).toEqual({ selections: 3, openings: 3 });
   } finally {
     try { if (app) await closeOwnedElectron(app); }

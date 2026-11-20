@@ -107,7 +107,7 @@ test('real preload IPC projects running, unknown, committed, failed, cancelled, 
     await login();
     async function searchCurrentContent() {
       await openQuery();
-      const filters = query.getByRole('button', { name: '筛选', exact: true });
+      const filters = query.getByRole('button', { name: '查询范围', exact: true });
       if (await filters.count()) {
         await filters.click();
         const shops = query.getByRole('combobox', { name: '当前店铺' });

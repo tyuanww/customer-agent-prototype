@@ -2248,7 +2248,7 @@ test('closeFocusedSurface closes Dashboard, collapses Query, and is a no-op on i
   }
 });
 
-test('restores the committed Query size across search and copy handoff', async () => {
+test('@float fits each new query after resizing and copy handoff', async () => {
   const app = await launchApp();
   try {
     const fox = await waitForRole(app, 'fox');
@@ -2263,12 +2263,18 @@ test('restores the committed Query size across search and copy handoff', async (
     const search = async (text: string) => {
       const input = query.getByTestId('question-input');
       await input.fill(text);
-      await input.press('Enter');
+      await query.getByTestId('search-button').click();
       await expect(query.getByTestId('script-card-1')).toBeVisible();
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
     };
     await open();
     await search(CLEANSER_QUERY);
+    await query.getByTestId('query-fox-focus-ring').evaluate(ring => {
+      ring.style.transform = 'translateX(100vw)';
+      ring.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    expect(await query.evaluate(() => document.elementFromPoint(4, innerHeight / 2)?.getAttribute('data-testid')))
+      .toBe('query-resize-left');
     const before = (await windowSnapshot(app)).find((item) => item.role === 'query');
     if (!before) throw new Error('Query window missing');
     const ack = await query.evaluate(async () => {
@@ -2291,20 +2297,20 @@ test('restores the committed Query size across search and copy handoff', async (
     });
     const size = { width: before.width - 64, height: Math.max(240, before.height - 36) };
     expect(ack).toMatchObject({ ok: true, ...size });
-    const expectSized = async () => {
+    const expectSized = async (expected: { width: number; height?: number }) => {
       await expect.poll(async () => (await windowSnapshot(app)).find((item) => item.role === 'query'))
-        .toMatchObject(size);
-      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-query-width', String(size.width));
+        .toMatchObject(expected);
+      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-query-width', String(expected.width));
     };
-    await expectSized();
+    await expectSized(size);
     await search('面膜过敏怎么办');
     await expect(query.getByTestId('script-card-2')).toHaveCount(0);
-    await expectSized();
+    await expectSized({ width: 600 });
     await query.getByTestId('copy-button-1').click();
     await expect.poll(async () => (await windowSnapshot(app)).find((item) => item.role === 'fox')?.visible).toBe(true);
     await open();
     await search(CLEANSER_QUERY);
-    await expectSized();
+    await expectSized({ width: before.width, height: before.height });
   } finally {
     await app.close();
   }

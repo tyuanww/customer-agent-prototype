@@ -7,6 +7,7 @@ import { expect, _electron as electron, type ElectronApplication, type Page } fr
 import { developmentProductProfile } from '../../src/main/product-runtime-config';
 import { SOP_QUERY_GROUPS, type SopQueryGroup } from '../../src/shared/sop-query';
 import { closeOwnedElectron } from './owned-electron';
+import { returnToQueryWindow } from './electron-focus';
 
 export type SopSyntheticProbe = { synthetic:boolean; apiOrigin:string; identityOrigin:string; shop:string; group:SopQueryGroup; query:string; branches:string[]; expectedMessage:string };
 
@@ -22,13 +23,11 @@ export async function runSopQueryProbe(probe:SopSyntheticProbe, afterCopy?:(surf
     app=await electron.launch({executablePath,cwd:fileURLToPath(new URL('../..',import.meta.url)),args:[`--user-data-dir=${directory}`,...(process.platform==='linux'?['--password-store=gnome-libsecret']:[]),'out/main/index.js','--demo-e2e'],env});
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=query'))).toBe(true);
     const query=app.windows().find(w=>w.url().includes('role=query'))!;
-    await app.evaluate(({app})=>app.focus({steal:true}));await query.evaluate(()=>window.customerAgent!.openSearch());
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening','false');
+    await returnToQueryWindow(app, query);
     const opened=app.waitForEvent('window');await query.getByRole('button',{name:'登录',exact:true}).click();
     const login=await opened;await expect.poll(()=>login.url()).toContain('role=login');await login.getByRole('button',{name:'飞书登录'}).click();
     await expect.poll(()=>query.evaluate(async()=>{const v=await window.customerAgent!.product!.sessionStatus();return v.ok&&v.signedIn;})).toBe(true);
-    await query.getByRole('button',{name:'筛选',exact:true}).click();
-    await query.getByRole('button',{name:'打开 SOP 流程'}).click();
+    await query.getByRole('button',{name:'手动找流程'}).click();
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=sop'))).toBe(true);
     const sop=app.windows().find(w=>w.url().includes('role=sop'))!;
     await expect(sop.getByRole('combobox',{name:'店铺'}).locator('option').filter({hasText:probe.shop})).toHaveCount(1);

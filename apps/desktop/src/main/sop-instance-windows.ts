@@ -44,10 +44,10 @@ export class SopInstanceWindows {
           const current = other === window ? null : other.bounds();
           return current ? [current] : [];
         }), query, workArea),
-      placeBookmark: workArea => placeSopBookmark(workArea, [...this.windows.keys()].flatMap(other => {
+      placeBookmark: (workArea, size) => placeSopBookmark(workArea, [...this.windows.keys()].flatMap(other => {
         const current = other === window ? null : other.bounds(true);
         return current ? [current] : [];
-      })),
+      }), size),
       onClosed: () => this.remove(window),
       onProjectionChanged: this.notifyResumeEntries,
     }, candidate);

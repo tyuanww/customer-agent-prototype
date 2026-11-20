@@ -213,6 +213,44 @@ describe('OverlayController fox drag settle transaction', () => {
     }
   });
 
+  it('moves the visible Query on consecutive drag gestures', () => {
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    query.setBounds({ x: 200, y: 140, width: 600, height: 350 });
+    Object.assign(controller as object, { query, overlayState: activeState() });
+    controllers.push(controller);
+
+    controller.moveBy(40, 20);
+    controller.moveBy(0, 0, true);
+    expect(query.getBounds()).toEqual({ x: 240, y: 160, width: 600, height: 350 });
+
+    controller.moveBy(-40, -20);
+    controller.moveBy(0, 0, true);
+    expect(query.getBounds()).toEqual({ x: 200, y: 140, width: 600, height: 350 });
+  });
+
+  it('fits an error without results after a manually sized Query', () => {
+    const controller = new OverlayController();
+    const query = createFoxWindow();
+    query.setBounds({ x: 200, y: 140, width: 504, height: 535 });
+    const state = activeState();
+    Object.assign(controller as object, {
+      query, overlayState: { ...state, layout: { ...state.layout, manualSize: query.getBounds() } },
+    });
+    controllers.push(controller);
+    const identity = {
+      sessionEpoch: state.sessionEpoch,
+      generation: state.generation,
+      windowGeneration: state.windowGeneration,
+      contentRevision: state.contentRevision + 1,
+    };
+    controller.reportUiPhase('ERROR', 0, identity);
+    controller.reportQueryLayout({
+      sessionId: state.handoff.id, sequence: 1, phase: 'ERROR', resultCount: 0, desiredHeight: 254, identity,
+    });
+    expect(query.getBounds()).toMatchObject({ width: 600, height: 254 });
+  });
+
   it.each(['move', 'moved'] as const)(
     'adopts the native Fox frame from the BrowserWindow %s event',
     (event) => {

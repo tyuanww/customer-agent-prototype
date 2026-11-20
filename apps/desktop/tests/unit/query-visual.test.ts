@@ -67,7 +67,7 @@ describe('query capsule visual contract', () => {
 
   it('treats the capsule as a white-first desktop input with purple as the action anchor', () => {
     expect(tokens).toContain('--glass: rgba(250, 252, 255, 0.88)');
-    expect(tokens).toContain('--query-glass: rgba(248, 249, 252, 0.80)');
+    expect(tokens).toContain('--query-glass: rgba(248, 249, 252, 0.94)');
     expect(tokens).toContain('--query-glass-inner: rgba(255, 255, 255, 0.48)');
     expect(tokens).toContain('--query-blur: blur(28px) saturate(118%)');
     expect(tokens).toContain('0 22px 58px rgba(23, 27, 38, 0.22)');

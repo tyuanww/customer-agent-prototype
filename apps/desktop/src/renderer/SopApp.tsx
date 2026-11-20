@@ -13,6 +13,7 @@ import {
   SOP_OPENING_MESSAGE,
   SOP_TERMINAL_MESSAGE,
   SOP_UNPUBLISHED_MESSAGE,
+  type SopLayoutRequest,
   type SopProjectedScript,
   type SopProjection,
   type SopWindowChrome,
@@ -274,23 +275,25 @@ export function SopApp({ projection: injected }: SopAppProps) {
       ? pipelineLayoutSignature(projection)
       : sopLayoutSignature(projection)
     : '';
+  const contentReady = isSopUnifiedProjection(projection) && projection.state === 'ready';
 
   const reportLayout = useCallback((desiredHeight: number) => {
     const api = window.sopWindow?.reportLayout;
     if (!api || injected) {
       return;
     }
-    const request = {
+    const request: SopLayoutRequest = {
       sessionId: Math.max(1, projection?.sessionId ?? sessionHintRef.current ?? 1),
       sequence: ++layoutSequenceRef.current,
       desiredHeight,
+      ...(contentReady ? { contentReady: true } : {}),
     };
     void api(request).then((ack) => {
       if (ack.ok) {
         sessionHintRef.current = ack.sessionId;
       }
     }).catch(() => undefined);
-  }, [injected, projection?.sessionId]);
+  }, [contentReady, injected, projection?.sessionId]);
 
   useLayoutEffect(() => {
     if (injected || chrome.kind === 'parked' || !layoutSignature) {
@@ -299,6 +302,18 @@ export function SopApp({ projection: injected }: SopAppProps) {
     const shell = shellRef.current;
     if (!shell) {
       return undefined;
+    }
+    const content = shell.querySelector<HTMLElement>('.sop-unified-content');
+    const header = shell.querySelector<HTMLElement>('.sop-chrome');
+    const actions = shell.querySelector<HTMLElement>('.sop-unified-actions');
+    if (content && header && actions) {
+      const measure = () => reportLayout(
+        Math.ceil(content.getBoundingClientRect().height + header.offsetHeight + actions.offsetHeight),
+      );
+      const observer = new ResizeObserver(measure);
+      observer.observe(content);
+      observer.observe(actions);
+      return () => observer.disconnect();
     }
     const frame = window.requestAnimationFrame(() => {
       const last = shell.querySelector<HTMLElement>('[data-sop-end]');

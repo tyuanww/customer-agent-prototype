@@ -185,12 +185,12 @@ export function registerOverlayIpc(getController: () => OverlayController | null
 
   ipcMain.handle(
     IPC_CHANNELS.REPORT_UI_PHASE,
-    (event, phase: unknown, resultCount: unknown, identity: unknown): void => {
+    (event, phase: unknown, resultCount: unknown, identity: unknown, startsSearch: unknown): void => {
       const controller = getController();
       if (!controller) {
         return;
       }
-      const trusted = isTrustedSender(
+      const trusted = isTrustedMainFrameSender(
         event,
         controller.trustedContents(),
         controller.rendererDevServerUrl,
@@ -200,11 +200,13 @@ export function registerOverlayIpc(getController: () => OverlayController | null
         !canReportUiPhase({ trusted, role }) ||
         !isReportablePhase(phase) ||
         !isResultCount(resultCount) ||
-        !isOverlayReportIdentity(identity)
+        !isOverlayReportIdentity(identity) ||
+        (startsSearch !== undefined &&
+          (startsSearch !== true || resultCount !== 0 || (phase !== 'SEARCH_INPUT' && phase !== 'RESULTS')))
       ) {
         return;
       }
-      controller.reportUiPhase(phase, resultCount, identity);
+      controller.reportUiPhase(phase, resultCount, identity, startsSearch);
     },
   );
 
