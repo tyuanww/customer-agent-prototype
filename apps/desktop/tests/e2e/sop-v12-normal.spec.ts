@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 import { parseContractSchema } from '@customer-agent/contracts/sop-resource-disable';
+import { returnToQueryWindow } from '../support/electron-focus';
 import { createSopV12NormalHost } from '../support/sop-v12-normal-host';
 import { readSopV12Probe, readSopV12Projection, runSopV12BackendProbe, setSopV12CloseUnavailable, setSopV12MediaDelay, setSopV12QueryDelay, type SopBackendOpeningEvidence, type SopV12BackendProbe } from '../support/sop-v12-backend-probe';
 
@@ -194,12 +195,7 @@ async function exerciseOptional({ app, sop }: Surface) {
 
 async function openAnotherCase({ app, query }: Pick<Surface, 'app' | 'query'>) {
   const previous = new Set(app.windows());
-  const shell = query.getByTestId('query-shell');
-  if (await shell.getAttribute('data-parked') === 'true') {
-    await query.evaluate(() => window.customerAgent!.openSearch());
-  }
-  await expect(shell).toHaveAttribute('data-parked', 'false');
-  await expect(shell).toHaveAttribute('data-opening', 'false');
+  await returnToQueryWindow(app, query);
   const entry = query.getByRole('button', { name: '打开 SOP 流程', exact: true });
   if (!(await entry.isVisible())) await query.getByRole('button', { name: '筛选', exact: true }).click();
   await entry.click();

@@ -9,6 +9,7 @@ import { SOP_RESOURCE_CONTRACT, type SopUnifiedProjection } from '../../src/shar
 import type { IntakeQuerySelection } from '../../src/shared/content-intake-query';
 import { developmentProductProfile } from '../../src/main/product-runtime-config';
 import { closeOwnedElectron } from './owned-electron';
+import { returnToQueryWindow } from './electron-focus';
 
 type C = components['schemas'];
 export type SopWireExchange = {
@@ -168,6 +169,7 @@ export async function runSopV12BackendProbe(input: SopV12BackendProbe) {
       clipboard.writeText = (text, type) => { actualWrite(text, type); state.copies.push(text); };
     }, input.apiOrigin);
     try {
+      await returnToQueryWindow(app, query);
       await query.getByRole('button', { name: '筛选', exact: true }).click();
       const shop = query.getByRole('combobox', { name: '当前店铺', exact: true });
       await expect(shop).toBeEnabled();
