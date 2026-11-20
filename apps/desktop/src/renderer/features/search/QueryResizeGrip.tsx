@@ -28,33 +28,32 @@ export function QueryResizeGrip({
   onKeyDown,
 }: QueryResizeGripProps) {
   return WINDOW_RESIZE_DIRECTIONS.map((direction) => {
-    // A single keyboard control per axis keeps the tab order short.
-    const axis = direction === edge ? 'height' : direction === 'right' ? 'width' : undefined;
-    const value = axis === 'height' ? height : width;
-    const min = axis === 'height' ? QUERY_LAYOUT_MIN_HEIGHT : QUERY_LAYOUT_MIN_WIDTH;
-    const limit = axis === 'height' ? window.screen.availHeight : window.screen.availWidth;
+    const keyboardAxis = direction === edge ? 'height' : direction === 'right' ? 'width' : undefined;
+    const value = keyboardAxis === 'height' ? height : width;
+    const min = keyboardAxis === 'height' ? QUERY_LAYOUT_MIN_HEIGHT : QUERY_LAYOUT_MIN_WIDTH;
+    const limit = keyboardAxis === 'height' ? window.screen.availHeight : window.screen.availWidth;
     return (
       <div
         key={direction}
         className="query-resize-grip"
-        role={axis ? 'separator' : undefined}
-        aria-hidden={axis ? undefined : true}
-        aria-orientation={axis === 'height' ? 'horizontal' : axis === 'width' ? 'vertical' : undefined}
-        aria-label={axis === 'height' ? '调整查询窗高度' : axis === 'width' ? '调整查询窗宽度' : undefined}
-        aria-valuemin={axis ? Math.min(min, value) : undefined}
-        aria-valuemax={axis ? Math.max(value, limit) : undefined}
-        aria-valuenow={axis ? value : undefined}
-        aria-valuetext={axis ? `${value} 像素` : undefined}
-        data-axis={axis}
+        role={keyboardAxis ? 'separator' : undefined}
+        aria-hidden={keyboardAxis ? undefined : true}
+        aria-orientation={keyboardAxis === 'height' ? 'horizontal' : keyboardAxis === 'width' ? 'vertical' : undefined}
+        aria-label={keyboardAxis === 'height' ? '调整查询窗高度' : keyboardAxis === 'width' ? '调整查询窗宽度' : undefined}
+        aria-valuemin={keyboardAxis ? Math.min(min, value) : undefined}
+        aria-valuemax={keyboardAxis ? Math.max(value, limit) : undefined}
+        aria-valuenow={keyboardAxis ? value : undefined}
+        aria-valuetext={keyboardAxis ? `${value} 像素` : undefined}
+        data-axis={keyboardAxis}
         data-edge={direction}
-        data-testid={axis === 'height' ? 'query-resize-grip' : `query-resize-${direction}`}
-        tabIndex={axis ? 0 : undefined}
+        data-testid={keyboardAxis === 'height' ? 'query-resize-grip' : `query-resize-${direction}`}
+        tabIndex={keyboardAxis ? 0 : undefined}
         onPointerDown={(event) => onPointerDown(event, direction)}
         onPointerMove={onPointerMove}
         onPointerUp={(event) => onFinish('end', event)}
         onPointerCancel={(event) => onFinish('cancel', event)}
         onLostPointerCapture={(event) => onFinish('cancel', event, true)}
-        onKeyDown={axis ? (event) => onKeyDown(event, axis) : undefined}
+        onKeyDown={keyboardAxis ? (event) => onKeyDown(event, keyboardAxis) : undefined}
       />
     );
   });

@@ -1502,10 +1502,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     productState?.sessionEpoch ?? 0, resetIntakeView);
   useEffect(() => {
     if (!intake) return;
-    return window.customerAgent?.intakeQuery?.onInvalidated(({ reason, contextId }) => {
+    return window.customerAgent?.intakeQuery?.onInvalidated(function invalidateFaqResults({ reason, contextId }) {
       if (contextId !== intakeContextIdRef.current) return;
-      // Invalidation can reach renderer before the FAQ invoke result.
-      // Fence that result while leaving the independently qualified SOP round.
       searchGenerationRef.current += 1;
       searchInFlightRef.current = false;
       setSearching(false);

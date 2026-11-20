@@ -7,8 +7,6 @@ import type { SopUnifiedSession } from './sop-unified-port';
 
 type CreateWindow = (instance: NonNullable<SopWindowControllerOptions['instance']>, candidate?: SopCandidateOpening) => SopWindowController;
 
-/** Owns the registered native windows. Each controller owns a single mutable
- * flow and accepts commands only from its own renderer. */
 export class SopInstanceWindows {
   private readonly windows = new Map<SopWindowController, () => void>();
   private readonly resumeListeners = new Set<() => void>();

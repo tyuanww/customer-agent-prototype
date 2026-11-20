@@ -22,7 +22,7 @@
 
 W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给 W6 的 Query 缩放。W6 的 SOP 部分接续 W4 的窗口所有权，完成后进入 W7。共享模块或 IPC 由一个工作单元写入，交接记录提交、入口、测试和阻塞。
 
-三路并行。W0/W2 沿现场构建定位首个失败请求。W8 用固定包和合成配置在 Windows 串行验收 W1 至 W7，覆盖双屏、任务栏和不同 DPI。W6 独立跟踪 macOS 收起焦点。[草稿 PR #224](https://github.com/tyuanww/customer-agent-prototype/pull/224)
+三路并行。W0/W2 沿现场构建定位首个失败请求。W8 用固定包和合成配置在 Windows 串行验收 W1 至 W7，覆盖双屏、任务栏和不同 DPI。W6 独立跟踪 macOS 收起焦点。[产品 PR #224](https://github.com/tyuanww/customer-agent-prototype/pull/224)
 
 [计划基线 CI · 91f404c1](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44501918151) · [产品候选首轮 CI · 20c55ee9](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44667250735)
 
@@ -85,6 +85,8 @@ W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给
 - [ ] **验收。** Windows 双屏不同缩放及任务栏占边时核对首开。两单分别贴边并恢复原步骤和尺寸。拔掉副屏后仍找得到书签。鼠标从书签进入正文只展开一次。
 
 ## W8 · 在同一个 Windows 安装包验收
+
+本轮验收版本为 **0.3.44**。用主线合并提交生成 Windows x64 工程包，以 EXE 的 SHA-256 和包内 `build-identity.json` 核对设备上的构建。下列 0.3.43 记录用于追溯上一轮验证。
 
 - [x] 已构建含 W5 的 Windows x64 未签名工程包 0.3.43。直接从 NSIS 安装程序提取 app.asar，核对 Main、四个 preload 和 renderer 等 14 个构建文件，内容逐字节一致。EXE SHA-256 为 `1ccc50ca35cf3d57ed677f5de1d0f229189d208fec04e43ef0b0678f30e80972`。包内 `build-identity.json` 记录产品提交 `07949f09392bac168eefcde2b3a77c5b6a0fb38c`。
 - [x] **合成账号。** [CLI 回归](../../scripts/intake-synthetic/cli.test.ts)以 HTTP 登录确认两种身份，非法值在创建资源前退出。另在本地 PG15 实测：`agent` 有合成店铺查询资格；`roster-nogrant` 登录成功，v12 授权返回 403，`/v1/auth/job` 返回 `actions.query: false`。[同包验收步骤](../how-to-verify-desktop.md#w5-候选与安装包联验)

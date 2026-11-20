@@ -10,7 +10,6 @@ import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createTemplate, createCsvTemplate, CSV_TEMPLATE_VERSION } from '@customer-agent/content-intake';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-// The W5 branch uses the actual application factory with explicit synthetic dependencies.
 import { createApiApp } from '../../dist/app.js';
 import { parseApiRuntimeConfig } from '../../dist/runtime-config.js';
 import { createServiceRepository } from '../../dist/service-repository.js';
@@ -47,10 +46,20 @@ import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-s
 type C = components['schemas'];
 export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'aftersale';
 export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
-/** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
- * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
-export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly'
-  | 'roster-stale' | 'roster-nogrant' | 'roster-agent' | 'roster-query-only' | 'roster-review-only';
+const rosterPrincipalLabels = {
+  'roster-director': '合成名单总监',
+  'roster-readonly': '合成只读总监',
+  'roster-stale': '合成过期总监',
+  'roster-nogrant': '合成无授权总监',
+  'roster-agent': '合成名单坐席',
+  'roster-query-only': '合成仅查询总监',
+  'roster-review-only': '合成仅审核总监',
+};
+export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | keyof typeof rosterPrincipalLabels;
+const principalLabels = new Map<string, string>([
+  ...INTAKE_SYNTHETIC_IDENTITIES.map(([id, , label]) => [id, label] as const),
+  ...Object.entries(rosterPrincipalLabels),
+]);
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -164,10 +173,6 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean
   return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false, options?.inputFormat ?? 'xlsx', options?.includeSopSource ?? false, options ?? {});
 }
 
-/** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
- * files, existing database or real provider is ever consumed.
- * The returned control methods are local test/terminal controls, not HTTP
- * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
   hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead' | 'includeSeats' | 'includeSopCandidates'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
@@ -554,10 +559,9 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     const report = (id: string, error: unknown) => { hooks.observeError?.(error); diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
     const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
     const ownerQueryFactWriter = createOwnerReviewedSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
-    const observeRequests = (server: FastifyInstance) => {
+    const recordSyntheticRequestPaths = (server: FastifyInstance) => {
       server.addHook('onRequest', async (request, reply) => {
         if (request.headers.host !== new URL(apiOrigin).host) return reply.code(403).send();
-        // Paths only: never retain credentials, auth codes, state or request bodies.
         if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
       });
     };
@@ -583,10 +587,10 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
           diagnostics.push({ id: diagnostic.code, reason: diagnostic.databaseCode ?? 'UNEXPECTED' });
         },
       });
-      observeRequests(app);
+      recordSyntheticRequestPaths(app);
     } else {
       app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
-      observeRequests(app);
+      recordSyntheticRequestPaths(app);
       registerProductAuthRoutes(app, auth);
       registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
       registerAccessRoutes(app, createDatabaseAccessEvaluator(pool), auth);
@@ -611,18 +615,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
           SEAT_APP_ID: 'app-a',
           SEAT_DEPARTMENT_ID: 'dept-a',
         }) }),
-        // Every principal that can appear in the grant-recipient directory needs a label, or the
-        // directory fails closed. The roster identities are added here for that reason only.
         principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
-          ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2]
-            ?? (principalId === 'roster-director' ? '合成名单总监'
-              : principalId === 'roster-readonly' ? '合成只读总监'
-              : principalId === 'roster-stale' ? '合成过期总监'
-              : principalId === 'roster-nogrant' ? '合成无授权总监'
-              : principalId === 'roster-agent' ? '合成名单坐席'
-              : principalId === 'roster-query-only' ? '合成仅查询总监'
-              : principalId === 'roster-review-only' ? '合成仅审核总监'
-              : null)
+          ? principalLabels.get(principalId) ?? null
           : null });
     }
     await portReservation.releaseApi();
@@ -690,8 +684,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         return ownerQueryFactWriter.write(authenticated, input);
       },
       selectIdentity(value: DesktopSyntheticIdentity) {
-        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',
-      'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only', 'roster-review-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+        if (!principalLabels.has(value)) throw new Error('Unknown synthetic identity');
+        selectedIdentity = value;
       },
       /** Revoke one principal's live query grant. The grant history is append-only, so this
        * is a versioned revoke rather than a delete, exactly like the product path. */

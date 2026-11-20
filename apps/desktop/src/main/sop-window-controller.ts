@@ -268,9 +268,8 @@ export class SopWindowController {
     const runtime = this.queryRuntime;
     if (this.instance && runtime instanceof SopUnifiedRuntime) {
       const projection = runtime.projection();
-      // A candidate without an active continuation has no reopen entry.
-      const discard = projection.state === 'ended' || (projection.entry === 'candidate' && !runtime.hasInstance());
-      if (discard && !win.isDestroyed()) win.destroy();
+      const candidateWithoutProgress = projection.entry === 'candidate' && !runtime.hasInstance();
+      if ((projection.state === 'ended' || candidateWithoutProgress) && !win.isDestroyed()) win.destroy();
     }
   }
 

@@ -189,7 +189,6 @@ export async function createSopV12NormalHost({ includeSopCandidates = false } = 
   };
 }
 
-/** Shared by the W5 native test and the foreground host for an installed client. */
 export async function createSopCandidateDesktopFixture() {
   const { SOP_CANDIDATE_CONTRACT_SET_ID } = await import('@customer-agent/contracts/sop-candidates');
   const fixture = await createSopV12NormalHost({ includeSopCandidates: true });

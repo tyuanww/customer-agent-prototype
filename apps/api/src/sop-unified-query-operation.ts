@@ -35,8 +35,6 @@ type ReadyGraph = Extract<SopQuerySelection, { kind: 'ready' }>['selected'];
 type ReadyResponse = Extract<UnifiedSopQueryResponse, { status: 'ready' }>;
 type QueryFacts = { candidateId: string; candidateVersion: number; sourceId: string; flowId: string; version: number };
 
-/** Private receipt inputs only. Candidate selection binds the discovery and
- * reference digest in the same receipt namespace as manual v12 queries. */
 type QueryReceiptRequest = UnifiedSopQueryRequest | {
   kind: 'discovered_candidate';
   request_id: string;

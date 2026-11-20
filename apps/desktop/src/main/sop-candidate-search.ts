@@ -23,14 +23,12 @@ type SearchRound = {
 };
 export type OpenSopCandidate = (candidate: SopCandidateOpening) => Promise<boolean>;
 
-/** Selection references and their original E stay with one Query submission.
- * A successful click hands the authorized C ready to a separate instance owner. */
 export class SopCandidateSearch {
   private current: SearchRound | null = null;
   constructor(private readonly session: IntakeUsageSession,
     private readonly qualify: (signal: AbortSignal) => Promise<SopQualification>,
     private readonly publish: (event: IntakeSopCandidatesEvent) => void,
-    private readonly open: OpenSopCandidate) {}
+    private readonly openCommittedCandidate: OpenSopCandidate) {}
 
   cancel(status?: 'stale') {
     const current = this.current;
@@ -129,9 +127,7 @@ export class SopCandidateSearch {
         throw new Error('SOP_CANDIDATE_RESPONSE_BINDING');
       }
       const { selection, entitlement } = qualification;
-      // The instance now owns first-open recovery. Replacing the Query cannot
-      // abort D or substitute a new selection for this committed C response.
-      return await this.open({ ready, selection, entitlement, sessionEpoch: round.epoch })
+      return await this.openCommittedCandidate({ ready, selection, entitlement, sessionEpoch: round.epoch })
         ? { ok: true, opened: true } : intakeQueryFailure('UNAVAILABLE');
     } catch (error) {
       if (!lease.live() || (error instanceof ProductHttpError

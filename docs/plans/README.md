@@ -13,7 +13,7 @@
 
 ## 待审功能任务卡
 
-- [Windows 客服前端调整](2026-11-19-windows-customer-frontend-task-cards.md)（ROUGH）：跟踪登录、首次 FAQ 查询、SOP 办理和窗口操作，首张卡核对现场安装包及失败步骤。
+- [Windows 客服前端调整](2026-11-19-windows-customer-frontend-task-cards.md)（APPROVED）。0.3.44 涵盖登录、查询、SOP 并行办理与窗口操作。任务卡跟踪现场首查和 Windows 实机验收。
 
 ## 现行 / 仍被引用
 

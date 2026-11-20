@@ -215,7 +215,6 @@ async function openAnotherCase({ app, query }: Pick<Surface, 'app' | 'query'>) {
   return sop;
 }
 
-/** Captures the built native Fox menu and invokes its actual MenuItem callback. */
 async function foxResumeMenuLabels(app: Surface['app'], selected?: string) {
   return app.evaluate(({ BrowserWindow, Menu }, label) => {
     const fox = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('role=fox'));

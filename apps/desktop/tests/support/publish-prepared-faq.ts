@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { parseContractSchema } from '@customer-agent/contracts';
 import type { IntakeSyntheticHost } from '../../../api/tests/support/intake-synthetic-host.ts';
 
-/** Publishes the synthetic host's initial three FAQ entries before any SOP source. */
 export async function publishPreparedFaq(host: {
   candidate: IntakeSyntheticHost['candidate'] | null;
   object: IntakeSyntheticHost['object'] | null;

@@ -1,5 +1,3 @@
--- Apply only with the disposable v12 synthetic installer. The approved W5
--- storage remains private, and the API owns the surrounding E transaction.
 ALTER SCHEMA w5_sop_candidate_draft OWNER TO intake_runtime_fn_owner;
 ALTER TABLE w5_sop_candidate_draft.discovery OWNER TO intake_runtime_fn_owner;
 ALTER TABLE w5_sop_candidate_draft.candidate OWNER TO intake_runtime_fn_owner;
@@ -58,8 +56,6 @@ BEGIN
   );
 
   IF p_status IS NOT NULL THEN
-    -- Keep fingerprints until their original session deadline. Limit the work
-    -- per completed decision and leave rows locked by another request alone.
     DELETE FROM w5_sop_candidate_draft.discovery AS saved
     USING (
       SELECT expired.session_hash, expired.request_id
@@ -67,8 +63,8 @@ BEGIN
       WHERE expired.session_expires_at <= clock_timestamp()
       ORDER BY expired.session_expires_at, expired.session_hash, expired.request_id
       LIMIT 100 FOR UPDATE SKIP LOCKED
-    ) AS expired
-    WHERE saved.session_hash = expired.session_hash AND saved.request_id = expired.request_id;
+    ) AS expired_sessions
+    WHERE saved.session_hash = expired_sessions.session_hash AND saved.request_id = expired_sessions.request_id;
   END IF;
   RETURN decision;
 END
@@ -95,18 +91,17 @@ BEGIN
     ON saved.session_hash = authority.session_hash AND saved.request_id = p_request_id;
   IF FOUND THEN RETURN; END IF;
 
-  -- Only the original authority with a real reference can observe expiry.
   IF EXISTS (
-    SELECT FROM w5_sop_candidate_draft.discovery AS saved
+    SELECT FROM w5_sop_candidate_draft.discovery AS original_discovery
     JOIN w5_sop_candidate_draft.candidate AS candidate
-      ON candidate.session_hash = saved.session_hash AND candidate.discovery_request_id = saved.request_id
-    WHERE saved.session_hash = authority.session_hash AND saved.request_id = p_request_id
-      AND saved.principal_id = authority.principal_id
-      AND saved.entitlement_hash = authority.entitlement_hash AND saved.release_id = authority.release_id
-      AND saved.authority_binding = authority.authority_binding
-      AND saved.session_expires_at = authority.session_expires_at
+      ON candidate.session_hash = original_discovery.session_hash AND candidate.discovery_request_id = original_discovery.request_id
+    WHERE original_discovery.session_hash = authority.session_hash AND original_discovery.request_id = p_request_id
+      AND original_discovery.principal_id = authority.principal_id
+      AND original_discovery.entitlement_hash = authority.entitlement_hash AND original_discovery.release_id = authority.release_id
+      AND original_discovery.authority_binding = authority.authority_binding
+      AND original_discovery.session_expires_at = authority.session_expires_at
       AND candidate.candidate_ref = p_candidate_ref
-      AND saved.expires_at <= clock_timestamp()
+      AND original_discovery.expires_at <= clock_timestamp()
   ) THEN
     RAISE EXCEPTION SQLSTATE 'W5002' USING MESSAGE = 'Candidate discovery expired';
   END IF;

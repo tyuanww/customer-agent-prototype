@@ -769,7 +769,7 @@ export class OverlayController {
       return;
     }
     const queryBounds = this.live(this.query) ? this.query.getBounds() : null;
-    const foxVisualCenter = queryBounds ? this.collapseFoxVisualCenter(queryBounds) : this.currentFoxVisualCenter({ includePeek: false });
+    const foxVisualCenter = queryBounds ? this.positionFoxForQueryCollapse(queryBounds) : this.currentFoxVisualCenter({ includePeek: false });
     const animate = Boolean(
       queryBounds
       && this.isWindowVisible(this.query)
@@ -2013,7 +2013,7 @@ export class OverlayController {
     return foxVisualCenterForNativeRect(fullFoxRect, this.overlayState.fox.edge, peekOffset);
   }
 
-  private collapseFoxVisualCenter(queryBounds: Rect): { x: number; y: number } {
+  private positionFoxForQueryCollapse(queryBounds: Rect): { x: number; y: number } {
     const center = this.currentFoxVisualCenter({ includePeek: false });
     const halfFox = FOX_VISUAL_SIZE / 2;
     if (
@@ -2026,8 +2026,6 @@ export class OverlayController {
     if (!this.live(fox) || fox.isVisible()) {
       return center;
     }
-    // A leading resize edge can leave the fox's old center outside Query's
-    // drawable area. Seat the hidden fox before calculating the closing frame.
     const workArea = this.currentWorkArea();
     const { fox: placed, dockEdge } = settleQueryDragGesture(queryBounds, workArea, this.sessionQueryAnchor());
     fox.setBounds(dockFoxNativeRect(placed, workArea, dockEdge));
