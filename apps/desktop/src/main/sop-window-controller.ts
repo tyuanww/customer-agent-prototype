@@ -73,7 +73,7 @@ export type SopWindowControllerOptions = {
   writeClipboard?: (text: string) => void;
   instance?: {
     place: (bounds: Rect, workArea: Rect, query: Rect | null) => Rect;
-    placeBookmark: (workArea: Rect) => Rect | null;
+    placeBookmark: (workArea: Rect, size?: Size) => Rect | null;
     onClosed: () => void;
     onProjectionChanged: () => void;
   };
@@ -108,6 +108,7 @@ export class SopWindowController {
   private sessionId = 0;
   private lastLayoutSequence = 0;
   private lastResizeSequence = 0;
+  private firstContentPlacement = false;
   private manualSize: Size | null = null;
   private resizing: { baseline: Rect; area: Rect; direction: WindowResizeDirection } | null = null;
   private parkedFrom: Rect | null = null;
@@ -179,9 +180,7 @@ export class SopWindowController {
     const win = this.liveWindow();
     if (!win?.isVisible() || !this.parkedFrom) return;
     const area = this.workArea(this.parkedFrom);
-    const next = this.instance?.placeBookmark(area);
-    if (next) win.setBounds(next);
-    else win.hide();
+    if (!this.fitBookmark(win, area, win.getBounds())) win.hide();
   }
 
   resumeInstance(): void {
@@ -263,6 +262,7 @@ export class SopWindowController {
     }
     this.cancelResize(win);
     this.dockArmed = false;
+    this.firstContentPlacement = false;
     win.hide();
     win.webContents.setBackgroundThrottling(false);
     const runtime = this.queryRuntime;
@@ -359,6 +359,7 @@ export class SopWindowController {
     }
     const area = this.workArea();
     const next = applySopDrag(win.getBounds(), delta.dx, delta.dy, area);
+    this.firstContentPlacement = false;
     win.setBounds(next);
     this.dockArmed = finished === true && next.x <= area.x + SOP_BOOKMARK_EDGE_DISTANCE;
   }
@@ -379,12 +380,13 @@ export class SopWindowController {
       return sopWindowFailure('UNAVAILABLE', '当前流程不可贴边');
     }
     const current = win.getBounds();
-    const bookmark = this.instance.placeBookmark(this.workArea(current));
-    if (!bookmark) return sopWindowFailure('UNAVAILABLE', '当前屏幕没有可用的贴边位置');
+    if (!this.fitBookmark(win, this.workArea(current))) {
+      return sopWindowFailure('UNAVAILABLE', '当前屏幕没有可用的贴边位置');
+    }
+    this.firstContentPlacement = false;
     this.dockArmed = false;
     this.parkedFrom = current;
     this.showChrome(win, { kind: 'parked', name });
-    win.setBounds(bookmark);
     return { ok: true };
   }
 
@@ -394,6 +396,7 @@ export class SopWindowController {
     if (request.type === 'begin') {
       if (request.sequence <= this.lastResizeSequence) return;
       this.cancelResize(win);
+      this.firstContentPlacement = false;
       this.dockArmed = false;
       this.lastResizeSequence = request.sequence;
       const workArea = this.workArea(win.getBounds());
@@ -442,9 +445,14 @@ export class SopWindowController {
     this.lastLayoutSequence = request.sequence;
     this.clearLayoutTimer();
     const current = win.getBounds();
-    const next = this.manualSize || this.resizing
+    const workArea = this.workArea(current);
+    let next = this.manualSize || this.resizing
       ? current
-      : applySopHeight(current, request.desiredHeight, this.workArea(current));
+      : applySopHeight(current, request.desiredHeight, workArea);
+    if (this.firstContentPlacement && request.contentReady) {
+      this.firstContentPlacement = false;
+      next = this.windowPlacement({ width: next.width, height: next.height }, workArea);
+    }
     const shouldProject = sopLayoutNeedsProjection(this.shellState, current, next);
     if (sopLayoutNeedsProjection('ready', current, next)) {
       win.setBounds(next);
@@ -526,6 +534,7 @@ export class SopWindowController {
         return { ok: true } as const;
       }
       this.sessionId++; this.lastLayoutSequence = 0; this.lastResizeSequence = 0; this.manualSize = null;
+      this.firstContentPlacement = Boolean(this.instance);
       const win = createOverlayChromeWindow(this.preloadPath, { width: SOP_WIDTH, height: SOP_OPEN_HEIGHT, title: 'SOP 合成流程', backgroundThrottling: false });
       lockRendererWindow(win); this.window = win;
       win.on('closed', () => {
@@ -535,7 +544,7 @@ export class SopWindowController {
         }
         this.instance?.onClosed();
       });
-      this.placeWindow(win, sopOpeningSize());
+      win.setBounds(this.windowPlacement(sopOpeningSize()));
       try {
         const loaded = await loadRenderer(win, 'sop', this.rendererDevServerUrl?.(), () => this.disposed);
         if (loaded !== 'loaded' || this.disposed || win.isDestroyed()) return this.failLoad(win);
@@ -571,7 +580,7 @@ export class SopWindowController {
 
     const existing = this.liveWindow();
     if (existing) {
-      this.placeWindow(existing, sopOpeningSize());
+      existing.setBounds(this.windowPlacement(sopOpeningSize()));
       if (retryLoad) {
         try {
           const loaded = await loadRenderer(
@@ -606,7 +615,7 @@ export class SopWindowController {
         this.window = null;
       }
     });
-    this.placeWindow(win, sopOpeningSize());
+    win.setBounds(this.windowPlacement(sopOpeningSize()));
     try {
       const loaded = await loadRenderer(
         win,
@@ -632,6 +641,7 @@ export class SopWindowController {
     if (!win) {
       return;
     }
+    this.firstContentPlacement = false;
     if (this.parkedFrom) {
       this.restoreBookmark(win, true);
       return;
@@ -640,13 +650,27 @@ export class SopWindowController {
       const current = win.getBounds();
       win.setBounds(clampRectToWorkArea({ ...current, ...this.manualSize }, this.workArea(current)));
     } else if (!this.instance) {
-      this.placeWindow(win, { width: SOP_WIDTH, height: win.getBounds().height });
+      win.setBounds(this.windowPlacement({ width: SOP_WIDTH, height: win.getBounds().height }));
     }
     if (!win.isVisible()) {
       win.show();
     }
     win.moveTop();
     win.focus();
+  }
+
+  private fitBookmark(win: BrowserWindow, area: Rect, size?: Size): boolean {
+    const previous = win.getBounds();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const slot = this.instance?.placeBookmark(area, size);
+      if (!slot) break;
+      win.setBounds(slot);
+      const actual = win.getBounds();
+      if (!sopLayoutNeedsProjection('ready', actual, slot)) return true;
+      size = actual;
+    }
+    win.setBounds(previous);
+    return false;
   }
 
   private restoreBookmark(win: BrowserWindow, focus: boolean): void {
@@ -671,13 +695,12 @@ export class SopWindowController {
     if (!win.webContents.isDestroyed()) win.webContents.send(IPC_CHANNELS.SOP_WINDOW_CHROME, chrome);
   }
 
-  private placeWindow(win: BrowserWindow, size: { width: number; height: number }): void {
+  private windowPlacement(size: Size, workArea = this.workArea()): Rect {
     const query = this.queryBounds();
-    const workArea = this.workArea();
     const bounds = this.instance
       ? placeSopLeftCenter(workArea, size)
       : placeSopNearQuery(query, workArea, size);
-    win.setBounds(this.instance ? this.instance.place(bounds, workArea, query) : bounds);
+    return this.instance ? this.instance.place(bounds, workArea, query) : bounds;
   }
 
   private armLayoutTimeout(): void {
@@ -712,7 +735,7 @@ export class SopWindowController {
     this.failCode = 'SOP_LOAD_FAILED';
     this.failMessage = SOP_OPEN_FAILURE_MESSAGE;
     if (!win.isDestroyed()) {
-      this.placeWindow(win, sopOpeningSize());
+      win.setBounds(this.windowPlacement(sopOpeningSize()));
       win.showInactive();
     }
     return sopWindowFailure('SOP_LOAD_FAILED', SOP_OPEN_FAILURE_MESSAGE);

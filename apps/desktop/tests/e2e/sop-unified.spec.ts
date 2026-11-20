@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { SOP_UNIFIED_CONTRACT } from '../../src/shared/sop-unified';
 import { intakeQueryData } from '../fixtures/intake-query-data';
+import { returnToQueryWindow } from '../support/electron-focus';
 import { startUnifiedHost } from '../support/sop-unified-host';
 import { closeOwnedElectron } from '../support/owned-electron';
 
@@ -87,21 +88,15 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     expect(storage.available).toBe(true); expect(storage.backend).not.toBe('basic_text');
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(window => window.url().includes('role=query'))!;
-    await app.evaluate(({ app }) => app.focus({ steal: true }));
-    await query.evaluate(() => window.customerAgent!.openSearch());
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    const running = app;
+    await returnToQueryWindow(running, query);
     const loginOpened = app.waitForEvent('window'); await query.getByRole('button', { name: '登录', exact: true }).click();
     const login = await loginOpened; await expect.poll(() => login.url()).toContain('role=login');
     await clickFeishuLogin(login);
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(true);
     const openSopFromQuery = async () => {
-      await query.evaluate(() => window.customerAgent!.openSearch());
-      await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-      const entry = query.getByRole('button', { name: '打开 SOP 流程' });
-      const filters = query.getByRole('button', { name: '筛选', exact: true });
-      await expect(entry.or(filters).first()).toBeVisible();
-      if (!await entry.isVisible()) await filters.click();
-      await entry.click();
+      await returnToQueryWindow(running, query);
+      await query.getByRole('button', { name: '手动找流程', exact: true }).click();
     };
     await openSopFromQuery();
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
@@ -112,8 +107,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(false);
     await expect(sop.getByText(/请重新登录/)).toBeVisible();
     await expect(sop.getByText('synthetic-shop', { exact: true })).toHaveCount(0);
-    await query.evaluate(() => window.customerAgent!.openSearch());
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await returnToQueryWindow(running, query);
     const reloginOpened = app.waitForEvent('window');
     await query.getByRole('button', { name: '登录', exact: true }).click();
     const relogin = await reloginOpened;
@@ -126,20 +120,37 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     expect(app.windows().filter(window => window.url().includes('role=sop'))).toEqual([sop]);
     await sop.screenshot({ path: path.join(evidence, 'session-recovered.png') });
     host.state.mediaDelayMs = 2000;
+    host.state.mediaFault = 'hash';
+    host.state.mediaFaultObject = 'synthetic-image-1';
     await sop.getByRole('textbox', { name: '问题' }).fill('合成完整流程');
     await sop.getByRole('button', { name: '查询流程' }).click();
     await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'ready');
-    await expect(sop.getByRole('button', { name: '下一步', exact: true })).toBeDisabled();
+    const next = sop.getByRole('button', { name: '下一步', exact: true });
+    await expect(next).toBeDisabled();
+    await expect(next).toHaveAccessibleDescription(/待确认：先核对合成型号、再核对合成数量/);
     await expect(sop.getByText('图片正在读取。', { exact: true })).toHaveCount(3);
     await expect(sop.getByRole('button', { name: '复制话术', exact: true }).first()).toBeDisabled();
     for (const label of ['1. 先核对合成型号', '2. 再核对合成数量']) {
       await sop.getByRole('checkbox', { name: label }).click();
       await expect(sop.getByRole('checkbox', { name: label })).toBeChecked();
     }
-    await expect(sop.getByRole('button', { name: '下一步', exact: true })).toBeDisabled();
+    await expect(next).toBeDisabled();
+    await expect(next).toHaveAccessibleDescription('必需图片「合成图片1」暂不可用。');
+    await sop.screenshot({ path: path.join(evidence, 'electron-required-image-failed.png') });
+    const disclosure = sop.getByText('补充资料与知识', { exact: true });
+    const knowledge = sop.getByText('这段内容用于合成验证。', { exact: true });
+    await expect(knowledge).toBeHidden();
+    await disclosure.press('Enter');
+    await expect(knowledge).toBeVisible();
+    await disclosure.press('Enter');
+    await expect(knowledge).toBeHidden();
+    host.state.mediaFault = '';
+    await sop.getByRole('region', { name: '必需图片' }).getByRole('button', { name: '重试图片' }).click();
     await expect(sop.getByRole('img', { name: '合成图片1' })).toBeVisible();
     await expect(sop.locator('figure img')).toHaveCount(3);
     await expect.poll(() => sop.locator('figure img').evaluateAll(images => images.every(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
+    await expect(next).toBeEnabled();
+    await expect(next).not.toHaveAccessibleDescription(/必需图片/);
     await sop.screenshot({ path: path.join(evidence, 'electron-action.png') });
     for (let index = 0; index < 2; index++) {
       await sop.getByRole('button', { name: '复制话术', exact: true }).nth(index).click();
@@ -190,6 +201,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     expect(windows[0]!.bounds.width).toBe(600); expect(windows[0]!.bounds.height).toBeLessThanOrEqual(620);
     await sop.getByRole('button', { name: '结束并清除进度' }).click();
     await expect.poll(() => host.continuations.get(oldContinuation)?.dead).toBe(true);
+    await expect.poll(() => sop.isClosed()).toBe(true);
     for (const media of host.fixture.result.media) media.binding.required = false;
     await openSopFromQuery();
     await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
@@ -217,6 +229,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     const optionalContinuation = [...host.continuations.keys()].find(id => id !== oldContinuation)!;
     await optional.getByRole('button', { name: '结束并清除进度' }).click();
     await expect.poll(() => host.continuations.get(optionalContinuation)?.dead).toBe(true);
+    await expect.poll(() => optional.isClosed()).toBe(true);
     for (const unavailable of [false, true]) {
       await openSopFromQuery();
       await expect.poll(() => app!.windows().some(window => window.url().includes('role=sop'))).toBe(true);
@@ -257,6 +270,7 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
       expect(fresh).not.toBe(old);
       await reopened.getByRole('button', { name: '结束并清除进度' }).click();
       await expect.poll(() => host.continuations.get(fresh)?.dead).toBe(true);
+      await expect.poll(() => reopened.isClosed()).toBe(true);
     }
     writeFileSync(path.join(evidence, 'electron-result.json'), JSON.stringify({ synthetic: true, postgres: false, nativeClipboardAfterCopy: true, scriptsCopied: 3, requiredProgressiveMedia: true, optionalCopyAndAdvanceWhileLoading: true, reusedResourceOwnerIsolation: true, nativeDestructionDiscardCases: 2, offlineDestroyedRemoteClose: 'unconfirmed',
       retainedRelease: 'synthetic-release-1', currentRelease: host.state.releaseId, closed: true, window: windows[0]!.bounds,

@@ -2961,7 +2961,10 @@ describe('QueryApp', () => {
     );
   });
 
-  it('cancels immediately on lostpointercapture even when buttons is still 1', async () => {
+  it.each([
+    { buttons: 1, operation: 'cancel', height: 312 },
+    { buttons: 0, operation: 'end', height: 400 },
+  ] as const)('finishes a resize with $operation when capture is lost with buttons=$buttons', async ({ buttons, operation, height }) => {
     let liveHeight = 312;
     resizeQuery.mockImplementation(async (request: {
       type: string;
@@ -3008,24 +3011,211 @@ describe('QueryApp', () => {
       return 21;
     });
 
-    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 8, screenY: 400 });
-    fireEvent.pointerMove(grip, { buttons: 1, pointerId: 8, screenY: 460, clientY: 460 });
+    function firePointer(type: string, pointerId: number, pressed: number, screenY: number) {
+      const event = new MouseEvent(type, { bubbles: true, buttons: pressed, screenY });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      fireEvent(grip, event);
+    }
+    firePointer('pointerdown', 8, 1, 400);
+    firePointer('pointermove', 8, 1, 460);
     act(() => pendingFrame?.(performance.now()));
     await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '400'));
 
-    fireEvent.lostPointerCapture(grip, { pointerId: 8, buttons: 1 });
-    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', '312'));
-    fireEvent.pointerUp(grip, { pointerId: 8, buttons: 0 });
+    captured.delete(8);
+    firePointer('lostpointercapture', 8, buttons, 100);
+    await waitFor(() => expect(grip).toHaveAttribute('aria-valuenow', String(height)));
+    firePointer('pointerup', 8, 0, 460);
     fireEvent.blur(window);
-    expect(resizeQuery.mock.calls.filter((call) => (
-      call[0].type === 'cancel' || call[0].type === 'end'
-    ))).toHaveLength(1);
+    const finishes = resizeQuery.mock.calls.map(([request]) => request)
+      .filter(request => request.type === 'cancel' || request.type === 'end');
+    expect(finishes).toEqual([expect.objectContaining({ type: operation })]);
+    if (operation === 'end') expect(finishes[0]).toMatchObject({ deltaX: 0, deltaY: 60 });
     expect(captured.has(8)).toBe(false);
 
-    fireEvent.pointerDown(grip, { button: 0, buttons: 1, pointerId: 9, screenY: 400 });
+    firePointer('pointerdown', 9, 1, 400);
     expect(resizeQuery.mock.calls.filter((call) => call[0].type === 'begin')).toHaveLength(2);
     raf.mockRestore();
   });
+  function connectFaqQuery() {
+    connectProduct();
+    const context = { ok: true as const, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' };
+    const access = vi.fn().mockResolvedValue(context);
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: [] });
+    window.customerAgent!.intakeQuery = {
+      mode: vi.fn(), access, selectConditions: vi.fn(), selectShop: vi.fn(), search,
+      copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+    };
+    return { access, search };
+  }
+
+  it('validates an editable FAQ question in place and submits exactly 500 Unicode characters', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalled());
+    const input = screen.getByRole('textbox', { name: '客户问题' });
+    const submit = screen.getByRole('button', { name: '查询' });
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    const spaces = '\u3000  ';
+    await user.type(input, `${spaces}{Enter}`);
+    expect(input).toHaveAccessibleDescription(EMPTY_QUERY_MESSAGE);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue(spaces);
+    expect(screen.queryByTestId('retry-button')).not.toBeInTheDocument();
+
+    const valid = '𠮷'.repeat(500);
+    const tooLong = `${valid}啊`;
+    await user.paste(tooLong);
+    await user.click(submit);
+    expect(input).toHaveAccessibleDescription('请输入最多 500 字的客户问题。');
+    expect(input).toHaveValue(`${spaces}${tooLong}`);
+    expect(input).toHaveFocus();
+    expect(screen.queryByTestId('retry-button')).not.toBeInTheDocument();
+    expect(search).not.toHaveBeenCalled();
+
+    await user.keyboard('{End}{Backspace}');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    fireEvent.compositionStart(input);
+    await user.keyboard('{Enter}');
+    expect(search).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(search).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ queryText: valid })));
+    await screen.findByTestId('no-hit');
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+    expect(scope).toHaveTextContent(/^查询范围$/);
+
+    fireEvent.change(input, { target: { value: spaces } });
+    await user.click(submit);
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+    expect(screen.queryByTestId('result-pane')).not.toBeInTheDocument();
+    await user.click(scope);
+    await user.click(submit);
+    expect(screen.getByTestId('intake-query-filters')).toHaveAttribute('data-open', 'true');
+    expect(input).toHaveAccessibleDescription(EMPTY_QUERY_MESSAGE);
+    expect(search).toHaveBeenCalledOnce();
+
+    act(() => {
+      for (const listener of commandListeners) listener({ type: 'clear-content' });
+    });
+    expect(scope).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    await user.click(scope);
+    expect(scope).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: '当前店铺' })).toBeVisible();
+    expect(input).toHaveValue(spaces);
+    expect(search).toHaveBeenCalledOnce();
+  });
+
+  it.each(['UNAVAILABLE', 'EXPIRED'] as const)('offers the recovery for a FAQ search that returns %s', async code => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    search.mockResolvedValueOnce(intakeQueryFailure(code));
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    const input = screen.getByRole('textbox', { name: '客户问题' });
+    await user.type(input, '合成客户问题{Enter}');
+    const warning = await screen.findByTestId('error-state');
+    if (code === 'EXPIRED') {
+      await user.click(within(warning).getByRole('button', { name: '刷新店铺' }));
+      await waitFor(() => expect(access).toHaveBeenCalledTimes(2));
+      expect(search).toHaveBeenCalledOnce();
+      expect(input).toHaveFocus();
+      await user.keyboard('{Enter}');
+    } else {
+      await user.click(within(warning).getByRole('button', { name: '重试' }));
+      expect(access).toHaveBeenCalledOnce();
+    }
+    await screen.findByTestId('no-hit');
+    expect(input).toHaveValue('合成客户问题');
+    expect(search.mock.calls.map(([request]) => request.queryText)).toEqual(['合成客户问题', '合成客户问题']);
+  });
+
+  it('offers login when the FAQ search refusal arrives before the session event', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    search.mockResolvedValueOnce(intakeQueryFailure('UNAUTHORIZED'));
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    const input = screen.getByRole('textbox', { name: '客户问题' });
+    await user.type(input, '合成客户问题{Enter}');
+    const login = await screen.findByRole('button', { name: '登录' });
+    expect(input).toHaveAccessibleDescription('登录已失效，请重新登录');
+    expect(input).toHaveValue('合成客户问题');
+    expect(screen.queryByTestId('retry-button')).not.toBeInTheDocument();
+    await user.click(login);
+    expect(window.customerAgent?.product?.login).toHaveBeenCalledOnce();
+  });
+
+  it('withdraws FAQ results on session expiry, keeps the question and distinguishes re-login from logout', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    const product = window.customerAgent?.product;
+    if (!product) throw new Error('Missing synthetic session port');
+    const signedIn = await product.sessionStatus();
+    if (!signedIn.ok || !signedIn.signedIn) throw new Error('Missing signed-in fixture');
+    type SessionResult = Awaited<ReturnType<typeof product.sessionStatus>>;
+    const signedOut = { ok: true, enabled: true, signedIn: false, sessionEpoch: signedIn.sessionEpoch + 1,
+      userId: null, role: null, authMode: null, expiresAt: null, displayName: null, job: null } satisfies SessionResult;
+    const relogged = { ...signedIn, sessionEpoch: signedOut.sessionEpoch + 1, job: null };
+    const logout = { ...signedOut, sessionEpoch: relogged.sessionEpoch + 1 };
+    const pendingLogout = deferred<SessionResult>();
+    const reloggedCapability = deferred<boolean>();
+    sopEntryAvailable.mockResolvedValueOnce(true).mockReturnValueOnce(reloggedCapability.promise);
+    const manual = { name: '手动找流程' };
+    let changeSession: (state: SessionResult) => void = () => {};
+    product.onSessionChanged = listener => { changeSession = listener; return () => {}; };
+    product.login = vi.fn()
+      .mockResolvedValueOnce({ ok: false, code: 'UNAVAILABLE', message: '服务暂不可用，请重试', sessionEpoch: signedOut.sessionEpoch })
+      .mockResolvedValueOnce(relogged);
+    product.logout = vi.fn().mockReturnValue(pendingLogout.promise);
+    search.mockResolvedValueOnce({ ok: true, rows: [{ kind: 'intake', key: 'first', rank: 1, title: '合成标题',
+      answerText: '合成正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    const input = screen.getByRole('textbox', { name: '客户问题' });
+    await user.type(input, '合成客户问题{Enter}');
+    const copy = await screen.findByTestId('copy-button-1');
+    expect(screen.getByRole('button', manual)).toBeVisible();
+    copy.focus();
+    act(() => changeSession(signedOut));
+    expect(screen.queryByText('合成正文')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', manual)).not.toBeInTheDocument();
+    expect(screen.getByTestId('query-shell')).toHaveAttribute('data-phase', 'SEARCH_INPUT');
+    expect(screen.queryByTestId('result-pane')).not.toBeInTheDocument();
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('合成客户问题');
+    act(() => changeSession(signedOut));
+    expect(input).toHaveAccessibleDescription('登录已失效，请重新登录');
+
+    await user.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByTestId('session-notice-failed')).toHaveTextContent('服务暂不可用，请重试');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByTestId('session-notice-success')).toHaveTextContent('登录成功');
+    expect(screen.queryByRole('button', manual)).not.toBeInTheDocument();
+    await act(async () => reloggedCapability.resolve(true));
+    expect(screen.getByRole('button', manual)).toBeVisible();
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('合成客户问题');
+    expect(search).toHaveBeenCalledOnce();
+
+    sopOpen.mockRejectedValueOnce(new Error('Synthetic window open failure'));
+    await user.click(screen.getByRole('button', manual));
+    expect(await screen.findByText('流程没有打开，请重试。')).toBeVisible();
+    expect(screen.queryByTestId('session-notice-success')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /· 退出$/ }));
+    act(() => changeSession(logout));
+    expect(screen.queryByTestId('session-notice-expired')).not.toBeInTheDocument();
+    await act(async () => pendingLogout.resolve(logout));
+    await waitFor(() => expect(screen.getByRole('button', { name: '登录' })).toBeVisible());
+    act(() => changeSession(logout));
+    expect(screen.queryByTestId('session-notice-expired')).not.toBeInTheDocument();
+    expect(input).toHaveValue('合成客户问题');
+  });
+
   it('refreshes failed FAQ shop discovery without submitting the question again', async () => {
     const user = userEvent.setup();
     connectProduct();
@@ -3054,6 +3244,57 @@ describe('QueryApp', () => {
     await waitFor(() => expect(search).toHaveBeenCalledOnce());
   });
 
+  it('keeps a selected scope readable when folded and offers refresh when its qualification expires', async () => {
+    vi.useFakeTimers();
+    const { access, search } = connectFaqQuery();
+    const context = { ok: true, ...emptyIntakeQueryContext(), shopId: 'shop-a', shops: ['shop-a'],
+      validUntil: new Date(Date.now() + 5_000).toISOString(), products: [{ id: 'product-a', label: '合成商品' }] };
+    access.mockResolvedValueOnce(context);
+    const api = window.customerAgent?.intakeQuery;
+    if (!api) throw new Error('Missing synthetic query fixture');
+    api.selectConditions = vi.fn().mockResolvedValue({ ...context, productIds: ['product-a'] });
+    try {
+      render(<QueryApp intake />); activateQuery();
+      await act(async () => {});
+      const scope = screen.getByRole('button', { name: '查询范围' });
+      const input = screen.getByTestId('question-input');
+      fireEvent.change(input, { target: { value: '合成问句' } });
+      expect(scope).toHaveTextContent(/^查询范围$/);
+      expect(scope).toHaveAccessibleDescription('shop-a · 商品全部 · 场景全部');
+      fireEvent.pointerDown(scope);
+      fireEvent.click(scope);
+      await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+      expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+      expect(scope).toHaveFocus();
+      expect(scope).toHaveAttribute('aria-expanded', 'true');
+      expect(document.getElementById(scope.getAttribute('aria-controls') ?? '')).toContainElement(screen.getByRole('combobox'));
+      fireEvent.click(screen.getByText('商品 · 全部'));
+      await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '合成商品' })); });
+      fireEvent.click(scope);
+      expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
+      expect(scope).toHaveFocus();
+      expect(scope).toHaveAttribute('aria-expanded', 'false');
+      expect(scope).toHaveAttribute('data-selected', 'true');
+      expect(scope).toHaveTextContent('商品 合成商品');
+      expect(scope).toHaveAccessibleDescription('shop-a · 商品 合成商品 · 场景全部');
+      expect(input).toHaveValue('合成问句');
+      expect(search).not.toHaveBeenCalled();
+
+      await act(async () => { fireEvent.click(screen.getByTestId('search-button')); });
+      expect(search).toHaveBeenCalledOnce();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_001); });
+      const error = screen.getByTestId('error-state');
+      expect(error).toHaveTextContent('查询范围资格已到期，请刷新店铺。');
+      await act(async () => { fireEvent.click(within(error).getByRole('button', { name: '刷新店铺' })); });
+      expect(access).toHaveBeenCalledTimes(2);
+      expect(search).toHaveBeenCalledOnce();
+      expect(input).toHaveValue('合成问句');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each(['success', 'rejected', 'thrown'] as const)('settles FAQ filter waits after %s and permits an explicit recovered query', async outcome => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
@@ -3075,14 +3316,15 @@ describe('QueryApp', () => {
       copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
     };
     render(<QueryApp intake />); activateQuery();
-    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: '筛选' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '查询范围' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: '查询范围' }));
     await user.click(await screen.findByText('商品 · 全部'));
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成客户问题' } });
     await user.click(screen.getByRole('checkbox', { name: '合成商品' }));
     expect(screen.getByTestId('search-button')).toBeDisabled();
     fireEvent.keyDown(screen.getByTestId('question-input'), { key: 'Enter', code: 'Enter' });
     expect(await screen.findByText('正在更新查询范围，请稍后查询。')).toBeVisible();
+    expect(screen.queryByTestId('retry-button')).not.toBeInTheDocument();
     expect(screen.queryByText('请输入最多 500 字的客户问题。')).not.toBeInTheDocument();
     expect(search).not.toHaveBeenCalled();
     if (outcome === 'success') {
@@ -3093,7 +3335,7 @@ describe('QueryApp', () => {
         else selection.resolve(context);
       });
       expect(screen.queryByText('正在更新查询范围，请稍后查询。')).not.toBeInTheDocument();
-      expect(await screen.findByText(outcome === 'rejected' ? '合成资格拒绝，请刷新店铺。' : '筛选条件更新失败，请刷新店铺。')).toBeVisible();
+      expect(await screen.findByText(outcome === 'rejected' ? '合成资格拒绝，请刷新店铺。' : '查询范围更新失败，请刷新店铺。')).toBeVisible();
       expect(search).not.toHaveBeenCalled();
       await user.click(screen.getByRole('button', { name: '刷新店铺' }));
       await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
@@ -3147,7 +3389,7 @@ describe('QueryApp', () => {
       await act(async () => faq.resolve(intakeQueryFailure('UNAVAILABLE')));
       expect(await screen.findByText('查询未完成')).toBeVisible();
     } else {
-      expect(await screen.findByText('没有匹配的 FAQ 话术，可选择下方 SOP 办理。')).toBeVisible();
+      expect(await screen.findByText('没有匹配的 FAQ 话术，可从上方选择流程办理。')).toBeVisible();
       expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
     }
     expect(candidate).toBeVisible();
@@ -3159,14 +3401,18 @@ describe('QueryApp', () => {
     expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
   });
 
-  it('shows FAQ before SOP and keeps its copy action after candidate discovery fails', async () => {
+  it('puts named SOPs above expanded filters, keeps one manual route and preserves three copyable FAQs after discovery fails', async () => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
       userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
       expiresAt: '2099-01-01T00:00:00Z', displayName: '合成坐席' };
-    const search = vi.fn().mockResolvedValue({ ok: true, rows: [{ kind: 'intake', key: 'faq-key', rank: 1, title: '合成话术',
-      answerText: '合成话术正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    const search = vi.fn().mockResolvedValue({ ok: true, rows: ([1, 2, 3] as const).map(rank => ({
+      kind: 'intake', key: `faq-key-${rank}`, rank, title: `合成话术 ${rank}`, answerText: `合成话术正文 ${rank}`,
+      applicabilityNote: '', riskNote: `合成风险提示 ${rank}`, releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z',
+    })) });
     const copy = vi.fn().mockResolvedValue({ ok: true, copied: true });
+    sopEntryAvailable.mockResolvedValue(true);
+    sopOpen.mockResolvedValue({ ok: true });
     let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
     window.customerAgent!.product = {
       sessionStatus: vi.fn().mockResolvedValue(session), login: vi.fn(), logout: vi.fn(), onSessionChanged: () => () => {},
@@ -3181,32 +3427,132 @@ describe('QueryApp', () => {
     };
     render(<QueryApp intake />); activateQuery();
     await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    const manualName = { name: '手动找流程' };
+    expect(await screen.findByRole('button', manualName)).toBeVisible();
+    expect(screen.queryByTestId('result-pane')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '查询范围' }));
+    expect(screen.getByRole('button', { name: '查询范围' })).toHaveFocus();
+    const pane = screen.getByTestId('result-pane');
+    pane.scrollTop = 20;
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问句' } });
     await user.click(screen.getByTestId('search-button'));
-    const copyButton = await screen.findByTestId('copy-button-1');
+    const copyButton = await screen.findByTestId('copy-button-2');
     expect(copyButton).toBeVisible();
-    expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
-    act(() => receive({ contextId: search.mock.calls[0]![0].contextId, status: 'unavailable' }));
+    expect(pane.scrollTop).toBe(0);
+    const shell = screen.getByTestId('query-shell');
+    await waitFor(() => expect(shell).toHaveAttribute('data-layout-ready', 'true'));
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    await user.click(scope);
+    expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
+    pane.scrollTop = 30;
+    await user.click(scope);
+    expect(pane.scrollTop).toBe(0);
+    expect(scope).toHaveFocus();
+    await waitFor(() => expect(shell).toHaveAttribute('data-layout-ready', 'true'));
+    pane.scrollTop = 30;
+    const contextId = search.mock.calls[0]![0].contextId;
+    act(() => receive({ contextId, status: 'searching' }));
+    expect(await screen.findByText('正在查找 SOP 候选…')).toBeVisible();
+    expect(shell).toHaveAttribute('data-layout-ready', 'true');
+    expect(copyButton).toBeEnabled();
+    act(() => receive({ contextId, candidates: [{ key: 'sop-key', label: '合成售后流程' }] }));
+    expect(pane.scrollTop).toBe(30);
+    const matched = screen.getByRole('region', { name: '办理流程' });
+    expect(pane.firstElementChild).toBe(matched);
+    expect(screen.getByTestId('intake-query-filters')).toHaveAttribute('data-open', 'true');
+    expect(within(matched).getByRole('button', { name: '合成售后流程' })).toBeEnabled();
+    expect(screen.getAllByRole('button', manualName)).toHaveLength(1);
+    const cards = [1, 2, 3].map(rank => screen.getByTestId(`script-card-${rank}`));
+    expect(cards[0]?.nextElementSibling).toBe(cards[1]);
+    expect(cards[1]?.nextElementSibling).toBe(cards[2]);
+    expect(within(cards[1]!).getByText('风险提示：合成风险提示 2')).toBeVisible();
+
+    act(() => receive({ contextId, candidates: [] }));
+    expect(pane.querySelector('[data-sop-candidates]')).toBeNull();
+    expect(within(matched).getAllByRole('button')).toEqual([screen.getByRole('button', manualName)]);
+    await user.click(screen.getByRole('button', manualName));
+    expect(sopOpen).toHaveBeenCalledExactlyOnceWith('sop-query');
+    expect(copyButton).toBeEnabled();
+    act(() => receive({ contextId, status: 'unavailable' }));
     expect(await screen.findByText('SOP 候选暂不可用，请重新查询。')).toBeVisible();
     await user.click(copyButton);
-    expect(copy).toHaveBeenCalledExactlyOnceWith({ key: 'faq-key' });
+    expect(copy).toHaveBeenCalledExactlyOnceWith({ key: 'faq-key-2' });
   });
 
-  it('shows a failed SOP selection on its candidate and opens the other candidate in the same search', async () => {
+  it('reveals the shop row inside a short pane after opening scope below five SOPs', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    search.mockResolvedValueOnce({ ok: true, rows: [{ kind: 'intake', key: 'first', rank: 1, title: '合成标题',
+      answerText: '合成正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
+    window.customerAgent!.intakeQuery!.onSopCandidates = listener => { receive = listener; return () => {}; };
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    await user.type(screen.getByRole('textbox', { name: '客户问题' }), '合成客户问题{Enter}');
+    expect(await screen.findByTestId('script-card-1')).toBeVisible();
+    const contextId = search.mock.calls[0]![0].contextId;
+    act(() => receive({ contextId, candidates: Array.from({ length: 5 }, (_, index) => ({
+      key: `sop-${index}`, label: `合成售后办理流程 ${index + 1}`,
+    })) }));
+    const disclosure = screen.getByText('选择办理流程（5）');
+    const pane = screen.getByTestId('result-pane');
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    Object.defineProperties(pane, { clientHeight: { value: 151 }, clientTop: { value: 1 } });
+    const getRect = HTMLElement.prototype.getBoundingClientRect;
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === pane) return new DOMRect(0, 88, 360, 152);
+      if (this.classList.contains('intake-shop-control')) {
+        const top = disclosure.parentElement?.hasAttribute('open') ? 600 : 140;
+        return new DOMRect(12, top - pane.scrollTop, 324, 32);
+      }
+      return getRect.call(this);
+    });
+    try {
+      scope.focus();
+      await user.keyboard('{Enter}');
+      expect(await screen.findByRole('combobox', { name: '当前店铺' })).toBeVisible();
+      expect(pane.scrollTop).toBe(0);
+      await user.keyboard('{Enter}');
+      expect(screen.queryByRole('combobox', { name: '当前店铺' })).not.toBeInTheDocument();
+
+      await user.click(disclosure);
+      expect(disclosure.parentElement).toHaveAttribute('open');
+      scope.focus();
+      await user.keyboard('{Enter}');
+      expect(await screen.findByRole('combobox', { name: '当前店铺' })).toBeVisible();
+      await waitFor(() => expect(pane.scrollTop).toBe(392));
+      expect(scope).toHaveFocus();
+      expect(pane.firstElementChild).toBe(screen.getByRole('region', { name: '办理流程' }));
+      expect(disclosure.parentElement).toHaveAttribute('open');
+      expect(screen.getByTestId('copy-button-1')).toBeEnabled();
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
+  it.each([2, 3, 5])('keeps %s SOP candidates in order and opens only the selected flow', async count => {
     const user = userEvent.setup();
     connectProduct();
     const first = '29454f4e-75cf-4d3c-a64a-90e8d161806e';
     const second = 'b0238fcc-871d-41b9-934c-f9b153102c5b';
+    const context = { ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a',
+      products: [{ id: 'product-a', label: '合成商品' }] };
+    const candidates = [
+      { key: first, label: '合成核对候选' },
+      { key: second, label: '合成退换候选' },
+      ...Array.from({ length: count - 2 }, (_, index) => ({ key: `sop-${index}`, label: `合成候选 ${index}` })),
+    ];
     const search = vi.fn().mockResolvedValue({ ok: true, rows: [{ kind: 'intake', key: 'faq-key', rank: 1, title: '合成话术',
       answerText: '合成话术正文', applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] });
+    const copy = vi.fn().mockResolvedValue({ ok: true, copied: true });
     const openSopCandidate = vi.fn()
       .mockResolvedValueOnce(intakeQueryFailure('SOP_CANDIDATE_UNAVAILABLE'))
       .mockResolvedValueOnce({ ok: true, opened: true });
     let receive: (event: IntakeSopCandidatesEvent) => void = () => {};
     window.customerAgent!.intakeQuery = {
       mode: vi.fn().mockResolvedValue({ ok: true, enabled: true }),
-      access: vi.fn().mockResolvedValue({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' }),
-      selectConditions: vi.fn(), selectShop: vi.fn(), search, copy: vi.fn(),
+      access: vi.fn().mockResolvedValue(context),
+      selectConditions: vi.fn().mockResolvedValue({ ...context, productIds: ['product-a'] }), selectShop: vi.fn(), search, copy,
       cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
       onSopCandidates: listener => { receive = listener; return () => {}; },
       openSopCandidate,
@@ -3216,8 +3562,21 @@ describe('QueryApp', () => {
     fireEvent.change(screen.getByTestId('question-input'), { target: { value: '合成问句' } });
     await user.click(screen.getByTestId('search-button'));
     await screen.findByTestId('copy-button-1');
-    act(() => receive({ contextId: search.mock.calls[0]![0].contextId,
-      candidates: [{ key: first, label: '合成核对候选' }, { key: second, label: '合成退换候选' }] }));
+    const contextId = search.mock.calls[0]![0].contextId;
+    act(() => receive({ contextId, candidates }));
+    const list = within(screen.getByTestId('sop-candidates'));
+    if (count > 2) {
+      const disclosure = screen.getByText(`选择办理流程（${count}）`, { exact: true });
+      expect(disclosure.parentElement).not.toHaveAttribute('open');
+      fireEvent.keyDown(disclosure, { key: '1', code: 'Digit1' });
+      expect(copy).not.toHaveBeenCalled();
+      await user.click(disclosure);
+      expect(disclosure.parentElement).toHaveAttribute('open');
+    } else {
+      expect(screen.queryByText(/选择办理流程/)).not.toBeInTheDocument();
+    }
+    expect(list.getAllByRole('button').map(button => button.textContent)).toEqual(candidates.map(candidate => candidate.label));
+    expect(openSopCandidate).not.toHaveBeenCalled();
     const firstButton = screen.getByRole('button', { name: '合成核对候选' });
     const secondButton = screen.getByRole('button', { name: '合成退换候选' });
 
@@ -3229,6 +3588,15 @@ describe('QueryApp', () => {
     await user.click(secondButton);
     expect(await screen.findByText('流程窗口已打开。')).toBeVisible();
     expect(openSopCandidate.mock.calls).toEqual([[{ key: first }], [{ key: second }]]);
+    const scope = screen.getByRole('button', { name: '查询范围' });
+    await user.click(scope);
+    await user.click(screen.getByText('商品 · 全部'));
+    await user.click(screen.getByRole('checkbox', { name: '合成商品' }));
+    expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('question-input')).toHaveValue('合成问句');
+    act(() => receive({ contextId, candidates }));
+    expect(screen.queryByTestId('sop-candidates')).not.toBeInTheDocument();
     expect(search).toHaveBeenCalledTimes(1);
   });
 
@@ -3257,7 +3625,7 @@ describe('QueryApp', () => {
     expect(screen.queryByText(/MiniMax 只规划/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('notice-backdrop')).not.toBeInTheDocument();
     await act(async () => menu.resolve({ ok: true, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: null }));
-    await user.click(screen.getByRole('button', { name: '筛选' }));
+    await user.click(screen.getByRole('button', { name: '查询范围' }));
     await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-a');
     await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-a'));
     const pending = deferred<unknown>(); search.mockReturnValueOnce(pending.promise);
@@ -3435,7 +3803,7 @@ describe('QueryApp', () => {
     await user.click(await screen.findByTestId('copy-button-1'));
     const oldId = search.mock.calls[0][0].contextId;
     if (action === 'shop switch') {
-      await user.click(screen.getByRole('button', { name: '筛选' }));
+      await user.click(screen.getByRole('button', { name: '查询范围' }));
       await user.selectOptions(screen.getByRole('combobox', { name: '当前店铺' }), 'shop-b');
       await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('shop-b'));
     } else {

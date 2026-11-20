@@ -36,10 +36,14 @@ test('dashboard handoff: collapsed filters and account logout across windows', a
     await query.getByRole('textbox').first().fill('洁面');
     await query.getByRole('button', { name: '查询', exact: true }).click();
     const filters = query.getByTestId('intake-query-filters');
-    await expect(filters).toHaveAttribute('data-open', 'false');
+    const scope = query.getByRole('button', { name: '查询范围', exact: true });
+    await expect(query.getByTestId('result-pane')).toBeVisible();
+    await expect(filters).toHaveCount(0);
+    await expect(scope).toHaveAttribute('aria-expanded', 'false');
     await expect(query.getByRole('combobox', { name: '当前店铺' })).toHaveCount(0);
     await query.screenshot({ path: path.join(evidence, 'query-filters-collapsed.png') });
-    await filters.getByRole('button', { name: '筛选', exact: true }).click();
+    await scope.click();
+    await expect(filters).toHaveAttribute('data-open', 'true');
     await expect(query.getByRole('combobox', { name: '当前店铺' })).toBeEnabled();
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
     const fits = await query.evaluate(() => { const b = document.querySelector('.intake-filter-body')!.getBoundingClientRect(); return b.bottom <= innerHeight; });
@@ -77,7 +81,7 @@ test('dashboard handoff: collapsed filters and account logout across windows', a
     await expect.poll(async () => (await host.status()).requests.filter(p => p === '/v1/auth/logout').length).toBe(before + 1);
     await expect.poll(() => query.evaluate(async () => { const v = await window.customerAgent!.product!.sessionStatus(); return v.ok && v.signedIn; })).toBe(false);
     await expect(query.getByRole('combobox', { name: '当前店铺' })).toHaveCount(0);
-    await expect(query.getByRole('button', { name: '筛选', exact: true })).toBeDisabled();
+    await expect(query.getByRole('button', { name: '查询范围', exact: true })).toBeDisabled();
     await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
     const hasToken = await dashboard.evaluate(() => JSON.stringify(Object.keys(window.dashboardContent ?? {})));
     expect(hasToken).not.toMatch(/token|invoke|send/i);

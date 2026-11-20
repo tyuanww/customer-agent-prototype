@@ -166,9 +166,13 @@ export function placeSopLeftCenter(workArea: Rect, size: Size = sopOpeningSize()
   }, workArea);
 }
 
-export function placeSopBookmark(workArea: Rect, occupied: readonly Rect[]): Rect | null {
-  const height = Math.min(SOP_BOOKMARK_HEIGHT, workArea.height);
-  const width = Math.min(SOP_BOOKMARK_WIDTH, workArea.width);
+export function placeSopBookmark(
+  workArea: Rect,
+  occupied: readonly Rect[],
+  size: Size = { width: SOP_BOOKMARK_WIDTH, height: SOP_BOOKMARK_HEIGHT },
+): Rect | null {
+  const height = Math.min(size.height, workArea.height);
+  const width = Math.min(size.width, workArea.width);
   const step = height + SOP_BOOKMARK_GAP;
   const count = Math.floor((workArea.height + SOP_BOOKMARK_GAP) / step);
   const top = Math.round(workArea.y + (workArea.height - (count * step - SOP_BOOKMARK_GAP)) / 2);

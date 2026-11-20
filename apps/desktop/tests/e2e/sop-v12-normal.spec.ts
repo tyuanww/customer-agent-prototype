@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 import { parseContractSchema } from '@customer-agent/contracts/sop-resource-disable';
+import { clampSopHeight } from '../../src/shared/sop-geometry';
 import { returnToQueryWindow } from '../support/electron-focus';
 import { createSopV12NormalHost } from '../support/sop-v12-normal-host';
 import { readSopV12Probe, readSopV12Projection, runSopV12BackendProbe, setSopV12CloseUnavailable, setSopV12MediaDelay, setSopV12QueryDelay, type SopBackendOpeningEvidence, type SopV12BackendProbe } from '../support/sop-v12-backend-probe';
@@ -196,8 +197,7 @@ async function exerciseOptional({ app, sop }: Surface) {
 async function openAnotherCase({ app, query }: Pick<Surface, 'app' | 'query'>) {
   const previous = new Set(app.windows());
   await returnToQueryWindow(app, query);
-  const entry = query.getByRole('button', { name: '打开 SOP 流程', exact: true });
-  if (!(await entry.isVisible())) await query.getByRole('button', { name: '筛选', exact: true }).click();
+  const entry = query.getByRole('button', { name: '手动找流程', exact: true });
   await entry.click();
   const newCase = () => app.windows().find(page => !previous.has(page) && page.url().includes('role=sop'));
   await expect.poll(() => Boolean(newCase())).toBe(true);
@@ -263,18 +263,52 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   }
   await expect(a.getByRole('checkbox', { name: confirmB, exact: true })).not.toBeChecked();
   await expect(b.getByRole('checkbox', { name: confirmA, exact: true })).not.toBeChecked();
+  const nativeA = await app.browserWindow(a);
+  const initialA = await nativeA.evaluate(win => win.getBounds());
+  const edge = await a.locator('.sop-resize-handles [data-edge="right"]').boundingBox();
+  if (!edge) throw new Error('Expected a SOP resize grip');
+  const x = edge.x + edge.width / 2;
+  const y = edge.y + edge.height / 2;
+  await a.mouse.move(x, y);
+  await a.mouse.down();
+  await a.mouse.move(x - 180, y);
+  await a.mouse.up();
+  await expect.poll(() => nativeA.evaluate(win => win.getBounds())).toMatchObject({ width: initialA.width - 180, height: initialA.height });
+  const nextA = a.getByRole('button', { name: '下一步', exact: true });
+  await expect(nextA).toBeInViewport({ ratio: 1 });
+  await expect(nextA).toBeDisabled();
+  await expect(nextA).toHaveAccessibleDescription('待确认：合成确认 confirm-b');
+  await a.getByRole('button', { name: '贴边暂放', exact: true }).click();
+  const bookmarkA = a.getByRole('button', { name: '恢复 合成办理甲', exact: true });
+  await bookmarkA.click();
+  await expect(a.getByRole('heading', { name: '合成任务 task-a' })).toBeVisible();
+  await expect(a.getByRole('checkbox', { name: confirmA, exact: true })).toBeChecked();
+  await expect(a.getByRole('checkbox', { name: confirmB, exact: true })).not.toBeChecked();
+  await expect(nextA).toBeInViewport({ ratio: 1 });
+  await expect(nextA).toHaveAccessibleDescription('待确认：合成确认 confirm-b');
+  await expect.poll(() => nativeA.evaluate(win => win.getBounds())).toMatchObject({ width: initialA.width - 180, height: initialA.height });
+  await a.screenshot({ path: path.join(evidenceDirectory, 'parallel-cases', 'restored-narrow.png') });
   for (const [page, label] of [[a, confirmB], [b, confirmA]] as const) {
     await page.getByRole('checkbox', { name: label, exact: true }).click();
     await page.getByRole('button', { name: '下一步', exact: true }).click();
     await expect(page.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
   }
   const nativeB = await app.browserWindow(b);
-  const nativeA = await app.browserWindow(a);
+  await expect(b.getByRole('button', { name: '无法判断 / 无法判断', exact: true })).toBeEnabled();
+  const fittedHeightB = await b.evaluate(() => Math.ceil(
+    document.querySelector('.sop-unified-content')!.getBoundingClientRect().height
+    + document.querySelector('.sop-chrome')!.getBoundingClientRect().height
+    + document.querySelector('.sop-unified-actions')!.getBoundingClientRect().height,
+  ));
+  const availableHeightB = await app.evaluate(({ screen }, bounds) => screen.getDisplayMatching(bounds).workArea.height,
+    await nativeB.evaluate(win => win.getBounds()));
+  await expect.poll(() => nativeB.evaluate(win => win.getBounds())).toMatchObject({
+    height: clampSopHeight(fittedHeightB, availableHeightB),
+  });
   const expandedA = await nativeA.evaluate(win => win.getBounds());
   const expandedB = await nativeB.evaluate(win => win.getBounds());
   await a.getByRole('button', { name: '贴边暂放', exact: true }).click();
   await b.getByRole('button', { name: '贴边暂放', exact: true }).click();
-  const bookmarkA = a.getByRole('button', { name: '恢复 合成办理甲', exact: true });
   const bookmarkB = b.getByRole('button', { name: '恢复 合成办理乙', exact: true });
   await expect(bookmarkA).toBeVisible();
   await expect(bookmarkB).toBeVisible();
@@ -476,8 +510,7 @@ for (const scenario of ['ordinary', 'parallel-cases', 'blocked', 'lost-query', '
         }).toBe(true);
         await query.evaluate(() => window.customerAgent!.openSearch());
         await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-        const entry = query.getByRole('button', { name: '打开 SOP 流程', exact: true });
-        if (!(await entry.isVisible())) await query.getByRole('button', { name: '筛选', exact: true }).click();
+        const entry = query.getByRole('button', { name: '手动找流程', exact: true });
         await entry.click();
         await expect.poll(() => app.windows().some(page => page.url().includes('role=sop'))).toBe(true);
         const reopened = app.windows().find(page => page.url().includes('role=sop'))!;

@@ -170,7 +170,7 @@ export async function runSopV12BackendProbe(input: SopV12BackendProbe) {
     }, input.apiOrigin);
     try {
       await returnToQueryWindow(app, query);
-      await query.getByRole('button', { name: '筛选', exact: true }).click();
+      await query.getByRole('button', { name: '查询范围', exact: true }).click();
       const shop = query.getByRole('combobox', { name: '当前店铺', exact: true });
       await expect(shop).toBeEnabled();
       await shop.selectOption(input.shopId);
@@ -190,7 +190,7 @@ export async function runSopV12BackendProbe(input: SopV12BackendProbe) {
       }, null, 2));
       throw error;
     }
-    await query.getByRole('button', { name: '打开 SOP 流程' }).click();
+    await query.getByRole('button', { name: '手动找流程' }).click();
     await expect.poll(() => app!.windows().some(page => page.url().includes('role=sop'))).toBe(true);
     const sop = app.windows().find(page => page.url().includes('role=sop'))!;
     if (input.mediaDelayMs) await setSopV12MediaDelay(app, input.mediaDelayMs);

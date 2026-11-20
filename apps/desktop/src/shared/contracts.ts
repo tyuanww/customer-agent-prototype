@@ -47,6 +47,7 @@ export type CustomerAgentApi = {
     phase: ReportablePhase,
     resultCount: ResultCount,
     identity: OverlayReportIdentity,
+    startsSearch?: true,
   ) => Promise<void>;
   reportHandoffMilestone?: (
     handoffId: number,

@@ -66,11 +66,7 @@ test('SOP explicit synthetic consumer uses graph edges, copies exact messages an
     const openSopFromQuery = async () => {
       await query.evaluate(() => window.customerAgent!.openSearch());
       await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-      const entry = query.getByRole('button', { name: '打开 SOP 流程' });
-      const filters = query.getByRole('button', { name: '筛选', exact: true });
-      await expect(entry.or(filters).first()).toBeVisible();
-      if (!await entry.isVisible()) await filters.click();
-      await entry.click();
+      await query.getByRole('button', { name: '手动找流程', exact: true }).click();
     };
     await openSopFromQuery();
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=sop'))).toBe(true);

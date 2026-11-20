@@ -117,7 +117,7 @@ test('the search door tells a session apart from its grant, its facts and its st
           body: JSON.stringify({ shopId: 'shop-a', contextGeneration: 1, productIds: [], scenarioIds: [], releaseId: null }),
         });
         expect([403, 404]).toContain(denied.status);
-        const filter = query.getByRole('button', { name: '筛选', exact: true });
+        const filter = query.getByRole('button', { name: '查询范围', exact: true });
         if (await filter.count()) await filter.click();
         await expect.poll(() => query.evaluate(() => {
           const select = document.querySelector<HTMLSelectElement>('select[aria-label="当前店铺"]');

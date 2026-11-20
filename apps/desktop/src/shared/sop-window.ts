@@ -73,6 +73,7 @@ export type SopLayoutRequest = {
   sessionId: number;
   sequence: number;
   desiredHeight: number;
+  contentReady?: true;
 };
 
 export type SopLayoutAck = {
@@ -179,12 +180,14 @@ export function isSopWindowResult(value: unknown): value is SopWindowResult {
 }
 
 export function isSopLayoutRequest(value: unknown): value is SopLayoutRequest {
-  if (!value || typeof value !== 'object' || !hasExactKeys(value, SOP_LAYOUT_KEYS)) {
+  if (!value || typeof value !== 'object') {
     return false;
   }
   const record = value as Partial<SopLayoutRequest>;
+  const keys = record.contentReady === true ? [...SOP_LAYOUT_KEYS, 'contentReady'] : SOP_LAYOUT_KEYS;
   return (
-    isSafePositiveInt(record.sessionId)
+    hasExactKeys(value, keys)
+    && isSafePositiveInt(record.sessionId)
     && isSafePositiveInt(record.sequence)
     && typeof record.desiredHeight === 'number'
     && Number.isFinite(record.desiredHeight)

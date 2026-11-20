@@ -283,11 +283,12 @@ const api: CustomerAgentApi & OverlayControlApi = {
   dismiss(restorePreviousApp?: boolean): Promise<void> {
     return ipcRenderer.invoke(IPC_CHANNELS.DISMISS, restorePreviousApp === true);
   },
-  reportUiPhase(phase, resultCount = 0, identity): Promise<void> {
-    if (!isReportablePhase(phase) || !isResultCount(resultCount) || !isOverlayReportIdentity(identity)) {
+  reportUiPhase(phase, resultCount = 0, identity, startsSearch): Promise<void> {
+    if (!isReportablePhase(phase) || !isResultCount(resultCount) || !isOverlayReportIdentity(identity)
+      || (startsSearch !== undefined && startsSearch !== true)) {
       return Promise.resolve();
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_UI_PHASE, phase, resultCount, identity);
+    return ipcRenderer.invoke(IPC_CHANNELS.REPORT_UI_PHASE, phase, resultCount, identity, startsSearch);
   },
   reportHandoffMilestone(handoffId, milestone, identity): Promise<void> {
     if (!isHandoffId(handoffId) || !isHandoffMilestone(milestone) || !isOverlayReportIdentity(identity)) {

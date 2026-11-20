@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SopApp } from '../../src/renderer/SopApp';
 import type { SopUnifiedProjection } from '../../src/shared/sop-unified';
@@ -24,12 +24,20 @@ beforeEach(() => {
 afterEach(() => { delete window.sopWindow; });
 it('renders full authorized task semantics and sends only selected typed intent', async () => {
   render(<SopApp projection={projection} />);
-  expect(screen.getByText('合成知识正文。')).toBeVisible();
+  const knowledge = screen.getByText('合成知识正文。');
+  const disclosure = screen.getByText('补充资料与知识');
+  expect(knowledge).not.toBeVisible();
+  fireEvent.click(disclosure);
+  expect(knowledge).toBeVisible();
   expect(screen.getByText('知识资料 synthetic-resource')).toBeVisible();
+  fireEvent.click(disclosure);
+  expect(knowledge).not.toBeVisible();
   expect(screen.getByText('择一话术 / 合成条件甲')).toBeVisible();
   expect(screen.getByText('补充话术 / 合成条件乙')).toBeVisible();
   expect(screen.getByText('判断依据 合成记录有明确标记')).toBeVisible();
-  expect(screen.getByRole('button', { name: '证据不足 / 无法判断' })).toBeDisabled();
+  const choice = screen.getByRole('button', { name: '证据不足 / 无法判断' });
+  expect(choice).toBeDisabled();
+  expect(choice).toHaveAccessibleDescription(/待确认：合成确认甲.*必需图片「合成图文」暂不可用/);
   const copies = screen.getAllByRole('button', { name: '复制话术' });
   expect(copies[0]).toBeDisabled(); fireEvent.click(copies[1]!);
   await waitFor(() => expect(unifiedCommand).toHaveBeenCalledWith({ kind: 'copy', key: 'copy-two' }));
@@ -39,6 +47,8 @@ it('renders full authorized task semantics and sends only selected typed intent'
 });
 it('removes protected body and images while paused, and provides recovery', async () => {
   const { rerender } = render(<SopApp projection={projection} />);
+  fireEvent.click(screen.getByText('补充资料与知识'));
+  expect(screen.getByText('合成知识正文。')).toBeVisible();
   rerender(<SopApp projection={{ ...projection, state: 'paused', title: '', node: null, notice: '请重新确认。' }} />);
   expect(screen.queryByText('合成知识正文。')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '复制话术' })).not.toBeInTheDocument();
@@ -51,15 +61,60 @@ it('renders a pending close with the original-request recovery intent', async ()
   await waitFor(() => expect(unifiedCommand).toHaveBeenCalledWith({ kind: 'clear' }));
 });
 
+it('names the remaining requirements and waits for the trusted projection after image recovery', async () => {
+  const [requirement] = projection.node.requirements;
+  const [image] = projection.node.media;
+  const action = { ...projection, node: {
+    ...projection.node, kind: 'action', nextKey: 'next-step',
+    requirements: [{ ...requirement!, confirmed: true }, { key: 'req-two', label: '合成确认乙', ordinal: 2, confirmed: false }],
+  } } satisfies SopUnifiedProjection;
+  const { rerender } = render(<SopApp projection={action} />);
+  const next = screen.getByRole('button', { name: '下一步' });
+  const confirmation = screen.getByRole('checkbox', { name: '2. 合成确认乙' });
+  expect(next).toBeDisabled();
+  expect(next).toHaveAccessibleDescription('待确认：合成确认乙 必需图片「合成图文」暂不可用。');
+  fireEvent.click(confirmation);
+  await waitFor(() => expect(unifiedCommand).toHaveBeenCalledExactlyOnceWith({ kind: 'confirm', key: 'req-two' }));
+  expect(confirmation).not.toBeChecked();
+  const confirmed = { ...action.node, requirements: action.node.requirements.map(item => ({ ...item, confirmed: true })) };
+  rerender(<SopApp projection={{ ...action, node: confirmed }} />);
+  expect(next).toHaveAccessibleDescription('必需图片「合成图文」暂不可用。');
+  const requiredImages = within(screen.getByRole('region', { name: '必需图片' }));
+  fireEvent.click(requiredImages.getByRole('button', { name: '重试图片' }));
+  await waitFor(() => expect(unifiedCommand).toHaveBeenLastCalledWith({ kind: 'media', key: 'media-one' }));
+  expect(next).toBeDisabled();
+
+  rerender(<SopApp projection={{ ...action, node: { ...confirmed, media: [{ ...image!, state: 'loading', image: null }] } }} />);
+  expect(next).toHaveAccessibleDescription('必需图片「合成图文」正在读取。');
+  const ready = { ...confirmed, media: [{ ...image!, state: 'ready', image: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }] } satisfies SopUnifiedProjection['node'];
+  rerender(<SopApp projection={{ ...action, node: ready }} />);
+  expect(requiredImages.getByRole('img', { name: '合成图文' })).toBeVisible();
+  expect(next).toBeDisabled();
+  expect(next).toHaveAccessibleDescription('当前无法继续。');
+
+  rerender(<SopApp projection={{ ...action, node: { ...ready, canAdvance: true } }} />);
+  expect(next).toBeEnabled();
+  expect(next).not.toHaveAccessibleDescription();
+  fireEvent.click(next);
+  await waitFor(() => expect(unifiedCommand).toHaveBeenLastCalledWith({ kind: 'next', key: 'next-step' }));
+});
+
 it('keeps authorized optional-image loading separate from action readiness', async () => {
-  if (projection.state !== 'ready') throw new Error('Expected ready fixture');
-  render(<SopApp projection={{ ...projection, node: { ...projection.node, canAdvance: true,
+  const optional = { ...projection, node: { ...projection.node, canAdvance: true,
+    requirements: projection.node.requirements.map(item => ({ ...item, confirmed: true })),
     media: [{ ...projection.node.media[0]!, required: false, state: 'loading', image: null }],
-  } }} />);
+  } } satisfies SopUnifiedProjection;
+  const { rerender } = render(<SopApp projection={optional} />);
   expect(screen.getByText('图片正在读取。')).toBeVisible();
-  expect(screen.getByText('合成知识正文。')).toBeVisible();
   expect(screen.queryByRole('button', { name: '重试图片' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '证据不足 / 无法判断' })).toBeEnabled();
+  const choice = screen.getByRole('button', { name: '证据不足 / 无法判断' });
+  expect(choice).toBeEnabled();
+  rerender(<SopApp projection={{ ...optional, node: { ...optional.node,
+    media: [{ ...optional.node.media[0]!, state: 'unavailable' }],
+  } }} />);
+  expect(screen.getByRole('button', { name: '重试图片' })).toBeEnabled();
+  expect(choice).toBeEnabled();
+  expect(choice).not.toHaveAccessibleDescription();
   fireEvent.click(screen.getAllByRole('button', { name: '复制话术' })[1]!);
   await waitFor(() => expect(unifiedCommand).toHaveBeenCalledWith({ kind: 'copy', key: 'copy-two' }));
 });
@@ -89,5 +144,6 @@ it('displays only the instance name while parked and restores the same step', as
   expect(bookmark).toHaveBeenLastCalledWith('restore');
   act(() => { for (const notify of chrome) notify({ kind: 'expanded' }); });
   expect(screen.getByRole('heading', { name: '合成判断任务' })).toBeVisible();
+  fireEvent.click(screen.getByText('补充资料与知识'));
   expect(screen.getByText('合成知识正文。')).toBeVisible();
 });

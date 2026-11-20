@@ -50,6 +50,7 @@ describe('SOP window IPC sender matrix', () => {
   const unifiedCommand = vi.fn(async () => ({ ok: true as const }));
   const queryCommand = vi.fn(async () => ({ ok: true as const }));
   const copyCurrent = vi.fn(() => ({ ok: true as const }));
+  const reportLayout = vi.fn(() => ({ ok: true as const }));
   const resize = vi.fn();
   const bookmark = vi.fn(() => ({ ok: true as const }));
 
@@ -73,6 +74,7 @@ describe('SOP window IPC sender matrix', () => {
       resumeAvailable,
       chooseEdge,
       copyCurrent,
+      reportLayout,
       queryCommand,
       unifiedCommand,
       resize,
@@ -154,5 +156,17 @@ describe('SOP window IPC sender matrix', () => {
     expect(resize).toHaveBeenCalledExactlyOnceWith(request);
     expect(bookmarkHandler(sop.event, 'restore-hover')).toEqual({ ok: true });
     expect(bookmark).toHaveBeenCalledExactlyOnceWith('restore-hover');
+  });
+
+  it('accepts a ready-content layout marker only on a valid SOP main-frame request', () => {
+    const run = handler(IPC_CHANNELS.SOP_WINDOW_REPORT_LAYOUT);
+    const layout = { sessionId: 1, sequence: 1, desiredHeight: 620 };
+    const ready = { ...layout, contentReady: true };
+    expect(run(query.event, ready)).toMatchObject({ ok: false });
+    expect(run(sop.event, { ...layout, contentReady: false })).toMatchObject({ ok: false });
+    expect(run(sop.event, { ...ready, x: 100 })).toMatchObject({ ok: false });
+    run(sop.event, layout);
+    run(sop.event, ready);
+    expect(reportLayout.mock.calls).toEqual([[layout], [ready]]);
   });
 });

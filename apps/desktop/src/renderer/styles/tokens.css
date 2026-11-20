@@ -6,7 +6,7 @@
   --fox-soft-solid: #f2eefb;
   --glass-inner: rgba(255, 255, 255, 0.56);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  --query-glass: rgba(248, 249, 252, 0.80);
+  --query-glass: rgba(248, 249, 252, 0.94);
   --query-glass-inner: rgba(255, 255, 255, 0.48);
   --query-glass-solid: #f7f8fb;
   --query-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.86);
@@ -16,6 +16,12 @@
   --query-control-pressed: rgba(246, 242, 255, 0.82);
   --query-accent-control: rgba(242, 236, 255, 0.92);
   --query-accent-control-hover: rgba(234, 226, 255, 0.96);
+  --query-action-compact-height: 28px;
+  --query-action-height: 36px;
+  --query-action-radius: 8px;
+  --query-space-tight: 4px;
+  --query-space: 8px;
+  --query-space-loose: 12px;
   --query-success-surface: rgba(239, 252, 248, 0.94);
   --query-success-control: rgba(72, 201, 169, 0.14);
   --query-success-ink: #1d765f;

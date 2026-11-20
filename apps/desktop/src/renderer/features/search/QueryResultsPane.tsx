@@ -6,12 +6,17 @@ import { ScriptCard } from './ScriptCard';
 import type { HelpStatus } from '@shared/product-help';
 import { isIntakeRow, type QueryResult, type RankedScript } from './types';
 import { IntakeFaqCard } from './IntakeFaqCard';
-import { SopCandidateList } from './SopCandidateList';
+import { SopCandidateList, SopCandidateStatus } from './SopCandidateList';
 import type { IntakeSopCandidatesEvent } from '@shared/content-intake-query';
 
 type QueryResultsPaneProps = {
   contextControls?: ReactNode;
-  sopCandidates?: IntakeSopCandidatesEvent | null;
+  intakeSop?: {
+    event: IntakeSopCandidatesEvent | null;
+    manualEntry: ReactNode;
+    manualError?: string;
+    onLayoutChange: () => void;
+  };
   phase: OverlayPhase;
   resultPaneRef: Ref<HTMLElement>;
   statusBannerRef: Ref<HTMLDivElement>;
@@ -26,7 +31,7 @@ type QueryResultsPaneProps = {
   sopEntryError?: string | null;
   sopEntryResume?: boolean;
   onOpenSop?: () => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   retryLabel?: string;
   onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
@@ -39,7 +44,7 @@ type QueryResultsPaneProps = {
 
 export function QueryResultsPane({
   contextControls,
-  sopCandidates,
+  intakeSop,
   phase,
   resultPaneRef,
   statusBannerRef,
@@ -64,6 +69,11 @@ export function QueryResultsPane({
   onOpenHelp,
   onLeaveNoHit,
 }: QueryResultsPaneProps) {
+  const sopEvent = intakeSop?.event;
+  const candidates = sopEvent && 'candidates' in sopEvent ? sopEvent.candidates : [];
+  const candidateStatus = sopEvent && 'status' in sopEvent ? sopEvent.status : null;
+  const hasCandidates = candidates.length > 0;
+
   return (
           <section
             ref={resultPaneRef}
@@ -72,13 +82,23 @@ export function QueryResultsPane({
             aria-label="候选话术"
             tabIndex={-1}
           >
+            {intakeSop && (hasCandidates || candidateStatus || intakeSop.manualEntry) ? (
+              <section className="intake-sop-entry" aria-label="办理流程" data-sop-entry>
+                {hasCandidates ? <div className="intake-sop-candidates" data-sop-candidates>
+                  <SopCandidateList key={sopEvent?.contextId} candidates={candidates} onFeedbackLayoutChange={intakeSop.onLayoutChange} />
+                </div> : null}
+                {intakeSop.manualEntry}
+                {candidateStatus ? <SopCandidateStatus status={candidateStatus} /> : null}
+                {intakeSop.manualError ? <p className="validation-error" role="status">{intakeSop.manualError}</p> : null}
+              </section>
+            ) : null}
             {contextControls ? <div data-query-context>{contextControls}</div> : null}
-            {phase === 'EMPTY' && sopCandidates ? (
+            {phase === 'EMPTY' && (hasCandidates || candidateStatus) ? (
               <div ref={statusBannerRef} className="status-banner" role="status">
-                {'candidates' in sopCandidates ? '没有匹配的 FAQ 话术，可选择下方 SOP 办理。' : '没有匹配的 FAQ 话术。'}
+                {hasCandidates ? '没有匹配的 FAQ 话术，可从上方选择流程办理。' : '没有匹配的 FAQ 话术。'}
               </div>
             ) : null}
-            {phase === 'EMPTY' && !sopCandidates ? (
+            {phase === 'EMPTY' && !hasCandidates && !candidateStatus ? (
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到可用话术</strong>
@@ -99,13 +119,11 @@ export function QueryResultsPane({
               <div ref={statusBannerRef} className="status-banner is-error" data-testid="error-state">
                 <strong>查询未完成</strong>
                 <span>{errorMessage || '请重试。'}</span>
-                <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
+                {onRetry ? <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
                   {retryLabel}
-                </button>
+                </button> : null}
               </div>
             ) : null}
-
-            {sopCandidates ? <SopCandidateList key={sopCandidates.contextId} event={sopCandidates} /> : null}
 
             {phase === 'RESULTS' || phase === 'COPIED' || (phase === 'ERROR' && results.length > 0) ? (
               <div className="result-content" data-testid="result-content" ref={resultContentRef}>

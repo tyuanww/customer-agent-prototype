@@ -10,17 +10,17 @@ import type { ProductSessionView } from '../../src/shared/product-session';
 import { unifiedFixture } from '../support/sop-unified-fixture';
 
 const native = vi.hoisted(() => {
-  function createWindow() {
+  function createWindow(id: number) {
     let bounds = { x: 0, y: 0, width: 600, height: 240 };
     let visible = false, destroyed = false;
     const closed = new Set<() => void>();
     return {
-      webContents: { id: 1, isDestroyed: () => destroyed, send: vi.fn(), setBackgroundThrottling: vi.fn() },
+      webContents: { id, isDestroyed: () => destroyed, send: vi.fn(), setBackgroundThrottling: vi.fn() },
       on: (_event: 'closed', listener: () => void) => closed.add(listener),
       isVisible: () => visible,
       isDestroyed: () => destroyed,
       getBounds: () => bounds,
-      setBounds: (value: typeof bounds) => { bounds = value; },
+      setBounds: (value: typeof bounds) => { bounds = { ...value, height: Math.max(39, value.height) }; },
       showInactive: () => { visible = true; },
       show: () => { visible = true; },
       hide: () => { visible = false; },
@@ -39,7 +39,7 @@ vi.mock('electron', () => ({ BrowserWindow: vi.fn(), clipboard: {}, nativeImage:
   screen: { on: vi.fn(), removeListener: vi.fn() } }));
 vi.mock('../../src/main/overlay-chrome-window.ts', () => ({
   createOverlayChromeWindow: () => {
-    const window = native.createWindow();
+    const window = native.createWindow(native.windows.length + 1);
     native.windows.push(window);
     return window;
   },
@@ -83,8 +83,8 @@ function setup() {
     ready: { status: 'ready', request_id: '11111111-1111-4111-8111-111111111111', release_id: entitlement.releaseId,
       lease_expires_at: new Date(Date.now() + 1000).toISOString(), result, reasons: [] },
   };
-  const controller = () => {
-    const window = native.windows[0]!;
+  const controller = (index = 0) => {
+    const window = native.windows[index]!;
     const contents = window.webContents as unknown as WebContents;
     const controller = manager.fromContents(contents);
     if (!controller) throw new Error('missing native window registration');
@@ -144,5 +144,64 @@ it('keeps a hidden manual draft available to reopen without a session', async ()
     await h.manager.open('sop-query');
     expect(native.windows).toHaveLength(1);
     expect(window.isVisible()).toBe(true);
+  } finally { h.manager.destroy(); }
+});
+
+it('centers the first measured SOP content and keeps the top on later layouts and reopen', async () => {
+  const h = setup();
+  try {
+    await h.manager.open('sop-query');
+    const { controller, window } = h.controller();
+    expect(window.getBounds()).toEqual({ x: 16, y: 330, width: 600, height: 240 });
+    controller.reportLayout({ sessionId: 1, sequence: 1, desiredHeight: 240 });
+    const content = { sessionId: 1, sequence: 2, desiredHeight: 620, contentReady: true } as const;
+    controller.reportLayout(content);
+    expect(window.getBounds()).toEqual({ x: 16, y: 140, width: 600, height: 620 });
+    controller.close();
+    await h.manager.open('sop-query');
+    controller.reportLayout({ ...content, sequence: 3, desiredHeight: 420 });
+    expect(window.getBounds()).toEqual({ x: 16, y: 140, width: 600, height: 420 });
+  } finally { h.manager.destroy(); }
+});
+
+it.each(['drag', 'resize'])('honors a title %s before the first content layout', async gesture => {
+  const h = setup();
+  try {
+    await h.manager.open('sop-query');
+    const { controller, window } = h.controller();
+    if (gesture === 'drag') controller.moveBy(40, -90, true);
+    else {
+      controller.resize({ type: 'begin', sessionId: 1, sequence: 1, direction: 'top-left' });
+      controller.resize({ type: 'end', sessionId: 1, sequence: 1, deltaX: -8, deltaY: -90 });
+    }
+    const content = { sessionId: 1, sequence: 1, desiredHeight: 620, contentReady: true } as const;
+    controller.reportLayout(content);
+    expect(window.getBounds()).toEqual(gesture === 'drag'
+      ? { x: 56, y: 240, width: 600, height: 620 }
+      : { x: 8, y: 240, width: 608, height: 330 });
+  } finally { h.manager.destroy(); }
+});
+
+it('reserves non-overlapping bookmark slots when the native minimum height exceeds 32', async () => {
+  const h = setup();
+  h.request.mockImplementation(async (_epoch, path, options) => {
+    if (path.endsWith('/close')) return { status: 204, value: null };
+    const { continuationId } = options?.body as { continuationId: string };
+    return { status: 200, value: { continuationId, entitlement: h.candidate.entitlement } };
+  });
+  try {
+    for (const index of [0, 1]) {
+      await expect(h.manager.openCandidate(h.candidate)).resolves.toBe('opened');
+      expect(h.controller(index).controller.bookmark('park')).toEqual({ ok: true });
+    }
+    const first = h.controller();
+    const second = h.controller(1);
+    const firstBounds = first.window.getBounds();
+    const secondBounds = second.window.getBounds();
+    expect(firstBounds).toMatchObject({ x: 0, width: 182, height: 39 });
+    expect(secondBounds).toMatchObject({ x: 0, width: 182, height: 39 });
+    expect(Math.abs(firstBounds.y - secondBounds.y)).toBeGreaterThanOrEqual(39);
+    expect(first.controller.bookmark('restore')).toEqual({ ok: true });
+    expect(first.window.getBounds()).toEqual({ x: 16, y: 330, width: 600, height: 240 });
   } finally { h.manager.destroy(); }
 });
