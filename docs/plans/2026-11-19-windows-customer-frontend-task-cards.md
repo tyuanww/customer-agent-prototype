@@ -10,7 +10,7 @@
 
 | 卡 | 可独立验收的结果 | 依赖 | 当前状态 |
 | --- | --- | --- | --- |
-| W0 | 绑定现场包、配置与首查失败点 | 无 | 现场机已核对四份构建标识，待绑定当时的进程 |
+| W0 | 绑定现场包、配置与首查失败点 | 无 | 反馈时段运行 765adfeb，待查首个失败请求 |
 | W1 | 登录后回到原问句 | 无 | 本地实现，Electron 回归通过 |
 | W2 | 首查可用，失败可恢复 | W0 定因 | 本地已验证刷新和再次查询，现场待定 |
 | W3 | × 可点，标题可拖 | 无 | 本地实现，独立 v1 和统一 v11 回归通过 |
@@ -22,7 +22,7 @@
 
 W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给 W6 的 Query 缩放。W6 的 SOP 部分接续 W4 的窗口所有权，完成后进入 W7。共享模块或 IPC 由一个工作单元写入，交接记录提交、入口、测试和阻塞。
 
-剩余事项分三路并行。W0 将现场已安装构建关联到故障时的启动，再沿 W2 找到首个失败请求。W8 用固定候选包及全新的合成配置，在 Windows 上串行验收 W1 至 W7，记录双屏、任务栏和不同 DPI。W6 的 macOS 收起焦点独立验证。产品实现已进入[草稿 PR #224](https://github.com/tyuanww/customer-agent-prototype/pull/224)。
+三路并行。W0/W2 沿现场构建定位首个失败请求。W8 用固定包和合成配置在 Windows 串行验收 W1 至 W7，覆盖双屏、任务栏和不同 DPI。W6 独立跟踪 macOS 收起焦点。[草稿 PR #224](https://github.com/tyuanww/customer-agent-prototype/pull/224)
 
 [计划基线 CI · 91f404c1](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44501918151) · [产品候选首轮 CI · 20c55ee9](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44667250735)
 
@@ -30,9 +30,9 @@ W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给
 
 - [x] Windows 截图显示已登录、已选店、SOP 入口，以及「查询未完成／请刷新店铺」。
 - [x] 公开发行版 `v0.3.42@1ca737ee` 的 Windows 安装包 SHA-256 为 `a9fea640460e4056df3a7cd9daa36a783b19953bdc92e101376457d931f81130`，早于添加 SOP 按钮的 `00cec500`。[发布记录](https://github.com/tyuanww/customer-agent-prototype/releases/tag/v0.3.42)
-- [x] **现场构建清点。** 11 月 20 日在当时测试的 Windows 上，逐份回读已安装程序的 `resources/build-identity.json`。普通安装为 `0.3.41@c9ee2240`，另有三份 `0.3.43` 试点安装，分别为 `c6cf544b`、`540c16f2`、`765adfeb`，均早于 11 月 19 日下午的备忘录。三份试点均含 SOP 入口。备忘录和截图未标构建号，桌面快捷方式名称与安装日期只用于筛选。
-- [ ] **绑定现场包。** 将故障时使用的客服程序与上述构建对应，补记生效 profile 和 SOP 模式。如找到对应原 EXE，再记录其 SHA-256。[构建标识](../how-to-ship-the-next-desktop-cut.md)
-- [ ] **定位首个失败。** 按获准范围核对有效授权和 FAQ 来源，沿同一请求查 Query 提交、Main 选店、资格签发、快照分页、本地检索。记录最早失败处和脱敏 code/reason，核对「重试」「刷新店铺」各走哪一步，再把 W2 分派给该边界的所有者。[查询权限](../how-to-check-roster-permission.md)
+- [x] **现场构建。** 四份安装的 `resources/build-identity.json` 分别对应普通版 `0.3.41@c9ee2240` 和三个 `0.3.43` 试点构建 `c6cf544b`、`540c16f2`、`765adfeb`。
+- [x] **反馈时段。** 11 月 19 日备忘录编辑于 15:31–15:48（UTC+8）。Windows 客服 EXE 启动记录中的路径指向 `765adfeb`，15:33:57、15:36:40、15:40:23 均有执行。以其包内提交 `765adfeb529a2f3e915b48551c78a81788f249bf` 复现；原下载 EXE 的 SHA-256 未取得。
+- [ ] **定位首个失败。** 核对当时生效的 profile、SOP 模式和授权。沿同一请求查选店、资格、快照分页及本地检索，用最早的脱敏 code/reason 确定 W2 归属。[查询权限](../how-to-check-roster-permission.md)
 
 ## W1 · 登录后回到原问句
 
@@ -44,7 +44,7 @@ W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给
 ## W2 · 有授权的首次 FAQ 查询可用
 
 - [x] **合成对照。** 在 macOS Electron 用同店同问句。更改资格的 `contextGeneration` 后无快照请求。更改快照的 `releaseId` 后有一次快照请求。两次均显示「查询未完成／请刷新店铺」。恢复响应后点「重试」，均重新获取资格和快照并返回话术。[对照入口](../../apps/desktop/tests/e2e/content-intake-query.spec.ts)
-- [x] **现场候选代码比对。** 三份 0.3.43 的 `QueryApp`、Main 查询与资格／快照模块内容相同。`765adfeb` 在店铺发现返回 `NO_GRANT` 时增加联系管理员的提示。截图已选店，单凭「请刷新店铺」无法区分资格绑定和快照内容校验失败。[店铺发现](../../apps/desktop/src/renderer/features/search/use-intake-shops.ts) · [资格与快照](../../apps/desktop/src/main/content-intake-usage.ts)
+- [x] **与现场版本对照。** `765adfeb` 至合成复现基线 `91f404c1` 的 Main 查询、资格、快照、店铺发现和结果页代码相同。`QueryApp` 差异限于快捷键提示。现有对照可解释相同文案，现场首个失败请求尚待核验。[结果页](../../apps/desktop/src/renderer/features/search/QueryResultsPane.tsx)
 - [ ] **按 W0 定因。** 资格失败查服务端范围和 Main 绑定，资格通过后查完整分页及关联字段。现有 `FORBIDDEN` 提示的「刷新店铺」直接走店铺发现。常规重试继续提交原问句。保留授权和分页校验。[资格与快照](../../apps/desktop/src/main/content-intake-usage.ts) · [结果页](../../apps/desktop/src/renderer/features/search/QueryResultsPane.tsx)
 - [ ] **验收。** 有效授权与已发布 FAQ 首查即命中。无 grant、过期、无命中、读失败分别可辨，撤权使旧复制句柄失效。用现场对应配置重放，记录资格请求次数、快照页数和首个结果，核对重复请求。
 
