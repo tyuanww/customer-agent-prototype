@@ -12,6 +12,7 @@ export async function launchIntakeElectron(options: {
   apiOrigin: string;
   identityOrigin: string;
   evidenceDirectory: string;
+  sopCandidates?: { sopContractSet: string; sopCandidateContractSet: string };
 }): Promise<ElectronApplication> {
   const { desktopRoot, userDataDirectory, apiOrigin, identityOrigin, evidenceDirectory } = options;
   const packagedExecutable = process.env.CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE;
@@ -24,6 +25,7 @@ export async function launchIntakeElectron(options: {
     // operator profile; every scenario supplies its own new temporary directory.
     writeFileSync(path.join(userDataDirectory, 'synthetic-stack.json'), JSON.stringify({
       mode: 'synthetic-local', apiOrigin, identityOrigin, contentIntake: 'faq-v2',
+      ...(options.sopCandidates && { sopQuery: 'menokin-sop-unified-v12', ...options.sopCandidates }),
     }), { mode: 0o600, flag: 'wx' });
   }
   let app: ElectronApplication | undefined;
@@ -33,6 +35,11 @@ export async function launchIntakeElectron(options: {
         ...process.env, DEMO_E2E: '1', CUSTOMER_AGENT_DESKTOP_API_ORIGIN: packaged ? 'http://127.0.0.1:1' : apiOrigin,
         CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN: packaged ? 'http://127.0.0.1:2' : identityOrigin,
         CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
+        ...(options.sopCandidates && {
+          CUSTOMER_AGENT_DESKTOP_SOP_QUERY: 'menokin-sop-unified-v12',
+          CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: options.sopCandidates.sopContractSet,
+          CUSTOMER_AGENT_DESKTOP_SOP_CANDIDATE_CONTRACT_SET: options.sopCandidates.sopCandidateContractSet,
+        }),
       } });
     if (packaged) {
       const identity = await app.evaluate(({ app, screen }) => ({ packaged: app.isPackaged, version: app.getVersion(),

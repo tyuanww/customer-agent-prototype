@@ -9,9 +9,10 @@ import { IntakeUsageError, type IntakeQualification } from './content-intake-usa
 
 type QueryIntent = Extract<SopUnifiedCommand, { kind: 'query' }>;
 type Active = {
-  query: QueryIntent;
+  query: QueryIntent | null;
   principalId: string;
   graph: SopTaskGraph;
+  instanceName: string;
   selection: SopSelection;
   continuationId: string;
   entitlement: SopSchemas['IntakeEntitlement'];
@@ -20,7 +21,11 @@ type Active = {
   contextGeneration: number;
   contentDeadline: number;
   mediaContext: 'query-preview' | 'live-continuation';
-  queryRequest: Readonly<SopSchemas['MenokinSopQuerySopQueryRequest']>;
+  queryRequestId: string;
+};
+export type SopCandidateOpening = Pick<IntakeQualification, 'selection' | 'entitlement'> & {
+  ready: SopSchemas['MenokinSopQuerySopReadyResponse'];
+  sessionEpoch: number;
 };
 type PendingQuery = {
   intent: QueryIntent;
@@ -70,7 +75,13 @@ export class SopUnifiedRuntime {
   private epoch: number;
   private readonly unsubscribers: (() => void)[];
   constructor(private readonly port: SopUnifiedPort, private readonly writeClipboard: (text: string) => void,
-    private readonly qualify?: (signal: AbortSignal) => Promise<IntakeQualification>) {
+    private readonly qualify?: (signal: AbortSignal) => Promise<IntakeQualification>,
+    private candidate?: SopCandidateOpening) {
+    if (candidate) {
+      this.value.entry = 'candidate';
+      this.value.state = 'loading';
+      this.value.notice = '正在打开流程。';
+    }
     this.epoch = port.session.view().sessionEpoch;
     this.unsubscribers = [port.session.subscribe(() => {
       const view = port.session.view();
@@ -83,11 +94,26 @@ export class SopUnifiedRuntime {
     }), port.session.onExplicitLogout(() => this.end('流程已结束。'))];
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  hasInstance(): boolean {
+    return this.active !== null;
+  }
+  canResumeInstance(): boolean {
+    const active = this.active;
+    if (this.port.contractVersion !== 'v12' || !active || Date.now() >= active.contentDeadline) return false;
+    const actor = this.port.session.view();
+    return actor.signedIn && actor.userId === active.principalId;
+  }
+  instanceName(): string | null {
+    return this.value.state === 'ready' && this.live() && this.canResumeInstance()
+      ? this.active?.instanceName ?? null
+      : null;
+  }
   projection(): SopUnifiedProjection {
     if (this.active && Date.now() >= this.active.contentDeadline) this.end('流程有效期已结束，请重新查询。');
     if (this.value.state === 'ready' && [...this.images.entries()].some(([key, image]) => image.state === 'ready' && this.image(key) === null)) this.render();
     if (this.value.state === 'ready' && !this.live()) this.pause('流程需要重新确认，请点击继续。');
-    return structuredClone(this.value);
+    const instanceName = this.instanceName();
+    return structuredClone(this.value.state === 'ready' && instanceName ? { ...this.value, instanceName } : this.value);
   }
   private emit() { for (const listener of this.listeners) listener(); }
   private clearTimers(clearCopy = true) {
@@ -100,7 +126,8 @@ export class SopUnifiedRuntime {
   }
   private concealed(state: Exclude<SopUnifiedProjection['state'], 'ready'>, notice: string) {
     this.stopMedia(); this.resetHandles(); this.images.clear(); this.clearTimers();
-    this.value = { ...this.value, state, notice, node: null, title: '', copied: false, busy: false };
+    const { projectionVersion, sessionId, shops, entry } = this.value;
+    this.value = { projectionVersion, sessionId, shops, ...(entry ? { entry } : {}), state, notice, node: null, title: '', copied: false, busy: false };
     this.emit();
   }
   private pause(notice: string) {
@@ -125,6 +152,15 @@ export class SopUnifiedRuntime {
     if (this.disposed) return;
     this.value.sessionId = sessionId;
     if (this.active || this.pendingQuery || this.closing || !this.port.session.view().signedIn) return;
+    if (this.value.entry === 'candidate') {
+      const candidate = this.candidate;
+      this.candidate = undefined;
+      if (candidate) await this.run(async signal => {
+        if (candidate.sessionEpoch !== this.port.session.view().sessionEpoch) throw new Error('SOP_SELECTION_REQUIRED');
+        await this.openReady(candidate.ready, candidate, null, signal);
+      });
+      return;
+    }
     await this.run(async signal => {
       const shops = await this.port.shops(signal);
       signal.throwIfAborted();
@@ -149,7 +185,8 @@ export class SopUnifiedRuntime {
       return { ok: result !== false };
     } catch (error) {
       if (generation === this.generation) {
-        if (error instanceof ProductHttpError && TERMINAL_REASONS.has(error.reason ?? '')) {
+        if (error instanceof ProductHttpError && (TERMINAL_REASONS.has(error.reason ?? '')
+          || (this.value.entry === 'candidate' && this.active?.opening && error.reason === 'LEASE_EXPIRED'))) {
           this.end('流程已失效，请结束后重新查询。');
         } else {
           const selectionUnavailable = (error instanceof Error && error.message === 'SOP_SELECTION_REQUIRED')
@@ -161,9 +198,11 @@ export class SopUnifiedRuntime {
           const retryQuery = this.port.contractVersion === 'v12' && this.pendingQuery !== null;
           this.concealed(this.closing ? 'closing' : this.active || retryQuery ? 'paused' : blocked ? 'blocked' : 'failed', this.closing
             ? '结束结果尚未确认，请按原请求确认。'
-            : selectionUnavailable
-              ? '请先在查询窗口确认当前店铺、商品与场景条件，再重新查询流程。'
-            : '流程暂不能继续，请确认登录和权限后重试。');
+            : this.value.entry === 'candidate' && !this.active
+              ? '流程暂不能打开，请回查询窗口重新选择。'
+              : selectionUnavailable
+                ? '请先在查询窗口确认当前店铺、商品与场景条件，再重新查询流程。'
+                : '流程暂不能继续，请确认登录和权限后重试。');
         }
       }
       return { ok: false };
@@ -187,15 +226,17 @@ export class SopUnifiedRuntime {
   private acceptReceipt(active: Active, receipt: SopSchemas['IntakeSopContinuationReceipt'], generation: number) {
     if (receipt.continuationId !== active.continuationId) throw new Error('SOP_CONTINUATION_BINDING');
     this.acceptEntitlement(active, receipt.entitlement, generation);
-    this.shops.set(active.query.shopKey, active.selection.shopId);
-    this.value.shops = [{ key: active.query.shopKey, label: active.selection.shopId }];
+    if (active.query) {
+      this.shops.set(active.query.shopKey, active.selection.shopId);
+      this.value.shops = [{ key: active.query.shopKey, label: active.selection.shopId }];
+    }
   }
   private action(active: Active, action: SopSchemas['IntakeSopActionCheck']['action'], edgeId: string | null = null, entry: SopSchemas['IntakeSopEntryRef'] | null = null): SopSchemas['IntakeSopActionCheck'] {
     return { entitlementId: active.entitlement.entitlementId, releaseId: active.releaseId,
       contextGeneration: active.contextGeneration, key: active.graph.result.flow.header.key,
       graphDigest: active.graph.result.graph_digest, nodeId: active.graph.current().id,
       continuationId: active.continuationId, action, edgeId, entry,
-      queryRequestId: action === 'open' ? active.queryRequest.request_id : null };
+      queryRequestId: action === 'open' ? active.queryRequestId : null };
   }
   private async authorize(active: Active, action: SopSchemas['IntakeSopActionCheck']['action'], signal: AbortSignal, edgeId: string | null = null, entry: SopSchemas['IntakeSopEntryRef'] | null = null) {
     if (this.port.session.view().role === 'agent' && active.graph.result.flow.header.audience === 'coach') throw new Error('SOP_AUDIENCE_DENIED');
@@ -359,7 +400,7 @@ export class SopUnifiedRuntime {
   }
   async command(command: SopUnifiedCommand): Promise<{ ok: boolean }> {
     if (command.kind === 'clear') return this.finish();
-    if (command.kind === 'query') return this.query(command);
+    if (command.kind === 'query') return this.value.entry === 'candidate' ? { ok: false } : this.query(command);
     const pendingQuery = this.pendingQuery;
     if (command.kind === 'refresh' && pendingQuery && !this.active) {
       return this.run(signal => this.consumeQuery(pendingQuery, signal));
@@ -382,6 +423,12 @@ export class SopUnifiedRuntime {
       await this.authorize(active, 'observe', signal);
       this.startMedia(active, 'all'); this.render();
     });
+    if (command.kind === 'rename') {
+      if (!this.instanceName()) return { ok: false };
+      active.instanceName = command.name.trim();
+      this.emit();
+      return { ok: true };
+    }
     const handle = this.handles.get(command.key);
     if (command.kind === 'media-failed') {
       if (handle?.kind !== 'media' || this.value.state !== 'ready' || this.image(handle.id) === null) return { ok: false };
@@ -452,24 +499,30 @@ export class SopUnifiedRuntime {
       this.concealed(response.status, response.status === 'no_match' ? '没有找到匹配流程。'
         : response.status === 'stale' ? '流程已失效，请重新查询。' : '当前流程不能安全提供，请联系管理员核对。'); return;
     }
+    return this.openReady(response, pending.qualification, pending.intent, signal, pending.qualification.isCurrent);
+  }
+  private async openReady(response: SopSchemas['MenokinSopQuerySopReadyResponse'],
+    qualification: Pick<IntakeQualification, 'selection' | 'entitlement'>, query: QueryIntent | null,
+    signal: AbortSignal, isCurrent?: () => boolean) {
     const actor = this.port.session.view(), role = actor.role;
-    if (!role || !actor.userId) throw new Error('SOP_SIGN_IN_REQUIRED');
+    if (!actor.signedIn || !role || !actor.userId) throw new Error('SOP_SIGN_IN_REQUIRED');
     const graph = new SopTaskGraph(response.result, role);
     if (Date.parse(response.lease_expires_at) <= Date.now()) throw new Error('SOP_LEASE_EXPIRED');
     const contentDeadline = Math.min(
       graph.result.flow.header.effectiveTo === null ? Infinity : Date.parse(graph.result.flow.header.effectiveTo),
       ...response.result.entries.map(row => row.entry.effectiveTo === null ? Infinity : Date.parse(row.entry.effectiveTo)));
     if (Date.parse(graph.result.flow.header.effectiveFrom) > Date.now() || response.result.entries.some(row => Date.parse(row.entry.effectiveFrom) > Date.now()) || contentDeadline <= Date.now()) throw new Error('SOP_CONTENT_EXPIRED');
-    const { selection, entitlement } = pending.qualification;
+    const { selection, entitlement } = qualification;
     const generation = entitlement.contextGeneration;
     this.contextGeneration = Math.max(this.contextGeneration, generation);
-    const active: Active = { query: pending.intent, principalId: actor.userId, graph, selection, continuationId: `sct_${randomBytes(32).toString('hex')}`,
+    const active: Active = { query, principalId: actor.userId, graph, instanceName: graph.result.flow.header.title.trim() || 'SOP 流程',
+      selection, continuationId: `sct_${randomBytes(32).toString('hex')}`,
       entitlement, opening: null, releaseId: response.release_id, contextGeneration: generation, contentDeadline, mediaContext: 'query-preview',
-      queryRequest: pending.request };
+      queryRequestId: response.request_id };
     this.acceptEntitlement(active, entitlement, generation);
     active.opening = this.action(active, 'open'); this.active = active; this.pendingQuery = null;
     await this.authorize(active, 'open', signal);
-    if (!pending.qualification.isCurrent()) { this.end('查询条件已变化，请重新查询。'); return false; }
+    if (isCurrent?.() === false) { this.end('查询条件已变化，请重新查询。'); return false; }
     this.startMedia(active); this.render();
   }
   async restart(): Promise<{ ok: boolean }> {
@@ -492,7 +545,9 @@ export class SopUnifiedRuntime {
     });
   }
   dispose() {
-    this.end('流程已结束。'); this.disposed = true;
+    if (this.disposed) return this.terminalClose;
+    this.disposed = true;
+    this.end('流程已结束。');
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.listeners.clear();
     return this.terminalClose;

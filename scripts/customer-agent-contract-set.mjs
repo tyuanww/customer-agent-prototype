@@ -25,6 +25,7 @@ import { createSopUnifiedProfile, SOP_UNIFIED_SCHEMA, SOP_UNIFIED_LOCK, SOP_UNIF
 import { createSopResourceDisableProfile, SOP_RESOURCE_SCHEMA, SOP_RESOURCE_LOCK, SOP_RESOURCE_CONSUMPTION_SCHEMA,
   SOP_RESOURCE_CORRECTED_SCHEMA, SOP_RESOURCE_CORRECTED_LOCK, SOP_RESOURCE_CORRECTED_CONSUMPTION_SCHEMA,
   SOP_RESOURCE_CORRECTED_PROFILE } from './sop-resource-disable-contract.mjs';
+import { verifySopCandidateContractSet } from './sop-candidate-contract.mjs';
 import { createCorrectedSopUnifiedProfile, SOP_CORRECTED_SCHEMA, SOP_CORRECTED_LOCK, SOP_CORRECTED_CONSUMPTION_SCHEMA } from './sop-unified-corrected-contract.mjs';
 
 const EXPECTED_PACKAGE_NAME = 'customer-agent-demo';
@@ -1732,13 +1733,13 @@ export function parseCliArguments(argv) {
     }
     options[match[1]] = match[2];
   }
-  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected', 'sopResourceDisable', 'sopResourceDisableCorrected'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
+  if (options.profile && (command !== 'verify' || !['sopUnified', 'sopUnifiedCorrected', 'sopResourceDisable', 'sopResourceDisableCorrected', 'sopCandidates'].includes(options.profile))) throw new Error('Unsupported contract-set profile');
   return { command, options };
 }
 
 function runCli() {
   const { command, options } = parseCliArguments(process.argv.slice(2));
-  const verifiers = { sopResourceDisableCorrected: verifyIngestedCorrectedSopResourceDisableContractSet, sopResourceDisable: verifyIngestedSopResourceDisableContractSet, sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
+  const verifiers = { sopCandidates: options => verifySopCandidateContractSet(options).summary, sopResourceDisableCorrected: verifyIngestedCorrectedSopResourceDisableContractSet, sopResourceDisable: verifyIngestedSopResourceDisableContractSet, sopUnified: verifyIngestedSopUnifiedContractSet, sopUnifiedCorrected: verifyIngestedCorrectedSopUnifiedContractSet };
   const result = command === 'ingest'
     ? ingestContractSetAndGenerate({
         projectRoot: options['project-root'],

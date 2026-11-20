@@ -36,6 +36,7 @@ it('guards all FAQ capabilities with trusted Query main-frame identity, exact pa
       [C.INTAKE_QUERY_MODE, []], [C.INTAKE_QUERY_ACCESS, []], [C.INTAKE_QUERY_SELECT, [{ shopId: 'shop-a' }]],
       [C.INTAKE_QUERY_CONDITIONS, [{ productIds: [], scenarioIds: [] }]],
       [C.INTAKE_QUERY_SEARCH, [{ queryText: '洁面', contextId: oldContext }]], [C.INTAKE_QUERY_COPY, [{ key: 'opaque' }]], [C.INTAKE_QUERY_CANCEL, []],
+      [C.INTAKE_QUERY_OPEN_SOP_CANDIDATE, [{ key: oldContext }]],
     ] as const) {
       const invoke = handlers.get(channel)!;
       for (const ev of [event(fox), event(query, {}), event(query, { parent: frame }), event({ ...query, id: 3 } as WebContents)]) {
@@ -52,6 +53,7 @@ it('guards all FAQ capabilities with trusted Query main-frame identity, exact pa
 });
 it('awaits online copy verification and forwards denial and invalidation through the Query IPC', async () => {
   const wire = intakeQueryData(), sent = vi.fn();
+  const invalidateSop = vi.fn();
   let factsExpired = false;
   const frame = { parent: null };
   const query = { id: 1, isDestroyed: () => false, getURL: () => 'http://127.0.0.1:5173/?role=query',
@@ -61,10 +63,19 @@ it('awaits online copy verification and forwards denial and invalidation through
       if (factsExpired && path.startsWith('/v1/intake/snapshot?')) throw new ProductHttpError('FORBIDDEN', 'ORG_FACTS_UNAVAILABLE');
       return { value: wire.respond(path, options.body) };
     } };
-  const dispose = registerContentIntakeQueryIpc(session, () => [query], () => 'query', () => 'http://127.0.0.1:5173/');
+  const dispose = registerContentIntakeQueryIpc(session, () => [query], () => 'query', () => 'http://127.0.0.1:5173/', invalidateSop);
   const event = { sender: query, senderFrame: frame } as IpcMainInvokeEvent;
+  renderer.event = event;
   try {
     clipboardWrite.mockClear();
+    const cancel = handlers.get(C.INTAKE_QUERY_CANCEL)!;
+    expect(await cancel({ ...event, senderFrame: { parent: frame } } as IpcMainInvokeEvent, 'overlay-handoff')).toMatchObject({ code: 'FORBIDDEN' });
+    expect(await cancel(event, { reason: 'overlay-handoff' })).toMatchObject({ code: 'VALIDATION' });
+    expect(await cancel(event, 'overlay-handoff', 'extra')).toMatchObject({ code: 'VALIDATION' });
+    expect(await intakeQuery.cancel('overlay-handoff')).toEqual({ ok: true, cancelled: true });
+    expect(invalidateSop).not.toHaveBeenCalled();
+    expect(await intakeQuery.cancel()).toEqual({ ok: true, cancelled: true });
+    expect(invalidateSop).toHaveBeenCalledTimes(1);
     await handlers.get(C.INTAKE_QUERY_SELECT)!(event, { shopId: 'shop-a' });
     const qualification = await dispose.qualifySop(query, new AbortController().signal);
     expect(qualification.selection).toEqual({ shopId: 'shop-a', productIds: [], scenarioIds: [] });
@@ -87,7 +98,7 @@ it('awaits online copy verification and forwards denial and invalidation through
     expect(await handlers.get(C.INTAKE_QUERY_COPY)!(event, { key: fresh.rows[0].key })).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     expect(clipboardWrite).toHaveBeenCalledTimes(1);
     expect(sent).toHaveBeenCalledWith(C.INTAKE_QUERY_INVALIDATED, { reason: 'invalidated', contextId: newContext });
-  } finally { dispose.dispose(); }
+  } finally { renderer.event = null; dispose.dispose(); }
 });
 
 it('queues a Main invalidation before a replacement search and delivers it through preload while that search waits', async () => {
@@ -132,4 +143,20 @@ it('queues a Main invalidation before a replacement search and delivers it throu
     expect(await intakeQuery.copy({ key: fresh.rows[0].key })).toEqual({ ok: true, copied: true });
     expect(clipboardWrite).toHaveBeenCalledTimes(1);
   } finally { release(); unsubscribe(); renderer.event = null; dispose.dispose(); }
+});
+
+it('rejects private fields on candidate IPC projection and click intent', async () => {
+  const listener = vi.fn(), unsubscribe = intakeQuery.onSopCandidates!(listener);
+  try {
+    const deliver = renderer.listeners.get(C.INTAKE_QUERY_SOP_CANDIDATES)!;
+    const candidate = { key: newContext, label: '合成候选' };
+    deliver({}, { contextId: oldContext, candidates: [{ ...candidate, candidate_ref: 'private' }] });
+    deliver({}, { contextId: oldContext, candidates: [candidate, candidate] });
+    deliver({}, { contextId: oldContext, candidates: [candidate], entitlementId: 'private' });
+    expect(listener).not.toHaveBeenCalled();
+    deliver({}, { contextId: oldContext, candidates: [candidate] });
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ contextId: oldContext, candidates: [candidate] });
+    const invalid = { key: newContext, candidate_ref: 'private' };
+    expect(await intakeQuery.openSopCandidate!(invalid)).toMatchObject({ code: 'VALIDATION' });
+  } finally { unsubscribe(); }
 });

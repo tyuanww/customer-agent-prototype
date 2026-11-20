@@ -90,7 +90,7 @@ export type ApiPrivateBootstrapConfig = Readonly<{
   contentWorker?: Readonly<{ database: ApiDatabaseBootstrapConfig }>;
   query: Readonly<
     | { mode: 'unified'; intake?: IntakeDatabaseBootstrapConfig }
-    | { mode: 'intake-compat'; intake: IntakeDatabaseBootstrapConfig }
+    | { mode: 'intake-compat'; intake: IntakeDatabaseBootstrapConfig; sopCandidates?: 'synthetic' }
   >;
 }>;
 
@@ -203,6 +203,12 @@ export function parseApiPrivateBootstrapConfig(
   const queryMode = exactEnvironmentValue(environment, 'CUSTOMER_AGENT_QUERY_MODE', issues) ?? 'unified';
   if (queryMode !== 'unified' && queryMode !== 'intake-compat') {
     issues.push(issue('CUSTOMER_AGENT_QUERY_MODE', 'invalid'));
+  }
+  const sopCandidates = exactEnvironmentValue(environment, 'CUSTOMER_AGENT_SOP_CANDIDATES', issues);
+  if (sopCandidates !== undefined && (sopCandidates !== 'synthetic' || queryMode !== 'intake-compat'
+    || environment.AUTH_SESSION_MODE !== 'product' || environment.AUTH_MODE !== 'mock'
+    || environment.CUSTOMER_AGENT_PROFILE !== 'test' && environment.CUSTOMER_AGENT_PROFILE !== 'formal-dev')) {
+    issues.push(issue('CUSTOMER_AGENT_SOP_CANDIDATES', 'invalid'));
   }
   const wantsIntake = queryMode === 'intake-compat'
     || environment.INTAKE_BUSINESS_DATABASE_URL !== undefined
@@ -382,7 +388,7 @@ export function parseApiPrivateBootstrapConfig(
   if (queryMode === 'unified') {
     query = Object.freeze({ mode: queryMode, ...(intake ? { intake } : {}) });
   } else if (queryMode === 'intake-compat' && intake) {
-    query = Object.freeze({ mode: queryMode, intake });
+    query = Object.freeze({ mode: queryMode, intake, ...(sopCandidates === 'synthetic' ? { sopCandidates } : {}) });
   }
   if (idempotencyHmac && logHash
     && Object.values(idempotencyHmac.keys).includes(logHash.key)) {

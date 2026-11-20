@@ -1,24 +1,24 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { parseContractSchema, type components } from '@customer-agent/contracts/sop-resource-disable';
+import { CONTRACT_PROVENANCE, parseContractSchema, type components } from '@customer-agent/contracts/sop-resource-disable';
 import { SOP_RESOURCE_FORMAT, SOP_TASK_STRUCTURE_SHA256 } from '@customer-agent/content-intake';
 import type { Client } from 'pg';
-import { createIntakeSyntheticHost, type DesktopSyntheticIdentity } from '../../../api/tests/support/intake-synthetic-host';
-import { graphFor } from '../../../api/src/content-intake/sop-graph';
-import { canonical } from '../../../api/src/content-intake/material';
-import { parseContractSchema as parseMaterial, withIntakeView } from '../../../api/src/content-intake/contract-view';
+import { createIntakeSyntheticHost, type DesktopSyntheticIdentity } from '../../../api/tests/support/intake-synthetic-host.ts';
+import { graphFor } from '../../../api/dist/content-intake/sop-graph.js';
+import { canonical } from '../../../api/dist/content-intake/material.js';
+import { parseContractSchema as parseMaterial, withIntakeView } from '../../../api/dist/content-intake/contract-view.js';
 import type { IntakePool } from '../../../api/src/content-intake/transaction';
-import { syntheticGraphMapping, syntheticTaskGraphWorkbook, syntheticResourceDisableWorkbook, graphImageFixtures } from '../../../../packages/content-intake/tests/support/sop-task-graph-workbook';
-import { SOP_RESOURCE_CONTRACT } from '../../src/shared/sop-unified';
-import { unifiedFixture } from './sop-unified-fixture';
+import { syntheticGraphMapping, syntheticTaskGraphWorkbook, syntheticResourceDisableWorkbook, graphImageFixtures } from '../../../../packages/content-intake/tests/support/sop-task-graph-workbook.ts';
+import { unifiedFixture } from './sop-unified-fixture.ts';
+import { publishPreparedFaq } from './publish-prepared-faq.ts';
 
 type C = components['schemas'];
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 const candidatePath = (key: C['IntakeCandidateKey']) => `/v1/intake/candidates/${key.candidateId}/versions/${key.version}`;
 
 /** Normal PostgreSQL/auth/B/C/D host. Only invented authorization and source configuration is seeded. */
-export async function createSopV12NormalHost() {
+export async function createSopV12NormalHost({ includeSopCandidates = false } = {}) {
   let database: Client | undefined;
-  let lostResponse: 'query' | 'open' | null = null;
+  let lostResponse: 'query' | 'open' | 'close' | null = null;
   const diagnostics: string[] = [];
   const faultAfterCommit = (pool: IntakePool): IntakePool => ({
     connect: async () => {
@@ -30,6 +30,7 @@ export async function createSopV12NormalHost() {
             const result = await target.query(sql, values);
             if (lostResponse === 'query' && sql.startsWith('SELECT content_intake.complete_sop_unified_query')) completed = true;
             if (lostResponse === 'open' && sql.startsWith('SELECT content_intake.open_sop_active_use')) completed = true;
+            if (lostResponse === 'close' && sql.startsWith('SELECT content_intake.close_sop_active_use')) completed = true;
             if (sql === 'COMMIT' && completed && lostResponse !== null) {
               lostResponse = null;
               throw new Error('SYNTHETIC_RESPONSE_LOST_AFTER_REAL_COMMIT');
@@ -42,9 +43,9 @@ export async function createSopV12NormalHost() {
       });
     },
   });
-  const host = await createIntakeSyntheticHost({
-    prepareCandidate: false, profile: 'purpose-runtime', includeSopQuery: true, includeSopContinuation: true,
-    includeLegacySearch: true,
+  const options = {
+    profile: 'purpose-runtime', includeSopQuery: true, includeSopContinuation: true,
+    includeLegacySearch: true, includeSopCandidates,
     wrapBusinessPool: faultAfterCommit, wrapUsagePool: faultAfterCommit,
     observeError: error => {
       diagnostics.push(error instanceof Error ? `${error.stack}\n${JSON.stringify({
@@ -62,7 +63,7 @@ export async function createSopV12NormalHost() {
           await client.query('INSERT INTO content_intake.vocabulary_displays VALUES($1,1,$2)', [id, `合成词项 ${id}`]);
         }
         for (const [sourceId, solo, optional] of [['source-resource', false, false], ['source-optional', false, true], ['source-solo', true, false]] as const) {
-          const mapping = syntheticGraphMapping(solo, solo);
+          const mapping = syntheticGraphMapping(solo, solo || includeSopCandidates);
           if (optional) for (const image of Object.values(mapping.images)) image.required = false;
           await client.query("INSERT INTO content_intake.sources(source_id,scope_id,current_mapping_version,mode) VALUES($1,'scope-resource',2,'v2-preview')", [sourceId]);
           await client.query(`INSERT INTO content_intake.source_mappings(source_id,version,template_version,rule_version,mapping_version,structure_digest,graph_mapping)
@@ -83,13 +84,15 @@ export async function createSopV12NormalHost() {
         throw error;
       }
     },
-  });
+  } satisfies Omit<NonNullable<Parameters<typeof createIntakeSyntheticHost>[0]>, 'prepareCandidate'>;
+  const host = includeSopCandidates ? await createIntakeSyntheticHost(options)
+    : await createIntakeSyntheticHost({ ...options, prepareCandidate: false });
   if (!database) { await host.close(); throw new Error('Normal fixture database unavailable'); }
   const admin = database;
   host.selectIdentity('agent');
   const request = (actor: DesktopSyntheticIdentity, url: string, init: RequestInit = {}) => {
     const headers = new Headers(init.headers);
-    headers.set('x-intake-contract-set', SOP_RESOURCE_CONTRACT);
+    headers.set('x-intake-contract-set', CONTRACT_PROVENANCE.contract_set_id);
     return host.requestAs(actor, url, { ...init, headers });
   };
   const post = (actor: DesktopSyntheticIdentity, url: string, body: unknown) => request(actor, url, {
@@ -108,7 +111,8 @@ export async function createSopV12NormalHost() {
       if (options.validImages) graphImageFixtures.set('image-entry', { bytes: unifiedFixture().image, extension: 'png' });
       bytes = options.disable ? await syntheticResourceDisableWorkbook(options.disable)
         : await syntheticTaskGraphWorkbook({ sharedTaskImage: true, solo: sourceId === 'source-solo',
-          shopWide: sourceId === 'source-solo', revision: options.revision ?? 1 });
+          shopWide: sourceId === 'source-solo' || includeSopCandidates, revision: options.revision ?? 1,
+          additionalEntryTerms: includeSopCandidates ? ['鹭鸶'] : [] });
     } finally {
       if (old) graphImageFixtures.set('image-entry', old);
     }
@@ -181,6 +185,27 @@ export async function createSopV12NormalHost() {
     return graph;
   }
   return { host, admin, request, post, publish, facts, diagnostics,
-    loseNextResponse: (operation: 'query' | 'open') => { lostResponse = operation; },
+    loseNextResponse: (operation: 'query' | 'open' | 'close') => { lostResponse = operation; },
   };
+}
+
+export async function createSopCandidateDesktopFixture() {
+  const { SOP_CANDIDATE_CONTRACT_SET_ID } = await import('@customer-agent/contracts/sop-candidates');
+  const fixture = await createSopV12NormalHost({ includeSopCandidates: true });
+  try {
+    await publishPreparedFaq(fixture.host, 'product');
+    const qualityCase = await fixture.publish({ validImages: true });
+    await fixture.facts(qualityCase, '品质售后SOP');
+    await fixture.facts(await fixture.publish({ sourceId: 'source-solo' }), '税收相关规则');
+    const desktopProfile = {
+      mode: 'synthetic-local' as const, contentIntake: 'faq-v2' as const,
+      apiOrigin: fixture.host.apiOrigin, identityOrigin: fixture.host.identityOrigin,
+      sopQuery: 'menokin-sop-unified-v12' as const, sopContractSet: CONTRACT_PROVENANCE.contract_set_id,
+      sopCandidateContractSet: SOP_CANDIDATE_CONTRACT_SET_ID,
+    };
+    return { ...fixture, desktopProfile, qualityCase };
+  } catch (error) {
+    await fixture.host.close();
+    throw error;
+  }
 }

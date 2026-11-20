@@ -7,10 +7,15 @@ import {
   SOP_OPEN_HEIGHT,
   SOP_WIDTH,
   clampSopHeight,
+  applySopHeight,
+  placeSopBesideWindows,
+  placeSopBookmark,
+  placeSopLeftCenter,
   placeSopNearQuery,
   sopLayoutNeedsProjection,
   sopWorkAreaForQuery,
 } from '../../src/shared/sop-geometry';
+import { resizeRectFromEdge } from '../../src/shared/window-resize-geometry';
 
 const workArea = { x: 0, y: 25, width: 1440, height: 875 };
 const query = { x: 80, y: 120, width: 600, height: 340 };
@@ -71,5 +76,37 @@ describe('SOP geometry cascade', () => {
       && placed.y < capsuleBottom
       && placed.y + placed.height > query.y;
     expect(overlapsCapsule).toBe(false);
+  });
+
+  it('centers the first SOP on a negative-coordinate display and keeps two bookmarks disjoint', () => {
+    const display = { x: -1440, y: 40, width: 1400, height: 840 };
+    expect(placeSopLeftCenter(display)).toEqual({ x: -1424, y: 340, width: 600, height: 240 });
+    const first = placeSopBookmark(display, []);
+    if (!first) throw new Error('Expected the first bookmark');
+    const second = placeSopBookmark(display, [first]);
+    if (!second) throw new Error('Expected another bookmark slot');
+    expect([first.x, second.x]).toEqual([display.x, display.x]);
+    expect(Math.abs(first.y - second.y)).toBeGreaterThanOrEqual(first.height);
+    expect(placeSopBookmark({ ...display, height: 12 }, [{ ...display, height: 12 }])).toBeNull();
+  });
+
+  it('keeps the Query capsule available when it occupies the first SOP position', () => {
+    const display = { x: 0, y: 0, width: 900, height: 700 };
+    const capsule = { x: 16, y: 230, width: 600, height: 88 };
+    const placed = placeSopBesideWindows(placeSopLeftCenter(display), [], capsule, display);
+    expect(placed).toEqual({ x: 16, y: 330, width: 600, height: 240 });
+  });
+
+  it('resizes two axes from a corner and clamps at the fixed opposite edges', () => {
+    const baseline = { x: 120, y: 160, width: 600, height: 300 };
+    const limits = { minSize: { width: 360, height: 240 }, maxSize: workArea };
+    expect(resizeRectFromEdge({
+      baseline, bounds: workArea, direction: 'top-left', deltaX: -160, deltaY: 100, ...limits,
+    })).toEqual({ x: 0, y: 220, width: 720, height: 240 });
+    const horizontal = resizeRectFromEdge({
+      baseline, bounds: workArea, direction: 'right', deltaX: -90, deltaY: 100, ...limits,
+    });
+    expect(horizontal).toEqual({ x: 120, y: 160, width: 510, height: 300 });
+    expect(applySopHeight(horizontal, 380, workArea)).toEqual({ ...horizontal, height: 380 });
   });
 });

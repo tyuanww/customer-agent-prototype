@@ -2,6 +2,7 @@ import { join, resolve } from 'node:path';
 
 export type DesktopActionId = 'open-search' | 'open-dashboard' | 'quit';
 export type EditRole = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll';
+export type SopResumeMenuEntry = { label: string; resume: () => void };
 
 export type DesktopMenuEntry =
   | {
@@ -17,7 +18,8 @@ export type DesktopMenuEntry =
     }
   | {
       type: 'separator';
-    };
+    }
+  | ({ type: 'resume-sop' } & SopResumeMenuEntry);
 
 export type ApplicationMenuSection =
   | {
@@ -92,12 +94,16 @@ function editEntries(capabilities: EditCapabilities): DesktopMenuEntry[] {
 export function createOverlayContextMenuModel(
   capabilities: EditCapabilities | null,
   dashboardEnabled = true,
+  sopEntries: readonly SopResumeMenuEntry[] = [],
 ): readonly DesktopMenuEntry[] {
   const editing = capabilities ? [...editEntries(capabilities), separator()] : [];
   return [
     ...editing,
     action('open-search'),
     ...(dashboardEnabled ? [action('open-dashboard')] : []),
+    ...(sopEntries.length ? [separator(), ...sopEntries.map((entry): DesktopMenuEntry => ({
+      type: 'resume-sop', ...entry,
+    }))] : []),
     separator(),
     action('quit'),
   ];

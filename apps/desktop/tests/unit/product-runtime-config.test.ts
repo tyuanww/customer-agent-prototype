@@ -1,3 +1,4 @@
+import { SOP_CANDIDATE_CONTRACT_SET_ID } from '@customer-agent/contracts/sop-candidates';
 import { SOP_RESOURCE_CONTRACT, SOP_UNIFIED_CONTRACT } from '../../src/shared/sop-unified';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -477,5 +478,38 @@ describe('formal v12 SOP profile', () => {
     expect(() => readPackagedProductProfile(directory)).toThrow();
     write(directory, { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v12', sopContractSet: SOP_UNIFIED_CONTRACT });
     expect(() => readPackagedProductProfile(directory)).toThrow();
+  });
+});
+
+describe('W5 candidate profile', () => {
+  it('requires an exact W5 set on the explicit loopback v12 profile', () => {
+    const v12 = {
+      ...LOOPBACK_ENV,
+      CUSTOMER_AGENT_DESKTOP_CONTENT_INTAKE: 'faq-v2',
+      CUSTOMER_AGENT_DESKTOP_SOP_QUERY: 'menokin-sop-unified-v12',
+      CUSTOMER_AGENT_DESKTOP_SOP_CONTRACT_SET: SOP_RESOURCE_CONTRACT,
+    };
+    const w5 = { CUSTOMER_AGENT_DESKTOP_SOP_CANDIDATE_CONTRACT_SET: SOP_CANDIDATE_CONTRACT_SET_ID };
+    expect(developmentProductProfile(v12)?.sopCandidateContractSet).toBeUndefined();
+    expect(developmentProductProfile({ ...v12, ...w5 })?.sopCandidateContractSet).toBe(SOP_CANDIDATE_CONTRACT_SET_ID);
+    expect(() => developmentProductProfile({ ...LOOPBACK_ENV, ...w5 })).toThrow();
+    expect(() => developmentProductProfile({ ...v12, CUSTOMER_AGENT_DESKTOP_SOP_CANDIDATE_CONTRACT_SET: SOP_RESOURCE_CONTRACT })).toThrow();
+    expect(() => developmentProductProfile({ ...v12, ...w5, CUSTOMER_AGENT_DESKTOP_API_ORIGIN: 'https://api.example.com' })).toThrow();
+  });
+
+  it('accepts the W5 contract field in userData only with the packaged loopback v12 profile', () => {
+    const directory = userDataDirectory();
+    const v12 = { ...STACK_PROFILE, contentIntake: 'faq-v2', sopQuery: 'menokin-sop-unified-v12', sopContractSet: SOP_RESOURCE_CONTRACT };
+    try {
+      write(directory, v12);
+      expect(readPackagedProductProfile(directory)?.sopCandidateContractSet).toBeUndefined();
+      write(directory, { ...v12, sopCandidateContractSet: SOP_CANDIDATE_CONTRACT_SET_ID });
+      expect(readPackagedProductProfile(directory)?.sopCandidateContractSet).toBe(SOP_CANDIDATE_CONTRACT_SET_ID);
+      write(directory, { ...v12, sopCandidateContractSet: SOP_RESOURCE_CONTRACT });
+      expect(() => readPackagedProductProfile(directory)).toThrow();
+      write(directory, { ...v12, mode: 'product-remote', apiOrigin: 'https://api.example.com',
+        identityOrigin: 'https://identity.example.com', sopCandidateContractSet: SOP_CANDIDATE_CONTRACT_SET_ID });
+      expect(() => readPackagedProductProfile(directory)).toThrow();
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 });

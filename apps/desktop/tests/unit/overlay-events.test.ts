@@ -65,6 +65,7 @@ describe('overlay command boundary', () => {
         anchor: 'left',
         handoffCenterX: -8,
         handoffCenterY: 44,
+        viewport: { width: 600, height: 88 },
         foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
       }),
     ).toBe(true);
@@ -80,6 +81,7 @@ describe('overlay command boundary', () => {
       animate: true,
       handoffCenterX: 44,
       handoffCenterY: 44,
+      viewport: { width: 600, height: 88 },
     })).toBe(true);
     expect(isOverlayCommand({
       type: 'query-layout-ack',
@@ -88,6 +90,7 @@ describe('overlay command boundary', () => {
       phase: 'RESULTS',
       resultCount: 3,
       height: 312,
+      width: 600,
       resizeEdge: 'bottom',
     })).toBe(true);
     expect(isOverlayCommand({
@@ -95,6 +98,7 @@ describe('overlay command boundary', () => {
       sessionId: 1,
       sequence: 2,
       height: 312,
+      width: 600,
       resizeEdge: 'bottom',
     })).toBe(false);
     expect(isOverlayCommand({
@@ -104,8 +108,9 @@ describe('overlay command boundary', () => {
       phase: 'RESULTS',
       resultCount: 3,
       height: 312,
-      resizeEdge: 'bottom',
       width: 800,
+      resizeEdge: 'bottom',
+      x: 80,
     })).toBe(false);
     expect(isOverlayCommand({ type: 'sync-fox-edge', edge: 'right', epoch: 3 })).toBe(true);
     expect(isOverlayCommand({
@@ -125,6 +130,7 @@ describe('overlay command boundary', () => {
         anchor: 'left',
         handoffCenterX: -8,
         handoffCenterY: 44,
+        viewport: { width: 600, height: 88 },
         foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
       }),
     ).toBe(false);
@@ -135,6 +141,7 @@ describe('overlay command boundary', () => {
         anchor: 'left',
         handoffCenterX: Number.NaN,
         handoffCenterY: 44,
+        viewport: { width: 600, height: 88 },
         foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
       }),
     ).toBe(false);
@@ -165,6 +172,7 @@ describe('overlay command boundary', () => {
       anchor: 'left',
       handoffCenterX: -8,
       handoffCenterY: 44,
+      viewport: { width: 600, height: 88 },
       foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
     });
     expect(prepare).toEqual({
@@ -173,6 +181,7 @@ describe('overlay command boundary', () => {
       anchor: 'left',
       handoffCenterX: -8,
       handoffCenterY: 44,
+      viewport: { width: 600, height: 88 },
       foxVisualTransform: IDENTITY_FOX_VISUAL_TRANSFORM,
     });
     expect(isOverlayCommand(prepare)).toBe(true);
@@ -195,6 +204,7 @@ describe('overlay command boundary', () => {
       animate: true,
       handoffCenterX: 32,
       handoffCenterY: 44,
+      viewport: { width: 600, height: 88 },
     })).toEqual({
       type: 'collapse',
       handoffId: 3,
@@ -203,6 +213,7 @@ describe('overlay command boundary', () => {
       animate: true,
       handoffCenterX: 32,
       handoffCenterY: 44,
+      viewport: { width: 600, height: 88 },
     });
     expect(foxEdgeCommand('right', 4)).toEqual({ type: 'fox-edge', edge: 'right', epoch: 4 });
     expect(syncFoxEdgeCommand('none', 5)).toEqual({ type: 'sync-fox-edge', edge: 'none', epoch: 5 });

@@ -39,6 +39,8 @@ import type {
 } from './service-repository.js';
 import { createUnavailableSearchOperation, registerSearchRoute, type SearchRouteDependencies } from './search-routes.js';
 import { registerSopQueryRoute, type SopQueryRouteDependencies } from './sop-query-routes.js';
+import { createSopCandidateOperation } from './sop-candidate-operation.js';
+import { sopCandidateRoutes } from './sop-candidate-routes.js';
 import { createUnifiedSopQueryOperation } from './sop-unified-query-operation.js';
 import { registerEventRoutes, type EventRouteDependencies } from './event-routes.js';
 import { registerContentImportRoutes, type ContentImportRouteDependencies } from './content-import-routes.js';
@@ -105,6 +107,7 @@ export type ApiAppOptions = Readonly<{
     business: IntakePurposePool;
     usage: IntakePurposePool;
     worker: IntakePurposePool;
+    sopCandidates?: 'synthetic';
     store: ContentObjectStore & Partial<Pick<ContentAttachmentStore, 'readAttachment'>>;
   }> | undefined;
   accessEvaluator?: AccessEvaluator | undefined;
@@ -165,6 +168,11 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
   }
   if (config.sessionMode !== 'product' && providedAuthService?.kind === 'product') {
     throw new Error('Product identity cannot be installed in mock session mode');
+  }
+  if (intakeDependencies?.sopCandidates
+    && (!(config.profile === 'formal-dev' || config.profile === 'test') || config.authMode !== 'mock'
+      || config.sessionMode !== 'product' || options.intakeOnlyQuery === undefined)) {
+    throw new Error('SOP candidates require the local synthetic intake composition');
   }
   const authService = providedAuthService ?? createMockAuthService();
   const app = fastify({
@@ -294,6 +302,13 @@ function assembleApiApp(options: ApiAppOptions, allowUnscopedLegacyOps: boolean)
       intakeDependencies.usage, intakeDependencies.store, report, undefined, { requireProductSession: true },
     );
     void app.register(contentIntakeUsageRoutes, { auth: authService, usage, report });
+    if (intakeDependencies.sopCandidates === 'synthetic') {
+      void app.register(sopCandidateRoutes, {
+        auth: authService,
+        operation: createSopCandidateOperation(intakeDependencies.usage, intakeDependencies.store, report),
+        report: error => report('', error),
+      });
+    }
     void app.register(sopContinuationRoutes, { auth: authService,
       continuation: createSopContinuationService(intakeDependencies.usage, report, intakeDependencies.store), report });
     void app.register(contentIntakeManagementRoutes, {

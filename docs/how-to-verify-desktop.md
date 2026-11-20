@@ -135,7 +135,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 两条命令都只创建私有临时 data directory / Unix socket / database，结束后清理；不连接共享或生产数据库。前者证明 migration/catalogue/ledger，后者证明 runtime readiness、runtime/admin 角色隔离、策略函数完整性和失败关闭。普通桌面/UI 改动无需反复运行这些重门禁。
 
-探头 / 缩回、Query 纵向拖拽，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 纵向拖拽和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
+探头 / 缩回、Query 边角缩放，以及 Dashboard 导航、主题、筛选和模块交互由 `pnpm test` 中的 unit/component 测试覆盖；默认 Playwright 门禁不再执行透明 overlay 或 macOS draggable region 下不稳定的长鼠标拖拽。真实贴边 hover / retract、Query 边角缩放和侧栏拖拽仍按第 4 节实机验收。`pnpm test:e2e` 截图写到本机忽略的 `.gstack/qa-reports/screenshots/`。不要把历史 `evidence/qa/2026-08-13/` 里的像素尺寸抄成当前 Query 高度。
 
 ---
 
@@ -458,6 +458,31 @@ pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/content-int
 
 前者验证 Main 资格、取消、超限与 renderer 告知/迟到结果；后者使用真实 Electron Main/preload、登录窗口和系统剪贴板，HTTP 为自有合成 wire。新 profile 的 Windows GUI、安装包和真实飞书未因此获得证据。
 
+
+### W5 候选与安装包联验
+
+在 Node.js 24、项目锁定的 pnpm 和 PostgreSQL 15 环境运行。以下用例通过真实 Electron、loopback API 和临时 PG15 发布 FAQ 及两个名称相同的 SOP，核对发现前后回执数量、组名、点击首开和原请求恢复。
+
+```sh
+pnpm contracts:verify --profile=sopCandidates
+pnpm build
+CUSTOMER_AGENT_SOP_CANDIDATES_E2E=1 pnpm --filter @customer-agent/desktop exec playwright test tests/e2e/sop-candidates-real-stack.spec.ts
+```
+
+在 macOS、Linux 或 Windows 的 WSL 运行 `pnpm dev:sop-candidates:synthetic`，默认使用有查询权的 `agent`。另起无权会话时追加 `--identity=roster-nogrant`。等待 `READY_SYNTHETIC_ONLY` 并核对 `identity`，在 `expiresAt` 前验收。换身份或重跑时，完全退出应用并停止旧宿主，再启动新宿主并使用新的专用目录。
+
+NSIS 会卸载同应用的旧版本，另选目录也会触发。只在一次性 Windows VM 或确认无同应用安装的专用 Windows 环境运行向导。按 [W8](plans/2026-11-19-windows-customer-frontend-task-cards.md#w8--在同一个-windows-安装包验收) 核对 EXE 的 SHA-256 后安装，取消结束页的自动运行。把 `synthetic-stack.json` 复制到新目录 `$testDir`，在 Windows PowerShell 预检回环端口。
+
+```powershell
+$config = Get-Content -Raw -LiteralPath (Join-Path $testDir 'synthetic-stack.json') | ConvertFrom-Json
+curl.exe --noproxy '*' --max-time 5 -s -o NUL -w '%{http_code}\n' "$($config.apiOrigin)/v1/auth/me"
+curl.exe --noproxy '*' --max-time 5 -s -o NUL -w '%{http_code}\n' "$($config.identityOrigin)/authorize"
+```
+
+确认依次返回 `401` 和 `400`，再运行 `& $appExe "--user-data-dir=$testDir"`，其中 `$appExe` 指向安装后的应用。从狐狸打开 Query，未登录时提交「合成入口」。在独立窗口点「飞书登录」，经系统浏览器完成合成回跳后，核对原问句和焦点。
+
+- `agent` 选择「合成示例店」，提交「合成入口」并核对 FAQ 和两个 SOP 候选。点击候选办理后，再查「洁面频次」核对原进度。并行开启同一模板时，重新提交「合成入口」并点击同组候选。
+- `roster-nogrant` 登录后提交问句，应看到「查询权限或资料尚未就绪，请联系管理员核对。」
 
 ## FAQ 原生上传与报告
 

@@ -27,6 +27,7 @@ export async function runSopQueryProbe(probe:SopSyntheticProbe, afterCopy?:(surf
     const opened=app.waitForEvent('window');await query.getByRole('button',{name:'登录',exact:true}).click();
     const login=await opened;await expect.poll(()=>login.url()).toContain('role=login');await login.getByRole('button',{name:'飞书登录'}).click();
     await expect.poll(()=>query.evaluate(async()=>{const v=await window.customerAgent!.product!.sessionStatus();return v.ok&&v.signedIn;})).toBe(true);
+    await query.getByRole('button',{name:'筛选',exact:true}).click();
     await query.getByRole('button',{name:'打开 SOP 流程'}).click();
     await expect.poll(()=>app!.windows().some(w=>w.url().includes('role=sop'))).toBe(true);
     const sop=app.windows().find(w=>w.url().includes('role=sop'))!;

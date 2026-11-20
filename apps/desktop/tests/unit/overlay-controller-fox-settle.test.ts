@@ -374,10 +374,12 @@ describe('OverlayController fox drag settle transaction', () => {
     expect(Reflect.get(controller, 'blurRecheckTimer')).not.toBeNull();
   });
 
-  it('keeps a blur that arrives while the query window is still opening', () => {
+  it('rechecks actual focus after a blur during opening', () => {
     vi.useFakeTimers();
     const controller = new OverlayController();
-    const query = createFoxWindow();
+    const isFocused = vi.fn(() => true);
+    const query = Object.assign(createFoxWindow(), { isFocused });
+    const dismiss = vi.spyOn(controller, 'dismiss').mockImplementation(() => undefined);
     const state = { ...activeState(), phase: 'opening' as const };
     Object.assign(controller as object, { query, overlayState: state });
     controllers.push(controller);
@@ -385,7 +387,11 @@ describe('OverlayController fox drag settle transaction', () => {
     Reflect.get(controller, 'handleQueryBlur').call(controller);
 
     expect(Reflect.get(controller, 'pendingQueryBlur')).toBe(true);
-    expect(Reflect.get(controller, 'blurRecheckTimer')).not.toBeNull();
+    vi.advanceTimersByTime(300);
+    expect(dismiss).not.toHaveBeenCalled();
+    isFocused.mockReturnValue(false);
+    Reflect.get(controller, 'handleQueryBlur').call(controller);
+    expect(dismiss).toHaveBeenCalledWith(true);
   });
 });
 
@@ -457,7 +463,7 @@ describe('OverlayController renderer work ownership', () => {
           generation: active.generation,
         }),
         layout: expect.objectContaining({
-          appliedHeight: expect.any(Number),
+          appliedSize: { width: expect.any(Number), height: expect.any(Number) },
         }),
       }),
     }));

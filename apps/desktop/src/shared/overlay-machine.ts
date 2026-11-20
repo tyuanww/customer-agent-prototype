@@ -15,7 +15,9 @@ import {
   isOverlayCommand,
   shortcutStatusCommand,
 } from './overlay-events';
-import { resolveSessionQueryAnchor, type Rect } from './overlay-geometry';
+import { resolveSessionQueryAnchor, type Rect, type Size } from './overlay-geometry';
+import { isQueryContentLayoutPhase, type QueryResizeEdge } from './query-layout';
+import { isWindowResizeDirection, type WindowResizeDirection } from './window-resize-geometry';
 import {
   parseOverlaySnapshot,
   validateOverlaySnapshot,
@@ -46,7 +48,6 @@ export type OverlaySurface = 'fox' | 'query';
 export type OverlayFocusIntent = 'fox' | 'query' | 'previous-app' | 'none';
 export type OverlayHandoffMode = 'none' | 'preparing-open' | 'opening' | 'closing';
 export type OverlayTimer = 'handoff' | 'layout' | 'drag-settle' | 'blur';
-export type QueryResizeEdge = 'top' | 'bottom';
 
 export type OverlayState = {
   readonly phase: OverlayLifecyclePhase;
@@ -75,13 +76,14 @@ export type OverlayState = {
     readonly ackSequence: number;
     readonly handoffId: number;
     readonly desiredHeight: number | null;
-    readonly appliedHeight: number | null;
+    readonly appliedSize: Size | null;
+    readonly manualSize: Size | null;
     readonly resizeEdge: QueryResizeEdge;
     readonly resize: {
       readonly handoffId: number;
       readonly lastSequence: number;
-      readonly baselineHeight: number;
-      readonly edge: QueryResizeEdge;
+      readonly baselineBounds: Rect;
+      readonly direction: WindowResizeDirection;
     } | null;
   };
   readonly drag: {
@@ -163,6 +165,7 @@ export type OverlayEvent =
       animate: boolean;
       handoffCenterX: number;
       handoffCenterY: number;
+      viewport: Size;
     } & EventGuard)
   | ({ type: 'TOGGLE_REQUESTED' } & EventGuard)
   | ({ type: 'QUERY_SUBSCRIBED' } & EventGuard)
@@ -198,8 +201,9 @@ export type OverlayEvent =
       type: 'QUERY_LAYOUT_ACK';
       handoffId: number;
       sequence: number;
-      height: number;
+      size: Size;
       resizeEdge: QueryResizeEdge;
+      manual?: boolean;
       contentPhase: ReportablePhase;
       resultCount: ResultCount;
       contentRevision: number;
@@ -214,39 +218,37 @@ export type OverlayEvent =
       type: 'LAYOUT_FALLBACK_APPLIED';
       handoffId: number;
       sequence: number;
-      height: number;
+      size: Size;
+      resizeEdge: QueryResizeEdge;
       contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_BEGIN';
       handoffId: number;
       sequence: number;
-      baselineHeight: number;
-      edge: QueryResizeEdge;
+      baselineBounds: Rect;
+      direction: WindowResizeDirection;
       contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_UPDATE';
       handoffId: number;
       sequence: number;
-      height: number;
-      edge: QueryResizeEdge;
+      bounds: Rect;
       contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_END';
       handoffId: number;
       sequence: number;
-      height: number;
-      commit: boolean;
+      bounds: Rect | null;
       contentRevision: number;
     } & EventGuard)
   | ({
       type: 'RESIZE_KEYBOARD';
       handoffId: number;
       sequence: number;
-      height: number;
-      edge: QueryResizeEdge;
+      bounds: Rect;
       contentRevision: number;
     } & EventGuard)
   | ({
@@ -430,8 +432,8 @@ export type NativeEffect =
     }
   | {
       readonly type: 'APPLY_RESIZE';
-      readonly height: number;
-      readonly edge: QueryResizeEdge;
+      readonly bounds: Rect;
+      readonly manual: boolean;
     }
   | { readonly type: 'REFRESH_QUERY_SHADOW' }
   | {
@@ -526,7 +528,8 @@ export function createInitialOverlayState(input: {
       ackSequence: 0,
       handoffId: 0,
       desiredHeight: null,
-      appliedHeight: null,
+      appliedSize: null,
+      manualSize: null,
       resizeEdge: 'bottom',
       resize: null,
     },
@@ -625,7 +628,8 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
       'ackSequence',
       'handoffId',
       'desiredHeight',
-      'appliedHeight',
+      'appliedSize',
+      'manualSize',
       'resizeEdge',
       'resize',
     ])
@@ -633,7 +637,7 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
       resize !== null
       && (
         !resize
-        || !hasExactKeys(resize, ['handoffId', 'lastSequence', 'baselineHeight', 'edge'])
+        || !hasExactKeys(resize, ['handoffId', 'lastSequence', 'baselineBounds', 'direction'])
       )
     )
     || !drag
@@ -722,10 +726,8 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
       layout.desiredHeight === null
       || (typeof layout.desiredHeight === 'number' && Number.isFinite(layout.desiredHeight))
     )
-    && (
-      layout.appliedHeight === null
-      || (typeof layout.appliedHeight === 'number' && Number.isFinite(layout.appliedHeight))
-    )
+    && (layout.appliedSize === null || isSize(layout.appliedSize))
+    && (layout.manualSize === null || isSize(layout.manualSize))
     && (layout.resizeEdge === 'top' || layout.resizeEdge === 'bottom')
     && (
       resize === null
@@ -733,9 +735,8 @@ export function isOverlaySnapshotProjection(value: unknown): value is OverlaySna
         resize
         && isPositiveInteger(resize.handoffId)
         && isPositiveInteger(resize.lastSequence)
-        && typeof resize.baselineHeight === 'number'
-        && Number.isFinite(resize.baselineHeight)
-        && (resize.edge === 'top' || resize.edge === 'bottom')
+        && isRect(resize.baselineBounds)
+        && isWindowResizeDirection(resize.direction)
       )
     )
     && drag
@@ -830,6 +831,16 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
+function isSize(value: unknown): value is Size {
+  return value !== null && typeof value === 'object'
+    && 'width' in value && isPositiveInteger(value.width)
+    && 'height' in value && isPositiveInteger(value.height);
+}
+
+function sizeOfBounds({ width, height }: Rect): Size {
+  return { width, height };
+}
+
 function hasExactKeys(value: object, keys: readonly string[]): boolean {
   const actual = Object.keys(value);
   return actual.length === keys.length && keys.every((key) => actual.includes(key));
@@ -901,7 +912,7 @@ function resetContent(state: OverlayState): OverlayState {
       sequence: 0,
       ackSequence: 0,
       desiredHeight: null,
-      appliedHeight: null,
+      appliedSize: null,
       resize: null,
     },
   };
@@ -921,6 +932,7 @@ function startOpening(
     anchor: plan.anchor,
     handoffCenterX: plan.handoffCenterX,
     handoffCenterY: plan.handoffCenterY,
+    viewport: sizeOfBounds(plan.queryBounds),
     foxVisualTransform: plan.foxVisualTransform,
   };
   const next: OverlayState = {
@@ -1088,6 +1100,7 @@ export function applyOverlayEvent(
             animate: event.animate,
             handoffCenterX: event.handoffCenterX,
             handoffCenterY: event.handoffCenterY,
+            viewport: event.viewport,
           },
         },
         {
@@ -1315,7 +1328,7 @@ export function applyOverlayEvent(
       if (event.contentPhase === 'COPIED' && state.contentPhase !== 'RESULTS' && state.contentPhase !== 'COPIED') {
         return rejected(state, 'invalid-phase');
       }
-      const cancelledResize = event.contentPhase === 'COPIED' ? state.layout.resize : null;
+      const cancelledResize = state.layout.resize;
       return applied(
         {
           ...state,
@@ -1326,7 +1339,7 @@ export function applyOverlayEvent(
             ? {
                 ...state.layout,
                 ackSequence: cancelledResize.lastSequence,
-                appliedHeight: cancelledResize.baselineHeight,
+                appliedSize: sizeOfBounds(cancelledResize.baselineBounds),
                 resize: null,
               }
             : state.layout,
@@ -1336,8 +1349,8 @@ export function applyOverlayEvent(
           ...(cancelledResize
             ? [{
                 type: 'APPLY_RESIZE' as const,
-                height: cancelledResize.baselineHeight,
-                edge: cancelledResize.edge,
+                bounds: cancelledResize.baselineBounds,
+                manual: false,
               }]
             : []),
         ],
@@ -1486,6 +1499,7 @@ export function applyOverlayEvent(
     case 'LAYOUT_REQUESTED': {
       if (
         state.phase !== 'active'
+        || state.layout.resize !== null
         || state.handoff.mode !== 'none'
         || !isPositiveInteger(event.handoffId)
         || event.handoffId !== state.handoff.id
@@ -1526,7 +1540,7 @@ export function applyOverlayEvent(
         || event.handoffId !== state.handoff.id
         || event.sequence !== state.layout.sequence
         || event.sequence <= state.layout.ackSequence
-        || !Number.isFinite(event.height)
+        || !isSize(event.size)
         || (event.resizeEdge !== 'top' && event.resizeEdge !== 'bottom')
         || event.contentRevision !== state.contentRevision
         || event.contentPhase !== state.contentPhase
@@ -1539,7 +1553,8 @@ export function applyOverlayEvent(
         layout: {
           ...state.layout,
           ackSequence: event.sequence,
-          appliedHeight: event.height,
+          appliedSize: event.size,
+          manualSize: event.manual ? event.size : state.layout.manualSize,
           resizeEdge: event.resizeEdge,
         },
       }, [{ type: 'CANCEL_TIMEOUT', timer: 'layout', handoffId: event.handoffId }]);
@@ -1567,7 +1582,7 @@ export function applyOverlayEvent(
         || event.handoffId !== state.handoff.id
         || event.sequence !== state.layout.sequence
         || event.sequence <= state.layout.ackSequence
-        || !Number.isFinite(event.height)
+        || !isSize(event.size)
         || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
@@ -1577,7 +1592,8 @@ export function applyOverlayEvent(
         layout: {
           ...state.layout,
           ackSequence: event.sequence,
-          appliedHeight: event.height,
+          appliedSize: event.size,
+          resizeEdge: event.resizeEdge,
           resize: null,
         },
       }, [{
@@ -1589,19 +1605,21 @@ export function applyOverlayEvent(
           sequence: event.sequence,
           phase: state.contentPhase,
           resultCount: state.resultCount,
-          height: event.height,
-          resizeEdge: state.layout.resizeEdge,
+          ...event.size,
+          resizeEdge: event.resizeEdge,
         },
       }]);
 
     case 'RESIZE_BEGIN': {
       if (
         state.phase !== 'active'
+        || !isQueryContentLayoutPhase(state.contentPhase)
         || event.handoffId !== state.handoff.id
         || state.layout.resize
         || !isPositiveInteger(event.sequence)
         || event.sequence <= state.layout.sequence
-        || !Number.isFinite(event.baselineHeight)
+        || !isRect(event.baselineBounds)
+        || !isWindowResizeDirection(event.direction)
         || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
@@ -1614,36 +1632,14 @@ export function applyOverlayEvent(
           resize: {
             handoffId: event.handoffId,
             lastSequence: event.sequence,
-            baselineHeight: event.baselineHeight,
-            edge: event.edge,
+            baselineBounds: event.baselineBounds,
+            direction: event.direction,
           },
         },
       });
     }
 
-    case 'RESIZE_UPDATE': {
-      const resize = state.layout.resize;
-      if (
-        state.phase !== 'active'
-        || !resize
-        || resize.handoffId !== event.handoffId
-        || event.handoffId !== state.handoff.id
-        || event.sequence <= resize.lastSequence
-        || !Number.isFinite(event.height)
-        || event.contentRevision !== state.contentRevision
-      ) {
-        return rejected(state, 'stale-layout');
-      }
-      return applied({
-        ...state,
-        layout: {
-          ...state.layout,
-          sequence: event.sequence,
-          resize: { ...resize, lastSequence: event.sequence, edge: event.edge },
-        },
-      }, [{ type: 'APPLY_RESIZE', height: event.height, edge: event.edge }]);
-    }
-
+    case 'RESIZE_UPDATE':
     case 'RESIZE_END': {
       const resize = state.layout.resize;
       if (
@@ -1651,34 +1647,35 @@ export function applyOverlayEvent(
         || !resize
         || resize.handoffId !== event.handoffId
         || event.handoffId !== state.handoff.id
-        || event.sequence <= resize.lastSequence
-        || !Number.isFinite(event.height)
+        || !isPositiveInteger(event.sequence)
+        || event.sequence <= state.layout.sequence
+        || (event.bounds !== null && !isRect(event.bounds))
         || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
       }
-      const height = event.commit ? event.height : resize.baselineHeight;
+      const bounds = event.bounds ?? resize.baselineBounds;
+      const ending = event.type === 'RESIZE_END';
+      const manual = ending && (bounds.width !== resize.baselineBounds.width || bounds.height !== resize.baselineBounds.height);
       return applied({
         ...state,
         layout: {
           ...state.layout,
           sequence: event.sequence,
-          ackSequence: event.sequence,
-          appliedHeight: height,
-          resizeEdge: resize.edge,
-          resize: null,
+          resize: ending ? null : { ...resize, lastSequence: event.sequence },
         },
-      }, [{ type: 'APPLY_RESIZE', height, edge: resize.edge }]);
+      }, [{ type: 'APPLY_RESIZE', bounds, manual }]);
     }
 
     case 'RESIZE_KEYBOARD':
       if (
         state.phase !== 'active'
+        || !isQueryContentLayoutPhase(state.contentPhase)
         || state.layout.resize
         || event.handoffId !== state.handoff.id
         || !isPositiveInteger(event.sequence)
         || event.sequence <= state.layout.sequence
-        || !Number.isFinite(event.height)
+        || !isRect(event.bounds)
         || event.contentRevision !== state.contentRevision
       ) {
         return rejected(state, 'stale-layout');
@@ -1688,11 +1685,8 @@ export function applyOverlayEvent(
         layout: {
           ...state.layout,
           sequence: event.sequence,
-          ackSequence: event.sequence,
-          appliedHeight: event.height,
-          resizeEdge: event.edge,
         },
-      }, [{ type: 'APPLY_RESIZE', height: event.height, edge: event.edge }]);
+      }, [{ type: 'APPLY_RESIZE', bounds: event.bounds, manual: true }]);
 
     case 'FOX_DRAG_MOVED': {
       if (!isPositiveInteger(event.dragGeneration) || !isRect(event.nextBounds)) {
@@ -1928,6 +1922,11 @@ export function applyOverlayEvent(
       const peekEpoch = state.fox.peekEpoch + 1;
       const next: OverlayState = {
         ...state,
+        layout: event.queryBounds ? {
+          ...state.layout,
+          resize: null,
+          appliedSize: state.layout.appliedSize ? sizeOfBounds(event.queryBounds) : null,
+        } : state.layout,
         fox: {
           edge: event.edge,
           peekEpoch,

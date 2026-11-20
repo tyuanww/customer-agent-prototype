@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { parseContractSchema as parseSopSchema, type components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
+import type { SOP_CANDIDATE_CONTRACT_SET_ID } from '@customer-agent/contracts/sop-candidates';
 import { SOP_RESOURCE_CONTRACT } from '../shared/sop-unified';
 import type { IntakeQueryInvalidation } from '../shared/content-intake-query';
 
@@ -20,7 +21,7 @@ export interface IntakeUsageSession {
     body?: unknown;
     signal: AbortSignal;
     maxResponseBytes?: number;
-    headers?: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT };
+    headers?: { 'x-intake-contract-set': typeof SOP_RESOURCE_CONTRACT | typeof SOP_CANDIDATE_CONTRACT_SET_ID };
   }): Promise<{value: unknown}>;
 }
 import { ProductHttpError } from './product-http.ts';
@@ -77,7 +78,7 @@ const COPY_CHECK_TIMEOUT_MS = 5_000;
 export class ContentIntakeUsage {
   private selection: Selection | null = null;
   private generation = 0;
-  private invalidation = 0;
+  private faqCatalogGeneration = 0;
   private epoch: number;
   private request: AbortController | null = null;
   private catalog: IntakeCatalog | null = null;
@@ -101,7 +102,7 @@ export class ContentIntakeUsage {
   }
   private emit(event: CatalogEvent) { for (const listener of this.listeners) listener(event); }
   private invalidate(reason: 'invalidated' | 'facts-expired' = 'invalidated') {
-    this.invalidation++; this.request?.abort(); this.request = null; this.catalog = null;
+    this.faqCatalogGeneration++; this.request?.abort(); this.request = null; this.catalog = null;
     if (this.timer) clearTimeout(this.timer); this.timer = null;
     this.emit(reason);
   }
@@ -132,7 +133,7 @@ export class ContentIntakeUsage {
     if (!view.signedIn) throw new IntakeUsageError('UNAUTHORIZED');
     const epoch = view.sessionEpoch;
     const generation = this.generation;
-    const invalidation = this.invalidation;
+    const faqGeneration = this.faqCatalogGeneration;
     const selection = structuredClone(this.selection);
     const response = await this.session.request(epoch, '/v1/intake/entitlements', {
       body: { ...selection, contextGeneration: generation, releaseId: null }, signal,
@@ -152,7 +153,8 @@ export class ContentIntakeUsage {
     const isCurrent = () => {
       const current = this.session.view();
       return !this.disposed && !signal.aborted && current.signedIn && current.sessionEpoch === epoch
-        && this.generation === generation && this.invalidation === invalidation
+        && this.generation === generation
+        && (purpose === 'sop' || this.faqCatalogGeneration === faqGeneration)
         && this.now() < expires && this.monotonic() < deadline;
     };
     if (!isCurrent()) throw new IntakeUsageError('STALE');
@@ -164,11 +166,11 @@ export class ContentIntakeUsage {
     if (this.disposed || !this.selection) throw new IntakeUsageError('STALE');
     const view = this.session.view();
     if (!view.signedIn) { this.invalidate(); throw new IntakeUsageError('UNAUTHORIZED'); }
-    const epoch = view.sessionEpoch, generation = this.generation, invalidation = this.invalidation;
+    const epoch = view.sessionEpoch, generation = this.generation, faqGeneration = this.faqCatalogGeneration;
     this.request?.abort(); const controller = new AbortController(); this.request = controller;
     const active = () => {
       const current = this.session.view();
-      if (this.disposed || this.generation !== generation || this.invalidation !== invalidation
+      if (this.disposed || this.generation !== generation || this.faqCatalogGeneration !== faqGeneration
         || current.sessionEpoch !== epoch || !current.signedIn) return false;
       return true;
     };

@@ -104,14 +104,16 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `overlay:report-ui-phase` | invoke | query-only；`isReportablePhase`；`resultCount ∈ {0,1,2,3}` |
 | `overlay:report-handoff-milestone` | invoke | `role === 'query'`；正整数 `handoffId`；枚举 `open-armed \| open-finished \| close-finished` |
 | `overlay:report-query-layout` | invoke | **`isTrustedMainFrameSender`** + query + 精确 key 的 `QueryLayoutRequest` |
-| `overlay:resize-query-height` | invoke | **main-frame** + query + `QueryResizeRequest` |
+| `overlay:resize-query` | invoke | **main-frame** + query + `QueryResizeRequest` |
 | `overlay:move-fox-by` | invoke | Fox：正整数 `generation`（测试 harness 可省略）；Query：允许无 generation |
 | `overlay:commit-fox-drag-settle` | invoke | **main-frame** + `role === 'fox'` + 正整数 `settleId` |
 | `overlay:set-fox-peek` | invoke | `role === 'fox'`；`peek \| retract`；`epoch >= 0` |
 | `overlay:command` | Main → renderer | preload 丢弃非 `isOverlayCommand` 的载荷 |
 | `sop-window:open` / `sop-window:entry-available` | invoke | 仅受信 Query；Fox / Dashboard / SOP 拒绝。Query 不得调用其它 `sop-window:*` |
 | `sop-window:close` / `end-flow` / `restart` / `choose-edge` / `next-step` / `move-by` / `report-layout` / `copy-current` | invoke | 仅 SOP 窗主框。`copy-current` 不接受任意字符串，Main 用当前投影 `answerText` + `resolveClipboardWrite` |
+| `sop-window:resize` / `bookmark` | invoke | 仅 SOP 自己的主框。缩放用手势序号、方向和相对位移，书签用窄操作枚举 |
 | `sop-window:projection` | Main → SOP | preload 丢弃非 `isSopProjection` 的载荷 |
+| `sop-window:chrome` | Main → SOP | 类型化窗口形态。`parked` 只投影仍可展示的名称 |
 
 `isTrustedSender`：sender 未销毁、属于 `trustedContents()`（仅 Fox / Query）、`senderFrame` 无 parent、URL 为允许的本机 dev server 或打包 `index.html`。
 
@@ -119,11 +121,11 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 
 Payload 共性：精确 key 集合、安全整数、枚举。不开放 width / x / y / bounds IPC，不暴露文件系统。
 
-SOP 几何（`apps/desktop/src/shared/sop-geometry.ts`）：宽 600，起壳高 240，hug 240–620，默认放在 Query 右侧 +16，否则左侧，否则下方 +12，并 clamp 到 workArea。左上角不得与 Query origin 重合。优先避开 Query 胶囊 88px 带；若仍重叠，Query 输入框仍可点。布局超时 `SOP_LAYOUT_TIMEOUT_MS = 180`，不要命名为 HANDOFF。复制反馈 `SOP_COPY_FEEDBACK_MS = 1200`。Main 拥有树与进度；renderer 只渲染投影。`copyCurrent()` 不得走 `clipboard:copy-text`、`copyAdopt` 或 `/v1/events/adoption`。
+SOP 默认宽 600，起壳高 240，hug 240–620。缩放后 Main 按窗保留手动尺寸，后续内容测量不回写默认宽高。v12 按实例路由命令、窗口和续用资格，首开优先靠左居中并避开已打开窗口与 Query 胶囊。贴边保存原展开 bounds，显示器变化时按可用工作区协调书签。旧入口沿用贴近 Query 的放置函数。布局超时 `SOP_LAYOUT_TIMEOUT_MS = 180`。复制反馈 `SOP_COPY_FEEDBACK_MS = 1200`。Main 拥有树与进度，renderer 渲染投影。`copyCurrent()` 不走 `clipboard:copy-text`、`copyAdopt` 或 `/v1/events/adoption`。
 
 ---
 
-## 4. Query 实测布局与纵向 resize ACK
+## 4. Query 实测布局与缩放 ACK
 
 正常结果路径（`RESULTS` / `EMPTY` / `ERROR`）：
 
@@ -133,7 +135,7 @@ SOP 几何（`apps/desktop/src/shared/sop-geometry.ts`）：宽 600，起壳高 
 4. `clampQueryDesiredHeight(desired, availableHeight)`，其中 `availableHeight = workArea.height - 16`（`SCREEN_MARGIN * 2`），再与常量上下限相交：`240 .. min(620, availableHeight)`。
 5. 一次 `setBounds`，返回 typed `QueryLayoutAck`。Query 必须 `acceptQueryLayoutAck`（ok、session、sequence、phase、count）后才 `layoutReady` 并展示内容。
 
-纵向 resize（`overlay:resize-query-height`）同一套 session / sequence / ACK：`begin | update | end | cancel | keyboard`。不开放水平或任意 bounds。
+边角缩放使用 `overlay:resize-query` 与同一套 session / sequence / ACK。操作包括 `begin | update | end | cancel | keyboard`。Main 从本次手势原始 bounds 应用方向与相对位移，回传实际宽高。松手或键盘调整后的尺寸用于后续结果窗，收起重开仍先显示精简胶囊。IPC 不接收绝对 bounds。
 
 **旧分档只属于异常 fallback**（`preferredQuerySizeForPhase` / `fallbackQuerySizeForPhase`，超时 `QUERY_LAYOUT_FALLBACK_MS = 160`）：
 

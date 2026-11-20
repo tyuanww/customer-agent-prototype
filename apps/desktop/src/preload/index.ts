@@ -301,11 +301,11 @@ const api: CustomerAgentApi & OverlayControlApi = {
     }
     return ipcRenderer.invoke(IPC_CHANNELS.REPORT_QUERY_LAYOUT, request);
   },
-  resizeQueryHeight(request) {
+  resizeQuery(request) {
     if (!isQueryResizeRequest(request)) {
       return Promise.resolve(rejectedQueryLayoutAck(0, 0));
     }
-    return ipcRenderer.invoke(IPC_CHANNELS.RESIZE_QUERY_HEIGHT, request);
+    return ipcRenderer.invoke(IPC_CHANNELS.RESIZE_QUERY, request);
   },
   moveFoxBy(
     deltaX: number,

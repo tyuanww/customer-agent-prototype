@@ -1523,7 +1523,7 @@ describe('FoxApp', () => {
 
     act(() => {
       for (const listener of commandListeners) {
-        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'left', dockEdge: 'none', animate: true, handoffCenterX: 44, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-closing', 'true');
@@ -1535,7 +1535,7 @@ describe('FoxApp', () => {
     act(() => {
       for (const listener of commandListeners) {
         listener({ type: 'activate-search', anchor: 'right', animate: false });
-        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: false, handoffCenterX: 600, handoffCenterY: 44 });
+        listener({ type: 'collapse', anchor: 'right', dockEdge: 'right', animate: false, handoffCenterX: 600, handoffCenterY: 44, viewport: { width: 600, height: 88 } });
       }
     });
     expect(screen.getByTestId('query-shell')).toHaveAttribute('data-closing', 'false');

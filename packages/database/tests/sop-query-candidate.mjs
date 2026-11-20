@@ -13,7 +13,7 @@ test('legacy candidate check verifies the complete 90 tail and preserves histori
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',
     'scripts/readiness-contract.mjs', 'scripts/sop-unified-contract.mjs', 'scripts/sop-unified-corrected-contract.mjs',
-    'scripts/sop-resource-disable-contract.mjs']) {
+    'scripts/sop-resource-disable-contract.mjs', 'scripts/sop-candidate-contract.mjs']) {
     mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
     cpSync(path.join(projectRoot, relative), path.join(root, relative), {
       recursive: true, filter: source => !['node_modules', 'dist'].includes(path.basename(source)),

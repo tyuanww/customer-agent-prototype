@@ -2,6 +2,8 @@ import { isSopUnifiedProjection, type SopUnifiedProjection } from '@shared/sop-u
 import { SopUnifiedView } from './SopUnifiedView';
 import { isSopQueryProjection, type SopQueryProjection } from '@shared/sop-query';
 import { SopQueryView } from './SopQueryView';
+import { SopResizeHandles } from './SopResizeHandles';
+import { SopBookmark } from './SopBookmark';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import { useWindowDrag } from './lib/use-window-drag';
@@ -13,6 +15,7 @@ import {
   SOP_UNPUBLISHED_MESSAGE,
   type SopProjectedScript,
   type SopProjection,
+  type SopWindowChrome,
 } from '@shared/sop-window';
 import {
   isSopPipelineProjection,
@@ -105,7 +108,8 @@ function SopPipelineView({
     >
       <div className="glass-shell">
         <div className="glass-surface" aria-hidden="true" />
-        <header className="sop-chrome" data-testid="sop-chrome" {...drag}>
+        <header className="sop-chrome" data-testid="sop-chrome">
+          <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
           <div className="sop-chrome-title">
             <strong>{projection.title}</strong>
             <span data-testid="sop-pipeline-sop">{projection.sopId}</span>
@@ -245,8 +249,10 @@ function SopCopyCard({
 export function SopApp({ projection: injected }: SopAppProps) {
   const [projection, setProjection] = useState<SopProjection | SopPipelineProjection | SopQueryProjection | SopUnifiedProjection | null>(injected ?? null);
   const [copying, setCopying] = useState(false);
+  const [chrome, setChrome] = useState<SopWindowChrome>({ kind: 'expanded' });
   const shellRef = useRef<HTMLDivElement>(null);
   const layoutSequenceRef = useRef(0);
+  const resizeSequenceRef = useRef(0);
   const sessionHintRef = useRef(0);
 
   useEffect(() => {
@@ -257,6 +263,10 @@ export function SopApp({ projection: injected }: SopAppProps) {
     return window.sopWindow?.onProjection((next) => {
       setProjection(next);
     });
+  }, [injected]);
+
+  useEffect(() => {
+    if (!injected) return window.sopWindow?.onChrome?.(setChrome);
   }, [injected]);
 
   const layoutSignature = projection
@@ -283,7 +293,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
   }, [injected, projection?.sessionId]);
 
   useLayoutEffect(() => {
-    if (injected || !layoutSignature) {
+    if (injected || chrome.kind === 'parked' || !layoutSignature) {
       return undefined;
     }
     const shell = shellRef.current;
@@ -298,7 +308,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
       reportLayout(desired);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [injected, layoutSignature, reportLayout]);
+  }, [injected, chrome.kind, layoutSignature, reportLayout]);
 
   const drag = useWindowDrag(
     (dx, dy, finished) => {
@@ -347,17 +357,23 @@ export function SopApp({ projection: injected }: SopAppProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [copyCurrent, projection]);
 
+  if (chrome.kind === 'parked') return <SopBookmark name={chrome.name} />;
+
   if (!projection) {
     return null;
   }
 
-  if (isSopUnifiedProjection(projection)) return <SopUnifiedView projection={projection} shellRef={shellRef} drag={drag} />;
+  const resizeHandles = !injected && window.sopWindow?.resize
+    ? <SopResizeHandles sessionId={projection.sessionId} nextSequence={() => ++resizeSequenceRef.current} />
+    : null;
 
-  if (isSopQueryProjection(projection)) return <SopQueryView projection={projection} shellRef={shellRef} drag={drag} />;
+  if (isSopUnifiedProjection(projection)) return <><SopUnifiedView projection={projection} shellRef={shellRef} drag={drag} />{resizeHandles}</>;
+
+  if (isSopQueryProjection(projection)) return <><SopQueryView projection={projection} shellRef={shellRef} drag={drag} />{resizeHandles}</>;
 
   if (isSopPipelineProjection(projection)) {
     return (
-      <SopPipelineView
+      <><SopPipelineView
         projection={projection}
         copying={copying || projection.copied}
         drag={drag}
@@ -374,7 +390,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
         onEnd={() => {
           void window.sopWindow?.endFlow();
         }}
-      />
+      />{resizeHandles}</>
     );
   }
 
@@ -382,10 +398,11 @@ export function SopApp({ projection: injected }: SopAppProps) {
   const failed = projection.shellState === 'failed';
 
   return (
-    <div className="sop-shell query-shell" data-testid="sop-shell" data-window-role="sop" ref={shellRef}>
+    <><div className="sop-shell query-shell" data-testid="sop-shell" data-window-role="sop" ref={shellRef}>
       <div className="glass-shell">
         <div className="glass-surface" aria-hidden="true" />
-        <header className="sop-chrome" data-testid="sop-chrome" {...drag}>
+        <header className="sop-chrome" data-testid="sop-chrome">
+          <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
           <div className="sop-chrome-title">
             <strong>{projection.sceneTitle}</strong>
             <span data-testid="sop-step">步骤 {projection.stepIndex}</span>
@@ -508,6 +525,6 @@ export function SopApp({ projection: injected }: SopAppProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>{resizeHandles}</>
   );
 }

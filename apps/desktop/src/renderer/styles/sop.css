@@ -18,6 +18,7 @@ html[data-role='sop'] #root {
 }
 
 .sop-chrome {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -27,6 +28,11 @@ html[data-role='sop'] #root {
   z-index: 1;
   color: var(--ink);
   user-select: none;
+}
+
+.sop-chrome-drag {
+  position: absolute;
+  inset: 0;
 }
 
 .sop-chrome-title {
@@ -57,12 +63,9 @@ html[data-role='sop'] #root {
   flex: 0 0 auto;
 }
 
-.sop-chrome-tools button,
-.sop-chrome-tools .env-badge {
-  -webkit-app-region: no-drag;
-}
-
 .sop-close {
+  position: relative;
+  z-index: 1;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -72,12 +75,77 @@ html[data-role='sop'] #root {
   color: var(--muted);
   font-size: 14px;
   line-height: 20px;
+  -webkit-app-region: no-drag;
 }
 
 .sop-close:hover {
   background: var(--query-control-hover);
   color: var(--ink);
 }
+
+.sop-park {
+  position: relative;
+  z-index: 1;
+}
+
+.sop-bookmark {
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 0 8px 8px 0;
+  background: var(--query-glass-solid);
+  color: var(--ink);
+  font-size: 13px;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sop-bookmark:focus-visible {
+  outline-offset: -3px;
+}
+
+.sop-resize-handles {
+  --sop-resize-edge: 6px;
+  --sop-resize-corner: 12px;
+  position: fixed;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sop-resize-handles > div {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.sop-resize-handles > :is([data-edge='top'], [data-edge='bottom']) {
+  inset-inline: var(--sop-resize-corner);
+  height: var(--sop-resize-edge);
+  cursor: ns-resize;
+}
+
+.sop-resize-handles > :is([data-edge='left'], [data-edge='right']) {
+  inset-block: var(--sop-resize-corner);
+  width: var(--sop-resize-edge);
+  cursor: ew-resize;
+}
+
+.sop-resize-handles > [data-edge*='-'] {
+  width: var(--sop-resize-corner);
+  height: var(--sop-resize-corner);
+}
+
+.sop-resize-handles > [data-edge^='top'] { top: 0; }
+.sop-resize-handles > [data-edge^='bottom'] { bottom: 0; }
+.sop-resize-handles > [data-edge$='left'] { left: 0; }
+.sop-resize-handles > [data-edge$='right'] { right: 0; }
+.sop-resize-handles > :is([data-edge='top-left'], [data-edge='bottom-right']) { cursor: nwse-resize; }
+.sop-resize-handles > :is([data-edge='top-right'], [data-edge='bottom-left']) { cursor: nesw-resize; }
 
 .sop-body {
   z-index: 1;

@@ -28,7 +28,7 @@ export function canReportQueryLayout(input: {
   return isTrustedQuerySender(input);
 }
 
-export function canResizeQueryHeight(input: {
+export function canResizeQuery(input: {
   trusted: boolean;
   role: RendererRole | null;
 }): boolean {

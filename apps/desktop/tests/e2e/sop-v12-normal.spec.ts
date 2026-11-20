@@ -2,8 +2,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { parseContractSchema } from '@customer-agent/contracts/sop-resource-disable';
+import { returnToQueryWindow } from '../support/electron-focus';
 import { createSopV12NormalHost } from '../support/sop-v12-normal-host';
 import { readSopV12Probe, readSopV12Projection, runSopV12BackendProbe, setSopV12CloseUnavailable, setSopV12MediaDelay, setSopV12QueryDelay, type SopBackendOpeningEvidence, type SopV12BackendProbe } from '../support/sop-v12-backend-probe';
 
@@ -52,16 +53,12 @@ async function exerciseGraph({ app, sop, evidence }: Surface) {
 }
 
 async function exerciseLogout({ app, sop, query, evidence }: Surface, owned: NonNullable<typeof fixture>) {
-  const old = await readSopV12Projection(sop);
-  const key = old.node!.scripts[0]!.key;
   await query.evaluate(() => window.customerAgent!.product!.logout());
-  await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'idle');
+  await expect.poll(() => sop.isClosed()).toBe(true);
   const closed = await owned.admin.query('SELECT closed_at FROM content_intake.sop_active_uses WHERE continuation_hash=$1',
     [createHash('sha256').update(evidence.opening.continuationId).digest('hex')]);
   expect(closed.rows[0].closed_at).not.toBeNull();
-  expect(await sop.evaluate(value => window.sopWindow!.unifiedCommand!({ kind: 'copy', key: value }), key)).toMatchObject({ ok: false });
-  expect(await sop.evaluate(() => window.sopWindow!.unifiedCommand!({ kind: 'refresh' }))).toMatchObject({ ok: false });
-  expect((await readSopV12Projection(sop)).node).toBeNull();
+  expect(await foxResumeMenuLabels(app)).not.toContain(evidence.ready.result.flow.header.title);
   expect((await readSopV12Probe(app)).copies).toHaveLength(1);
 }
 
@@ -74,6 +71,7 @@ async function exerciseNaturalExpiry(surface: Surface, owned: NonNullable<typeof
     WHERE token_hash=(SELECT session_hash FROM content_intake.sop_active_uses WHERE continuation_hash=$1)`, [hash]);
   await sop.getByRole('button', { name: '复制话术', exact: true }).first().click();
   await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'paused');
+  expect((await readSopV12Projection(sop)).instanceName).toBeUndefined();
   expect((await readSopV12Probe(app)).copies).toHaveLength(1);
   await query.evaluate(() => window.customerAgent!.openSearch());
   const opened = app.waitForEvent('window');
@@ -195,19 +193,152 @@ async function exerciseOptional({ app, sop }: Surface) {
   expect((await readSopV12Projection(sop)).node!.media.every(item => item.owner !== 'knowledge')).toBe(true);
 }
 
-async function exerciseBlocked({ app, sop }: Surface, owned: NonNullable<typeof fixture>) {
+async function openAnotherCase({ app, query }: Pick<Surface, 'app' | 'query'>) {
+  const previous = new Set(app.windows());
+  await returnToQueryWindow(app, query);
+  const entry = query.getByRole('button', { name: '打开 SOP 流程', exact: true });
+  if (!(await entry.isVisible())) await query.getByRole('button', { name: '筛选', exact: true }).click();
+  await entry.click();
+  const newCase = () => app.windows().find(page => !previous.has(page) && page.url().includes('role=sop'));
+  await expect.poll(() => Boolean(newCase())).toBe(true);
+  const sop = newCase()!;
+  await sop.getByRole('combobox', { name: '店铺', exact: true }).click();
+  await sop.getByText('shop-a', { exact: true }).last().click();
+  await sop.getByRole('combobox', { name: '流程', exact: true }).click();
+  await sop.getByText('品质售后SOP', { exact: true }).last().click();
+  await sop.getByRole('textbox', { name: '问题', exact: true }).fill('合成入口');
+  await sop.getByRole('button', { name: '查询流程', exact: true }).click();
+  return sop;
+}
+
+async function foxResumeMenuLabels(app: Surface['app'], selected?: string) {
+  return app.evaluate(({ BrowserWindow, Menu }, label) => {
+    const fox = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('role=fox'));
+    if (!fox) throw new Error('Fox window missing');
+    const originalPopup = Menu.prototype.popup;
+    let labels: string[] = [];
+    Menu.prototype.popup = function (options) {
+      labels = this.items.map(item => item.label);
+      this.items.find(item => item.label === label)?.click({}, fox, fox.webContents);
+      options?.callback?.();
+    };
+    try {
+      fox.webContents.emit('context-menu', {}, { isEditable: false, x: 0, y: 0, menuSourceType: 'mouse' });
+      return labels;
+    } finally {
+      Menu.prototype.popup = originalPopup;
+    }
+  }, selected);
+}
+
+async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof fixture>) {
+  const { app, sop: a, query, evidence } = surface;
+  const b = await openAnotherCase(surface);
+  await expect(b.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'ready');
+  const openings = (await readSopV12Probe(app)).exchanges
+    .filter(item => item.path === '/v1/intake/sop/check' && item.status === 200)
+    .map(item => parseContractSchema('IntakeSopActionCheck', item.body));
+  expect(openings).toHaveLength(2);
+  const [openA, openB] = openings;
+  expect(openA).toEqual(evidence.opening);
+  expect(openB).toMatchObject({ graphDigest: evidence.opening.graphDigest });
+  expect(openB!.continuationId).not.toBe(openA!.continuationId);
+  expect(openB!.queryRequestId).not.toBe(openA!.queryRequestId);
+
+  async function rename(sop: Page, name: string) {
+    await sop.getByRole('button', { name: '重命名', exact: true }).click();
+    await sop.getByRole('textbox', { name: '流程名称', exact: true }).fill(name);
+    await sop.getByRole('button', { name: '保存名称', exact: true }).click();
+    await expect(sop.locator('.sop-chrome-title')).toHaveText(name);
+  }
+  await rename(a, '合成办理甲');
+  await rename(b, '合成办理乙');
+  expect(await a.evaluate(() => window.sopWindow?.queryCommand?.({ kind: 'clear' }))).toMatchObject({ ok: false });
+  const confirmA = '1. 合成确认 confirm-a';
+  const confirmB = '2. 合成确认 confirm-b';
+  for (const [page, label] of [[a, confirmA], [b, confirmB]] as const) {
+    const checkbox = page.getByRole('checkbox', { name: label, exact: true });
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
+  }
+  await expect(a.getByRole('checkbox', { name: confirmB, exact: true })).not.toBeChecked();
+  await expect(b.getByRole('checkbox', { name: confirmA, exact: true })).not.toBeChecked();
+  for (const [page, label] of [[a, confirmB], [b, confirmA]] as const) {
+    await page.getByRole('checkbox', { name: label, exact: true }).click();
+    await page.getByRole('button', { name: '下一步', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
+  }
+  const nativeB = await app.browserWindow(b);
+  const nativeA = await app.browserWindow(a);
+  const expandedA = await nativeA.evaluate(win => win.getBounds());
+  const expandedB = await nativeB.evaluate(win => win.getBounds());
+  await a.getByRole('button', { name: '贴边暂放', exact: true }).click();
+  await b.getByRole('button', { name: '贴边暂放', exact: true }).click();
+  const bookmarkA = a.getByRole('button', { name: '恢复 合成办理甲', exact: true });
+  const bookmarkB = b.getByRole('button', { name: '恢复 合成办理乙', exact: true });
+  await expect(bookmarkA).toBeVisible();
+  await expect(bookmarkB).toBeVisible();
+  await expect(a.getByRole('heading', { name: '合成任务 task-b' })).toHaveCount(0);
+  const parkedA = await nativeA.evaluate(win => win.getBounds());
+  const parkedB = await nativeB.evaluate(win => win.getBounds());
+  expect(parkedA.x).toBe(parkedB.x);
+  expect(Math.abs(parkedA.y - parkedB.y)).toBeGreaterThanOrEqual(parkedA.height);
+  await bookmarkA.hover();
+  await expect(a.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
+  await expect.poll(() => nativeA.evaluate(win => win.getBounds())).toMatchObject({ width: expandedA.width, height: expandedA.height });
+  await bookmarkB.click();
+  await expect(b.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
+  await expect.poll(() => nativeB.evaluate(win => win.getBounds())).toMatchObject({ width: expandedB.width, height: expandedB.height });
+  await b.getByRole('button', { name: '收起流程，保留进度', exact: true }).click();
+  await expect.poll(() => nativeB.evaluate(win => win.isVisible())).toBe(false);
+  expect(await foxResumeMenuLabels(app)).toEqual(expect.arrayContaining(['合成办理甲', '合成办理乙']));
+
+  owned.loseNextResponse('close');
+  await a.getByRole('button', { name: '结束并清除进度', exact: true }).click();
+  const retry = a.getByRole('button', { name: '按原请求确认结束', exact: true });
+  await expect(retry).toBeEnabled();
+  expect((await readSopV12Projection(a)).instanceName).toBeUndefined();
+  await retry.click();
+  await expect.poll(() => a.isClosed()).toBe(true);
+  const closes = (await readSopV12Probe(app)).exchanges.filter(item => item.path.endsWith('/continuations/close'));
+  expect(closes.map(item => [item.status, item.body])).toEqual([
+    [503, { continuationId: openA!.continuationId }],
+    [204, { continuationId: openA!.continuationId }],
+  ]);
+
+  const labels = await foxResumeMenuLabels(app, '合成办理乙');
+  expect(labels).toContain('合成办理乙');
+  expect(labels).not.toContain('合成办理甲');
+  await expect.poll(() => nativeB.evaluate(win => win.isVisible())).toBe(true);
+  await expect(b.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
+  await b.getByRole('button', { name: '复制话术', exact: true }).click();
+  await expect.poll(async () => (await readSopV12Probe(app)).copies).toEqual([
+    '合成对客原文 A\n版本 1', '合成对客原文 A\n版本 1',
+  ]);
+
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+  const rows = () => owned.admin.query('SELECT continuation_hash,closed_at FROM content_intake.sop_active_uses WHERE continuation_hash=ANY($1)',
+    [[hash(openA!.continuationId), hash(openB!.continuationId)]]);
+  expect((await rows()).rows.find(row => row.continuation_hash === hash(openA!.continuationId)).closed_at).not.toBeNull();
+  expect((await rows()).rows.find(row => row.continuation_hash === hash(openB!.continuationId)).closed_at).toBeNull();
+  await query.evaluate(() => window.customerAgent!.product!.logout());
+  await expect.poll(() => b.isClosed()).toBe(true);
+  expect((await rows()).rows.every(row => row.closed_at !== null)).toBe(true);
+  expect(await foxResumeMenuLabels(app)).not.toContain('合成办理乙');
+}
+
+async function exerciseBlocked(surface: Surface, owned: NonNullable<typeof fixture>) {
+  const { app, sop } = surface;
   const previous = await readSopV12Projection(sop);
   await owned.publish({ revision: 2, validImages: true });
-  const result = await sop.evaluate(shopKey => window.sopWindow!.unifiedCommand!({
-    kind: 'query', shopKey, group: '品质售后SOP', text: '合成入口',
-  }), previous.shops[0]!.key);
-  expect(result).toMatchObject({ ok: true });
-  await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'blocked');
-  const projection = await readSopV12Projection(sop);
+  const blocked = await openAnotherCase(surface);
+  await expect(blocked.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'blocked');
+  const projection = await readSopV12Projection(blocked);
   expect(projection.node).toBeNull();
-  await expect(sop.getByText('合成知识原文', { exact: true })).toHaveCount(0);
-  await expect(sop.locator('figure img')).toHaveCount(0);
-  expect(await sop.evaluate(key => window.sopWindow!.unifiedCommand!({ kind: 'copy', key }), previous.node!.scripts[0]!.key)).toMatchObject({ ok: false });
+  await expect(blocked.getByText('合成知识原文', { exact: true })).toHaveCount(0);
+  await expect(blocked.locator('figure img')).toHaveCount(0);
+  expect(await blocked.evaluate(key => window.sopWindow!.unifiedCommand!({ kind: 'copy', key }), previous.node!.scripts[0]!.key)).toMatchObject({ ok: false });
+  await expect(sop.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'ready');
   const observed = await readSopV12Probe(app);
   expect(observed.copies).toHaveLength(1);
   const query = observed.exchanges.filter(item => item.path === '/v1/sop/query').at(-1)!;
@@ -231,7 +362,7 @@ test.afterAll(async () => {
   await fixture?.host.close();
 });
 
-for (const scenario of ['ordinary', 'blocked', 'lost-query', 'lost-open', 'destroy-online', 'destroy-offline', 'graph', 'required-slow', 'natural-expiry', 'logout', 'revocation', 'late-query', 'optional-slow', 'publication'] as const) {
+for (const scenario of ['ordinary', 'parallel-cases', 'blocked', 'lost-query', 'lost-open', 'destroy-online', 'destroy-offline', 'graph', 'required-slow', 'natural-expiry', 'logout', 'revocation', 'late-query', 'optional-slow', 'publication'] as const) {
   test(`normal88 complete selection, owner media and native clipboard ${scenario}`, async () => {
     if (!fixture) throw new Error('Normal fixture missing');
     const owned = fixture;
@@ -320,6 +451,7 @@ for (const scenario of ['ordinary', 'blocked', 'lost-query', 'lost-open', 'destr
         const observed = await readSopV12Probe(app);
         expect(observed.copies).toEqual(['合成对客原文 A\n版本 1']);
         if (scenario === 'graph') return exerciseGraph(surface);
+        if (scenario === 'parallel-cases') return exerciseParallelCases(surface, owned);
         if (scenario === 'natural-expiry') return exerciseNaturalExpiry(surface, owned);
         if (scenario === 'logout') return exerciseLogout(surface, owned);
         if (scenario === 'revocation') return exerciseRevocation(surface, owned);
@@ -344,7 +476,9 @@ for (const scenario of ['ordinary', 'blocked', 'lost-query', 'lost-open', 'destr
         }).toBe(true);
         await query.evaluate(() => window.customerAgent!.openSearch());
         await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-        await query.getByRole('button', { name: '打开 SOP 流程', exact: true }).click();
+        const entry = query.getByRole('button', { name: '打开 SOP 流程', exact: true });
+        if (!(await entry.isVisible())) await query.getByRole('button', { name: '筛选', exact: true }).click();
+        await entry.click();
         await expect.poll(() => app.windows().some(page => page.url().includes('role=sop'))).toBe(true);
         const reopened = app.windows().find(page => page.url().includes('role=sop'))!;
         await expect(reopened.getByTestId('sop-unified-shell')).toHaveAttribute('data-state', 'idle');

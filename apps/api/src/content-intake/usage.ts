@@ -172,7 +172,10 @@ export async function issueSopContinuationEntitlement(client: IntakeTransaction,
 }
 
 export type PreparedIntakeUsage = PreparedIntakeSelection & { release: string };
-export type ExistingEntitlementUse = PreparedIntakeUsage & { entitlement: C['IntakeEntitlement'] };
+export type ExistingEntitlementUse = PreparedIntakeUsage & {
+  entitlement: C['IntakeEntitlement'];
+  sessionValidUntil: number;
+};
 
 /** Reuses the selected ordinary entitlement without issuing another lease. */
 export async function readCurrentIntakeEntitlement(client: IntakeTransaction, who: Principal,
@@ -205,7 +208,8 @@ export async function readCurrentIntakeEntitlement(client: IntakeTransaction, wh
   const graph = await client.query<{ until: Date | null }>('SELECT content_intake.read_sop_graph_deadline($1,$2) AS until', [who.id, lease.release_id]);
   until = Math.min(until, graph.rows[0]?.until?.getTime() ?? Infinity);
   client.validUntil(until);
-  return { ctx, scopes, until, release: lease.release_id, binding: binding(ctx, scopes), entitlement: {
+  return { ctx, scopes, until, release: lease.release_id, binding: binding(ctx, scopes),
+    sessionValidUntil: session.validUntil, entitlement: {
     entitlementId, releaseId: lease.release_id, shopId: ctx.shopId, contextGeneration: ctx.contextGeneration,
     revocationGeneration: who.generation, validUntil: new Date(until).toISOString(), scopes: scopes.map(scope => scope.scope),
   } };

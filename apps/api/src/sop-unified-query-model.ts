@@ -6,6 +6,13 @@ import type { SopQueryOperationFailure } from './sop-query-operation.js';
 type C = components['schemas'];
 export const SOP_UNIFIED_QUERY_CONTRACT_SET_ID = CONTRACT_PROVENANCE.contract_set_id;
 export const SOP_QUERY_MAX_RESPONSE_BYTES = 1_048_576;
+export const SOP_GROUP_ORDER = [
+  '过敏流程SOP',
+  '长痘痘SOP',
+  '品质售后SOP',
+  '少错破SOP',
+  '税收相关规则',
+] as const satisfies readonly UnifiedSopQueryRequest['sop_group'][];
 export type UnifiedSopQueryRequest = C['MenokinSopQuerySopQueryRequest'];
 export type UnifiedSopQueryResponse = C['MenokinSopQuerySopQueryResponse'];
 export type UnifiedSopReadyResult = C['MenokinSopQuerySopReadyResult'];

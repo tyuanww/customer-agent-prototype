@@ -1539,7 +1539,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 0 12px 8px;
+  margin-right: 8px;
+  padding: 0 4px 8px 12px;
   border-top: 1px solid var(--hairline);
 }
 
@@ -1548,55 +1549,81 @@
 }
 
 .query-shell.is-awaiting-layout .result-content,
+.query-shell.is-awaiting-layout [data-sop-candidates],
 .query-shell.is-awaiting-layout .status-banner {
   visibility: hidden;
 }
 
 .query-resize-grip {
   position: absolute;
-  left: 10px;
-  right: 10px;
   z-index: 4;
-  height: 20px;
-  cursor: ns-resize;
   touch-action: none;
   -webkit-app-region: no-drag;
 }
 
-.query-resize-grip::after {
+.query-resize-grip[data-edge='top'],
+.query-resize-grip[data-edge='bottom'] {
+  inset-inline: 14px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.query-resize-grip[data-edge='left'],
+.query-resize-grip[data-edge='right'] {
+  inset-block: 14px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.query-resize-grip[data-edge*='-'] {
+  width: 14px;
+  height: 14px;
+}
+
+.query-resize-grip[data-edge='top-left'],
+.query-resize-grip[data-edge='bottom-right'] {
+  cursor: nwse-resize;
+}
+
+.query-resize-grip[data-edge='top-right'],
+.query-resize-grip[data-edge='bottom-left'] {
+  cursor: nesw-resize;
+}
+
+.query-resize-grip[data-edge^='top'] { top: 0; }
+.query-resize-grip[data-edge^='bottom'] { bottom: 0; }
+.query-resize-grip[data-edge$='left'] { left: 0; }
+.query-resize-grip[data-edge$='right'] { right: 0; }
+
+.query-resize-grip[data-axis]::after {
   position: absolute;
-  left: 50%;
-  width: 28px;
-  height: 3px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--muted) 58%, transparent);
   content: '';
-  transform: translateX(-50%) scaleX(1);
-  transition:
-    background-color var(--duration-fast) var(--ease),
-    transform var(--duration-fast) var(--ease);
+  transition: background-color var(--duration-fast) var(--ease);
 }
 
-.query-resize-grip[data-edge='bottom'] {
-  bottom: 0;
+.query-resize-grip[data-axis='height']::after {
+  left: 50%;
+  width: 28px;
+  height: 3px;
+  transform: translateX(-50%);
 }
 
-.query-resize-grip[data-edge='bottom']::after {
-  bottom: 4px;
-}
+.query-resize-grip[data-edge='top']::after { top: 3px; }
+.query-resize-grip[data-edge='bottom']::after { bottom: 3px; }
 
-.query-resize-grip[data-edge='top'] {
-  top: 0;
-}
-
-.query-resize-grip[data-edge='top']::after {
-  top: 4px;
+.query-resize-grip[data-axis='width']::after {
+  top: 50%;
+  right: 3px;
+  width: 3px;
+  height: 28px;
+  transform: translateY(-50%);
 }
 
 .query-resize-grip:hover::after,
 .query-resize-grip:focus-visible::after {
-  background: color-mix(in srgb, var(--fox) 72%, var(--muted));
-  transform: translateX(-50%) scaleX(1.12);
+  background: var(--focus);
 }
 
 .query-resize-grip:focus-visible {
@@ -1605,7 +1632,6 @@
 
 .query-resize-grip:active::after {
   background: var(--fox);
-  transform: translateX(-50%) scaleX(1.18) scaleY(1.18);
 }
 
 .result-pane:focus-visible {
@@ -1698,6 +1724,29 @@
   background: var(--glass-inner);
   color: var(--ink);
   font-size: 12px;
+}
+
+[data-sop-candidates] {
+  margin: 8px 0;
+}
+
+.sop-candidate-list {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.sop-candidate-list > div,
+.sop-candidate-list .retry-btn {
+  max-width: 100%;
+}
+
+.sop-candidate-list .retry-btn {
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.sop-candidate-list p {
+  margin: 4px 0 0;
 }
 
 .sop-entry-banner .retry-btn {
@@ -2272,7 +2321,7 @@ html[data-role='fox'] #root {
     box-shadow: none;
   }
 
-  .query-resize-grip::after {
+  .query-resize-grip[data-axis]::after {
     background: CanvasText;
     box-shadow: none;
   }
@@ -2408,8 +2457,6 @@ html[data-role='fox'] #root {
 .product-query-context input, .product-query-context select { max-width: 220px; min-height: 32px; color: inherit; background: var(--query-glass-solid); border: 1px solid var(--hairline); border-radius: 6px; }
 .catalog-scope-error { margin: 6px 0 0; color: var(--danger); font-size: 12px; line-height: 16px; }
 
-/* Narrow shop IDs are the only labels in the intake contract. Keep the full ID
-   in the native select without growing the fixed-width query capsule. */
 /* FAQ filters share the existing result region and its hug/scroll measurement. */
 .intake-query-filters { padding: 8px 12px; border-bottom: 1px solid var(--hairline); color: var(--ink); font-size: 12px; }
 .intake-query-filters p { margin: 8px 0 0; color: var(--muted); }

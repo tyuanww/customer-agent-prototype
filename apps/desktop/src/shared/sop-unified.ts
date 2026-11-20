@@ -9,8 +9,10 @@ export type SopGraphResult = SopSchemas['MenokinSopQuerySopReadyResult'];
 export type SopTask = SopSchemas['IntakeSopNode'];
 export type SopMedia = SopGraphResult['media'][number];
 export type SopEntryRef = SopSchemas['IntakeSopEntryRef'];
+export const SOP_INSTANCE_NAME_MAX_LENGTH = 80;
 export type SopUnifiedCommand =
   | { kind: 'query'; shopKey: string; group: SopQueryGroup; text: string }
+  | { kind: 'rename'; name: string }
   | { kind: 'confirm' | 'choose' | 'copy' | 'next' | 'media'; key: string }
   | { kind: 'media-failed'; key: string }
   | { kind: 'refresh' }
@@ -19,6 +21,7 @@ export type SopUnifiedCommand =
 type ProjectionBase = {
   projectionVersion: 'sop-unified-v11';
   sessionId: number;
+  entry?: 'candidate';
   shops: { key: string; label: string }[];
   notice: string;
   busy: boolean;
@@ -70,11 +73,12 @@ export type SopUnifiedNode = {
   nextKey: string;
 };
 export type SopUnifiedProjection = ProjectionBase & (
-  | { state: 'ready'; title: string; node: SopUnifiedNode }
+  | { state: 'ready'; title: string; node: SopUnifiedNode; instanceName?: string }
   | {
     state: 'idle' | 'loading' | 'blocked' | 'stale' | 'no_match' | 'paused' | 'closing' | 'ended' | 'failed';
     node: null;
     title: '';
+    instanceName?: never;
   }
 );
 
@@ -94,6 +98,10 @@ export function isSopUnifiedCommand(value: unknown): value is SopUnifiedCommand 
   if (isSopQueryCommand(value)) return true;
   if (!record(value)) return false;
   if (value.kind === 'refresh') return exact(value, ['kind']);
+  if (value.kind === 'rename') return exact(value, ['kind', 'name'])
+    && string(value.name, SOP_INSTANCE_NAME_MAX_LENGTH)
+    && value.name.trim().length > 0
+    && !/\p{Cc}/u.test(value.name);
   return ['confirm', 'next', 'media', 'media-failed'].includes(String(value.kind))
     && exact(value, ['kind', 'key'])
     && string(value.key, 128)
@@ -103,13 +111,16 @@ export function isSopUnifiedCommand(value: unknown): value is SopUnifiedCommand 
 /** Renderer projections contain only display text, verified images and ephemeral action keys. */
 export function isSopUnifiedProjection(value: unknown): value is SopUnifiedProjection {
   if (!record(value)
-    || !exact(value, ['projectionVersion', 'sessionId', 'shops', 'notice', 'busy', 'copied', 'state', 'title', 'node'])
+    || !exact(value, ['projectionVersion', 'sessionId', 'shops', 'notice', 'busy', 'copied', 'state', 'title', 'node',
+      ...('instanceName' in value ? ['instanceName'] : []), ...('entry' in value ? ['entry'] : [])])
     || value.projectionVersion !== 'sop-unified-v11'
+    || ('entry' in value && value.entry !== 'candidate')
     || !Number.isSafeInteger(value.sessionId)
     || Number(value.sessionId) < 1
     || !string(value.notice)
     || typeof value.busy !== 'boolean'
     || typeof value.copied !== 'boolean'
+    || ('instanceName' in value && (!string(value.instanceName, 512) || !value.instanceName.trim()))
     || !array(value.shops, 1000, shop => record(shop)
       && exact(shop, ['key', 'label'])
       && string(shop.key, 128)
@@ -120,7 +131,8 @@ export function isSopUnifiedProjection(value: unknown): value is SopUnifiedProje
     return ['idle', 'loading', 'blocked', 'stale', 'no_match', 'paused', 'closing', 'ended', 'failed'].includes(String(value.state))
       && value.node === null
       && value.title === ''
-      && !value.copied;
+      && !value.copied
+      && !('instanceName' in value);
   }
   const node = value.node;
   return string(value.title, 512)

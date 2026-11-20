@@ -20,6 +20,7 @@ import {
   trayIconCandidates,
   type DesktopActionId,
   type DesktopMenuEntry,
+  type SopResumeMenuEntry,
 } from './desktop-menu-model';
 
 type DesktopActions = Readonly<Record<DesktopActionId, () => void>>;
@@ -32,6 +33,10 @@ export type DesktopShell = {
 export type DesktopShellOptions = {
   controller: OverlayController;
   quit: () => void;
+  sopResume?: {
+    resumeEntries: () => readonly SopResumeMenuEntry[];
+    subscribeResumeEntries: (listener: () => void) => () => void;
+  };
 };
 
 function createActions(options: DesktopShellOptions): DesktopActions {
@@ -68,6 +73,7 @@ function toMenuTemplate(
         enabled: entry.enabled,
       };
     }
+    if (entry.type === 'resume-sop') return { label: entry.label, click: entry.resume };
     return {
       id: entry.id,
       label: entry.label,
@@ -107,20 +113,45 @@ function contextEditCapabilities(params: ContextMenuParams) {
 }
 
 function bindOverlayContextMenus(
-  controller: OverlayController,
+  { controller, sopResume }: DesktopShellOptions,
   actions: DesktopActions,
 ): () => void {
   const bindings: Array<{
     win: BrowserWindow;
     handler: (event: Electron.Event, params: ContextMenuParams) => void;
   }> = [];
+  let closeSopPopup: (() => void) | null = null;
 
   for (const win of controller.getWindows()) {
     const handler = (_event: Electron.Event, params: ContextMenuParams): void => {
+      const source = controller.overlayRoleOf(win.webContents) === 'fox' ? sopResume : undefined;
+      if (source) closeSopPopup?.();
+      const sopEntries = source?.resumeEntries() ?? [];
       const menu = Menu.buildFromTemplate(
-        toMenuTemplate(createOverlayContextMenuModel(contextEditCapabilities(params), controller.dashboardEnabled), actions),
+        toMenuTemplate(createOverlayContextMenuModel(contextEditCapabilities(params), controller.dashboardEnabled, sopEntries), actions),
       );
       const releaseBlurGuard = controller.beginNativeContextMenu(win);
+      let unsubscribe: (() => void) | undefined;
+      let closed = false;
+      const cleanup = () => {
+        if (closed) return false;
+        closed = true;
+        if (closeSopPopup === close) closeSopPopup = null;
+        unsubscribe?.();
+        releaseBlurGuard();
+        return true;
+      };
+      const close = () => {
+        if (cleanup() && !win.isDestroyed()) menu.closePopup(win);
+      };
+      if (source) {
+        closeSopPopup = close;
+        unsubscribe = source.subscribeResumeEntries(() => {
+          const current = source.resumeEntries();
+          if (current.length !== sopEntries.length || current.some((entry, index) =>
+            entry.label !== sopEntries[index]?.label || entry.resume !== sopEntries[index]?.resume)) close();
+        });
+      }
       try {
         menu.popup({
           window: win,
@@ -128,10 +159,10 @@ function bindOverlayContextMenus(
           x: Math.round(params.x),
           y: Math.round(params.y),
           sourceType: params.menuSourceType,
-          callback: releaseBlurGuard,
+          callback: cleanup,
         });
       } catch (error) {
-        releaseBlurGuard();
+        cleanup();
         console.warn('[desktop-shell] 原生右键菜单打开失败，已保持现有窗口可用。', error);
       }
     };
@@ -140,6 +171,7 @@ function bindOverlayContextMenus(
   }
 
   return () => {
+    closeSopPopup?.();
     for (const { win, handler } of bindings) {
       if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
         win.webContents.removeListener('context-menu', handler);
@@ -202,7 +234,7 @@ function createTray(actions: DesktopActions, dashboardEnabled: boolean): Tray | 
 export function installDesktopShell(options: DesktopShellOptions): DesktopShell {
   const actions = createActions(options);
   installApplicationMenu(actions, options.controller.dashboardEnabled);
-  const unbindContextMenus = bindOverlayContextMenus(options.controller, actions);
+  const unbindContextMenus = bindOverlayContextMenus(options, actions);
   const tray = createTray(actions, options.controller.dashboardEnabled);
   let destroyed = false;
 

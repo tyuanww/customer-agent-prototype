@@ -185,10 +185,10 @@ Main 为已解析的产品 profile 创建 `ProductAnnounce`，并注册公告、
 | RendererRole | Renderer | preload | 主要能力 |
 | --- | --- | --- | --- |
 | `fox` | `FoxApp` | overlay `index.cjs` | 浮窗拖拽、贴边、快捷键唤起、打开 Query |
-| `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、布局高度、打开 Dashboard / SOP |
+| `query` | `QueryApp` | overlay `index.cjs` | 查询胶囊、BM25/hydrate 或未登录 S0 fixture 检索、复制、内容测量与缩放意图、打开 Dashboard / SOP |
 | `dashboard` | `DashboardApp` | 独立 `dashboard.cjs`（`dashboardWording` / `dashboardContent` / `dashboardIteration` / `dashboardOps`） | 当前页是工作台、内容库、SOP、资料审核、设置。内容库只读当前发布目录。preload 保留旧 SOP 与待办通道，但普通服务不提供这些旧操作，见下文。资料页走 `dashboard:content-parse` 与 import-then-publish（无独立 import IPC）。软件目录禁止 latest.yml。没有 `dashboardAnnounce` 或 `dashboardDesk`。 |
 | `login` | `LoginApp` | 独立 `login.cjs` | 飞书 / 账号 chooser；isolated session；不进 `trustedContents()` |
-| `sop` | `SopApp` | 独立 `sop.cjs` | 过敏售后流程树投影；Query 可同时开；Dashboard 打开时 SOP `hideRememberingProgress()`；不进 `trustedContents()` |
+| `sop` | `SopApp` | 独立 `sop.cjs` | 渲染流程投影。v12 注册表由 Main 按办理实例分派窗口、缩放和书签，指令仅进自身主帧。Dashboard 打开时收起 SOP 并保留进度 |
 
 所有受信 renderer 都通过 `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false` 的窗口偏好运行。`apps/desktop/src/shared/overlay-events.ts` 和 `apps/desktop/src/shared/contracts.ts` 是 main 与 preload/renderer 共同遵守的协议边界。任何新能力都应先增加窄类型的 channel、validator 和失败返回，再接到 UI。
 
@@ -260,6 +260,8 @@ v1.17 migrated PG15
 `receipts.json` 以 SHA-256 绑定模型、合同、消费者、迁移、命令结果、环境和状态数，并对 unified 与 seat 回执执行精确来源清单，递归核验其来源哈希。`verify-manual-identity-with-basefix.mjs` 是 BASEFIX 文件的唯一所有者，持有固定 commit、文件 SHA-256、单文件范围和九文件 38 测试预期；unified 来源清单明确排除该文件，发现重复所有权时 fail-closed。检查器对缺失或删除声明的回执、来源漂移 fail-closed；它要求 `syncCommit` 是受测 head 的祖先，且该提交之后只允许两个回执文件变化。BASEFIX 不在测试树中时，正式入口创建临时归档并只替换该测试 blob；BASEFIX 已在祖先中时，入口运行当前 tested head 的真实测试文件，使后续迁移验证组合行为而不是旧快照。缺提交、错误祖先关系或结果不是精确 9 文件 38 测试都失败。运行时可生成机器可读报告，绑定精确 tested head、witness 路径、七个负向控制、BASEFIX blob 与 tested file hash、实测结果和错误数。改动受测源码后必须先重跑再更新证据；FORM 本身不修改陈旧测试。
 
 ### 5.3 桌面 overlay 单一状态所有者（OVL-01）
+
+Query 手动展开尺寸由 overlay 状态机保存并应用到后续结果。renderer 发送有序手势的方向和相对位移，Main 从原生起始 bounds 计算并回传实际尺寸。详见[缩放合同](reference-desktop-contracts.md#4-query-实测布局与缩放-ack)。
 
 `apps/desktop/src/shared/overlay-machine.ts` 是 Fox / Query overlay 的唯一状态与转换所有者，集中保存 lifecycle/content phase、active surface、handoff identity/mode、focus intent、layout/resize sequence、drag session/settle identity、session epoch、generation 和 window generation。`applyOverlayEvent` 是纯函数，返回 `applied / ignored / rejected`、下一状态和 typing 后的 `NativeEffect[]`；BrowserWindow、focus、bounds、timers 和 renderer command 只能由 `overlay-controller.ts` 执行这些 effect。迟到 handoff、layout、drag、blur、session、release 和内容事件按 window generation、session epoch、handoff/layout sequence、release/content revision 与 drag settle identity fail-closed，不能重新打开已关闭窗口、回滚 release 或提交旧显示器的 bounds。Query 首次订阅晚于打开命令时，reducer 重放创建 opening 时保存的原始 `prepare-search`，不会用零中心或 identity transform 重造动画起点。
 
@@ -436,6 +438,8 @@ SOP 持久图片候选由原 `content-object-store.ts` 拥有私有 obj 文件�
 统一 taskgraph 桌面由 `main/sop-unified-runtime.ts` 拥有单个历史流程、确认进度、原请求重试、短期动作句柄、过期、媒体工作取消与原生复制。`sop-unified-port.ts` 拥有固定合同路径、wire parser 和完整媒体绑定。Query 的 `ContentIntakeUsage` 继续独占当前完整选择，通过 Main-only qualification 供 SOP 使用。`shared/sop-task-graph.ts` 拥有纯图校验及推进，`shared/sop-unified.ts` 拥有窄 IPC 命令与展示投影，`SopUnifiedView` 只显示投影及发送意图。`sop-image-decoder.ts` 在 Main 解码已核对哈希的图片，GIF 使用无 preload、无 Node 的隐藏 sandbox 文档，拥有取消和截止清理。v11 与 v12 合成 profile 必须分别匹配精确受锁合同，正式运行保持未激活。正常后端及原生复制验证见[continuation 验证说明](how-to-verify-sop-continuation.md#桌面正常后端联合验证)。
 
 预览暂存的回滚恢复由 `linked-preview.ts` 拥有：`stagePreviews` 返回绑定本次快照的 `commit/rollback` 句柄；明确回滚跳过已回滚前驱，成功提交只结算本次快照并截断其前驱链，不影响后继暂存。两个解析调用方各持有自己的句柄；普通发布别名采用不结算待定暂存。service 对未知冻结保存原句柄和完整候选键，同一存活实例重试经当前授权及数据库结果确认后才恢复，不借用可变输入槽，也不承诺重启恢复。同候选版本的删除回执只从当前预览集合收缩，末行取消的空态屏障不能被旧回执扩大。完整取消由 owner 按候选版本清理同数组别名并保留版本屏障；迟到解析不能复活已取消版本，迟到旧取消不能清除更新投影。更高版本才可按准确输入对象重建。
+
+W5 的 `@customer-agent/contracts/sop-candidates` 从冻结的 OpenAPI 1.31.0 生成发现和选中的校验器。`sop-candidate-operation.ts` 在当前授权范围内匹配并保存短期候选，选中后复用 v12 的就绪回执。数据库的两个调用入口和临时记录只装入专用合成 PG15。Main 的 `SopCandidateSearch` 随 Query 的提交保管原资格和服务端引用，把显示名称和本地句柄发给 Query 主帧。选中返回 `SOP_STALE` 时，Main 用原发现请求确认整轮是否失效。选中成功后，v12 实例持有首开请求及后续进度。[W5 验证方法](how-to-verify-desktop.md#w5-候选与安装包联验)
 
 ### OBS-01 观测机制
 

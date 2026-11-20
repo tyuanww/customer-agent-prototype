@@ -1,80 +1,97 @@
 # Windows 客服前端调整任务卡
 
-> **状态：ROUGH · 待审。** 2026-11-19。来源为备忘录《客服前端调整》、其中引用的《客服 agent 微调》窗口要求，以及坐席在 Windows 下载安装包后的三张截图。排查基线为产品仓 `main@49f00e90`。本页记录本次功能的依赖、决定与验收进度。
+> **状态：APPROVED · 本地合成实施。** 2026-11-19。用户要求推进剩余任务卡，授权本地实现和验证。现场诊断、合同冻结及 Windows 实机验收沿用各自门禁。需求来自《客服前端调整》《客服 agent 微调》和 Windows 截图。排查基线为 `main@49f00e90`。
 
 坐席登录后回到原问句。一次查询显示 FAQ 和 SOP 候选。坐席主动进入流程，可命名、并行办理、缩放和贴边暂放。
 
 ## 推进顺序
 
-本计划处于 `ROUGH`。现在可继续 W0 的只读排查，以及 W1 至 W7 的独立取证和方案核对。现场诊断使用已获准的环境和证据。W1 至 W7 的代码实施从对应计划获批后开始，按表中依赖逐卡推进。W8 在有获准的 Windows 候选包、设备和测试范围后执行。[计划状态与实施输入](../../PROJECT_CHARTER.md#2-本仓的权威顺序) · [各阶段退出条件](../reference-engineering-workflow.md#2-固定阶段与退出条件)
+按下表依赖推进本地代码和验证。W0 现场证据缺口只影响依赖现场配置的事项。W8 需要获准的候选包和 Windows 设备。[实施输入](../../PROJECT_CHARTER.md#2-本仓的权威顺序) · [阶段条件](../reference-engineering-workflow.md#2-固定阶段与退出条件)
 
 | 卡 | 可独立验收的结果 | 依赖 | 当前状态 |
 | --- | --- | --- | --- |
-| W0 | 把现场安装包、实际运行配置与首次失败步骤对应起来 | 无 | 排查中，已核对官网包和 SOP 源码历史，待现场包 |
-| W1 | 未登录点查询能登录，成功回到精简搜索框 | 可独立取证，获批后从 main 开工 | macOS 合成登录通过，待获批 |
-| W2 | 有资格时首次 FAQ 查询成功，失败时坐席知道如何恢复 | W0 的失败证据决定修复位置 | 已追到授权和快照边界，待定因 |
-| W3 | SOP 标题栏的 × 能点，标题空白处仍能拖动 | 可独立取证，获批后从 main 开工 | Chromium 命中对照、macOS SOP 基线通过，待 Windows 复现 |
-| W4 | 并行办理可分别命名、结束，并从狐狸右键恢复 | W3；需确定 × 的最终语义 | 方案待审 |
-| W5 | 问一次即可看到授权 SOP 候选，点击才开始办理 | W0 确认目标 profile；复用 W2 的资格口径、W4 的实例入口 | 匹配与首开接口待评审 |
-| W6 | Query 和 SOP 的四边、四角都能缩放，内容更新后尺寸稳定 | 可独立取证，SOP 部分与 W4 协调窗口所有权 | 已核对尺寸写入，方案待审 |
-| W7 | SOP 首开在左侧中央，多个书签分别恢复原步骤与尺寸 | W4、W6 | 方案待审 |
-| W8 | 同一 Windows 候选安装包跑通整套客服操作 | W1 至 W7 的适用结果 | 待实机验收 |
+| W0 | 绑定现场包、配置与首查失败点 | 无 | 反馈时段运行 765adfeb，待查首个失败请求 |
+| W1 | 登录后回到原问句 | 无 | 本地实现，Electron 回归通过 |
+| W2 | 首查可用，失败可恢复 | W0 定因 | 本地已验证刷新和再次查询，现场待定 |
+| W3 | × 可点，标题可拖 | 无 | 本地实现，独立 v1 和统一 v11 回归通过 |
+| W4 | 并行办理、命名、结束与恢复 | W3 | 合成 v12 已实现，Electron 与 PG15 通过 |
+| W5 | 同一问句展示授权 SOP 候选 | 版本化候选合同、W2 资格、W4 实例 | 本机合成链通过，Windows 实机待验 |
+| W6 | Query 和 SOP 缩放后保持尺寸 | SOP 部分依赖 W4 | 缩放本地通过；焦点交接和 Windows DPI 待验 |
+| W7 | 左侧首开和实例书签恢复 | W4、W6 | 本地双书签通过，Windows 多屏待验 |
+| W8 | 同一安装包贯通操作 | W1 至 W7 | 工程包结构通过，待实机 |
 
-**现在并行取证。** W0 查安装包和首查失败点。W1、W3 分别验证登录和 SOP 点击。W6 对照 Query 与 SOP 的尺寸写入。W2、W5 可先做合成对照与合同盘点。W8 可先准备实机用例。
+W1、W3 独立验证。W2 的恢复动作在 W1 后接入 `QueryApp`，再交给 W6 的 Query 缩放。W6 的 SOP 部分接续 W4 的窗口所有权，完成后进入 W7。共享模块或 IPC 由一个工作单元写入，交接记录提交、入口、测试和阻塞。
 
-**获批后交叉实施。** W1 与 W3 可从同一基线各开 worktree。W2 等 W0 定因。若 W2 也改 `QueryApp`，在 W1 后接入。W4 在 W3 后拥有 SOP 实例和窗口。W6 的 Query 几何可独立，SOP 部分基于 W4 的窗口所有权。W5 消费 W2 的资格和 W4 的首开接口。W7 等 W4、W6。W8 验收同一候选。
+三路并行。W0/W2 沿现场构建定位首个失败请求。W8 用固定包和合成配置在 Windows 串行验收 W1 至 W7，覆盖双屏、任务栏和不同 DPI。W6 独立跟踪 macOS 收起焦点。[产品 PR #224](https://github.com/tyuanww/customer-agent-prototype/pull/224)
 
-同一模块或 IPC 合同由一个工作区写入。W3 优先改 SOP 标题栏，涉及共享拖动钩子时先交接。共享 `QueryApp` 的卡按落地顺序从最新基线接续。上下游交接记录提交、入口、测试和剩余阻塞。
+[计划基线 CI · 91f404c1](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44501918151) · [产品候选首轮 CI · 20c55ee9](https://github.com/tyuanww/customer-agent-prototype/actions/runs/44667250735)
 
 ## W0 · 找到 Windows 首查的第一个失败点
 
-- [x] 坐席确认环境为 Windows 安装包。截图能看到登录后的坐席、当前店铺、SOP 入口，以及「查询未完成／请刷新店铺」。
-- [x] 官网为 `Demo-0.3.42-win-x64-UNSIGNED.exe`，SHA-256 为 `a9fea640460e4056df3a7cd9daa36a783b19953bdc92e101376457d931f81130`。SOP 按钮新增于 `00cec500`，`v0.3.42@1ca737ee` 的历史不包含该提交。截图中的 SOP 入口对应更新的源码，包版本仍待核。[官网下载页](https://download.jianghua.site/windows.html) · [对应 Release](https://github.com/weiweity/customer-agent-prototype/releases/tag/v0.3.42)
-- [ ] **绑定现场包。** 优先取得原 EXE 文件名及 SHA-256。若只保留已安装应用，核对版本和随包构建标识（若有），再记录生效的 profile 模式、SOP 模式及故障时间。发布记录和现场记录分栏保存；仅有版本号时保留证据缺口。[构建标识与运行配置](../how-to-ship-the-next-desktop-cut.md)
-- [ ] **沿同一请求定位。** 先核对目标店铺是否有有效查询授权及 FAQ 来源。再依次核对 Query 提交、Main 选店、资格签发、快照分页校验、本地检索。记录首个失败步骤与脱敏 code/reason，记录「重试」和「刷新店铺」是否到达同一步。真实诊断遵循既有授权，只在本卡记录证据位置和结论。[账号查询权限](../how-to-check-roster-permission.md)
-- [ ] **完成条件。** 有与现场包对应的对照，能指出最早失败的边界并把 W2 分派给该边界的所有者。无法确认时列明缺哪条证据，保持待定因。只有无授权时按授权流程处理；界面反馈可单独验收。
+- [x] Windows 截图显示已登录、已选店、SOP 入口，以及「查询未完成／请刷新店铺」。
+- [x] 公开发行版 `v0.3.42@1ca737ee` 的 Windows 安装包 SHA-256 为 `a9fea640460e4056df3a7cd9daa36a783b19953bdc92e101376457d931f81130`，早于添加 SOP 按钮的 `00cec500`。[发布记录](https://github.com/tyuanww/customer-agent-prototype/releases/tag/v0.3.42)
+- [x] **现场构建。** 四份安装的 `resources/build-identity.json` 分别对应普通版 `0.3.41@c9ee2240` 和三个 `0.3.43` 试点构建 `c6cf544b`、`540c16f2`、`765adfeb`。
+- [x] **反馈时段。** 11 月 19 日备忘录编辑于 15:31–15:48（UTC+8）。Windows 客服 EXE 启动记录中的路径指向 `765adfeb`，15:33:57、15:36:40、15:40:23 均有执行。以其包内提交 `765adfeb529a2f3e915b48551c78a81788f249bf` 复现；原下载 EXE 的 SHA-256 未取得。
+- [ ] **定位首个失败。** 核对当时生效的 profile、SOP 模式和授权。沿同一请求查选店、资格、快照分页及本地检索，用最早的脱敏 code/reason 确定 W2 归属。[查询权限](../how-to-check-roster-permission.md)
 
 ## W1 · 登录后回到原问句
 
-- [ ] **链路与调整。** 查询按钮与回车进入同一提交逻辑，未登录时复用已有独立登录窗。会话交换成功后，Query 显示「登录成功」、恢复输入焦点。把店铺发现前后的清理与展开结果页分开。单店自动选，多店在首次提交确需选店时提示，首屏仅保留搜索所需控件。[提交与会话回传](../../apps/desktop/src/renderer/QueryApp.tsx) · [提示显示条件](../../apps/desktop/src/renderer/features/search/QueryCapsule.tsx) · [店铺加载](../../apps/desktop/src/renderer/features/search/use-intake-shops.ts)
-- [ ] **回归。** 用按钮、回车和连续点击触发登录。取消或失败后保留原文；恢复已有会话时不重复提示；仍能从工作台入口登录后进入工作台。无查询权的账号可以完成登录，查询时看到真实原因。
-- [ ] **Windows 验收。** 新会话输一条合成问句后点查询，只出现一个登录窗。成功后同一问句仍可编辑，后台读店完成时未主动展开店铺或 SOP。记录登录窗创建次数与额外结果页展开次数，重复建窗或自动展开即失败。
+- [x] **合成复现。** 在 macOS Electron 输入问句后点查询或按 Enter，均未创建登录窗，也未发送登录请求。显式登录保留问句。后台发现店铺后 Query 进入 `RESULTS`。[复现入口](../../apps/desktop/tests/e2e/content-intake-query.spec.ts)
+- [x] **改动。** 按钮和回车共用 `runSearch`。未登录提交复用现有独立登录窗。成功后提示一次、保留问句并恢复焦点。读店保持精简搜索框，单店自动选，多店在提交确需选店时打开筛选。[提交与会话](../../apps/desktop/src/renderer/QueryApp.tsx)
+- [x] **本地回归。** 旧构建点击查询等待登录窗超时，修复后 Electron 用例通过，确认只发一次登录请求、后台读店后仍保持精简窗。工作台和登录窗口原有测试通过。[Query E2E](../../apps/desktop/tests/e2e/content-intake-query.spec.ts)
+- [ ] **设备验收。** 在 W8 核对按钮、Enter、连点、取消及恢复会话。工作台入口保持可用，无查询权账号能登录并在查询时看到原因。
 
 ## W2 · 有授权的首次 FAQ 查询可用
 
-- [ ] **按证据选方案。** 有效 grant 缺失、店铺范围已变、资料读取失败分别对应不同恢复动作。W0 若定位到资格签发，核对服务端范围和 Main 的合同视图；若签发成功，继续检查完整快照及其关联字段。仅在已确认的所有者处修复，并让原始失败类别贯穿 IPC 和结果页。把“重新查原问题”和“重新发现店铺”分别接到对应动作。[查询 IPC](../../apps/desktop/src/main/content-intake-query-ipc.ts) · [Main 检索](../../apps/desktop/src/main/content-intake-query.ts) · [资格与快照](../../apps/desktop/src/main/content-intake-usage.ts) · [服务端范围](../../apps/api/src/content-intake/usage.ts)
-- [ ] **合成对照。** 同店、同问句，有权且已有已发布 FAQ 时首查即见预期话术；无 grant、资格过期、无匹配和读取失败分别得到对应结果。撤权后旧复制句柄失效。沿用服务端授权和完整分页校验。[既有 Query E2E](../../apps/desktop/tests/e2e/content-intake-query.spec.ts)
-- [ ] **Windows 验收。** 在与 W0 对应的安装配置重放首查与恢复动作。记录资格请求次数、快照页数和首个结果，额外自动重试或重复获取整套快照须能解释；缺现场对照时只登记合成验证结果。
+- [x] **合成对照。** 在 macOS Electron 用同店同问句。更改资格的 `contextGeneration` 后无快照请求。更改快照的 `releaseId` 后有一次快照请求。两次均显示「查询未完成／请刷新店铺」。恢复响应后点「重试」，均重新获取资格和快照并返回话术。[对照入口](../../apps/desktop/tests/e2e/content-intake-query.spec.ts)
+- [x] **与现场版本对照。** `765adfeb` 至合成复现基线 `91f404c1` 的 Main 查询、资格、快照、店铺发现和结果页代码相同。`QueryApp` 差异限于快捷键提示。现有对照可解释相同文案，现场首个失败请求尚待核验。[结果页](../../apps/desktop/src/renderer/features/search/QueryResultsPane.tsx)
+- [ ] **按 W0 定因。** 资格失败查服务端范围和 Main 绑定，资格通过后查完整分页及关联字段。现有 `FORBIDDEN` 提示的「刷新店铺」直接走店铺发现。常规重试继续提交原问句。保留授权和分页校验。[资格与快照](../../apps/desktop/src/main/content-intake-usage.ts) · [结果页](../../apps/desktop/src/renderer/features/search/QueryResultsPane.tsx)
+- [ ] **验收。** 有效授权与已发布 FAQ 首查即命中。无 grant、过期、无命中、读失败分别可辨，撤权使旧复制句柄失效。用现场对应配置重放，记录资格请求次数、快照页数和首个结果，核对重复请求。
 
 ## W3 · 修复 × 的点击命中
 
-- [ ] **链路与调整。** 当前独立与统一 SOP 表单均把 × 放在启用指针捕获的标题内。上一轮 Chromium 最小实验中，标题捕获时 click 落在 HEADER，对照组落在 BUTTON。先在 Windows 鼠标与键盘上对照标题、按钮、preload、Main 的 close。若命中问题成立，在标题组件划清拖动区和操作区，复核所有共享该拖动行为的窗口。[拖动处理](../../apps/desktop/src/renderer/lib/use-window-drag.ts) · [独立视图](../../apps/desktop/src/renderer/SopQueryView.tsx) · [统一视图](../../apps/desktop/src/renderer/SopUnifiedView.tsx) · [关闭入口](../../apps/desktop/src/main/sop-window-ipc.ts)
-- [ ] **验收。** 本卡沿用当前「× 收起、保留进度」语义。Windows 点 × 一次只触发一次收起；键盘激活也能收起；拖动标题只移动窗口。重开后步骤保留。W4 单独处理结束办理的产品语义。
+- [x] **macOS Electron 复现。** 独立 v1、统一 v11 均观察到 `pointerdown` 命中按钮，标题栏捕获后 `click` 落在标题。Main 的窗口仍可见。键盘 Enter 能收起，证明现有关闭链路可达。[拖动处理](../../apps/desktop/src/renderer/lib/use-window-drag.ts) · [关闭入口](../../apps/desktop/src/main/sop-window-ipc.ts)
+- [x] **改动与本地回归。** 四个 SOP 标题栏的 × 独立于拖动命中层。独立 v1 和统一 v11 的 Electron 用例在旧构建上未收起，在修复构建上可收起且重开保留进度。标题栏拖动仍移动窗口。[独立视图](../../apps/desktop/src/renderer/SopQueryView.tsx) · [统一视图](../../apps/desktop/src/renderer/SopUnifiedView.tsx)
+- [x] **交接验证。** Query 视觉切换只取消 FAQ 请求，保留 v1 的独立 SOP。实际搜索、选店、筛选和查询取消仍使旧 v1 失效。最终构建通过 FAQ、SOP v1 和 SOP v11 的 Electron 回归。[Query IPC](../../apps/desktop/src/main/content-intake-query-ipc.ts)
+- [ ] **设备验收。** Windows 点 × 或按 Enter 只收起一次，重开保留步骤，拖动标题仅移动窗。
 
 ## W4 · 同一模板可开两次，分别命名和结束
 
-- [ ] **产品取舍。** 推荐每次办理独占一个窗口，以流程标题为默认名，支持会话内改名。单窗多标签也能保存多份进度，但两单无法并排。建议明确区分右上角 × 结束本单与 Esc／折叠保留进度；有进度时提示结束后果。该决定会改变现行设计，实施前确认并同步维护源。[现行交互](../../DESIGN.md) · [桌面合同](../reference-desktop-contracts.md)
-- [ ] **链路与调整。** 针对 W0 确定支持的 SOP 模式，Main 按办理实例绑定窗口、会话、步骤、发布版本、复制及续用句柄。核对既有单窗、单 active、新查询结束旧 active 和失效广播四处假设。狐狸右键由 Main 原生菜单列出可恢复的实例；能力未启用时隐藏，无进行中实例时给出从查询开始的路径。每个 SOP 主帧仅能操作自己的实例。[窗口控制器](../../apps/desktop/src/main/sop-window-controller.ts) · [统一运行时](../../apps/desktop/src/main/sop-unified-runtime.ts) · [原生菜单](../../apps/desktop/src/main/desktop-menu-model.ts)
-- [ ] **验收。** 用同一模板主动打开两次，命名 A/B，各推进一步。结束 A 后从狐狸右键恢复 B 并复制其当前步骤。服务端结束回执丢失时按原请求恢复。登出后旧内容失效。检查一次结束只影响一个实例，结束后其窗口和订阅被回收。[续用与结束验证](../how-to-verify-sop-continuation.md)
+- [x] **本地取舍。** 合成 v12 每单一窗，默认显示流程标题，可改名。延续现行 × 和 Esc 收起，结束用明确操作。单窗多标签无法并排办理。[现行设计](../../DESIGN.md) · [桌面合同](../reference-desktop-contracts.md)
+- [x] **实例归属。** 合成 v12 新增 Main 实例注册表。每窗独立持有步骤、版本、复制和续用句柄，命令按自身主帧路由。登出撤销全部实例。狐狸右键提供可恢复实例。资格变化时撤掉原菜单和书签名称。[窗口注册表](../../apps/desktop/src/main/sop-instance-windows.ts) · [原生菜单](../../apps/desktop/src/main/desktop-shell.ts)
+- [x] **本地回归。** Electron 和隔离 PG15 通过并行办理、流程拒绝和登出三个用例。A 结束回执丢失后按原请求确认，B 可从狐狸恢复并复制。退出时核对两条续用记录关闭。[v12 Electron 用例](../../apps/desktop/tests/e2e/sop-v12-normal.spec.ts)
 
 ## W5 · FAQ 自动匹配，点击后才打开 SOP
 
-- [ ] **先定接口。** FAQ 继续读取授权快照。SOP 复用同次问句及 Main 持有的店铺、商品、场景。比较两种做法：既有按组接口逐组查询，需要合并跨组歧义与多份查询证明；由服务端匹配所有者返回跨组候选，可统一歧义判定。推荐后者。先验证现有自动路由能否同时给出 FAQ 和 SOP 并保留首开证明；需要扩展合同时，按项目流程冻结再接入。[既有匹配器](../../apps/api/src/sop-unified-query-context.ts) · [自动路由](../../apps/api/src/query/query-coordinator.ts) · [桌面服务端口](../../apps/desktop/src/main/sop-unified-port.ts)
-- [ ] **打通坐席入口。** Query 展示可进入的流程名称。Main 持有候选证明与短期句柄，点击后重新确认并打开 W4 的实例。新问句只撤销旧候选。独立 v1 的上下文失效与统一续用语义分别核对。SOP 超时仍可展示有效 FAQ。[Query 入口](../../apps/desktop/src/renderer/features/search/SopQueryEntry.tsx) · [SOP 工作流](../../apps/desktop/src/main/sop-unified-runtime.ts)
-- [ ] **验收。** 用仅 FAQ、仅 SOP、两者命中、歧义、换店、撤权与迟到响应做对照。未点击时首开次数为零；同一候选双击只开一个实例；下一题不关上一单。人为延迟 SOP 响应，FAQ 可先呈现。Windows 安装包上的实际操作只有一次输入与一次主动进入。[正常后端电子窗用例](../../apps/desktop/tests/e2e/sop-v12-normal.spec.ts)
+- [x] **接口现状。** `QueryCoordinator` 的 `auto` 在 FAQ 和 SOP 中择一。现有 SOP 匹配按 `sop_group`。统一 runtime 消费就绪结果后立即授权 `open`。服务端现有测试已验证路由择一和组内匹配。[自动路由](../../apps/api/src/query/query-coordinator.ts) · [匹配器](../../apps/api/src/sop-unified-query-context.ts) · [首开链路](../../apps/desktop/src/main/sop-unified-runtime.ts)
+- [x] **合同评审包。** 基于现行 v12，生成 W5 的 OpenAPI 1.31.0/schema 1.36 本地评审包。发现只返回名称和句柄，选中签发 C 供 D 首开。接口、存储和合成导出验证通过。
+- [x] **首开验证。** 隔离 PG15 的 HTTP 预演通过发现、原 E 选中及 v12 首开。换 E 拒绝，C 丢回执可重放。
+- [x] **组内歧义。** 用户确认任一组有歧义就隐藏本次全部 SOP 候选，FAQ 独立呈现。实际匹配器原型和隔离存储约束通过。
+- [x] **合同冻结。** 治理仓 `6124b4cc4e29` 已导出并核验 W5 合同。
+- [x] **产品接入。** 产品仓校验并消费冻结集 `cs-ai-c11-openapi-1.31.0-schema-1.36-6124b4cc4e29`。API 在显式合成配置中发现、选中，Main 保管原资格和服务端引用，Query 展示名称和本地点击句柄。两条新路径使用 W5 合同头，资格及首开沿用 v12。[模块归属](../reference-project-architecture.md#sop-pipeline-source-and-release-projection)
+- [x] **本机合成联验。** macOS Electron、Fastify 与 PG15 贯通仅 FAQ、仅 SOP、同时命中和均无命中。两个组各有一条可选，首次查询零选中和首开；连点和丢失 C/D 回执后的重试只开一单。下一题保留已勾选步骤，组内歧义时仍有 FAQ。仅 SOP 命中时提示选择流程，均无结果才提示升级。窗口加载中资格到期会立即释放空窗。首开回执未知仍可恢复。定向用例覆盖换店、迟到、撤权与超时保留 FAQ 复制。[原生联验](../../apps/desktop/tests/e2e/sop-candidates-real-stack.spec.ts) · [Main 边界](../../apps/desktop/tests/unit/sop-candidate-query.test.ts)
+- [x] **0.3.44 审核回归。** 同轮两个候选中，一个缺少材料或版本已变时，原 FAQ 保留，另一单可直接打开。会话在事务开始前失效返回 401，事务超时可重试。[原生联验](../../apps/desktop/tests/e2e/sop-candidates-real-stack.spec.ts) · [HTTP 与 PG15](../../apps/api/tests/sop-unified-query.integration.test.ts)
+- [ ] **Windows 实机。** 以 W8 同一安装包核对一次输入、主动首开和并行办理。[验收入口](../how-to-verify-desktop.md#w5-候选与安装包联验)
 
 ## W6 · Query 与 SOP 都能自由缩放
 
-- [ ] **链路与调整。** 对照系统原生缩放和既有窄 IPC 手柄，在透明窗口、焦点和狐狸交接都成立的前提下选接口更小的方案。Query 的现有手柄只改高度；共享几何及 SOP 内容高度回报仍会写入固定宽度。Main 拥有最终 bounds，renderer 负责内容换行与滚动。用户拖过后以手动尺寸为准，跨步骤布局 ACK 遵守这一选择。[Query 手柄](../../apps/desktop/src/renderer/features/search/QueryResizeGrip.tsx) · [Query 布局](../../apps/desktop/src/shared/query-layout.ts) · [SOP 几何](../../apps/desktop/src/shared/sop-geometry.ts)
-- [ ] **验收。** Windows 分别拖两个窗口的四边和四角，宽高不锁比例，尺寸受内容最低可用范围和工作区约束。查询出结果、复制后收起再展开、SOP 换步骤时都不跳回原宽。记录拖动结束的 bounds 与下一次布局确认后的 bounds；无工作区变化时意外回写一次即失败。运行 float 及受影响的 Electron 交接测试。[分层验证](../how-to-verify-desktop.md)
+- [x] **本地实现。** 透明窗保留 `resizable: false`。Main 从自身手势起点应用方向和相对位移，保存并裁剪手动尺寸。布局 ACK 回传实际宽高，renderer 换行与滚动。Query 复制后重开再查询恢复手动尺寸的 Electron 用例通过。[Electron 透明窗约束](https://www.electronjs.org/docs/latest/tutorial/custom-window-styles#limitations) · [Query 布局](../../apps/desktop/src/shared/query-layout.ts) · [SOP 窗口](../../apps/desktop/src/main/sop-window-controller.ts)
+- [ ] **验收。** 两窗能拖四边四角，宽高独立，受最小可用尺寸和工作区约束。比较松手与出结果、复制后重开、换步骤后的 bounds。工作区未变时保持手动尺寸。跑 float 和受影响的 Electron 交接测试。[分层验证](../how-to-verify-desktop.md)
+- [x] **专项。** Float、Query 缩放及 v1 SOP 保宽通过。Main 复核重开的原生焦点，真实失焦仍可收起。
+- [ ] **macOS 焦点。** 85 次 Electron 试验中，现行收起对照 5/5 归还键盘、5/5 采到双窗离屏；仅 deactivate 时 0/15 归还。追加两应用对照中，以 AppKit 激活开窗前捕获的应用，5/5 归还键盘，采样期间 Fox 保持可见、Dock 身份保留。接入前仍需验证真实 Fox 点击、快捷键、快速重开与原生模块打包签名。[平台交接](../../apps/desktop/src/main/overlay-platform.ts)
 
 ## W7 · SOP 左侧居中，贴边后可恢复原步骤
 
-- [ ] **链路与调整。** Main 从 Query 所在显示器取工作区，首次靠左垂直居中。展开、折叠标题、贴边书签按实例管理。空闲离开可折叠；拖至边缘保留名称，悬停或点击恢复。输入、拖动或鼠标移入正文期间保持展开。复用 W6 的展开尺寸。[显示器选择](../../apps/desktop/src/main/main.ts) · [SOP 放置](../../apps/desktop/src/shared/sop-geometry.ts) · [窗口生命周期](../../apps/desktop/src/main/sop-window-controller.ts)
-- [ ] **验收。** Windows 双屏不同缩放、任务栏占边时，首开在所选屏幕工作区左侧中央。把两个命名流程停成书签，分别恢复到原步骤和手动尺寸。移除显示器后仍能找回。鼠标从书签移入正文只应展开一次，不能循环收起。
+- [x] **本地实现。** v12 首开优先定位到 Query 所在工作区的左侧中央，可贴边暂放。Electron 已验证两个书签占不同位置，只显示名称，悬停和点击分别恢复实例的步骤与原展开尺寸。[放置函数](../../apps/desktop/src/shared/sop-geometry.ts) · [v12 Electron 用例](../../apps/desktop/tests/e2e/sop-v12-normal.spec.ts)
+- [ ] **验收。** Windows 双屏不同缩放及任务栏占边时核对首开。两单分别贴边并恢复原步骤和尺寸。拔掉副屏后仍找得到书签。鼠标从书签进入正文只展开一次。
 
 ## W8 · 在同一个 Windows 安装包验收
 
-- [ ] 记录候选提交、Windows 安装资产的 SHA-256、构建标识、实际 profile 和合成输入。按各卡影响面复用已通过的组件、Electron、API 和 PG 证据；公共合同、权限或跨模块变更按仓库规则跑全套检查。打包检查和设备验收分别记录。[验证范围](../../AGENTS.md) · [打包与签名](../reference-packaging-and-signing.md)
-- [ ] 通过正常安装入口操作：未登录提交、登录、一次 FAQ 命中、主动进入 SOP、另开同模板、分别命名、缩放、贴边、从狐狸恢复、结束其中一单、退出账号。再用无查询授权的合成会话验证拒绝路径。把每个失败定位到对应卡，记录版本、输入、预期、实见与证据位置。
-- [ ] 产品复核 Windows 实际交互。分别登记「代码检查通过」「合成链路通过」「Windows 安装包人工验收通过」。现场首查的结论沿用 W0/W2 证据。
+本轮验收版本为 **0.3.44**。用主线合并提交生成 Windows x64 工程包，以 EXE 的 SHA-256 和包内 `build-identity.json` 核对设备上的构建。下列 0.3.43 记录用于追溯上一轮验证。
+
+- [x] 已构建含 W5 的 Windows x64 未签名工程包 0.3.43。直接从 NSIS 安装程序提取 app.asar，核对 Main、四个 preload 和 renderer 等 14 个构建文件，内容逐字节一致。EXE SHA-256 为 `1ccc50ca35cf3d57ed677f5de1d0f229189d208fec04e43ef0b0678f30e80972`。包内 `build-identity.json` 记录产品提交 `07949f09392bac168eefcde2b3a77c5b6a0fb38c`。
+- [x] **合成账号。** [CLI 回归](../../scripts/intake-synthetic/cli.test.ts)以 HTTP 登录确认两种身份，非法值在创建资源前退出。另在本地 PG15 实测：`agent` 有合成店铺查询资格；`roster-nogrant` 登录成功，v12 授权返回 403，`/v1/auth/job` 返回 `actions.query: false`。[同包验收步骤](../how-to-verify-desktop.md#w5-候选与安装包联验)
+- [ ] **记录环境。** 核对候选 EXE 与已安装构建标识，记录 Windows 版本、缩放和任务栏位置。在 Windows 预检 WSL 两个回环端口，用两份独立配置测试有权和无权会话。[Windows 与 WSL 联调](../how-to-develop-content-intake.md#p2-独立-apipg-与桌面合成联调)
+- [ ] **登录与首查。** 未登录提交，成功后焦点回原问句。首查见 FAQ 和候选；另用无查询权会话验证拒绝。与 W2 对照相应请求阶段。
+- [ ] **并行办理与窗口。** 点同模板开两单，命名并推进。缩放后换步，贴边后从狐狸恢复，结束一单后另一单仍可用，登出使旧内容失效。
+- [ ] **登记结果。** 每项记任务卡编号、输入、预期、实见和证据位置。分别记录代码检查、合成链路、打包结构和 Windows 人工验收。产品复核设备上的实际交互。

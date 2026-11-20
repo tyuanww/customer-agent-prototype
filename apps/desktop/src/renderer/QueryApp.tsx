@@ -27,7 +27,10 @@ import {
   type QueryLayoutAck,
   type QueryLayoutRequest,
   type QueryResizeEdge,
+  type QueryResizeDelta,
+  type QueryResizeRequest,
 } from '@shared/query-layout';
+import type { WindowResizeDirection } from '@shared/window-resize-geometry';
 import {
   IDENTITY_FOX_VISUAL_TRANSFORM,
   type OverlayControlApi,
@@ -78,13 +81,15 @@ import { ALLERGY_SOP_SCENE_ID, isAllergySopEntry } from '@shared/sop-entry';
 import { compactQueryText } from '@shared/query-analyze';
 import { SOP_OPEN_FAILURE_MESSAGE } from '@shared/sop-window';
 import type { LibraryDomain } from '@shared/library-delta';
-import { intakeQueryFailure } from '@shared/content-intake-query';
+import { intakeQueryFailure, type IntakeSopCandidatesEvent } from '@shared/content-intake-query';
 import {
   adoptedPlaceholderValues,
   announceInvalidationEffect,
   copySuccessErrorMessage,
   rankedScriptsFromProductCandidates,
 } from './features/search/query-view-model';
+
+type QueryError = string | { message: string; recovery: 'refresh-shops' };
 
 export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
@@ -97,7 +102,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
   const sessionNoticeRef = useRef<SessionNotice | null>(null);
   const signedInRef = useRef(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [queryError, setErrorMessage] = useState<QueryError>('');
+  const errorMessage = typeof queryError === 'string' ? queryError : queryError.message;
+  const refreshShopsOnRetry = typeof queryError !== 'string' && queryError.recovery === 'refresh-shops';
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
   const [copiedRank, setCopiedRank] = useState<1 | 2 | 3 | null>(null);
@@ -117,6 +124,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<QueryResizeEdge>('bottom');
   const [queryHeight, setQueryHeight] = useState(QUERY_INPUT_HEIGHT);
+  const [queryWidth, setQueryWidth] = useState(QUERY_WIDTH);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultPaneRef = useRef<HTMLElement>(null);
   const resultContentRef = useRef<HTMLDivElement>(null);
@@ -133,8 +141,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const resultCountRef = useRef<ResultCount>(0);
   const resizeGripRef = useRef<HTMLDivElement | null>(null);
   const resizePointerRef = useRef<number | null>(null);
-  const resizeOriginYRef = useRef(0);
-  const resizeDeltaRef = useRef(0);
+  const resizeOriginRef = useRef({ x: 0, y: 0 });
+  const resizeDeltaRef = useRef<QueryResizeDelta>({ deltaX: 0, deltaY: 0 });
   const resizeFrameRef = useRef<number | null>(null);
   const resizeFinishedRef = useRef(true);
   const composingRef = useRef(false);
@@ -149,6 +157,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const copyGenerationRef = useRef(0);
   const searchGenerationRef = useRef(0);
   const intakeContextIdRef = useRef<string | null>(null);
+  const [sopCandidates, setSopCandidates] = useState<IntakeSopCandidatesEvent | null>(null);
   const [placeholderValues, setPlaceholderValues] = useState<Partial<Record<'order_id' | 'date', string>>>({});
   const [, setAnnounce] = useState<Extract<ProductAnnounceResult, { ok: true }> | null>(null);
   const [announceInvalid, setAnnounceInvalid] = useState(false);
@@ -467,15 +476,12 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setOpening(openingNow);
     setClosing(snapshot.contract.phase === 'closing');
     setResizeEdge(snapshot.layout.resizeEdge);
-    if (snapshot.layout.appliedHeight !== null) {
-      setQueryHeight(snapshot.layout.appliedHeight);
-    } else {
-      setQueryHeight(QUERY_INPUT_HEIGHT);
-    }
+    setQueryHeight(snapshot.layout.appliedSize?.height ?? QUERY_INPUT_HEIGHT);
+    setQueryWidth(snapshot.layout.appliedSize?.width ?? QUERY_WIDTH);
     if (snapshot.contract.phase === 'opening') {
       setLayoutReady(false);
     } else if (
-      snapshot.layout.appliedHeight !== null
+      snapshot.layout.appliedSize !== null
       || snapshot.contract.phase === 'parked'
       || snapshot.contract.phase === 'closed'
       || snapshot.contentPhase === 'SEARCH_INPUT'
@@ -594,6 +600,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       contentBanner,
       content?.lastElementChild ?? null,
       pane?.querySelector('[data-query-context]') ?? null,
+      pane?.querySelector('[data-sop-candidates]') ?? null,
     ]);
     const panePad = pane
       ? Number.parseFloat(getComputedStyle(pane).paddingBottom) || 0
@@ -649,6 +656,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
       setResizeEdge(ack.resizeEdge);
       setQueryHeight(ack.height);
+      setQueryWidth(ack.width);
       setLayoutReady(true);
       window.requestAnimationFrame(() => {
         void reportOverlayEvent({
@@ -709,6 +717,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (command.type === 'cancel-query') {
         searchGenerationRef.current += 1;
         intakeContextIdRef.current = null;
+        setSopCandidates(null);
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({
@@ -736,6 +745,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         return;
       }
       if (command.type === 'clear-content') {
+        intakeContextIdRef.current = null;
+        setSopCandidates(null);
         setResults([]);
         setReportError('');
         setInvalidMessage('');
@@ -790,8 +801,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         openingUserInteractionRef.current = false;
         searchGenerationRef.current += 1;
         intakeContextIdRef.current = null;
+        setSopCandidates(null);
         setPlaceholderValues({});
-        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        if (intake) void window.customerAgent?.intakeQuery?.cancel('overlay-handoff');
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         searchInFlightRef.current = false;
         if (searchTimerRef.current !== null) {
@@ -804,8 +816,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setAnchor(command.anchor);
           setHandoffGeometry(
             queryHandoffGeometry(
-              QUERY_WIDTH,
-              QUERY_INPUT_HEIGHT,
+              command.viewport.width,
+              command.viewport.height,
               command.anchor,
               'none',
               { x: command.handoffCenterX, y: command.handoffCenterY },
@@ -925,8 +937,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setAnchor(command.anchor);
           setHandoffGeometry(
             queryHandoffGeometry(
-              QUERY_WIDTH,
-              Math.max(QUERY_INPUT_HEIGHT, window.innerHeight),
+              command.viewport.width,
+              command.viewport.height,
               command.anchor,
               command.dockEdge,
               { x: command.handoffCenterX, y: command.handoffCenterY },
@@ -946,8 +958,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         cancelScheduledResultFocus();
         searchGenerationRef.current += 1;
         intakeContextIdRef.current = null;
+        setSopCandidates(null);
         setPlaceholderValues({});
-        if (intake) void window.customerAgent?.intakeQuery?.cancel();
+        if (intake) void window.customerAgent?.intakeQuery?.cancel('overlay-handoff');
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
         copyGenerationRef.current += 1;
         searchInFlightRef.current = false;
@@ -991,6 +1004,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           phase: command.phase,
           resultCount: command.resultCount,
           height: command.height,
+          width: command.width,
           resizeEdge: command.resizeEdge,
         };
         if (!acceptQueryLayoutAck({
@@ -1006,6 +1020,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
         setResizeEdge(ack.resizeEdge);
         setQueryHeight(ack.height);
+        setQueryWidth(ack.width);
         setLayoutReady(true);
         window.requestAnimationFrame(() => {
           if (ackIdentity) {
@@ -1068,7 +1083,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         layoutFrameRef.current = null;
       }
     };
-  }, [closing, layoutReady, opening, phase, requestQueryLayout, results.length]);
+  }, [closing, layoutReady, opening, phase, requestQueryLayout, results.length, sopCandidates]);
 
   useEffect(() => {
     if (!layoutReady || opening || closing) {
@@ -1193,6 +1208,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const cancelPendingSearch = useCallback(() => {
     searchGenerationRef.current += 1;
     intakeContextIdRef.current = null;
+    setSopCandidates(null);
         setPlaceholderValues({});
         if (intake) void window.customerAgent?.intakeQuery?.cancel();
         else void window.customerAgent?.productSearch?.cancelSearch({ sessionEpoch: productEpochRef.current, generation: searchGenerationRef.current });
@@ -1462,6 +1478,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         openDashboardWindowRef.current();
       } else {
         pendingDashboardOpenRef.current = false;
+        if (intake && !signingOut && result.ok && result.signedIn) {
+          focusQueryInput(false);
+        }
       }
       return result;
     } catch {
@@ -1473,28 +1492,42 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         setSessionBusy(false);
       }
     }
-  }, [acceptProductSession, productState]);
+  }, [acceptProductSession, focusQueryInput, intake, productState]);
 
   const resetIntakeView = useCallback(() => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
-    if (phaseRef.current !== 'FOX_IDLE') reportPhase('RESULTS');
+    if (isQueryContentLayoutPhase(phaseRef.current)) reportPhase('RESULTS');
   }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
   const intakeShops = useIntakeShops(intake, Boolean(productState?.ok && productState.signedIn),
     productState?.sessionEpoch ?? 0, resetIntakeView);
   useEffect(() => {
     if (!intake) return;
-    return window.customerAgent?.intakeQuery?.onInvalidated(({ reason, contextId }) => {
+    return window.customerAgent?.intakeQuery?.onInvalidated(function invalidateFaqResults({ reason, contextId }) {
       if (contextId !== intakeContextIdRef.current) return;
-      cancelPendingCopy(); setResults([]); cancelPendingSearch();
-      if (!searchInFlightRef.current && phaseRef.current !== 'FOX_IDLE') {
+      searchGenerationRef.current += 1;
+      searchInFlightRef.current = false;
+      setSearching(false);
+      cancelPendingCopy(); setResults([]);
+      if (phaseRef.current !== 'FOX_IDLE') {
         setErrorMessage(reason === 'facts-expired' ? intakeQueryFailure('FACTS_EXPIRED').message : '资料资格已失效，请重新查询。'); reportPhase('ERROR');
       }
     });
-  }, [intake, cancelPendingSearch, cancelPendingCopy, reportPhase]);
+  }, [intake, cancelPendingCopy, reportPhase]);
+  useEffect(() => {
+    if (!intake) return;
+    return window.customerAgent?.intakeQuery?.onSopCandidates?.(event => {
+      if (event.contextId !== intakeContextIdRef.current) return;
+      setSopCandidates('candidates' in event && event.candidates.length === 0 ? null : event);
+      setLayoutReady(false);
+    });
+  }, [intake]);
 
   const runSearch = useCallback(() => {
     if (intake) {
-      if (!(productState?.ok && productState.signedIn)) return;
+      if (!(productState?.ok && productState.signedIn)) {
+        if (!(productState?.ok && !productState.enabled)) void sessionAction();
+        return;
+      }
       const api = window.customerAgent?.intakeQuery;
       if (!api) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); return; }
       // A session with no query grant has no shops either, so the shop prompt would say the
@@ -1506,19 +1539,35 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         reportPhase('ERROR'); return;
       }
       const text = (inputRef.current?.value ?? query).trim();
-      const blocked = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
-        : !intakeShops.shopId ? '请先选择有权限的店铺。'
-          : !text || [...text].length > 500 ? '请输入最多 500 字的客户问题。' : null;
+      const validText = text.length > 0 && [...text].length <= 500;
+      const blocked: QueryError | null = intakeShops.busy ? '正在更新查询范围，请稍后查询。'
+        : !validText ? '请输入最多 500 字的客户问题。'
+          : intakeShops.shopId ? null
+            : intakeShops.error ? { message: intakeShops.error, recovery: 'refresh-shops' }
+              : '请先选择有权限的店铺。';
       if (blocked) {
+        if (!intakeShops.busy && validText && !intakeShops.shopId && intakeShops.shops.length > 1) {
+          setFiltersOpen(true);
+          setLayoutReady(false);
+        }
         setErrorMessage(blocked); reportPhase('ERROR'); return;
       }
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      if (sessionNoticeRef.current?.kind === 'success') {
+        sessionNoticeRef.current = null;
+        setSessionNotice(null);
+      }
       const generation = ++searchGenerationRef.current;
       const contextId = crypto.randomUUID(); intakeContextIdRef.current = contextId;
       searchInFlightRef.current = true; setSearching(true); reportPhase('RESULTS');
       void api.search({ queryText: text, contextId }).then(result => {
         if (generation !== searchGenerationRef.current) return;
-        if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
+        if (!result.ok) {
+          setErrorMessage(result.code === 'FORBIDDEN'
+            ? { message: result.message, recovery: 'refresh-shops' }
+            : result.message);
+          reportPhase('ERROR'); return;
+        }
         setResults(result.rows); reportPhase(result.rows.length ? 'RESULTS' : 'EMPTY', result.rows.length as ResultCount);
       }).catch(() => {
         if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); }
@@ -1647,7 +1696,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     }, SEARCH_FEEDBACK_MS);
-  }, [cancelPendingCopy, cancelScheduledResultFocus, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce, intake, intakeShops.shopId, intakeShops.busy]);
+  }, [cancelPendingCopy, cancelScheduledResultFocus, query, reportPhase, productState, cancelPendingSearch, refreshAnnounce,
+    intake, intakeShops.shopId, intakeShops.busy, intakeShops.error, intakeShops.shops.length, sessionAction]);
 
   const copyScript = useCallback(
     async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
@@ -1837,7 +1887,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     });
   }, [sopEntryBusy]);
 
+  const loadIntakeShops = intakeShops.load;
   const retry = useCallback(() => {
+    if (refreshShopsOnRetry) {
+      setFiltersOpen(true);
+      void loadIntakeShops();
+      return;
+    }
     if (dashboardOpenFailedRef.current) {
       openDashboard();
       return;
@@ -1847,7 +1903,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return;
     }
     runSearch();
-  }, [copyScript, errorMessage, openDashboard, runSearch]);
+  }, [copyScript, errorMessage, loadIntakeShops, openDashboard, refreshShopsOnRetry, runSearch]);
 
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss(true);
@@ -1953,8 +2009,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     runSearch();
   };
 
-  const showQueryResizeGrip = isQueryContentLayoutPhase(phase);
-  const expanded = showQueryResizeGrip || phase === 'COPIED';
+  const expanded = isQueryContentLayoutPhase(phase) || phase === 'COPIED';
+  const showQueryResizeGrip = expanded && phase !== 'COPIED' && !parked && !opening && !closing;
   const scopeKeys = [...new Set(results.flatMap((row) => isIntakeRow(row) ? [] : row.placeholderKeys ?? []))];
   const showScopeFields = Boolean(
     window.customerAgent?.productSearch
@@ -1987,6 +2043,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     layoutSequenceRef.current = Math.max(layoutSequenceRef.current, ack.sequence);
     setResizeEdge(ack.resizeEdge);
     setQueryHeight(ack.height);
+    setQueryWidth(ack.width);
     window.requestAnimationFrame(() => {
       void reportOverlayEvent({
         type: 'frame-observed',
@@ -2012,15 +2069,17 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
   }, []);
 
+  const queryResizeDelta = useCallback((event: { screenX: number; screenY: number }): QueryResizeDelta => ({
+    deltaX: Math.round(event.screenX - resizeOriginRef.current.x),
+    deltaY: Math.round(event.screenY - resizeOriginRef.current.y),
+  }), []);
+
   const finishQueryResize = useCallback((
     kind: 'end' | 'cancel',
-    pointerId?: number,
-    options?: { alreadyLost?: boolean },
+    pointer?: { pointerId: number; screenX: number; screenY: number },
+    alreadyLost = false,
   ) => {
-    if (resizeFinishedRef.current) {
-      return;
-    }
-    if (pointerId !== undefined && resizePointerRef.current !== pointerId) {
+    if (resizeFinishedRef.current || (pointer && resizePointerRef.current !== pointer.pointerId)) {
       return;
     }
     resizeFinishedRef.current = true;
@@ -2030,41 +2089,30 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
     const captured = resizePointerRef.current;
     resizePointerRef.current = null;
-    if (!options?.alreadyLost) {
+    if (!alreadyLost) {
       releaseQueryResizeCapture(captured);
     }
-    const api = window.customerAgent?.resizeQueryHeight;
-    if (!api || activeHandoffIdRef.current <= 0) {
+
+    const identity = overlayReportIdentity();
+    if (!identity || activeHandoffIdRef.current <= 0) {
+      return;
+    }
+    const request = { sessionId: activeHandoffIdRef.current, sequence: ++layoutSequenceRef.current, identity };
+    const operation = kind === 'end'
+      ? { ...request, type: kind, ...(pointer ? queryResizeDelta(pointer) : resizeDeltaRef.current) }
+      : { ...request, type: kind };
+    void window.customerAgent?.resizeQuery?.(operation)
+      .then((ack) => applyQueryResizeAck(ack, request, identity))
+      .catch(() => undefined);
+  }, [applyQueryResizeAck, overlayReportIdentity, queryResizeDelta, releaseQueryResizeCapture]);
+
+  const startQueryResize = (event: React.PointerEvent<HTMLDivElement>, direction: WindowResizeDirection) => {
+    if (!showQueryResizeGrip || (typeof event.button === 'number' && event.button !== 0) || !resizeFinishedRef.current) {
       return;
     }
     const identity = overlayReportIdentity();
-    if (!identity) {
-      return;
-    }
-    const request = {
-      type: kind,
-      sessionId: activeHandoffIdRef.current,
-      sequence: ++layoutSequenceRef.current,
-      phase: phaseRef.current,
-    };
-    void api({
-      type: kind,
-      sessionId: request.sessionId,
-      sequence: request.sequence,
-      identity,
-    }).then((ack) => {
-      applyQueryResizeAck(ack, request, identity);
-    }).catch(() => undefined);
-  }, [applyQueryResizeAck, overlayReportIdentity, releaseQueryResizeCapture]);
-
-  const startQueryResize = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (parked || opening || closing || !showQueryResizeGrip) {
-      return;
-    }
-    if (typeof event.button === 'number' && event.button !== 0) {
-      return;
-    }
-    if (resizePointerRef.current !== null && !resizeFinishedRef.current) {
+    const api = window.customerAgent?.resizeQuery;
+    if (!identity || !api) {
       return;
     }
     event.preventDefault();
@@ -2072,28 +2120,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     resizeGripRef.current = event.currentTarget;
     resizeFinishedRef.current = false;
     resizePointerRef.current = event.pointerId;
-    resizeOriginYRef.current = event.screenY;
-    resizeDeltaRef.current = 0;
+    resizeOriginRef.current = { x: event.screenX, y: event.screenY };
+    resizeDeltaRef.current = { deltaX: 0, deltaY: 0 };
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    const identity = overlayReportIdentity();
-    if (!identity) {
-      finishQueryResize('cancel', event.pointerId);
-      return;
-    }
-    const request = {
-      type: 'begin' as const,
-      sessionId: activeHandoffIdRef.current,
-      sequence: ++layoutSequenceRef.current,
-      phase: phaseRef.current,
-    };
-    void window.customerAgent?.resizeQueryHeight?.({
-      type: 'begin',
-      sessionId: request.sessionId,
-      sequence: request.sequence,
-      identity,
-    }).then((ack) => {
-      applyQueryResizeAck(ack, request, identity);
-    }).catch(() => undefined);
+    const request = { sessionId: activeHandoffIdRef.current, sequence: ++layoutSequenceRef.current, identity };
+    void api({ ...request, type: 'begin', direction })
+      .then((ack) => applyQueryResizeAck(ack, request, identity))
+      .catch(() => undefined);
   };
 
   const moveQueryResize = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -2101,82 +2134,53 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       return;
     }
     if (typeof event.buttons === 'number' && (event.buttons & 1) === 0) {
-      finishQueryResize('cancel', event.pointerId);
+      finishQueryResize('cancel', event);
       return;
     }
-    // The preload/Main contract accepts finite integers only. Pointer
-    // coordinates can be fractional on scaled displays, so normalize once at
-    // the renderer boundary instead of silently rejecting a valid drag frame.
-    resizeDeltaRef.current = Math.round(event.screenY - resizeOriginYRef.current);
+    // Normalize fractional screen coordinates from a scaled display before IPC.
+    resizeDeltaRef.current = queryResizeDelta(event);
     if (resizeFrameRef.current !== null) {
-      return;
-    }
-    const identity = overlayReportIdentity();
-    if (!identity) {
-      finishQueryResize('cancel', event.pointerId);
       return;
     }
     resizeFrameRef.current = window.requestAnimationFrame(() => {
       resizeFrameRef.current = null;
-      if (resizeFinishedRef.current) {
+      const identity = overlayReportIdentity();
+      if (resizeFinishedRef.current || !identity) {
         return;
       }
-      const request = {
-        sessionId: activeHandoffIdRef.current,
-        sequence: ++layoutSequenceRef.current,
-        phase: phaseRef.current,
-      };
-      void window.customerAgent?.resizeQueryHeight?.({
-        type: 'update',
-        sessionId: request.sessionId,
-        sequence: request.sequence,
-        deltaY: resizeDeltaRef.current,
-        identity,
-      }).then((ack) => {
-        applyQueryResizeAck(ack, request, identity);
-      }).catch(() => undefined);
+      const request = { sessionId: activeHandoffIdRef.current, sequence: ++layoutSequenceRef.current, identity };
+      void window.customerAgent?.resizeQuery?.({ ...request, type: 'update', ...resizeDeltaRef.current })
+        .then((ack) => applyQueryResizeAck(ack, request, identity))
+        .catch(() => undefined);
     });
   };
 
-  const handleQueryResizeKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (
-      event.key !== 'ArrowUp' &&
-      event.key !== 'ArrowDown' &&
-      event.key !== 'Home' &&
-      event.key !== 'End'
-    ) {
-      return;
-    }
-    event.preventDefault();
+  const handleQueryResizeKey = (event: React.KeyboardEvent<HTMLDivElement>, axis: 'width' | 'height') => {
     const identity = overlayReportIdentity();
     if (!identity) {
       return;
     }
-    const request = {
-      sessionId: activeHandoffIdRef.current,
-      sequence: ++layoutSequenceRef.current,
-      phase: phaseRef.current,
-    };
-    void window.customerAgent?.resizeQueryHeight?.({
-      type: 'keyboard',
-      sessionId: request.sessionId,
-      sequence: request.sequence,
-      key: event.key,
-      shiftKey: event.shiftKey,
-      identity,
-    }).then((ack) => {
-      applyQueryResizeAck(ack, request, identity);
-    }).catch(() => undefined);
+    const { key, shiftKey } = event;
+    const request = { sessionId: activeHandoffIdRef.current, sequence: layoutSequenceRef.current + 1, identity };
+    const action: QueryResizeRequest | null = axis === 'height' && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End')
+      ? { ...request, type: 'keyboard', axis, key, shiftKey }
+      : axis === 'width' && (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'Home' || key === 'End')
+        ? { ...request, type: 'keyboard', axis, key, shiftKey }
+        : null;
+    if (!action) {
+      return;
+    }
+    event.preventDefault();
+    layoutSequenceRef.current = request.sequence;
+    void window.customerAgent?.resizeQuery?.(action)
+      .then((ack) => applyQueryResizeAck(ack, request, identity))
+      .catch(() => undefined);
   };
 
   useEffect(() => {
     const abort = () => finishQueryResize('cancel');
-    const onWindowPointerUp = (event: PointerEvent) => {
-      finishQueryResize('end', event.pointerId);
-    };
-    const onWindowPointerCancel = (event: PointerEvent) => {
-      finishQueryResize('cancel', event.pointerId);
-    };
+    const onWindowPointerUp = (event: PointerEvent) => finishQueryResize('end', event);
+    const onWindowPointerCancel = (event: PointerEvent) => finishQueryResize('cancel', event);
     window.addEventListener('blur', abort);
     window.addEventListener('pointerup', onWindowPointerUp);
     window.addEventListener('pointercancel', onWindowPointerCancel);
@@ -2184,12 +2188,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       window.removeEventListener('blur', abort);
       window.removeEventListener('pointerup', onWindowPointerUp);
       window.removeEventListener('pointercancel', onWindowPointerCancel);
+      abort();
     };
   }, [finishQueryResize]);
 
-  useEffect(() => () => {
-    finishQueryResize('cancel');
-  }, [finishQueryResize]);
+  useEffect(() => {
+    if (!showQueryResizeGrip) {
+      finishQueryResize('cancel');
+    }
+  }, [finishQueryResize, showQueryResizeGrip]);
 
   const foxVisualState = queryFoxVisualState(searching, phase);
 
@@ -2222,6 +2229,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       data-handoff-id={activeHandoffIdRef.current}
       data-window-generation={overlaySnapshotRef.current?.windowGeneration ?? 0}
       data-query-height={queryHeight}
+      data-query-width={queryWidth}
       aria-busy={searching}
       onPointerDownCapture={() => {
         if (openingRef.current) {
@@ -2341,6 +2349,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
                 }}
               />
             ) : undefined}
+            sopCandidates={sopCandidates}
             phase={phase}
             resultPaneRef={resultPaneRef}
             statusBannerRef={statusBannerRef}
@@ -2402,6 +2411,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               markLocal();
             }}
             onRetry={retry}
+            retryLabel={refreshShopsOnRetry ? '刷新店铺' : undefined}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);
             }}
@@ -2412,10 +2422,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         ) : null}
         {showQueryResizeGrip ? (
           <QueryResizeGrip
-            gripRef={resizeGripRef}
-            activePointerIdRef={resizePointerRef}
             edge={resizeEdge}
             height={queryHeight}
+            width={queryWidth}
             onPointerDown={startQueryResize}
             onPointerMove={moveQueryResize}
             onFinish={finishQueryResize}

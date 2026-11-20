@@ -1,6 +1,7 @@
 import type { SopUnifiedCommand, SopUnifiedProjection } from './sop-unified';
 import type { SopQueryProjection, SopQueryCommand } from './sop-query';
 import type { SopPipelineProjection } from './sop-pipeline';
+import type { WindowResizeDirection } from './window-resize-geometry';
 
 export type SopCopyResult =
   | { ok: true }
@@ -78,8 +79,18 @@ export type SopLayoutAck = {
   ok: boolean;
   sessionId: number;
   sequence: number;
+  width: number;
   height: number;
 };
+
+export type SopResizeRequest = { sessionId: number; sequence: number } & (
+  | { type: 'begin'; direction: WindowResizeDirection }
+  | { type: 'update' | 'end'; deltaX: number; deltaY: number }
+  | { type: 'cancel' }
+);
+
+export type SopBookmarkIntent = 'park' | 'park-after-edge-drag' | 'restore' | 'restore-hover';
+export type SopWindowChrome = { kind: 'expanded' } | { kind: 'parked'; name: string };
 
 export type SopWindowApi = {
   unifiedCommand?(command: SopUnifiedCommand): Promise<SopWindowResult>;
@@ -90,6 +101,9 @@ export type SopWindowApi = {
   chooseEdge(edgeId: string): Promise<SopWindowResult>;
   nextStep(): Promise<SopWindowResult>;
   moveBy(dx: number, dy: number, finished?: boolean): Promise<void>;
+  resize?(request: SopResizeRequest): Promise<void>;
+  bookmark?(intent: SopBookmarkIntent): Promise<SopWindowResult>;
+  onChrome?(cb: (chrome: SopWindowChrome) => void): () => void;
   reportLayout(request: SopLayoutRequest): Promise<SopLayoutAck>;
   copyCurrent(): Promise<SopCopyResult>;
   /** Replays this document's latest validated Main projection, then subscribes to updates. */
@@ -103,7 +117,7 @@ export type QuerySopWindowApi = {
 };
 
 const SOP_LAYOUT_KEYS = ['sessionId', 'sequence', 'desiredHeight'] as const;
-const SOP_LAYOUT_ACK_KEYS = ['ok', 'sessionId', 'sequence', 'height'] as const;
+const SOP_LAYOUT_ACK_KEYS = ['ok', 'sessionId', 'sequence', 'width', 'height'] as const;
 const SOP_PROJECTION_KEYS = [
   'sceneId',
   'sceneTitle',
@@ -177,6 +191,18 @@ export function isSopLayoutRequest(value: unknown): value is SopLayoutRequest {
   );
 }
 
+export function isSopBookmarkIntent(value: unknown): value is SopBookmarkIntent {
+  return value === 'park' || value === 'park-after-edge-drag' || value === 'restore' || value === 'restore-hover';
+}
+
+export function isSopWindowChrome(value: unknown): value is SopWindowChrome {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const chrome = value as Record<string, unknown>;
+  return chrome.kind === 'expanded' && hasExactKeys(chrome, ['kind'])
+    || chrome.kind === 'parked' && hasExactKeys(chrome, ['kind', 'name'])
+      && typeof chrome.name === 'string' && chrome.name.length > 0 && chrome.name.length <= 512;
+}
+
 export function isSopLayoutAck(value: unknown): value is SopLayoutAck {
   if (!value || typeof value !== 'object' || !hasExactKeys(value, SOP_LAYOUT_ACK_KEYS)) {
     return false;
@@ -190,15 +216,13 @@ export function isSopLayoutAck(value: unknown): value is SopLayoutAck {
     && typeof record.sequence === 'number'
     && Number.isSafeInteger(record.sequence)
     && record.sequence >= 0
-    && typeof record.height === 'number'
-    && Number.isSafeInteger(record.height)
-    && record.height > 0
-    && record.height <= 4096
+    && isSafePositiveInt(record.width)
+    && isSafePositiveInt(record.height)
   );
 }
 
 export function rejectedSopLayoutAck(sessionId = 0, sequence = 0, height = 240): SopLayoutAck {
-  return { ok: false, sessionId, sequence, height };
+  return { ok: false, sessionId, sequence, width: 600, height };
 }
 
 function isProjectedEdge(value: unknown): value is SopProjectedEdge {

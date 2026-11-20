@@ -4,6 +4,7 @@ import { authenticateRequestHeaders } from './auth-service.js';
 import { authenticatedProductSession } from './product-auth-service.js';
 import { validateContractSchema, selectIntakeView, isSopView, withIntakeView, intakeContractSet } from './content-intake/contract-view.js';
 import { type UnifiedSopQueryOperation } from './sop-unified-query-model.js';
+import { SOP_GROUP_ORDER } from './sop-unified-query-model.js';
 import { parseUnifiedSopQueryResponse } from './sop-unified-query-validation.js';
 import type { SopQueryOperation, SopQueryFailureCode } from './sop-query-operation.js';
 import { isSopQueryResponse } from './sop-query-validation.js';
@@ -13,13 +14,7 @@ import {
   type SopQueryResponse,
 } from './sop-query-model.js';
 
-const SOP_GROUPS = new Set([
-  '过敏流程SOP',
-  '长痘痘SOP',
-  '品质售后SOP',
-  '少错破SOP',
-  '税收相关规则',
-]);
+const SOP_GROUPS = new Set<string>(SOP_GROUP_ORDER);
 const PRODUCT_CONTEXT_TYPES = new Set(['storewide', 'category', 'sku']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHOP_ID = /^[-A-Za-z0-9._:]+$/;
@@ -97,13 +92,14 @@ function errorBody(code: string, message: string, requestId?: string): Record<st
   };
 }
 
-function sendSopError(
+export function sendSopError(
   reply: FastifyReply,
   statusCode: 400 | 401 | 403 | 409 | 422 | 503,
   code: string,
   message: string,
   requestId?: string,
 ): FastifyReply {
+  if (statusCode === 401) reply.header('www-authenticate', 'Bearer');
   return reply.code(statusCode).send(errorBody(code, message, requestId));
 }
 
@@ -113,8 +109,9 @@ function requestIdOf(value: unknown): string | undefined {
     : undefined;
 }
 
-function sendOperationFailure(reply: FastifyReply, failure: Readonly<{ ok: false; code: SopQueryFailureCode }>): FastifyReply {
+export function sendOperationFailure(reply: FastifyReply, failure: Readonly<{ ok: false; code: SopQueryFailureCode }>): FastifyReply {
   switch (failure.code) {
+    case 'UNAUTHORIZED': return sendSopError(reply, 401, 'SCOPE_DENIED', '缺少或无法验证产品会话');
     case 'SCOPE_DENIED': return sendSopError(reply, 403, 'SCOPE_DENIED', '当前主体没有该店铺或 SOP 查询资格');
     case 'IDEMPOTENCY_CONFLICT': return sendSopError(reply, 409, 'IDEMPOTENCY_CONFLICT', '同一请求编号对应的请求内容冲突');
     case 'SOP_BLOCKED': return sendSopError(reply, 422, 'SOP_BLOCKED', '当前 SOP 不能安全提供');
@@ -133,8 +130,7 @@ export function registerSopQueryRoute(
     reply.header('cache-control', 'no-store');
     const actor = await authenticateRequestHeaders(authService, request.headers);
     if (actor === null) {
-      reply.header('www-authenticate', 'Bearer');
-      return sendSopError(reply, 401, 'SCOPE_DENIED', '缺少或无法验证产品会话');
+      return sendOperationFailure(reply, { ok: false, code: 'UNAUTHORIZED' });
     }
     const contractHeader = request.headers['x-intake-contract-set'];
     const headers: string[] = [];

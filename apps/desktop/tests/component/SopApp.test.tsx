@@ -63,7 +63,7 @@ describe('SopApp injected projection', () => {
       chooseEdge: vi.fn(async () => ({ ok: true as const })),
       nextStep: vi.fn(async () => ({ ok: true as const })),
       moveBy: vi.fn(async () => undefined),
-      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, width: 600, height: 320 })),
       copyCurrent,
       onProjection: () => () => undefined,
     };
@@ -114,7 +114,7 @@ describe('SopApp injected projection', () => {
       chooseEdge: vi.fn(async () => ({ ok: true as const })),
       nextStep: vi.fn(async () => ({ ok: true as const })),
       moveBy: vi.fn(async () => undefined),
-      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, width: 600, height: 320 })),
       copyCurrent,
       onProjection: () => () => undefined,
     };
@@ -132,7 +132,7 @@ describe('SopApp injected projection', () => {
 
   it('reports layout once when the same step is projected again', async () => {
     let emit: (projection: ReturnType<typeof projectionFor>) => void = () => undefined;
-    const reportLayout = vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 }));
+    const reportLayout = vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, width: 600, height: 320 }));
     window.sopWindow = {
       close: vi.fn(async () => undefined),
       endFlow: vi.fn(async () => undefined),
@@ -206,7 +206,7 @@ describe('SopApp injected projection', () => {
       chooseEdge,
       nextStep: vi.fn(async () => ({ ok: true as const })),
       moveBy: vi.fn(async () => undefined),
-      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, width: 600, height: 320 })),
       copyCurrent: vi.fn(async () => ({ ok: true as const })),
       onProjection: () => () => undefined,
     };
@@ -241,7 +241,7 @@ describe('SopApp injected projection', () => {
       chooseEdge: vi.fn(async () => ({ ok: true as const })),
       nextStep: vi.fn(async () => ({ ok: true as const })),
       moveBy: vi.fn(async () => undefined),
-      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, height: 320 })),
+      reportLayout: vi.fn(async () => ({ ok: true, sessionId: 1, sequence: 1, width: 600, height: 320 })),
       copyCurrent,
       onProjection: () => () => undefined,
     };

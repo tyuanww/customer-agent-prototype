@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import { SOP_TASK_HEADERS, SOP_TASK_SHEETS, type SopTaskSheet } from '../../src/sop-task-workbook.js';
+import { SOP_TASK_HEADERS, SOP_TASK_SHEETS } from '@customer-agent/content-intake';
+import type { SopTaskSheet } from '../../src/sop-task-workbook.js';
 
 export const graphApplicability = (solo = false, shopWide = false) => shopWide ? { productRefs: [], scenarioRefs: [] } : ({ productRefs: [{ id: solo ? 'product-solo' : 'product-graph', displayVersion: 1 }],
   scenarioRefs: [{ id: solo ? 'scenario-solo' : 'scenario-graph', displayVersion: 1 }] });

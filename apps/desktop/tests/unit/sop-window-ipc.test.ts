@@ -50,6 +50,8 @@ describe('SOP window IPC sender matrix', () => {
   const unifiedCommand = vi.fn(async () => ({ ok: true as const }));
   const queryCommand = vi.fn(async () => ({ ok: true as const }));
   const copyCurrent = vi.fn(() => ({ ok: true as const }));
+  const resize = vi.fn();
+  const bookmark = vi.fn(() => ({ ok: true as const }));
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,10 +75,13 @@ describe('SOP window IPC sender matrix', () => {
       copyCurrent,
       queryCommand,
       unifiedCommand,
+      resize,
+      bookmark,
     } as unknown as SopWindowController;
     registerSopWindowIpc({
       getOverlay: () => overlay,
       getSop: () => sopController,
+      getSopForContents: (contents) => sopController.isSopContents(contents) ? sopController : null,
     });
   });
 
@@ -128,5 +133,26 @@ describe('SOP window IPC sender matrix', () => {
     expect(handler(IPC_CHANNELS.SOP_WINDOW_CHOOSE_EDGE)(query.event, 'has-photo')).toMatchObject({ ok: false });
     expect(handler(IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT)(sop.event)).toEqual({ ok: true });
     expect(handler(IPC_CHANNELS.SOP_WINDOW_COPY_CURRENT)(query.event)).toMatchObject({ ok: false });
+  });
+
+  it('only accepts resize and bookmark intents from their owned SOP main frame', () => {
+    const request = { type: 'begin', sessionId: 1, sequence: 1, direction: 'top-left' };
+    const resizeHandler = handler(IPC_CHANNELS.SOP_WINDOW_RESIZE);
+    const bookmarkHandler = handler(IPC_CHANNELS.SOP_WINDOW_BOOKMARK);
+    for (const event of [query.event, fox.event, dashboard.event, { ...sop.event, senderFrame: { parent: {} } } as IpcMainInvokeEvent]) {
+      resizeHandler(event, request);
+      expect(bookmarkHandler(event, 'park')).toMatchObject({ ok: false });
+    }
+    resizeHandler(sop.event, { ...request, width: 800 });
+    resizeHandler(sop.event, { ...request, direction: 'inside' });
+    resizeHandler(sop.event, { type: 'update', sessionId: 1, sequence: 1, deltaX: 0, deltaY: Infinity });
+    resizeHandler(sop.event, request, 'extra');
+    expect(bookmarkHandler(sop.event, 'park', { name: 'injected' })).toMatchObject({ ok: false });
+    expect(resize).not.toHaveBeenCalled();
+    expect(bookmark).not.toHaveBeenCalled();
+    resizeHandler(sop.event, request);
+    expect(resize).toHaveBeenCalledExactlyOnceWith(request);
+    expect(bookmarkHandler(sop.event, 'restore-hover')).toEqual({ ok: true });
+    expect(bookmark).toHaveBeenCalledExactlyOnceWith('restore-hover');
   });
 });

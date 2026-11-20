@@ -2,14 +2,17 @@ import { isSopUnifiedCommand, isSopUnifiedProjection, type SopUnifiedProjection 
 import { isSopQueryProjection, isSopQueryCommand, type SopQueryProjection } from '../shared/sop-query';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
+  isSopBookmarkIntent,
   isSopLayoutAck,
   isSopLayoutRequest,
   isSopProjection,
+  isSopWindowChrome,
   isSopWindowResult,
   rejectedSopLayoutAck,
   type SopCopyResult,
   type SopProjection,
   type SopWindowApi,
+  type SopWindowChrome,
 } from '../shared/sop-window';
 import { isSopPipelineProjection, type SopPipelineProjection } from '../shared/sop-pipeline';
 
@@ -22,6 +25,9 @@ const RESTART = 'sop-window:restart';
 const CHOOSE_EDGE = 'sop-window:choose-edge';
 const NEXT_STEP = 'sop-window:next-step';
 const MOVE_BY = 'sop-window:move-by';
+const RESIZE = 'sop-window:resize';
+const BOOKMARK = 'sop-window:bookmark';
+const CHROME = 'sop-window:chrome';
 const REPORT_LAYOUT = 'sop-window:report-layout';
 const COPY_CURRENT = 'sop-window:copy-current';
 const PROJECTION = 'sop-window:projection';
@@ -30,6 +36,13 @@ const projectionListeners = new Set<(projection: SopProjection | SopPipelineProj
 // Main can publish before React subscribes. Retain only the latest validated
 // projection for this document; Main still owns state and invalidation.
 let latestProjection: SopProjection | SopPipelineProjection | SopQueryProjection | SopUnifiedProjection | null = null;
+let chrome: SopWindowChrome = { kind: 'expanded' };
+const chromeListeners = new Set<(value: SopWindowChrome) => void>();
+ipcRenderer.on(CHROME, (_event, payload: unknown) => {
+  if (!isSopWindowChrome(payload)) return;
+  chrome = payload;
+  for (const listener of chromeListeners) listener(chrome);
+});
 
 ipcRenderer.on(PROJECTION, (_event, payload: unknown) => {
   if (!isSopProjection(payload) && !isSopPipelineProjection(payload) && !isSopQueryProjection(payload) && !isSopUnifiedProjection(payload)) {
@@ -111,6 +124,27 @@ const api: SopWindowApi = {
     } catch {
       // Drag can race with hide.
     }
+  },
+  async resize(request) {
+    try {
+      await ipcRenderer.invoke(RESIZE, request);
+    } catch {
+      // The SOP can close during a pointer gesture.
+    }
+  },
+  async bookmark(intent) {
+    if (!isSopBookmarkIntent(intent)) return unavailable;
+    try {
+      const result: unknown = await ipcRenderer.invoke(BOOKMARK, intent);
+      return isSopWindowResult(result) ? result : unavailable;
+    } catch {
+      return unavailable;
+    }
+  },
+  onChrome(cb) {
+    chromeListeners.add(cb);
+    cb(chrome);
+    return () => { chromeListeners.delete(cb); };
   },
   async reportLayout(request) {
     if (!isSopLayoutRequest(request)) {

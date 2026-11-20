@@ -4,14 +4,16 @@ import { createServer as createHttpServer, request as rawHttpRequest } from 'nod
 import { createServer as createNetServer, type AddressInfo, type Server } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { Pool } from 'pg';
 import { applyDatabaseMigrations } from '@customer-agent/database';
 import { Pg15Harness } from '@customer-agent/database/testkit';
 import { createTemplate, createCsvTemplate, CSV_TEMPLATE_VERSION } from '@customer-agent/content-intake';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-// Built production modules are the exact HTTP consumers. This test-only host is
-// intentionally outside app.ts/main.ts and does not alter runtime/ACL locks.
+import { createApiApp } from '../../dist/app.js';
+import { parseApiRuntimeConfig } from '../../dist/runtime-config.js';
+import { createServiceRepository } from '../../dist/service-repository.js';
+import { inspectCurrentIntakeRelease } from '../../dist/integration/intake-readiness.js';
 import { createProductAuthService, IdentityFailure } from '../../dist/product-auth-service.js';
 import { registerProductAuthRoutes } from '../../dist/product-auth-routes.js';
 import { registerAuthRoutes } from '../../dist/auth-routes.js';
@@ -26,7 +28,7 @@ import { contentIntakeUsageRoutes } from '../../dist/content-intake/usage-http.j
 import { sopContinuationRoutes } from '../../dist/sop-continuation-routes.js';
 import { createSopContinuationService } from '../../dist/sop-continuation.js';
 import { createEventRepository } from '../../dist/event-repository.js';
-import { registerSearchRoute } from '../../dist/search-routes.js';
+import { registerSearchRoute, type SearchRouteDependencies } from '../../dist/search-routes.js';
 import { createIntakeTransactions, IntakeRejection, type IntakePool } from '../../dist/content-intake/transaction.js';
 import { createIntakePurposePool, type IntakePurposePool } from '../../dist/content-intake/runtime-pool.js';
 import { createRegisteredOrganizationRefresh } from '../../dist/content-intake/organization/registered-refresh.js';
@@ -44,10 +46,20 @@ import { INTAKE_SYNTHETIC_IDENTITIES, seedIntakeSyntheticHost } from './intake-s
 type C = components['schemas'];
 export type IntakeSyntheticDomain = 'product' | 'campaign' | 'presale' | 'aftersale';
 export type IntakeSyntheticIdentity = 'director' | 'enabler' | 'reviewer' | 'agent';
-/** One roster principal exists only so the desktop lane can read /v1/auth/job. The four intake
- * identities above stay confirmed-synthetic, because intake routes reject a roster scope. */
-export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | 'roster-director' | 'roster-readonly'
-  | 'roster-stale' | 'roster-nogrant' | 'roster-agent' | 'roster-query-only' | 'roster-review-only';
+const rosterPrincipalLabels = {
+  'roster-director': '合成名单总监',
+  'roster-readonly': '合成只读总监',
+  'roster-stale': '合成过期总监',
+  'roster-nogrant': '合成无授权总监',
+  'roster-agent': '合成名单坐席',
+  'roster-query-only': '合成仅查询总监',
+  'roster-review-only': '合成仅审核总监',
+};
+export type DesktopSyntheticIdentity = IntakeSyntheticIdentity | keyof typeof rosterPrincipalLabels;
+const principalLabels = new Map<string, string>([
+  ...INTAKE_SYNTHETIC_IDENTITIES.map(([id, , label]) => [id, label] as const),
+  ...Object.entries(rosterPrincipalLabels),
+]);
 export const INTAKE_SYNTHETIC_FAQ = Object.freeze([
   { title: '合成洁面使用', answer: '先取适量合成洁面产品。\n再用清水洗净。' },
   { title: '合成洁面频次', answer: '合成洁面示例：每日一次。\n以示例适用说明为准。' },
@@ -73,6 +85,7 @@ type PreparedHost = HostState & { candidate: C['IntakeCandidate']; object: C['In
 type SyntheticProfile = 'existing' | 'purpose-runtime';
 type HostOptions = { afterSopAttachmentRead?: () => Promise<void>; includeSopContinuation?: boolean; includeSopQuery?: boolean; profile?: SyntheticProfile; domain?: IntakeSyntheticDomain; duplicateShopNames?: boolean; inputFormat?: 'xlsx' | 'csv'; includeSopSource?: boolean;
   includeSeats?: boolean;
+  includeSopCandidates?: boolean;
   includeLegacySearch?: boolean;
   configureDatabase?: (client: Awaited<ReturnType<Pg15Harness['connect']>>) => Promise<void>;
   wrapBusinessPool?: (pool: IntakePool) => IntakePool; wrapUsagePool?: (pool: IntakePool) => IntakePool; observeError?: (error: unknown) => void;
@@ -160,23 +173,21 @@ export function createIntakeSyntheticHost(options?: { prepareCandidate?: boolean
   return startIntakeSyntheticHost(options?.prepareCandidate !== false, options?.profile ?? 'existing', options?.domain ?? 'product', options?.duplicateShopNames ?? false, options?.inputFormat ?? 'xlsx', options?.includeSopSource ?? false, options ?? {});
 }
 
-/** Fresh Unix-socket PG15 + real product-session/HTTP modules. No environment
- * files, existing DB, production factory or real provider is ever consumed.
- * The returned control methods are local test/terminal controls, not HTTP
- * administrative routes. Synthetic data disappears on close; no approval provider is installed. */
 async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: SyntheticProfile, domain: IntakeSyntheticDomain, duplicateShopNames: boolean, inputFormat: 'xlsx' | 'csv', includeSopSource: boolean,
-  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead' | 'includeSeats'> = {}) {
+  hooks: Pick<HostOptions, 'configureDatabase' | 'wrapBusinessPool' | 'wrapUsagePool' | 'observeError' | 'observeSyntheticRequest' | 'includeLegacySearch' | 'includeSopQuery' | 'includeSopContinuation' | 'afterSopAttachmentRead' | 'includeSeats' | 'includeSopCandidates'> = {}) {
   if (includeSopSource && (prepareCandidate || domain !== 'product' || inputFormat !== 'xlsx')) throw new Error('SOP fixture requires an unprepared product/XLSX host');
+  if (hooks.includeSopCandidates && profile !== 'purpose-runtime') throw new Error('W5 fixture requires purpose-runtime');
   const pg = new Pg15Harness();
   const authLogin = profile === 'purpose-runtime' ? 'stack_backend_auth' : 'synthetic_intake_auth';
   let admin: Awaited<ReturnType<Pg15Harness['connect']>> | undefined;
   let pool: IntakePool | undefined;
   let usagePool: IntakePool | undefined, terminalPool: IntakePool | undefined;
+  let purposePools: Record<'business' | 'usage' | 'worker' | 'organization', IntakePurposePool> | undefined;
   const ownedPools: (Pool | IntakePurposePool)[] = [];
   const purposeQueries: Record<string, number> = {};
-  function ownPool(raw: Pool | IntakePurposePool, purpose: string): IntakePool {
+  function ownPool(raw: Pool | IntakePurposePool, purpose: string): IntakePurposePool {
     ownedPools.push(raw); purposeQueries[purpose] = 0;
-    return { connect: async () => {
+    return { end: () => raw.end(), get totalCount() { return raw.totalCount; }, connect: async () => {
       const client = await raw.connect();
       return new Proxy(client, { get(target, key) {
         if (key === 'query') return (sql: string, parameters?: unknown[]) => { purposeQueries[purpose] = purposeQueries[purpose]! + 1; return target.query(sql, parameters); };
@@ -186,7 +197,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     } };
   }
   let auth: Awaited<ReturnType<typeof createProductAuthService>> | undefined;
-  const app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
+  let app: FastifyInstance | undefined;
   let apiOrigin = '', identityOrigin = '', selectedIdentity: DesktopSyntheticIdentity = 'enabler';
   let seatPasswordIdentityOrigin: string | null = null;
   let portReservation: AdjacentLoopbackPortReservation | undefined;
@@ -231,7 +242,7 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
   async function close() {
     if (closed) return; closed = true;
     const failures: unknown[] = [];
-    for (const cleanup of [() => app.close(), () => new Promise<void>((resolve, reject) => {
+    for (const cleanup of [() => app?.close(), () => new Promise<void>((resolve, reject) => {
       if (!identity.listening) { resolve(); return; }
       identity.closeAllConnections(); identity.close(error => error ? reject(error) : resolve());
     }), () => auth?.close(), ...ownedPools.map(pool => () => pool.end()), () => admin?.end(), () => pg.stop(),
@@ -476,8 +487,13 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
     await admin.query('COMMIT');
     await admin.query(`CREATE ROLE ${authLogin} LOGIN NOINHERIT; GRANT app_backend_auth TO ${authLogin}`);
     await hooks.configureDatabase?.(admin);
+    if (hooks.includeSopCandidates) {
+      const { installSopCandidateSyntheticStorage } = await import('../../../../packages/database/candidates/w5_sop_candidates/install.test-only.ts');
+      await installSopCandidateSyntheticStorage(admin, pg);
+    }
     if (profile === 'purpose-runtime') {
-      const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePool>;
+      const roles = {} as Record<'business' | 'usage' | 'worker' | 'organization', IntakePurposePool>;
+      purposePools = roles;
       for (const purpose of ['business', 'usage', 'worker', 'organization'] as const) {
         const capability = purpose === 'organization' ? 'intake_org_writer' : `intake_${purpose}`, login = `synthetic_${purpose}`;
         await admin.query(`CREATE ROLE ${login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT ${capability} TO ${login}`);
@@ -516,71 +532,93 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         }
         if (!value || value.expires <= Date.now()) throw new IdentityFailure('LOGIN_INVALID'); return value.binding; }, close: () => undefined,
     }, 'mock');
-    app.addHook('onRequest', async (request, reply) => {
-      if (request.headers.host !== new URL(apiOrigin).host) return reply.code(403).send();
-      // Paths only: never retain credentials, auth codes, state or request bodies.
-      if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
-    });
-    registerProductAuthRoutes(app, auth);
-    registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
-    registerAccessRoutes(app, createDatabaseAccessEvaluator(pool), auth);
     // The real search door, on a real app_runtime LOGIN: the search function is executable
     // only by that capability, so the lanes cannot borrow the intake pools. The keys are
     // throwaway fixture material and are never printed. The login inherits app_runtime
     // rather than taking it with SET ROLE, because the event repository runs as the session.
+    if (hooks.includeSopCandidates || hooks.includeLegacySearch !== false) {
+      await admin.query('CREATE ROLE stack_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO stack_runtime');
+    }
+    let searchDependencies: SearchRouteDependencies | undefined;
     if (hooks.includeLegacySearch !== false) {
-      await admin!.query('CREATE ROLE stack_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; GRANT app_runtime TO stack_runtime');
       const searchPool = new Pool({ ...database.config, user: 'stack_runtime', max: 4 });
       ownedPools.push(searchPool);
       const searchEvents = createEventRepository(searchPool, 'synthetic_host_search');
-      registerSearchRoute(app, auth, {
+      searchDependencies = {
         operation: { execute: (request) => searchEvents.executeSearch(request) },
         logHash: { version: 'hmac-log-v1', key: 'synthetic-host-log-hash-material-0001' },
         idempotencyHmac: { currentVersion: 'hmac-idempotency-v1',
           keys: { 'hmac-idempotency-v1': 'synthetic-host-idempotency-material-0001' } },
-      });
+      };
     }
-    app.get('/v1/notices/current', async (request, reply) => {
-      if (!(await authenticateRequestHeaders(auth!, request.headers))) return reply.code(401).send();
-      return reply.code(410).send({ error: { code: 'GONE', message: 'No notice in the synthetic fixture' } });
-    });
-    const store = createContentObjectStore(path.join(pg.root, 'objects'));
-    pool = hooks.wrapBusinessPool?.(pool) ?? pool;
-    const report = (id: string, error: unknown) => { hooks.observeError?.(error); diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
-    usagePool = hooks.wrapUsagePool?.(usagePool) ?? usagePool;
-    if (hooks.includeSopQuery) registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store, report) });
-    const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
-    const ownerQueryFactWriter = createOwnerReviewedSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
-    const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
-    await app.register(contentIntakeUsageRoutes, { auth, usage, report });
-    if (hooks.includeSopContinuation) await app.register(sopContinuationRoutes, {
-      auth, continuation: createSopContinuationService(usagePool, report, { async readAttachment(descriptor) {
-        const bytes = await store.readAttachment(descriptor); await hooks.afterSopAttachmentRead?.(); return bytes;
-      } }), report,
-    });
     const seatRoot = path.join(pg.root, 'seat-accounts');
     mkdirSync(seatRoot, { recursive: true });
-    await app.register(contentIntakeManagementRoutes, {
-      auth, pool, store, report,
-      ...(terminalPool ? { terminalPool } : {}),
-      ...(hooks.includeSeats === false ? {} : { seatService: createSeatServiceFromEnv(pool, seatRoot, {
-        SEAT_TENANT_ID: 'tenant-a',
-        SEAT_APP_ID: 'app-a',
-        SEAT_DEPARTMENT_ID: 'dept-a',
-      }) }),
-      // Every principal that can appear in the grant-recipient directory needs a label, or the
-      // directory fails closed. The roster identities are added here for that reason only.
-      principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
-        ? INTAKE_SYNTHETIC_IDENTITIES.find(([id]) => id === principalId)?.[2]
-          ?? (principalId === 'roster-director' ? '合成名单总监'
-            : principalId === 'roster-readonly' ? '合成只读总监'
-            : principalId === 'roster-stale' ? '合成过期总监'
-            : principalId === 'roster-nogrant' ? '合成无授权总监'
-            : principalId === 'roster-agent' ? '合成名单坐席'
-            : principalId === 'roster-query-only' ? '合成仅查询总监'
-            : principalId === 'roster-review-only' ? '合成仅审核总监'
-            : null)
-        : null });
+    const store = createContentObjectStore(path.join(pg.root, 'objects'));
+    pool = hooks.wrapBusinessPool?.(pool) ?? pool;
+    usagePool = hooks.wrapUsagePool?.(usagePool) ?? usagePool;
+    const report = (id: string, error: unknown) => { hooks.observeError?.(error); diagnostics.push({ id, reason: error instanceof IntakeRejection ? error.reason : 'UNEXPECTED' }); };
+    const queryFactWriter = createSyntheticSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
+    const ownerQueryFactWriter = createOwnerReviewedSopQueryFactWriter(createIntakeTransactions(pool, report, { requireProductSession: true }));
+    const recordSyntheticRequestPaths = (server: FastifyInstance) => {
+      server.addHook('onRequest', async (request, reply) => {
+        if (request.headers.host !== new URL(apiOrigin).host) return reply.code(403).send();
+        if (requests.length < 1000) requests.push(request.url.split('?')[0]!);
+      });
+    };
+    if (hooks.includeSopCandidates && purposePools) {
+      const connectThrough = (owned: IntakePurposePool, wrapped: IntakePool): IntakePurposePool => ({
+        connect: () => wrapped.connect(), end: () => owned.end(), get totalCount() { return owned.totalCount; },
+      });
+      const usage = connectThrough(purposePools.usage, usagePool);
+      app = createApiApp({
+        config: parseApiRuntimeConfig({ CUSTOMER_AGENT_PROFILE: 'test', AUTH_MODE: 'mock', AUTH_SESSION_MODE: 'product',
+          CUSTOMER_AGENT_API_PORT: String(portReservation.apiPort) }),
+        repository: createServiceRepository({
+          connectionString: `postgresql://stack_runtime@localhost/${database.name}?${new URLSearchParams({ host: pg.socket, port: String(pg.port) })}`,
+          poolMax: 2, connectionTimeoutMs: 2000, readinessTimeoutMs: 3000,
+        }),
+        authService: auth,
+        intakeDependencies: { business: connectThrough(purposePools.business, pool), usage, worker: purposePools.worker, store,
+          sopCandidates: 'synthetic' },
+        intakeOnlyQuery: { inspect: () => inspectCurrentIntakeRelease(usage) },
+        searchDependencies,
+        diagnosticSink: diagnostic => {
+          hooks.observeError?.(new Error(JSON.stringify(diagnostic)));
+          diagnostics.push({ id: diagnostic.code, reason: diagnostic.databaseCode ?? 'UNEXPECTED' });
+        },
+      });
+      recordSyntheticRequestPaths(app);
+    } else {
+      app = Fastify({ logger: false, exposeHeadRoutes: false, routerOptions: { maxParamLength: 128 } });
+      recordSyntheticRequestPaths(app);
+      registerProductAuthRoutes(app, auth);
+      registerAuthRoutes(app, auth, async (userId) => readStoredRosterPermission(admin!, userId), async (user) => readAuthorizationActions(admin!, user));
+      registerAccessRoutes(app, createDatabaseAccessEvaluator(pool), auth);
+      if (searchDependencies) registerSearchRoute(app, auth, searchDependencies);
+      app.get('/v1/notices/current', async (request, reply) => {
+        if (!(await authenticateRequestHeaders(auth!, request.headers))) return reply.code(401).send();
+        return reply.code(410).send({ error: { code: 'GONE', message: 'No notice in the synthetic fixture' } });
+      });
+      if (hooks.includeSopQuery) registerSopQueryRoute(app, auth, { unifiedOperation: createUnifiedSopQueryOperation(usagePool, store, report) });
+      const usage = createContentIntakeService(usagePool, store, report, undefined, { requireProductSession: true });
+      await app.register(contentIntakeUsageRoutes, { auth, usage, report });
+      if (hooks.includeSopContinuation) await app.register(sopContinuationRoutes, {
+        auth, continuation: createSopContinuationService(usagePool, report, { async readAttachment(descriptor) {
+          const bytes = await store.readAttachment(descriptor); await hooks.afterSopAttachmentRead?.(); return bytes;
+        } }), report,
+      });
+      await app.register(contentIntakeManagementRoutes, {
+        auth, pool, store, report,
+        ...(terminalPool ? { terminalPool } : {}),
+        ...(hooks.includeSeats === false ? {} : { seatService: createSeatServiceFromEnv(pool, seatRoot, {
+          SEAT_TENANT_ID: 'tenant-a',
+          SEAT_APP_ID: 'app-a',
+          SEAT_DEPARTMENT_ID: 'dept-a',
+        }) }),
+        principalLabels: ({ tenantId, appId, principalId }) => tenantId === 'tenant-a' && appId === 'app-a'
+          ? principalLabels.get(principalId) ?? null
+          : null });
+    }
     await portReservation.releaseApi();
     apiOrigin = await app.listen({ host: '127.0.0.1', port: portReservation.apiPort });
     let prepared: { candidate: C['IntakeCandidate']; object: C['IntakeObject'] } | null = null;
@@ -646,8 +684,8 @@ async function startIntakeSyntheticHost(prepareCandidate: boolean, profile: Synt
         return ownerQueryFactWriter.write(authenticated, input);
       },
       selectIdentity(value: DesktopSyntheticIdentity) {
-        if (!['director', 'enabler', 'reviewer', 'agent', 'roster-director', 'roster-readonly',
-      'roster-stale', 'roster-nogrant', 'roster-agent', 'roster-query-only', 'roster-review-only'].includes(value)) throw new Error('Unknown synthetic identity'); selectedIdentity = value;
+        if (!principalLabels.has(value)) throw new Error('Unknown synthetic identity');
+        selectedIdentity = value;
       },
       /** Revoke one principal's live query grant. The grant history is append-only, so this
        * is a versioned revoke rather than a delete, exactly like the product path. */

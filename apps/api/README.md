@@ -60,6 +60,16 @@ curl --silent --include http://127.0.0.1:3100/ready
 
 T1 路径为 login-requests → 固定 callback → PKCE S256 exchange → `/v1/auth/me` → logout。会话落在 PostgreSQL，数据库仅存 token 摘要；兑换成功响应丢失后重新登录，不能重放获取 bearer。提供方是本机合成测试服务，其 `/exchange` 只返回 `{provider: "synthetic", binding_id: "synthetic_..."}`，该合成提供方不调用真实飞书；独立 `feishu-identity-provider` 拥有 OAuth 身份接口，不拥有 P2 组织事实或审批同步。实际启动入口及此 wire 已在隔离 PG15 合成集成测试贯通；本节不提供真实凭据或运行激活。
 
+
+## W5 SOP 候选合成验证
+
+在本机 `test` 或 `formal-dev` 合成产品会话中，`CUSTOMER_AGENT_QUERY_MODE=intake-compat` 与 `CUSTOMER_AGENT_SOP_CANDIDATES=synthetic` 一起显式装配发现和选中路由。两条路由协商冻结的 W5 合同。E、人工按组查询和 D 首开继续使用 v12。合成测试在每次运行时为隔离 PostgreSQL 15 装载候选存储，并使用真实 Fastify 应用。
+
+```bash
+pnpm --filter @customer-agent/api build
+pnpm --filter @customer-agent/api test:integration:sop-candidates
+```
+
 ## 合成内容导入（T2）
 
 在已有 runtime pool 上接收 `POST /v1/content/import` 的 CSV/XLSX multipart（字段 `file`、`source_bindings`）。文件先写入 `CONTENT_OBJECT_STORE_DIR` 的不可变对象并校验摘要，随后才调用 `enqueue_content_import` 原子创建 batch、source bindings 与 outbox；事务提交成功后才返回 202。状态查询与取消走既有 SQL 投影；coach/owner 以外角色拒绝。单文件 10 MiB、上传 30 秒。飞书 JSON 导入保持关闭。提交结果不确定时不得回收已接收对象。连接池预算：enqueue/status/cancel 复用 `app_runtime`。

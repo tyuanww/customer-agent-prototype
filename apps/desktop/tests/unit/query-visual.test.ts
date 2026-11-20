@@ -142,15 +142,16 @@ describe('query capsule visual contract', () => {
     expect(css).toContain('--query-match-exact-surface: var(--query-match-exact-solid)');
   });
 
-  it('keeps a visible mirrored resize affordance inside the 20px hit target', () => {
-    expect(css).toMatch(/\.query-resize-grip\s*\{[\s\S]*?height: 20px/);
-    expect(css).toMatch(/\.query-resize-grip::after\s*\{[\s\S]*?width: 28px;[\s\S]*?height: 3px/);
+  it('keeps two visible resize controls and non-draggable perimeter hit targets', () => {
+    expect(css).toMatch(/\.query-resize-grip\s*\{[^}]*-webkit-app-region: no-drag/);
+    expect(css).toMatch(/\.query-resize-grip\[data-axis='height'\]::after\s*\{[^}]*width: 28px;[^}]*height: 3px/);
+    expect(css).toMatch(/\.query-resize-grip\[data-axis='width'\]::after\s*\{[^}]*width: 3px;[^}]*height: 28px/);
     expect(css).toContain(".query-resize-grip[data-edge='bottom']::after");
     expect(css).toContain(".query-resize-grip[data-edge='top']::after");
     expect(css).toContain('.query-resize-grip:hover::after,');
     expect(css).toContain('.query-resize-grip:focus-visible::after');
     expect(css).toContain('.query-resize-grip:active::after');
-    expect(css).toMatch(/forced-colors: active[\s\S]*?\.query-resize-grip::after\s*\{[\s\S]*?background: CanvasText/);
+    expect(css).toMatch(/forced-colors: active[\s\S]*?\.query-resize-grip\[data-axis\]::after\s*\{[\s\S]*?background: CanvasText/);
   });
 
   it('keeps small semantic text readable on light and dark material fallbacks', () => {

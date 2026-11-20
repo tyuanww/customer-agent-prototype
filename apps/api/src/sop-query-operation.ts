@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from './auth-service.js';
 import type { SopQueryReadResult, SopQueryRequest, SopQueryResponse } from './sop-query-model.js';
 
 export type SopQueryFailureCode =
+  | 'UNAUTHORIZED'
   | 'SCOPE_DENIED'
   | 'IDEMPOTENCY_CONFLICT'
   | 'SOP_BLOCKED'

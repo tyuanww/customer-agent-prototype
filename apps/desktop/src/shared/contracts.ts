@@ -54,7 +54,7 @@ export type CustomerAgentApi = {
     identity: OverlayReportIdentity,
   ) => Promise<void>;
   reportQueryLayout?: (request: QueryLayoutRequest) => Promise<QueryLayoutAck>;
-  resizeQueryHeight?: (request: QueryResizeRequest) => Promise<QueryLayoutAck>;
+  resizeQuery?: (request: QueryResizeRequest) => Promise<QueryLayoutAck>;
   moveFoxBy: (
     deltaX: number,
     deltaY: number,

@@ -113,7 +113,8 @@ export function QueryCapsule({
               {deepThinkingDescription}
             </span> : null}
             <div className="capsule-meta">
-              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired' || sessionNotice.kind === 'waiting')) ? (
+              {invalidMessage || (sessionNotice && (sessionNotice.kind === 'failed' || sessionNotice.kind === 'expired'
+                || sessionNotice.kind === 'waiting' || (intake && sessionNotice.kind === 'success'))) ? (
               <p
                 id="query-guidance"
                 className="capsule-hint"

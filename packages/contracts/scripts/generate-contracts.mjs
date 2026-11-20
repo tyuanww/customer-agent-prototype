@@ -15,6 +15,8 @@ import openapiTS, { astToString } from 'openapi-typescript';
 import { parse, stringify } from 'yaml';
 import { verifyCurrentSopResourceDisableContractSet, verifyIngestedCorrectedSopUnifiedContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
+import { verifySopCandidateContractSet } from '../../../scripts/sop-candidate-contract.mjs';
+
 const CODEGEN_SCHEMA = 'customer-agent-contract-codegen/v1';
 const RUNTIME_SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
 const GENERATED_HEADER = 'GENERATED FILE. DO NOT EDIT. Run `pnpm contracts:generate` from the repository root.';
@@ -37,6 +39,11 @@ const SOP_RESOURCE_OUTPUTS = Object.freeze(Object.fromEntries(
   Object.entries(OUTPUTS).map(([key, file]) => [key, file.replace(
     '/openapi/', '/openapi/sop-resource-disable/',
   ).replace('/src/generated/', '/src/generated/sop-resource-disable/')]),
+));
+const SOP_CANDIDATE_OUTPUTS = Object.freeze(Object.fromEntries(
+  Object.entries(OUTPUTS).map(([key, file]) => [key, file.replace(
+    '/openapi/', '/openapi/sop-candidates/',
+  ).replace('/src/generated/', '/src/generated/sop-candidates/')]),
 ));
 const SOP_RESOURCE_LOCK = 'contracts/upstream/customer-agent/sop-resource-disable-contract-set.lock.json';
 const SOP_RESOURCE_CORRECTED_LOCK = 'contracts/upstream/customer-agent/sop-resource-disable-corrected-contract-set.lock.json';
@@ -415,13 +422,15 @@ async function buildSnapshotViews(projectRoot, snapshot) {
   if (!resource && existsSync(path.join(projectRoot, path.dirname(SOP_RESOURCE_OUTPUTS.manifest)))) {
     throw new Error('SOP resource disable generated view requires its consumption lock');
   }
+  const candidates = await buildSopCandidatesView(projectRoot);
   return Object.freeze({
     ...legacy,
     views: {
       sopUnified: { contract_set_id: unified.contract_set_id, schema_count: unified.schema_count },
+      sopCandidates: { contract_set_id: candidates.contract_set_id, schema_count: candidates.schema_count },
       ...(resource ? { sopResourceDisable: { contract_set_id: resource.contract_set_id, schema_count: resource.schema_count } } : {}),
     },
-    files: new Map([...legacy.files, ...unified.files, ...(resource?.files ?? [])]),
+    files: new Map([...legacy.files, ...unified.files, ...(resource?.files ?? []), ...candidates.files]),
   });
 }
 
@@ -443,6 +452,28 @@ async function buildResourceDisableView(projectRoot) {
       source_manifest: { sha256: sha256(manifestBytes), bytes: manifestBytes.length },
       source_artifacts: { openapi: manifest.openapi, database: manifest.database,
         ...manifest.resourceDisable, legacyV11: manifest.legacyV11 },
+    },
+  });
+}
+
+async function buildSopCandidatesView(projectRoot) {
+  const { manifest, manifestBytes, schemaView, summary } = verifySopCandidateContractSet({ projectRoot });
+  return buildGeneratedArtifactsFromSnapshot({
+    ...summary,
+    lock: { ...summary, source_repository: manifest.source_repository,
+      openapi_sha256: manifest.openapi.sha256, database_sha256: manifest.database.sha256 },
+    manifest,
+    openapi_source: JSON.stringify(schemaView),
+    intake_status: 'VERIFIED_NOT_ACTIVATED',
+  }, {
+    outputs: SOP_CANDIDATE_OUTPUTS,
+    view: 'sop-candidates',
+    provenance: {
+      view: 'sopCandidates',
+      source_manifest: { sha256: summary.manifest_sha256, bytes: manifestBytes.length },
+      source_artifacts: { openapi: manifest.openapi, database: manifest.database,
+        storage: manifest.storage, authorization: manifest.authorization },
+      predecessor_contract_set_id: manifest.predecessor.contractSetId,
     },
   });
 }
@@ -512,11 +543,13 @@ function assertExactGeneratedMemberSet(projectRoot, expectedPaths) {
 }
 
 export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, check = false, profile } = {}) {
-  if (profile !== undefined && profile !== 'sopResourceDisable') throw new Error('Unsupported contract codegen profile');
+  if (profile !== undefined && !['sopResourceDisable', 'sopCandidates'].includes(profile)) throw new Error('Unsupported contract codegen profile');
   const resolvedRoot = path.resolve(projectRoot);
   return withVerifiedContractSetSnapshot({ projectRoot: resolvedRoot }, async (snapshot) => {
-    const generated = profile === 'sopResourceDisable'
-      ? await buildResourceDisableView(resolvedRoot) : await buildSnapshotViews(resolvedRoot, snapshot);
+    let generated;
+    if (profile === 'sopResourceDisable') generated = await buildResourceDisableView(resolvedRoot);
+    else if (profile === 'sopCandidates') generated = await buildSopCandidatesView(resolvedRoot);
+    else generated = await buildSnapshotViews(resolvedRoot, snapshot);
     const drift = [];
 
     for (const [relativePath, expectedContent] of generated.files) {
@@ -549,11 +582,14 @@ export async function generateContracts({ projectRoot = DEFAULT_PROJECT_ROOT, ch
 
 async function runCli() {
   const arguments_ = process.argv.slice(2);
-  if (arguments_.some((argument) => !['--check', '--profile=sopResourceDisable'].includes(argument))) {
-    throw new Error(`Unknown contract codegen option: ${arguments_.find((argument) => !['--check', '--profile=sopResourceDisable'].includes(argument))}`);
-  }
-  const result = await generateContracts({ check: arguments_.includes('--check'),
-    profile: arguments_.includes('--profile=sopResourceDisable') ? 'sopResourceDisable' : undefined });
+  const supported = new Set(['--check', '--profile=sopResourceDisable', '--profile=sopCandidates']);
+  const invalid = arguments_.find((argument) => !supported.has(argument));
+  if (invalid) throw new Error(`Unknown contract codegen option: ${invalid}`);
+  const profiles = arguments_.filter(argument => argument.startsWith('--profile='));
+  if (profiles.length > 1) throw new Error('Select at most one contract codegen profile');
+  const result = await generateContracts({
+    check: arguments_.includes('--check'), profile: profiles[0]?.slice('--profile='.length),
+  });
   console.log(JSON.stringify(result, null, 2));
 }
 
