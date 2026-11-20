@@ -28,24 +28,25 @@ test('one FAQ submission discovers SOPs and only a chosen candidate opens a case
     const sopWindows = () => running.windows().filter(page => page.url().includes('role=sop'));
     await expect.poll(() => running.windows().some(page => page.url().includes('role=query'))).toBe(true);
     const query = running.windows().find(page => page.url().includes('role=query'))!;
-    await running.evaluate(({ app: native }) => native.focus({ steal: true }));
-    await query.evaluate(() => window.customerAgent!.openSearch());
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
-    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
-    await waitForFocusedWindow(running, 'query');
+    await returnToQueryWindow(running, query);
     const question = query.getByTestId('question-input');
     const submit = async (text: string) => {
       await question.fill(text);
       await query.getByTestId('search-button').click();
     };
-    await query.getByRole('button', { name: '登录', exact: true }).click();
-    await expect.poll(() => running.windows().some(page => page.url().includes('role=login'))).toBe(true);
-    const login = running.windows().find(page => page.url().includes('role=login'))!;
+    await question.fill('合成入口');
+    const openedLogin = running.waitForEvent('window');
+    await question.press('Enter');
+    const login = await openedLogin;
+    await expect.poll(() => login.url()).toContain('role=login');
     await login.getByRole('button', { name: '飞书登录' }).click();
     await expect.poll(() => query.evaluate(async () => {
       const state = await window.customerAgent!.product!.sessionStatus();
       return state.ok && state.signedIn;
     })).toBe(true);
+    await expect(question).toHaveValue('合成入口');
+    await expect(question).toBeFocused();
+    await waitForFocusedWindow(running, 'query');
     await query.getByRole('button', { name: '筛选', exact: true }).click();
     const shop = query.getByRole('combobox', { name: '当前店铺', exact: true });
     await shop.selectOption('shop-a');
