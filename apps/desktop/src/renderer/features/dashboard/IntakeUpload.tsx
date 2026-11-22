@@ -18,9 +18,9 @@ const jobStates: Record<NonNullable<IntakeUploadView['job']>['state'], string> =
 
 /** This form keeps human choices only. Main owns the selected file, identities,
  * original write requests and candidate; no filesystem or HTTP input crosses it. */
-export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocked, stopping, apply }: {
+export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocked, refreshing = false, stopping, apply }: {
   active?: boolean;
-  view: IntakeUploadView; busy: boolean; blocked: boolean; refreshBlocked: boolean; stopping: boolean;
+  view: IntakeUploadView; busy: boolean; blocked: boolean; refreshBlocked: boolean; refreshing?: boolean; stopping: boolean;
   apply: (command: IntakeUploadCommand) => void;
 }) {
   const [preparer, setPreparer] = useState(view.preparerSelection ?? '');
@@ -38,6 +38,7 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
   }, [view.draftRevision, view.editorSelections, view.preparerSelection]);
   const readingDisabled = !active || busy || view.busy || stopping;
   const disabled = readingDisabled || blocked;
+  const canStop = refreshing || view.canStop;
   const declaring = !!view.file && view.canSubmit;
   const ready = !!preparer && editors.length > 0 && confirmed;
   return <section className="intake-upload" aria-label="上传 FAQ 资料">
@@ -87,13 +88,13 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
       <ActionButton disabled={disabled || !view.canRetry} onClick={() => apply({ action: 'upload-retry' })}>按原请求重试上传</ActionButton>
     </div>}
     <div className="intake-toolbar">
-      {view.canStop && <ActionButton disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</ActionButton>}
+      {canStop && <ActionButton disabled={stopping} onClick={() => apply({ action: 'upload-stop' })}>停止本机等待</ActionButton>}
       {view.canRefresh && (!!view.file || !!view.job) && <ActionButton disabled={readingDisabled || refreshBlocked} onClick={() => apply({ action: 'upload-refresh' })}>刷新解析进度</ActionButton>}
       {view.canSaveReport && <ActionButton disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</ActionButton>}
       {view.canOpen && <ActionButton disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>审核本次资料</ActionButton>}
     </div>
     {view.job?.state === 'validated' && !readingDisabled && !view.canOpen && <p>请告知有该来源查看权限的同事，由对方在「资料批次」中继续处理。</p>}
-    {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；生成待审核资料后再按其权限处理。</p>}
+    {(canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；生成待审核资料后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">
       <h3>校验结果</h3>
       <p>最近读取的服务端状态：{jobStates[view.job.state]}。停止本机等待不会改变此状态。</p>

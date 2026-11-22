@@ -291,10 +291,10 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     confirmation.current?.destroy();
     confirmation.current = askConfirm(content, onOk, danger);
   };
-  const [operation, setOperation] = useState<{ kind: 'review' } | { kind: 'overview'; selection: CandidateRow['selection'] } | null>(null);
+  const [operation, setOperation] = useState<{ kind: 'review'; action?: IntakeManagementCommand['action'] } | { kind: 'overview'; selection: CandidateRow['selection'] } | null>(null);
   const busy = operation !== null;
   const [error, setError] = useState('');
-  const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [rereading, setRereading] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
   const stopPending = useRef(false);
@@ -378,7 +378,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       finally {
         // Main's stop acknowledgement releases local waiting. A late original
         // response must neither replace this view nor unlock a newer request.
-        pending.current = null; setOperation(null); setUploadRequest(false);
+        pending.current = null; setOperation(null);
         stopPending.current = false; setStopping(false);
       }
       return;
@@ -389,10 +389,9 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       setError(WORKBENCH_EMPTY.intakeUnmounted);
       return;
     }
-    setOperation(fromOverview ? { kind: 'overview', selection: request.row.selection } : { kind: 'review' });
+    setOperation(fromOverview ? { kind: 'overview', selection: request.row.selection } : { kind: 'review', action: command?.action });
     setError(''); const gen = ++generation.current; pending.current = gen;
     const uploading = command?.action.startsWith('upload-') ?? false;
-    setUploadRequest(uploading);
     try {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
@@ -433,26 +432,29 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
         setError('管理服务不可用，请刷新。');
       }
     } finally {
-      if (pending.current === gen) { pending.current = null; setOperation(null); setUploadRequest(false); }
+      if (pending.current === gen) { pending.current = null; setOperation(null); }
     }
   };
   const upload = view?.upload;
+  const reviewAction = operation?.kind === 'review' ? operation.action : undefined;
+  const refreshingUpload = reviewAction === 'upload-refresh';
   const uploadParsing = active && presentation === 'review' && !!upload?.file
     && (upload.job?.state === 'reading' || upload.job?.state === 'parsing');
-  const uploadPolling = (busy && uploadRequest) || uploadParsing;
+  const uploadPolling = !refreshingUpload && (reviewAction?.startsWith('upload-') || uploadParsing);
   useEffect(() => {
     if (!uploadPolling) return;
     let active = true, polling = false;
-    const gen = generation.current;
-    // current() now also settles a running parse job through one HTTP read per tick
-    // (Main serialises it), so this loop is what advances 解析中 to its final state.
-    // Manual refresh sends the same command. Every other state still comes from memory.
     const read = async () => {
-      if (polling) return;
+      if (polling || stopPending.current) return;
       polling = true;
+      // An upload command can start and finish while the poller keeps running.
+      // Capture its generation per tick and leave the command's final reply in place.
+      const gen = generation.current, command = pending.current;
       try {
         const reply = await window.dashboardIntake!.current();
-        if (active && generation.current === gen && reply.view) commitRef.current({ status: 'ready', value: reply.view });
+        if (active && generation.current === gen && pending.current === command && reply.view) {
+          commitRef.current({ status: 'ready', value: reply.view });
+        }
       } catch { /* The original command owns its visible transport outcome. */ }
       finally { polling = false; }
     };
@@ -603,7 +605,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       </div>
       {explainUploadAccess && <p id={uploadAccessId}>上传资料需要可维护的来源。没有权限，请找人开通。</p>}
       <div id={`${sectionId}-upload`} hidden={!showUpload}>
-        <IntakeUpload view={upload} active={active && presentation === 'review' && showUpload} busy={presentation !== 'review' || busy || rereading} stopping={stopping}
+        <IntakeUpload view={upload} active={active && presentation === 'review' && showUpload} busy={presentation !== 'review' || busy || rereading} refreshing={refreshingUpload} stopping={stopping}
           blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />
       </div>
     </section>}

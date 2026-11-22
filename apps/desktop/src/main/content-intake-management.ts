@@ -65,6 +65,7 @@ export class ContentIntakeManagement {
   private workflowPending: WorkflowOperation | null = null;
   private active: AbortController | null = null;
   private activeUpload: AbortController | null = null;
+  private uploadObservation: Promise<void> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private deadline = 0;
   private epoch: number;
@@ -142,14 +143,14 @@ export class ContentIntakeManagement {
       review: canRead ? this.review : null, workflowResult: canRead ? this.workflowResult : null,
       pending: session.signedIn ? this.unresolved() : null, receipt: canRead ? this.receipt : null, upload: this.upload.view(access) });
   }
-  /** The renderer polls `current` while an upload command is in flight, and that tick
-   * is where a still-running parse job gets its next observation. The manual refresh
-   * button sends the same `upload-refresh` command, so this is the automatic path, not
-   * the only one. A failed tick keeps the last known phase and the next tick retries. */
+  /** Concurrent `current` calls share the observation of an active parse job. */
   async settleUpload(): Promise<void> {
+    if (this.uploadObservation) return this.uploadObservation;
     if (this.disposed || this.active || !this.session.view().signedIn || !this.upload.needsSettle()) return;
-    try { await this.upload.command({ action: 'upload-refresh' }, this.validAccess()); }
-    catch { /* The next poll tick retries; the view keeps its last known phase. */ }
+    this.uploadObservation = this.upload.command({ action: 'upload-refresh' }, this.validAccess())
+      .then(() => undefined, () => { /* Keep the last known phase until the next read. */ })
+      .finally(() => { this.uploadObservation = null; });
+    return this.uploadObservation;
   }
   private async refreshAccess(signal: AbortSignal) {    const access = await loadIntakeAccess(this.session, signal);
     if (signal.aborted) return reject('STALE');
@@ -203,6 +204,10 @@ export class ContentIntakeManagement {
       } else if (isIntakeUploadCommand(c)) {
         if (this.unresolved() || this.quality.hasDraft()) return reject('CONFLICT');
         if (this.selected && ['upload-source','upload-choose','upload-submit','upload-open'].includes(c.action)) return reject('CONFLICT');
+        if (c.action === 'upload-refresh' && this.uploadObservation) {
+          await this.uploadObservation;
+          assertActive();
+        }
         // Reset only abandons local preparation. It must work offline after
         // access expiry; Upload still rejects pending writes and parsing jobs.
         if (c.action !== 'upload-reset' && !this.validAccess()) { await this.refreshAccess(controller.signal); assertActive(); }

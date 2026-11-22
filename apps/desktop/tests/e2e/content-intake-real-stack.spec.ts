@@ -162,17 +162,15 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       }
       await upload.getByRole('button', { name: '上传并校验', exact: true }).click();
     }
-    async function settleParse(expected: string) {
-      await expect.poll(async () => {
-        if (expected === '校验通过，待审核资料已生成' && await dashboard.getByRole('region', { name: '批次详情', exact: true }).isVisible()) return true;
-        if (await upload.getByRole('status').filter({ hasText: expected }).count()) return true;
-        const refresh = upload.getByRole('button', { name: '刷新解析进度', exact: true });
-        if (await refresh.count() && await refresh.isEnabled()) await refresh.click();
-        return await upload.getByRole('status').filter({ hasText: expected }).count() > 0;
-      }, { timeout: 60_000, intervals: [100, 250, 500] }).toBe(true);
+    const batchDetail = dashboard.getByRole('region', { name: '批次详情', exact: true });
+    async function openValidatedBatch() {
+      const review = upload.getByRole('button', { name: '审核本次资料', exact: true });
+      await expect(batchDetail.or(review).first()).toBeVisible({ timeout: 60_000 });
+      if (await review.isVisible()) await review.click();
+      await expect(batchDetail).toBeVisible();
     }
     await selectAndSubmit(path.basename(badFile));
-    await settleParse('整批校验未通过');
+    await expect(upload.getByRole('status').filter({ hasText: '整批校验未通过' })).toBeVisible({ timeout: 60_000 });
     const validation = upload.getByRole('region', { name: '资料校验结果', exact: true });
     await expect(validation).toContainText('共 1 个问题');
     // The API projects a numeric column; the saved XLSX report retains the input
@@ -190,9 +188,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await validation.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-upload-error-report.png') });
     await selectAndSubmit(path.basename(goodFile));
-    await settleParse('校验通过，待审核资料已生成');
+    await openValidatedBatch();
     await expect(upload.getByRole('button', { name: '刷新解析进度', exact: true })).toHaveCount(0);
-    await expect(dashboard.getByRole('region', { name: '批次详情', exact: true })).toBeVisible();
     await expect(upload).not.toBeVisible();
     await dashboard.getByRole('button', { name: '返回批次列表', exact: true }).click();
     await expect(dashboard.getByRole('region', { name: '资料批次列表', exact: true }).getByRole('button', { name: /^继续查看 / })).toBeVisible();
@@ -257,12 +254,12 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(upload.getByText(/正在准备修订/)).toContainText('原版本 1');
     await expect(sources).toBeDisabled();
     await selectAndSubmit(path.basename(badFile));
-    await settleParse('整批校验未通过');
+    await expect(upload.getByRole('status').filter({ hasText: '整批校验未通过' })).toBeVisible({ timeout: 60_000 });
     const oldPath = `/v1/intake/candidates/${old.key.candidateId}/versions/1`;
     const unchanged = await (await host.requestAs('enabler', oldPath)).json();
     expect(unchanged).toMatchObject({ key: old.key, state: 'ready', publicationPolicy: 'direct-v1', sourceEvidenceVersion: 1, approvalEvidenceVersion: 0 });
     await selectAndSubmit(path.basename(revisionFile));
-    await settleParse('校验通过，待审核资料已生成');
+    await openValidatedBatch();
     await expect.poll(async () => (
       await dashboard.evaluate(() => window.dashboardIntake!.current())
     ).view?.selected ?? null).toMatchObject({
@@ -316,7 +313,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await expect(dashboard.getByRole('region', { name: '批次详情', exact: true })).toHaveCount(0);
     // A separate unpublished candidate can be cancelled without withdrawing the live release.
     await selectAndSubmit(path.basename(goodFile));
-    await settleParse('校验通过，待审核资料已生成');
+    await openValidatedBatch();
     const cancelled = (await dashboard.evaluate(() => window.dashboardIntake!.current())).view!.selected!;
     expect(cancelled.key.candidateId).not.toBe(revised.key.candidateId);
     await dashboard.getByRole('button', { name: '取消这份资料', exact: true }).click();

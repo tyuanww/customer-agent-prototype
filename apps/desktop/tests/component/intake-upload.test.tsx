@@ -139,6 +139,57 @@ it('stops a pending upload through the management controller and ignores its lat
   expect(await screen.findByText(/校验通过，待审核资料已生成/)).toBeInTheDocument();
   expect(command.mock.calls.map(([c]) => c.action)).toEqual(['list', 'upload-submit', 'upload-stop', 'upload-retry']);
 });
+it('continues showing automatic parse updates after a manual refresh', async () => {
+  const user = userEvent.setup();
+  const job = { totalIssues: 0, excludedSheetCount: 0, excludedMediaCount: 0, issues: [] };
+  const parsing = management(upload({ phase: 'parsing', canSubmit: false, canRefresh: true, job: { ...job, state: 'parsing' } }));
+  const validated = management(upload({ phase: 'validated', canSubmit: false, canOpen: true, job: { ...job, state: 'validated' } }));
+  let finishOldRead!: (reply: Awaited<ReturnType<IntakeManagementApi['current']>>) => void;
+  let finishLatestRead!: typeof finishOldRead;
+  const current = vi.fn<IntakeManagementApi['current']>()
+    .mockImplementationOnce(() => new Promise(resolve => { finishOldRead = resolve; }))
+    .mockImplementation(() => new Promise(resolve => { finishLatestRead = resolve; }));
+  const command = vi.fn<IntakeManagementApi['command']>().mockResolvedValue({ ok: true, view: parsing });
+  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command, current, onInvalidated: () => () => undefined };
+  render(<IntakeManagement />);
+
+  const refresh = await screen.findByRole('button', { name: '刷新解析进度' });
+  await waitFor(() => expect(current).toHaveBeenCalledTimes(1));
+  await user.click(refresh);
+  expect(command).toHaveBeenLastCalledWith({ action: 'upload-refresh' });
+  await act(async () => finishOldRead({ ok: true, view: { ...parsing, upload: { ...parsing.upload, busy: true, canRefresh: false } } }));
+  expect(screen.getByRole('button', { name: '刷新解析进度' })).toBeEnabled();
+  await waitFor(() => expect(current).toHaveBeenCalledTimes(2));
+  await act(async () => finishLatestRead({ ok: true, view: validated }));
+
+  expect(await screen.findByRole('button', { name: '审核本次资料' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: '刷新解析进度' })).not.toBeInTheDocument();
+});
+it('can stop a manual refresh while the automatic read is still waiting', async () => {
+  const user = userEvent.setup();
+  const parsing = management(upload({ phase: 'parsing', canSubmit: false, canRefresh: true,
+    job: { state: 'parsing', totalIssues: 0, excludedSheetCount: 0, excludedMediaCount: 0, issues: [] } }));
+  const stopped = { ...parsing, upload: { ...parsing.upload, phase: 'stopped' as const } };
+  let finishRead!: (reply: Awaited<ReturnType<IntakeManagementApi['current']>>) => void;
+  let finishRefresh!: (reply: Awaited<ReturnType<IntakeManagementApi['command']>>) => void;
+  const current = vi.fn<IntakeManagementApi['current']>()
+    .mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; }))
+    .mockResolvedValue({ ok: true, view: stopped });
+  const command = vi.fn<IntakeManagementApi['command']>(async ({ action }) => {
+    if (action === 'upload-refresh') return new Promise(resolve => { finishRefresh = resolve; });
+    return { ok: true, view: action === 'upload-stop' ? stopped : parsing };
+  });
+  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command, current, onInvalidated: () => () => undefined };
+  render(<IntakeManagement />);
+
+  await user.click(await screen.findByRole('button', { name: '刷新解析进度' }));
+  const stop = await screen.findByRole('button', { name: '停止本机等待' });
+  expect(current).toHaveBeenCalledTimes(1);
+  await user.click(stop);
+  expect(command).toHaveBeenLastCalledWith({ action: 'upload-stop' });
+  await act(async () => { finishRefresh({ ok: true, view: parsing }); finishRead({ ok: true, view: parsing }); });
+  expect(screen.getByText(/已停止本机等待：/)).toBeVisible();
+});
 it('protects an already opened candidate from a new native file selection while allowing report reads', async () => {
   const user = userEvent.setup();
   const view = { ...management(upload({ phase: 'validated', canSubmit: false, canSaveReport: true })), selected: intakeManagementData(1).candidate };

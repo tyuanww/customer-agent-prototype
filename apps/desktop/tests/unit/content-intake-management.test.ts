@@ -79,6 +79,29 @@ it('does not replace an opened candidate when an older upload refresh returns an
     expect(f.main.view().selected?.key).toEqual(f.data.candidate.key);
   } finally { upload.mockRestore(); f.main.dispose(); }
 });
+it('queues manual parse refresh behind an automatic observation', async () => {
+  const f = fixture();
+  let finishObservation!: () => void;
+  const observation = new Promise<null>(resolve => { finishObservation = () => resolve(null); });
+  let observing = false;
+  const upload = vi.spyOn(ContentIntakeUpload.prototype, 'command').mockImplementation(async () => {
+    if (observing) throw new ProductHttpError('CONFLICT');
+    observing = true;
+    try { return await observation; } finally { observing = false; }
+  });
+  const pendingJob = vi.spyOn(ContentIntakeUpload.prototype, 'needsSettle').mockReturnValue(true);
+  try {
+    await f.main.command({ action: 'list', next: false });
+    const automatic = f.main.settleUpload();
+    const concurrent = f.main.settleUpload();
+    const manual = f.main.command({ action: 'upload-refresh' });
+    const refreshed = expect(manual).resolves.toMatchObject({ authorized: true });
+    finishObservation();
+    await Promise.all([automatic, concurrent]);
+    await refreshed;
+    expect(upload.mock.calls.map(([command]) => command.action)).toEqual(['upload-refresh', 'upload-refresh']);
+  } finally { pendingJob.mockRestore(); upload.mockRestore(); f.main.dispose(); }
+});
 it('uses scoped capabilities instead of legacy role; freezes, preserves per-page human drafts and submits', async () => {
   const f = fixture(21);
   try {
