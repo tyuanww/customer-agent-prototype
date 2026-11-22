@@ -7,16 +7,20 @@ import { SopUnifiedPort, type SopUnifiedSession } from '../../src/main/sop-unifi
 import { SopUnifiedRuntime, type SopCandidateOpening } from '../../src/main/sop-unified-runtime';
 import { SopWindowController } from '../../src/main/sop-window-controller';
 import type { ProductSessionView } from '../../src/shared/product-session';
+import { isSopUnifiedProjection } from '../../src/shared/sop-unified';
 import { unifiedFixture } from '../support/sop-unified-fixture';
 
 const native = vi.hoisted(() => {
   function createWindow(id: number) {
     let bounds = { x: 0, y: 0, width: 600, height: 240 };
+    let title = '';
     let visible = false, destroyed = false;
     const closed = new Set<() => void>();
     return {
       webContents: { id, isDestroyed: () => destroyed, send: vi.fn(), setBackgroundThrottling: vi.fn() },
-      on: (_event: 'closed', listener: () => void) => closed.add(listener),
+      on: (event: string, listener: () => void) => { if (event === 'closed') closed.add(listener); },
+      getTitle: () => title,
+      setTitle: (value: string) => { title = value; },
       isVisible: () => visible,
       isDestroyed: () => destroyed,
       getBounds: () => bounds,
@@ -75,7 +79,9 @@ function setup() {
   const manager = new SopInstanceWindows(session, (instance, candidate) => {
     const controller = new SopWindowController({ instance, preloadPath: '/tmp/unused-preload', queryBounds: () => null,
       workArea: () => ({ x: 0, y: 0, width: 1200, height: 900 }), sessionRole: () => sessionView.role });
-    controller.setQueryRuntime(new SopUnifiedRuntime(new SopUnifiedPort(session, () => false, 'v12'), vi.fn(), undefined, candidate));
+    controller.setQueryRuntime(new SopUnifiedRuntime(new SopUnifiedPort(session, () => false, 'v12'), vi.fn(), async () => ({
+      selection: { shopId: entitlement.shopId, productIds: [], scenarioIds: [] }, entitlement, isCurrent: () => true,
+    }), candidate));
     return controller;
   });
   const candidate: SopCandidateOpening = {
@@ -126,7 +132,7 @@ it('hides a candidate with an unknown D receipt and keeps it available to resume
     expect(window.isVisible()).toBe(false);
     expect(h.manager.fromContents(contents)).toBe(controller);
     const [entry] = h.manager.resumeEntries();
-    expect(entry?.label).toBe('恢复 SOP 流程');
+    expect(entry?.label).toBe('#01 恢复 SOP 流程');
     entry?.resume();
     expect(window.isVisible()).toBe(true);
   } finally { h.manager.destroy(); }
@@ -196,6 +202,17 @@ it('reserves non-overlapping bookmark slots when the native minimum height excee
     }
     const first = h.controller();
     const second = h.controller(1);
+    expect(h.manager.resumeEntries().map(entry => entry.label)).toEqual([
+      '#01 合成完整任务图', '#02 合成完整任务图',
+    ]);
+    expect(first.window.getTitle()).toBe('#01 合成完整任务图');
+    expect(second.window.getTitle()).toBe('#02 合成完整任务图');
+    expect(first.window.webContents.send).toHaveBeenCalledWith('sop-window:chrome', {
+      kind: 'parked', caseNumber: 1, name: '合成完整任务图',
+    });
+    expect(second.window.webContents.send).toHaveBeenCalledWith('sop-window:chrome', {
+      kind: 'parked', caseNumber: 2, name: '合成完整任务图',
+    });
     const firstBounds = first.window.getBounds();
     const secondBounds = second.window.getBounds();
     expect(firstBounds).toMatchObject({ x: 0, width: 182, height: 39 });
@@ -204,4 +221,33 @@ it('reserves non-overlapping bookmark slots when the native minimum height excee
     expect(first.controller.bookmark('restore')).toEqual({ ok: true });
     expect(first.window.getBounds()).toEqual({ x: 16, y: 330, width: 600, height: 240 });
   } finally { h.manager.destroy(); }
+});
+
+it('uses a fresh case number when the same native window starts a new case', async () => {
+  const h = setup();
+  const shops = vi.spyOn(SopUnifiedPort.prototype, 'shops').mockResolvedValue([h.candidate.selection.shopId]);
+  const query = vi.spyOn(SopUnifiedPort.prototype, 'query').mockImplementation(async input => ({
+    ...h.candidate.ready, request_id: input.request_id, lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  }));
+  const check = vi.spyOn(SopUnifiedPort.prototype, 'check').mockImplementation(async input => ({
+    continuationId: input.continuationId!, entitlement: h.candidate.entitlement,
+  }));
+  try {
+    await expect(h.manager.open('sop-query')).resolves.toEqual({ ok: true });
+    const { controller, window, contents } = h.controller();
+    const projection: unknown = window.webContents.send.mock.lastCall?.[1];
+    if (!isSopUnifiedProjection(projection) || !projection.shops[0]) throw new Error('Missing SOP shop projection');
+    await expect(controller.unifiedCommand({
+      kind: 'query', shopKey: projection.shops[0].key, group: '品质售后SOP', text: '合成办理',
+    })).resolves.toEqual({ ok: true });
+    expect(window.getTitle()).toBe('#01 合成完整任务图');
+    await expect(controller.restart()).resolves.toEqual({ ok: true });
+    expect(h.manager.fromContents(contents)).toBe(controller);
+    expect(native.windows).toHaveLength(1);
+    expect(h.manager.resumeEntries().map(entry => entry.label)).toEqual(['#02 合成完整任务图']);
+    expect(window.getTitle()).toBe('#02 合成完整任务图');
+  } finally {
+    h.manager.destroy();
+    shops.mockRestore(); query.mockRestore(); check.mockRestore();
+  }
 });

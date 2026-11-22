@@ -13,6 +13,7 @@ export class SopInstanceWindows {
   private readonly resumeListeners = new Set<() => void>();
   private readonly unsubscribeLogout: () => void;
   private draft: SopWindowController | null = null;
+  private lastCaseNumber = 0;
 
   constructor(private readonly session: Pick<SopUnifiedSession, 'view' | 'onExplicitLogout'>,
     private readonly createWindow: CreateWindow) {
@@ -38,7 +39,12 @@ export class SopInstanceWindows {
   }
 
   private registerWindow(candidate?: SopCandidateOpening) {
+    let numbered: { identity: symbol; number: number } | null = null;
     const window = this.createWindow({
+      caseNumber: identity => {
+        if (numbered?.identity !== identity) numbered = { identity, number: ++this.lastCaseNumber };
+        return numbered.number;
+      },
       place: (bounds, workArea, query) => placeSopBesideWindows(bounds,
         [...this.windows.keys()].flatMap(other => {
           const current = other === window ? null : other.bounds();
@@ -114,5 +120,6 @@ export class SopInstanceWindows {
 
   private clear(): void {
     for (const window of this.windows.keys()) this.remove(window);
+    this.lastCaseNumber = 0;
   }
 }

@@ -1,4 +1,4 @@
-import { Button, Drawer, Empty, Input, Modal, Select, Steps, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
+import { Button, Drawer, Input, Modal, Select, Steps, Table, type ButtonProps, type TableColumnsType, type TableProps } from 'antd';
 import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import './workbench-v9.css';
 import './intake-permissions.css';
@@ -12,7 +12,7 @@ import { formatIntakeTime, formatSeatClock, timeoutUntil } from './intake-time';
 import { IntakeAntdTheme } from './intake-antd';
 import { SeatDateTime } from './seat-date-time';
 import { useAsyncResource } from './use-async-resource';
-import { WorkbenchFailed, WorkbenchLoading, WorkbenchNoAccess, WorkbenchUncertain } from './WorkbenchState';
+import { WorkbenchEmpty, WorkbenchFailed, WorkbenchLoading, WorkbenchNoAccess, WorkbenchUncertain } from './WorkbenchState';
 import type { AccessBlock } from '@shared/workbench-access';
 import { memberPermissionSummary, permissionMembers, permissionStatus, shortPermissionReference, type MemberRow, type PermissionGrant } from './intake-permission-members';
 
@@ -20,32 +20,38 @@ function DeskButton(props: ButtonProps) {
   return <Button {...props} autoInsertSpace={false} />;
 }
 
-function PermissionsEmpty({ description }: { description: string }) {
-  return <Empty image={null} description={description} />;
-}
-
 /** rc-table copies aria-label onto the table. antd's prop type omits it. */
 function A11yTable<RecordType extends object>(props: TableProps<RecordType> & { 'aria-label': string }) {
   return createElement(Table as ComponentType<typeof props>, props);
 }
+
+const SEAT_UNAVAILABLE = '账号暂不可用。';
 
 function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boolean; createOpen: boolean; setCreateOpen: (open: boolean) => void }) {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [post, setPost] = useState<IntakePost>(DEFAULT_INTAKE_POST);
-  const [rows, setRows] = useState<SeatAccountRecord[]>([]);
   const [resetting, setResetting] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [disabling, setDisabling] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const flight = useRef(false);
-  const listGeneration = useRef(0);
   const blocked = disabled || busy;
+  const { resource: seats, reload: refreshSeats } = useAsyncResource<SeatAccountRecord[]>(async () => {
+    try {
+      const reply = await window.dashboardSeats?.command({ action: 'list' });
+      if (reply?.ok === false) return { status: 'error', message: reply.message };
+      if (reply?.action === 'list') return { status: 'ready', value: reply.seats };
+      return { status: 'error', message: SEAT_UNAVAILABLE };
+    } catch {
+      return { status: 'error', message: SEAT_UNAVAILABLE };
+    }
+  }, [], { status: 'loading' });
   const send = async (intent: SeatAccountIntent): Promise<SeatAccountReply | null> => {
     const api = window.dashboardSeats;
-    if (!api) { setProblem('账号暂不可用。'); return null; }
+    if (!api) { setProblem(SEAT_UNAVAILABLE); return null; }
     if (flight.current) return null;
     flight.current = true;
     setBusy(true); setProblem('');
@@ -54,7 +60,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
       if (!reply.ok) { setProblem(reply.message); return null; }
       return reply;
     } catch {
-      setProblem('账号暂不可用。');
+      setProblem(SEAT_UNAVAILABLE);
       return null;
     } finally { flight.current = false; setBusy(false); }
   };
@@ -80,19 +86,6 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
     if (!isIntakePost(value)) { setProblem('请选择岗位。'); return; }
     setPost(value);
   };
-  useEffect(() => {
-    refreshSeats();
-  }, []);
-  const refreshSeats = () => {
-    const api = window.dashboardSeats;
-    if (!api) { setProblem('账号暂不可用。'); return; }
-    const generation = ++listGeneration.current;
-    void api.command({ action: 'list' }).then(reply => {
-      if (generation !== listGeneration.current) return;
-      if (!reply.ok) { setProblem(reply.message); return; }
-      if (reply.action === 'list') setRows(reply.seats);
-    }).catch(() => { setProblem('账号暂不可用。'); });
-  };
   const closeAll = () => {
     if (flight.current) return;
     setProblem('');
@@ -106,12 +99,14 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
   };
   return <section>
     {problem && !createOpen && !resetting && !disabling && <p role="alert">{problem}</p>}
-    <A11yTable<SeatAccountRecord>
+    {seats.status === 'loading' && <WorkbenchLoading rows={5} label="正在读取账号" />}
+    {seats.status === 'error' && <WorkbenchFailed message={seats.message} onRetry={blocked ? undefined : refreshSeats} />}
+    {seats.status === 'ready' && <A11yTable<SeatAccountRecord>
       aria-label="账号"
       pagination={false}
       rowKey="username"
-      dataSource={rows}
-      locale={{ emptyText: <PermissionsEmpty description="新建账号后会出现在这里。" /> }}
+      dataSource={seats.value}
+      locale={{ emptyText: <WorkbenchEmpty>新建账号后会出现在这里。</WorkbenchEmpty> }}
       columns={[
         { title: '姓名', dataIndex: 'displayName' },
         { title: '登录名', dataIndex: 'username' },
@@ -122,7 +117,7 @@ function SeatAccounts({ disabled, createOpen, setCreateOpen }: { disabled: boole
           <DeskButton type="text" danger disabled={blocked} onClick={() => { setProblem(''); setDisabling(row.username); closeReset(); }}>停用</DeskButton>
         </div> : null },
       ]}
-    />
+    />}
     <Modal open={createOpen} title="新建账号" width={440} footer={null} destroyOnHidden transitionName="" maskTransitionName="" onCancel={closeAll}>
         {problem && <p role="alert">{problem}</p>}
         <fieldset className="fields" disabled={blocked} style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
@@ -410,14 +405,14 @@ export function IntakePermissions({
             options={view.sources.map(source => ({ value: source.selection, label: source.label }))} onChange={selection => { void apply({ action: 'source', selection }); }} />
           <DeskButton aria-label="刷新权限列表" disabled={disabled || !!view.preview} onClick={readAgain}>刷新</DeskButton></div>
         <A11yTable<MemberRow> className="intake-permissions-members" aria-label="成员权限" pagination={false} rowKey="key" tableLayout="fixed" dataSource={memberRows} columns={memberColumns}
-          locale={{ emptyText: <PermissionsEmpty description={view.source ? '添加成员或授权后会出现在这里。' : '请选择配置范围。'} /> }} />
+          locale={{ emptyText: <WorkbenchEmpty>{view.source ? '添加成员或授权后会出现在这里。' : '请选择配置范围。'}</WorkbenchEmpty> }} />
       </> : null}
       <Drawer open={detailOpen} title={selectedMember ? `${selectedMember.label}的权限` : '权限详情'} size={800}
         rootClassName="intake-permissions-detail" destroyOnHidden onClose={closeMember}>
         {detailOpen && operationFeedback}
         {(busy || view.busy) && <DeskButton onClick={()=>void apply({action:'stop'})}>停止等待</DeskButton>}
         <A11yTable<PermissionGrant> aria-label="权限明细" pagination={false} rowKey="selection" tableLayout="fixed" scroll={{ x: 680 }} dataSource={selectedMember?.grants ?? []} columns={grantColumns}
-          locale={{ emptyText: <PermissionsEmpty description="开通权限后会出现在这里。" /> }} />
+          locale={{ emptyText: <WorkbenchEmpty>开通权限后会出现在这里。</WorkbenchEmpty> }} />
         {revokeTarget && !revokeTarget.revoked ? <fieldset className="intake-permissions-form" disabled={revokeDisabled}>
           <div>{labels[revokeTarget.action]}<span className="intake-permissions-meta">{revokeTarget.scope}，记录 {shortPermissionReference(revokeTarget.reference)}</span></div>
           <label><span>撤销原因</span><Input aria-label="撤销原因" disabled={revokeDisabled} maxLength={512} value={revokeReason} onChange={event => setRevokeReason(event.target.value)} /></label>

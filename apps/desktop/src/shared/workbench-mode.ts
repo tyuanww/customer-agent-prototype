@@ -1,7 +1,12 @@
-export type WorkbenchKind = 'product-remote' | 'faq-v2' | 'legacy';
+export type WorkbenchMode =
+  | { kind: 'legacy' }
+  // The Query entry is wired for this run. The Query window still checks session and workflow access.
+  | { kind: 'product-remote' | 'faq-v2'; manualSopEntry: boolean };
+
+export type WorkbenchKind = WorkbenchMode['kind'];
 
 export type WorkbenchModeReply =
-  | { ok: true; kind: WorkbenchKind }
+  | ({ ok: true } & WorkbenchMode)
   | { ok: false; code: 'FORBIDDEN' };
 
 export function workbenchKind(profile: {

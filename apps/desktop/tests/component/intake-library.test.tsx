@@ -93,7 +93,9 @@ it('counts only the visible domain and search results in the footer',async()=>{
  expect(screen.getByRole('button', { name: '刷新可用资料' })).toBeVisible();
  expect(screen.queryByText(/读取资格已到期/)).not.toBeInTheDocument();
  await user.click(screen.getByRole('tab',{name:'SOP'}));
- expect(screen.getByRole('tabpanel')).toHaveTextContent('此分类还没有可用话术，资料审核发布后会出现在这里。');
+ const empty = screen.getByRole('cell', { name: '此分类还没有可用话术，资料审核发布后会出现在这里。' });
+ expect(empty).toBeVisible();
+ expect(empty.querySelector('img, svg')).toBeNull();
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('这一栏还没有 SOP 目录。');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('未接入');
  expect(screen.getByRole('tabpanel')).not.toHaveTextContent('SOP 接口');

@@ -1,5 +1,5 @@
 import { SopUnifiedRuntime } from './sop-unified-runtime';
-import type { SopUnifiedCommand } from '../shared/sop-unified';
+import { sopCaseLabel, type SopUnifiedCommand, type SopUnifiedProjection } from '../shared/sop-unified';
 import type { SopQueryRuntime } from './sop-query-runtime';
 import type { SopQueryCommand } from '../shared/sop-query';
 import { BrowserWindow, clipboard, nativeImage, type WebContents } from 'electron';
@@ -62,6 +62,8 @@ import { createOverlayChromeWindow } from './overlay-chrome-window';
 import { loadRenderer } from './overlay-renderer-loader';
 import { lockRendererWindow } from './window-security';
 
+const SOP_QUERY_WINDOW_TITLE = 'SOP 合成流程';
+
 export type SopWindowControllerOptions = {
   preloadPath?: string;
   legacyEnabled?: boolean;
@@ -72,6 +74,7 @@ export type SopWindowControllerOptions = {
   publishedScriptIds?: () => SopPublishSet;
   writeClipboard?: (text: string) => void;
   instance?: {
+    caseNumber: (identity: symbol) => number;
     place: (bounds: Rect, workArea: Rect, query: Rect | null) => Rect;
     placeBookmark: (workArea: Rect, size?: Size) => Rect | null;
     onClosed: () => void;
@@ -167,8 +170,9 @@ export class SopWindowController {
 
   instanceMenuLabel(): string | null {
     const runtime = this.queryRuntime;
-    if (!(runtime instanceof SopUnifiedRuntime) || !runtime.canResumeInstance()) return null;
-    return runtime.instanceName() ?? '恢复 SOP 流程';
+    if (!(runtime instanceof SopUnifiedRuntime)) return null;
+    const number = this.instanceNumber(runtime);
+    return number === null ? null : sopCaseLabel(number, runtime.instanceName() ?? '恢复 SOP 流程');
   }
 
   bounds(visibleOnly = false): Rect | null {
@@ -376,7 +380,8 @@ export class SopWindowController {
     if (this.parkedFrom || (intent === 'park-after-edge-drag' && !this.dockArmed)) return { ok: true };
     const projection = this.queryRuntime.projection();
     const name = projection.instanceName;
-    if (!name || projection.busy || this.resizing || !this.instanceMenuLabel()) {
+    const caseNumber = this.instanceNumber(this.queryRuntime);
+    if (!name || !caseNumber || projection.busy || this.resizing) {
       return sopWindowFailure('UNAVAILABLE', '当前流程不可贴边');
     }
     const current = win.getBounds();
@@ -386,7 +391,7 @@ export class SopWindowController {
     this.firstContentPlacement = false;
     this.dockArmed = false;
     this.parkedFrom = current;
-    this.showChrome(win, { kind: 'parked', name });
+    this.showChrome(win, { kind: 'parked', caseNumber, name });
     return { ok: true };
   }
 
@@ -535,8 +540,9 @@ export class SopWindowController {
       }
       this.sessionId++; this.lastLayoutSequence = 0; this.lastResizeSequence = 0; this.manualSize = null;
       this.firstContentPlacement = Boolean(this.instance);
-      const win = createOverlayChromeWindow(this.preloadPath, { width: SOP_WIDTH, height: SOP_OPEN_HEIGHT, title: 'SOP 合成流程', backgroundThrottling: false });
+      const win = createOverlayChromeWindow(this.preloadPath, { width: SOP_WIDTH, height: SOP_OPEN_HEIGHT, title: SOP_QUERY_WINDOW_TITLE, backgroundThrottling: false });
       lockRendererWindow(win); this.window = win;
+      if (this.instance) win.on('page-title-updated', event => { event.preventDefault(); });
       win.on('closed', () => {
         if (this.window === win) {
           this.window = null;
@@ -752,11 +758,25 @@ export class SopWindowController {
     return this.tree ?? ALLERGY_SOP_TREE;
   }
 
+  private instanceNumber(runtime: SopUnifiedRuntime): number | null {
+    const identity = runtime.resumableInstance();
+    return this.instance && identity !== null ? this.instance.caseNumber(identity) : null;
+  }
+
+  private projectUnifiedCase(projection: SopUnifiedProjection, runtime: SopUnifiedRuntime): SopUnifiedProjection {
+    if (!this.instance) return projection;
+    const identifiable = projection.instanceName || projection.state === 'paused' || projection.state === 'closing';
+    return { ...projection, caseNumber: identifiable ? this.instanceNumber(runtime) : null };
+  }
+
   private pushProjection(): void {
     const win = this.liveWindow();
     if (win && this.queryRuntime && !win.webContents.isDestroyed()) {
-      const projection = this.queryRuntime.projection();
+      const runtime = this.queryRuntime;
+      const result = runtime.projection();
       if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+      const projection = runtime instanceof SopUnifiedRuntime && result.projectionVersion === 'sop-unified-v11'
+        ? this.projectUnifiedCase(result, runtime) : result;
       if (this.parkedFrom && (projection.projectionVersion !== 'sop-unified-v11' || !projection.instanceName)) {
         win.hide();
         this.clearBookmark(win);
@@ -764,6 +784,12 @@ export class SopWindowController {
       if (this.instance && projection.state === 'ended' && !win.isVisible()) {
         win.destroy();
         return;
+      }
+      if (this.instance && projection.projectionVersion === 'sop-unified-v11') {
+        const title = projection.caseNumber
+          ? sopCaseLabel(projection.caseNumber, projection.instanceName ?? 'SOP 流程')
+          : SOP_QUERY_WINDOW_TITLE;
+        if (win.getTitle() !== title) win.setTitle(title);
       }
       win.webContents.send(IPC_CHANNELS.SOP_WINDOW_PROJECTION, projection);
       return;

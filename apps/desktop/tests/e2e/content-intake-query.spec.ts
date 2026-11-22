@@ -106,6 +106,11 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     if (process.env.INTAKE_QUERY_SCREENSHOT) await query.screenshot({ path: process.env.INTAKE_QUERY_SCREENSHOT });
     await expect(query.getByTestId('query-shell')).toHaveAttribute('data-layout-ready', 'true');
     await expect(query.getByTestId('copy-button-1')).toBeVisible();
+    const riskyFaq = query.getByTestId('script-card-1');
+    await expect(riskyFaq.getByText('风险提示：单独风险说明')).toBeVisible();
+    await expect(riskyFaq.locator('kbd')).toHaveCount(0);
+    await query.getByTestId('result-pane').press('1');
+    await expect(query.getByTestId('toast')).toHaveCount(0);
     const mainBeforeCopy = await app.evaluate(({ BrowserWindow }) => {
       const harness: unknown = Reflect.get(globalThis, '__demoTest');
       if (!harness || typeof harness !== 'object') throw new Error('Missing overlay harness');
@@ -181,11 +186,45 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     const filter = await query.getByTestId('intake-query-filters').boundingBox();
     expect(capsule!.height).toBe(88); expect(filter!.y).toBeGreaterThanOrEqual(capsule!.y+capsule!.height);
     if (process.env.INTAKE_QUERY_SCREENSHOT) await query.screenshot({path:process.env.INTAKE_QUERY_SCREENSHOT});
+    const scope = query.getByRole('button', { name: '查询范围', exact: true });
+    await scope.click();
+    await expect(scope).toHaveAttribute('aria-expanded', 'false');
+    const resize = query.getByRole('separator', { name: '调整查询窗宽度', exact: true });
+    for (let width = 576; width >= 360; width -= 24) {
+      await resize.press('Shift+ArrowLeft');
+      await expect(resize).toHaveAttribute('aria-valuenow', String(width));
+    }
+    const queryWindow = await app.browserWindow(query);
+    const originalBounds = await queryWindow.evaluate(window => window.getBounds());
+    await queryWindow.evaluate((window, bounds) => window.setBounds({ ...bounds, height: 240 }), originalBounds);
+    await expect.poll(() => query.evaluate(() => [innerWidth, innerHeight])).toEqual([360, 240]);
+    const scopeShop = scope.getByText('shop-b', { exact: true });
+    const scopeCount = scope.getByText('+2', { exact: true });
+    await expect(scopeShop).toBeInViewport({ ratio: 1 });
+    await expect(scopeCount).toBeInViewport({ ratio: 1 });
+    expect(await scopeShop.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    expect(await scopeCount.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await query.screenshot({ path: test.info().outputPath('faq-scope-360x240.png') });
+    await queryWindow.evaluate((window, bounds) => window.setBounds(bounds), originalBounds);
+    await scope.click();
+    await expect(query.getByTestId('intake-query-filters').locator('summary').getByText('合成洁面产品', { exact: true })).toBeVisible();
+    await expect(query.getByTestId('intake-query-filters').locator('summary').getByText('合成晨间场景', { exact: true })).toBeVisible();
     const productDetails = query.locator('details').filter({has:query.locator('summary').filter({hasText:'商品'})});
     if (await productDetails.getAttribute('open') === null) await productDetails.locator('summary').click();
     await query.getByRole('button',{name:'清除商品'}).click();
     await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
     await query.getByTestId('search-button').click();
+    await expect(query.getByTestId('no-hit')).toBeVisible();
+    const contact = query.getByText('仍需帮助时，请到客服飞书群联系值班人员。', { exact: true });
+    await expect(contact).toBeInViewport({ ratio: 1 });
+    await expect(query.getByTestId('no-hit').getByRole('link')).toHaveCount(0);
+    await query.screenshot({ path: test.info().outputPath('faq-manual-feishu.png') });
+    await query.getByRole('button', { name: '修改问句' }).click();
+    await expect(question).toBeFocused();
+    expect(await question.evaluate(input => ({
+      start: input instanceof HTMLInputElement ? input.selectionStart : null,
+      end: input instanceof HTMLInputElement ? input.selectionEnd : null,
+    }))).toEqual({ start: 0, end: '麒麟'.length });
     await expect(query.getByTestId('no-hit')).toBeVisible();
     const fox = app.windows().find(w => w.url().includes('role=fox'))!;
     expect(await fox.evaluate(() => window.customerAgent!.intakeQuery!.access())).toMatchObject({ code: 'FORBIDDEN' });

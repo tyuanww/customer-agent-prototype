@@ -93,6 +93,14 @@ html[data-role='dashboard'] .dashboard-shell .dashboard-nav-group {
   transition: opacity var(--wb-motion) var(--wb-ease);
 }
 
+.dashboard-nav-status {
+  margin-inline-start: 8px;
+  color: var(--wb-text-2);
+  -webkit-text-fill-color: currentColor;
+  font-size: var(--wb-text-meta);
+  font-weight: 400;
+}
+
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-badge,
 html[data-role='dashboard'] .dashboard-shell .dashboard-nav-item > button > small {
   min-width: 0;
@@ -265,7 +273,7 @@ html[data-role='dashboard'] .dashboard-shell .wb-state-loading .ant-skeleton-par
 html[data-role='dashboard'] .dashboard-shell .wb-state-line,
 html[data-role='dashboard'] .dashboard-shell .wb-state-empty {
   margin: 8px 0 0;
-  color: var(--wb-text-3);
+  color: var(--wb-text-2);
   font-size: var(--wb-text-meta);
   line-height: var(--wb-line-meta);
 }

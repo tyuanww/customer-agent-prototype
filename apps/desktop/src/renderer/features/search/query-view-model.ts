@@ -1,3 +1,4 @@
+import type { IntakeQueryFailure } from '@shared/content-intake-query';
 import {
   LIBRARY_DOMAIN_LABELS,
   LIBRARY_DOMAINS,
@@ -6,7 +7,7 @@ import {
 } from '@shared/library-delta';
 import type { ProductCandidate } from '@shared/product-search';
 import { PRODUCT_ERRORS } from '@shared/product-session';
-import type { RankedScript, ScriptDomain } from './types';
+import type { QueryResult, RankedScript, ScriptDomain } from './types';
 
 const PRODUCT_DOMAIN_LABEL = {
   product: '产品',
@@ -143,4 +144,22 @@ export function announceInvalidationEffect(input: {
     errorMessage: ANNOUNCE_EXPIRED_MESSAGE,
     phase: 'ERROR',
   };
+}
+export type QueryError = { message: string } & (
+  | { recovery: 'none' | 'retry-search' | 'refresh-shops' | 'retry-dashboard' }
+  | { recovery: 'retry-copy'; result: QueryResult }
+);
+
+export function intakeScopeFailure(failure: IntakeQueryFailure): QueryError {
+  switch (failure.code) {
+    case 'NO_GRANT':
+      return { message: `${failure.message}请联系管理员确认可查询店铺和使用期限。`, recovery: 'none' };
+    case 'UNAVAILABLE':
+    case 'STALE':
+    case 'EXPIRED':
+    case 'FORBIDDEN':
+      return { message: failure.message, recovery: 'refresh-shops' };
+    default:
+      return { message: failure.message, recovery: 'none' };
+  }
 }

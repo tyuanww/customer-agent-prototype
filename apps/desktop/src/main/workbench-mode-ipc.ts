@@ -9,11 +9,13 @@ export function registerWorkbenchModeIpc(
   profile: PackagedProductProfile | null,
   dashboard: () => WebContents | null,
   devUrl: () => string | undefined,
+  manualSopEntry: boolean,
 ): { dispose(): void } {
   const handle = (event: IpcMainInvokeEvent): WorkbenchModeReply => {
     const contents = dashboard();
     if (!contents || !isTrustedMainFrameSender(event, [contents], devUrl())) return { ok: false, code: 'FORBIDDEN' };
-    return { ok: true, kind: workbenchKind(profile) };
+    const kind = workbenchKind(profile);
+    return kind === 'legacy' ? { ok: true, kind } : { ok: true, kind, manualSopEntry };
   };
   ipcMain.handle(CHANNEL, handle);
   return { dispose: () => { ipcMain.removeHandler(CHANNEL); } };

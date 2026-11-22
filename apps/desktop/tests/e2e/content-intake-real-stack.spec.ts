@@ -364,7 +364,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       // Use the displayed button directly, without a search or refresh after revocation.
       await query.getByTestId('copy-button-1').click();
       await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
-      await expect(query.getByTestId('error-state')).toContainText('资料资格已失效，请重新查询。');
+      await expect(query.getByTestId('error-state').getByRole('button', { name: '刷新店铺' })).toBeVisible();
       expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('合成撤权复制检查哨兵');
       const use = (await host.status()).purposeQueries;
       expect(use.business).toBeGreaterThan(10); expect(use.usage).toBeGreaterThan(10); expect(use.worker).toBeGreaterThan(10);

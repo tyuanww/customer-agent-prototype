@@ -265,9 +265,10 @@ if (!gotLock) {
       () => productSession !== null,
     );
     registerOverlayIpc(() => controller);
+    const getSop = () => sopInstances ?? sopController;
     registerSopWindowIpc({
       getOverlay: () => controller,
-      getSop: () => sopInstances ?? sopController,
+      getSop,
       getSopForContents: (contents) => sopInstances?.fromContents(contents)
         ?? (sopController?.isSopContents(contents) ? sopController : null),
     });
@@ -351,7 +352,8 @@ if (!gotLock) {
     intakeManagement = registerContentIntakeManagementIpc(workbenchSession,
       () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl, productProfile ?? null);
     registerWorkbenchModeIpc(productProfile ?? null,
-      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl);
+      () => controller?.dashboardWebContents() ?? null, () => controller?.rendererDevServerUrl,
+      workbenchSession !== null && getSop()?.entryAvailable() === true);
     intakeQuery = registerContentIntakeQueryIpc(workbenchSession,
       () => controller?.trustedContents() ?? [], contents => controller?.overlayRoleOf(contents) ?? null,
       () => controller?.rendererDevServerUrl, () => {
