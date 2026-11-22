@@ -2712,4 +2712,9 @@ html[data-role='fox'] #root {
   margin: 0;
 }
 
+.intake-faq-empty-contact {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .intake-term-options input[type="checkbox"] { accent-color: var(--fox); }

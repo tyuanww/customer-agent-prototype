@@ -105,6 +105,9 @@ export function QueryResultsPane({
                     : candidateStatus ? '没有匹配的 FAQ 话术。' : '没找到可用话术'}
                 </strong>
                 <Button className="retry-btn" onClick={intakeSop.onEditQuestion}>修改问句</Button>
+                {!hasCandidates && candidateStatus !== 'searching' ? (
+                  <p className="intake-faq-empty-contact">仍需帮助时，请到客服飞书群联系值班人员。</p>
+                ) : null}
               </div>
             ) : null}
             {phase === 'EMPTY' && !intakeSop ? (
