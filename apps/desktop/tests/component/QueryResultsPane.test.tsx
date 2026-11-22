@@ -9,6 +9,7 @@ import {
   SCRIPT_INACCURACY_RECORDED_STATUS,
 } from '../../src/renderer/features/search/query-view';
 import type { QueryResult, RankedScript } from '../../src/renderer/features/search/types';
+import type { IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
 
 function rankedScript(overrides: Partial<RankedScript> = {}): RankedScript {
   return {
@@ -32,7 +33,7 @@ function rankedScript(overrides: Partial<RankedScript> = {}): RankedScript {
 function renderResults(input: {
   results?: RankedScript[];
   copiedRank?: 1 | 2 | 3 | null;
-  onCopy?: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
+  onCopy?: (script: QueryResult, trigger: HTMLElement | null) => void;
 } = {}) {
   const onCopy = input.onCopy ?? vi.fn();
   render(
@@ -51,6 +52,37 @@ function renderResults(input: {
   );
   return { onCopy };
 }
+
+describe('FAQ manual Feishu contact guidance', () => {
+  const message = '仍需帮助时，请到客服飞书群联系值班人员。';
+
+  it('shows a manual next step and preserves the edit action when there is no match', async () => {
+    const user = userEvent.setup();
+    const onEditQuestion = vi.fn();
+    const onOpenHelp = vi.fn();
+    render(<QueryResultsPane phase="EMPTY" resultPaneRef={null} statusBannerRef={null} resultContentRef={null}
+      intakeSop={{ event: null, manualEntry: null, onEditQuestion, onLayoutChange: vi.fn() }}
+      errorMessage="" results={[]} copying={false} copiedRank={null} onCopy={vi.fn()} onOpenHelp={onOpenHelp} />);
+
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(onOpenHelp).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '修改问句' }));
+    expect(onEditQuestion).toHaveBeenCalledOnce();
+    expect(onOpenHelp).not.toHaveBeenCalled();
+  });
+
+  it.each<IntakeSopCandidatesEvent>([
+    { contextId: 'fixture', status: 'searching' },
+    { contextId: 'fixture', candidates: [{ key: 'fixture-sop', label: '合成办理流程' }] },
+  ])('withholds the manual guidance while SOP is searching or a candidate is available', event => {
+    render(<QueryResultsPane phase="EMPTY" resultPaneRef={null} statusBannerRef={null} resultContentRef={null}
+      intakeSop={{ event, manualEntry: null, onEditQuestion: vi.fn(), onLayoutChange: vi.fn() }}
+      errorMessage="" results={[]} copying={false} copiedRank={null} onCopy={vi.fn()} />);
+
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+  });
+});
 
 describe('QueryResultsPane script inaccuracy report', () => {
   it('does not show the inaccuracy control on empty results', () => {

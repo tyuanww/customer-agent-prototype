@@ -1,4 +1,4 @@
-import type { SopUnifiedCommand, SopUnifiedProjection } from './sop-unified';
+import { isSopCaseNumber, type SopUnifiedCommand, type SopUnifiedProjection } from './sop-unified';
 import type { SopQueryProjection, SopQueryCommand } from './sop-query';
 import type { SopPipelineProjection } from './sop-pipeline';
 import type { WindowResizeDirection } from './window-resize-geometry';
@@ -91,7 +91,7 @@ export type SopResizeRequest = { sessionId: number; sequence: number } & (
 );
 
 export type SopBookmarkIntent = 'park' | 'park-after-edge-drag' | 'restore' | 'restore-hover';
-export type SopWindowChrome = { kind: 'expanded' } | { kind: 'parked'; name: string };
+export type SopWindowChrome = { kind: 'expanded' } | { kind: 'parked'; caseNumber: number; name: string };
 
 export type SopWindowApi = {
   unifiedCommand?(command: SopUnifiedCommand): Promise<SopWindowResult>;
@@ -202,7 +202,8 @@ export function isSopWindowChrome(value: unknown): value is SopWindowChrome {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const chrome = value as Record<string, unknown>;
   return chrome.kind === 'expanded' && hasExactKeys(chrome, ['kind'])
-    || chrome.kind === 'parked' && hasExactKeys(chrome, ['kind', 'name'])
+    || chrome.kind === 'parked' && hasExactKeys(chrome, ['kind', 'caseNumber', 'name'])
+      && isSopCaseNumber(chrome.caseNumber)
       && typeof chrome.name === 'string' && chrome.name.length > 0 && chrome.name.length <= 512;
 }
 

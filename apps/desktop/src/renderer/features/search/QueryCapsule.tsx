@@ -12,7 +12,7 @@ import {
 type QueryCapsuleProps = {
   productControl?: React.ReactNode;
   scopeControl?: {
-    context: string;
+    context: { shop: string; filterCount: number } | null;
     description: string;
     panelId: string;
     open: boolean;
@@ -88,7 +88,7 @@ export function QueryCapsule({
       ) : <span className="validation-error" role="status">{manualSopError}</span>}
     </p>
   ) : null;
-  const scopeContext = signedIn ? scopeControl?.context : '';
+  const scopeContext = signedIn ? scopeControl?.context : null;
 
   return (
         <div className="query-capsule" data-intake={intake ? true : undefined}>
@@ -181,7 +181,10 @@ export function QueryCapsule({
                     }}
                   >
                     <span className="query-scope-label">查询范围</span>
-                    {scopeContext ? <span className="query-scope-context" aria-hidden="true">{scopeContext}</span> : null}
+                    {scopeContext ? <>
+                      <span className="query-scope-shop" aria-hidden="true">{scopeContext.shop}</span>
+                      {scopeContext.filterCount > 0 ? <span className="query-scope-count" aria-hidden="true">+{scopeContext.filterCount}</span> : null}
+                    </> : null}
                   </button>
                   {signedIn ? <span className="sr-only" id={scopeDescriptionId}>{scopeControl.description}</span> : null}
                 </> : !intake ? <div className="capsule-tools-end">

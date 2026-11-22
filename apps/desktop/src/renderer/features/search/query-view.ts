@@ -16,6 +16,7 @@ import {
   type ProductSessionResult,
   type ProductSessionView,
 } from '@shared/product-session';
+import { isIntakeRow, type QueryResult } from './types';
 
 export function sessionEntryLabel(state: ProductSessionView): string {
   return sessionDisplayName({
@@ -117,6 +118,10 @@ export function resultCopyRankFromKey(code: string, key: string): 1 | 2 | 3 | nu
     return null;
   }
   return Number(rank) as 1 | 2 | 3;
+}
+
+export function hasResultCopyShortcut(result: QueryResult): boolean {
+  return !isIntakeRow(result) || !result.riskNote.trim();
 }
 
 export function maxContentBottom(

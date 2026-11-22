@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { sopCaseLabel } from '@shared/sop-unified';
 
-export function SopBookmark({ name }: { name: string }) {
+export function SopBookmark({ caseNumber, name }: { caseNumber: number; name: string }) {
+  const label = sopCaseLabel(caseNumber, name);
   const timer = useRef<number | undefined>(undefined);
   const cancelHover = () => window.clearTimeout(timer.current);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return <button
     type="button"
     className="sop-bookmark"
-    aria-label={`恢复 ${name}`}
-    title={name}
+    aria-label={`恢复 ${label}`}
+    title={label}
     onPointerEnter={event => {
       if (event.pointerType !== 'mouse') return;
       cancelHover();
@@ -19,5 +21,5 @@ export function SopBookmark({ name }: { name: string }) {
       cancelHover();
       void window.sopWindow?.bookmark?.('restore');
     }}
-  >{name}</button>;
+  >{label}</button>;
 }

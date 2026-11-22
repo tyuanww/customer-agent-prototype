@@ -5,13 +5,17 @@ import type { useIntakeShops } from './use-intake-shops';
 type IntakeFilterState = ReturnType<typeof useIntakeShops>;
 export const INTAKE_FILTER_PANEL_ID = 'intake-filter-body';
 
-function Terms({ label, options, selected, disabled, onChange, onLayoutChange }: {
-  label: string; options: IntakeQueryOption[]; selected: string[]; disabled: boolean; onChange: (ids: string[]) => void; onLayoutChange: () => void;
+function Terms({ label, options, selected, selectedLabels, disabled, onChange, onLayoutChange }: {
+  label: string; options: IntakeQueryOption[]; selected: string[]; selectedLabels: string[]; disabled: boolean;
+  onChange: (ids: string[]) => void; onLayoutChange: () => void;
 }) {
   const [text, setText] = useState('');
   const matches = options.filter(option => option.label.includes(text.trim()) || option.id.includes(text.trim()));
   return <details className="intake-terms" onToggle={onLayoutChange}>
-    <summary>{label} · {selected.length ? `已选 ${selected.length}` : '全部'}</summary>
+    <summary>
+      {label} · {selected.length ? `已选 ${selected.length}` : '全部'}
+      {selectedLabels.length ? <span className="intake-selected-terms">{selectedLabels.join('、')}</span> : null}
+    </summary>
     <fieldset disabled={disabled}>
       <legend className="sr-only">{label}查询范围</legend>
       <input aria-label={`查找${label}`} value={text} onChange={event => { setText(event.target.value); onLayoutChange(); }} placeholder={`查找${label}`} />
@@ -45,28 +49,24 @@ export function describeIntakeQueryScope(state: IntakeFilterState) {
   const shop = state.shopId ? shopLabels.get(state.shopId) ?? state.shopId : '';
   const products = state.productIds.map(id => state.products.find(option => option.id === id)?.label ?? id);
   const scenarios = state.scenarioIds.map(id => state.scenarios.find(option => option.id === id)?.label ?? id);
-  const context = [
-    products.length ? `商品 ${products.length === 1 ? products[0] : products.length}` : '',
-    scenarios.length ? `场景 ${scenarios.length === 1 ? scenarios[0] : scenarios.length}` : '',
-    state.shops.length > 1 ? shop : '',
-  ].filter(Boolean).join(' · ');
   const description = [
     shop || (state.busy ? '读取店铺中' : '未选店铺'),
     products.length ? `商品 ${products.join('、')}` : '商品全部',
     scenarios.length ? `场景 ${scenarios.join('、')}` : '场景全部',
   ].join(' · ');
-  return { shopLabels, usingShopIds: state.shops.some(id => !names.has(id)), context, description };
+  const context = shop ? { shop, filterCount: products.length + scenarios.length } : null;
+  return { shopLabels, usingShopIds: state.shops.some(id => !names.has(id)), context, description, products, scenarios };
 }
 
 export function IntakeQueryFilters({ state, scope, signedIn, open, shopControlRef, showError, onLayoutChange }: {
-  state: IntakeFilterState; scope: Pick<ReturnType<typeof describeIntakeQueryScope>, 'shopLabels' | 'usingShopIds'>;
+  state: IntakeFilterState; scope: ReturnType<typeof describeIntakeQueryScope>;
   signedIn: boolean; open: boolean; shopControlRef?: Ref<HTMLDivElement>; showError: boolean; onLayoutChange: () => void;
 }) {
   const disabled = state.busy || !signedIn;
   const layoutRef = useRef(onLayoutChange);
   layoutRef.current = onLayoutChange;
   useEffect(() => { layoutRef.current(); }, [state.error]);
-  const error = showError && state.error ? <p role="alert" className="validation-error">{state.error}</p> : null;
+  const error = showError && state.error ? <p role="alert" className="validation-error">{state.error.message}</p> : null;
   return <div className="intake-query-filters" data-testid="intake-query-filters" data-open={open ? 'true' : 'false'}>
     {open ? <div className="intake-filter-body" id={INTAKE_FILTER_PANEL_ID}>
       <div className="intake-shop-control" ref={shopControlRef}>
@@ -78,11 +78,14 @@ export function IntakeQueryFilters({ state, scope, signedIn, open, shopControlRe
         </select>
         <button type="button" className="retry-btn" disabled={disabled} onClick={() => { void state.load(); }}>刷新店铺</button>
       </div>
+      {scope.context ? <p className="intake-selected-shop">{scope.context.shop}</p> : null}
       {scope.usingShopIds ? <p role="status">当前显示店铺编号。</p> : null}
       <div className="intake-condition-controls">
-        <Terms onLayoutChange={onLayoutChange} label="商品" options={state.products} selected={state.productIds} disabled={disabled || !state.shopId}
+        <Terms onLayoutChange={onLayoutChange} label="商品" options={state.products} selected={state.productIds}
+          selectedLabels={scope.products} disabled={disabled || !state.shopId}
           onChange={productIds => { void state.selectConditions({ productIds, scenarioIds: state.scenarioIds }); }} />
-        <Terms onLayoutChange={onLayoutChange} label="场景" options={state.scenarios} selected={state.scenarioIds} disabled={disabled || !state.shopId}
+        <Terms onLayoutChange={onLayoutChange} label="场景" options={state.scenarios} selected={state.scenarioIds}
+          selectedLabels={scope.scenarios} disabled={disabled || !state.shopId}
           onChange={scenarioIds => { void state.selectConditions({ productIds: state.productIds, scenarioIds }); }} />
       </div>
       <p role="status">未选条件时查询全部授权话术。请点击查询。</p>

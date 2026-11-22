@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { emptyIntakeQueryContext, type IntakeQuerySelection, type IntakeQueryContext } from '@shared/content-intake-query';
+import { intakeScopeFailure, type QueryError } from './query-view-model';
 
 /** Menu intent state only. Main must authorize even IDs returned by this hook. */
-export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: number, reset: (expiredError?: string) => void) {
+export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: number, reset: (expiredError?: QueryError) => void) {
   const [context, setContext] = useState<IntakeQueryContext>(emptyIntakeQueryContext);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<QueryError | null>(null);
   const sequence = useRef(0);
   // Notice changes update view-reset behavior without restarting discovery.
   const resetRef = useRef(reset); resetRef.current = reset;
@@ -13,44 +14,45 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
     const api = window.customerAgent?.intakeQuery;
     if (!enabled || !signedIn || !api) return;
     const request = ++sequence.current;
-    resetRef.current(); setBusy(true); setError(''); setContext(emptyIntakeQueryContext());
+    resetRef.current(); setBusy(true); setError(null); setContext(emptyIntakeQueryContext());
     try {
       const value = await (shopId ? api.selectShop({ shopId }) : api.access());
       if (request !== sequence.current) return;
       if (value.ok) setContext(value);
-      else {
-        setError(value.code === 'NO_GRANT'
-          ? `${value.message}请联系管理员确认可查询店铺和使用期限。`
-          : value.message);
-      }
-    } catch { if (request === sequence.current) setError('店铺读取失败，请重试。'); }
+      else setError(intakeScopeFailure(value));
+    } catch {
+      if (request === sequence.current) setError({ message: '店铺读取失败，请刷新店铺。', recovery: 'refresh-shops' });
+    }
     finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
   const selectConditions = useCallback(async (selection: IntakeQuerySelection) => {
     const api = window.customerAgent?.intakeQuery;
     if (!enabled || !signedIn || !api) return;
     const request = ++sequence.current;
-    resetRef.current(); setBusy(true); setError('');
+    resetRef.current(); setBusy(true); setError(null);
     // Reflect the checkbox intent immediately; search stays disabled until Main accepts it.
     setContext(current => ({ ...current, ...selection }));
     try {
       const value = await api.selectConditions(selection);
       if (request !== sequence.current) return;
       if (value.ok) setContext(value);
-      else { setContext(emptyIntakeQueryContext()); setError(value.message); }
+      else { setContext(emptyIntakeQueryContext()); setError(intakeScopeFailure(value)); }
     } catch {
-      if (request === sequence.current) { setContext(emptyIntakeQueryContext()); setError('查询范围更新失败，请刷新店铺。'); }
+      if (request === sequence.current) {
+        setContext(emptyIntakeQueryContext());
+        setError({ message: '查询范围更新失败，请刷新店铺。', recovery: 'refresh-shops' });
+      }
     } finally { if (request === sequence.current) { resetRef.current(); setBusy(false); } }
   }, [enabled, signedIn]);
   useEffect(() => {
     if (!context.validUntil) return;
     const timer = setTimeout(() => {
-      const message = '查询范围资格已到期，请刷新店铺。';
+      const expiration: QueryError = { message: '查询范围资格已到期，请刷新店铺。', recovery: 'refresh-shops' };
       sequence.current++;
-      resetRef.current(message);
+      resetRef.current(expiration);
       setContext(emptyIntakeQueryContext());
       setBusy(false);
-      setError(message);
+      setError(expiration);
     }, Math.max(0, Math.min(2_147_483_647, Date.parse(context.validUntil) - Date.now())));
     return () => clearTimeout(timer);
   }, [context.validUntil]);
@@ -62,7 +64,7 @@ export function useIntakeShops(enabled: boolean, signedIn: boolean, epoch: numbe
   }, [context.shopNamesValidUntil]);
   const invalidate = useCallback(() => { sequence.current++; }, []);
   useEffect(() => {
-    invalidate(); setContext(emptyIntakeQueryContext()); setError(''); setBusy(false);
+    invalidate(); setContext(emptyIntakeQueryContext()); setError(null); setBusy(false);
     if (enabled && signedIn) void load();
     return invalidate;
   }, [enabled, signedIn, epoch, load, invalidate]);

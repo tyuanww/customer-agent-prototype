@@ -10,6 +10,15 @@ export type SopTask = SopSchemas['IntakeSopNode'];
 export type SopMedia = SopGraphResult['media'][number];
 export type SopEntryRef = SopSchemas['IntakeSopEntryRef'];
 export const SOP_INSTANCE_NAME_MAX_LENGTH = 80;
+
+export function isSopCaseNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function sopCaseLabel(caseNumber: number, name: string): string {
+  return `#${String(caseNumber).padStart(2, '0')} ${name}`;
+}
+
 export type SopUnifiedCommand =
   | { kind: 'query'; shopKey: string; group: SopQueryGroup; text: string }
   | { kind: 'rename'; name: string }
@@ -22,6 +31,8 @@ type ProjectionBase = {
   projectionVersion: 'sop-unified-v11';
   sessionId: number;
   entry?: 'candidate';
+  /** Local display ordinal, or null before an authorized case is available. Legacy windows omit it. */
+  caseNumber?: number | null;
   shops: { key: string; label: string }[];
   notice: string;
   busy: boolean;
@@ -112,7 +123,8 @@ export function isSopUnifiedCommand(value: unknown): value is SopUnifiedCommand 
 export function isSopUnifiedProjection(value: unknown): value is SopUnifiedProjection {
   if (!record(value)
     || !exact(value, ['projectionVersion', 'sessionId', 'shops', 'notice', 'busy', 'copied', 'state', 'title', 'node',
-      ...('instanceName' in value ? ['instanceName'] : []), ...('entry' in value ? ['entry'] : [])])
+      ...('instanceName' in value ? ['instanceName'] : []), ...('entry' in value ? ['entry'] : []),
+      ...('caseNumber' in value ? ['caseNumber'] : [])])
     || value.projectionVersion !== 'sop-unified-v11'
     || ('entry' in value && value.entry !== 'candidate')
     || !Number.isSafeInteger(value.sessionId)
@@ -120,6 +132,8 @@ export function isSopUnifiedProjection(value: unknown): value is SopUnifiedProje
     || !string(value.notice)
     || typeof value.busy !== 'boolean'
     || typeof value.copied !== 'boolean'
+    || ('caseNumber' in value && value.caseNumber !== null && (!isSopCaseNumber(value.caseNumber)
+      || !(value.state === 'paused' || value.state === 'closing' || (value.state === 'ready' && 'instanceName' in value))))
     || ('instanceName' in value && (!string(value.instanceName, 512) || !value.instanceName.trim()))
     || !array(value.shops, 1000, shop => record(shop)
       && exact(shop, ['key', 'label'])
