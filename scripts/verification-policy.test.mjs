@@ -834,7 +834,7 @@ test('workflow and package gates consume the dependency-map runner', () => {
   }
   assert.match(packageJson.scripts['verify:changed'], /verification-policy\.mjs run/u);
   assert.deepEqual(map.checks['workflow-tests'].command, [
-    ['pnpm', '--filter', '@customer-agent/database', 'build'],
+    ['pnpm', 'build:services'],
     ['pnpm', 'test:workflow'],
   ]);
 

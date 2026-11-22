@@ -86,7 +86,7 @@
     "architecture": { "job": "quick", "command": [["pnpm","check:architecture"]] },
     "workspace-check": { "job": "quick", "command": [["node","scripts/workspace-hygiene.mjs","check"]] },
     "workspace-hygiene-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","exec","vitest","run","tests/unit/workspace-hygiene.test.ts"]] },
-    "workflow-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/database","build"],["pnpm","test:workflow"]] },
+    "workflow-tests": { "job": "quick", "command": [["pnpm","build:services"],["pnpm","test:workflow"]] },
     "desktop-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test"]] },
     "overlay-unit": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test","--","overlay"]] },
     "api-tests": { "job": "quick", "command": [["pnpm","test:api"]] },
