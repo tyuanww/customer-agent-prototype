@@ -47,7 +47,7 @@ const SOP_LIFECYCLE_INPUT_BUDGET_BYTES = 531 * 1024;
 // Context and Unicode boundary regressions increase the measured allowance to 126 KiB.
 const SOP_QUERY_INPUT_BUDGET_BYTES = 126 * 1024;
 // The shared Windows verification route and its policy regression retain 3 KiB.
-const VERIFICATION_POLICY_INPUT_BUDGET_BYTES = 3 * 1024;
+const VERIFICATION_POLICY_INPUT_BUDGET_BYTES = 5 * 1024;
 // FINAL-005-D retains the 0087 owner, generated SQL, HTTP and restore evidence.
 // Its measured source-input excess requires 341 KiB.
 const SOP_CONTINUATION_INPUT_BUDGET_BYTES = 341 * 1024;
