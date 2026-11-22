@@ -202,7 +202,7 @@ it('creates an outsourced seat from an intent and does not keep the password on 
   expect(intents.some(intent=>intent.action==='disable')).toBe(false);
   await user.click(confirm);
   expect(intents.some(intent=>intent.action==='disable'&&'username' in intent&&intent.username==='seatui')).toBe(true);
-  expect(within(row).getByRole('cell',{name:/已停用/})).toBeInTheDocument();
+  expect(await screen.findByRole('row',{name:/seatui.*已停用/})).toBeInTheDocument();
  }finally{main.dispose();}
 });
 
