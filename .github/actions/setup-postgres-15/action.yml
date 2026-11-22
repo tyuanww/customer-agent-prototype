@@ -1,0 +1,27 @@
+name: Set up PostgreSQL 15 tests
+description: Install workspace dependencies and the PostgreSQL 15 test binaries.
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: 11.19.0
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 24
+        cache: pnpm
+    - name: Install PostgreSQL 15 binaries
+      shell: bash
+      run: |
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl --fail --show-error --silent \
+          -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+          https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        . /etc/os-release
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+          | sudo tee /etc/apt/sources.list.d/pgdg.list
+        sudo apt-get update
+        sudo apt-get install --yes postgresql-15
+        echo "/usr/lib/postgresql/15/bin" >> "$GITHUB_PATH"
+    - shell: bash
+      run: pnpm install --frozen-lockfile
