@@ -69,53 +69,31 @@ jobs:
 
   postgres-15:
     needs: changes
-    name: PostgreSQL 15 integration
+    name: PostgreSQL 15 storage and identity
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - if: needs.changes.outputs.mode != 'full'
-        run: echo "This change scope does not require PostgreSQL integration."
-      - if: needs.changes.outputs.mode == 'full'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # Historical keyword baseline provenance is verified against Git.
-      - if: needs.changes.outputs.mode == 'full'
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: ./.github/actions/setup-postgres-15
+      - run: pnpm test:db:integration
+      - run: pnpm test:backup:integration
+      - run: pnpm test:identity:integration
+      - run: pnpm --filter @customer-agent/api test:e2e:backend
+      - run: pnpm test:g1a:e0:ci
+
+  postgres-15-api:
+    needs: changes
+    name: PostgreSQL 15 API integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          version: 11.19.0
-      - if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - if: needs.changes.outputs.mode == 'full'
-        name: Install PostgreSQL 15 binaries
-        shell: bash
-        run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl --fail --show-error --silent \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-            https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          . /etc/os-release
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-15
-          echo "/usr/lib/postgresql/15/bin" >> "$GITHUB_PATH"
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm install --frozen-lockfile
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm test:db:integration
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm test:backup:integration
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm --filter @customer-agent/api test:integration
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm test:identity:integration
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm --filter @customer-agent/api test:e2e:backend
-      - if: needs.changes.outputs.mode == 'full'
-        run: pnpm test:g1a:e0:ci
+          fetch-depth: 0 # Historical keyword baseline provenance is verified against Git.
+      - uses: ./.github/actions/setup-postgres-15
+      - run: pnpm --filter @customer-agent/api test:integration
 
   windows-feasibility:
     needs: changes
@@ -238,7 +216,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [changes, quality, postgres-15, windows-feasibility, linux-feasibility]
+    needs: [changes, quality, postgres-15, postgres-15-api, windows-feasibility, linux-feasibility]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
