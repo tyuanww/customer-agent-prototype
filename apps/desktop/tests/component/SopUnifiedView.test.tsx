@@ -150,7 +150,7 @@ it('parks immediately with the case number and name and restores the same step',
 });
 
 it('asks before ending a case and confirms only the current window intent', async () => {
-  render(<SopApp projection={{ ...projection, caseNumber: 2, instanceName: '合成办理乙' }} />);
+  const { rerender } = render(<SopApp projection={{ ...projection, caseNumber: 2, instanceName: '合成办理乙' }} />);
   const end = screen.getByRole('button', { name: '结束办理' });
   fireEvent.click(end);
   const dialog = await screen.findByRole('dialog', { name: '结束当前办理？' });
@@ -160,6 +160,12 @@ it('asks before ending a case and confirms only the current window intent', asyn
   await waitFor(() => expect(dialog).not.toBeVisible());
   expect(unifiedCommand).not.toHaveBeenCalled();
   fireEvent.click(end);
+  await screen.findByRole('dialog', { name: '结束当前办理？' });
+  rerender(<SopApp projection={{ ...projection, caseNumber: 3, instanceName: '合成办理丙' }} />);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '结束当前办理？' })).not.toBeInTheDocument());
+  expect(unifiedCommand).not.toHaveBeenCalled();
+  fireEvent.click(end);
+  expect(await screen.findByText(/#03 合成办理丙.*进度/)).toBeVisible();
   const confirm = await screen.findByRole('button', { name: '确认结束' });
   fireEvent.click(confirm);
   await waitFor(() => expect(unifiedCommand).toHaveBeenCalledExactlyOnceWith({ kind: 'clear' }));

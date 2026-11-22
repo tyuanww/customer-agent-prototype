@@ -20,7 +20,7 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState('');
   const [nameDraft, setNameDraft] = useState<string | null>(null);
-  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [confirmingCaseNumber, setConfirmingCaseNumber] = useState<number | null>(null);
   const guidanceId = useId();
   const endCancel = useRef<HTMLButtonElement>(null);
   const busy = waiting || projection.busy;
@@ -40,11 +40,11 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   const node = projection.state === 'ready' ? projection.node : null;
   const caseName = projection.instanceName || projection.title || 'SOP 流程';
   const caseTitle = projection.caseNumber ? sopCaseLabel(projection.caseNumber, caseName) : caseName;
-  const canEndCase = Boolean(projection.caseNumber && projection.state !== 'closing');
-  const endDialogOpen = canEndCase && confirmEnd;
+  const endableCaseNumber = projection.state === 'closing' ? null : projection.caseNumber ?? null;
+  const endDialogOpen = endableCaseNumber !== null && endableCaseNumber === confirmingCaseNumber;
   useEffect(() => {
-    if (!canEndCase) setConfirmEnd(false);
-  }, [canEndCase]);
+    if (!endDialogOpen) setConfirmingCaseNumber(null);
+  }, [endDialogOpen]);
   const canPark = Boolean(projection.caseNumber && projection.instanceName && !busy && !endDialogOpen && nameDraft === null);
   const requiredMedia = node?.media.filter(item => item.required) ?? [];
   const missingMedia = requiredMedia.filter(item => item.state !== 'ready');
@@ -83,8 +83,8 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
             if (!result.ok) setError(result.message);
           });
         }}>暂放</Button> : null}
-        {canEndCase ? <Button type="text" className="sop-park" disabled={busy}
-          onClick={() => setConfirmEnd(true)}>结束办理</Button> : null}
+        {endableCaseNumber !== null ? <Button type="text" className="sop-park" disabled={busy}
+          onClick={() => setConfirmingCaseNumber(endableCaseNumber)}>结束办理</Button> : null}
         <Button type="text" className="sop-close" aria-label="收起流程，保留进度" onClick={() => { void window.sopWindow?.close(); }}>×</Button>
       </header>
       <div className="sop-body"><div className="sop-unified-content">
@@ -163,11 +163,11 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
     <Modal open={endDialogOpen} title="结束当前办理？" width={360} centered
       closable={false} mask={{ closable: false }} destroyOnHidden transitionName="" maskTransitionName=""
       afterOpenChange={open => { if (open) endCancel.current?.focus(); }}
-      onCancel={() => setConfirmEnd(false)}
+      onCancel={() => setConfirmingCaseNumber(null)}
       footer={[
-        <Button key="cancel" ref={endCancel} autoInsertSpace={false} onClick={() => setConfirmEnd(false)}>取消</Button>,
-        <Button key="confirm" type="primary" danger disabled={busy} onClick={() => {
-          setConfirmEnd(false);
+        <Button key="cancel" ref={endCancel} autoInsertSpace={false} onClick={() => setConfirmingCaseNumber(null)}>取消</Button>,
+        <Button key="confirm" type="primary" danger disabled={!endDialogOpen || busy} onClick={() => {
+          setConfirmingCaseNumber(null);
           void command({ kind: 'clear' });
         }}>确认结束</Button>,
       ]}>
