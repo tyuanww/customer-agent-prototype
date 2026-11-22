@@ -36,7 +36,10 @@ html[data-dashboard-theme='dark'] .dashboard-shell.is-intake .wb9,
 .wb9 button,.wb9 input,.wb9 select{font:inherit;color:inherit}
 .wb9 .ant-btn-primary:not(:disabled),
 .wb9 .ant-btn-primary:not(:disabled):hover,
-.wb9 .ant-btn-primary:not(:disabled):active { color:var(--wb-surface); }
+.wb9 .ant-btn-primary:not(:disabled):active { color:var(--wb-on-accent); }
+.wb9 .ant-btn-primary.ant-btn-color-primary:not(:disabled):hover:not(:active) {
+  background-color:color-mix(in srgb, var(--wb-accent-hover) 70%, var(--wb-accent));
+}
 .wb9 button.ant-btn-link:not(.ant-btn-dangerous):not(.tab) { color: var(--chart-use); }
 .wb9 button.ant-btn-dangerous { color: var(--danger); }
 .wb9 button{cursor:pointer}
