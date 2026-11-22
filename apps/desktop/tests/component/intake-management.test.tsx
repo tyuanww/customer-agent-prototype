@@ -33,7 +33,7 @@ function destinationContext(overrides: Partial<IntakeDestinationContext> = {}): 
   return {
     active: 'materials', canViewGrantSettings: false, canManageAccounts: false, canUploadSop: false,
     seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'owner:director', workbenchMode: 'faq-v2',
-    workbenchStatus: 'ready', onRetryWorkbench: () => undefined,
+    workbenchStatus: 'ready', showManualSopHint: false, onRetryWorkbench: () => undefined,
     snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
     ...overrides,
   };

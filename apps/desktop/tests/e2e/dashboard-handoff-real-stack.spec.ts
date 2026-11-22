@@ -65,8 +65,12 @@ test('dashboard handoff: collapsed filters and account logout across windows', a
     const overviewRequests = (await host.status()).requests;
     for (const route of ['/v1/events/usage', '/v1/metrics/question', '/v1/metrics/iteration-tasks', '/v1/metrics/inaccuracy-outcomes']) expect(overviewRequests).not.toContain(route);
     await dashboard.screenshot({ path: path.join(evidence, 'workspace.png') });
-    await dashboard.getByTestId('nav-sop').click();
-    await expect(dashboard.getByTestId('module-sop')).toContainText('SOP 学习与执行尚未开放。');
+    const sopTab = dashboard.getByRole('tab', { name: 'SOP', exact: true });
+    await expect(sopTab).toHaveAccessibleDescription('尚未开放');
+    await sopTab.click();
+    const sopPanel = dashboard.getByTestId('module-sop');
+    await expect(sopPanel).toContainText('工作台尚未开放 SOP 学习与执行。');
+    await expect(sopPanel).not.toContainText('手动找流程');
     await expect(dashboard.getByTestId('sop-upload')).toHaveCount(0);
     await dashboard.getByTestId('nav-wording').click();
     await expect(dashboard.getByRole('tab', { name: '本机草稿', exact: true })).toHaveCount(0);

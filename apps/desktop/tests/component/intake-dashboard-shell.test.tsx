@@ -221,7 +221,7 @@ it('keeps the intake pages inside 980 by 680 in light and dark', async () => {
     }
     expect(getComputedStyle(content).overflowX).toBe('hidden');
     await user.click(screen.getByTestId('nav-sop'));
-    expect(screen.getByTestId('module-sop')).toHaveTextContent('SOP 学习与执行尚未开放。');
+    expect(screen.getByTestId('module-sop')).toHaveTextContent('工作台尚未开放 SOP 学习与执行。');
     await user.click(screen.getByTestId('nav-wording'));
     expect(screen.getByRole('region', { name: '可用话术目录' })).toBeInTheDocument();
     await user.click(screen.getByTestId('nav-settings'));

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardApp } from '../../src/renderer/DashboardApp';
 import { DASHBOARD_WINDOW_TITLE } from '../../src/shared/dashboard-window';
+import { observeSessionJob } from '../../src/shared/product-session';
 import type { WorkbenchModeReply } from '../../src/shared/workbench-mode';
 
 type ColorSchemeListener = (event: MediaQueryListEvent) => void;
@@ -157,7 +158,7 @@ describe('DashboardApp', () => {
     expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(questionRates).not.toHaveBeenCalled();
-    await act(async () => { resolveMode({ ok: true, kind }); });
+    await act(async () => { resolveMode({ ok: true, kind, manualSopEntry: false }); });
     expect(screen.queryByTestId('overview-usage-status')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: '时间范围' })).not.toBeInTheDocument();
     expect(screen.queryByText('没有查询')).not.toBeInTheDocument();
@@ -215,6 +216,7 @@ describe('DashboardApp', () => {
     render(<DashboardApp />);
     await user.click(screen.getByTestId('nav-sop'));
     expect(await screen.findByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
+    expect(screen.getByRole('tab', { name: 'SOP' })).not.toHaveAccessibleDescription('尚未开放');
     expect(screen.getByTestId('sop-library-empty')).toHaveTextContent('请先登录后再管理 SOP。');
     expect(screen.getByTestId('sop-upload')).toBeDisabled();
     expect(screen.getByTestId('sop-delete')).toBeDisabled();
@@ -318,6 +320,59 @@ describe('DashboardApp', () => {
     fireEvent.keyDown(screen.getByTestId('nav-materials'), { key: 'ArrowUp' });
     expect(screen.getByTestId('dashboard-content')).toHaveAttribute('data-active-module', 'sop');
     expect(screen.getByTestId('module-sop')).toBeInTheDocument();
+  });
+
+  it('describes the unopened SOP page before selection in the expanded and collapsed sidebars', async () => {
+    installColorSchemeMedia(false, true);
+    const user = userEvent.setup();
+    const mode = { ok: true, kind: 'product-remote', manualSopEntry: false } as const;
+    window.dashboardWorkbench = { mode: async () => mode };
+    render(<DashboardApp />);
+    await act(async () => {});
+
+    const sop = screen.getByRole('tab', { name: 'SOP' });
+    expect(sop).toHaveAccessibleDescription('尚未开放');
+    expect(within(sop).getByText('尚未开放')).toBeVisible();
+    expect(sop).toHaveAttribute('aria-selected', 'false');
+    await user.click(screen.getByRole('button', { name: '折叠侧边栏' }));
+    expect(sop).toHaveAccessibleDescription('尚未开放');
+    await user.hover(sop);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('SOP / 尚未开放');
+    expect(sop).toHaveAttribute('aria-selected', 'false');
+
+    await user.click(screen.getByRole('tab', { name: '内容库' }));
+    await user.keyboard('{ArrowDown}');
+    await new Promise(resolve => window.requestAnimationFrame(resolve));
+    expect(sop).toHaveFocus();
+    expect(sop).toHaveAccessibleDescription('尚未开放');
+    expect(sop).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText(/手动找流程/)).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])('guides a signed-in seat only when the manual SOP entry is %s', async (manualSopEntry) => {
+    window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'faq-v2', manualSopEntry }) };
+    const job = observeSessionJob({ title: '客服坐席', directory: [{ name: '客服坐席', enabled: true }] });
+    let signedIn = true;
+    window.dashboardContent = {
+      session: async () => signedIn
+        ? ({ ok: true, enabled: true, signedIn: true, role: 'agent', displayName: '合成坐席', job })
+        : ({ ok: true, enabled: true, signedIn: false, role: null, displayName: null, job: null }),
+      parseUpload: vi.fn(), publishDraft: vi.fn(), rollbackPrevious: vi.fn(), cancelInFlight: vi.fn(),
+    };
+    const user = userEvent.setup();
+    render(<DashboardApp />);
+    await screen.findByRole('button', { name: '账号信息' });
+    await user.click(screen.getByRole('tab', { name: 'SOP' }));
+
+    const guide = screen.queryByText(/点狐狸头打开查询窗，再选择「手动找流程」。/);
+    if (manualSopEntry) expect(guide).toBeVisible();
+    else expect(guide).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '手动找流程' })).not.toBeInTheDocument();
+
+    signedIn = false;
+    fireEvent.focus(window);
+    await screen.findByTestId('module-signed-out');
+    expect(screen.queryByText(/手动找流程/)).not.toBeInTheDocument();
   });
 
   it('adds 设置 last on the intake sidebar and projects the whitelist line', async () => {

@@ -326,7 +326,7 @@ pnpm check:architecture # 模块依赖方向；不启动应用
 
 当前目录结构已经把合同接收/校验、migration 控制面、API host、runtime/admin 双 pool、SearchBackend、事件事务、内容导入/发布、桌面产品 adapter、测试专用 E0 runner 和生产栈 supervisor 分到各自 owner；两个 API pool 不共享登录，renderer 权限未放宽。2026-10-14 在 `4a22c6b` 上运行 `pnpm check:architecture`，438 个源码/配置文件、0 个依赖方向违规。更早的记录仍有效：`main@4739c39` 的 CI run `37024571842` 是 303 个文件、0 违规；统一工作台当时是 389 个文件、0 违规。`runtime_activated=false` 和 synthetic-only 边界仍保留。
 
-当前工作台只有 intake 这一套页面，不再用 `profile` 切换旧模块。侧栏五页是工作台、内容库、SOP、资料审核、设置。`IntakeManagement` 同时支撑工作台摘要和资料审核；`IntakePermissions` 挂在「设置」，页内分别渲染授权与账号能力。话术库是常驻的 `IntakeLibrary`。SOP 是当前会话树。没有目录接口时写「请先登录后再管理 SOP。」，不写「未接入」。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这五页一致。知识库组件、本机草稿路由和对应 Main/preload 通道已删除；既有磁盘文件保留但运行时不读写。字段见[资料页与设置页](reference-intake-pages.md)。
+工作台的侧栏有工作台、内容库、SOP、资料审核、设置。`IntakeManagement` 同时支撑工作台摘要和资料审核。`IntakePermissions` 挂在「设置」，页内分别渲染授权与账号能力。话术库是常驻的 `IntakeLibrary`。legacy 工作台的 SOP 读取当前会话树。FAQ 与远程工作台通过 `dashboard:workbench-mode` 读取 Main 的手动流程入口状态，办理入口留在 Query。使用记录没有来源时写「使用记录还不能在这里看。」。`DASHBOARD_MODULE_IDS` 与这五页一致。知识库组件、本机草稿路由和对应 Main/preload 通道已删除；既有磁盘文件保留但运行时不读写。字段见[资料页与设置页](reference-intake-pages.md)。
 
 四个结构性改造已落地：ARCH-01 的依赖方向门、ARCH-02 的 `@customer-agent/retrieval-core`、ARCH-03 的 API runtime/config/features 拆分，以及 ARCH-04 的桌面平台/查询 view-model/展示组件拆分。OVL-01 随后把窗口 handoff、layout、focus、drag、session 与 renderer phase 收口到共享 overlay reducer；`overlay-controller.ts` 只执行 typed native effects，`QueryApp.tsx` 和 `FoxApp.tsx` 只消费 snapshot，`DashboardApp.tsx` 继续拥有工作台导航状态。
 
