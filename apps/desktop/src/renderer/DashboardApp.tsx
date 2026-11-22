@@ -9,8 +9,9 @@ import {
   type IntakeSidebarItem,
 } from './features/dashboard/intake-destinations';
 import { type DashboardContentRole } from '../shared/dashboard-content';
+import { DISPLAY_SEPARATOR } from '../shared/display-separator';
 import { type SessionJobView } from '../shared/product-session';
-import type { WorkbenchKind } from '../shared/workbench-mode';
+import type { WorkbenchMode } from '../shared/workbench-mode';
 import {
   canManageAccounts,
   canOpenSettings,
@@ -126,7 +127,7 @@ function usePageUse(): PageUseSnapshot {
 
 function DashboardWorkspace() {
   const snapshot = usePageUse();
-  const [workbenchMode, setWorkbenchMode] = useState<WorkbenchKind | null>(null);
+  const [workbenchMode, setWorkbenchMode] = useState<WorkbenchMode | null>(null);
   const [workbenchStatus, setWorkbenchStatus] = useState<'pending' | 'ready' | 'error'>(() => window.dashboardWorkbench ? 'pending' : 'ready');
   const [workbenchAttempt, setWorkbenchAttempt] = useState(0);
   useEffect(() => {
@@ -141,7 +142,7 @@ function DashboardWorkspace() {
     void Promise.resolve().then(() => api.mode()).then(reply => {
       if (!alive) return;
       if (reply.ok) {
-        setWorkbenchMode(reply.kind);
+        setWorkbenchMode(reply);
         setWorkbenchStatus('ready');
       } else {
         setWorkbenchMode(null);
@@ -168,6 +169,9 @@ function DashboardWorkspace() {
   );
   const jobKnown = sessionPhase === 'ready';
   const [contentSignedIn, setContentSignedIn] = useState<boolean | null>(null);
+  const modernWorkbench = workbenchMode !== null && workbenchMode.kind !== 'legacy';
+  const sopStatus = modernWorkbench ? '尚未开放' : null;
+  const showManualSopHint = modernWorkbench && workbenchMode.manualSopEntry === true && contentSignedIn === true;
   const [contentRole, setContentRole] = useState<DashboardContentRole | null>(null);
   const sessionEpoch = useRef(0);
   const sessionConfirmed = useRef(false);
@@ -718,6 +722,7 @@ function DashboardWorkspace() {
         >
           {navItems.map((item) => {
             const selected = item.id === active;
+            const status = item.id === 'sop' ? sopStatus : null;
             const showGroup = item.group !== lastGroup;
             lastGroup = item.group;
             return (
@@ -735,7 +740,7 @@ function DashboardWorkspace() {
                   aria-selected={selected}
                   aria-current={selected ? 'page' : undefined}
                   aria-label={item.label}
-                  aria-describedby={navTooltip?.key === item.id && navTooltip.visible
+                  aria-describedby={status ? 'dashboard-nav-sop-status' : navTooltip?.key === item.id && navTooltip.visible
                     ? 'dashboard-nav-tooltip'
                     : undefined}
                   data-testid={`nav-${item.id}`}
@@ -785,7 +790,10 @@ function DashboardWorkspace() {
                   }}
                 >
                   <span className="dashboard-nav-icon"><DashboardNavIcon id={sidebarIcon(item.id)} /></span>
-                  <span className="dashboard-nav-label">{item.label}</span>
+                  <span className="dashboard-nav-label">
+                    {item.label}
+                    {status ? <span id="dashboard-nav-sop-status" className="dashboard-nav-status">{status}</span> : null}
+                  </span>
                   {item.id === 'overview' && todoCount ? <small className="dashboard-nav-badge" aria-label={`待办 ${todoCount} 项`}>{todoCount}</small> : null}
                 </Button>
               </div>
@@ -825,7 +833,7 @@ function DashboardWorkspace() {
           style={{ left: navTooltip.left, top: navTooltip.top }}
           data-testid="dashboard-nav-tooltip"
         >
-          {navTooltip.label}
+          {navTooltip.label}{navTooltip.key === 'sop' && sopStatus ? `${DISPLAY_SEPARATOR}${sopStatus}` : null}
         </div>
       ) : null}
 
@@ -866,7 +874,8 @@ function DashboardWorkspace() {
             jobKnown,
             jobPending: sessionPhase === 'pending',
             sessionKey,
-            workbenchMode,
+            workbenchMode: workbenchMode?.kind ?? null,
+            showManualSopHint,
             workbenchStatus,
             onRetryWorkbench: () => setWorkbenchAttempt(value => value + 1),
             snapshot,

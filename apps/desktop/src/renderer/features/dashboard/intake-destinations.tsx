@@ -39,6 +39,7 @@ export type IntakeDestinationContext = {
   jobPending: boolean;
   sessionKey: string;
   workbenchMode: WorkbenchKind | null;
+  showManualSopHint: boolean;
   workbenchStatus: 'pending' | 'ready' | 'error';
   onRetryWorkbench: () => void;
   snapshot: PageUseSnapshot;
@@ -53,7 +54,12 @@ const INTAKE_DESTINATION_MOUNTS: {
   wording: (ctx) => <ContentLibraryDestination ctx={ctx} />,
   sop: (ctx) => ctx.workbenchMode === 'legacy'
     ? <SopLibraryModule sop={ctx.snapshot.phase === 'ready' ? ctx.snapshot.sop : undefined} canUploadSop={ctx.canUploadSop} />
-    : <section className="dash-module" data-testid="module-sop"><h1 className="desk-sr">SOP</h1><p className="content-empty">SOP 学习与执行尚未开放。</p></section>,
+    : <section className="dash-module" data-testid="module-sop">
+        <h1 className="desk-sr">SOP</h1>
+        <p className="content-empty">
+          工作台尚未开放 SOP 学习与执行。{ctx.showManualSopHint ? '点狐狸头打开查询窗，再选择「手动找流程」。' : null}
+        </p>
+      </section>,
   materials: (ctx) => <MaterialsDestination key={ctx.sessionKey} active={ctx.active === 'materials' || (ctx.active === 'overview' && ctx.workbenchMode !== 'legacy')}
     presentation={ctx.active === 'overview' && ctx.workbenchMode !== 'legacy' ? 'overview' : 'review'} onOpenReview={() => ctx.onOpen('materials')} />,
   settings: (ctx) => (

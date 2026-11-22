@@ -36,7 +36,7 @@ it('keeps the current workbench pages when the mode is product-remote', async ()
     command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
     onInvalidated: () => () => undefined,
   } as unknown as Window['dashboardPermissions'];
-  window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'product-remote' }) };
+  window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'product-remote', manualSopEntry: false }) };
   render(<DashboardApp />);
   expect(await screen.findByTestId('nav-materials')).toHaveAccessibleName('资料审核');
   expect(await screen.findByTestId('nav-settings')).toHaveAccessibleName('设置');
@@ -67,7 +67,7 @@ it('keeps 设置 and 资料 when the mode is faq-v2', async () => {
     command: async () => ({ ok: false, code: 'UNAVAILABLE', message: '', view: null }),
     onInvalidated: () => () => undefined,
   } as unknown as Window['dashboardPermissions'];
-  window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'faq-v2' }) };
+  window.dashboardWorkbench = { mode: async () => ({ ok: true, kind: 'faq-v2', manualSopEntry: false }) };
   render(<DashboardApp />);
   expect(await screen.findByTestId('nav-settings')).toHaveAccessibleName('设置');
   expect(screen.getByTestId('nav-materials')).toHaveAccessibleName('资料审核');

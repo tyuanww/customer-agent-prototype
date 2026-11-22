@@ -33,7 +33,7 @@ function destinationContext(overrides: Partial<IntakeDestinationContext> = {}): 
   return {
     active: 'materials', canViewGrantSettings: false, canManageAccounts: false, canUploadSop: false,
     seatLibraryOnly: false, jobKnown: true, jobPending: false, sessionKey: 'owner:director', workbenchMode: 'faq-v2',
-    workbenchStatus: 'ready', onRetryWorkbench: () => undefined,
+    workbenchStatus: 'ready', showManualSopHint: false, onRetryWorkbench: () => undefined,
     snapshot: { phase: 'signed-out' }, onOpen: () => undefined, onTodoCount: () => undefined,
     ...overrides,
   };
@@ -585,7 +585,11 @@ it('shows only authorized open batches in overview, with distinct batch IDs and 
     expect(overview.getAllByRole('row')).toHaveLength(4);
     for (const id of ['atch-0', 'atch-1', 'atch-2']) expect(overview.getByRole('cell', { name: new RegExp(id) })).toBeInTheDocument();
     expect(overview.queryByRole('cell', { name: /atch-3|atch-4|atch-5/ })).not.toBeInTheDocument();
-    expect(overview.getAllByRole('button').map(button => button.textContent)).toEqual(['查看全部资料']);
+    expect(overview.getByRole('columnheader', { name: '下一步' })).toBeInTheDocument();
+    expect(overview.getByRole('row', { name: /atch-0/ })).toHaveTextContent('核对材料');
+    expect(overview.getByRole('row', { name: /atch-1/ })).toHaveTextContent('确认发布');
+    expect(overview.getByRole('row', { name: /atch-2/ })).toHaveTextContent('发布中');
+    expect(overview.getAllByRole('button', { name: /^查看详情 / })).toHaveLength(3);
     expect(within(screen.getByRole('region', { name: '待审核资料' })).queryByText(/全店|总计|命中率|该店铺/)).not.toBeInTheDocument();
     await f.user.click(overview.getByRole('button', { name: '查看全部资料' }));
     expect(openReview).toHaveBeenCalledOnce();
@@ -601,6 +605,100 @@ it('shows only authorized open batches in overview, with distinct batch IDs and 
     view.moreCandidates = false;
     await act(async () => { f.listeners.forEach(listener => listener()); });
     expect(overview.getByText('有可处理的资料批次时，会显示在这里。')).toBeInTheDocument();
+  } finally { page.unmount(); f.main.dispose(); }
+});
+
+it('opens the exact overview batch by keyboard after Main selects it, then focuses its heading', async () => {
+  const f = setup();
+  const candidate = { ...f.data.candidate, key: { candidateId: 'candidate-b', version: 2, digest: 'b'.repeat(64) } };
+  const respond = f.data.respond;
+  f.data.respond = (path, body) => {
+    if (path.startsWith('/v1/intake/candidates?')) return { items: [f.data.candidate, candidate], nextCursor: null };
+    if (path.endsWith('/candidate-b/versions/2')) return candidate;
+    return respond(path, body);
+  };
+  let complete: (() => void) | undefined;
+  window.dashboardIntake!.command = async command => {
+    const reply = await f.command(command);
+    if (command.action === 'select') await new Promise<void>(resolve => { complete = resolve; });
+    return reply;
+  };
+  const page = render(renderIntakeDestinations(destinationContext({ active: 'overview', onOpen })));
+  function onOpen(target: 'wording' | 'materials' | 'settings') {
+    page.rerender(renderIntakeDestinations(destinationContext({ active: target, onOpen })));
+  }
+  try {
+    await f.user.tab();
+    expect(await screen.findByRole('button', { name: '查看全部资料' })).toHaveFocus();
+    await screen.findByRole('button', { name: '查看详情 产品 / candidate-b / 修订 2' });
+    await f.user.tab();
+    expect(screen.getByRole('button', { name: '查看详情 产品 / candidate-a / 修订 1' })).toHaveFocus();
+    await f.user.tab();
+    const target = screen.getByRole('button', { name: '查看详情 产品 / candidate-b / 修订 2' });
+    expect(target).toHaveFocus();
+    await f.user.keyboard('{Enter}{Enter}');
+    expect(screen.getByTestId('module-overview')).toBeVisible();
+    expect(target).toBeDisabled();
+    expect(screen.getByRole('button', { name: '查看详情 产品 / candidate-a / 修订 1' })).toBeDisabled();
+    expect(f.command.mock.calls.filter(([command]) => command.action === 'select')).toHaveLength(1);
+    await act(async () => complete?.());
+    const details = screen.getByRole('region', { name: '批次详情' });
+    expect(within(details).getByRole('heading', { name: '产品 / candidate-b' })).toHaveFocus();
+    expect(details).toHaveTextContent('修订 2');
+    expect(screen.queryByTestId('module-overview')).not.toBeInTheDocument();
+  } finally { page.unmount(); f.main.dispose(); }
+});
+
+it('keeps a failed overview selection on the queue and allows a read followed by a new selection', async () => {
+  const f = setup(), onOpenReview = vi.fn();
+  window.dashboardIntake!.command = async command => command.action === 'select'
+    ? { ok: false, code: 'UNAVAILABLE', message: '暂时无法查看批次。', view: f.main.view() }
+    : f.command(command);
+  const current = vi.fn(window.dashboardIntake!.current);
+  window.dashboardIntake!.current = current;
+  render(<IntakeManagement presentation="overview" onOpenReview={onOpenReview} />);
+  try {
+    const action = { name: '查看详情 产品 / candidate-a / 修订 1' };
+    await f.user.click(await screen.findByRole('button', action));
+    expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法查看批次。');
+    expect(onOpenReview).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: '批次详情' })).not.toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: '重新读取当前状态' }));
+    expect(await screen.findByRole('button', action)).toBeEnabled();
+    expect(current).toHaveBeenCalledOnce();
+    window.dashboardIntake!.command = f.command;
+    await f.user.click(screen.getByRole('button', action));
+    expect(onOpenReview).toHaveBeenCalledOnce();
+  } finally { f.main.dispose(); }
+});
+
+it.each(['left the overview', 'access was invalidated'] as const)('ignores a late navigation after %s', async (reason) => {
+  const f = setup(), onOpen = vi.fn();
+  let complete: (() => void) | undefined;
+  window.dashboardIntake!.command = async command => {
+    const reply = await f.command(command);
+    if (command.action === 'select') await new Promise<void>(resolve => { complete = resolve; });
+    return reply;
+  };
+  const overview = destinationContext({ active: 'overview', onOpen });
+  const page = render(renderIntakeDestinations(overview));
+  try {
+    const action = { name: '查看详情 产品 / candidate-a / 修订 1' };
+    await f.user.click(await screen.findByRole('button', action));
+    await waitFor(() => expect(complete).toBeTypeOf('function'));
+    if (reason === 'left the overview') {
+      page.rerender(renderIntakeDestinations(destinationContext({ active: 'sop', onOpen })));
+      page.rerender(renderIntakeDestinations(overview));
+    } else {
+      f.data.state.allowed = false;
+      await act(async () => { f.listeners.forEach(listener => listener()); });
+      expect(await screen.findByText('取得资料查看权限后，会显示可处理的批次。')).toBeVisible();
+      expect(screen.queryByRole('button', action)).not.toBeInTheDocument();
+    }
+    await act(async () => complete?.());
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(screen.getByTestId('module-overview')).toBeVisible();
+    expect(screen.queryByRole('region', { name: '批次详情' })).not.toBeInTheDocument();
   } finally { page.unmount(); f.main.dispose(); }
 });
 
@@ -650,10 +748,14 @@ it('preserves an unsaved quality judgment through list and overview without lift
   try {
     await f.user.click(within(screen.getByRole('radiogroup', { name: '批次筛选' })).getByText('已发布'));
     const calls = f.command.mock.calls.length;
-    page.rerender(<IntakeManagement presentation="overview" onOpenReview={() => undefined} />);
+    const onOpenReview = vi.fn(() => page.rerender(<IntakeManagement />));
+    page.rerender(<IntakeManagement presentation="overview" onOpenReview={onOpenReview} />);
     expect(screen.queryByRole('textbox', { name: '判断说明 合成洁面 1' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '提交本轮审核' })).not.toBeInTheDocument();
-    page.rerender(<IntakeManagement />);
+    expect(screen.getByRole('button', { name: '查看详情 产品 / candidate-b / 修订 1' })).toBeDisabled();
+    await f.user.click(screen.getByRole('button', { name: '查看详情 产品 / candidate-a / 修订 1' }));
+    expect(screen.getByRole('textbox', { name: '判断说明 合成洁面 1' })).toHaveValue('需核对原文');
+    await f.user.click(screen.getByRole('button', { name: '返回批次列表' }));
     expect(within(screen.getByRole('radiogroup', { name: '批次筛选' })).getByRole('radio', { name: '已发布' })).toBeChecked();
     await f.user.click(screen.getByRole('button', { name: '继续当前审核' }));
     expect(f.command).toHaveBeenCalledTimes(calls);

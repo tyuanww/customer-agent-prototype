@@ -9,6 +9,7 @@ import { IntakeUsageError, type IntakeQualification } from './content-intake-usa
 
 type QueryIntent = Extract<SopUnifiedCommand, { kind: 'query' }>;
 type Active = {
+  identity: symbol;
   query: QueryIntent | null;
   principalId: string;
   graph: SopTaskGraph;
@@ -97,14 +98,15 @@ export class SopUnifiedRuntime {
   hasInstance(): boolean {
     return this.active !== null;
   }
-  canResumeInstance(): boolean {
+  /** Main-only identity that survives refresh and rename for the life of the same case. */
+  resumableInstance(): symbol | null {
     const active = this.active;
-    if (this.port.contractVersion !== 'v12' || !active || Date.now() >= active.contentDeadline) return false;
+    if (this.port.contractVersion !== 'v12' || !active || Date.now() >= active.contentDeadline) return null;
     const actor = this.port.session.view();
-    return actor.signedIn && actor.userId === active.principalId;
+    return actor.signedIn && actor.userId === active.principalId ? active.identity : null;
   }
   instanceName(): string | null {
-    return this.value.state === 'ready' && this.live() && this.canResumeInstance()
+    return this.value.state === 'ready' && this.live() && this.resumableInstance() !== null
       ? this.active?.instanceName ?? null
       : null;
   }
@@ -515,7 +517,7 @@ export class SopUnifiedRuntime {
     const { selection, entitlement } = qualification;
     const generation = entitlement.contextGeneration;
     this.contextGeneration = Math.max(this.contextGeneration, generation);
-    const active: Active = { query, principalId: actor.userId, graph, instanceName: graph.result.flow.header.title.trim() || 'SOP 流程',
+    const active: Active = { identity: Symbol(), query, principalId: actor.userId, graph, instanceName: graph.result.flow.header.title.trim() || 'SOP 流程',
       selection, continuationId: `sct_${randomBytes(32).toString('hex')}`,
       entitlement, opening: null, releaseId: response.release_id, contextGeneration: generation, contentDeadline, mediaContext: 'query-preview',
       queryRequestId: response.request_id };
