@@ -1,6 +1,6 @@
 import type { components } from '@customer-agent/contracts';
 import { Button, Collapse, ConfigProvider, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { IntakeManagementCommand, IntakeManagementReply, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
 import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
@@ -32,6 +32,7 @@ function ActionButton(props: ButtonProps) {
   return <Button autoInsertSpace={false} {...props} />;
 }
 type CandidateRow = IntakeManagementView['candidates'][number];
+type OverviewSelection = { action: 'select-from-overview'; row: CandidateRow };
 const domainWord: Record<string, string> = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' };
 function candidateCategory(scopeLabel?: string, domain?: string) {
   const label = scopeLabel?.split(DISPLAY_SEPARATOR).at(-1)?.trim();
@@ -274,13 +275,27 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
   const [reviewPane, setReviewPane] = useState<ReviewPane | null>(null);
   const activeReview = useRef(active && presentation === 'review');
   activeReview.current = active && presentation === 'review';
+  const overviewVisit = useRef<symbol | null>(null);
+  useLayoutEffect(() => {
+    if (active && presentation === 'overview') overviewVisit.current = Symbol();
+    return () => { overviewVisit.current = null; };
+  }, [active, presentation]);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const focusDetail = useRef(false);
+  const openOverviewDetail = () => {
+    setDetailOpen(true);
+    focusDetail.current = true;
+    onOpenReview?.();
+  };
   const confirmation = useRef<ReturnType<typeof Modal.confirm> | null>(null);
   useEffect(() => () => { confirmation.current?.destroy(); confirmation.current = null; }, [active, presentation]);
   const confirm = (content: string, onOk: () => void, danger = false) => {
     confirmation.current?.destroy();
     confirmation.current = askConfirm(content, onOk, danger);
   };
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [operation, setOperation] = useState<{ kind: 'review' } | { kind: 'overview'; selection: CandidateRow['selection'] } | null>(null);
+  const busy = operation !== null;
+  const [error, setError] = useState('');
   const [uploadRequest, setUploadRequest] = useState(false), [stopping, setStopping] = useState(false);
   const [rereading, setRereading] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
@@ -340,9 +355,11 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     if (previous.has(id) === dirty) return previous;
     const next = new Set(previous); if (dirty) next.add(id); else next.delete(id); return next;
   }), []);
-  const apply = async (command?: IntakeManagementCommand) => {
-    // Parked forms retain input, but cannot dispatch an operation from overview.
-    if (!activeReview.current) return;
+  const apply = async (request?: IntakeManagementCommand | OverviewSelection) => {
+    const fromOverview = request?.action === 'select-from-overview';
+    const visit = overviewVisit.current;
+    if (fromOverview ? !visit || !onOpenReview : !activeReview.current) return;
+    const command: IntakeManagementCommand | undefined = fromOverview ? { action: 'select', selection: request.row.selection } : request;
     if (command?.action === 'upload-stop') {
       if (stopPending.current) return;
       if (!window.dashboardIntake) {
@@ -360,7 +377,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       finally {
         // Main's stop acknowledgement releases local waiting. A late original
         // response must neither replace this view nor unlock a newer request.
-        pending.current = null; setBusy(false); setUploadRequest(false);
+        pending.current = null; setOperation(null); setUploadRequest(false);
         stopPending.current = false; setStopping(false);
       }
       return;
@@ -369,19 +386,27 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     if (!window.dashboardIntake) {
       commit({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
       setError(WORKBENCH_EMPTY.intakeUnmounted);
-      setBusy(false);
       return;
     }
-    setBusy(true); setError(''); const gen = ++generation.current; pending.current = gen;
+    setOperation(fromOverview ? { kind: 'overview', selection: request.row.selection } : { kind: 'review' });
+    setError(''); const gen = ++generation.current; pending.current = gen;
     const uploading = command?.action.startsWith('upload-') ?? false;
     setUploadRequest(uploading);
     try {
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
+      if (fromOverview && reply.ok && (!reply.view.signedIn || !reply.view.authorized || !sameCandidate(request.row.candidate, reply.view.selected))) {
+        commit(resourceForReply(reply));
+        setError('无法打开该批次，请重新读取当前状态。');
+        return;
+      }
       commit(resourceForReply(reply)); if (!reply.ok) setError(reply.message);
       if (reply.ok && command) {
-        if (command.action === 'select' || command.action === 'upload-open') setDetailOpen(true);
+        if (command.action === 'select' || command.action === 'upload-open') {
+          if (fromOverview && overviewVisit.current === visit) openOverviewDetail();
+          else setDetailOpen(true);
+        }
         if (['select', 'upload-open', 'confirm-source', 'freeze', 'submit', 'refresh-candidate', 'discard', 'revise'].includes(command.action)) setReviewPane(null);
         if (command.action === 'revise') setUploadOpen(true);
       }
@@ -405,7 +430,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
         setError('管理服务不可用，请刷新。');
       }
     } finally {
-      if (pending.current === gen) { pending.current = null; setBusy(false); setUploadRequest(false); }
+      if (pending.current === gen) { pending.current = null; setOperation(null); setUploadRequest(false); }
     }
   };
   const upload = view?.upload;
@@ -450,7 +475,8 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     if (hasSelected && uploadPhase === 'validated') setUploadOpen(false);
     else if (uploadPhase && uploadPhase !== 'idle' && !hasSelected) setUploadOpen(true);
   }, [uploadPhase, hasSelected]);
-  const disabled = !active || presentation !== 'review' || busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const unavailable = !active || busy || reading || rereading || stopping || !!view?.rollback.pending || !!view?.pending || !!upload?.busy || !!upload?.pending;
+  const disabled = presentation !== 'review' || unavailable;
   const uploadDraft = !!(upload?.file || upload?.revisionOf) && upload?.phase !== 'validated';
   const quality = view?.quality;
   const dirty = dirtyIds.size > 0;
@@ -461,13 +487,20 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     ? currentStep(view, dirtyIds) : null;
   const pane = reviewPane ?? workflowPane(step?.target, view?.selected?.publicationPolicy);
   const inDetail = !!view?.selected && detailOpen;
+  useLayoutEffect(() => {
+    if (active && presentation === 'review' && inDetail && focusDetail.current) {
+      focusDetail.current = false;
+      detailHeading.current?.focus();
+    }
+  }, [active, presentation, inDetail]);
   const candidates = view?.candidates ?? [];
   const currentPublishedReleaseId = candidates
     .filter(row => row.candidate.state === 'published' && row.candidate.publishedReleaseId !== null)
     .sort((left, right) => Date.parse(right.candidate.updatedAt) - Date.parse(left.candidate.updatedAt))[0]
     ?.candidate.publishedReleaseId ?? null;
   const visibleCandidates = candidates.filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
-  const rowDisabled = disabled || dirty || !!view?.hasDraft || uploadDraft;
+  const selectionBlocked = dirty || !!view?.hasDraft || uploadDraft;
+  const rowDisabled = disabled || selectionBlocked;
   const batchColumns: TableColumnsType<CandidateRow> = [
     { title: '资料批次', key: 'batch', render: (_value, row) => <div className="intake-batch-label">
       <span title={row.candidate.key.candidateId}>{candidateCategory(row.scopeLabel)} / {shortBatchId(row.candidate.key.candidateId)}</span>
@@ -476,9 +509,18 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     { title: '分类', key: 'category', render: (_value, row) => candidateCategory(row.scopeLabel) },
     { title: '更新时间', key: 'time', render: (_value, row) => formatSeatClock(row.candidate.updatedAt) },
     { title: '审核状态', key: 'state', render: (_value, row) => candidateState(row.candidate) },
+    { title: '下一步', key: 'next', render: (_value, row) => listNext(row.candidate) },
+  ];
+  const overviewColumns: TableColumnsType<CandidateRow> = [...batchColumns,
+    { title: '操作', key: 'action', render: (_value, row) => {
+      const current = sameCandidate(row.candidate, view?.selected ?? null);
+      return <ActionButton type="text" disabled={!onOpenReview || unavailable || (!current && selectionBlocked)}
+        loading={operation?.kind === 'overview' && operation.selection === row.selection}
+        aria-label={`查看详情 ${candidateCategory(row.scopeLabel)} / ${shortBatchId(row.candidate.key.candidateId)} / 修订 ${row.candidate.key.version}`}
+        onClick={() => current ? openOverviewDetail() : void apply({ action: 'select-from-overview', row })}>查看详情</ActionButton>;
+    } },
   ];
   const candidateColumns: TableColumnsType<CandidateRow> = [...batchColumns,
-    { title: '下一步', key: 'next', render: (_value, row) => listNext(row.candidate) },
     { title: '操作', key: 'action', render: (_value, row) => {
       const current = sameCandidate(row.candidate, view?.selected ?? null);
       const label = current ? '继续查看' : isOpenCandidate(row.candidate.state) ? '审核' : '查看';
@@ -504,8 +546,9 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
         onRetry={busy || reading || rereading || stopping ? undefined : reread} />}
       {reading || rereading || (!view && !error && !readFailure) ? <WorkbenchLoading label="读取待审核资料" />
         : view?.signedIn && view.authorized
-        ? <><Table<CandidateRow> columns={batchColumns} dataSource={candidates.filter(row => isOpenCandidate(row.candidate.state))}
+        ? <><Table<CandidateRow> columns={overviewColumns} dataSource={candidates.filter(row => isOpenCandidate(row.candidate.state))}
           pagination={false} rowKey="selection" locale={{ emptyText: view.moreCandidates ? '当前页没有待审核资料，后续批次尚未读取。' : '有可处理的资料批次时，会显示在这里。' }} />
+          {(selectionBlocked || view.pending || view.rollback.pending || upload?.pending) && <p role="status">请先在资料审核处理当前操作，再切换批次。</p>}
           {view.moreCandidates && <p className="intake-muted">这里只显示当前已读取的批次。点击“查看全部资料”，可在批次列表继续翻页。</p>}</>
         : view ? <p>{!view.signedIn ? '登录后可查看待审核资料。' : '取得资料查看权限后，会显示可处理的批次。'}</p> : null}
     </section>}
@@ -566,7 +609,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       {view.selected && <section className="intake-sheet" aria-label="批次详情" hidden={!inDetail}>
         <div className="intake-toolbar"><ActionButton onClick={() => setDetailOpen(false)}>返回批次列表</ActionButton>
           <ActionButton disabled={disabled} onClick={() => confirm('放弃尚未提交的输入并关闭当前审核？已提交的记录不会撤销。', () => void apply({ action: 'discard' }))}>放弃输入并关闭</ActionButton></div>
-        <h2 id={`${sectionId}-candidate`} tabIndex={-1}>{candidateCategory(selectedRow?.scopeLabel, view.material?.materialHeader.scope.domain)} / {shortBatchId(view.selected.key.candidateId)}</h2>
+        <h2 ref={detailHeading} id={`${sectionId}-candidate`} tabIndex={-1}>{candidateCategory(selectedRow?.scopeLabel, view.material?.materialHeader.scope.domain)} / {shortBatchId(view.selected.key.candidateId)}</h2>
         <p className="intake-muted">修订 {view.selected.key.version} / 更新于 {formatSeatClock(view.selected.updatedAt)}</p>
         <p>{candidateState(view.selected)}：{['awaiting-evidence','ready'].includes(view.selected.state)
           ? [...new Set(view.selected.readinessReasons.map(readinessLabel))].join(' / ') || '基础证据已齐备，发布仍须独立核验' : '此版本不再接受修改或发布。'}</p>
