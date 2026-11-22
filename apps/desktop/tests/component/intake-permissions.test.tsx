@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { StrictMode } from 'react';
 import { act,render,screen,fireEvent,waitFor,within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach,expect,it,vi } from 'vitest';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import type { IntakePermissionCommand, IntakePermissionReply, IntakePermissionView } from '../../src/shared/content-intake-permissions';
 import { actionsForIntakePost } from '../../src/shared/intake-post-actions';
-import type { SeatAccountIntent, SeatAccountRecord } from '../../src/shared/seat-account-intent';
+import type { SeatAccountApi, SeatAccountIntent, SeatAccountRecord } from '../../src/shared/seat-account-intent';
 import { IntakePermissions } from '../../src/renderer/features/dashboard/IntakePermissions';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
 const PAGE = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/renderer/features/dashboard/IntakePermissions.tsx');
@@ -325,7 +326,7 @@ function permissionView(patch: Partial<IntakePermissionView> = {}): IntakePermis
   };
 }
 
-it('shows a loading skeleton before the permission read resolves', async () => {
+it('shows a loading skeleton before the permission read resolves to a text-only empty table', async () => {
   let release: (value: { ok: true; view: ReturnType<typeof permissionView> }) => void = () => undefined;
   const view = permissionView();
   window.dashboardPermissions = {
@@ -337,7 +338,10 @@ it('shows a loading skeleton before the permission read resolves', async () => {
   expect(screen.getByLabelText('正在读取权限')).toBeInTheDocument();
   expect(screen.queryByRole('table', { name: '成员权限' })).not.toBeInTheDocument();
   release({ ok: true, view });
-  expect(await screen.findByRole('table', { name: '成员权限' })).toBeInTheDocument();
+  const table = await screen.findByRole('table', { name: '成员权限' });
+  const empty = within(table).getByRole('cell', { name: /添加成员或授权后会出现在这里。/ });
+  expect(empty).toBeVisible();
+  expect(empty.querySelectorAll('img, svg').length).toBe(0);
   expect(screen.queryByLabelText('正在读取权限')).not.toBeInTheDocument();
 });
 
@@ -486,6 +490,16 @@ function showPermissionView(view: IntakePermissionView) {
   render(<IntakePermissions canViewGrantSettings canManageAccounts active />);
   return command;
 }
+
+it('shows a text-only empty state for a member with no grants', async () => {
+  showPermissionView(permissionView({ people: [{ selection: 'person-one', label: '合成成员' }] }));
+  const members = await screen.findByRole('table', { name: '成员权限' });
+  await userEvent.click(within(members).getByRole('button', { name: '查看权限' }));
+  const detail = screen.getByRole('table', { name: '权限明细' });
+  const empty = within(detail).getByRole('cell', { name: /开通权限后会出现在这里。/ });
+  expect(empty).toBeVisible();
+  expect(empty.querySelectorAll('img, svg').length).toBe(0);
+});
 
 it('groups only by exact nonempty person selection, preserving same names and every unresolved grant', async () => {
   const grants = [
@@ -677,6 +691,42 @@ it('uses the supplied server gate and clears details when that view is replaced'
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '新增授权' })).not.toBeInTheDocument();
+});
+
+it('shows a text-only empty accounts table only after a successful read', async () => {
+  let rejectRead: (error: Error) => void = () => undefined;
+  const command = vi.fn<SeatAccountApi['command']>()
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectRead = reject; }))
+    .mockResolvedValue({ ok: true, action: 'list', seats: [] });
+  window.dashboardSeats = { command };
+  render(<IntakePermissions canViewGrantSettings={false} canManageAccounts active />);
+  expect(screen.getByRole('status', { name: '正在读取账号' })).toBeVisible();
+  expect(screen.queryByRole('table', { name: '账号' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '新建账号' })).toBeEnabled();
+  rejectRead(new Error('合成读取失败'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('账号暂不可用。');
+  expect(screen.queryByRole('table', { name: '账号' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: '重试' }));
+  const table = await screen.findByRole('table', { name: '账号' });
+  const empty = within(table).getByRole('cell', { name: /新建账号后会出现在这里。/ });
+  expect(empty).toBeVisible();
+  expect(empty.querySelectorAll('img, svg').length).toBe(0);
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: '新建账号' }));
+  expect(screen.getByRole('dialog', { name: '新建账号' })).toBeVisible();
+});
+
+it('ignores a late read rejection after a newer accounts list loads', async () => {
+  let rejectOldRead: (error: Error) => void = () => undefined;
+  const command = vi.fn<SeatAccountApi['command']>()
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOldRead = reject; }))
+    .mockResolvedValue({ ok: true, action: 'list', seats: [{ displayName: '合成坐席', username: 'synthetic-seat', post: '客服', enabled: true }] });
+  window.dashboardSeats = { command };
+  render(<StrictMode><IntakePermissions canViewGrantSettings={false} canManageAccounts active /></StrictMode>);
+  expect(await screen.findByRole('row', { name: /合成坐席/ })).toBeVisible();
+  await act(async () => { rejectOldRead(new Error('合成旧读取失败')); });
+  expect(screen.getByRole('row', { name: /合成坐席/ })).toBeVisible();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 it('keeps account refusal inside the open create and reset dialogs with inputs intact', async () => {

@@ -77,6 +77,7 @@ function MaterialPage({ material, disabled, apply, pageIndex }: { material: NonN
       <ActionButton disabled={disabled || !material.nextCursor} onClick={() => apply({ action: 'material', next: true })}>下一页材料</ActionButton>
     </div>
     <Table rowKey="businessEntryId" dataSource={material.entries} pagination={false} size="small"
+      locale={{ emptyText: '当前页没有原文条目。' }}
       columns={[
         // Workbook titles may repeat; the business code identifies the original row.
         { title: '条目编号', dataIndex: 'businessEntryId', render: id => <code>{id}</code> },

@@ -468,6 +468,20 @@ it('opens published materials without an unavailable rollback entry', async () =
   } finally { f.main.dispose(); }
 });
 
+it('shows a text-only state when the current materials page has no original entries', async () => {
+  const f = setup();
+  f.data.material.entries = [];
+  render(<IntakeManagement />);
+  try {
+    await f.user.click(await screen.findByRole('button', { name: '审核 产品 / candidate-a' }));
+    await f.user.click(screen.getByRole('button', { name: '查看材料' }));
+    const material = await screen.findByRole('region', { name: '当前页材料与差异' });
+    const empty = within(material).getByRole('cell', { name: '当前页没有原文条目。' });
+    expect(empty).toBeVisible();
+    expect(empty.querySelectorAll('img, svg').length).toBe(0);
+  } finally { f.main.dispose(); }
+});
+
 it('offers rollback only for an older published release and sends only release ids', async () => {
   const f = setup(); render(<IntakeManagement />);
   try {
