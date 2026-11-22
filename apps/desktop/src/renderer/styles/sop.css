@@ -267,6 +267,7 @@ html[data-role='sop'] #root {
 }
 
 .sop-unified .sop-body { padding: 0; }
+.sop-unified .sop-chrome-title strong { overflow: hidden; text-overflow: ellipsis; }
 .sop-unified-content { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; }
 .sop-unified .sop-stage { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .sop-unified h2 { font-size: 20px; margin: 0; overflow-wrap: anywhere; }
@@ -282,7 +283,9 @@ html[data-role='sop'] #root {
   background: var(--query-glass-solid);
 }
 .sop-unified-actions .sop-end { margin: 0 auto 0 0; }
-.sop-unified-actions .ant-btn-primary { flex-shrink: 0; }
+.sop-unified-actions:empty { display: none; }
+.sop-unified-actions .ant-btn-primary { flex-shrink: 0; margin-inline-start: auto; }
+.sop-end-details { overflow-wrap: anywhere; }
 .sop-unified-query { display: grid; gap: 10px; }
 .sop-unified-query label { display: grid; gap: 4px; }
 .sop-unified-query .ant-select { width: 100%; }

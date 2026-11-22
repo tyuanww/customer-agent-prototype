@@ -119,12 +119,12 @@ it('keeps authorized optional-image loading separate from action readiness', asy
   await waitFor(() => expect(unifiedCommand).toHaveBeenCalledWith({ kind: 'copy', key: 'copy-two' }));
 });
 
-it('displays only the instance name while parked and restores the same step', async () => {
+it('parks immediately with the case number and name and restores the same step', async () => {
   const chrome = new Set<(value: SopWindowChrome) => void>();
   const api = window.sopWindow!;
   api.reportLayout = async ({ sessionId, sequence }) => ({ ok: true, sessionId, sequence, width: 600, height: 320 });
   api.onProjection = cb => {
-    cb({ ...projection, instanceName: '合成办理甲' });
+    cb({ ...projection, caseNumber: 1, instanceName: '合成办理甲' });
     return () => undefined;
   };
   api.onChrome = cb => {
@@ -135,15 +135,32 @@ it('displays only the instance name while parked and restores the same step', as
   api.bookmark = bookmark;
   render(<SopApp />);
   expect(screen.getByRole('heading', { name: '合成判断任务' })).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: '贴边暂放' }));
+  fireEvent.click(screen.getByRole('button', { name: '暂放' }));
   await waitFor(() => expect(bookmark).toHaveBeenCalledExactlyOnceWith('park'));
-  act(() => { for (const notify of chrome) notify({ kind: 'parked', name: '合成办理甲' }); });
+  expect(unifiedCommand).not.toHaveBeenCalled();
+  act(() => { for (const notify of chrome) notify({ kind: 'parked', caseNumber: 1, name: '合成办理甲' }); });
   expect(screen.getAllByRole('button')).toHaveLength(1);
   expect(screen.queryByText('合成知识正文。')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '恢复 合成办理甲' }));
+  fireEvent.click(screen.getByRole('button', { name: '恢复 #01 合成办理甲' }));
   expect(bookmark).toHaveBeenLastCalledWith('restore');
   act(() => { for (const notify of chrome) notify({ kind: 'expanded' }); });
   expect(screen.getByRole('heading', { name: '合成判断任务' })).toBeVisible();
   fireEvent.click(screen.getByText('补充资料与知识'));
   expect(screen.getByText('合成知识正文。')).toBeVisible();
+});
+
+it('asks before ending a case and confirms only the current window intent', async () => {
+  render(<SopApp projection={{ ...projection, caseNumber: 2, instanceName: '合成办理乙' }} />);
+  const end = screen.getByRole('button', { name: '结束办理' });
+  fireEvent.click(end);
+  const dialog = await screen.findByRole('dialog', { name: '结束当前办理？' });
+  expect(within(dialog).getByText(/#02 合成办理乙/)).toBeVisible();
+  expect(unifiedCommand).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+  await waitFor(() => expect(dialog).not.toBeVisible());
+  expect(unifiedCommand).not.toHaveBeenCalled();
+  fireEvent.click(end);
+  const confirm = await screen.findByRole('button', { name: '确认结束' });
+  fireEvent.click(confirm);
+  await waitFor(() => expect(unifiedCommand).toHaveBeenCalledExactlyOnceWith({ kind: 'clear' }));
 });

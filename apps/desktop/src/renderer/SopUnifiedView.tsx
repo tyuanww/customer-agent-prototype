@@ -1,7 +1,7 @@
 import { IntakeAntdTheme } from './features/dashboard/intake-antd';
-import { Button, Checkbox, Input, Select } from 'antd';
-import { useEffect, useId, useState, type RefObject } from 'react';
-import { SOP_INSTANCE_NAME_MAX_LENGTH, SOP_QUERY_GROUPS, type SopUnifiedCommand, type SopUnifiedNode, type SopUnifiedProjection } from '@shared/sop-unified';
+import { Button, Checkbox, Input, Modal, Select } from 'antd';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
+import { SOP_INSTANCE_NAME_MAX_LENGTH, SOP_QUERY_GROUPS, sopCaseLabel, type SopUnifiedCommand, type SopUnifiedNode, type SopUnifiedProjection } from '@shared/sop-unified';
 import type { SopQueryGroup } from '@shared/sop-query';
 import type { useWindowDrag } from './lib/use-window-drag';
 
@@ -20,7 +20,9 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState('');
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const guidanceId = useId();
+  const endCancel = useRef<HTMLButtonElement>(null);
   const busy = waiting || projection.busy;
   useEffect(() => {
     if (!projection.shops.some(shop => shop.key === shopKey)) setShop(projection.shops.length === 1 ? projection.shops[0]!.key : '');
@@ -36,7 +38,14 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
     return false;
   };
   const node = projection.state === 'ready' ? projection.node : null;
-  const canPark = Boolean(projection.instanceName && !busy && nameDraft === null);
+  const caseName = projection.instanceName || projection.title || 'SOP 流程';
+  const caseTitle = projection.caseNumber ? sopCaseLabel(projection.caseNumber, caseName) : caseName;
+  const canEndCase = Boolean(projection.caseNumber && projection.state !== 'closing');
+  const endDialogOpen = canEndCase && confirmEnd;
+  useEffect(() => {
+    if (!canEndCase) setConfirmEnd(false);
+  }, [canEndCase]);
+  const canPark = Boolean(projection.caseNumber && projection.instanceName && !busy && !endDialogOpen && nameDraft === null);
   const requiredMedia = node?.media.filter(item => item.required) ?? [];
   const missingMedia = requiredMedia.filter(item => item.state !== 'ready');
   const pendingConfirmations = node?.requirements.filter(item => !item.confirmed).map(item => item.label).join('、');
@@ -54,24 +63,28 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
         </>}
     </figure>
   );
-  return <IntakeAntdTheme><div className="sop-shell query-shell sop-unified" data-testid="sop-unified-shell" data-state={projection.state} data-busy={busy} ref={shellRef}
+  return <IntakeAntdTheme><div className="sop-shell query-shell sop-unified" data-testid="sop-unified-shell" data-state={projection.state} data-busy={busy}
+    data-confirm-ending={endDialogOpen} ref={shellRef}
     onPointerLeave={event => {
       const goingToResize = event.relatedTarget instanceof Element && event.relatedTarget.closest('.sop-resize-handles');
-      if (canPark && event.buttons === 0 && !goingToResize && !event.currentTarget.querySelector('input:focus, textarea:focus, [contenteditable]:focus')) {
+      if (canPark && event.buttons === 0 && !goingToResize
+        && !event.currentTarget.querySelector('input:focus, textarea:focus, [contenteditable]:focus')) {
         void window.sopWindow?.bookmark?.('park-after-edge-drag');
       }
     }}>
     <div className="glass-shell"><div className="glass-surface" aria-hidden="true" />
       <header className="sop-chrome">
         <div className="sop-chrome-drag" aria-hidden="true" {...drag} />
-        <div className="sop-chrome-title"><strong>{projection.instanceName || projection.title || 'SOP 流程'}</strong></div>
+        <div className="sop-chrome-title" title={caseTitle}><strong>{caseTitle}</strong></div>
         {node && projection.instanceName && nameDraft === null ? <Button type="text" className="sop-park"
           disabled={busy} onClick={() => setNameDraft(projection.instanceName ?? '')}>重命名</Button> : null}
-        {projection.instanceName && window.sopWindow?.bookmark ? <Button type="text" className="sop-park" disabled={!canPark} onClick={() => {
+        {projection.caseNumber && projection.instanceName && window.sopWindow?.bookmark ? <Button type="text" className="sop-park" autoInsertSpace={false} disabled={!canPark} onClick={() => {
           void window.sopWindow?.bookmark?.('park').then(result => {
             if (!result.ok) setError(result.message);
           });
-        }}>贴边暂放</Button> : null}
+        }}>暂放</Button> : null}
+        {canEndCase ? <Button type="text" className="sop-park" disabled={busy}
+          onClick={() => setConfirmEnd(true)}>结束办理</Button> : null}
         <Button type="text" className="sop-close" aria-label="收起流程，保留进度" onClick={() => { void window.sopWindow?.close(); }}>×</Button>
       </header>
       <div className="sop-body"><div className="sop-unified-content">
@@ -94,7 +107,7 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
                 if (saved) setNameDraft(null);
               });
             }}>
-              <label>流程名称<Input autoFocus aria-label="流程名称" value={nameDraft} maxLength={SOP_INSTANCE_NAME_MAX_LENGTH} disabled={busy} onChange={event => setNameDraft(event.target.value)} /></label>
+              <label>办理名称<Input autoFocus aria-label="办理名称" value={nameDraft} maxLength={SOP_INSTANCE_NAME_MAX_LENGTH} disabled={busy} onChange={event => setNameDraft(event.target.value)} /></label>
               <Button htmlType="submit" disabled={busy || !nameDraft.trim()}>保存名称</Button>
               <Button disabled={busy} onClick={() => setNameDraft(null)}>取消</Button>
             </form> : null}
@@ -141,10 +154,24 @@ export function SopUnifiedView({ projection, shellRef, drag }: {
         </> : null}
       </div></div>
       <footer className="sop-unified-actions">
-        <Button type="text" className="sop-end" data-sop-end="true" disabled={busy} onClick={() => { void window.sopWindow?.endFlow(); }}>结束并清除进度</Button>
+        {projection.caseNumber === undefined ? <Button type="text" className="sop-end" data-sop-end="true" disabled={busy}
+          onClick={() => { void window.sopWindow?.endFlow(); }}>结束并清除进度</Button> : null}
         {node?.kind === 'action' ? <Button type="primary" aria-describedby={advanceGuidance}
           disabled={busy || !node.canAdvance} onClick={() => { void command({ kind: 'next', key: node.nextKey }); }}>下一步</Button> : null}
       </footer>
     </div>
+    <Modal open={endDialogOpen} title="结束当前办理？" width={360} centered
+      closable={false} mask={{ closable: false }} destroyOnHidden transitionName="" maskTransitionName=""
+      afterOpenChange={open => { if (open) endCancel.current?.focus(); }}
+      onCancel={() => setConfirmEnd(false)}
+      footer={[
+        <Button key="cancel" ref={endCancel} autoInsertSpace={false} onClick={() => setConfirmEnd(false)}>取消</Button>,
+        <Button key="confirm" type="primary" danger disabled={busy} onClick={() => {
+          setConfirmEnd(false);
+          void command({ kind: 'clear' });
+        }}>确认结束</Button>,
+      ]}>
+      <p className="sop-end-details">「{caseTitle}」的进度将被清除。其他办理可以继续。</p>
+    </Modal>
   </div></IntakeAntdTheme>;
 }

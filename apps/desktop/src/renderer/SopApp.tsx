@@ -347,6 +347,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (event.defaultPrevented || shellRef.current?.dataset.confirmEnding === 'true') return;
         event.preventDefault();
         void window.sopWindow?.close();
         return;
@@ -372,7 +373,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [copyCurrent, projection]);
 
-  if (chrome.kind === 'parked') return <SopBookmark name={chrome.name} />;
+  if (chrome.kind === 'parked') return <SopBookmark caseNumber={chrome.caseNumber} name={chrome.name} />;
 
   if (!projection) {
     return null;

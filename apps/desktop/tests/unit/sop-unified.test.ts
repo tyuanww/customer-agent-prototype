@@ -140,9 +140,15 @@ describe('unified graph semantics', () => {
       expect(isSopUnifiedCommand({ kind: 'rename', name })).toBe(false);
     }
     expect(isSopUnifiedCommand({ kind: 'rename', name: '合成办理甲', instanceId: 'another-window' })).toBe(false);
+    expect(isSopUnifiedCommand({ kind: 'clear', caseNumber: 2 })).toBe(false);
     for (const value of [{ kind: 'confirm', key: 'opaque', token: 'bad' }, { kind: 'next' }, { kind: 'media', key: 'opaque', url: 'https://example.invalid' }]) expect(isSopUnifiedCommand(value)).toBe(false);
     const projection = { projectionVersion: 'sop-unified-v11', sessionId: 1, shops: [], notice: '', busy: false, copied: false, state: 'paused', title: '', node: null };
     expect(isSopUnifiedProjection(projection)).toBe(true);
+    expect(isSopUnifiedProjection({ ...projection, caseNumber: 1 })).toBe(true);
+    expect(isSopUnifiedProjection({ ...projection, caseNumber: null })).toBe(true);
+    expect(isSopUnifiedProjection({ ...projection, caseNumber: 0 })).toBe(false);
+    expect(isSopUnifiedProjection({ ...projection, caseNumber: '1' })).toBe(false);
+    expect(isSopUnifiedProjection({ ...projection, caseNumber: 1, state: 'idle' })).toBe(false);
     expect(isSopUnifiedProjection({ ...projection, node: { instruction: 'protected' } })).toBe(false);
     expect(isSopUnifiedProjection({ ...projection, instanceName: '合成办理甲' })).toBe(false);
   });
