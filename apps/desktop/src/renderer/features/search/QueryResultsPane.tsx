@@ -1,3 +1,4 @@
+import { Button } from 'antd';
 import type { Ref, ReactNode } from 'react';
 import { COPY_SUCCESS_MESSAGE } from '@shared/contracts';
 import type { OverlayPhase } from '@shared/overlay-machine';
@@ -8,6 +9,7 @@ import { isIntakeRow, type QueryResult, type RankedScript } from './types';
 import { IntakeFaqCard } from './IntakeFaqCard';
 import { SopCandidateList, SopCandidateStatus } from './SopCandidateList';
 import type { IntakeSopCandidatesEvent } from '@shared/content-intake-query';
+import { hasResultCopyShortcut } from './query-view';
 
 type QueryResultsPaneProps = {
   contextControls?: ReactNode;
@@ -16,6 +18,7 @@ type QueryResultsPaneProps = {
     manualEntry: ReactNode;
     manualError?: string;
     onLayoutChange: () => void;
+    onEditQuestion: () => void;
   };
   phase: OverlayPhase;
   resultPaneRef: Ref<HTMLElement>;
@@ -33,7 +36,7 @@ type QueryResultsPaneProps = {
   onOpenSop?: () => void;
   onRetry?: () => void;
   retryLabel?: string;
-  onCopy: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
+  onCopy: (script: QueryResult, trigger: HTMLElement | null) => void;
   reportedScriptIds?: ReadonlySet<string>;
   reportError?: string;
   onReportInaccuracy?: (script: RankedScript) => void;
@@ -73,6 +76,8 @@ export function QueryResultsPane({
   const candidates = sopEvent && 'candidates' in sopEvent ? sopEvent.candidates : [];
   const candidateStatus = sopEvent && 'status' in sopEvent ? sopEvent.status : null;
   const hasCandidates = candidates.length > 0;
+  const shortcutsActive = phase === 'RESULTS' && !copying;
+  const faqShortcutKeys = shortcutsActive ? results.filter(hasResultCopyShortcut).map(row => row.rank).join(' / ') : '';
 
   return (
           <section
@@ -93,12 +98,16 @@ export function QueryResultsPane({
               </section>
             ) : null}
             {contextControls ? <div data-query-context>{contextControls}</div> : null}
-            {phase === 'EMPTY' && (hasCandidates || candidateStatus) ? (
-              <div ref={statusBannerRef} className="status-banner" role="status">
-                {hasCandidates ? '没有匹配的 FAQ 话术，可从上方选择流程办理。' : '没有匹配的 FAQ 话术。'}
+            {phase === 'EMPTY' && intakeSop ? (
+              <div ref={statusBannerRef} className="status-banner intake-faq-empty" data-testid={hasCandidates || candidateStatus ? undefined : 'no-hit'}>
+                <strong role="status">
+                  {hasCandidates ? '没有匹配的 FAQ 话术，可从上方选择流程办理。'
+                    : candidateStatus ? '没有匹配的 FAQ 话术。' : '没找到可用话术'}
+                </strong>
+                <Button className="retry-btn" onClick={intakeSop.onEditQuestion}>修改问句</Button>
               </div>
             ) : null}
-            {phase === 'EMPTY' && !hasCandidates && !candidateStatus ? (
+            {phase === 'EMPTY' && !intakeSop ? (
               <div ref={statusBannerRef} className="status-banner no-hit" data-testid="no-hit" role="status" aria-live="polite">
                 <span className="no-hit-mark" aria-hidden="true">?</span>
                 <strong>没找到可用话术</strong>
@@ -118,7 +127,7 @@ export function QueryResultsPane({
             {phase === 'ERROR' ? (
               <div ref={statusBannerRef} className="status-banner is-error" data-testid="error-state">
                 <strong>查询未完成</strong>
-                <span>{errorMessage || '请重试。'}</span>
+                {errorMessage ? <span role="status">{errorMessage}</span> : null}
                 {onRetry ? <button type="button" className="retry-btn" data-testid="retry-button" onClick={onRetry}>
                   {retryLabel}
                 </button> : null}
@@ -135,7 +144,7 @@ export function QueryResultsPane({
                         {COPY_SUCCESS_MESSAGE}{errorMessage ? `；${errorMessage}` : ''}
                       </span>
                     ) : (
-                      <span>{results.length} 条 · 按 1 / 2 / 3 复制</span>
+                      <span>{results.length} 条{intakeSop ? (faqShortcutKeys && ` · 按 ${faqShortcutKeys} 复制`) : ' · 按 1 / 2 / 3 复制'}</span>
                     )}
                   </div>
                   {reportError ? <div className="validation-error" role="status">{reportError}</div> : null}
@@ -158,7 +167,7 @@ export function QueryResultsPane({
                   ) : null}
                   {results.map((script) => isIntakeRow(script) ? (
                     <IntakeFaqCard key={script.key} row={script} copying={copying || phase === 'COPIED'}
-                      copied={copiedRank === script.rank} onCopy={onCopy} />
+                      copied={copiedRank === script.rank} shortcutsActive={shortcutsActive} onCopy={onCopy} />
                   ) : (
                     <ScriptCard
                       key={script.scriptId}

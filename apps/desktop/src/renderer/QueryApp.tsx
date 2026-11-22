@@ -68,6 +68,7 @@ import {
   queryFoxVisualState,
   queryHandoffCssVars,
   queryShellClassName,
+  hasResultCopyShortcut,
   resultCopyRankFromKey,
   SESSION_NOTICE_TEXT,
   sessionNoticeForResult,
@@ -87,9 +88,8 @@ import {
   announceInvalidationEffect,
   copySuccessErrorMessage,
   rankedScriptsFromProductCandidates,
+  type QueryError,
 } from './features/search/query-view-model';
-
-type QueryError = string | { message: string; recovery: 'refresh-shops' | 'none' };
 
 export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [productState, setProductState] = useState<ProductSessionResult | null>(null);
@@ -103,9 +103,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
   const sessionNoticeRef = useRef<SessionNotice | null>(null);
   const signedInRef = useRef(false);
-  const [queryError, setErrorMessage] = useState<QueryError>('');
-  const errorMessage = typeof queryError === 'string' ? queryError : queryError.message;
-  const errorRecovery = typeof queryError === 'string' ? 'retry' : queryError.recovery;
+  const [queryError, setQueryError] = useState<QueryError | null>(null);
+  const errorMessage = queryError?.message ?? '';
   const [copying, setCopying] = useState(false);
   const [searching, setSearching] = useState(false);
   const [copiedRank, setCopiedRank] = useState<1 | 2 | 3 | null>(null);
@@ -152,7 +151,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const copyInFlightRef = useRef(false);
   const searchInFlightRef = useRef(false);
   const preferenceWriteRef = useRef(Promise.resolve());
-  const dashboardOpenFailedRef = useRef(false);
   const sessionActionRef = useRef<'login' | 'logout' | null>(null);
   const sessionGenerationRef = useRef(0);
   const pendingDashboardOpenRef = useRef(false);
@@ -196,7 +194,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const openingFrameRef = useRef<number | null>(null);
   const inputFocusFrameRef = useRef<number | null>(null);
   const collapseCleanupTimerRef = useRef<number | null>(null);
-  const pendingCopyRef = useRef<QueryResult | null>(null);
   const activeHandoffIdRef = useRef(0);
   const handoffReportRef = useRef<{
     handoffId: number;
@@ -242,7 +239,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     setCopying(false);
     setSearching(false);
     setCopiedRank(null);
-    setErrorMessage('');
+    setQueryError(null);
     setInvalidMessage('');
     setHelpStatus('待核实');
     lastProductQueryRef.current = null;
@@ -448,14 +445,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     if (sessionChanged || windowChanged) {
       searchGenerationRef.current += 1;
       copyGenerationRef.current += 1;
-      pendingCopyRef.current = null;
       searchInFlightRef.current = false;
       copyInFlightRef.current = false;
       setResults([]);
       setSearching(false);
       setCopying(false);
       setCopiedRank(null);
-      setErrorMessage('');
+      setQueryError(null);
     }
     activeHandoffIdRef.current = snapshot.handoff.id;
     const preparingOpen = snapshot.contract.phase === 'opening'
@@ -761,7 +757,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (command.type === 'cancel-copy') {
         copyGenerationRef.current += 1;
         copyInFlightRef.current = false;
-        pendingCopyRef.current = null;
+        setQueryError(current => current?.recovery === 'retry-copy' ? null : current);
         if (dismissTimerRef.current !== null) {
           window.clearTimeout(dismissTimerRef.current);
           dismissTimerRef.current = null;
@@ -776,7 +772,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         setResults([]);
         setReportError('');
         setInvalidMessage('');
-        setErrorMessage('');
+        setQueryError(null);
         setHelpStatus('待核实');
         lastProductQueryRef.current = null;
         // OVL owns the monotonic content revision for every invalidation.
@@ -857,7 +853,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           setQuery('');
           setResults([]);
           setInvalidMessage('');
-          setErrorMessage('');
+          setQueryError(null);
           setLayoutReady(true);
           layoutSequenceRef.current = 0;
           lastAppliedLayoutSequenceRef.current = 0;
@@ -999,7 +995,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           dismissTimerRef.current = null;
         }
         copyInFlightRef.current = false;
-        pendingCopyRef.current = null;
         composingRef.current = false;
         setQuery('');
         setCopying(false);
@@ -1253,7 +1248,6 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   const cancelPendingCopy = useCallback(() => {
     copyGenerationRef.current += 1;
     copyInFlightRef.current = false;
-    pendingCopyRef.current = null;
     if (dismissTimerRef.current !== null) {
       window.clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = null;
@@ -1275,7 +1269,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setHelpStatus('待核实');
       setQuery(nextQuery);
       setResults([]);
-      setErrorMessage('');
+      setQueryError(null);
       setInvalidMessage('');
       if (phase !== 'SEARCH_INPUT') {
         reportPhase(intake ? 'RESULTS' : 'SEARCH_INPUT');
@@ -1294,13 +1288,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       announceReleaseRef.current = null;
       setAnnounce(null);
       if (!searchInFlightRef.current) {
-        setErrorMessage('');
+        setQueryError(null);
         setAnnounceInvalid(!sessionActionRef.current);
         reportPhase('SEARCH_INPUT');
         return result;
       }
       setAnnounceInvalid(false);
-      setErrorMessage(result.message); reportPhase('ERROR'); return result;
+      setQueryError({ message: result.message, recovery: 'retry-search' }); reportPhase('ERROR'); return result;
     }
     const snapshot = overlaySnapshotRef.current;
     const identity = overlayReportIdentity();
@@ -1316,10 +1310,10 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       // 软更新：换 rel_N 只换租约。**禁止** setResults([]) / cancelPendingSearch——
       // 坐席正在接待，Top 3 必须留在屏幕上。真失效走 onInvalidated 才抽空。
       announceReleaseRef.current = result.releaseId;
-      setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
+      setAnnounce(result); setAnnounceInvalid(false); setQueryError(null); return result;
     }
     announceReleaseRef.current = result.releaseId;
-    setAnnounce(result); setAnnounceInvalid(false); setErrorMessage(''); return result;
+    setAnnounce(result); setAnnounceInvalid(false); setQueryError(null); return result;
   }, [overlayReportIdentity, reportOverlayEvent, reportPhase, intake]);
 
   const acceptProductSession = useCallback((value: ProductSessionResult, source: SessionNoticeSource = 'status') => {
@@ -1366,7 +1360,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       cancelPendingSearch(); cancelPendingCopy(); setResults([]); setAnnounce(null); announceReleaseRef.current = null;
       setAnnounceInvalid(false);
       setFiltersOpen(false);
-      setErrorMessage('');
+      setQueryError(null);
       if (!intake || wasSignedIn || source !== 'status') setInvalidMessage('');
       reportPhase('SEARCH_INPUT');
       if (intake && wasSignedIn && (resultPaneRef.current?.contains(document.activeElement)
@@ -1408,7 +1402,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       });
       setAnnounceInvalid(invalidation.announceInvalid);
       if (invalidation.errorMessage !== null) {
-        setErrorMessage(invalidation.errorMessage);
+        setQueryError(invalidation.errorMessage ? { message: invalidation.errorMessage, recovery: 'retry-search' } : null);
       }
       if (invalidation.phase !== null) {
         reportPhase(invalidation.phase);
@@ -1540,13 +1534,13 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
   }, [acceptProductSession, focusQueryInput, intake, productState]);
 
-  const resetIntakeView = useCallback((expiredError?: string) => {
+  const resetIntakeView = useCallback((expiredError?: QueryError) => {
     cancelPendingSearch(); cancelPendingCopy(); setResults([]);
     if (expiredError && signedInRef.current && queryInteractiveRef.current) {
-      setErrorMessage({ message: expiredError, recovery: 'refresh-shops' });
+      setQueryError(expiredError);
       reportPhase('ERROR');
     } else {
-      setErrorMessage('');
+      setQueryError(null);
       if (isQueryContentLayoutPhase(phaseRef.current) || phaseRef.current === 'COPIED') reportPhase('RESULTS');
     }
   }, [cancelPendingSearch, cancelPendingCopy, reportPhase]);
@@ -1561,7 +1555,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setSearching(false);
       cancelPendingCopy(); setResults([]);
       if (phaseRef.current !== 'FOX_IDLE') {
-        setErrorMessage(reason === 'facts-expired' ? intakeQueryFailure('FACTS_EXPIRED').message : '资料资格已失效，请重新查询。'); reportPhase('ERROR');
+        switch (reason) {
+          case 'invalidated':
+            setQueryError({ message: intakeQueryFailure('FORBIDDEN').message, recovery: 'refresh-shops' });
+            break;
+          case 'expired':
+            setQueryError({ message: '资料资格已失效，请重新查询。', recovery: 'retry-search' });
+            break;
+          case 'facts-expired':
+            setQueryError({ message: intakeQueryFailure('FACTS_EXPIRED').message, recovery: 'none' });
+            break;
+        }
+        reportPhase('ERROR');
       }
     });
   }, [intake, cancelPendingCopy, reportPhase]);
@@ -1580,7 +1585,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       const request = { queryText, contextId: crypto.randomUUID() };
       const showQuestionError = (message: string) => {
         cancelScheduledResultFocus();
-        setErrorMessage('');
+        setQueryError(null);
         setInvalidMessage(message);
         reportPhase(filtersOpen && productState?.ok && productState.signedIn ? 'RESULTS' : 'SEARCH_INPUT');
         focusQueryInput(false);
@@ -1594,29 +1599,31 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         return;
       }
       const api = window.customerAgent?.intakeQuery;
-      if (!api) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); return; }
+      if (!api) {
+        setQueryError({ message: '查询服务暂不可用。', recovery: 'none' });
+        reportPhase('ERROR'); return;
+      }
       // A session with no query grant has no shops either, so the shop prompt would say the
       // wrong thing: the reason is the missing grant, not an unselected shop.
       if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
         // Trust the projection's own sentence: it distinguishes a closed facts window from a
         // missing grant, and those tell the operator to do different things.
         setResults([]);
-        setErrorMessage({ message: productState.job.notice ?? PERMISSION_DENIAL_MESSAGE, recovery: 'none' });
+        setQueryError({ message: productState.job.notice ?? PERMISSION_DENIAL_MESSAGE, recovery: 'none' });
         reportPhase('ERROR'); return;
       }
       const blocked: QueryError | null = intakeShops.busy
         ? { message: '正在更新查询范围，请稍后查询。', recovery: 'none' }
         : intakeShops.shopId ? null
-          : intakeShops.error ? { message: intakeShops.error, recovery: 'refresh-shops' }
-            : { message: '请先选择有权限的店铺。', recovery: 'none' };
+          : intakeShops.error ?? { message: '请先选择有权限的店铺。', recovery: 'none' };
       if (blocked) {
         if (!intakeShops.busy && !intakeShops.shopId && intakeShops.shops.length > 1) {
           setFiltersOpen(true);
           setLayoutReady(false);
         }
-        setErrorMessage(blocked); reportPhase('ERROR'); return;
+        setQueryError(blocked); reportPhase('ERROR'); return;
       }
-      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setQueryError(null); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
         sessionNoticeRef.current = null;
         setSessionNotice(null);
@@ -1634,28 +1641,29 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               showQuestionError(result.message);
               return;
             case 'EXPIRED':
-              setErrorMessage({ message: '查询资格已到期，请刷新店铺。', recovery: 'refresh-shops' });
+              setQueryError({ message: '查询资格已到期，请刷新店铺。', recovery: 'refresh-shops' });
               break;
             case 'FORBIDDEN':
-              setErrorMessage({ message: result.message, recovery: 'refresh-shops' });
+              setQueryError({ message: result.message, recovery: 'refresh-shops' });
               break;
             case 'UNAUTHORIZED':
               acceptProductSession(productFailure('UNAUTHORIZED', productEpochRef.current));
               return;
-            case 'NO_PRINCIPAL':
-            case 'NO_GRANT':
-            case 'ROLE_UNKNOWN':
-            case 'LIMIT':
-              setErrorMessage({ message: result.message, recovery: 'none' });
+            case 'STALE':
+            case 'UNAVAILABLE':
+              setQueryError({ message: result.message, recovery: 'retry-search' });
               break;
             default:
-              setErrorMessage(result.message);
+              setQueryError({ message: result.message, recovery: 'none' });
           }
           reportPhase('ERROR'); return;
         }
         setResults(result.rows); reportPhase(result.rows.length ? 'RESULTS' : 'EMPTY', result.rows.length as ResultCount);
       }).catch(() => {
-        if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试。'); reportPhase('ERROR'); }
+        if (generation === searchGenerationRef.current) {
+          setQueryError({ message: '查询服务暂不可用，请重试。', recovery: 'retry-search' });
+          reportPhase('ERROR');
+        }
       }).finally(() => {
         if (generation === searchGenerationRef.current) { searchInFlightRef.current = false; setSearching(false); }
       });
@@ -1667,16 +1675,16 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       if (productState.job?.status === 'resolved' && !productState.job.rights.search) {
         setResults([]);
-        setErrorMessage(productState.job.notice ?? PERMISSION_DENIAL_MESSAGE);
+        setQueryError({ message: productState.job.notice ?? PERMISSION_DENIAL_MESSAGE, recovery: 'none' });
         reportPhase('ERROR');
         return;
       }
       const api = window.customerAgent.productSearch;
       const queryText = (inputRef.current?.value ?? query).trim();
       if (!api || !queryText || [...queryText].length > 500) {
-        setResults([]); setErrorMessage('请输入最多 500 字的客户问题。'); reportPhase('ERROR'); return;
+        setResults([]); setQueryError({ message: '请输入最多 500 字的客户问题。', recovery: 'none' }); reportPhase('ERROR'); return;
       }
-      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setErrorMessage(''); setInvalidMessage('');
+      cancelPendingSearch(); cancelPendingCopy(); setResults([]); setQueryError(null); setInvalidMessage('');
       if (sessionNoticeRef.current?.kind === 'success') {
         sessionNoticeRef.current = null;
         setSessionNotice(null);
@@ -1695,7 +1703,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         : search();
       void run.then(result => {
         if (!result || generation !== searchGenerationRef.current || sessionEpoch !== productEpochRef.current) return;
-        if (!result.ok) { setErrorMessage(result.message); reportPhase('ERROR'); return; }
+        if (!result.ok) { setQueryError({ message: result.message, recovery: 'retry-search' }); reportPhase('ERROR'); return; }
         if (!('queryId' in result) || result.generation !== generation || result.sessionEpoch !== sessionEpoch) return;
         const items = rankedScriptsFromProductCandidates({
           candidates: result.candidates,
@@ -1707,12 +1715,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         lastProductQueryRef.current = { sessionEpoch, generation, queryId: result.queryId, hitStatus: result.hitStatus };
         setResults(items); reportPhase(items.length ? 'RESULTS' : 'EMPTY', items.length as ResultCount);
       }).catch(() => {
-        if (generation === searchGenerationRef.current) { setErrorMessage('查询服务暂不可用，请重试'); reportPhase('ERROR'); }
+        if (generation === searchGenerationRef.current) { setQueryError({ message: '查询服务暂不可用，请重试', recovery: 'retry-search' }); reportPhase('ERROR'); }
       }).finally(() => { if (generation === searchGenerationRef.current) { searchInFlightRef.current = false; setSearching(false); } });
       return;
     }
 
-    dashboardOpenFailedRef.current = false;
     if (searchInFlightRef.current) {
       return;
     }
@@ -1735,7 +1742,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     }
 
     setInvalidMessage('');
-    setErrorMessage('');
+    setQueryError(null);
     cancelPendingCopy();
     cancelScheduledResultFocus();
     reportPhase('SEARCH_INPUT', 0, true);
@@ -1772,7 +1779,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         reportPhase('RESULTS', outcome.results.length as ResultCount);
       } catch {
         setResults([]);
-        setErrorMessage('本地检索失败，请重试。');
+        setQueryError({ message: '本地检索失败，请重试。', recovery: 'retry-search' });
         reportPhase('ERROR');
       } finally {
         if (generation === searchGenerationRef.current) {
@@ -1785,7 +1792,7 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
     intake, intakeShops.shopId, intakeShops.busy, intakeShops.error, intakeShops.shops.length, sessionAction]);
 
   const copyScript = useCallback(
-    async (script: QueryResult, trigger: HTMLButtonElement | null = null) => {
+    async (script: QueryResult, trigger: HTMLElement | null = null) => {
       if (
         copyInFlightRef.current ||
         phase === 'COPIED' ||
@@ -1795,36 +1802,41 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       }
       copyInFlightRef.current = true;
       const copyGeneration = copyGenerationRef.current;
-      pendingCopyRef.current = script;
       if (trigger) {
         trigger.focus();
       }
 
       const api = window.customerAgent;
       const resultCount = results.length as ResultCount;
-      if (!api) {
-        setErrorMessage('复制失败，请重试');
+      const intakeApi = api?.intakeQuery;
+      if (!api || (isIntakeRow(script) && !intakeApi)) {
+        setQueryError({ message: '复制功能暂不可用。', recovery: 'none' });
         reportPhase('ERROR', resultCount);
         copyInFlightRef.current = false;
         return;
       }
 
+      const showCopyError = (message: string) => {
+        setQueryError({ message, recovery: 'retry-copy', result: script });
+        reportPhase('ERROR', resultCount);
+      };
       setCopying(true);
       try {
         const connected = !!api.product && !(productState?.ok && !productState.enabled);
-        const result = isIntakeRow(script) ? await api.intakeQuery?.copy({ key: script.key }) ?? { ok: false as const, message: '复制失败，请重试' }
+        const result = isIntakeRow(script) ? await intakeApi?.copy({ key: script.key }) ?? intakeQueryFailure('UNAVAILABLE')
           : connected ? (script.productCopy && api.productSearch
           ? await api.productSearch.copyAdopt({
             ...script.productCopy,
             placeholderValues: adoptedPlaceholderValues(script.placeholderKeys, placeholderValues),
           })
-          : { ok: false as const, message: '候选已失效，请重新查询' }) : await api.copyText(script.answerText);
+          : { ok: false as const, code: 'STALE' as const, message: '候选已失效，请重新查询' }) : await api.copyText(script.answerText);
         if (copyGeneration !== copyGenerationRef.current) {
           return;
         }
         if (result.ok) {
           setCopiedRank(script.rank);
-          setErrorMessage(copySuccessErrorMessage(result));
+          const notice = copySuccessErrorMessage(result);
+          setQueryError(notice ? { message: notice, recovery: 'none' } : null);
           reportPhase('COPIED', resultCount);
           dismissTimerRef.current = window.setTimeout(() => {
             dismissTimerRef.current = null;
@@ -1834,14 +1846,34 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
           }, COPY_FEEDBACK_MS);
           return;
         }
-        setErrorMessage(result.message || '复制失败，请重试');
-        reportPhase('ERROR', resultCount);
+        if ('code' in result && result.code !== 'CLIPBOARD_FAILED') {
+          if (isIntakeRow(script)) {
+            if (result.code === 'UNAUTHORIZED') {
+              acceptProductSession(productFailure('UNAUTHORIZED', productEpochRef.current));
+              return;
+            }
+            if (result.code === 'UNAVAILABLE') {
+              showCopyError('复制服务暂不可用，请重试。');
+              return;
+            }
+            setResults([]);
+            const recovery = result.code === 'EXPIRED' || result.code === 'FORBIDDEN'
+              ? 'refresh-shops' : result.code === 'STALE' ? 'retry-search' : 'none';
+            const message = result.code === 'EXPIRED' ? '查询资格已到期，请刷新店铺。' : result.message;
+            setQueryError({ message, recovery });
+            reportPhase('ERROR');
+            return;
+          }
+          setQueryError({ message: result.message, recovery: 'retry-search' });
+          reportPhase('ERROR', resultCount);
+          return;
+        }
+        showCopyError(result.message || '复制失败，请重试');
       } catch {
         if (copyGeneration !== copyGenerationRef.current) {
           return;
         }
-        setErrorMessage('复制失败，请重试');
-        reportPhase('ERROR', resultCount);
+        showCopyError('复制失败，请重试');
       } finally {
         if (copyGeneration === copyGenerationRef.current) {
           copyInFlightRef.current = false;
@@ -1849,15 +1881,18 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         }
       }
     },
-    [phase, reportPhase, results.length, placeholderValues, productState],
+    [acceptProductSession, phase, reportPhase, results.length, placeholderValues, productState],
   );
 
   const openDashboardWindow = useCallback(() => {
-    dashboardOpenFailedRef.current = false;
+    const retrying = queryError?.recovery === 'retry-dashboard';
+    const searchGeneration = searchGenerationRef.current;
+    const copyGeneration = copyGenerationRef.current;
+    const isCurrent = () => searchGeneration === searchGenerationRef.current && copyGeneration === copyGenerationRef.current;
     const request = window.customerAgent?.openDashboard();
     const failOpen = (): void => {
-      dashboardOpenFailedRef.current = true;
-      setErrorMessage('工作台未打开，请重试。查询窗口仍保持可用。');
+      if (!isCurrent()) return;
+      setQueryError({ message: '工作台未打开，请重试。查询窗口仍保持可用。', recovery: 'retry-dashboard' });
       reportPhase('ERROR', results.length as ResultCount);
     };
     if (!request) {
@@ -1869,16 +1904,15 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         failOpen();
         return;
       }
-      dashboardOpenFailedRef.current = false;
-      setErrorMessage('');
-      if (phaseRef.current === 'ERROR') {
+      if (retrying && isCurrent() && phaseRef.current === 'ERROR') {
+        setQueryError(null);
         const resultCount = results.length as ResultCount;
         reportPhase(resultCount > 0 ? 'RESULTS' : 'SEARCH_INPUT', resultCount);
       }
     }).catch(() => {
       failOpen();
     });
-  }, [reportPhase, results.length]);
+  }, [queryError?.recovery, reportPhase, results.length]);
   openDashboardWindowRef.current = openDashboardWindow;
 
   const openDashboard = useCallback(() => {
@@ -1973,23 +2007,24 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
   }, [sopEntryBusy]);
 
   const loadIntakeShops = intakeShops.load;
-  const retry = useCallback(() => {
-    if (errorRecovery === 'refresh-shops') {
-      setFiltersOpen(true);
-      void loadIntakeShops();
-      focusQueryInput(false);
-      return;
+  const retry = () => {
+    switch (queryError?.recovery) {
+      case 'refresh-shops':
+        setFiltersOpen(true);
+        void loadIntakeShops();
+        focusQueryInput(false);
+        break;
+      case 'retry-dashboard':
+        openDashboard();
+        break;
+      case 'retry-copy':
+        void copyScript(queryError.result);
+        break;
+      case 'retry-search':
+        runSearch();
+        break;
     }
-    if (dashboardOpenFailedRef.current) {
-      openDashboard();
-      return;
-    }
-    if (pendingCopyRef.current && errorMessage.includes('复制')) {
-      void copyScript(pendingCopyRef.current);
-      return;
-    }
-    runSearch();
-  }, [copyScript, errorMessage, errorRecovery, focusQueryInput, loadIntakeShops, openDashboard, runSearch]);
+  };
 
   const dismiss = useCallback(() => {
     void window.customerAgent?.dismiss(true);
@@ -2005,9 +2040,9 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
         sessionEpoch: last.sessionEpoch, generation: last.generation, queryId: last.queryId, action,
       });
       if (lastProductQueryRef.current?.queryId !== last.queryId) return;
-      if (!result.ok) { setErrorMessage(result.message); return; }
-      if (!result.opened) { setErrorMessage(failedMessage); return; }
-      setErrorMessage('');
+      if (!result.ok) { setQueryError({ message: result.message, recovery: 'none' }); return; }
+      if (!result.opened) { setQueryError({ message: failedMessage, recovery: 'none' }); return; }
+      setQueryError(null);
       setHelpStatus(openedStatus);
     } finally {
       helpInFlightRef.current = false;
@@ -2067,8 +2102,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       if (rank === null) {
         return;
       }
-      const script = results[rank - 1];
-      if (!script) {
+      const script = results.find(result => result.rank === rank);
+      if (!script || !hasResultCopyShortcut(script)) {
         return;
       }
       event.preventDefault();
@@ -2479,7 +2514,11 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               />
             ) : undefined}
             intakeSop={intake ? { event: sopCandidates, manualEntry: manualSopControl, manualError: manualSopError,
-              onLayoutChange: handleSopLayoutChange } : undefined}
+              onLayoutChange: handleSopLayoutChange,
+              onEditQuestion: () => {
+                cancelScheduledResultFocus();
+                focusQueryInput();
+              } } : undefined}
             phase={phase}
             resultPaneRef={resultPaneRef}
             statusBannerRef={statusBannerRef}
@@ -2540,8 +2579,8 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
               }
               markLocal();
             }}
-            onRetry={errorRecovery === 'none' ? undefined : retry}
-            retryLabel={errorRecovery === 'refresh-shops' ? '刷新店铺' : undefined}
+            onRetry={queryError && queryError.recovery !== 'none' ? retry : undefined}
+            retryLabel={queryError?.recovery === 'refresh-shops' ? '刷新店铺' : undefined}
             onCopy={(item, trigger) => {
               void copyScript(item, trigger);
             }}
