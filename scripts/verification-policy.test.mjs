@@ -180,7 +180,7 @@ test('workflow, desktop, API, query, SOP and overlay paths select their intended
   assert.equal(sop.jobs.quick, true);
   assert.ok(ids(sop, 'quick').includes('sop-content-tests'));
   assert.ok(ids(sop, 'quick').includes('sop-api-tests'));
-  assert.ok(ids(sop, 'quick').includes('sop-desktop-tests'));
+  assert.ok(ids(sop, 'quick').includes('desktop-tests'));
   assert.ok(sop.liveLanes.includes('sop-path'));
 
   const overlay = verificationPlan(['apps/desktop/src/main/overlay-controller.ts'], map);
@@ -439,7 +439,10 @@ test('plan commands are lane-scoped and deduplicated', () => {
     'packages/database/src/planner.ts',
   ], map);
   const quick = planLaneCommands(mixed, 'quick');
-  assert.equal(quick.filter((command) => JSON.stringify(command) === JSON.stringify(['pnpm', '--filter', '@customer-agent/desktop', 'test'])).length, 1);
+  const desktopTests = quick.filter(([, , workspace, script]) => workspace === '@customer-agent/desktop' && script === 'test');
+  assert.deepEqual(desktopTests, [[
+    'pnpm', '--filter', '@customer-agent/desktop', 'test', '--fileParallelism', '--minWorkers=2', '--maxWorkers=2',
+  ]]);
   assert.ok(quick.some((command) => JSON.stringify(command) === JSON.stringify(['pnpm', 'lint'])));
   assert.deepEqual(planLaneCommands(mixed, 'electron'), [
     ['pnpm', 'test:e2e:float'],
