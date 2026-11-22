@@ -1,4 +1,4 @@
-import { emptyIntakeQueryContext, intakeQueryFailure, type IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
+import { emptyIntakeQueryContext, intakeQueryFailure, type IntakeQueryRow, type IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -3041,12 +3041,104 @@ describe('QueryApp', () => {
     const context = { ok: true as const, ...emptyIntakeQueryContext(), shops: ['shop-a'], shopId: 'shop-a' };
     const access = vi.fn().mockResolvedValue(context);
     const search = vi.fn().mockResolvedValue({ ok: true, rows: [] });
+    const copy = vi.fn().mockResolvedValue({ ok: true, copied: true });
     window.customerAgent!.intakeQuery = {
       mode: vi.fn(), access, selectConditions: vi.fn(), selectShop: vi.fn(), search,
-      copy: vi.fn(), cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
+      copy, cancel: vi.fn().mockResolvedValue({ ok: true, cancelled: true }), onInvalidated: () => () => {},
     };
-    return { access, search };
+    return { access, search, copy };
   }
+
+  function faqRow(rank: IntakeQueryRow['rank'], riskNote = ''): IntakeQueryRow {
+    return {
+      kind: 'intake', key: `faq-key-${rank}`, rank, title: `合成标题 ${rank}`,
+      answerText: `合成正文 ${rank}\n保留换行`, applicabilityNote: '只用于合成演示', riskNote,
+      releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z',
+    };
+  }
+
+  it('selects the original FAQ question after no hit and awaits an explicit resubmission', async () => {
+    const user = userEvent.setup();
+    const { access, search } = connectFaqQuery();
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: '客户问题' });
+    await user.type(input, '原合成问题{Enter}');
+    const noHit = await screen.findByTestId('no-hit');
+    expect(noHit).not.toHaveTextContent(/升级|转交/);
+    await user.click(within(noHit).getByRole('button', { name: '修改问句' }));
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('原合成问题'.length);
+    expect(search).toHaveBeenCalledOnce();
+    await user.keyboard('新合成问题');
+    expect(input).toHaveValue('新合成问题');
+    expect(search).toHaveBeenCalledOnce();
+    await user.keyboard('{Enter}');
+    expect(search.mock.calls.map(([request]) => request.queryText)).toEqual(['原合成问题', '新合成问题']);
+  });
+
+  it.each(['explicit button', 'numeric shortcut'] as const)('uses the %s for the appropriate FAQ row', async method => {
+    const user = userEvent.setup();
+    const { access, search, copy } = connectFaqQuery();
+    search.mockResolvedValue({ ok: true, rows: [faqRow(1, '先停手并确认'), faqRow(2)] });
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    await user.type(screen.getByRole('textbox', { name: '客户问题' }), '合成问题{Enter}');
+    const risky = await screen.findByTestId('script-card-1');
+    const safe = screen.getByTestId('script-card-2');
+    const riskButton = within(risky).getByRole('button', { name: '复制话术' });
+    const warning = within(risky).getByText('风险提示：先停手并确认');
+    const applicability = within(risky).getByText('适用说明：只用于合成演示');
+    expect(warning.compareDocumentPosition(within(risky).getByTestId('answer-text-1')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(applicability.compareDocumentPosition(riskButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(riskButton).toHaveAccessibleDescription('风险提示：先停手并确认 适用说明：只用于合成演示');
+    expect(risky.querySelector('kbd')).toBeNull();
+    expect(riskButton).not.toHaveAttribute('aria-keyshortcuts');
+    expect(safe.querySelector('kbd')).toHaveTextContent('2');
+    expect(within(safe).getByRole('button', { name: '复制话术' })).toHaveAttribute('aria-keyshortcuts', '2');
+    expect(screen.getByText('2 条 · 按 2 复制')).toBeVisible();
+    const pane = screen.getByTestId('result-pane');
+    await waitFor(() => expect(pane).toHaveFocus());
+    fireEvent.keyDown(pane, { key: '1', code: 'Digit1' });
+    expect(copy).not.toHaveBeenCalled();
+    if (method === 'explicit button') {
+      riskButton.focus();
+      await user.keyboard('{Enter}');
+    } else {
+      fireEvent.keyDown(pane, { key: '2', code: 'Digit2' });
+    }
+    expect(await screen.findByTestId('toast')).toHaveTextContent(/^已复制$/);
+    expect(copy).toHaveBeenCalledExactlyOnceWith({ key: method === 'explicit button' ? 'faq-key-1' : 'faq-key-2' });
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it.each(['CLIPBOARD_FAILED', 'STALE'] as const)('recovers a FAQ copy from %s using only its applicable action', async code => {
+    const user = userEvent.setup();
+    const { access, search, copy } = connectFaqQuery();
+    search.mockResolvedValue({ ok: true, rows: [faqRow(1)] });
+    copy.mockResolvedValueOnce(intakeQueryFailure(code));
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(access).toHaveBeenCalledOnce());
+    await user.type(screen.getByRole('textbox', { name: '客户问题' }), '合成问题{Enter}');
+    await user.click(await screen.findByTestId('copy-button-1'));
+    const error = await screen.findByTestId('error-state');
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    if (code === 'STALE') {
+      expect(screen.queryByTestId('answer-text-1')).not.toBeInTheDocument();
+    }
+    await user.click(within(error).getByRole('button', { name: '重试' }));
+    if (code === 'CLIPBOARD_FAILED') {
+      await screen.findByTestId('toast');
+      expect(search).toHaveBeenCalledOnce();
+      expect(copy.mock.calls).toEqual([[{ key: 'faq-key-1' }], [{ key: 'faq-key-1' }]]);
+    } else {
+      await screen.findByTestId('answer-text-1');
+      expect(search).toHaveBeenCalledTimes(2);
+      expect(copy).toHaveBeenCalledOnce();
+    }
+    expect(access).toHaveBeenCalledOnce();
+  });
 
   it('validates an editable FAQ question in place and submits exactly 500 Unicode characters', async () => {
     const user = userEvent.setup();
@@ -3084,7 +3176,7 @@ describe('QueryApp', () => {
     await screen.findByTestId('no-hit');
     expect(screen.queryByTestId('intake-query-filters')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查询范围' })).toBe(scope);
-    expect(scope).toHaveTextContent(/^查询范围$/);
+    expect(scope).toHaveTextContent('shop-a');
 
     fireEvent.change(input, { target: { value: spaces } });
     await user.click(submit);
@@ -3259,7 +3351,8 @@ describe('QueryApp', () => {
       const scope = screen.getByRole('button', { name: '查询范围' });
       const input = screen.getByTestId('question-input');
       fireEvent.change(input, { target: { value: '合成问句' } });
-      expect(scope).toHaveTextContent(/^查询范围$/);
+      expect(scope).toHaveTextContent('shop-a');
+      expect(scope).not.toHaveTextContent('+');
       expect(scope).toHaveAccessibleDescription('shop-a · 商品全部 · 场景全部');
       fireEvent.pointerDown(scope);
       fireEvent.click(scope);
@@ -3276,7 +3369,7 @@ describe('QueryApp', () => {
       expect(scope).toHaveFocus();
       expect(scope).toHaveAttribute('aria-expanded', 'false');
       expect(scope).toHaveAttribute('data-selected', 'true');
-      expect(scope).toHaveTextContent('商品 合成商品');
+      expect(scope).toHaveTextContent('shop-a+1');
       expect(scope).toHaveAccessibleDescription('shop-a · 商品 合成商品 · 场景全部');
       expect(input).toHaveValue('合成问句');
       expect(search).not.toHaveBeenCalled();
@@ -3391,6 +3484,10 @@ describe('QueryApp', () => {
     } else {
       expect(await screen.findByText('没有匹配的 FAQ 话术，可从上方选择流程办理。')).toBeVisible();
       expect(screen.queryByTestId('no-hit')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '修改问句' }));
+      expect(screen.getByTestId('question-input')).toHaveFocus();
+      expect(search).toHaveBeenCalledOnce();
+      expect(open).not.toHaveBeenCalled();
     }
     expect(candidate).toBeVisible();
     await user.click(candidate);

@@ -32,7 +32,7 @@ function rankedScript(overrides: Partial<RankedScript> = {}): RankedScript {
 function renderResults(input: {
   results?: RankedScript[];
   copiedRank?: 1 | 2 | 3 | null;
-  onCopy?: (script: QueryResult, trigger: HTMLButtonElement | null) => void;
+  onCopy?: (script: QueryResult, trigger: HTMLElement | null) => void;
 } = {}) {
   const onCopy = input.onCopy ?? vi.fn();
   render(
