@@ -20,6 +20,10 @@ Node.js 24 可直接核对导航定义：
 node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./apps/desktop/src/renderer/features/dashboard/intake-destination-rows.ts"; console.log(rows.map(({ id, label }) => ({ id, label })))'
 ```
 
+资料审核独立核对查看和上传权限。查看批次使用 `content-manage`。上传资料使用 `import`，来源列表只显示有权维护且支持当前导入流程的来源。只获得上传权限时，校验通过后由有该来源查看权限的人在「资料批次」继续处理。
+
+「刷新资料权限」重新读取当前权限。批次刷新或翻页失败时，页面保留错误并提供「重新读取第一页批次」。权限尚未读取或读取失败期间，工作台和资料审核显示对应的读取状态。
+
 左下角账号入口显示当前账号信息，并提供退出登录。Main 撤销会话后同步工作台和查询窗口；远端退出未确认时，界面保留相应提示。
 
 内容库没有本机草稿页签，已发布内容按当前业务授权读取。设置里的权限时间仍用本机可读时间和 UTC 偏移。

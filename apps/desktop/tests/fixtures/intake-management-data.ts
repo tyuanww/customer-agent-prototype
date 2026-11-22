@@ -25,7 +25,10 @@ export function intakeManagementData(count = 2) {
   const respond = (path: string, body?: unknown): unknown => {
     const u = new URL(path, 'http://127.0.0.1');
     if (u.pathname.endsWith('/authorization')) return { factsVersion: 1, revocationGeneration: 0, policyVersion: 1, validUntil, nextCursor: null,
-      capabilities: [{ scope, actions: state.allowed ? ['content-manage', ...(state.reviewer ? ['review'] : []), ...(state.confirmer ? ['source-confirm'] : []), ...(state.publisher ? ['publish'] : []), ...(state.importer ? ['import'] : []), ...(state.canceller ? ['candidate-cancel'] : []), ...(state.rollback ? ['rollback'] : [])] : ['query'], mayAllocate: [], mayDelegate: [], validUntil }] };
+      capabilities: [{ scope, actions: [
+        ...(state.allowed ? ['content-manage', ...(state.reviewer ? ['review'] : []), ...(state.confirmer ? ['source-confirm'] : []), ...(state.publisher ? ['publish'] : []), ...(state.canceller ? ['candidate-cancel'] : []), ...(state.rollback ? ['rollback'] : [])] : ['query']),
+        ...(state.importer ? ['import'] : []),
+      ], mayAllocate: [], mayDelegate: [], validUntil }] };
     if (u.pathname.endsWith('/sources')) return { items: [{ scope, version: 1, templateVersion: 'faq-p1.1', ruleVersion: 'intake-p1.1', mappingVersion: 'mapping-p1.1', structureDigest: 'a'.repeat(64), contentIntakeMode: 'v2-preview', modeVersion: 1 }], nextCursor: null };
     if (!state.allowed) throw new Error('FORBIDDEN');
     if (u.pathname === '/v1/intake/candidates') return { items: [candidate], nextCursor: null };

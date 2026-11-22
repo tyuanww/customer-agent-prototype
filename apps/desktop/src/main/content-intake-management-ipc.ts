@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
-import { isIntakeManagementCommand, type IntakeManagementReply } from '../shared/content-intake-management';
+import { INTAKE_BATCH_LIST_FAILURE_MESSAGES, isIntakeManagementCommand, type IntakeBatchListFailure, type IntakeManagementReply } from '../shared/content-intake-management';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 import { isTrustedMainFrameSender } from './sender-guard';
@@ -219,6 +219,10 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       : code === 'CONFLICT' ? '请先处理未完成操作或明确放弃尚未提交的判断。'
         : code === 'UNAUTHORIZED' ? '请先在查询窗口登录。' : '请求未完成或权限已改变。请刷新候选；结果不明时按页面提示确认原操作结果。'),
     view: manager?.view() ?? null });
+  const batchListFailure = (manager: ContentIntakeManagement, code: string, stage: IntakeBatchListFailure['stage']): IntakeManagementReply => ({
+    ok: false, code, view: manager.view(),
+    message: code === 'UNAUTHORIZED' ? '请先在查询窗口登录。' : INTAKE_BATCH_LIST_FAILURE_MESSAGES[stage],
+  });
   for (const channel of CHANNELS) ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const wc = dashboard();
     if (!wc || !isTrustedMainFrameSender(event, [wc], devUrl())) return failure('FORBIDDEN');
@@ -273,8 +277,12 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       wc.once('destroyed', () => { win?.removeListener('close', close); windows.delete(wc); owned.dispose(); });
     }
     try {
-      if (channel === 'dashboard:intake-current') await manager.settleUpload();
-      if (channel === 'dashboard:intake-current') return { ok: true, view: manager.view() };
+      if (channel === 'dashboard:intake-current') {
+        await manager.settleUpload();
+        const batchFailure = manager.lastBatchListFailure();
+        if (batchFailure) return batchListFailure(manager, batchFailure.code, batchFailure.stage);
+        return { ok: true, view: manager.view() };
+      }
       const command = args[0] as Parameters<ContentIntakeManagement['command']>[0];
       if (command.action === 'recover' || command.action === 'rollback-recover') {
         const recovered = await plane?.recover(
@@ -323,7 +331,12 @@ export function registerContentIntakeManagementIpc(session: ProductSession | nul
       if (error instanceof DashboardControlPlaneError) {
         return failure(error.code, manager, error.message);
       }
-      return failure(error instanceof ProductHttpError ? error.code : 'UNAVAILABLE', manager, error instanceof ProductHttpError ? error.reason : undefined);
+      const code = error instanceof ProductHttpError ? error.code : 'UNAVAILABLE';
+      const batchFailure = manager.lastBatchListFailure();
+      if (batchFailure && isIntakeManagementCommand(args[0]) && args[0].action === 'list') {
+        return batchListFailure(manager, code, batchFailure.stage);
+      }
+      return failure(code, manager, error instanceof ProductHttpError ? error.reason : undefined);
     }
   });
   return { allowClose: () => { if (!allowClose()) return false; closing = true; return true; }, dispose: () => {

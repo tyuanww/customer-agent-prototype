@@ -31,10 +31,19 @@ export type IntakeRollbackView = {
   result: { state: C['IntakeRollbackReceipt']['state']; releaseId: string | null } | null;
   hasReview: boolean; canExecute: boolean;
 };
+export const INTAKE_BATCH_LIST_FAILURE_MESSAGES = {
+  access: '资料权限暂时无法读取。',
+  batches: '资料批次暂时无法读取。',
+} as const;
+export type IntakeBatchListFailure = Readonly<{
+  stage: keyof typeof INTAKE_BATCH_LIST_FAILURE_MESSAGES;
+  retryFirstBatchPage: boolean;
+}>;
 export type IntakeManagementView = {
   rollback: IntakeRollbackView;
   upload: IntakeUploadView;
   signedIn: boolean; displayName: string; authorized: boolean; validUntil: string | null;
+  batchListFailure?: IntakeBatchListFailure;
   candidates: { selection: string; scopeLabel: string; candidate: C['IntakeCandidate'] }[]; moreCandidates: boolean;
   selected: C['IntakeCandidate'] | null; material: C['IntakeCandidatePage'] | null;
   /** Zero-based page index of the material page on screen; the renderer only uses
