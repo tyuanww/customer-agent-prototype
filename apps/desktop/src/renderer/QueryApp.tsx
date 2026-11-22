@@ -1555,9 +1555,17 @@ export function QueryApp({ intake = false }: { intake?: boolean }) {
       setSearching(false);
       cancelPendingCopy(); setResults([]);
       if (phaseRef.current !== 'FOX_IDLE') {
-        setQueryError(reason === 'facts-expired'
-          ? { message: intakeQueryFailure('FACTS_EXPIRED').message, recovery: 'none' }
-          : { message: '资料资格已失效，请重新查询。', recovery: 'retry-search' });
+        switch (reason) {
+          case 'invalidated':
+            setQueryError({ message: intakeQueryFailure('FORBIDDEN').message, recovery: 'refresh-shops' });
+            break;
+          case 'expired':
+            setQueryError({ message: '资料资格已失效，请重新查询。', recovery: 'retry-search' });
+            break;
+          case 'facts-expired':
+            setQueryError({ message: intakeQueryFailure('FACTS_EXPIRED').message, recovery: 'none' });
+            break;
+        }
         reportPhase('ERROR');
       }
     });

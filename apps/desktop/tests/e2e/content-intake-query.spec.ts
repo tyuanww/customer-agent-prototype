@@ -194,13 +194,18 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
       await resize.press('Shift+ArrowLeft');
       await expect(resize).toHaveAttribute('aria-valuenow', String(width));
     }
+    const queryWindow = await app.browserWindow(query);
+    const originalBounds = await queryWindow.evaluate(window => window.getBounds());
+    await queryWindow.evaluate((window, bounds) => window.setBounds({ ...bounds, height: 240 }), originalBounds);
+    await expect.poll(() => query.evaluate(() => [innerWidth, innerHeight])).toEqual([360, 240]);
     const scopeShop = scope.getByText('shop-b', { exact: true });
     const scopeCount = scope.getByText('+2', { exact: true });
     await expect(scopeShop).toBeInViewport({ ratio: 1 });
     await expect(scopeCount).toBeInViewport({ ratio: 1 });
     expect(await scopeShop.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
     expect(await scopeCount.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-    await query.screenshot({ path: test.info().outputPath('faq-scope-360px.png') });
+    await query.screenshot({ path: test.info().outputPath('faq-scope-360x240.png') });
+    await queryWindow.evaluate((window, bounds) => window.setBounds(bounds), originalBounds);
     await scope.click();
     await expect(query.getByTestId('intake-query-filters').locator('summary').getByText('合成洁面产品', { exact: true })).toBeVisible();
     await expect(query.getByTestId('intake-query-filters').locator('summary').getByText('合成晨间场景', { exact: true })).toBeVisible();
