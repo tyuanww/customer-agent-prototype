@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { isIntakeManagementCommand, type IntakeManagementCommand, type IntakeManagementView, type IntakeRollbackCommand } from '../shared/content-intake-management';
+import { isIntakeManagementCommand, type IntakeBatchListFailure, type IntakeManagementCommand, type IntakeManagementView, type IntakeRollbackCommand } from '../shared/content-intake-management';
 import { isIntakeUploadCommand } from '../shared/content-intake-upload';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
@@ -10,6 +10,7 @@ import { ContentIntakeRollback } from './content-intake-rollback';
 import { ContentIntakeQuality } from './content-intake-quality';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
+import type { ProductErrorCode } from '../shared/product-session';
 type C = components['schemas'];
 type Session = Pick<ProductSession, 'view' | 'subscribe' | 'request'>;
 type LegacyPublish = Omit<C['IntakePublish'], 'confirmed'> & { approvalEvidenceVersion: number };
@@ -19,6 +20,7 @@ type WorkflowOperation =
   | { action: 'cancel'; body: C['IntakeCancel'] }
   | { action: 'publish'; body: C['IntakePublish'] | LegacyPublish };
 type Request = (path: string, body?: unknown) => Promise<unknown>;
+type BatchListFailure = IntakeBatchListFailure & Readonly<{ code: ProductErrorCode }>;
 type OperationBoundary = Readonly<{
   signal: AbortSignal;
   beginCommit(): void;
@@ -49,6 +51,7 @@ export class ContentIntakeManagement {
   private access: IntakeAccess | null = null;
   private rows: { selection: string; candidate: C['IntakeCandidate'] }[] = [];
   private cursor: string | null = null;
+  private batchListFailure: BatchListFailure | null = null;
   private selected: C['IntakeCandidate'] | null = null;
   private material: C['IntakeCandidatePage'] | null = null;
   /** Page 0 is represented by an empty trail. trail[k] is the cursor that moved from
@@ -78,10 +81,12 @@ export class ContentIntakeManagement {
     });
     this.unsubscribe = session.subscribe(() => {
       if (!session.view().signedIn || session.view().sessionEpoch !== this.epoch) {
-        this.epoch = session.view().sessionEpoch; this.workflowPending = null; this.rollback.invalidate(true); this.upload.invalidate(true); this.invalidate(); this.clearSelection();
+        this.epoch = session.view().sessionEpoch; this.batchListFailure = null; this.workflowPending = null; this.rollback.invalidate(true); this.upload.invalidate(true); this.invalidate(); this.clearSelection();
       }
     });
   }
+  /** A window re-reading after invalidation needs the failed read as well as the cleared projection. */
+  lastBatchListFailure(): BatchListFailure | null { return this.batchListFailure; }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private invalidate() {
     this.active?.abort(); this.access = null; this.rows = []; this.cursor = null; this.material = null; this.materialTrail = [];
@@ -119,8 +124,12 @@ export class ContentIntakeManagement {
     const canRead = !!this.selected && this.can('content-manage', this.selected.sourceId);
     const mutable = canRead && ['awaiting-evidence','ready'].includes(this.selected!.state);
     const canReview = mutable && this.can('review', this.selected!.sourceId);
+    const listFailure = this.batchListFailure;
     return structuredClone({ rollback: this.rollback.view(access), signedIn: session.signedIn, displayName: session.signedIn ? session.displayName ?? '已登录' : '未登录',
       authorized, validUntil: access?.validUntil ?? null,
+      ...(session.signedIn && listFailure ? {
+        batchListFailure: { stage: listFailure.stage, retryFirstBatchPage: listFailure.retryFirstBatchPage },
+      } : {}),
       candidates: this.rows.map(row => ({ ...row, scopeLabel: scopeLabel(this.access?.sources ?? [], row.candidate.sourceId) })),
       moreCandidates: this.cursor !== null,
       selected: canRead ? this.selected : null, material: canRead ? this.material : null,
@@ -178,6 +187,7 @@ export class ContentIntakeManagement {
       const r = await this.session.request(epoch, path, { ...(body !== undefined ? { body } : {}), signal: controller.signal, maxResponseBytes: 8 * 1024 * 1024 });
       assertActive(); return r.value;
     };
+    let batchReadStage: IntakeBatchListFailure['stage'] = 'access';
     try {
       if (isRollback(c)) {
         if (this.unresolved() || this.quality.hasDraft() || this.upload.closeRisk()) return reject('CONFLICT');
@@ -231,6 +241,7 @@ export class ContentIntakeManagement {
             this.clearSelection();
           } else if (this.selected && !this.can('review', this.selected.sourceId)) this.quality.cancelRead();
           if (this.can('content-manage')) {
+            batchReadStage = 'batches';
             const q = new URLSearchParams({ limit: '20', ...(cursor ? { cursor } : {}) });
             const page = parseContractSchema('IntakeCandidateList', await request(`/v1/intake/candidates?${q}`));
             if (page.items.some(item => !this.can('content-manage', item.sourceId))) return reject('FORBIDDEN');
@@ -239,6 +250,7 @@ export class ContentIntakeManagement {
             const current = selected && page.items.find(candidate => sameKey(candidate.key, selected.key) && candidate.sourceId === selected.sourceId);
             if (current) this.observeCandidate(current);
           } else { this.rows = []; this.cursor = null; this.selected = null; this.quality.cancelRead(); }
+          this.batchListFailure = null;
         } else if (c.action === 'discard') {
           this.clearSelection();
         } else if (c.action === 'select') {
@@ -331,6 +343,13 @@ export class ContentIntakeManagement {
       }
       assertActive(); return this.view();
     } catch (error) {
+      if (c.action === 'list' && !controller.signal.aborted && this.epoch === epoch) {
+        this.batchListFailure = {
+          code: error instanceof ProductHttpError ? error.code : 'UNAVAILABLE',
+          stage: batchReadStage,
+          retryFirstBatchPage: c.next || batchReadStage === 'batches' || this.access !== null || this.batchListFailure?.retryFirstBatchPage === true,
+        };
+      }
       // First validation refusal preserves correctable human work. All other
       // failures revoke displayed materials; uncertain bodies remain recoverable.
       if (this.active === controller && !(error instanceof ProductHttpError && ['VALIDATION','CONFLICT'].includes(error.code))) this.invalidate();

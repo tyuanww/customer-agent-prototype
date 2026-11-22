@@ -66,7 +66,6 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
     </Space>
     {view.revisionOf && <p className="intake-notice" role="status">{view.phase === 'validated' ? '已完成修订' : '正在准备修订'}：{view.revisionOf.candidateId}，原版本 {view.revisionOf.version}。请上传完整修订稿。</p>}
     {blocked && <p className="intake-notice">开始新的上传前，请完成当前审核并关闭，或在批次详情中放弃未提交的输入。</p>}
-    {!view.authorized && <p>请核对登录与来源授权。</p>}
     {view.notice && <p role="status">{view.notice}</p>}
     {declaring && <fieldset className="intake-fields" disabled={disabled}>
       <legend>确认整理责任人与全部实际改稿人</legend>
@@ -93,6 +92,7 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
       {view.canSaveReport && <ActionButton disabled={readingDisabled} onClick={() => apply({ action: 'upload-save-report' })}>保存完整错误报告</ActionButton>}
       {view.canOpen && <ActionButton disabled={disabled} onClick={() => apply({ action: 'upload-open' })}>审核本次资料</ActionButton>}
     </div>
+    {view.job?.state === 'validated' && !readingDisabled && !view.canOpen && <p>请告知有该来源查看权限的同事，由对方在「资料批次」中继续处理。</p>}
     {(view.canStop || view.phase === 'stopped' || !!view.pending) && <p>停止本机等待不会撤销服务器已接收的任务。请继续核对原任务结果；生成待审核资料后再按其权限处理。</p>}
     {view.job && <section aria-label="资料校验结果">
       <h3>校验结果</h3>

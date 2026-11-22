@@ -88,7 +88,8 @@ function MaterialsDestination({ active, presentation, onOpenReview }: { active: 
     if (!visited && !active) return undefined;
     return window.dashboardIntake?.onInvalidated(() => setGeneration(value => value + 1));
   }, [visited, active]);
-  return <div hidden={!active}>{(visited || active) && <IntakeManagement key={generation} active={active} presentation={presentation} onOpenReview={onOpenReview} />}</div>;
+  return <div hidden={!active}>{(visited || active) && <IntakeManagement key={generation} readProjectionFirst={generation > 0}
+    active={active} presentation={presentation} onOpenReview={onOpenReview} />}</div>;
 }
 
 function shouldMount(row: IntakeDestinationRow, ctx: IntakeDestinationContext): boolean {

@@ -68,6 +68,22 @@ it('shows total issues separately from the bounded page and saves the complete r
   await user.click(screen.getByRole('button', { name: '选择 CSV / Excel 文件' }));
   expect(apply).toHaveBeenLastCalledWith({ action: 'upload-choose' });
 });
+it.each([true, false])('gives the next step after validation when the uploaded batch canOpen=%s', async canOpen => {
+  const apply = vi.fn(), user = userEvent.setup();
+  const view = upload({ phase: 'validated', canSubmit: false, canOpen,
+    job: { state: 'validated', totalIssues: 0, excludedSheetCount: 0, excludedMediaCount: 0, issues: [] } });
+  render(<IntakeUpload view={view} busy={false} blocked={false} refreshBlocked={false} stopping={false} apply={apply} />);
+  const openBatch = screen.queryByRole('button', { name: '审核本次资料' });
+  if (canOpen) {
+    expect(openBatch).toBeEnabled();
+    if (openBatch) await user.click(openBatch);
+    expect(apply).toHaveBeenCalledWith({ action: 'upload-open' });
+  } else {
+    expect(openBatch).not.toBeInTheDocument();
+    expect(screen.getByText('请告知有该来源查看权限的同事，由对方在「资料批次」中继续处理。')).toBeVisible();
+  }
+});
+
 it('shows CSV record coordinates and offers a pathless choice for either supported format', async () => {
   const apply = vi.fn(), user = userEvent.setup();
   render(<IntakeUpload view={upload({ file: { name: 'synthetic-faq.csv', bytes: 1024 }, phase: 'failed', canSubmit: false,
@@ -118,7 +134,7 @@ it('stops a pending upload through the management controller and ignores its lat
   await screen.findByText(/正在上传文件/);
   await act(async () => resolve({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
   expect(screen.queryByText(/校验通过，待审核资料已生成/)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '刷新上传权限' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '刷新资料权限' })).toBeDisabled();
   await act(async () => finishRetry({ ok: true, view: management(upload({ phase: 'validated', canSubmit: false, canOpen: true })) }));
   expect(await screen.findByText(/校验通过，待审核资料已生成/)).toBeInTheDocument();
   expect(command.mock.calls.map(([c]) => c.action)).toEqual(['list', 'upload-submit', 'upload-stop', 'upload-retry']);
@@ -190,9 +206,45 @@ it('can refresh permissions without discarding an uncertain upload or requiring 
     current: async () => ({ ok: true, view: structuredClone(view) }), onInvalidated: () => () => undefined };
   render(<IntakeManagement />);
   expect(await screen.findByRole('button', { name: '按原请求重试上传' })).toBeEnabled();
-  await user.click(screen.getByRole('button', { name: '刷新上传权限' }));
+  await user.click(screen.getByRole('button', { name: '刷新资料权限' }));
   expect(command).toHaveBeenLastCalledWith({ action: 'list', next: false });
 });
+it('keeps the batch read error after recovering a previously uncertain upload', async () => {
+  const user = userEvent.setup();
+  const pending = management(upload({ phase: 'unknown', pending: 'upload', canSubmit: false, canRetry: true }));
+  const batchListFailure = { stage: 'batches' as const, retryFirstBatchPage: true };
+  const failed = { ...pending, batchListFailure, authorized: false, validUntil: null,
+    upload: upload({ phase: 'unknown', authorized: false, file: null, principals: [], pending: 'upload', canSubmit: false, canRetry: true }) };
+  const recovered = { ...management(upload({ phase: 'validated', canSubmit: false, canOpen: true,
+    job: { state: 'validated', totalIssues: 0, excludedMediaCount: 0, excludedSheetCount: 0, issues: [] } })), batchListFailure };
+  let current = pending;
+  let lists = 0;
+  const command = vi.fn<IntakeManagementApi['command']>(async c => {
+    if (c.action === 'list') {
+      lists++;
+      if (lists === 2) {
+        current = failed;
+        return { ok: false, code: 'UNAVAILABLE', message: '资料批次暂时无法读取。', view: failed };
+      }
+    }
+    if (c.action === 'upload-retry') current = recovered;
+    if (lists === 3) current = { ...recovered, batchListFailure: undefined };
+    return { ok: true, view: current };
+  });
+  window.dashboardIntake = { mode: async () => ({ ok: true, enabled: true }), command,
+    current: async () => ({ ok: true, view: current }), onInvalidated: () => () => undefined };
+  render(<IntakeManagement />);
+  await user.click(await screen.findByRole('button', { name: '刷新资料权限' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('资料批次暂时无法读取。');
+  await user.click(screen.getByRole('button', { name: '按原请求重试上传' }));
+  expect(await screen.findByRole('button', { name: '审核本次资料' })).toBeEnabled();
+  expect(screen.getByRole('alert')).toHaveTextContent('资料批次暂时无法读取。');
+  await user.click(screen.getByRole('button', { name: '重新读取第一页批次' }));
+  expect(await screen.findByRole('region', { name: '资料批次列表' })).toBeVisible();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(command).toHaveBeenLastCalledWith({ action: 'list', next: false });
+});
+
 it.each(['revoked', 'unavailable'] as const)('does not retain personal material when IPC recovery is %s', async outcome => {
   const user = userEvent.setup(), view = management(upload()); let recovering = false;
   const current = vi.fn<IntakeManagementApi['current']>(async () => {

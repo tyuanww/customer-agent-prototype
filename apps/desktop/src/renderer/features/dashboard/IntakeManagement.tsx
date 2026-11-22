@@ -1,7 +1,7 @@
 import type { components } from '@customer-agent/contracts';
 import { Button, Collapse, ConfigProvider, Input, Modal, Segmented, Select, Table, type ButtonProps, type TableColumnsType } from 'antd';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { IntakeManagementCommand, IntakeManagementReply, IntakeManagementView, QualityPage } from '@shared/content-intake-management';
+import { INTAKE_BATCH_LIST_FAILURE_MESSAGES, type IntakeManagementCommand, type IntakeManagementReply, type IntakeManagementView, type QualityPage } from '@shared/content-intake-management';
 import { asyncFailure, type AsyncResource } from '@shared/async-resource';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import { READ_DISCARDED, useAsyncResource, type DashboardRead } from './use-async-resource';
@@ -10,7 +10,7 @@ import { IntakeAntdTheme } from './intake-antd';
 import { IntakeRollback } from './IntakeRollback';
 import { IntakeUpload } from './IntakeUpload';
 import { formatSeatClock } from './intake-time';
-import { WorkbenchFailed, WorkbenchLoading } from './WorkbenchState';
+import { WorkbenchFailed, WorkbenchLoading, WorkbenchNoAccess } from './WorkbenchState';
 import './intake-management.css';
 
 function askConfirm(content: string, onOk: () => void, danger = false) {
@@ -259,15 +259,13 @@ function resourceForReply(reply: IntakeManagementReply): AsyncResource<IntakeMan
   if (!reply.ok) return asyncFailure(reply.code, { forbidden: reply.message, error: reply.message });
   return { status: 'idle' };
 }
-function shownView(view: IntakeManagementView | null): AsyncResource<IntakeManagementView> {
-  return view ? { status: 'ready', value: view } : { status: 'idle' };
-}
 /** The host keeps this instance across both destinations. A second overview
  * reader would duplicate access invalidation and lose the in-progress forms. */
-export function IntakeManagement({ active = true, presentation = 'review', onOpenReview }: {
+export function IntakeManagement({ active = true, presentation = 'review', onOpenReview, readProjectionFirst = false }: {
   active?: boolean;
   presentation?: 'overview' | 'review';
   onOpenReview?: () => void;
+  readProjectionFirst?: boolean;
 }) {
   const sectionId = useId();
   const [detailOpen, setDetailOpen] = useState(true);
@@ -300,7 +298,8 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
   const [rereading, setRereading] = useState(false);
   const generation = useRef(0), pending = useRef<number | null>(null);
   const stopPending = useRef(false);
-  const listed = useRef(false);
+  const batchList = useRef<'initial' | 'loaded' | 'retry-first-page'>('initial');
+  const readProjection = useRef(readProjectionFirst);
   const readTicket = useRef(0);
   const held = useRef<AsyncResource<IntakeManagementView>>(window.dashboardIntake
     ? { status: 'idle' }
@@ -320,14 +319,16 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     const api = window.dashboardIntake;
     if (!api) return finish({ status: 'error', message: WORKBENCH_EMPTY.intakeUnmounted });
     try {
-      const reply = listed.current ? await api.current() : await api.command({ action: 'list', next: false });
+      const projectionOnly = readProjection.current || batchList.current === 'loaded';
+      const reply = projectionOnly ? await api.current() : await api.command({ action: 'list', next: false });
       if (generation.current !== gen) return stale();
-      listed.current = true;
+      readProjection.current = false;
+      if (reply.ok || reply.code === 'UNAUTHORIZED') batchList.current = 'loaded';
+      else if (reply.view?.batchListFailure?.retryFirstBatchPage) batchList.current = 'retry-first-page';
       setError(!reply.ok && reply.view ? reply.message : '');
       return finish(resourceForReply(reply));
     } catch {
       if (generation.current !== gen) return stale();
-      listed.current = true;
       setError('');
       return finish({ status: 'error', message: '管理服务不可用，请刷新。' });
     }
@@ -396,6 +397,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       const api = window.dashboardIntake!;
       const reply = await (command ? api.command(command) : api.current());
       if (generation.current !== gen) return;
+      if (command?.action === 'list') batchList.current = reply.ok || reply.code === 'UNAUTHORIZED' ? 'loaded' : 'retry-first-page';
       if (fromOverview && reply.ok && (!reply.view.signedIn || !reply.view.authorized || !sameCandidate(request.row.candidate, reply.view.selected))) {
         commit(resourceForReply(reply));
         setError('无法打开该批次，请重新读取当前状态。');
@@ -412,6 +414,7 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
       }
     } catch {
       if (generation.current !== gen) return;
+      if (command?.action === 'list') batchList.current = 'retry-first-page';
       if (uploading) {
         // Re-read Main's access-filtered projection before keeping form input.
         // A failed IPC reply alone cannot prove either success or revocation.
@@ -461,10 +464,16 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     if (!api) return undefined;
     const off = api.onInvalidated(() => {
       const gen = ++generation.current; setDirtyIds(new Set());
-      commitRef.current({ status: 'idle' });
-      setError('请重新读取当前状态。');
-      void api.current().then(reply => { if (generation.current === gen) commitRef.current(shownView(reply.view)); })
-        .catch(() => { if (generation.current === gen) commitRef.current({ status: 'idle' }); });
+      commitRef.current({ status: 'loading' });
+      setError(''); setRereading(false);
+      void api.current().then(reply => {
+        if (generation.current !== gen) return;
+        if (!reply.ok && reply.view?.batchListFailure?.retryFirstBatchPage) batchList.current = 'retry-first-page';
+        setError(!reply.ok && reply.view ? reply.message : '');
+        commitRef.current(resourceForReply(reply));
+      }).catch(() => {
+        if (generation.current === gen) commitRef.current({ status: 'error', message: '管理服务不可用，请刷新。' });
+      });
     });
     const invalidate = () => { generation.current++; };
     return () => { invalidate(); pending.current = null; off(); };
@@ -501,6 +510,31 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
   const visibleCandidates = candidates.filter(row => candidateVisible(row.candidate.state, candidateFilter, sameCandidate(row.candidate, view?.selected ?? null)));
   const selectionBlocked = dirty || !!view?.hasDraft || uploadDraft;
   const rowDisabled = disabled || selectionBlocked;
+  const accessKnown = !!view?.validUntil;
+  const canOpenUpload = !!upload && (upload.authorized || upload.phase !== 'idle' || !!upload.pending || upload.canReset || upload.busy);
+  const showUpload = uploadOpen && canOpenUpload;
+  const reviewRecoveryPending = !!(view?.pending || view?.rollback.pending);
+  const lastListFailure = view?.batchListFailure;
+  const failureMessage = error || readFailure || (lastListFailure && INTAKE_BATCH_LIST_FAILURE_MESSAGES[lastListFailure.stage]);
+  const showAccessStatus = !failureMessage && !reviewRecoveryPending;
+  const checkingStatus = busy || reading || rereading || stopping;
+  const hasLoadedBatches = batchList.current === 'loaded' && !lastListFailure;
+  const batchListLoading = !hasLoadedBatches && !failureMessage && checkingStatus;
+  const refreshAccess = () => {
+    if (batchList.current === 'loaded') batchList.current = 'initial';
+    readProjection.current = false;
+    reread();
+  };
+  const refreshAccessDisabled = checkingStatus || !!upload?.busy || dirty || !!view?.hasDraft || reviewRecoveryPending;
+  const needsAccessRefresh = !!view?.signedIn && (!accessKnown || !view.authorized || !upload?.authorized || !!upload.pending);
+  const retryList = !!window.dashboardIntake && view?.signedIn !== false && !reviewRecoveryPending
+    && (!hasLoadedBatches || (view?.signedIn && !accessKnown));
+  const retryLabel = accessKnown || lastListFailure?.retryFirstBatchPage || batchList.current === 'retry-first-page' ? '重新读取第一页批次' : '刷新资料权限';
+  const failure = failureMessage && <WorkbenchFailed message={failureMessage}
+    retryLabel={retryList ? retryLabel : '重新读取当前状态'}
+    onRetry={(retryList ? refreshAccessDisabled : checkingStatus) ? undefined : retryList ? refreshAccess : reread} />;
+  const explainUploadAccess = showAccessStatus && accessKnown && !!upload && !upload.authorized;
+  const uploadAccessId = `${sectionId}-upload-access`;
   const batchColumns: TableColumnsType<CandidateRow> = [
     { title: '资料批次', key: 'batch', render: (_value, row) => <div className="intake-batch-label">
       <span title={row.candidate.key.candidateId}>{candidateCategory(row.scopeLabel)} / {shortBatchId(row.candidate.key.candidateId)}</span>
@@ -542,28 +576,35 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     data-testid={presentation === 'overview' ? 'module-overview' : undefined}>
     {presentation === 'overview' && <section aria-label="待审核资料">
       <div className="intake-candidate-head"><h1>待审核资料</h1><ActionButton disabled={!onOpenReview} onClick={onOpenReview}>查看全部资料</ActionButton></div>
-      {(error || readFailure) && <WorkbenchFailed message={error || readFailure} retryLabel="重新读取当前状态"
-        onRetry={busy || reading || rereading || stopping ? undefined : reread} />}
-      {reading || rereading || (!view && !error && !readFailure) ? <WorkbenchLoading label="读取待审核资料" />
-        : view?.signedIn && view.authorized
+      {failure}
+      {reading || rereading || batchListLoading || (!view && !failureMessage) ? <WorkbenchLoading label="读取待审核资料" />
+        : view?.signedIn && view.authorized && hasLoadedBatches
         ? <><Table<CandidateRow> columns={overviewColumns} dataSource={candidates.filter(row => isOpenCandidate(row.candidate.state))}
           pagination={false} rowKey="selection" locale={{ emptyText: view.moreCandidates ? '当前页没有待审核资料，后续批次尚未读取。' : '有可处理的资料批次时，会显示在这里。' }} />
           {(selectionBlocked || view.pending || view.rollback.pending || upload?.pending) && <p role="status">请先在资料审核处理当前操作，再切换批次。</p>}
           {view.moreCandidates && <p className="intake-muted">这里只显示当前已读取的批次。点击“查看全部资料”，可在批次列表继续翻页。</p>}</>
-        : view ? <p>{!view.signedIn ? '登录后可查看待审核资料。' : '取得资料查看权限后，会显示可处理的批次。'}</p> : null}
+        : showAccessStatus && view && (!view.signedIn ? <p>登录后可查看待审核资料。</p>
+          : !view.authorized && <><p>{accessKnown ? '取得资料查看权限后，会显示可处理的批次。' : '刷新资料权限后可查看待审核批次。'}</p>
+            <ActionButton disabled={refreshAccessDisabled} onClick={refreshAccess}>刷新资料权限</ActionButton></>)}
     </section>}
     <div hidden={presentation !== 'review'}>
     <h1>资料审核</h1>
-    <p className="intake-operator">{view?.displayName ?? (busy || reading || rereading ? '正在读取会话…' : '会话待确认')}</p>
-    {(error || readFailure) && <div><p role="alert">{error || readFailure}</p><ActionButton disabled={busy || reading || rereading || stopping} onClick={reread}>重新读取当前状态</ActionButton></div>}
+    {view && <p className="intake-operator">{view.displayName}</p>}
+    {!view && !failureMessage && <WorkbenchLoading label="读取资料权限" />}
+    {presentation === 'review' && failure}
+    {view && !view.signedIn && showAccessStatus && <p>请先在查询窗口登录。</p>}
     {view?.signedIn && upload && <section aria-label="资料上传">
-      <ActionButton type={inDetail ? 'default' : 'primary'} aria-expanded={uploadOpen} aria-controls={`${sectionId}-upload`}
-        onClick={() => setUploadOpen(open => !open)}>{uploadOpen ? '收起上传区' : '上传资料'}</ActionButton>
-      <div id={`${sectionId}-upload`} hidden={!uploadOpen}>
-        <IntakeUpload view={upload} active={active && presentation === 'review' && uploadOpen} busy={presentation !== 'review' || busy || rereading} stopping={stopping}
+      {!accessKnown && showAccessStatus && <p>刷新资料权限后可查看当前可用操作。</p>}
+      <div className="intake-toolbar">
+        <ActionButton type={upload.authorized && !inDetail ? 'primary' : 'default'} disabled={!canOpenUpload}
+          aria-expanded={showUpload} aria-controls={`${sectionId}-upload`} aria-describedby={explainUploadAccess ? uploadAccessId : undefined}
+          onClick={() => setUploadOpen(!showUpload)}>{showUpload ? '收起上传区' : canOpenUpload && !upload.authorized ? '查看上传进度' : '上传资料'}</ActionButton>
+        {needsAccessRefresh && !(failureMessage && retryList) && <ActionButton disabled={refreshAccessDisabled} onClick={refreshAccess}>刷新资料权限</ActionButton>}
+      </div>
+      {explainUploadAccess && <p id={uploadAccessId}>上传资料需要可维护的来源。没有权限，请找人开通。</p>}
+      <div id={`${sectionId}-upload`} hidden={!showUpload}>
+        <IntakeUpload view={upload} active={active && presentation === 'review' && showUpload} busy={presentation !== 'review' || busy || rereading} stopping={stopping}
           blocked={dirty || view.hasDraft || !!view.pending || !!view.rollback.pending || !!view.selected} refreshBlocked={dirty || view.hasDraft} apply={c => void apply(c)} />
-        {(!upload.authorized || !!upload.pending) && <ActionButton disabled={busy || reading || rereading || stopping}
-          onClick={() => void apply({ action: 'list', next: false })}>刷新上传权限</ActionButton>}
       </div>
     </section>}
     {view?.pending && <section className="intake-notice" aria-label="待恢复操作"><h2 id={`${sectionId}-recovery`} tabIndex={-1}>操作结果待确认</h2>
@@ -575,10 +616,11 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
     {view?.signedIn && (view.rollback.pending || !!view.rollback.impact || !!view.rollback.result) && <IntakeRollback active={active && presentation === 'review'} view={view} busy={!active || presentation !== 'review' || busy || rereading || stopping}
       blocked={!!view.pending || !!upload?.busy || !!upload?.pending || uploadDraft || view.hasDraft || [...dirtyIds].some(id => id !== 'rollback-input')}
       apply={c => void apply(c)} onDirty={onDirty} />}
-    {view && !view.signedIn && <p>请先在查询窗口登录。</p>}
-    {view?.signedIn && !view.authorized && !view.pending && <p>请确认登录与店铺授权。</p>}
+    {view?.signedIn && accessKnown && !view.authorized && showAccessStatus &&
+      <WorkbenchNoAccess need="查看资料批次" detail="没有权限，请找人开通。" />}
     {view?.authorized && <div className="intake-stage">
-      <section aria-label="资料批次列表" hidden={inDetail}>
+      {!inDetail && batchListLoading && <WorkbenchLoading label="读取资料批次" />}
+      {hasLoadedBatches && <section aria-label="资料批次列表" hidden={inDetail}>
         <div className="intake-candidate-head">
           <h2>资料批次</h2>
           <div className="intake-toolbar">
@@ -603,9 +645,9 @@ export function IntakeManagement({ active = true, presentation = 'review', onOpe
         <Table<CandidateRow> columns={candidateColumns} dataSource={visibleCandidates} pagination={false} rowKey="selection"
           locale={{ emptyText: view.candidates.length
             ? '这个筛选下没有资料批次。'
-            : '上传资料并通过校验后，会显示在这里。' }} />
+            : upload?.authorized ? '上传资料并通过校验后，会显示在这里。' : '有可查看的资料批次时，会显示在这里。' }} />
         {(dirty || view.hasDraft) && <p role="status">当前审核有未提交的输入，请继续当前审核，或进入详情后放弃输入。</p>}
-      </section>
+      </section>}
       {view.selected && <section className="intake-sheet" aria-label="批次详情" hidden={!inDetail}>
         <div className="intake-toolbar"><ActionButton onClick={() => setDetailOpen(false)}>返回批次列表</ActionButton>
           <ActionButton disabled={disabled} onClick={() => confirm('放弃尚未提交的输入并关闭当前审核？已提交的记录不会撤销。', () => void apply({ action: 'discard' }))}>放弃输入并关闭</ActionButton></div>

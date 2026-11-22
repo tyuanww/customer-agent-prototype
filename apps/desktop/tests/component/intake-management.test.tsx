@@ -414,8 +414,104 @@ it('preserves an existing rollback plan and unknown recovery without exposing a 
   } finally { f.main.dispose(); }
 });
 
+it.each([
+  { canRead: true, canUpload: false },
+  { canRead: false, canUpload: true },
+  { canRead: false, canUpload: false },
+])('uses independent review access when canRead=$canRead and canUpload=$canUpload', async ({ canRead, canUpload }) => {
+  const f = setup();
+  f.data.state.allowed = canRead;
+  f.data.state.importer = canUpload;
+  render(<IntakeManagement />);
+  try {
+    expect(await screen.findByText('合成审核员')).toBeVisible();
+    expect(screen.queryByText(/确认登录|先在查询窗口登录/)).not.toBeInTheDocument();
+    const list = screen.queryByRole('region', { name: '资料批次列表' });
+    const upload = screen.getByRole('button', { name: '上传资料' });
+    if (canRead) {
+      expect(list).toBeVisible();
+    } else {
+      expect(list).not.toBeInTheDocument();
+      expect(screen.getByText('你还不能查看资料批次')).toBeVisible();
+    }
+    if (canUpload) {
+      expect(upload).toBeEnabled();
+      await f.user.click(upload);
+      await choose(f.user, '上传来源', '产品 / source-a / shop-a');
+      expect(f.command).toHaveBeenLastCalledWith({ action: 'upload-source', selection: expect.any(String) });
+    } else {
+      expect(upload).toBeDisabled();
+      expect(screen.getByText('上传资料需要可维护的来源。没有权限，请找人开通。')).toBeVisible();
+    }
+
+    f.data.state.allowed = true;
+    f.data.state.importer = true;
+    await f.user.click(screen.getByRole('button', { name: '刷新资料权限' }));
+    expect(await screen.findByRole('region', { name: '资料批次列表' })).toBeVisible();
+    expect(upload).toBeEnabled();
+    expect(screen.queryByText('你还不能查看资料批次')).not.toBeInTheDocument();
+  } finally { f.main.dispose(); }
+});
+
+it('keeps permission discovery failures visible and reloads access with the existing list command', async () => {
+  const f = setup();
+  let observed = false;
+  window.dashboardIntake!.command = async c => {
+    if (!observed) return { ok: false, code: 'UNAVAILABLE', message: '资料权限暂时无法读取。', view: f.main.view() };
+    return f.command(c);
+  };
+  render(<IntakeManagement />);
+  try {
+    expect(await screen.findByRole('alert')).toHaveTextContent('资料权限暂时无法读取。');
+    expect(screen.queryByText('你还不能查看资料批次')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '上传资料' })).toBeDisabled();
+    observed = true;
+    await f.user.click(screen.getByRole('button', { name: '刷新资料权限' }));
+    expect(await screen.findByRole('region', { name: '资料批次列表' })).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(f.command).toHaveBeenLastCalledWith({ action: 'list', next: false });
+  } finally { f.main.dispose(); }
+});
+
+it.each([['刷新批次', false], ['下一页批次', true]] as const)('restarts at the first batch page after %s fails', async (label, forwardsInvalidation) => {
+  const f = setup();
+  const respond = f.data.respond;
+  let fail = false;
+  f.data.respond = (path, body) => {
+    if (!path.startsWith('/v1/intake/candidates?')) return respond(path, body);
+    if (fail) { fail = false; throw new Error('synthetic batch read failed'); }
+    return { items: [f.data.candidate], nextCursor: 'second-page' };
+  };
+  const api = window.dashboardIntake!;
+  api.current = async () => {
+    const failure = f.main.lastBatchListFailure();
+    return failure ? { ok: false, code: failure.code, message: '资料批次暂时无法读取。', view: f.main.view() }
+      : { ok: true, view: f.main.view() };
+  };
+  api.command = async command => {
+    try { return await f.command(command); }
+    catch { return { ok: false, code: 'UNAVAILABLE', message: '资料批次暂时无法读取。', view: f.main.view() }; }
+  };
+  if (forwardsInvalidation) f.main.subscribe(() => f.listeners.forEach(listener => listener()));
+  render(renderIntakeDestinations(destinationContext()));
+  try {
+    expect(await screen.findByRole('button', { name: '审核 产品 / candidate-a' })).toBeVisible();
+    fail = true;
+    await f.user.click(screen.getByRole('button', { name: label }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('资料批次暂时无法读取。');
+    expect(screen.queryByRole('region', { name: '资料批次列表' })).not.toBeInTheDocument();
+    fail = false;
+    await f.user.click(screen.getByRole('button', { name: '重新读取第一页批次' }));
+    expect(await screen.findByRole('button', { name: '审核 产品 / candidate-a' })).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(f.command).toHaveBeenCalledTimes(3);
+    expect(f.command).toHaveBeenLastCalledWith({ action: 'list', next: false });
+  } finally { f.main.dispose(); }
+});
+
 it('opens a full-width batch list, then a single detail with on-demand original rows and differences', async () => {
   const f = setup();
+  f.data.state.importer = true;
   f.data.material.differences = [{ businessEntryId: 'faq-a', change: 'modify', previousVersion: 1, nextVersion: 2, beforeDigest: 'a'.repeat(64), afterDigest: 'b'.repeat(64) }];
   render(<IntakeManagement />);
   try {
@@ -677,6 +773,7 @@ it.each(['left the overview', 'access was invalidated'] as const)('ignores a lat
       page.rerender(renderIntakeDestinations(overview));
     } else {
       f.data.state.allowed = false;
+      await f.main.command({ action: 'list', next: false });
       await act(async () => { f.listeners.forEach(listener => listener()); });
       expect(await screen.findByText('取得资料查看权限后，会显示可处理的批次。')).toBeVisible();
       expect(screen.queryByRole('button', action)).not.toBeInTheDocument();
@@ -688,24 +785,53 @@ it.each(['left the overview', 'access was invalidated'] as const)('ignores a lat
   } finally { page.unmount(); f.main.dispose(); }
 });
 
-it('distinguishes overview loading, read failure and confirmed lack of access, with a read-only retry', async () => {
+it.each([
+  { replyView: 'none', retryLabel: '刷新资料权限' },
+  { replyView: 'unconfirmed', retryLabel: '刷新资料权限' },
+  { replyView: 'confirmed', retryLabel: '重新读取第一页批次' },
+])('retries the overview batch read after a failure with a $replyView projection', async ({ replyView, retryLabel }) => {
   const f = setup();
-  const view = await f.main.command({ action: 'list', next: false });
+  const unconfirmed = f.main.view();
+  const confirmed = await f.main.command({ action: 'list', next: false });
+  f.data.state.allowed = false;
   let finish!: (reply: IntakeManagementReply) => void;
-  window.dashboardIntake!.command = vi.fn(() => new Promise<IntakeManagementReply>(resolve => { finish = resolve; }));
-  const current = vi.fn(async () => ({ ok: true as const, view: { ...view, authorized: false } }));
+  window.dashboardIntake!.command = vi.fn<NonNullable<typeof window.dashboardIntake>['command']>()
+    .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    .mockImplementation(f.command);
+  const current = vi.fn(window.dashboardIntake!.current);
   window.dashboardIntake!.current = current;
   render(<IntakeManagement presentation="overview" onOpenReview={() => undefined} />);
   try {
     expect(screen.getByRole('status', { name: '读取待审核资料' })).toHaveAttribute('aria-busy', 'true');
+    const view = replyView === 'none' ? null : replyView === 'unconfirmed' ? unconfirmed : { ...confirmed, candidates: [] };
+    await act(async () => finish({ ok: false, code: 'UNAVAILABLE', message: '暂时无法读取资料。', view }));
+    expect(screen.getByRole('alert')).toHaveTextContent('暂时无法读取资料。');
     expect(screen.queryByText('取得资料查看权限后，会显示可处理的批次。')).not.toBeInTheDocument();
-    await act(async () => finish({ ok: false, code: 'UNAVAILABLE', message: '管理服务不可用，请刷新。', view: null }));
-    expect(screen.getByRole('alert')).toHaveTextContent('管理服务不可用，请刷新。');
+    expect(screen.queryByText('有可处理的资料批次时，会显示在这里。')).not.toBeInTheDocument();
+    await f.user.click(screen.getByRole('button', { name: retryLabel }));
+    expect(await screen.findByText('取得资料查看权限后，会显示可处理的批次。')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(current).not.toHaveBeenCalled();
+    expect(window.dashboardIntake!.command).toHaveBeenCalledTimes(2);
+    expect(window.dashboardIntake!.command).toHaveBeenLastCalledWith({ action: 'list', next: false });
+  } finally { f.main.dispose(); }
+});
+
+it('shows the overview permission refresh after invalidation without implying denial', async () => {
+  const f = setup();
+  const unconfirmed = f.main.view();
+  render(<IntakeManagement presentation="overview" onOpenReview={() => undefined} />);
+  try {
+    const detail = { name: '查看详情 产品 / candidate-a / 修订 1' };
+    await screen.findByRole('button', detail);
+    window.dashboardIntake!.current = async () => ({ ok: true, view: unconfirmed });
+    await act(async () => { f.listeners.forEach(listener => listener()); });
+    expect(screen.queryByRole('button', detail)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('取得资料查看权限后，会显示可处理的批次。')).not.toBeInTheDocument();
-    await f.user.click(screen.getByRole('button', { name: '重新读取当前状态' }));
-    expect(await screen.findByText('取得资料查看权限后，会显示可处理的批次。')).toBeInTheDocument();
-    expect(current).toHaveBeenCalledOnce();
-    expect(window.dashboardIntake!.command).toHaveBeenCalledTimes(1);
+    await f.user.click(screen.getByRole('button', { name: '刷新资料权限' }));
+    expect(await screen.findByRole('button', detail)).toBeEnabled();
+    expect(f.command).toHaveBeenLastCalledWith({ action: 'list', next: false });
   } finally { f.main.dispose(); }
 });
 
