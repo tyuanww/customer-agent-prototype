@@ -210,6 +210,10 @@ test('FAQ Query logs in, selects shops, searches, copies, expires, recovers and 
     await expect(query.getByTestId('answer-text-1')).toHaveCount(0);
     await query.getByTestId('search-button').click();
     await expect(query.getByTestId('no-hit')).toBeVisible();
+    const contact = query.getByText('仍需帮助时，请到客服飞书群联系值班人员。', { exact: true });
+    await expect(contact).toBeInViewport({ ratio: 1 });
+    await expect(query.getByTestId('no-hit').getByRole('link')).toHaveCount(0);
+    await query.screenshot({ path: test.info().outputPath('faq-manual-feishu.png') });
     await query.getByRole('button', { name: '修改问句' }).click();
     await expect(question).toBeFocused();
     expect(await question.evaluate(input => ({
