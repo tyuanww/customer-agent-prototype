@@ -605,6 +605,16 @@ test('local worktree diffs use the merge base and keep every changed side', () =
   }
 });
 
+test('main CI requires both isolated PostgreSQL jobs', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const postgres = workflowJob(workflow, 'postgres-15');
+  const api = workflowJob(workflow, 'postgres-15-api');
+  const apiIntegration = /run: pnpm --filter @customer-agent\/api test:integration$/mu;
+  assert.match(api, apiIntegration);
+  assert.doesNotMatch(postgres, apiIntegration);
+  assert.match(workflowJob(workflow, 'gate'), /needs: \[.*postgres-15, postgres-15-api,/u);
+});
+
 test('PR and main aggregate gates reject missing, skipped, cancelled or failed required jobs', () => {
   const docsNeeds = successfulNeeds(['quick']);
   docsNeeds.changes.outputs.mode = 'docs';
@@ -653,6 +663,7 @@ test('PR and main aggregate gates reject missing, skipped, cancelled or failed r
     changes: { result: 'success', outputs: { mode: 'full' } },
     quality: { result: 'success' },
     'postgres-15': { result: 'success' },
+    'postgres-15-api': { result: 'success' },
     'windows-feasibility': { result: 'success' },
     'linux-feasibility': { result: 'success' },
   };

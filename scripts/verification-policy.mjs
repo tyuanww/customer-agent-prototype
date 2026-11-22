@@ -349,7 +349,7 @@ export function assertPrGate(needs) {
 }
 
 export function assertCiGate(needs) {
-  for (const key of ['changes', 'quality', 'postgres-15', 'windows-feasibility', 'linux-feasibility']) if (needs?.[key]?.result !== 'success') throw new Error(`CI_REQUIRED_JOB_NOT_SUCCESS: ${key}`);
+  for (const key of ['changes', 'quality', 'postgres-15', 'postgres-15-api', 'windows-feasibility', 'linux-feasibility']) if (needs?.[key]?.result !== 'success') throw new Error(`CI_REQUIRED_JOB_NOT_SUCCESS: ${key}`);
   if (needs?.changes?.outputs?.mode !== 'full') throw new Error('CI_FULL_PLAN_MISSING');
 }
 
