@@ -324,6 +324,17 @@ test('every source-code route restores the architecture boundary check', () => {
   assert.ok(ids(full, 'quick').includes('architecture'));
 });
 
+test('task cards with workspace budget changes use a focused hygiene plan', () => {
+  const plan = verificationPlan([
+    'docs/plans/2026-11-22-customer-ux-improvements.md',
+    'scripts/workspace-hygiene.mjs',
+  ], map);
+  assert.equal(plan.mode, 'focused');
+  assert.deepEqual(plan.requiredJobs, ['changes', 'quick']);
+  assert.ok(planLaneCommands(plan, 'quick').some(([bin, script]) => bin === 'node' && script === 'scripts/workspace-hygiene.mjs'));
+  assert.ok(planLaneCommands(plan, 'quick').some((command) => command.includes('tests/unit/workspace-hygiene.test.ts')));
+});
+
 test('unknown, invalid, ambiguous and stale-generated paths fail closed to the full gate', () => {
   const unknown = verificationPlan(['tools/new-secret-policy.txt'], map);
   assert.equal(unknown.mode, 'full');
@@ -430,7 +441,7 @@ test('full fallback materializes every map-owned check', () => {
 
 test('plan commands are lane-scoped and deduplicated', () => {
   const docs = verificationPlan(['docs/reference-engineering-workflow.md'], map);
-  assert.deepEqual(planLaneCommands(docs, 'quick'), [['pnpm', 'workspace:check']]);
+  assert.deepEqual(planLaneCommands(docs, 'quick'), [['node', 'scripts/workspace-hygiene.mjs', 'check']]);
 
   const mixed = verificationPlan([
     'apps/desktop/src/main/main.ts',
@@ -834,7 +845,7 @@ test('workflow and package gates consume the dependency-map runner', () => {
   }
   assert.match(packageJson.scripts['verify:changed'], /verification-policy\.mjs run/u);
   assert.deepEqual(map.checks['workflow-tests'].command, [
-    ['pnpm', '--filter', '@customer-agent/database', 'build'],
+    ['pnpm', 'build:services'],
     ['pnpm', 'test:workflow'],
   ]);
 
@@ -861,6 +872,13 @@ test('PR lanes fetch full history and precheck runs through the shared map runne
   );
   assert.doesNotMatch(changes, /run: node --test scripts\/verification-policy\.test\.mjs/u);
   assert.doesNotMatch(changes, /run: node scripts\/check-documentation\.mjs/u);
+});
+
+test('the PR quick runner executes the docs plan even without dependency installation', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ci-pr.yml', import.meta.url), 'utf8');
+  const quick = workflowJob(workflow, 'quick');
+  assert.match(quick, /^ {6}- env:\n(?:.*\n){2}.*--lane quick$/mu);
+  assert.match(quick, /mode != 'docs'\n {8}run: pnpm install/u);
 });
 
 test('main CI continues to hardcode the authoritative full mode', () => {

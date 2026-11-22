@@ -7,7 +7,9 @@
     "package.json",
     ".github/workflows/ci-pr.yml",
     ".github/workflows/ci.yml",
-    "docs/reference-engineering-workflow.md"
+    "docs/reference-engineering-workflow.md",
+    "scripts/workspace-hygiene.mjs",
+    "scripts/workspace-hygiene.d.mts"
   ],
   "owners": [
     {
@@ -34,7 +36,9 @@
         "scripts/verification-dependencies.json",
         "package.json",
         ".github/workflows/ci-pr.yml",
-        ".github/workflows/ci.yml"
+        ".github/workflows/ci.yml",
+        "scripts/workspace-hygiene.mjs",
+        "scripts/workspace-hygiene.d.mts"
       ],
       "description": "Verification policy, its tests, and workflow consumers."
     },
@@ -80,8 +84,9 @@
     "lint": { "job": "quick", "command": [["pnpm","lint"]] },
     "typecheck": { "job": "quick", "command": [["pnpm","typecheck"]] },
     "architecture": { "job": "quick", "command": [["pnpm","check:architecture"]] },
-    "workspace-check": { "job": "quick", "command": [["pnpm","workspace:check"]] },
-    "workflow-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/database","build"],["pnpm","test:workflow"]] },
+    "workspace-check": { "job": "quick", "command": [["node","scripts/workspace-hygiene.mjs","check"]] },
+    "workspace-hygiene-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","exec","vitest","run","tests/unit/workspace-hygiene.test.ts"]] },
+    "workflow-tests": { "job": "quick", "command": [["pnpm","build:services"],["pnpm","test:workflow"]] },
     "desktop-tests": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test"]] },
     "overlay-unit": { "job": "quick", "command": [["pnpm","--filter","@customer-agent/desktop","test","--","overlay"]] },
     "api-tests": { "job": "quick", "command": [["pnpm","test:api"]] },
@@ -127,6 +132,16 @@
       "rules": true,
       "checks": { "precheck": ["policy-tests"], "quick": ["lint", "architecture", "workspace-check", "workflow-tests"], "electron": ["sop-query-electron"] },
       "liveLanes": ["workflow-consumer"],
+      "databaseLanes": [],
+      "packagingLanes": [],
+      "generatedInputs": []
+    },
+    {
+      "id": "workspace-hygiene",
+      "owner": "verification-tooling",
+      "paths": ["scripts/workspace-hygiene.mjs", "scripts/workspace-hygiene.d.mts"],
+      "checks": { "quick": ["workspace-check", "workspace-hygiene-tests", "lint", "architecture"] },
+      "liveLanes": [],
       "databaseLanes": [],
       "packagingLanes": [],
       "generatedInputs": []
