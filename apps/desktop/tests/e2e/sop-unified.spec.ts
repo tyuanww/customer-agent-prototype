@@ -94,6 +94,13 @@ test('v11 complete graph, native-window destruction and clipboard keep protected
     const login = await loginOpened; await expect.poll(() => login.url()).toContain('role=login');
     await clickFeishuLogin(login);
     await expect.poll(() => query.evaluate(async () => { const value = await window.customerAgent!.product!.sessionStatus(); return value.ok && value.signedIn; })).toBe(true);
+    expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
+    await expect.poll(() => running.windows().some(window => window.url().includes('role=dashboard'))).toBe(true);
+    const dashboard = running.windows().find(window => window.url().includes('role=dashboard'))!;
+    const sopTab = dashboard.getByRole('tab', { name: 'SOP', exact: true });
+    await expect(sopTab).toHaveAccessibleDescription('尚未开放');
+    await sopTab.click();
+    await expect(dashboard.getByText(/点狐狸头打开查询窗，再选择「手动找流程」。/)).toBeVisible();
     const openSopFromQuery = async () => {
       await returnToQueryWindow(running, query);
       await query.getByRole('button', { name: '手动找流程', exact: true }).click();
