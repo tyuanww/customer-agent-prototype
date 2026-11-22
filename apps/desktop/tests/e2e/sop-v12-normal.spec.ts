@@ -54,12 +54,13 @@ async function exerciseGraph({ app, sop, evidence }: Surface) {
 }
 
 async function exerciseLogout({ app, sop, query, evidence }: Surface, owned: NonNullable<typeof fixture>) {
+  const caseTitle = await sop.locator('.sop-chrome-title').innerText();
   await query.evaluate(() => window.customerAgent!.product!.logout());
   await expect.poll(() => sop.isClosed()).toBe(true);
   const closed = await owned.admin.query('SELECT closed_at FROM content_intake.sop_active_uses WHERE continuation_hash=$1',
     [createHash('sha256').update(evidence.opening.continuationId).digest('hex')]);
   expect(closed.rows[0].closed_at).not.toBeNull();
-  expect(await foxResumeMenuLabels(app)).not.toContain(evidence.ready.result.flow.header.title);
+  expect(await foxResumeMenuLabels(app)).not.toContain(caseTitle);
   expect((await readSopV12Probe(app)).copies).toHaveLength(1);
 }
 
@@ -244,15 +245,21 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   expect(openB).toMatchObject({ graphDigest: evidence.opening.graphDigest });
   expect(openB!.continuationId).not.toBe(openA!.continuationId);
   expect(openB!.queryRequestId).not.toBe(openA!.queryRequestId);
+  const sameTitle = evidence.ready.result.flow.header.title;
+  await expect(a.locator('.sop-chrome-title')).toHaveText(`#01 ${sameTitle}`);
+  await expect(b.locator('.sop-chrome-title')).toHaveText(`#02 ${sameTitle}`);
+  expect(await foxResumeMenuLabels(app)).toEqual(expect.arrayContaining([`#01 ${sameTitle}`, `#02 ${sameTitle}`]));
 
-  async function rename(sop: Page, name: string) {
+  async function rename(sop: Page, caseNumber: string, name: string) {
     await sop.getByRole('button', { name: '重命名', exact: true }).click();
-    await sop.getByRole('textbox', { name: '流程名称', exact: true }).fill(name);
+    const nameInput = sop.getByRole('textbox', { name: '办理名称', exact: true });
+    await expect(nameInput).toHaveValue(sameTitle);
+    await nameInput.fill(name);
     await sop.getByRole('button', { name: '保存名称', exact: true }).click();
-    await expect(sop.locator('.sop-chrome-title')).toHaveText(name);
+    await expect(sop.locator('.sop-chrome-title')).toHaveText(`${caseNumber} ${name}`);
   }
-  await rename(a, '合成办理甲');
-  await rename(b, '合成办理乙');
+  await rename(a, '#01', '合成办理甲');
+  await rename(b, '#02', '合成办理乙');
   expect(await a.evaluate(() => window.sopWindow?.queryCommand?.({ kind: 'clear' }))).toMatchObject({ ok: false });
   const confirmA = '1. 合成确认 confirm-a';
   const confirmB = '2. 合成确认 confirm-b';
@@ -278,8 +285,8 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   await expect(nextA).toBeInViewport({ ratio: 1 });
   await expect(nextA).toBeDisabled();
   await expect(nextA).toHaveAccessibleDescription('待确认：合成确认 confirm-b');
-  await a.getByRole('button', { name: '贴边暂放', exact: true }).click();
-  const bookmarkA = a.getByRole('button', { name: '恢复 合成办理甲', exact: true });
+  await a.getByRole('button', { name: '暂放', exact: true }).click();
+  const bookmarkA = a.getByRole('button', { name: '恢复 #01 合成办理甲', exact: true });
   await bookmarkA.click();
   await expect(a.getByRole('heading', { name: '合成任务 task-a' })).toBeVisible();
   await expect(a.getByRole('checkbox', { name: confirmA, exact: true })).toBeChecked();
@@ -307,9 +314,9 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   });
   const expandedA = await nativeA.evaluate(win => win.getBounds());
   const expandedB = await nativeB.evaluate(win => win.getBounds());
-  await a.getByRole('button', { name: '贴边暂放', exact: true }).click();
-  await b.getByRole('button', { name: '贴边暂放', exact: true }).click();
-  const bookmarkB = b.getByRole('button', { name: '恢复 合成办理乙', exact: true });
+  await a.getByRole('button', { name: '暂放', exact: true }).click();
+  await b.getByRole('button', { name: '暂放', exact: true }).click();
+  const bookmarkB = b.getByRole('button', { name: '恢复 #02 合成办理乙', exact: true });
   await expect(bookmarkA).toBeVisible();
   await expect(bookmarkB).toBeVisible();
   await expect(a.getByRole('heading', { name: '合成任务 task-b' })).toHaveCount(0);
@@ -325,13 +332,24 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   await expect.poll(() => nativeB.evaluate(win => win.getBounds())).toMatchObject({ width: expandedB.width, height: expandedB.height });
   await b.getByRole('button', { name: '收起流程，保留进度', exact: true }).click();
   await expect.poll(() => nativeB.evaluate(win => win.isVisible())).toBe(false);
-  expect(await foxResumeMenuLabels(app)).toEqual(expect.arrayContaining(['合成办理甲', '合成办理乙']));
+  expect(await foxResumeMenuLabels(app)).toEqual(expect.arrayContaining(['#01 合成办理甲', '#02 合成办理乙']));
 
+  const end = a.getByRole('button', { name: '结束办理', exact: true });
+  const dialog = a.getByRole('dialog', { name: '结束当前办理？', exact: true });
+  await end.click();
+  await expect(dialog.getByText(/#01 合成办理甲/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused();
+  await a.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(a.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
+  expect((await readSopV12Probe(app)).exchanges.filter(item => item.path.endsWith('/continuations/close'))).toHaveLength(0);
   owned.loseNextResponse('close');
-  await a.getByRole('button', { name: '结束并清除进度', exact: true }).click();
+  await end.click();
+  await dialog.getByRole('button', { name: '确认结束', exact: true }).click();
   const retry = a.getByRole('button', { name: '按原请求确认结束', exact: true });
   await expect(retry).toBeEnabled();
   expect((await readSopV12Projection(a)).instanceName).toBeUndefined();
+  await expect(a.locator('.sop-chrome-title')).toHaveText('#01 SOP 流程');
   await retry.click();
   await expect.poll(() => a.isClosed()).toBe(true);
   const closes = (await readSopV12Probe(app)).exchanges.filter(item => item.path.endsWith('/continuations/close'));
@@ -340,9 +358,9 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
     [204, { continuationId: openA!.continuationId }],
   ]);
 
-  const labels = await foxResumeMenuLabels(app, '合成办理乙');
-  expect(labels).toContain('合成办理乙');
-  expect(labels).not.toContain('合成办理甲');
+  const labels = await foxResumeMenuLabels(app, '#02 合成办理乙');
+  expect(labels).toContain('#02 合成办理乙');
+  expect(labels.some(label => label.startsWith('#01 '))).toBe(false);
   await expect.poll(() => nativeB.evaluate(win => win.isVisible())).toBe(true);
   await expect(b.getByRole('heading', { name: '合成任务 task-b' })).toBeVisible();
   await b.getByRole('button', { name: '复制话术', exact: true }).click();
@@ -358,7 +376,7 @@ async function exerciseParallelCases(surface: Surface, owned: NonNullable<typeof
   await query.evaluate(() => window.customerAgent!.product!.logout());
   await expect.poll(() => b.isClosed()).toBe(true);
   expect((await rows()).rows.every(row => row.closed_at !== null)).toBe(true);
-  expect(await foxResumeMenuLabels(app)).not.toContain('合成办理乙');
+  expect(await foxResumeMenuLabels(app)).not.toContain('#02 合成办理乙');
 }
 
 async function exerciseBlocked(surface: Surface, owned: NonNullable<typeof fixture>) {

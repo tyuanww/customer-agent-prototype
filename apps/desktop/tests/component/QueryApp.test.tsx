@@ -1,4 +1,4 @@
-import { emptyIntakeQueryContext, intakeQueryFailure, type IntakeQueryRow, type IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
+import { emptyIntakeQueryContext, intakeQueryFailure, type IntakeQueryInvalidationEvent, type IntakeQueryRow, type IntakeSopCandidatesEvent } from '../../src/shared/content-intake-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -3800,6 +3800,43 @@ describe('QueryApp', () => {
     expect(await screen.findByTestId('toast')).toHaveTextContent(COPY_SUCCESS_MESSAGE);
   });
 
+  it.each(['event first', 'reply first'] as const)('refreshes FAQ scope after copy permission is denied with %s', async order => {
+    const user = userEvent.setup();
+    const { access, search, copy } = connectFaqQuery();
+    const api = window.customerAgent?.intakeQuery;
+    if (!api) throw new Error('Missing synthetic query fixture');
+    let invalidate: (event: IntakeQueryInvalidationEvent) => void = () => {};
+    api.onInvalidated = listener => { invalidate = listener; return () => {}; };
+    const pending = deferred<ReturnType<typeof intakeQueryFailure>>();
+    copy.mockReturnValueOnce(pending.promise);
+    search.mockResolvedValueOnce({ ok: true, rows: [faqRow(1)] });
+
+    render(<QueryApp intake />); activateQuery();
+    await waitFor(() => expect(screen.getByTestId('search-button')).toBeEnabled());
+    const input = screen.getByRole('textbox', { name: '客户问题' });
+    await user.type(input, '合成客户问题{Enter}');
+    await user.click(await screen.findByTestId('copy-button-1'));
+    const deliver = () => act(() => invalidate({ reason: 'invalidated', contextId: search.mock.calls[0][0].contextId }));
+    const deny = () => act(async () => pending.resolve(intakeQueryFailure('FORBIDDEN')));
+    if (order === 'event first') {
+      deliver();
+      expect(screen.queryByText(/合成正文 1/)).not.toBeInTheDocument();
+      await deny();
+    } else {
+      await deny();
+      deliver();
+    }
+
+    expect(screen.queryByTestId('copy-button-1')).not.toBeInTheDocument();
+    expect(screen.queryByText(COPY_SUCCESS_MESSAGE)).not.toBeInTheDocument();
+    const error = screen.getByTestId('error-state');
+    await user.click(within(error).getByRole('button', { name: '刷新店铺' }));
+    await waitFor(() => expect(access).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: '查询范围' })).toHaveAttribute('aria-expanded', 'true');
+    expect(search).toHaveBeenCalledOnce();
+    expect(input).toHaveValue('合成客户问题');
+  });
+
   it('clears a result and explains expired organization facts while its copy response is pending', async () => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
@@ -3833,10 +3870,15 @@ describe('QueryApp', () => {
     expect(screen.queryByText('合成正文')).not.toBeInTheDocument();
     await act(async () => copy.resolve({ ok: false, code: 'FACTS_EXPIRED', message: '资料资格过期了，请稍后重试。' }));
     expect(screen.getByText('资料资格过期了，请稍后重试。')).toBeVisible();
+    expect(within(screen.getByTestId('error-state')).queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByText(COPY_SUCCESS_MESSAGE)).not.toBeInTheDocument();
   });
 
-  it.each(['facts-expired', 'invalidated', 'expired'] as const)('rejects a late search reply after its own %s event arrives first', async reason => {
+  it.each([
+    ['facts-expired', '资料资格过期了，请稍后重试。', null],
+    ['invalidated', '请刷新店铺。', '刷新店铺'],
+    ['expired', '资料资格已失效，请重新查询。', '重试'],
+  ] as const)('rejects a late search reply after its own %s event arrives first', async (reason, message, action) => {
     const user = userEvent.setup();
     const session = { ok: true as const, enabled: true, signedIn: true, sessionEpoch: 1,
       userId: 'synthetic', role: 'agent' as const, authMode: 'mock' as const,
@@ -3865,7 +3907,10 @@ describe('QueryApp', () => {
     await act(async () => pending.resolve({ ok: true, rows: [{ kind: 'intake', key: 'stale', rank: 1, title: '失效标题', answerText: '失效正文',
       applicabilityNote: '', riskNote: '', releaseId: 'r1', validUntil: '2099-01-01T00:00:00Z' }] }));
     expect(screen.queryByText('失效正文')).not.toBeInTheDocument();
-    expect(screen.getByText(reason === 'facts-expired' ? '资料资格过期了，请稍后重试。' : '资料资格已失效，请重新查询。')).toBeVisible();
+    const error = screen.getByTestId('error-state');
+    expect(within(error).getByText(message)).toBeVisible();
+    if (action) expect(within(error).getByRole('button', { name: action })).toBeVisible();
+    else expect(within(error).queryByRole('button')).not.toBeInTheDocument();
   });
 
   it.each(['shop switch', 'logout'] as const)('ignores an old copy event after %s, but clears a current invalidation', async action => {
@@ -3918,7 +3963,7 @@ describe('QueryApp', () => {
     expect(screen.getByText('新上下文合成正文')).toBeVisible();
     act(() => invalidate({ reason: 'invalidated', contextId: newId }));
     expect(screen.queryByText('新上下文合成正文')).not.toBeInTheDocument();
-    expect(screen.getByText('资料资格已失效，请重新查询。')).toBeVisible();
+    expect(within(screen.getByTestId('error-state')).getByRole('button', { name: '刷新店铺' })).toBeVisible();
   });
 
 });

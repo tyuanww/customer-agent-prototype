@@ -367,7 +367,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       // Use the displayed button directly, without a search or refresh after revocation.
       await query.getByTestId('copy-button-1').click();
       await expect(query.locator('[data-testid^="answer-text-"]')).toHaveCount(0);
-      await expect(query.getByTestId('error-state')).toContainText('资料资格已失效，请重新查询。');
+      await expect(query.getByTestId('error-state').getByRole('button', { name: '刷新店铺' })).toBeVisible();
       expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('合成撤权复制检查哨兵');
       const use = (await host.status()).purposeQueries;
       expect(use.business).toBeGreaterThan(10); expect(use.usage).toBeGreaterThan(10); expect(use.worker).toBeGreaterThan(10);
@@ -403,5 +403,57 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
       expect(existsSync(host.root)).toBe(false); expect(existsSync(directory)).toBe(false);
       console.info(JSON.stringify({ status: 'OWNED_RESOURCES_REMOVED', hostDirectory: host.root, desktopDirectory: directory }));
     }
+  }
+});
+
+test('overview opens the authorized pending batch and focuses its heading', async () => {
+  test.skip(process.env.CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E !== '1', 'Explicit PG15/Electron synthetic gate');
+  const { createIntakeSyntheticHost } = await import('../../../api/tests/support/intake-synthetic-host.ts');
+  const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
+  const evidence = process.env.INTAKE_REAL_STACK_SCREENSHOT_DIR
+    ?? path.resolve(desktopRoot, '../../.gstack/intake-synthetic', `overview-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  mkdirSync(evidence, { recursive: true });
+  const host = await createIntakeSyntheticHost({ prepareCandidate: true });
+  const directory = mkdtempSync(path.join(tmpdir(), 'intake-overview-electron-'));
+  let app: ElectronApplication | undefined;
+  try {
+    app = await launchIntakeElectron({ desktopRoot, userDataDirectory: directory,
+      apiOrigin: host.apiOrigin, identityOrigin: host.identityOrigin, evidenceDirectory: evidence });
+    await expect.poll(() => app!.windows().some(window => window.url().includes('role=query'))).toBe(true);
+    const query = app.windows().find(window => window.url().includes('role=query'))!;
+    await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
+    await app.evaluate(({ app }) => app.focus({ steal: true }));
+    await query.evaluate(() => window.customerAgent!.openSearch());
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-parked', 'false');
+    await expect(query.getByTestId('query-shell')).toHaveAttribute('data-opening', 'false');
+    await waitForFocusedWindow(app, 'query');
+    await query.getByRole('button', { name: '登录', exact: true }).click();
+    await expect.poll(() => app!.windows().some(window => window.url().includes('role=login'))).toBe(true);
+    await app.windows().find(window => window.url().includes('role=login'))!.getByRole('button', { name: '飞书登录' }).click();
+    await expect.poll(async () => query.evaluate(async () => {
+      const session = await window.customerAgent!.product!.sessionStatus();
+      return session.ok && session.signedIn;
+    })).toBe(true);
+    expect(await query.evaluate(() => window.customerAgent!.openDashboard())).toMatchObject({ ok: true });
+    await expect.poll(() => app!.windows().some(window => window.url().includes('role=dashboard'))).toBe(true);
+    const dashboard = app.windows().find(window => window.url().includes('role=dashboard'))!;
+    await dashboard.getByTestId('nav-overview').click();
+    const table = dashboard.getByTestId('module-overview').getByRole('table');
+    await expect(table.getByRole('row')).toHaveCount(2);
+    await expect(table.getByRole('cell', { name: '核对材料', exact: true })).toBeVisible();
+    const rowAction = table.getByRole('button', { name: /^查看详情 产品 \/ / });
+    await rowAction.focus();
+    await dashboard.screenshot({ path: path.join(evidence, 'overview-candidate-queue.png') });
+    await rowAction.press('Enter');
+    await expect(dashboard.getByTestId('nav-materials')).toHaveAttribute('aria-selected', 'true');
+    const details = dashboard.getByRole('region', { name: '批次详情', exact: true });
+    await expect(details.getByRole('heading', { name: /^产品 \/ / })).toBeFocused();
+    const selected = await dashboard.evaluate(async () => (await window.dashboardIntake!.current()).view?.selected?.key);
+    expect(selected).toEqual(host.candidate.key);
+    expect((await host.status()).publications).toBe(0);
+    await dashboard.screenshot({ path: path.join(evidence, 'overview-candidate-detail.png') });
+  } finally {
+    try { if (app) await closeOwnedElectron(app); }
+    finally { try { await host.close(); } finally { rmSync(directory, { recursive: true, force: true }); } }
   }
 });

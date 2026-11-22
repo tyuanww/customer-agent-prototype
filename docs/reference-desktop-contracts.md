@@ -112,8 +112,8 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 | `sop-window:open` / `sop-window:entry-available` | invoke | 仅受信 Query；Fox / Dashboard / SOP 拒绝。Query 不得调用其它 `sop-window:*` |
 | `sop-window:close` / `end-flow` / `restart` / `choose-edge` / `next-step` / `move-by` / `report-layout` / `copy-current` | invoke | 仅 SOP 窗主框。`copy-current` 不接受任意字符串，Main 用当前投影 `answerText` + `resolveClipboardWrite` |
 | `sop-window:resize` / `bookmark` | invoke | 仅 SOP 自己的主框。缩放用手势序号、方向和相对位移，书签用窄操作枚举 |
-| `sop-window:projection` | Main → SOP | preload 丢弃非 `isSopProjection` 的载荷 |
-| `sop-window:chrome` | Main → SOP | 类型化窗口形态。`parked` 只投影仍可展示的名称 |
+| `sop-window:projection` | Main → SOP | preload 校验各 SOP 投影。v12 实例窗用 `caseNumber` 投影办理编号，当前无可展示办理时为 `null` |
+| `sop-window:chrome` | Main → SOP | 类型化窗口形态。`parked` 投影当前可展示办理的编号和名称 |
 
 `isTrustedSender`：sender 未销毁、属于 `trustedContents()`（仅 Fox / Query）、`senderFrame` 无 parent、URL 为允许的本机 dev server 或打包 `index.html`。
 
@@ -122,6 +122,8 @@ preload 只把 `CustomerAgentApi` 挂到 `window.customerAgent`，没有通用 `
 Payload 共性：精确 key 集合、安全整数、枚举。不开放 width / x / y / bounds IPC，不暴露文件系统。
 
 SOP 默认宽 600，起壳高 240，hug 240–620。缩放后 Main 按窗保留手动尺寸，后续内容测量不回写默认宽高。v12 按实例路由命令、窗口和续用资格，首开优先靠左居中并避开已打开窗口与 Query 胶囊。贴边保存原展开 bounds，显示器变化时按可用工作区协调书签。旧入口沿用贴近 Query 的放置函数。布局超时 `SOP_LAYOUT_TIMEOUT_MS = 180`。复制反馈 `SOP_COPY_FEEDBACK_MS = 1200`。Main 拥有树与进度，renderer 渲染投影。`copyCurrent()` 不走 `clipboard:copy-text`、`copyAdopt` 或 `/v1/events/adoption`。
+
+Main 注册表为每笔办理分配本次会话的展示编号，标题、书签和狐狸恢复菜单共用。改名和恢复沿用原编号。同一窗口办理新实例时分配新编号。所有窗口命令仍由 Main 按发送窗口的主帧路由，`clear` 不接受编号。
 
 ---
 
