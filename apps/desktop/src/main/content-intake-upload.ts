@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { SOP_RULE_VERSION } from '@customer-agent/content-intake';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadFormat, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
-import type { IntakeAccess } from './content-intake-access';
+import { isLegacySopIntakeSource, type IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 
@@ -25,10 +24,8 @@ const reject = (code: 'STALE' | 'CONFLICT' | 'FORBIDDEN' | 'VALIDATION'): never 
 const sameContext = (a: C['IntakeManagementContext'], b: C['IntakeManagementContext']) =>
   a.sourceId === b.sourceId && a.sourceVersion === b.sourceVersion && a.baseReleaseId === b.baseReleaseId
   && a.principalId === b.principalId && a.factsVersion === b.factsVersion;
-// Legacy discovery exposes the SOP opt-in through the mapping version while
-// the scope and template keep their FAQ-compatible values.
 function uploadCategory(source: C['IntakeSource']): IntakeUploadView['sources'][number]['category'] {
-  return source.mappingVersion === SOP_RULE_VERSION ? 'sop' : source.scope.domain;
+  return isLegacySopIntakeSource(source) ? 'sop' : source.scope.domain;
 }
 const parsing = (job: C['IntakeParseJob'] | null) => job?.state === 'reading' || job?.state === 'parsing';
 

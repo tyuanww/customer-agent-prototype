@@ -1,6 +1,6 @@
 import { emptyIntakeQueryContext, type IntakeQueryContext } from '../shared/content-intake-query';
 import { isIntakeCatalogCommand, type IntakeCatalogCommand, type IntakeCatalogRow, type IntakeCatalogView } from '../shared/content-intake-catalog';
-import { loadIntakeAccess, loadIntakeVocabulary } from './content-intake-access';
+import { isLegacySopIntakeSource, loadIntakeAccess, loadIntakeVocabulary } from './content-intake-access';
 import { ContentIntakeUsage, IntakeUsageError, type IntakeCatalog, type IntakeUsageSession } from './content-intake-usage';
 
 /** One Dashboard owns its selection and complete read; Query has a separate owner.
@@ -105,13 +105,8 @@ export class ContentIntakeCatalog {
       // A disappearing condition must not silently broaden a previously selected read.
       if (productIds.some(id => !menus.products.some(p => p.id === id)) || scenarioIds.some(id => !menus.scenarios.some(p => p.id === id))) throw new IntakeUsageError('STALE');
       this.namesDeadline = access.shopNamesDeadline ?? 0;
-      // The registered tuple, not the scope domain, decides which board a row belongs
-      // to: a SOP workbook is registered under an existing product scope because the
-      // frozen contract's domain enum has no `sop`, so `domain` alone would file every
-      // SOP entry under 产品 while the SOP tab stayed empty. Only the mapping marker is
-      // reachable here; the contract types the template and rule fields as FAQ literals.
       this.sopSources = new Set(access.sources
-        .filter(source => source.mappingVersion === 'sop-not-imported')
+        .filter(isLegacySopIntakeSource)
         .map(source => source.scope.sourceId));
       this.context = { ...emptyIntakeQueryContext(), ...menus, shops: access.shops, shopId, productIds, scenarioIds,
         shopNames: access.shopNames ?? [], shopNamesValidUntil: access.shopNamesValidUntil ?? null, validUntil: access.validUntil };

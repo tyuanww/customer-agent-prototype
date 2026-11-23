@@ -40,6 +40,21 @@ it('distinguishes same-shop same-domain sources and previews the exact two FAQ a
   expect(f.receipts.size).toBe(0);
  } finally { main.dispose(); }
 });
+it('represents a legacy SOP source and refuses the FAQ preset for it', async () => {
+ const f=intakePermissionsData(['import','source-confirm']);
+ f.sources.push({...f.sources[0]!,mappingVersion:'sop-not-imported',scope:{...f.scope,sourceId:'source-sop'}});
+ const main=new ContentIntakePermissions(f.session);
+ try {
+  const view=await main.command({action:'refresh'});
+  const [faq,sop]=view.sources;
+  expect(faq?.label).toMatch(/FAQ 工作簿/);
+  expect(sop?.label).toMatch(/SOP 工作簿/);
+  const selected=await main.command({action:'source',selection:sop!.selection});
+  expect(selected.faqPreviewAvailable).toBeUndefined();
+  await expect(main.command(f.command(selected.people[0]!.selection,FAQ_PERMISSION_PRESET))).rejects.toMatchObject({code:'STALE'});
+  expect(f.requests.some(r=>r.path==='/v1/intake/grants/preview')).toBe(false);
+ } finally { main.dispose(); }
+});
 it('rejects the FAQ preset locally when either action is unavailable', async () => {
  const f=intakePermissionsData(['import']),main=new ContentIntakePermissions(f.session);
  try {

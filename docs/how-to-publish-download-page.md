@@ -14,10 +14,10 @@
 
 ## 补发官网下载页
 
-补一个**已经发过**的 Release（例如 0.3.25 发布时该 workflow 还没合入）：
+补发与当前生产 API 版本一致的已发布 Release：
 
 1. GitHub → Actions → **Download page** → **Run workflow**。
-2. `tag` 填 `v0.3.25`（or 对应 tag）。
+2. `tag` 填当前生产 API 版本对应的标签。
 3. 跑完网页在 1 分钟内更新，Cloudflare 会缓存一会儿。
 
 本机想先看会改成什么，在仓库里对着 `gh-pages` 的 worktree 跑：

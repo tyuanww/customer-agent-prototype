@@ -4,11 +4,11 @@ import { actionsForPermissionPreset, FAQ_PERMISSION_ACTIONS, FAQ_PERMISSION_PRES
 import { GRANTABLE_ACTIONS, type OpenGrant } from '../shared/page-use';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
-import { loadIntakeAccess } from './content-intake-access';
+import { isLegacySopIntakeSource, loadIntakeAccess } from './content-intake-access';
 import type { IntakeUsageSession } from './content-intake-usage';
 import { ProductHttpError } from './product-http';
 type C = components['schemas'];
-type Source = { selection: string; source: C['IntakeSource']; label: string; actions: C['IntakeAction'][] };
+type Source = { selection: string; source: C['IntakeSource']; label: string; faq: boolean; actions: C['IntakeAction'][] };
 type Person = C['IntakePrincipalPage']['items'][number] & { selection: string; deadline: number };
 type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange']; uncertain: boolean };
 const reject = () => { throw new ProductHttpError('STALE'); };
@@ -24,7 +24,7 @@ function scopeLabel(scope: C['IntakeScope'], sourceLabel: string): string {
 }
 
 function canPreviewFaq(source: Source): boolean {
-  return FAQ_FORMAT_LABEL.has(source.source.templateVersion)
+  return source.faq
     && FAQ_PERMISSION_ACTIONS.every(action => source.actions.includes(action));
 }
 
@@ -204,9 +204,11 @@ export class ContentIntakePermissions {
           const actions=capability.mayAllocate.filter(action=>grantableActions.has(action));
           if(!actions.length)return [];
           const prefix=reference.slice(0,12);
-          const format=FAQ_FORMAT_LABEL.get(source.templateVersion) ?? '资料来源';
+          const sop=isLegacySopIntakeSource(source);
+          const faqFormat=sop ? undefined : FAQ_FORMAT_LABEL.get(source.templateVersion);
+          const format=sop ? 'SOP 工作簿' : faqFormat ?? '资料来源';
           const label=scopeLabel(source.scope, `${format} ${prefixes.get(prefix)===1?prefix:reference}`);
-          return [{source,actions,selection:randomUUID(),label}];
+          return [{source,actions,selection:randomUUID(),label,faq:faqFormat!==undefined}];
         });
         if(this.sources.length===1){this.selected=this.sources[0]!;await readSelected();}
       }else{
