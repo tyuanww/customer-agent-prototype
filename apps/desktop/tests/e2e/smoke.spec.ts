@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ElectronApplication, type Page, _electron as electron } from '@playwright/test';
+import type { OverlayController } from '../../src/main/overlay-controller';
 import {
   FOX_EDGE_VISIBLE_PX,
   FOX_SIZE,
@@ -1962,6 +1963,11 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
   try {
     const query = await waitForRole(app, 'query');
     await waitForHarness(app);
+    const readMainMetrics = () => app.evaluate(() => (
+      globalThis as typeof globalThis & {
+        __demoTest: { queryLayoutDebug: OverlayController['queryLayoutDebugState'] };
+      }
+    ).__demoTest.queryLayoutDebug().performance);
     let errors = 0;
     const errorMessages: string[] = [];
     const cycles = Number(process.env.OVL_BENCH_CYCLES ?? 50);
@@ -1994,6 +2000,8 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
         } catch {
           // Native focus is a separate OS acceptance; the cycle still exercises it.
         }
+        // A revision change drops pending frames.
+        await expect.poll(async () => (await readMainMetrics()).pending).toBe(0);
         await app.evaluate(() => {
           (globalThis as typeof globalThis & {
             __demoTest: { reportUiPhase: (phase: 'RESULTS', count: 3) => void };
@@ -2082,6 +2090,7 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
               foxVisible: snapshot.some((item) => item.role === 'fox' && item.visible),
             };
           }).toEqual({ queryVisible: false, foxVisible: true });
+          await expect.poll(async () => (await readMainMetrics()).pending).toBe(0);
         } catch (error) {
           errors += 1;
           if (errorMessages.length < 5) {
@@ -2090,24 +2099,7 @@ test('@float reports reducer and main-command-to-renderer-callback percentiles',
         }
       }
     }
-    const mainMetrics = await app.evaluate(() => (
-      globalThis as typeof globalThis & {
-        __demoTest: {
-          queryLayoutDebug: () => {
-            performance: {
-              count: number;
-              p50: number | null;
-              p95: number | null;
-              p99: number | null;
-              coldMs: number | null;
-              coldSemantics: 'first-completed-observation';
-              pending: number;
-              errors: number;
-            };
-          };
-        };
-      }
-    ).__demoTest.queryLayoutDebug().performance);
+    const mainMetrics = await readMainMetrics();
     console.log(`OVL_FRAME_PERF ${JSON.stringify({
       method: 'Main records the send timestamp. Renderer reports from rAF callbacks for open/layout and from the close-completion callback for collapse. This is not a paint-completion signal.',
       p50: mainMetrics.p50,
