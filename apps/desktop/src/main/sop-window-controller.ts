@@ -611,7 +611,7 @@ export class SopWindowController {
     const win = createOverlayChromeWindow(this.preloadPath, {
       width: SOP_WIDTH,
       height: SOP_OPEN_HEIGHT,
-      title: '过敏售后流程 · Demo',
+      title: '过敏售后流程',
       backgroundThrottling: false,
     });
     lockRendererWindow(win);

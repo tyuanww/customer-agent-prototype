@@ -27,7 +27,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '请先取约一颗黄豆大小的「澄芽氨基酸洁面乳」（合成演示产品），加水揉出泡沫后轻柔按摩面部 30 秒，避开眼周，再以清水洗净。该说明仅用于 Demo 合成场景，不代表真实产品说明书。',
+      '请先取约一颗黄豆大小的「澄芽氨基酸洁面乳」（合成演示产品），加水揉出泡沫后轻柔按摩面部 30 秒，避开眼周，再以清水洗净。该说明仅供离线示例使用，不代表真实产品说明书。',
     platform: '私域企微',
     scopeLabel: '日常清洁 · 合成演示',
     riskLevel: 'low',
@@ -55,7 +55,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '简洁版合成话术：取黄豆大小的「澄芽氨基酸洁面乳」，加水揉出泡沫，轻柔按摩约 30 秒后洗净，注意避开眼周。本条仅供 Demo 展示，不代表真实产品说明。',
+      '简洁版合成话术：取黄豆大小的「澄芽氨基酸洁面乳」，加水揉出泡沫，轻柔按摩约 30 秒后洗净，注意避开眼周。本条仅供离线示例使用，不代表真实产品说明。',
     platform: '抖音私信',
     scopeLabel: '日常清洁 · 简洁回复',
     riskLevel: 'low',
@@ -89,7 +89,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '温和提醒版合成话术：首次使用「澄芽氨基酸洁面乳」可先少量试用，揉出泡沫后减少摩擦；如持续刺痛或泛红，请停止使用并转人工复核。Demo 不作真实肤质判断。',
+      '温和提醒版合成话术：首次使用「澄芽氨基酸洁面乳」可先少量试用，揉出泡沫后减少摩擦；如持续刺痛或泛红，请停止使用并转人工复核。此示例不用于真实肤质判断。',
     platform: '售前咨询',
     scopeLabel: '日常清洁 · 温和提醒',
     riskLevel: 'medium',
@@ -157,7 +157,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '「月白轻透防晒乳」为合成演示产品：日间出门前取两指长涂匀面部，出汗或擦拭后约两小时补涂。晚间请用洁面充分清洁，无需专用卸妆油也可洗净。Demo 不读取真实肤质档案。',
+      '「月白轻透防晒乳」为合成演示产品：日间出门前取两指长涂匀面部，出汗或擦拭后约两小时补涂。晚间请用洁面充分清洁，无需专用卸妆油也可洗净。离线模式不读取真实肤质档案。',
     platform: '抖音私信',
     scopeLabel: '日间防护 · 合成演示',
     riskLevel: 'low',
@@ -185,7 +185,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '「白露季满赠」为合成活动：单笔实付满 299 赠「露芷修护面膜」体验装 1 片，每位用户限赠 1 次，不与会员日券叠加。结算页需勾选「白露季满赠」。Demo 不核验真实订单或库存。',
+      '「白露季满赠」为合成活动：单笔实付满 299 赠「露芷修护面膜」体验装 1 片，每位用户限赠 1 次，不与会员日券叠加。结算页需勾选「白露季满赠」。离线模式不核验真实订单或库存。',
     platform: '商城结算页',
     scopeLabel: '白露季满赠 · 全店合成商品',
     riskLevel: 'medium',
@@ -247,7 +247,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '「露芷修护面膜」为合成演示产品，Demo 不能替代医学判断。请告知用户：孕期皮肤更敏感，建议先咨询医师，并做局部试用；不要承诺“一定安全”或“医生推荐”。必要时升级话术师复核。',
+      '「露芷修护面膜」为合成演示产品，此示例不能替代医学判断。请告知用户：孕期皮肤更敏感，建议先咨询医师，并做局部试用；不要承诺“一定安全”或“医生推荐”。必要时升级话术师复核。',
     platform: '售前咨询',
     scopeLabel: '孕期咨询 · 合成演示',
     riskLevel: 'high',
@@ -344,7 +344,7 @@ export const SYNTHETIC_SCRIPTS: readonly ScriptFixture[] = deepFreeze([
       ],
     },
     answerText:
-      '请立即停用并清水冲洗；不要自行推荐激素药膏。记录首次使用时间、部位和照片（Demo 不会上传）。持续刺痛或扩散请就医。此为合成售后话术，不会创建真实工单。',
+      '请立即停用并清水冲洗；不要自行推荐激素药膏。记录首次使用时间、部位和照片。持续刺痛或扩散请就医。此为合成售后话术，离线模式不会上传照片或创建真实工单。',
     platform: '售后工单',
     scopeLabel: '过敏应急 · 合成演示',
     riskLevel: 'high',
