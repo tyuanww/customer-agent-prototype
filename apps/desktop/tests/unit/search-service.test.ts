@@ -200,12 +200,6 @@ describe('searchScripts', () => {
     expect(matched?.answerText).toContain('澄芽氨基酸洁面乳');
   });
 
-  it('keeps the old product label out of visible offline answers', () => {
-    for (const { answerText } of SYNTHETIC_SCRIPTS) {
-      expect(answerText).not.toMatch(/\bDemo\b/iu);
-    }
-  });
-
   it('never recalls a script only because the answer body contains the query', () => {
     const scripts = [
       fixture({
@@ -286,7 +280,8 @@ describe('searchScripts', () => {
       expect(item.search.intents.length).toBeGreaterThan(0);
       expect(item.search.anchors.length).toBeGreaterThan(0);
       expect(item.search.anchors.some((anchor) => anchor.kind === 'entity')).toBe(true);
-      expect(item.answerText).toMatch(/合成|Demo/);
+      expect(item.answerText).toContain('合成');
+      expect(item.answerText).not.toMatch(/\bDemo\b/iu);
       expect(JSON.stringify(item)).not.toContain('达肤妍');
     }
   });
