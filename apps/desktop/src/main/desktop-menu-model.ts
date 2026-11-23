@@ -44,7 +44,7 @@ export type EditCapabilities = {
 const ACTIONS = {
   'open-search': { type: 'action', id: 'open-search', label: '打开话术查询' },
   'open-dashboard': { type: 'action', id: 'open-dashboard', label: '打开运营工作台' },
-  quit: { type: 'action', id: 'quit', label: '退出 Demo' },
+  quit: { type: 'action', id: 'quit', label: '退出客服话术浮窗' },
 } as const satisfies Record<DesktopActionId, DesktopMenuEntry>;
 
 const EDIT_LABELS: Readonly<Record<EditRole, string>> = {

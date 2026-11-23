@@ -396,6 +396,8 @@ const CATALOGUE_SUCCESSOR_STEPS: readonly CatalogueSuccessorStep[] = [
     predecessorId: '0088_sop_resource_lifecycle', requiresPredecessor: 'Seat display projection requires the exact resource lifecycle predecessor' },
   { index: 89, minimumCatalogueLength: 90, id: '0090_owner_reviewed_sop_query_facts',
     predecessorId: '0089_seat_display_projection', requiresPredecessor: 'Owner-reviewed SOP facts require the exact seat projection predecessor' },
+  { index: 90, minimumCatalogueLength: 91, id: '0091_sop_entry_stop_batch',
+    predecessorId: '0090_owner_reviewed_sop_query_facts', requiresPredecessor: 'SOP entry stop batching requires the exact owner review predecessor' },
 ];
 
 function requiredSuccessorStep(
@@ -449,6 +451,7 @@ function matchesCatalogueSuccessorStep(
   return occupiedChecksum === FROZEN_OCCUPIED_SHA256
     && (step.id !== '0089_seat_display_projection' || migration.sha256 === generatedMigrationCatalogue.migrations[88]?.sha256)
     && (step.id !== '0090_owner_reviewed_sop_query_facts' || migration.sha256 === generatedMigrationCatalogue.migrations[89]?.sha256)
+    && (step.id !== '0091_sop_entry_stop_batch' || migration.sha256 === generatedMigrationCatalogue.migrations[90]?.sha256)
     && (step.id !== '0088_sop_resource_lifecycle' || sameSignedSuccessor(migration, catalogue.compatibility.sopResourceOverlay)
       && migration.sha256 === generatedMigrationCatalogue.migrations[87]?.sha256
       && catalogue.migrations[86]?.sha256 === catalogue.compatibility.sopContinuationOverlay?.migrationSha256)

@@ -9,9 +9,11 @@ const version = readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8').trim(
 const head = execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
 const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
 const profilePath = path.join(homedir(), 'Library/Application Support/客服话术浮窗 Demo/synthetic-stack.json');
+const desktopPackage = JSON.parse(readFileSync(path.join(repositoryRoot, 'apps/desktop/package.json'), 'utf8'));
+const macIdentityPath = `mac-universal/${desktopPackage.build.productName}.app/Contents/Resources/build-identity.json`;
 const identityCandidates = [
-  'release/local-unsigned/mac-universal/客服话术浮窗 Demo.app/Contents/Resources/build-identity.json',
-  'release/distribution/mac-universal/客服话术浮窗 Demo.app/Contents/Resources/build-identity.json',
+  `release/local-unsigned/mac/${macIdentityPath}`,
+  `release/distribution/${macIdentityPath}`,
 ].map((relative) => path.join(repositoryRoot, relative));
 
 function readJson(file) {

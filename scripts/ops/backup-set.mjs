@@ -53,6 +53,7 @@ const GIT_SHA = /^[0-9a-f]{40}$/u;
 const TAR_BLOCK = 512;
 const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 const BACKUP_SETS_DIRECTORY = 'backup-sets';
+const PRODUCTION_RELEASE_POINTER = '/srv/customer-agent/current';
 
 export class BackupSetError extends Error {
   constructor(code, message, options = undefined) {
@@ -736,6 +737,74 @@ function appIdentity() {
   return Object.freeze({ productVersion, productVersionSource, gitSha: null, gitShaSource: 'not-provided' });
 }
 
+export function readRunningBackupRelease({
+  current = PRODUCTION_RELEASE_POINTER,
+  releaseRoot = REPOSITORY_ROOT,
+  execute = (command, args) => run(command, args, { timeout: 10_000 }).trim(),
+  read = (file) => readFileSync(file, 'utf8'),
+  canonical = realpathSync,
+} = {}) {
+  const failBinding = () => fail('BACKUP_RELEASE_BINDING_INVALID', 'Backup must match the running production API and immutable release');
+  try {
+    const root = canonical(current);
+    const sha = path.basename(root);
+    if (root !== releaseRoot || root !== path.join(path.dirname(current), 'releases', sha) || !GIT_SHA.test(sha)) {
+      failBinding();
+    }
+    if (execute('git', ['-C', root, 'rev-parse', 'HEAD']) !== sha
+      || execute('git', ['--no-optional-locks', '-C', root, 'status', '--porcelain=v1', '--untracked-files=no']) !== '') {
+      failBinding();
+    }
+    const version = read(path.join(root, 'VERSION')).trim();
+    if (!/^\d+\.\d+\.\d+$/u.test(version)) failBinding();
+    const parent = execute('systemctl', ['show', '--property=MainPID', '--value', 'customer-agent-stack.service']);
+    const processId = /^[1-9]\d*$/u;
+    if (!processId.test(parent)) failBinding();
+    const proc = `/proc/${parent}`;
+    const children = read(`${proc}/task/${parent}/children`).trim().split(/\s+/u).filter(Boolean);
+    const expectedEntry = path.join(root, 'apps/api/dist/main.js');
+    const currentEntry = path.join(current, 'apps/api/dist/main.js');
+    const apiChildren = children.filter((child) => {
+      if (!processId.test(child)) return false;
+      try {
+        const entry = read(`/proc/${child}/cmdline`).split('\0')[1];
+        return (entry === expectedEntry || entry === currentEntry) && canonical(`/proc/${child}/cwd`) === root;
+      } catch (error) {
+        if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error;
+        return false; // An unrelated child may exit during enumeration.
+      }
+    });
+    if (apiChildren.length !== 1 || canonical(current) !== root) failBinding();
+    const child = apiChildren[0];
+    const stat = read(`/proc/${child}/stat`);
+    const startTime = stat.slice(stat.lastIndexOf(') ') + 2).trim().split(/\s+/u)[19];
+    if (!/^\d+$/u.test(startTime ?? '')) failBinding();
+    return Object.freeze({ root, sha, version, parent, child, startTime });
+  } catch {
+    failBinding();
+  }
+}
+
+function assertBackupReleaseUnchanged(expected) {
+  if (expected && canonicalJson(readRunningBackupRelease()) !== canonicalJson(expected)) {
+    fail('BACKUP_RELEASE_BINDING_CHANGED', 'Production API or release changed during backup');
+  }
+}
+
+function assertBackupReleaseMigrations(release, migrations) {
+  if (!release) return;
+  const catalogue = readJson(path.join(release.root, 'packages/database/migrations/manifest.generated.json'),
+    'BACKUP_RELEASE_BINDING_INVALID', MAX_MANIFEST_BYTES)?.migrations;
+  if (!Array.isArray(catalogue) || catalogue.length !== migrations.length) {
+    fail('BACKUP_RELEASE_SCHEMA_MISMATCH', 'Backup snapshot is not on the running release migration catalogue');
+  }
+  try {
+    assertReleasePrefix(migrations, catalogue);
+  } catch {
+    fail('BACKUP_RELEASE_SCHEMA_MISMATCH', 'Backup snapshot is not on the running release migration catalogue');
+  }
+}
+
 async function toolingIdentity() {
   return Object.freeze({
     implementation: 'scripts/ops/backup-set.mjs',
@@ -1386,7 +1455,15 @@ export async function createBackupSet(options = {}) {
   const preserveExisting = options.preserveExisting === undefined ? false : options.preserveExisting;
   if (typeof preserveExisting !== 'boolean') fail('BACKUP_ARGUMENT_INVALID', 'Invalid backup preservation option');
   const startedAt = utcNow();
+  const runningRelease = options.runningRelease;
+  assertBackupReleaseUnchanged(runningRelease);
   const stack = options.stack ?? loadStackProfile();
+  const application = appIdentity();
+  if (runningRelease && (stack.stackRoot !== '/srv/customer-agent/stack'
+    || stack.databaseName !== 'customer_agent_formal'
+    || application.gitSha !== runningRelease.sha || application.productVersion !== runningRelease.version)) {
+    fail('BACKUP_RELEASE_BINDING_INVALID', 'Running release identity does not match the backup target');
+  }
   const pgBin = options.pgBin ?? discoverPg15Bin();
   const backupRoot = path.resolve(
     options.backupRoot
@@ -1420,6 +1497,7 @@ export async function createBackupSet(options = {}) {
     snapshot = await openDatabaseSnapshot(stack);
     const snapshotAt = snapshot.at;
     const snapshotMetadata = readDatabaseMetadata(pgBin, stack, { snapshotId: snapshot.id });
+    assertBackupReleaseMigrations(runningRelease, snapshotMetadata.database.migrations);
     const beforeDump = readDatabaseMetadata(pgBin, stack).database;
     if (beforeDump.databaseOwner !== snapshotMetadata.database.databaseOwner
       || beforeDump.rolesFingerprint !== snapshotMetadata.database.rolesFingerprint
@@ -1471,7 +1549,7 @@ export async function createBackupSet(options = {}) {
       dumpStartedAt,
       dumpCompletedAt,
       completedAt,
-      application: appIdentity(),
+      application,
       tooling: await toolingIdentity(),
       artifacts,
       database: snapshotMetadata.database,
@@ -1490,6 +1568,7 @@ export async function createBackupSet(options = {}) {
       }
       const finalLocal = path.join(backupRoot, BACKUP_SETS_DIRECTORY, id);
       if (existsSync(finalLocal)) fail('BACKUP_ID_CONFLICT', 'Backup destination appeared while preparing publication');
+      assertBackupReleaseUnchanged(runningRelease);
       renameSync(copyStaging, prepared.final);
       copyStaging = null;
       fsyncDirectory(prepared.root);
@@ -1537,6 +1616,7 @@ export async function createBackupSet(options = {}) {
       });
     } else {
       const finalLocal = path.join(backupRoot, BACKUP_SETS_DIRECTORY, id);
+      assertBackupReleaseUnchanged(runningRelease);
       renameSync(staging, finalLocal);
       staging = null;
       fsyncDirectory(path.dirname(finalLocal));
@@ -2793,10 +2873,16 @@ async function main() {
   try {
     if (command === 'backup') {
       const args = process.argv.slice(3);
-      if (args.length > 1 || (args.length === 1 && args[0] !== '--preserve-existing')) {
-        fail('BACKUP_ARGUMENT_INVALID', 'Expected no options or --preserve-existing');
+      if (new Set(args).size !== args.length
+        || args.some((arg) => !['--preserve-existing', '--bind-running-release'].includes(arg))) {
+        fail('BACKUP_ARGUMENT_INVALID', 'Expected --preserve-existing or --bind-running-release');
       }
-      const result = await createBackupSet({ preserveExisting: args.length === 1 });
+      const runningRelease = args.includes('--bind-running-release') ? readRunningBackupRelease() : undefined;
+      if (runningRelease) {
+        process.env.CUSTOMER_AGENT_BACKUP_PRODUCT_VERSION = runningRelease.version;
+        process.env.CUSTOMER_AGENT_BACKUP_GIT_SHA = runningRelease.sha;
+      }
+      const result = await createBackupSet({ preserveExisting: args.includes('--preserve-existing'), runningRelease });
       process.exitCode = result.degraded ? 3 : 0;
       return;
     }

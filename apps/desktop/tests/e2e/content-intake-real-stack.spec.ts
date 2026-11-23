@@ -23,7 +23,8 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
   const createInput = format === 'csv'
     ? (options?: Parameters<typeof createIntakeSyntheticCsv>[0]) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), createIntakeSyntheticCsv(options)])
     : createIntakeSyntheticWorkbook;
-  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile, inputFormat: format });
+  const includeSopSource = format === 'xlsx';
+  const host = await createIntakeSyntheticHost({ prepareCandidate: false, profile, inputFormat: format, includeSopSource });
   const directory = mkdtempSync(path.join(tmpdir(), 'intake-real-stack-electron-'));
   const desktopRoot = fileURLToPath(new URL('../..', import.meta.url));
   const evidence = process.env.INTAKE_REAL_STACK_SCREENSHOT_DIR
@@ -56,11 +57,22 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     // and saves the actual API response; no filesystem, parser or HTTP mocks.
     await app.evaluate(({ dialog }, files) => {
       const choices = [files.badFile, files.goodFile, files.badFile, files.revisionFile, files.goodFile];
-      dialog.showOpenDialog = async () => {
+      let sopChoicePending = files.includeSopSource;
+      dialog.showOpenDialog = (async (_window, options) => {
+        const openOptions = sopChoicePending
+          ? { title: '选择 SOP 工作簿', filters: [{ name: 'SOP 工作簿（XLSX）', extensions: ['xlsx'] }] }
+          : { title: '选择 FAQ 资料文件', filters: [{ name: 'FAQ 资料（CSV / Excel）', extensions: ['csv', 'xlsx'] }] };
+        if (options.title !== openOptions.title || JSON.stringify(options.filters) !== JSON.stringify(openOptions.filters)) {
+          throw new Error('Unexpected native file dialog for the selected upload source');
+        }
+        if (sopChoicePending) {
+          sopChoicePending = false;
+          return { canceled: true, filePaths: [] };
+        }
         const selected = choices.shift();
         if (!selected) throw new Error('Unexpected extra native file selection');
         return { canceled: false, filePaths: [selected] };
-      };
+      }) as typeof dialog.showOpenDialog;
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: files.reportFile });
       const confirmations = [0, 1];
       dialog.showMessageBox = (async (_window, options) => {
@@ -69,7 +81,7 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
         }
         return { response: confirmations.shift() ?? 0, checkboxChecked: false };
       }) as typeof dialog.showMessageBox;
-    }, { badFile, goodFile, revisionFile, reportFile });
+    }, { badFile, goodFile, revisionFile, reportFile, includeSopSource });
     await expect.poll(() => app!.windows().some(w => w.url().includes('role=query'))).toBe(true);
     const query = app.windows().find(w => w.url().includes('role=query'))!;
     await query.waitForFunction(() => Boolean(window.customerAgent?.intakeQuery));
@@ -100,7 +112,18 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     const dashboard = app.windows().find(w => w.url().includes('role=dashboard'))!;
     await dashboard.getByTestId('nav-materials').click();
     await dashboard.getByRole('button', { name: '上传资料', exact: true }).click();
-    const upload = dashboard.getByRole('region', { name: '上传 FAQ 资料', exact: true });
+    if (process.platform === 'darwin') {
+      const applicationMenu = await app.evaluate(({ Menu }) => {
+        const item = Menu.getApplicationMenu()?.items[0];
+        return { label: item?.label, entries: item?.submenu?.items.map(entry => entry.label) };
+      });
+      expect(applicationMenu).toMatchObject({
+        label: '客服话术浮窗',
+        entries: expect.arrayContaining(['关于 客服话术浮窗', '隐藏 客服话术浮窗', '退出 客服话术浮窗']),
+      });
+      expect(applicationMenu.entries?.join(' ')).not.toMatch(/Demo|开发|测试/);
+    }
+    const upload = dashboard.getByRole('region', { name: '上传资料', exact: true });
     const sources = upload.getByRole('combobox', { name: '上传来源', exact: true });
     await expect(sources).toBeEnabled();
     await dashboard.screenshot({ path: path.join(evidence, 'dashboard-intake-start.png') });
@@ -144,7 +167,16 @@ test('native FAQ upload, revision and cancellation preserve the confirmed releas
     await resizeDashboard(1180, 760);
     await appearance('light');
     await sources.click();
-    await dashboard.getByRole('option', { name: /产品/ }).first().click();
+    if (includeSopSource) {
+      const sop = dashboard.getByRole('option', { name: 'SOP / source-sop / shop-a', exact: true });
+      await expect(sop).toBeVisible();
+      await sop.click();
+      await upload.getByRole('button', { name: '选择 SOP 工作簿', exact: true }).click();
+      await expect(upload.getByRole('status').filter({ hasText: '等待选择文件' })).toBeVisible();
+      expect((await host.status()).requests.some(p => p.endsWith('/objects'))).toBe(false);
+      await sources.click();
+    }
+    await dashboard.getByRole('option', { name: '产品 / source-a / shop-a', exact: true }).click();
     async function selectAndSubmit(filename: string) {
       await upload.getByRole('button', { name: '选择 CSV / Excel 文件', exact: true }).click();
       await expect(upload.getByRole('status').filter({ hasText: filename })).toBeVisible();

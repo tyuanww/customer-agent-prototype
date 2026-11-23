@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('legacy candidate check verifies the complete 90 tail and preserves historical 83/84/85 artifacts', t => {
+test('legacy candidate check verifies the complete 91 tail and preserves historical 83/84/85 artifacts', t => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'sop-query-candidate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const relative of ['package.json', 'contracts/upstream/customer-agent', 'packages/database', 'scripts/customer-agent-contract-set.mjs',

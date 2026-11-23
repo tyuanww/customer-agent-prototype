@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { macPackageOutputDirectory } from './mac-package-paths.mjs';
@@ -14,15 +14,23 @@ if (mode !== 'local' && mode !== 'distribution') {
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(desktopRoot, '../..');
 const outputDir = macPackageOutputDirectory(repositoryRoot, mode);
-const appContainer = path.join(outputDir, 'mac-universal');
-const appName = readdirSync(appContainer).find((name) => name.endsWith('.app'));
-if (!appName) {
-  throw new Error(`Universal .app not found in ${appContainer}`);
-}
-
-const appPath = path.join(appContainer, appName);
+const packageJson = JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8'));
+const { appId, productName } = packageJson.build;
+const appPath = path.join(outputDir, 'mac-universal', `${productName}.app`);
 const resources = path.join(appPath, 'Contents', 'Resources');
 const infoPlist = path.join(appPath, 'Contents', 'Info.plist');
+for (const [key, expected] of Object.entries({
+  CFBundleName: productName,
+  CFBundleDisplayName: productName,
+  CFBundleIdentifier: appId,
+})) {
+  const actual = execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', infoPlist], {
+    encoding: 'utf8',
+  }).trim();
+  if (actual !== expected) {
+    throw new Error(`${key} must be ${expected}, got ${actual}`);
+  }
+}
 const executable = execFileSync(
   '/usr/libexec/PlistBuddy',
   ['-c', 'Print :CFBundleExecutable', infoPlist],

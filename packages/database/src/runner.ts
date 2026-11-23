@@ -192,6 +192,8 @@ export async function applyMigrationCatalogue(
       const sopQuery = migration.id === '0086_sop_unified_query';
       const sopContinuation = migration.id === '0087_sop_unified_continuation';
       const sopResource = migration.id === '0088_sop_resource_lifecycle';
+      const sopEntryStopBatch = migration.id === '0091_sop_entry_stop_batch';
+      const verifyInTransaction = closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage || sopLifecycle || sopQuery || sopContinuation || sopResource || sopEntryStopBatch;
       try {
         // This grant-only successor requires a verified physical predecessor,
         // not merely a matching ledger. Both audits share its ACL/ledger
@@ -219,7 +221,8 @@ export async function applyMigrationCatalogue(
         if (sopQuery) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 85) });
         if (sopContinuation) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 86) });
         if (sopResource) await verifyReadinessSuccessor(client, { ...catalogue, migrations: catalogue.migrations.slice(0, 87) });
-        const verifierSearchPath = closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage || sopLifecycle || sopQuery || sopContinuation || sopResource
+        if (sopEntryStopBatch) await verifyMigrationPrefix(client, migration.position - 1);
+        const verifierSearchPath = verifyInTransaction
           ? (await client.query<{ search_path: string }>("SELECT current_setting('search_path') AS search_path")).rows[0]?.search_path
           : undefined;
         await client.query(migration.sql);
@@ -239,7 +242,7 @@ export async function applyMigrationCatalogue(
             executionMs,
           ],
         );
-        if (closesLegacyChecks || repairsSuccessor || readinessSuccessor || occupiedDomain || defaultTenant || directoryActivity || unifiedStorage || sopLifecycle || sopQuery || sopContinuation || sopResource) {
+        if (verifyInTransaction) {
           // Generated SQL changes search_path locally. pg_get_* definitions use
           // that path when qualifying names; audit in the same context as the
           // predecessor instead of mistaking rendering differences for drift.

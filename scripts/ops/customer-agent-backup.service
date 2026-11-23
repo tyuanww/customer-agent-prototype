@@ -18,7 +18,7 @@ Environment=CUSTOMER_AGENT_BACKUP_ROOT=/srv/customer-agent/catalog-backups
 Environment=CUSTOMER_AGENT_BACKUP_KEEP=14
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-ExecStart=/srv/customer-agent/current/scripts/ops/customer-agent-backup.sh
+ExecStart=/srv/customer-agent/current/scripts/ops/customer-agent-backup.sh --bind-running-release
 # 3 means "dumped, but there is no off-site copy". The gap stays visible in the unit's
 # exit status and log without the timer entering a failed state every night.
 SuccessExitStatus=0 3

@@ -646,12 +646,12 @@ export class OverlayController {
     this.fox = this.createChromeWindow({
       width: FOX_SIZE,
       height: FOX_SIZE,
-      title: '客服话术浮窗 · Demo',
+      title: '客服话术浮窗',
     });
     this.query = this.createChromeWindow({
       width: QUERY_WIDTH,
       height: QUERY_INPUT_HEIGHT,
-      title: '客服话术查询 · Demo',
+      title: '客服话术查询',
       backgroundThrottling: false,
       macPanel: false,
     });

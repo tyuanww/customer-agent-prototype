@@ -2,21 +2,17 @@
 
 官网就是本仓的 `gh-pages` 分支，域名 `download.jianghua.site`。页面上的版本号、各平台下载链接、文件大小和 SHA-256 都是**写死在 HTML 里**的，没有构建步骤。
 
-现在由 `.github/workflows/download-page.yml` 自动改：**每次 `gh release create` 后**（`release: published`），workflow 拉取该 Release 的 Windows 和 macOS 资产元数据，重写 `gh-pages` 上的 `index.html` 和 `windows.html`，然后提交推送。数据全部来自 Release，不来自页面，所以页面最多是「旧」，不会「错」。
+正式 Release 发布后，`.github/workflows/download-page.yml` 读取 Windows 安装器和 macOS DMG 的资产元数据，重写 `gh-pages` 上的 `index.html` 和 `windows.html`。官网只展示 Windows 和 macOS。脚本遇到缺包、重复平台资产、缺摘要或遗留 Linux 链接会退出。
 
-当前发布配置只展示 Windows 和 macOS。`gh-pages` 页面不得保留指向旧 Linux 包的链接；脚本遇到 Linux 链接会失败关闭。以后恢复 Linux 发布时，同时修改官网面板、`scripts/update-download-page.mjs` 和对应测试。
+## 准备发布资产
 
-## Prerequisites
+1. 冻结正式提交，确认标签、`VERSION` 和完整提交 SHA 一致。等同一次由 push 触发的完整 CI 成功，确认它提供 `windows-local-unsigned` 与 `mac-local-unsigned`。Mac job 使用现有未签名打包入口并核对包内构建 SHA。Windows job 核对安装器与主程序的 PE 属性和包内构建 SHA。
+2. 获得对应未签名包分发授权后，创建草稿 Release。在 GitHub Actions 运行 **Publish artifact to release**，输入该标签。工作流从标签 SHA 对应的同一 CI run 取包。
+3. 回读 Release，确认同平台各只有一个资产，文件名为 `customer-agent-<VERSION>-win-x64-UNSIGNED.exe` 和 `customer-agent-<VERSION>-mac-universal-UNSIGNED.dmg`。核对 GitHub 的 `sha256:` digest 与工作流记录一致。重跑会沿用已存在且摘要完全相同的附件。发现其他同平台附件时先核对保留哪一个，再使用现有受控发布权限处理。
+4. 将已验摘要的安装包和受管配置配套交付给部署员。先给 Windows 和 Mac 的目标用户下发并回读远端配置，再打开应用验收首装、升级和重开。官网下载仅提供安装包。受管配置由部署员经内部设备下发渠道交付。[Windows 受管首装](how-to-office-machine-product-remote.md#受管首装) · [macOS 受管首装](how-to-macos-packaged-product-remote.md#受管首装)
+5. 用 `node scripts/ops/production-smoke.mjs --expected-version "$(cat VERSION)"` 确认正式 API 已切换到标签对应的版本，再按批准发布 Release。**Download page** 工作流会再次核验该版本和线上就绪状态，通过后才更新官网。如果发布事件未触发工作流，用下一节的手动入口补发，再核对官网与同一 Release 的链接和 SHA-256。
 
-1. 这次发布的 Release 已经建好，且带两个当前发布平台的资产：
-   - `Demo-<VERSION>-win-x64-UNSIGNED.exe`
-   - `Demo-<VERSION>-mac-universal-UNSIGNED.dmg`
-2. 那两个资产都有 GitHub 的 `sha256:` digest。缺一个，脚本会直接失败，不会发出带错链接或错校验值的页面。
-3. 改 workflow 或脚本的 PR 已合入 `main`（workflow 从默认分支取脚本，不从那两个 tag 取，所以补发老 Release 不会因为 tag 里没有脚本而失败）。
-
-## Steps
-
-正常发版不用手动做事。`gh release create <tag>` 一发布，workflow 自己跑。
+## 补发官网下载页
 
 补一个**已经发过**的 Release（例如 0.3.25 发布时该 workflow 还没合入）：
 
@@ -42,6 +38,8 @@ node scripts/update-download-page.mjs --dir /tmp/jianghua-download-pages --check
 
 | 情形 | 报错 |
 | --- | --- |
+| GitHub Release 是草稿、预发行或缺少状态 | `must be a published stable release` |
+| Release 同平台有多个附件 | `release vX.Y.Z has multiple win assets` 或 `multiple mac assets` |
 | 页面上的下载链接指向**别的仓库** | `page links a release on <owner>/<repo>, but this script publishes ...` |
 | 页面不再链接 Windows 或 macOS（少一个下载按钮） | `page no longer links the mac asset` |
 | 页面仍链接已停用的 Linux 平台 | `page links the unsupported linux platform` |
@@ -54,7 +52,7 @@ node scripts/update-download-page.mjs --dir /tmp/jianghua-download-pages --check
 ## Verification
 
 - 打开 `https://download.jianghua.site/`，hero 与「下载」段的 `vX.Y.Z` 是这次版本，「下载 · <大小>」与该 Release 资产一致。
-- 点页面上任一下载按钮，落到 `.../releases/download/<tag>/Demo-<VERSION>-...`。
+- 点页面上任一下载按钮，确认目标为该 Release 中对应平台的唯一附件。
 - 点 SHA-256 芯片，复制出的值等于 Release 资产的 digest。
 - 工作台「打开下载页」用的是数据库里 `is_current=true` 那一行，和官网是**两条独立链路**；改官网不会改工作台，见下。
 
@@ -98,6 +96,6 @@ FROM ops_loop.software_release_catalog WHERE is_current;
 | --- | --- |
 | workflow 报 `refusing to publish the older vX.Y.Z` | 你要发的版本比页面现有的旧。确认确实要回滚才加 `--allow-downgrade`（本机跑）；CI 里没有这个开关，页面只会向前走。 |
 | Actions 里没跑 | Release 是 `draft` 或 `prerelease`；这两种不会触发 `published`。发布正式 Release，或用 `workflow_dispatch` 补。 |
-| workflow 红在「Rewrite the page」 | 该 Release 缺 Windows/macOS 资产、资产没有 sha256 digest，或页面仍保留 Linux 链接。修复后重跑。 |
+| workflow 红在「Rewrite the page」 | 该 Release 缺 Windows 或 macOS 资产、同平台有多个附件、资产缺 SHA-256，或页面仍保留 Linux 链接。修复后重跑。 |
 | 页面没变 | 页面已经是该版本（workflow 会跳过推送）；或 Cloudflare 还在缓存，等一会儿。 |
 | 官网更新了但工作台没更新 | 预期。两条链路，工作台要直写上面那张表。 |

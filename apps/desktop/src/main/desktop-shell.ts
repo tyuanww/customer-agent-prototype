@@ -23,6 +23,8 @@ import {
   type SopResumeMenuEntry,
 } from './desktop-menu-model';
 
+const PRODUCT_NAME = '客服话术浮窗';
+
 type DesktopActions = Readonly<Record<DesktopActionId, () => void>>;
 
 export type DesktopShell = {
@@ -86,6 +88,23 @@ function installApplicationMenu(actions: DesktopActions, dashboardEnabled: boole
   const template = createApplicationMenuModel(process.platform, dashboardEnabled).map(
     (section): MenuItemConstructorOptions => {
       if (section.type === 'role') {
+        if (section.role === 'appMenu') {
+          app.setAboutPanelOptions({ applicationName: PRODUCT_NAME });
+          return {
+            label: PRODUCT_NAME,
+            submenu: [
+              { role: 'about', label: `关于 ${PRODUCT_NAME}` },
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide', label: `隐藏 ${PRODUCT_NAME}` },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit', label: `退出 ${PRODUCT_NAME}` },
+            ],
+          };
+        }
         return { role: section.role };
       }
       return {
@@ -209,7 +228,7 @@ function createTray(actions: DesktopActions, dashboardEnabled: boolean): Tray | 
     }
     const tray = new Tray(trayIcon);
     const menu = Menu.buildFromTemplate(toMenuTemplate(createTrayMenuModel(dashboardEnabled), actions));
-    tray.setToolTip('客服 Agent Demo');
+    tray.setToolTip(PRODUCT_NAME);
 
     if (process.platform === 'linux') {
       // AppIndicator does not reliably emit click; assigning the context menu is

@@ -33,7 +33,7 @@ export async function readSyntheticQualityReport(bytes: Buffer): Promise<string[
   return rows;
 }
 
-export async function syntheticTaskGraphWorkbook(options: { qualityCount?: number; withoutTaskImages?: boolean; narrowKnowledgeImage?: boolean; sharedTaskImage?: boolean; effectiveTo?: string; queryBudgetProbe?: boolean; shopWide?: boolean; revision?: number; solo?: boolean; disable?: boolean;
+export async function syntheticTaskGraphWorkbook(options: { qualityCount?: number; withoutTaskImages?: boolean; narrowKnowledgeImage?: boolean; sharedTaskImage?: boolean; effectiveTo?: string; queryBudgetProbe?: boolean; shopWide?: boolean; revision?: number; solo?: boolean; disable?: boolean; disableScriptB?: boolean;
   missingUnknown?: boolean; unresolvedConfirmation?: boolean; wrongHeader?: boolean; longTaskId?: boolean; additionalEntryTerms?: readonly string[] } = {}) {
   const { revision = 1, solo = false } = options;
   const book = new ExcelJS.Workbook();
@@ -57,13 +57,13 @@ export async function syntheticTaskGraphWorkbook(options: { qualityCount?: numbe
     for (const [id, taskId, scriptId, relation] of [
       ['association-a', 'task-a', 'script-a', '独立'], ['association-b', 'task-a', 'script-b', '替代'],
       ['association-c', 'task-b', 'script-a', '配套'],
-    ]) row('执行任务', { 记录类型: '话术引用', 任务编号: taskId!, 场景编号: flowId, 关联编号: id!, 话术编号: scriptId!, 适用条件: '合成显式条件', 话术关系: relation! });
+    ].filter(([, , scriptId]) => !options.disableScriptB || scriptId !== 'script-b')) row('执行任务', { 记录类型: '话术引用', 任务编号: taskId!, 场景编号: flowId, 关联编号: id!, 话术编号: scriptId!, 适用条件: '合成显式条件', 话术关系: relation! });
     for (const [id, title, target, unknown, ordinal] of [
       ['branch-known', '已确认', 'task-known', '否', '1'], ['branch-unknown', '无法判断', 'task-unknown', options.missingUnknown ? '否' : '是', '2'],
     ]) row('判断分支', { 分支编号: id!, 任务编号: 'task-b', 选项: title!, 判断依据: `合成依据 ${id}`, 目标任务编号: target!,
       是否无法判断: unknown!, 匹配词: JSON.stringify([`合成匹配 ${id}`]), 分支顺序: ordinal! });
     row('客户话术', { 话术编号: 'script-a', 话术标题: '合成对客 A', 对客正文: `合成对客原文 A\n版本 ${revision}`, 关联资源编号: '["image-entry"]' });
-    row('客户话术', { 话术编号: 'script-b', 话术标题: '合成对客 B', 对客正文: '合成对客原文 B', 关联资源编号: '[]' });
+    row('客户话术', { 话术编号: 'script-b', 话术标题: '合成对客 B', 对客正文: '合成对客原文 B', 关联资源编号: '[]', 维护状态: options.disableScriptB ? '停用' : '启用' });
     for (let index = 0; index < (options.qualityCount ?? 0); index++) row('客户话术', { 话术编号: `quality-script-${index}`,
       话术标题: `合成质量话术 ${index}`, 对客正文: `合成质量正文 ${index}`, 关联资源编号: '[]' });
     if (options.queryBudgetProbe) for (let index = 0; index < 12; index++) {

@@ -6,7 +6,7 @@ import { joinDisplayParts } from '@shared/display-separator';
 function ActionButton(props: ButtonProps) {
   return <Button autoInsertSpace={false} {...props} />;
 }
-const domainWord = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
+const categoryWord = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后', sop: 'SOP' } as const;
 const phases: Record<IntakeUploadView['phase'], string> = {
   idle: '请选择资料来源', selected: '等待选择文件', choosing: '正在选择文件', confirming: '请确认实际参与人',
   uploading: '正在上传文件', receiving: '正在提交校验任务', parsing: '正在校验资料', failed: '整批校验未通过',
@@ -41,13 +41,15 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
   const canStop = refreshing || view.canStop;
   const declaring = !!view.file && view.canSubmit;
   const ready = !!preparer && editors.length > 0 && confirmed;
-  return <section className="intake-upload" aria-label="上传 FAQ 资料">
+  const selected = view.sources.find(source => source.selection === view.sourceSelection);
+  const fileChoice = selected?.category === 'sop' ? '选择 SOP 工作簿' : '选择 CSV / Excel 文件';
+  return <section className="intake-upload" aria-label="上传资料">
     <Space wrap className="intake-upload-row" size={8}>
       <Select aria-label="上传来源" value={view.sourceSelection ?? undefined} virtual={false} style={{ width: 280 }}
         placeholder="请选择有权维护的来源" disabled={disabled || !view.authorized || !!view.pending || !!view.file || !!view.revisionOf}
         onChange={selection => { if (selection) apply({ action: 'upload-source', selection }); }}
-        options={view.sources.map(source => ({ value: source.selection, label: joinDisplayParts([domainWord[source.domain] ?? '', source.label]) }))} />
-      <ActionButton disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>选择 CSV / Excel 文件</ActionButton>
+        options={view.sources.map(source => ({ value: source.selection, label: joinDisplayParts([categoryWord[source.category], source.label]) }))} />
+      <ActionButton disabled={disabled || !view.canChoose} onClick={() => apply({ action: 'upload-choose' })}>{fileChoice}</ActionButton>
       {(view.sourceSelection || view.canReset) && <ActionButton disabled={disabled || !view.canReset} onClick={() => {
         const run = () => apply({ action: 'upload-reset' });
         if (!view.file && !view.revisionOf) run();
@@ -112,7 +114,7 @@ export function IntakeUpload({ view, active = true, busy, blocked, refreshBlocke
           { title: '问题与修正建议', dataIndex: 'message' },
         ]}
       />}
-      {view.job.state === 'failed' && <p>本批尚未生成待审核资料。请按报告修正资料中的全部阻断问题，再重新选择 CSV / Excel 文件。</p>}
+      {view.job.state === 'failed' && <p>本批尚未生成待审核资料。请按报告修正资料中的全部阻断问题，再重新{fileChoice}。</p>}
     </section>}
   </section>;
 }

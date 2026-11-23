@@ -82,20 +82,25 @@ export function formatDateZh(iso) {
 }
 
 /**
- * Normalise a `gh release view --json tagName,publishedAt,assets` payload into
- * the manifest the renderer consumes. Fails closed: a missing published platform
- * asset or an asset without a sha256 digest stops the publish instead of shipping
- * a page with a broken link or a wrong checksum.
+ * Normalise a `gh release view --json tagName,publishedAt,isDraft,isPrerelease,assets` payload into
+ * the manifest the renderer consumes. Missing required assets, duplicate
+ * platform assets, and invalid SHA-256 digests stop publication.
  */
 export function manifestFromRelease(release) {
   if (!release || typeof release !== 'object') throw new Error('release payload must be an object');
   const version = String(release.tagName ?? '').replace(/^v/u, '');
   if (!/^\d+\.\d+\.\d+$/u.test(version)) throw new Error(`unexpected release tag: ${String(release.tagName)}`);
+  if (release.isDraft !== false || release.isPrerelease !== false) {
+    throw new Error(`release v${version} must be a published stable release`);
+  }
 
   const assets = {};
   for (const asset of release.assets ?? []) {
     const platform = platformOf(asset.name);
     if (!platform) continue;
+    if (assets[platform]) {
+      throw new Error(`release v${version} has multiple ${platform} assets: ${assets[platform].name}, ${asset.name}`);
+    }
     const sha256 = String(asset.digest ?? '').replace(/^sha256:/u, '');
     if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error(`asset ${asset.name} has no sha256 digest`);
     assets[platform] = { name: asset.name, bytes: asset.size, sha256 };
@@ -273,7 +278,7 @@ export function updateDownloadPages({ dir, manifest, check = false, allowDowngra
 export function fetchRelease(tag) {
   const stdout = execFileSync(
     'gh',
-    ['release', 'view', tag, '--repo', RELEASE_REPO, '--json', 'tagName,publishedAt,assets'],
+    ['release', 'view', tag, '--repo', RELEASE_REPO, '--json', 'tagName,publishedAt,isDraft,isPrerelease,assets'],
     { encoding: 'utf8' },
   );
   return JSON.parse(stdout);

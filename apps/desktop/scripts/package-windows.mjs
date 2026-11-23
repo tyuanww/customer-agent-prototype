@@ -45,7 +45,7 @@ export function packageWindows(
 ) {
   if (mode !== 'local') {
     throw new Error(
-      'Windows packaging in this Demo is local-unsigned only. There is no signed distribution path.',
+      'Windows packaging is local-unsigned only. There is no signed distribution path.',
     );
   }
 

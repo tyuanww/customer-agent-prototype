@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -56,6 +59,46 @@ test('fails when the deployed version differs from the expected version', () => 
   assert.equal(report.checks.apiVersionMatches, false);
 });
 
+test('the CLI reports health before deployment and rejects an unmet release target', async t => {
+  const bin = mkdtempSync(path.join(tmpdir(), 'production-smoke-'));
+  t.after(() => rmSync(bin, { recursive: true, force: true }));
+  const probes = observation();
+  const responses = [
+    [`${API_ORIGIN}/health`, probes.apiHealth],
+    [`${API_ORIGIN}/ready`, probes.apiReady],
+    [`${IDENTITY_ORIGIN}/health`, probes.identityHealth],
+    [`${API_ORIGIN}/v1/intake/sources`, probes.unauthSources],
+    [`${API_ORIGIN}/v1/events/usage`, probes.unauthUsage],
+  ];
+  writeFileSync(path.join(bin, 'curl'), [
+    '#!/bin/sh',
+    'for url do :; done',
+    'case "$url" in',
+    ...responses.map(([url, probe]) => `'${url}') printf '%s\\n%s' '${JSON.stringify(probe.json) ?? ''}' '${probe.status}' ;;`),
+    '*) exit 2 ;;',
+    'esac',
+  ].join('\n'), { mode: 0o700 });
+  const run = (...args) => promisify(execFile)(process.execPath, [
+    SMOKE_SCRIPT, '--api-origin', API_ORIGIN, '--identity-origin', IDENTITY_ORIGIN, ...args,
+  ], { encoding: 'utf8', env: { PATH: bin } });
+
+  const health = JSON.parse((await run()).stdout);
+  assert.equal(health.ok, true);
+  assert.equal(health.version, '0.3.42');
+  assert.equal(health.expectedVersion, null);
+  assert.equal(Object.hasOwn(health.checks, 'apiVersionMatches'), false);
+
+  await assert.rejects(run('--expected-version', '0.3.43'), error => {
+    assert.equal(error.code, 1);
+    const release = JSON.parse(error.stdout);
+    assert.equal(release.expectedVersion, '0.3.43');
+    assert.equal(release.version, '0.3.42');
+    assert.equal(release.ok, false);
+    assert.deepEqual(Object.keys(release.checks).filter(key => !release.checks[key]), ['apiVersionMatches']);
+    return true;
+  });
+});
+
 test('fails when readiness omits a dependency or reports a degraded check', () => {
   const missing = observation();
   missing.apiReady.json.checks.storage = undefined;
@@ -86,7 +129,7 @@ test('reports safe probe failures without response contents', () => {
     },
   }));
   assert.equal(report.ok, false);
-  assert.equal(report.checks.apiVersionMatches, false);
+  assert.equal(report.checks.apiHealth, false);
   assert.deepEqual(report.probes, {
     apiHealth: { status: 0, error: 'CURL_6' },
     apiReady: { status: 200 },
@@ -163,5 +206,6 @@ test('parses only distinct public HTTPS origins and semantic versions', () => {
     '--identity-origin', API_ORIGIN,
   ]).ok, false);
   assert.equal(parseOptions(['--expected-version', 'latest']).ok, false);
+  assert.equal(parseOptions(['--expected-version', '']).ok, false);
   assert.equal(parseOptions(['--', '--help']).help, true);
 });

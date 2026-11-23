@@ -3,7 +3,7 @@ import { Pool, type Client, type DatabaseError, type QueryResultRow } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { generatedMigrationCatalogue } from '../src/generated/migrations.generated.js';
 import { inspectDatabaseMigrations } from '../src/planner.js';
-import { applyDatabaseMigrations, applyMigrationCatalogue } from '../src/runner.js';
+import { applyDatabaseMigrations, applyMigrationCatalogue, applyMigrationPrefix } from '../src/runner.js';
 import type {
   DatabaseQueryClient,
   ExecutableDatabaseMigration,
@@ -66,7 +66,7 @@ const SOP_REPAIR_SUFFIX = [
   '0084_sop_unified_storage',
   '0085_sop_unified_lifecycle',
   '0086_sop_unified_query', '0087_sop_unified_continuation', '0088_sop_resource_lifecycle',
-  '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts',
+  '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts', '0091_sop_entry_stop_batch',
 ] as const;
 
 interface CountRow extends QueryResultRow { count: number }
@@ -227,7 +227,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', { timeout: 30_000 
         '0084_sop_unified_storage',
         '0085_sop_unified_lifecycle',
         '0086_sop_unified_query', '0087_sop_unified_continuation', '0088_sop_resource_lifecycle',
-        '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts',
+        '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts', '0091_sop_entry_stop_batch',
       ]);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
     } finally { await client.end(); }
@@ -886,6 +886,34 @@ describe.sequential('PostgreSQL 15 immutable migration gate', { timeout: 30_000 
     }
   }, 180_000);
 
+  it('applies only the batched SOP stop trigger after verifying the exact 90-migration prefix', async () => {
+    const client = await harness.connect(harness.createDatabase('sop_entry_stop_batch_upgrade').config);
+    try {
+      await applyMigrationPrefix(client, 90);
+      const triggerToggle = 'ALTER TABLE content_intake.release_lineage';
+      await client.query(`${triggerToggle} DISABLE TRIGGER sop_active_entry_stop`);
+      await expect(applyDatabaseMigrations(client)).rejects.toMatchObject({
+        code: 'MIGRATION_APPLY_FAILED', migrationId: '0091_sop_entry_stop_batch',
+      });
+      expect((await inspectDatabaseMigrations(client)).applied).toHaveLength(90);
+      await client.query(`${triggerToggle} ENABLE TRIGGER sop_active_entry_stop`);
+      await client.query(`ALTER TABLE public.import_batches
+        DISABLE TRIGGER backend_review_sync_wait_on_batch_failed,
+        DISABLE TRIGGER import_batches_restore_snapshots`);
+
+      const upgraded = await applyDatabaseMigrations(client);
+      expect(upgraded.applied.map(migration => migration.id)).toEqual(['0091_sop_entry_stop_batch']);
+      expect(await verifyDatabaseMigrations(client)).toMatchObject({
+        status: 'PASS', migrationCount: 91, triggerFingerprint: {
+          difference: 'import_batches_tgenabled',
+          disabledTriggers: ['backend_review_sync_wait_on_batch_failed', 'import_batches_restore_snapshots'],
+        },
+      });
+    } finally {
+      await client.end();
+    }
+  }, 120_000);
+
   it('applies ACL before SOP and keeps each suffix authority boundary exact', async () => {
     const database = harness.createDatabase('acl_sop_suffix');
     const client = await harness.connect(database.config);
@@ -903,7 +931,7 @@ describe.sequential('PostgreSQL 15 immutable migration gate', { timeout: 30_000 
       });
 
       const sop = await applyDatabaseMigrations(client);
-      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage', '0085_sop_unified_lifecycle', '0086_sop_unified_query', '0087_sop_unified_continuation', '0088_sop_resource_lifecycle', '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts']);
+      expect(sop.applied.map(({ id }) => id)).toEqual(['0083_sop_pipeline_projection', '0084_sop_unified_storage', '0085_sop_unified_lifecycle', '0086_sop_unified_query', '0087_sop_unified_continuation', '0088_sop_resource_lifecycle', '0089_seat_display_projection', '0090_owner_reviewed_sop_query_facts', '0091_sop_entry_stop_batch']);
       expect((await verifyDatabaseMigrations(client)).status).toBe('PASS');
 
       const privileges = await client.query<{

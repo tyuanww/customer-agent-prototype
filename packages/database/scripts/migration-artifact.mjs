@@ -19,6 +19,10 @@ export const SOP_OWNER_REVIEW_SOURCE = Object.freeze({ position: 90, id: '0090_o
   file: 'packages/database/overlays/0090_owner_reviewed_sop_query_facts.sql', sha256: 'd9efc43fe0cb015a10c24fe0843ff849b09d99ac8125882fb6043960ece235d5',
   migrationSha256: 'b18c20f0801ebd6c6bf76eecd66077ee12cca9438dfdece785bb28ae8fdeb52a', predecessorSha256: '10d17991fc2178286418dd3c09527921b26b7eba35ba836568c69a18916ebd88' });
 
+export const SOP_ENTRY_STOP_BATCH_SOURCE = Object.freeze({ position: 91, id: '0091_sop_entry_stop_batch',
+  file: 'packages/database/overlays/0091_sop_entry_stop_batch.sql', sha256: 'b882d54bd429a7f7c168ba5d2a2842149d843561fcc8ef3e8b4d7293ab7b579d',
+  migrationSha256: '3ecb09121caed12f3b23d2ab8ee055b876638e1f4194d128296e25f250eec187', predecessorSha256: 'e8b6c94ddf3d3c917cf52933ac86b3f5ede80645bf29414930a2c2b871ff5f05' });
+
 export const SOP_RESOURCE_SOURCE = Object.freeze({ position: 88, id: '0088_sop_resource_lifecycle',
   file: 'packages/database/overlays/0088_sop_resource_lifecycle.sql', sha256: '9efa55bb15efcb33214e966a9b6eeac81157523acbe47281610cd5be55027c60' });
 

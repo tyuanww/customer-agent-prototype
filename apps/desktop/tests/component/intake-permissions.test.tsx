@@ -46,15 +46,15 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(document.querySelector('select')).toBeNull();
   await user.click(screen.getByRole('button',{name:'新增授权'}));
   expect(screen.getByRole('button',{name:'新增授权'})).toHaveClass('ant-btn-primary');
-  expect(screen.getByRole('combobox',{name:/^岗位$/}).closest('.ant-select')).toHaveTextContent('客服');
+  expect(screen.getByRole('combobox',{name:'授权配置'}).closest('.ant-select')).toHaveTextContent('客服');
   expect(document.querySelector('select')).toBeNull();
   const page=readFileSync(PAGE,'utf8');
-  expect(page).toContain('actionsForIntakePost');
+  expect(page).toContain('actionsForPermissionPreset');
   expect(page).not.toContain('content-manage');
   expect(page).not.toContain('source-confirm');
   expect(page).not.toContain('password-accounts');
   await pick(user,'成员','合成坐席');
-  await pick(user,/^岗位$/,'客服主管');
+  await pick(user,'授权配置','客服主管');
   await user.click(screen.getByLabelText('生效时间'));
   await user.type(screen.getByLabelText('生效时间'), '2026-10-08 10:00{Enter}');
   await user.click(screen.getByLabelText('失效时间'));
@@ -64,7 +64,18 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').map(request=>(request.body as {items:{action:string}[]}).items.map(item=>item.action))).toEqual([[...supervisor.actions]]);
   expect(f.requests.some(request=>request.path.includes('password') || request.path.includes('account'))).toBe(false);
   await user.click(screen.getByRole('button',{name:'返回修改'}));
-  await pick(user,/^岗位$/,'客服');
+  await pick(user,'授权配置','首批 FAQ');
+  await user.click(screen.getByRole('button',{name:'预览权限'}));
+  await screen.findByText('预览，尚未保存');
+  const faqPreview=screen.getByRole('region',{name:'权限预览'});
+  expect(faqPreview).toHaveTextContent('上传资料、确认来源');
+  expect(faqPreview).not.toHaveTextContent(/查看与管理资料|发布资料/);
+  expect(f.grants).toHaveLength(0);
+  expect(f.requests.filter(request=>request.path==='/v1/intake/grants/preview').at(-1)).toMatchObject({
+   body:{items:[{action:'import',kind:'business'},{action:'source-confirm',kind:'business'}]},
+  });
+  await user.click(screen.getByRole('button',{name:'返回修改'}));
+  await pick(user,'授权配置','客服');
   await user.click(screen.getByRole('button',{name:'预览权限'}));
   await screen.findByText('预览，尚未保存');expect(f.grants).toHaveLength(0);
   const displayedPeriod='2026-10-08 10:00 至 2026-10-09 10:00';
@@ -87,7 +98,7 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(grantCells.join('\n')).not.toMatch(/source-/);
   expect(grantCells.join('\n')).not.toMatch(/shop-/);
   const scopeCell=grantCells.find(cell=>cell.includes('该店铺'));
-  expect(scopeCell).toContain('该来源');
+  expect(scopeCell).toMatch(/FAQ 工作簿 [A-F0-9]{12}/);
   expect(scopeCell).toContain('产品');
   const periodCell=grantCells.find(cell=>cell.includes('2026-10-08'));
   expect(periodCell).toContain(displayedPeriod);
@@ -102,7 +113,7 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(confirmRevoke).toBeEnabled();
   await user.click(confirmRevoke);
   // rc-util's test build reuses test-id for Drawer and Modal titles; locate the visible confirmation title.
-  const revokeDialog=(await screen.findByText('收回 合成坐席 在 该店铺 / 产品 / 该来源的查询复制')).closest<HTMLElement>('[role="dialog"]')!;
+  const revokeDialog=(await screen.findByText(/收回 合成坐席 在 该店铺 \/ 产品 \/ FAQ 工作簿 [A-F0-9]{12}的查询复制/)).closest<HTMLElement>('[role="dialog"]')!;
   expect(revokeDialog).toHaveTextContent('仅撤销这条权限。撤销后如需使用，须重新授权。');
   const revokeCancel=within(revokeDialog).getByRole('button',{name:'取消'});
   const revokeCommit=within(revokeDialog).getByRole('button',{name:'确认收回'});
@@ -118,7 +129,7 @@ it('selects a post, previews that post through the existing command, then saves 
   expect(commands.some(command=>command.action==='save')).toBe(true);
   expect(commands.some(command=>command.action==='revoke')).toBe(true);
   expect(commands.every(command=>['refresh','save','retry','discard','stop','source','preview','revoke'].includes(command.action))).toBe(true);
-  expect(commands.filter(command=>command.action==='preview').map(command=>command.action==='preview'?[...command.actions]:[])).toEqual([[...supervisor.actions],[...agent.actions]]);
+  expect(commands.filter(command=>command.action==='preview').map(command=>command.preset)).toEqual(['客服主管','faq-first-batch','客服']);
  }finally{main.dispose();}
 }, 30_000);
 it('does not offer a post the current scope cannot grant',async()=>{
@@ -126,7 +137,7 @@ it('does not offer a post the current scope cannot grant',async()=>{
  window.dashboardPermissions={current:async()=>({ok:true,view:main.view()}),command:async c=>({ok:true,view:await main.command(c)}),onInvalidated:fn=>main.subscribe(fn)};
  try{render(<IntakePermissions canViewGrantSettings canManageAccounts active/>);await screen.findAllByRole('row',{name:/合成坐席/});
   await userEvent.click(screen.getByRole('button',{name:'新增授权'}));
-  const post=screen.getByRole('combobox',{name:/^岗位$/});
+  const post=screen.getByRole('combobox',{name:'授权配置'});
   expect(post.closest('.ant-select')).toHaveTextContent('客服');
   await userEvent.click(post);
   expect((await screen.findAllByRole('option')).map(option=>option.textContent)).toEqual(['客服']);

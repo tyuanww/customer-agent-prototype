@@ -313,7 +313,7 @@ describe('packaged synthetic product profile', () => {
     const packageJson = JSON.parse(readFileSync(path.join(desktopRoot, 'package.json'), 'utf8')) as {
       build: { productName: string };
     };
-    expect(packageJson.build.productName).toBe('客服话术浮窗 Demo');
+    expect(packageJson.build.productName).toBe('客服话术浮窗');
     expect(main).toContain("app.setName('客服话术浮窗 Demo')");
     expect(main.indexOf("app.setName('客服话术浮窗 Demo')")).toBeLessThan(
       main.indexOf('app.requestSingleInstanceLock()'),

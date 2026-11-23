@@ -2,6 +2,11 @@ name: Production smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Deployed API version to verify (x.y.z)
+        required: true
+        type: string
   schedule:
     - cron: '17 * * * *'
 
@@ -9,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-smoke
+  group: production-smoke-${{ github.event_name }}-${{ inputs.expected_version }}
   cancel-in-progress: true
 
 jobs:
@@ -22,4 +27,11 @@ jobs:
         with:
           node-version: 24
       - run: node --test scripts/ops/production-smoke.test.mjs
-      - run: node scripts/ops/production-smoke.mjs
+      - name: Check production health
+        if: github.event_name == 'schedule'
+        run: node scripts/ops/production-smoke.mjs
+      - name: Verify deployed release version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: node scripts/ops/production-smoke.mjs --expected-version "$EXPECTED_VERSION"

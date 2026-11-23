@@ -12,7 +12,7 @@
 | `scripts/ops/customer-agent-backup.timer` | 每日 03:20，漏跑后补执行 |
 | `scripts/ops/customer-agent-restore-drill.sh` | 将备份集还原到独立临时 PG15 集群并执行完整迁移后验 |
 
-配置与运行命令见[验证备份集](how-to-verify-backup-set.md)。连接与对象目录从既有 `profile.json` 读取，不新增数据库配置真源。
+配置与运行命令见[验证备份集](how-to-verify-backup-set.md)。连接与对象目录从既有 `profile.json` 读取。定时单元通过 `--bind-running-release` 绑定运行中的生产 API。清单记录实际版本和完整 Git 提交，数据库快照账本须匹配该提交的完整迁移目录。生成备份时若进程、发布指针或账本发生错配，备份在发布目录可见前失败。
 
 每个备份集包含 full custom dump、无角色密码的角色定义、对象归档、manifest 和其 SHA-256。数据库元数据与 `pg_dump` 使用同一导出快照，角色目录在 dump 前后另行核对稳定。manifest 记录迁移序列与哈希、角色、owner、ACL 指纹、对象引用、receipt、未引用文件、应用版本与 Git SHA、工具指纹和各阶段时间。
 

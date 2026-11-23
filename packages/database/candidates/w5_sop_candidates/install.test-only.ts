@@ -1,9 +1,8 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import type { Client } from 'pg';
-import { verifyMigrationPrefix, type Pg15Harness } from '../../dist/testkit/index.js';
+import { verifyDatabaseMigrations } from '../../dist/index.js';
+import type { Pg15Harness } from '../../dist/testkit/index.js';
 import { verifySopCandidateContractSet } from '../../../../scripts/sop-candidate-contract.mjs';
-
-const W5_V12_MIGRATION_COUNT = 90;
 
 type HarnessIdentity = {
   db: string;
@@ -14,7 +13,7 @@ type HarnessIdentity = {
   pg_major: number;
 };
 
-/** Installs into the caller's started, disposable PG15 harness after exact v12 verification. */
+/** Installs into the caller's started, disposable PG15 harness after verifying the complete product catalogue. */
 export async function installSopCandidateSyntheticStorage(
   client: Client, harness: Pick<Pg15Harness, 'owner' | 'data'>,
 ): Promise<void> {
@@ -34,7 +33,7 @@ export async function installSopCandidateSyntheticStorage(
   const entrypoints = readFileSync(new URL('./entrypoints.sql', import.meta.url), 'utf8');
   await client.query('BEGIN');
   try {
-    await verifyMigrationPrefix(client, W5_V12_MIGRATION_COUNT);
+    await verifyDatabaseMigrations(client);
     await client.query(storageSql);
     await client.query(entrypoints);
     await client.query('COMMIT');

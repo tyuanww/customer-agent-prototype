@@ -53,6 +53,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Require the production API to match the download version
+        run: node tool/scripts/ops/production-smoke.mjs --expected-version "${RELEASE_TAG#v}"
+
       - name: Rewrite the page from the release
         run: node tool/scripts/update-download-page.mjs --dir pages --from-release "$RELEASE_TAG" --version-out "$RUNNER_TEMP/published-version"
 

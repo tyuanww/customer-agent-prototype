@@ -2,10 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, rename, unlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
-import { dialog, type BrowserWindow } from 'electron';
-import { INTAKE_UPLOAD_MAX_BYTES, intakeInputMime } from '../shared/content-intake-upload';
+import { dialog, type BrowserWindow, type OpenDialogOptions } from 'electron';
+import { INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, type IntakeUploadFormat } from '../shared/content-intake-upload';
 import { ProductHttpError } from './product-http';
 import type { IntakePublicationPrompt } from './content-intake-management';
+
+const inputOptions: Record<IntakeUploadFormat, OpenDialogOptions> = {
+  faq: { title: '选择 FAQ 资料文件', properties: ['openFile'], filters: [{ name: 'FAQ 资料（CSV / Excel）', extensions: ['csv', 'xlsx'] }] },
+  sop: { title: '选择 SOP 工作簿', properties: ['openFile'], filters: [{ name: 'SOP 工作簿（XLSX）', extensions: ['xlsx'] }] },
+};
 
 /** Paths never leave Main. Read one bounded, regular CSV or XLSX file; save only to a
  * native user-selected destination, replacing it atomically after a full write.
@@ -34,14 +39,13 @@ export function createIntakeNativeFiles(window: BrowserWindow) {
       }));
       return choice.response === 1;
     },
-    async chooseInputFile(signal: AbortSignal): Promise<{ name: string; bytes: Buffer } | null> {
+    async chooseInputFile(format: IntakeUploadFormat, signal: AbortSignal): Promise<{ name: string; bytes: Buffer } | null> {
       live(signal);
-      const choice = await choose(signal, () => dialog.showOpenDialog(window, { title: '选择 FAQ 资料文件',
-        properties: ['openFile'], filters: [{ name: 'FAQ 资料（CSV / Excel）', extensions: ['csv', 'xlsx'] }] }));
+      const choice = await choose(signal, () => dialog.showOpenDialog(window, inputOptions[format]));
       live(signal);
       if (choice.canceled) return null;
       const path = choice.filePaths[0];
-      const mime = path ? intakeInputMime(path) : null;
+      const mime = path ? intakeInputMime(path, format) : null;
       if (choice.filePaths.length !== 1 || !path || !mime) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');
       const before = await lstat(path); live(signal);
       if (!before.isFile()) throw new ProductHttpError('VALIDATION', 'FILE_INVALID');

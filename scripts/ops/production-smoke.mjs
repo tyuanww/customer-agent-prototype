@@ -159,9 +159,7 @@ export function validateObservation(observation, expectedVersion) {
       && health.service === 'cs-ai-api'
       && typeof health.version === 'string'
       && VERSION.test(health.version),
-    apiVersionMatches: expectedVersion === undefined
-      ? typeof healthVersion === 'string' && VERSION.test(healthVersion)
-      : healthVersion === expectedVersion,
+    ...(expectedVersion === undefined ? {} : { apiVersionMatches: healthVersion === expectedVersion }),
     apiReady: observation.apiReady.status === 200
       && exactKeys(ready, ['status', 'checks'])
       && ready.status === 'ready'
@@ -184,6 +182,7 @@ export function validateObservation(observation, expectedVersion) {
   return Object.freeze({
     ok: Object.values(checks).every(Boolean),
     version: typeof healthVersion === 'string' && VERSION.test(healthVersion) ? healthVersion : null,
+    expectedVersion: expectedVersion ?? null,
     checks,
     probes: Object.freeze(probes),
   });
@@ -199,7 +198,7 @@ function printHelp() {
     'Options:',
     `  --api-origin <origin>        default ${DEFAULT_API_ORIGIN}`,
     `  --identity-origin <origin>   default ${DEFAULT_IDENTITY_ORIGIN}`,
-    '  --expected-version <x.y.z>   optionally require the deployed API version',
+    '  --expected-version <x.y.z>   require this deployed API version for release verification',
     '  --help, -h',
     '',
   ].join('\n'));

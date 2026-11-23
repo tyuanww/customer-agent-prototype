@@ -2,10 +2,10 @@ import { Button, Drawer, Input, Modal, Select, Steps, Table, type ButtonProps, t
 import { createElement, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import './workbench-v9.css';
 import './intake-permissions.css';
-import { INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionReply, type IntakePermissionView } from '@shared/content-intake-permissions';
+import { actionsForPermissionPreset, FAQ_PERMISSION_PRESET, INTAKE_PERMISSION_ACTION_LABELS as labels, type IntakePermissionCommand, type IntakePermissionPreset, type IntakePermissionReply, type IntakePermissionView } from '@shared/content-intake-permissions';
 import type { PermissionsUse } from '@shared/page-use';
 import { type AsyncResource } from '@shared/async-resource';
-import { actionsForIntakePost, DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
+import { DEFAULT_INTAKE_POST, INTAKE_POSTS, intakePostsCoveredBy, isIntakePost, type IntakePost } from '@shared/intake-post-actions';
 import { WORKBENCH_EMPTY } from '@shared/workbench-empty';
 import type { SeatAccountIntent, SeatAccountRecord, SeatAccountReply } from '@shared/seat-account-intent';
 import { formatIntakeTime, formatSeatClock, timeoutUntil } from './intake-time';
@@ -184,7 +184,7 @@ export function IntakePermissions({
   gate?: Extract<PermissionsUse, { state: 'open' }> | null;
 }) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [person,setPerson]=useState(''),[post,setPost]=useState<IntakePost>(DEFAULT_INTAKE_POST);
+  const [person,setPerson]=useState(''),[preset,setPreset]=useState<IntakePermissionPreset>(DEFAULT_INTAKE_POST);
   const [starts,setStarts]=useState(''),[expires,setExpires]=useState(''),[reason,setReason]=useState('');
   const [revoke,setRevoke]=useState(''),[revokeReason,setRevokeReason]=useState('');
   const [memberKey,setMemberKey]=useState<string | null>(null);
@@ -273,7 +273,7 @@ export function IntakePermissions({
     return api.onInvalidated(()=>{if(!pending.current)void apply();});
   },[apply, canViewGrantSettings]);
   useEffect(()=>{
-    setPerson('');setPost(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');
+    setPerson('');setPreset(DEFAULT_INTAKE_POST);setRevoke('');setRevokeReason('');
     setMemberKey(null);setConfirmRevoke(false);
   },[view?.source,available]);
   useEffect(()=>{
@@ -297,19 +297,14 @@ export function IntakePermissions({
     if(resource.status==='forbidden'){reload();return;}
     void apply({action:'refresh'});
   };
-  const offered=intakePostsCoveredBy(view?.actions??[]);
-  const chosen=offered.includes(post)?post:undefined;
-  const chosenActions = actionsForIntakePost(chosen);
+  const offered: IntakePermissionPreset[] = intakePostsCoveredBy(view?.actions??[]);
+  if (view?.faqPreviewAvailable) offered.push(FAQ_PERMISSION_PRESET);
+  const chosen=offered.includes(preset)?preset:undefined;
+  const chosenActions=actionsForPermissionPreset(chosen);
   const scopeLabel = view?.sources.find(source => source.selection === view.source)?.label;
-  const previewPost=()=>{
-    if(!chosen){setError('当前范围没有可授予的岗位。');return;}
-    const mapped=actionsForIntakePost(chosen);
-    if(!mapped.ok){setError('未知岗位。');return;}
-    void apply({action:'preview',person,actions:[...mapped.actions],startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason});
-  };
-  const choosePost=(value:string)=>{
-    if(!isIntakePost(value)){setError('未知岗位。');return;}
-    setPost(value);
+  const previewPermissions=()=>{
+    if(!chosen)return;
+    void apply({action:'preview',person,preset:chosen,startsAt:new Date(starts).toISOString(),expiresAt:new Date(expires).toISOString(),reason});
   };
   const closeGrant=()=>{
     if(!view?.preview){setGrantOpen(false);return;}
@@ -441,9 +436,10 @@ export function IntakePermissions({
               <div><span className="intake-permissions-meta">授权范围</span>{scopeLabel}</div>
               <div className="two"><label><span>成员</span><Select<string> aria-label="成员" value={person || undefined} placeholder="请选择成员" disabled={disabled} virtual={false}
                 options={view.people.map(item => ({ value: item.selection, label: item.label }))} onChange={setPerson} /></label>
-              <label><span>岗位</span><Select<string> aria-label="岗位" value={chosen} disabled={disabled || offered.length === 0} virtual={false}
-                placeholder={offered.length === 0 ? '当前范围没有可授予的岗位' : '请选择岗位'} options={offered.map(name => ({ value: name, label: name }))} onChange={choosePost} /></label></div>
-              {chosenActions.ok ? <div><span className="intake-permissions-meta">包含能力</span>{chosenActions.actions.map(action => labels[action]).join('、')}</div> : null}
+              <label><span>授权配置</span><Select<IntakePermissionPreset> aria-label="授权配置" value={chosen} disabled={disabled || offered.length === 0} virtual={false}
+                placeholder={offered.length === 0 ? '当前范围没有可用的授权配置' : '请选择授权配置'}
+                options={offered.map(value => ({ value, label: value === FAQ_PERMISSION_PRESET ? '首批 FAQ' : value }))} onChange={setPreset} /></label></div>
+              {chosenActions ? <div><span className="intake-permissions-meta">包含能力</span>{chosenActions.map(action => labels[action]).join('、')}</div> : null}
               <div className="two"><label><span>生效时间</span><SeatDateTime label="生效时间" placeholder="选择生效时间" value={starts} onChange={setStarts} disabled={disabled} /></label>
               <label><span>失效时间</span><SeatDateTime label="失效时间" placeholder="选择失效时间" value={expires} onChange={setExpires} disabled={disabled} /></label></div>
               <span className="intake-permissions-meta">时间为本机时间</span>
@@ -451,7 +447,7 @@ export function IntakePermissions({
             </fieldset>
             <footer className="intake-permissions-actions"><DeskButton onClick={closeGrant}>取消</DeskButton>
               <DeskButton type="primary" disabled={disabled || !person || !chosen || !starts || !expires || !reason.trim() || !Number.isFinite(Date.parse(starts)) || !Number.isFinite(Date.parse(expires))}
-                onClick={previewPost}>预览权限</DeskButton></footer>
+                onClick={previewPermissions}>预览权限</DeskButton></footer>
           </> : <section aria-label="权限预览">
             <dl className="intake-permissions-preview">
               <div><dt>成员</dt><dd>{view.preview.person}</dd></div>

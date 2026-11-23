@@ -40,6 +40,7 @@ import {
   RELEASE_PROOF_SCHEMA, assertReleaseProof, assertReleasePrefix, verifyReleaseDatabase,
   assertControllerBinding, readServiceStartup,
 } from './release-proof.mjs';
+import { assertNoActiveColdCutover } from './release-cold-cutover.mjs';
 import { readCandidateApiEnvironment } from './release-query-profile.mjs';
 
 const DEFAULT_ROOT = '/srv/customer-agent';
@@ -1047,6 +1048,9 @@ function defaultDependencies(options) {
       runtimeRelease: path.join(options.root, 'current'), unit: options.unit }, undefined, undefined, { declarationOnly });
   };
   return Object.freeze({
+    assertNoActiveColdCutover: () => {
+      if (options.environment === 'production') assertNoActiveColdCutover();
+    },
     readCurrent: async () => readCurrent(options.root),
     readCurrentIdentity: async () => readCurrentIdentity(options.root),
     // Older v3 journals bind this historical digest without claiming a current candidate build.
@@ -1234,7 +1238,7 @@ export async function runProductionRelease(options, suppliedDependencies) {
   let interrupted = false;
   let mutationStarted = false;
   let rollbackAdmitted = false;
-  let auditEnabled = !modern;
+  let auditEnabled = false;
   const onSignal = () => { interrupted = true; };
   const assertNotInterrupted = () => {
     if (interrupted) fail('INTERRUPTED', 'deployment received a termination signal');
@@ -1322,7 +1326,9 @@ export async function runProductionRelease(options, suppliedDependencies) {
       await dependencies.restartService();
     }
     phase = 'rollback-readiness';
-    await dependencies.waitForReady(profile, previous.version);
+    const rollbackQueryMode = state.releaseProof?.rollbackQueryProfile.mode;
+    // Historical unified releases can predate the query-mode response header.
+    await dependencies.waitForReady(profile, previous.version, undefined, rollbackQueryMode, rollbackQueryMode === 'unified');
     if (state.releaseProof) {
       assertControllerBinding(state.releaseProof.controller, await dependencies.readServiceStartup());
       const restored = await dependencies.readRollbackQueryProfile(profile, previous);
@@ -1345,6 +1351,8 @@ export async function runProductionRelease(options, suppliedDependencies) {
   };
 
   try {
+    if (options.apply) await dependencies.assertNoActiveColdCutover?.();
+    auditEnabled = !modern;
     await audit('started', { apply: options.apply });
     assertNotInterrupted();
     deploymentState = options.apply ? await dependencies.readState() : null;

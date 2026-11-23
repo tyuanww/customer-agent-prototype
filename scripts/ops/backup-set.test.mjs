@@ -35,6 +35,7 @@ import {
   loadStackProfile,
   pruneVerifiedBackupSets,
   readCandidateRelease,
+  readRunningBackupRelease,
   replicationConfiguration,
   verifyBackupSet,
 } from './backup-set.mjs';
@@ -45,6 +46,49 @@ const productVersion = readFileSync(path.join(repositoryRoot, 'VERSION'), 'utf8'
 const databaseName = 'customer_agent_intake_test';
 const objectId = `obj_${'1'.repeat(64)}`;
 const otherObjectId = `obj_${'2'.repeat(64)}`;
+
+test('binds a daily backup to the exact API process and its clean release', () => {
+  const sha = 'b'.repeat(40);
+  const current = '/controlled/current';
+  const releaseRoot = `/controlled/releases/${sha}`;
+  const apiEntry = `${current}/apps/api/dist/main.js`;
+  const files = {
+    [`${releaseRoot}/VERSION`]: '0.3.44\n',
+    '/proc/101/task/101/children': '102 103 ',
+    '/proc/102/cmdline': '/usr/bin/node\0/identity.ts\0',
+    '/proc/103/cmdline': `/usr/bin/node\0${apiEntry}\0`,
+    '/proc/103/stat': `103 (api child) S ${Array(18).fill('0').join(' ')} 321 0`,
+  };
+  const resolve = { [current]: releaseRoot, '/proc/103/cwd': releaseRoot };
+  const options = {
+    current, releaseRoot,
+    read(filename) {
+      assert.ok(Object.hasOwn(files, filename), filename);
+      return files[filename];
+    },
+    canonical(filename) {
+      assert.ok(Object.hasOwn(resolve, filename), filename);
+      return resolve[filename];
+    },
+    execute(command, args) {
+      if (command === 'systemctl') return '101';
+      if (args.includes('rev-parse')) return sha;
+      assert.ok(args.includes('--untracked-files=no'));
+      return '';
+    },
+  };
+  assert.deepEqual(readRunningBackupRelease(options), {
+    root: releaseRoot, sha, version: '0.3.44', parent: '101', child: '103', startTime: '321',
+  });
+  resolve['/proc/103/cwd'] = '/controlled/previous';
+  assert.throws(() => readRunningBackupRelease(options), { code: 'BACKUP_RELEASE_BINDING_INVALID' });
+  resolve['/proc/103/cwd'] = releaseRoot;
+  assert.throws(() => readRunningBackupRelease({
+    ...options, execute: (command, args) => args.includes('status') ? ' M VERSION' : options.execute(command, args),
+  }), { code: 'BACKUP_RELEASE_BINDING_INVALID' });
+  resolve[current] = '/controlled/other';
+  assert.throws(() => readRunningBackupRelease(options), { code: 'BACKUP_RELEASE_BINDING_INVALID' });
+});
 
 test('backup rejects a non-boolean preservation option before accessing the stack', async () => {
   await assert.rejects(createBackupSet({ preserveExisting: 'true' }), { code: 'BACKUP_ARGUMENT_INVALID' });

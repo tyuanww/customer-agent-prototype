@@ -41,8 +41,7 @@
 | `scripts/ops/customer-agent-stack-watchdog.service` | oneshot，同上身份。 |
 | `scripts/ops/customer-agent-stack-watchdog.timer` | 开机 4 分钟后起，之后每分钟一次。 |
 
-脚本是纯 `bash` + `curl` + `awk`，**不依赖仓库、不依赖 node**，所以可以单独拷到机器上。
-（看门狗要调 `node`，但 `node` 是栈本身就在用的，不算新依赖。）
+健康探针和告警发送器一起复制到同一目录。发送器使用栈已有的 Node.js 生成请求并读取飞书的应答。
 
 ## 安装
 
@@ -66,6 +65,7 @@ sudo install -m 0755 scripts/ops/customer-agent-stack-watchdog.sh /srv/customer-
 sudo install -m 0644 scripts/ops/customer-agent-stack-watchdog.service /etc/systemd/system/
 sudo install -m 0644 scripts/ops/customer-agent-stack-watchdog.timer /etc/systemd/system/
 sudo install -m 0755 scripts/ops/customer-agent-health-check.sh /srv/customer-agent/scripts/
+sudo install -m 0755 scripts/ops/send-ops-alert.sh /srv/customer-agent/scripts/
 sudo install -m 0644 scripts/ops/customer-agent-health-check.service /etc/systemd/system/
 sudo install -m 0644 scripts/ops/customer-agent-health-check.timer   /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -87,29 +87,23 @@ journalctl -u customer-agent-health-check -n 20 --no-pager
 journalctl -u customer-agent-stack-watchdog -n 20 --no-pager
 ```
 
-## 验证（照做一遍，别只看它「在跑」）
+## 验证
+
+在隔离环境执行：
 
 ```bash
-# 1) 现在站点是好的：跑一次不应该有告警，计数文件应为空
-sudo -u customer-agent /srv/customer-agent/scripts/customer-agent-health-check.sh; echo "exit=$?"
-sudo cat /var/lib/customer-agent/health-failures 2>/dev/null || echo "(尚无计数文件=正确)"
-
-# 2) 手动把计数顶到 2，再跑一次 -> 应发出告警
-echo 2 | sudo tee /var/lib/customer-agent/health-failures
-sudo -u customer-agent /srv/customer-agent/scripts/customer-agent-health-check.sh; echo "exit=$?"
-# 飞书群里应该收到一条；计数变成 3
-
-# 3) 清回去
-echo 0 | sudo tee /var/lib/customer-agent/health-failures
+node --test scripts/ops/health-check.test.mjs scripts/ops/send-ops-alert.test.mjs
 ```
+
+测试使用本地探针和接收器验证计数、投递失败重试、实际确认和恢复清零。部署后从 `journalctl -u customer-agent-health-check` 确认定时探测，并在获准的告警演练中从飞书群回读一条探针通知。
 
 ## 几个刻意的设计，改动前请先读
 
 - **计数文件在 `/var/lib/customer-agent/health-failures`，不在 `/tmp`。**
   单元开了 `PrivateTmp=true`，每次调用都有独立的 `/tmp`，计数会每分钟归零，阈值永远到不了，告警永远不发。
   这是「看起来装了监控」的典型写法，所以有测试专门钉住这个配对。
-- **只告警一次（第 3 次），第 4、5 次不再发。** 每次尝试都写 journal，重复发没有新信息。
-  恢复后计数清零，下次再出问题会重新告警。
+- **连续失败达到 3 次时开始发送告警。** Webhook 返回 HTTP 2xx 且飞书确认成功后记为送达，同一轮故障只记一次。
+  发送失败时，后续定时检查继续重试。恢复后计数和送达状态一起清零。
 - **脚本永远 `exit 0`（除非配置读不到）。** 非零退出会让单元变成 `failed`，从而分不清「站点挂了」和「监控自己坏了」。
   配置读不到时反而**故意** `exit 1` 并打 FATAL：读不到配置的探针不许伪装成正常探针。
 - **脚本不打印 webhook 地址、不打印响应体。**

@@ -29,6 +29,8 @@ const ZIP_SHA = '22f18b4a08c9424f430f42a0573229bcd12f4d0fbb62d16f6007180f71e6599
 /** The real v0.3.25 Release, trimmed to the fields the page renderer reads. */
 const RELEASE_0325 = Object.freeze({
   tagName: 'v0.3.25',
+  isDraft: false,
+  isPrerelease: false,
   publishedAt: '2026-09-29T14:38:07+08:00',
   assets: [
     { name: 'Demo-0.3.25-linux-x86_64-UNSIGNED.AppImage', size: 132024996, digest: `sha256:${LINUX_SHA}` },
@@ -41,6 +43,8 @@ const RELEASE_0325 = Object.freeze({
 /** An older release than the page, with asset names that match its own tag. */
 const RELEASE_039 = Object.freeze({
   tagName: 'v0.3.9',
+  isDraft: false,
+  isPrerelease: false,
   publishedAt: '2026-08-01T10:00:00+08:00',
   assets: [
     { name: 'Demo-0.3.9-linux-x86_64-UNSIGNED.AppImage', size: 100000000, digest: `sha256:${'a'.repeat(64)}` },
@@ -134,6 +138,26 @@ test('manifestFromRelease keeps linked assets, drops the zip, and requires Windo
   assert.throws(() => manifestFromRelease({ ...RELEASE_0325, assets: noDigest }), /no sha256 digest/u);
 
   assert.throws(() => manifestFromRelease({ ...RELEASE_0325, tagName: 'nightly' }), /unexpected release tag/u);
+});
+
+test('the official page refuses drafts and prereleases even with both package assets', () => {
+  for (const status of [{ isDraft: true }, { isPrerelease: true }, { isDraft: undefined }]) {
+    assert.throws(() => manifestFromRelease({ ...RELEASE_0325, ...status }), /published stable release/u);
+  }
+});
+
+test('manifestFromRelease refuses multiple published assets for a platform in either order', () => {
+  for (const platform of PUBLISHED_PLATFORMS) {
+    const original = RELEASE_0325.assets.find((asset) => platformOf(asset.name) === platform);
+    const duplicate = { ...original, name: original.name.replace('Demo-', 'customer-agent-'),
+      digest: `sha256:${'d'.repeat(64)}` };
+    const assets = [...RELEASE_0325.assets, duplicate];
+    for (const order of [assets, [...assets].reverse()]) {
+      assert.throws(() => manifestFromRelease({ ...RELEASE_0325, assets: order }), {
+        message: new RegExp(`multiple ${platform} assets`, 'u'),
+      });
+    }
+  }
 });
 
 test('renderIndex rewrites version, date, sizes, checksums and every URL', () => {

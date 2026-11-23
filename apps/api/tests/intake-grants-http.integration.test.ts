@@ -49,6 +49,32 @@ describe.skipIf(!enabled)('business permission HTTP and PG15 (synthetic)',()=>{
  }
  async function counts(){return (await admin.query(`SELECT (SELECT count(*) FROM content_intake.grants) AS grants,(SELECT count(*) FROM content_intake.grant_history) AS history,
   (SELECT count(*) FROM backend_review.receipts) AS receipts,(SELECT revocation_generation FROM content_intake.principals WHERE principal_id='agent') AS generation`)).rows[0];}
+ it('previews exactly the two FAQ business actions and keeps the role ceiling',async()=>{
+  const authz=parseContractSchema('IntakeAuthorization',(await http('/v1/intake/authorization')).value);
+  const capability=authz.capabilities.find(item=>item.scope.sourceId==='source-a')!;
+  expect(capability.mayAllocate).toEqual(expect.arrayContaining(['import','source-confirm']));
+  const people=parseContractSchema('IntakePrincipalPage',(await http('/v1/intake/principals?sourceId=source-a&purpose=grant-recipient')).value).items;
+  const reviewer=people.find(item=>item.principalId==='reviewer')!;
+  const base=await batch('faq-preview-test');
+  const request=parseContractSchema('IntakeGrantBatch',{...base,items:['import','source-confirm'].map(action=>({
+    ...base.items[0],action,scope:capability.scope,recipientPrincipalId:reviewer.principalId,recipientFactsVersion:reviewer.factsVersion,
+  }))});
+  const before=await counts();
+  const preview=await http('/v1/intake/grants/preview','POST',request);
+  expect(preview.status).toBe(200);
+  expect(parseContractSchema('IntakeGrantList',preview.value)).toMatchObject({
+   items:['import','source-confirm'].map(action=>({
+    action,kind:'business',scope:capability.scope,recipientPrincipalId:reviewer.principalId,
+   })),nextCursor:null,
+  });
+  const agent=people.find(item=>item.principalId==='agent')!;
+  const blocked=await http('/v1/intake/grants/preview','POST',{...request,items:request.items.map(item=>({
+    ...item,recipientPrincipalId:agent.principalId,recipientFactsVersion:agent.factsVersion,
+  }))});
+  expect(blocked.status).toBe(403);
+  expect(parseContractSchema('IntakeError',blocked.value).error.details.reason).toBe('ROLE_CEILING');
+  expect(await counts()).toEqual(before);
+ });
  it('selects names, previews without writes, saves/replays/lists, then revokes a disabled recipient',async()=>{
   const request=await batch();const before=await counts();
   const preview=await http('/v1/intake/grants/preview','POST',request);expect(preview.status).toBe(200);expect(parseContractSchema('IntakeGrantList',preview.value).items[0]!.grantId).toMatch(/^preview_/);expect(await counts()).toEqual(before);

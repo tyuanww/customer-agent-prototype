@@ -9,11 +9,14 @@ export type IntakeUploadCommand =
   | { action: 'upload-choose' | 'upload-refresh' | 'upload-retry' | 'upload-stop' | 'upload-save-report' | 'upload-reset' | 'upload-open' };
 export type IntakeUploadPhase = 'idle' | 'selected' | 'choosing' | 'confirming' | 'uploading' | 'receiving'
   | 'parsing' | 'failed' | 'validated' | 'unknown' | 'stopped';
+export type IntakeUploadFormat = 'faq' | 'sop';
 export type IntakeUploadView = {
   draftRevision: number; phase: IntakeUploadPhase; busy: boolean; authorized: boolean; validUntil: string | null;
   /** Display only. Main retains the complete old key; renderer cannot replace it. */
   revisionOf: { candidateId: string; version: number } | null;
-  sources: { selection: string; label: string; domain: 'product' | 'campaign' | 'presale' | 'aftersale' }[]; sourceSelection: string | null;
+  /** Category is a display value; the opaque selection remains bound to the original scope in Main. */
+  sources: { selection: string; label: string; category: C['IntakeSourceScope']['domain'] | 'sop' }[];
+  sourceSelection: string | null;
   file: { name: string; bytes: number } | null;
   principals: { selection: string; displayLabel: string; enabled: boolean }[];
   preparerSelection: string | null; editorSelections: string[]; confirmed: boolean;
@@ -24,9 +27,9 @@ export type IntakeUploadView = {
 };
 /** Main's finite file-format hint. Bytes are uploaded unchanged; only the API
  * parser validates encoding, contents and their registered source mapping. */
-export function intakeInputMime(name: string): C['IntakeObject']['mime'] | null {
+export function intakeInputMime(name: string, format: IntakeUploadFormat): C['IntakeObject']['mime'] | null {
   if (/\.xlsx$/i.test(name)) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  if (/\.csv$/i.test(name)) return 'text/csv';
+  if (format === 'faq' && /\.csv$/i.test(name)) return 'text/csv';
   return null;
 }
 export const INTAKE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;

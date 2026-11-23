@@ -15,6 +15,7 @@ ENV_FILE="${CUSTOMER_AGENT_MONITOR_ENV:-/srv/customer-agent/monitor.env}"
 # there resets to zero every minute and the threshold is never reached. Keep the
 # counter somewhere that survives across runs instead.
 STATE_FILE="${CUSTOMER_AGENT_HEALTH_STATE:-/var/lib/customer-agent/health-failures}"
+ALERTED_FILE="$STATE_FILE.alerted"
 DEFAULT_URL="https://agent-auth.jianghua.site/ready"
 THRESHOLD=3
 CURL_TIMEOUT=10
@@ -60,6 +61,10 @@ esac
 
 http_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "$PROBE_URL" 2>/dev/null || true)"
 
+if [ "$http_code" = "200" ] || [ "$failures" -lt "$THRESHOLD" ]; then
+  rm -f -- "$ALERTED_FILE" 2>/dev/null || log "WARN cannot clear alert state at $ALERTED_FILE"
+fi
+
 if [ "$http_code" = "200" ]; then
   if [ "$failures" -ne 0 ]; then
     log "recovered: $PROBE_URL answered 200 after $failures failure(s)"
@@ -72,23 +77,13 @@ failures=$((failures + 1))
 printf '%s\n' "$failures" > "$STATE_FILE" 2>/dev/null || log "WARN cannot persist counter to $STATE_FILE"
 log "probe failed ($failures/$THRESHOLD): url=$PROBE_URL http_code=${http_code:-none}"
 
-if [ "$failures" -lt "$THRESHOLD" ]; then
+if [ "$failures" -lt "$THRESHOLD" ] || [ -f "$ALERTED_FILE" ]; then
   exit 0
 fi
 
-# Alert only on the exact threshold crossing; the log above carries every attempt, so
-# repeated webhook spam at 4,5,6... would add nothing.
-if [ "$failures" -gt "$THRESHOLD" ]; then
-  exit 0
-fi
-
-payload="$(printf '{"msg_type":"text","content":{"text":"[customer-agent] %s 探针连续失败 %s 次\\nURL: %s\\nHTTP: %s"}}' \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$failures" "$PROBE_URL" "${http_code:-none}")"
-
-if curl -s -o /dev/null --max-time "$CURL_TIMEOUT" \
-  -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK"; then
-  log "alert sent (threshold $THRESHOLD reached)"
-else
-  log "WARN alert delivery failed"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+if FEISHU_ALERT_WEBHOOK="$WEBHOOK" "$SCRIPT_DIR/send-ops-alert.sh" --probe "$failures" "$PROBE_URL" "$http_code" 2>&1; then
+  touch -- "$ALERTED_FILE" 2>/dev/null || log "WARN cannot persist alert state at $ALERTED_FILE"
+  log "alert sent after $failures consecutive probe failures"
 fi
 exit 0

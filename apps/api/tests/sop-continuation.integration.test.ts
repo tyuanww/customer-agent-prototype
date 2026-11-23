@@ -184,7 +184,7 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
       ownerKind, ownerId, resourceId: binding.resourceId });
     return `/v1/intake/sop/releases/${releaseId}/media/${binding.objectId}?${query}`;
   }
-  async function publish(sourceId: string, base: string, revision = 1, effectiveTo?: string, options: { solo?: boolean; disable?: boolean; sourceVersion?: number } = {}) {
+  async function publish(sourceId: string, base: string, revision = 1, effectiveTo?: string, options: { solo?: boolean; disable?: boolean; disableScriptB?: boolean; sourceVersion?: number } = {}) {
     const form = new FormData(); form.set('operationId', operation('upload'));
     form.set('file', new Blob([new Uint8Array(await syntheticTaskGraphWorkbook({ ...options, shopWide: true, revision, queryBudgetProbe: sourceId === 'source-query-large', sharedTaskImage: sourceId === 'source-a', narrowKnowledgeImage: sourceId === 'source-query-b', ...(effectiveTo ? { effectiveTo } : {}) }))], { type: mime }), 'synthetic-query.xlsx');
     const object = await checked(await request('enabler', `/v1/intake/sources/${sourceId}/objects`, { method: 'POST', body: form }), 'IntakeObject');
@@ -720,7 +720,7 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
   it('verifies real 87 private owners, search paths, execution ACLs and rejects a PUBLIC privilege mutation', async () => {
     const names = ['assert_sop_graph_scope','project_sop_authorized_graph','project_sop_query_bundle','resolve_sop_open_facts',
       'open_sop_active_use','lock_sop_active_use','read_sop_action_bundle','issue_sop_continuation_lease',
-      'read_sop_continuation_media','terminate_sop_active_uses','prepare_sop_action'];
+      'read_sop_continuation_media','terminate_sop_active_uses','prepare_sop_action','sop_active_entry_disabled'];
     const rows = (await admin.query(`SELECT p.oid::regprocedure::text signature,owner.rolname owner,p.prosecdef,p.proconfig,
       has_function_privilege('public',p.oid,'EXECUTE') public_execute,has_function_privilege('app_runtime',p.oid,'EXECUTE') app_execute
       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles owner ON owner.oid=p.proowner
@@ -740,5 +740,51 @@ describe.skipIf(!enabled).sequential('normal 87 continuation through real HTTP, 
     } finally { await admin.query('ROLLBACK'); }
     writeFileSync(path.join(evidenceRoot, 'private-acl.json'), JSON.stringify({ rows, publicMutationRejected: true, arbitraryHistoricalReadDenied: true }, null, 2));
   });
+
+  it('stops every dependent continuation on entry withdrawal in a mixed release and its inherited rollback lineage', async () => {
+    const current = (await admin.query('SELECT current_release_id FROM public.content_current WHERE id=1')).rows[0].current_release_id;
+    const solo = await publish('source-solo', current, 5, undefined, { solo: true });
+    await facts(solo, '品质售后SOP');
+    const first = await openCurrent(92);
+    const second = await openCurrent(93);
+    const independent = await openCurrent(94, '品质售后SOP');
+    const baseReleaseId = first.opening.releaseId;
+    const disabled = await publish('source-a', baseReleaseId, 5, undefined, { sourceVersion: 3, disableScriptB: true });
+    const withdraws = (await admin.query(`SELECT lineage.business_entry_id, entry->>'operation' AS operation
+      FROM content_intake.release_lineage lineage
+      JOIN content_intake.candidate_versions c ON (c.candidate_id,c.version)=(lineage.candidate_id,lineage.candidate_version)
+      CROSS JOIN LATERAL jsonb_array_elements(c.material->'entries') entry
+      WHERE lineage.release_id=$1 AND lineage.source_id='source-a' AND entry->>'businessEntryId'=lineage.business_entry_id
+      ORDER BY 1`, [disabled.releaseId])).rows;
+    expect(withdraws).toEqual([
+      { business_entry_id: 'script-a', operation: 'upsert' },
+      { business_entry_id: 'script-b', operation: 'disable' },
+    ]);
+    expect((await admin.query('SELECT target_kind FROM content_intake.sop_graph_disable_events WHERE release_id=$1',
+      [disabled.releaseId])).rows).toEqual([]);
+
+    async function assertStopped(continuationIds: string[]) {
+      const states = (await admin.query(`SELECT closed_at IS NOT NULL AS closed, session_hash, termination_reason
+        FROM content_intake.sop_active_uses WHERE continuation_hash=ANY($1::text[])`, [continuationIds.map(digest)])).rows;
+      expect(states).toEqual(continuationIds.map(() => ({ closed: true, session_hash: null, termination_reason: 'content-disabled' })));
+    }
+    await assertStopped([first.opening.continuationId, second.opening.continuationId]);
+    const renewed = await checked(await post('agent', '/v1/intake/sop/continuations/renew',
+      { continuationId: independent.opening.continuationId, contextGeneration: 95 }), 'IntakeSopContinuationReceipt');
+    expect(renewed.entitlement.releaseId).toBe(baseReleaseId);
+
+    async function rollback(baseReleaseId: string, targetReleaseId: string) {
+      const impact = await checked(await post('director', '/v1/intake/rollback/preview', { baseReleaseId, targetReleaseId }),
+        'IntakeRollbackImpact');
+      return checked(await post('director', '/v1/intake/rollback', { operationId: operation('rollback-entry-withdrawal'),
+        baseReleaseId, targetReleaseId, impactDigest: impact.impactDigest, rollbackPlanId: impact.rollbackPlanId, confirmed: true }),
+      'IntakeRollbackReceipt');
+    }
+    const restored = await rollback(disabled.releaseId, baseReleaseId);
+    const reopened = await openCurrent(96);
+    expect(reopened.opening.releaseId).toBe(restored.releaseId);
+    await rollback(reopened.opening.releaseId, disabled.releaseId);
+    await assertStopped([reopened.opening.continuationId]);
+  }, 120_000);
 
 });

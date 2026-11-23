@@ -201,7 +201,7 @@ describe.runIf(process.env.CUSTOMER_AGENT_DB_PG15_INTEGRATION === '1')('runtime 
         migrationCount: generatedMigrationCatalogue.migrations.length,
         triggerFingerprint: {
           entries: 151,
-          frozenSha256: '62f61ac4d0a99f8f1deda75dc4ac0649ee78e44d02bb01ceb63e251e3d7b1784',
+          frozenSha256: '642f592ef0b94c32e8ff916820d89487551e42c485621913d374841dc0387ee5',
           difference: 'import_batches_tgenabled',
           disabledTriggers: [
             'backend_review_sync_wait_on_batch_failed',

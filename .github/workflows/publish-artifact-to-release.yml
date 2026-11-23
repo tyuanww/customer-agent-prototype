@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
 
       - name: Resolve the successful full CI run
         id: resolve
@@ -38,6 +38,10 @@ jobs:
             exit 1
           fi
 
+          test "$TAG" = "v$(cat VERSION)" || {
+            echo "tag $TAG disagrees with the checked-out VERSION" >&2
+            exit 1
+          }
           EXPECTED_SHA="$(git rev-parse HEAD)"
           RUN_ID="$(gh run list \
             --repo "$GITHUB_REPOSITORY" \
@@ -61,15 +65,56 @@ jobs:
           run-id: ${{ steps.resolve.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Attach it to the release
+      - name: Validate and attach packages from the same run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
+          EXPECTED_SHA: ${{ steps.resolve.outputs.expected_sha }}
         run: |
-          set -eu
-          mapfile -t FILES < <(find package -type f -name '*UNSIGNED*' -print)
-          test "${#FILES[@]}" -gt 0 || { echo "the checked CI run has no UNSIGNED package" >&2; exit 1; }
-          for FILE in "${FILES[@]}"; do
-            echo "${FILE} $(stat -c%s "${FILE}") bytes sha256 $(sha256sum "${FILE}" | cut -d' ' -f1)"
+          set -euo pipefail
+          shopt -s nullglob
+          VERSION="${TAG#v}"
+          WINDOWS=(package/windows-local-unsigned/*-"$VERSION"-win-x64-UNSIGNED.exe)
+          MAC=(package/mac-local-unsigned/*-"$VERSION"-mac-universal-UNSIGNED.dmg)
+          LINUX=(package/linux-local-unsigned/*-"$VERSION"-linux-x86_64-UNSIGNED.AppImage)
+          test "${#WINDOWS[@]}" -eq 1 && test "${#MAC[@]}" -eq 1 && test "${#LINUX[@]}" -le 1 || {
+            echo "CI at $EXPECTED_SHA must provide exactly one Windows EXE and macOS DMG and at most one Linux AppImage for $TAG" >&2
+            exit 1
+          }
+
+          mkdir package/release-assets
+          cp "${WINDOWS[0]}" "package/release-assets/customer-agent-$VERSION-win-x64-UNSIGNED.exe"
+          cp "${MAC[0]}" "package/release-assets/customer-agent-$VERSION-mac-universal-UNSIGNED.dmg"
+          if [ "${#LINUX[@]}" -eq 1 ]; then
+            cp "${LINUX[0]}" "package/release-assets/customer-agent-$VERSION-linux-x86_64-UNSIGNED.AppImage"
+          fi
+
+          ASSETS="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets)"
+          UPLOAD=()
+          for FILE in package/release-assets/*; do
+            NAME="${FILE##*/}"
+            SHA="$(sha256sum "$FILE" | cut -d' ' -f1)"
+            case "$NAME" in
+              *.exe) FAMILY='win-x64.*\.exe$' ;;
+              *.dmg) FAMILY='mac-universal.*\.dmg$' ;;
+              *.AppImage) FAMILY='linux-x86_64.*\.AppImage$' ;;
+            esac
+            MATCHES="$(jq -c --arg family "$FAMILY" '[.assets[] | select(.name | test($family))]' <<< "$ASSETS")"
+            case "$(jq length <<< "$MATCHES")" in
+              0) UPLOAD+=("$FILE") ;;
+              1)
+                if ! jq -e --arg name "$NAME" --arg digest "sha256:$SHA" '.[0] | .name == $name and .digest == $digest' <<< "$MATCHES" >/dev/null; then
+                  echo "Release $TAG already has a different asset for $NAME" >&2
+                  exit 1
+                fi
+                ;;
+              *)
+                echo "Release $TAG has multiple assets matching $FAMILY" >&2
+                exit 1
+                ;;
+            esac
+            echo "$NAME $(stat -c%s "$FILE") bytes sha256 $SHA ($EXPECTED_SHA)"
           done
-          gh release upload "$TAG" "${FILES[@]}" --clobber --repo "${{ github.repository }}"
+          if [ "${#UPLOAD[@]}" -gt 0 ]; then
+            gh release upload "$TAG" "${UPLOAD[@]}" --repo "$GITHUB_REPOSITORY"
+          fi
