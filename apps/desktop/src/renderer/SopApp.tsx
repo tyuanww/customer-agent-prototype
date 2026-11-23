@@ -424,7 +424,7 @@ export function SopApp({ projection: injected }: SopAppProps) {
             <span data-testid="sop-step">步骤 {projection.stepIndex}</span>
           </div>
           <div className="sop-chrome-tools">
-            {projection.demo ? <span className="env-badge">DEMO</span> : null}
+            {projection.demo ? <span className="env-badge">合成示例</span> : null}
             <button
               type="button"
               className="sop-close"
