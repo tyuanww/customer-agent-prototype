@@ -219,7 +219,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageJson.build.nsis.displayLanguageSelector).toBe(false);
     expect(packageJson.build.nsis.createDesktopShortcut).toBe(true);
     expect(packageJson.build.nsis.createStartMenuShortcut).toBe(true);
-    expect(packageJson.build.nsis.shortcutName).toBe('客服话术浮窗 Demo');
+    expect(packageJson.build.nsis.shortcutName).toBe('客服话术浮窗');
     expect(packageJson.build.nsis.runAfterFinish).toBe(true);
     expect(packageJson.build.nsis.deleteAppDataOnUninstall).toBe(false);
     expect(packageJson.build.nsis.license).toBeUndefined();
@@ -227,7 +227,7 @@ describe('Windows local-unsigned packaging contract', () => {
     expect(packageJson.build.nsis.script).toBeUndefined();
     const zh = readFileSync(path.join(root, 'build/license_zh_CN.txt'), 'utf8');
     const en = readFileSync(path.join(root, 'build/license_en.txt'), 'utf8');
-    expect(zh).toContain('客服话术浮窗 Demo');
+    expect(zh).not.toContain('客服话术浮窗 Demo');
     expect(zh).toContain('MIT License');
     expect(zh).toContain('Copyright (c) 2026 tyuanww');
     expect(en).toContain('MIT License');

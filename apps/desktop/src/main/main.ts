@@ -94,11 +94,9 @@ function applyContentSecurityPolicy(devServerUrl?: string): void {
   });
 }
 
-// Packaged userData is Electron's per-OS directory under app.getName(). The
-// synthetic stack writes synthetic-stack.json under 客服话术浮窗 Demo. Name
-// must be set before requestSingleInstanceLock(), which is the first API that
-// materializes that path; otherwise a packaged build looks under
-// @customer-agent/desktop and fail-closes.
+// Keep the legacy Electron name before the single-instance lock. Existing
+// profiles use it for userData, and macOS safeStorage uses it for Keychain.
+// The OS-visible name comes from the package's productName.
 app.setName('客服话术浮窗 Demo');
 ensureNoProxyLoopback();
 applyChromiumLoopbackProxyBypass(app.commandLine);

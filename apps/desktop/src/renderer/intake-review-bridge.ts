@@ -31,7 +31,7 @@ function managementView(): IntakeManagementView {
     upload: {
       draftRevision: 0, phase: 'idle', busy: false, authorized: true, validUntil: '2099-01-01T00:00:00.000Z',
       revisionOf: null,
-      sources: [{ selection: 'source-sel-a', label: 'source-a / shop-a', domain: 'product' }],
+      sources: [{ selection: 'source-sel-a', label: 'source-a / shop-a', category: 'product' }],
       sourceSelection: null, file: null, principals: [],
       preparerSelection: null, editorSelections: [], confirmed: false, pending: null, job: null,
       canChoose: true, canSubmit: false, canRetry: false, canRefresh: false,

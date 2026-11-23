@@ -149,8 +149,8 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 预期产物（名称由 `productName` + `version` + `UNSIGNED` 组成）：
 
-- `release/local-unsigned/mac/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.dmg`
-- `release/local-unsigned/mac/客服话术浮窗 Demo-<version>-mac-universal-UNSIGNED.zip`
+- `release/local-unsigned/mac/客服话术浮窗-<version>-mac-universal-UNSIGNED.dmg`
+- `release/local-unsigned/mac/客服话术浮窗-<version>-mac-universal-UNSIGNED.zip`
 - `release/local-unsigned/mac/mac-universal/*.app`（后验读取此目录；也可从 DMG/ZIP 打开同一份 `.app`）
 
 构建后会跑 `apps/desktop/scripts/finalize-mac-package.mjs local`（删 `.blockmap`）和 `apps/desktop/scripts/verify-mac-package.mjs local`。
@@ -173,7 +173,7 @@ CUSTOMER_AGENT_API_PG15_INTEGRATION=1 pnpm --filter @customer-agent/api exec vit
 
 1. `node scripts/synthetic-stack/stack.ts start`（写入 Electron userData 下的 `synthetic-stack.json`：macOS `~/Library/Application Support/客服话术浮窗 Demo/`，Windows `%APPDATA%\客服话术浮窗 Demo\`，Linux `~/.config/客服话术浮窗 Demo/`（若设置 `XDG_CONFIG_HOME` 则走该目录）。只含 `mode` 与两个精确 loopback origin，无 token）
 2. 需要单独刷新或打印路径：`node scripts/synthetic-stack/stack.ts packaged-profile`（stdout 只有路径，不含开发态环境变量）
-3. 打开 `release/local-unsigned/mac/mac-universal/客服话术浮窗 Demo.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
+3. 打开 `release/local-unsigned/mac/mac-universal/客服话术浮窗.app`，或安装同一目录下的 UNSIGNED DMG/ZIP
 
 打包态**忽略** `CUSTOMER_AGENT_DESKTOP_API_ORIGIN` / `CUSTOMER_AGENT_DESKTOP_IDENTITY_ORIGIN`。缺文件或 origin 不合法则拒启，不回退 S0 fixture。这仍不是签名、公证、外发或 M5 人工验收。
 
@@ -203,7 +203,7 @@ node apps/desktop/scripts/verify-mac-release-env.mjs && node apps/desktop/script
 
 预期产物：
 
-- `release/local-unsigned/windows/客服话术浮窗 Demo-<version>-win-x64-UNSIGNED.exe`
+- `release/local-unsigned/windows/客服话术浮窗-<version>-win-x64-UNSIGNED.exe`
 - `release/local-unsigned/windows/win-unpacked/`（含 `resources/icon.ico` 与 `resources/synthetic-offline.json`）
 
 本仓没有 Windows `distribution` 路径。`mode !== 'local'` 会直接抛错。
@@ -512,7 +512,7 @@ CSV 用例保留 BOM、逗号、引号及多行正文原字节，回读 `CSV!H3`
 ```sh
 CUSTOMER_AGENT_INTAKE_SYNTHETIC_E2E=1 \
 CUSTOMER_AGENT_INTAKE_PURPOSE_RUNTIME=1 \
-CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/绝对路径/客服话术浮窗 Demo.app/Contents/MacOS/客服话术浮窗 Demo' \
+CUSTOMER_AGENT_INTAKE_PACKAGED_EXECUTABLE='/绝对路径/客服话术浮窗.app/Contents/MacOS/客服话术浮窗' \
 pnpm --filter @customer-agent/desktop exec playwright test \
   tests/e2e/content-intake-real-stack.spec.ts \
   tests/e2e/content-intake-permissions-real-stack.spec.ts \

@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
+import { INTAKE_REPORT_MAX_BYTES, INTAKE_UPLOAD_MAX_BYTES, intakeInputMime, isIntakeUploadCommand, type IntakeUploadCommand, type IntakeUploadFormat, type IntakeUploadPhase, type IntakeUploadView } from '../shared/content-intake-upload';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
-import type { IntakeAccess } from './content-intake-access';
+import { isLegacySopIntakeSource, type IntakeAccess } from './content-intake-access';
 import { ProductHttpError } from './product-http';
 import type { ProductSession } from './product-session';
 
@@ -15,7 +15,7 @@ type Principal = C['IntakePrincipalPage']['items'][number] & { selection: string
 type Pending = { kind: 'upload'; operationId: string; file: SelectedInput } | { kind: 'receive'; body: C['IntakeReceive'] };
 type Request = (path: string, options?: Parameters<Session['request']>[2]) => Promise<unknown>;
 export type IntakeNativeFiles = {
-  chooseInputFile(signal: AbortSignal): Promise<InputFile | null>;
+  chooseInputFile(format: IntakeUploadFormat, signal: AbortSignal): Promise<InputFile | null>;
   saveReport(bytes: Buffer, signal: AbortSignal): Promise<boolean>;
 };
 // 100 issues × (512 message + 64 code + 64 sheet) × up to 6 JSON-escape bytes, plus metadata.
@@ -24,6 +24,9 @@ const reject = (code: 'STALE' | 'CONFLICT' | 'FORBIDDEN' | 'VALIDATION'): never 
 const sameContext = (a: C['IntakeManagementContext'], b: C['IntakeManagementContext']) =>
   a.sourceId === b.sourceId && a.sourceVersion === b.sourceVersion && a.baseReleaseId === b.baseReleaseId
   && a.principalId === b.principalId && a.factsVersion === b.factsVersion;
+function uploadCategory(source: C['IntakeSource']): IntakeUploadView['sources'][number]['category'] {
+  return isLegacySopIntakeSource(source) ? 'sop' : source.scope.domain;
+}
 const parsing = (job: C['IntakeParseJob'] | null) => job?.state === 'reading' || job?.state === 'parsing';
 
 /** Owns a whole native upload draft and original uncertain writes, all in memory.
@@ -105,7 +108,7 @@ export class ContentIntakeUpload {
     return structuredClone({ draftRevision: this.revision, phase: this.phase, busy, authorized: allowed.length > 0,
       revisionOf: readable && this.priorKey ? { candidateId: this.priorKey.candidateId, version: this.priorKey.version } : null,
       validUntil: readable && deadlines.length ? new Date(Math.min(...deadlines.map(Date.parse))).toISOString() : null,
-      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, domain: s.scope.domain, label: joinDisplayParts([s.scope.sourceId, s.scope.shopId ?? s.scope.brandId]) })),
+      sources: allowed.map(s => ({ selection: this.sources.get(s.scope.sourceId)!, category: uploadCategory(s), label: joinDisplayParts([s.scope.sourceId, s.scope.shopId ?? s.scope.brandId]) })),
       sourceSelection: readable ? this.sources.get(this.sourceId!) ?? null : null,
       file: readable && this.file ? { name: this.file.name, bytes: this.file.bytes.length } : null,
       principals: declarations ? this.principals.map(({ selection, displayLabel, enabled }) => ({ selection, displayLabel, enabled })) : [],
@@ -250,7 +253,8 @@ export class ContentIntakeUpload {
       if (!source) return reject('FORBIDDEN');
       this.clearDraft(); this.sourceId = source.scope.sourceId; this.phase = 'selected'; return null;
     }
-    if (!allowed.some(s => s.scope.sourceId === this.sourceId)) return reject('FORBIDDEN');
+    const source = allowed.find(s => s.scope.sourceId === this.sourceId);
+    if (!source) return reject('FORBIDDEN');
     const controller = new AbortController(); this.active = controller;
     const abort = () => controller.abort(); signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();
     const assertActive = () => {
@@ -270,9 +274,10 @@ export class ContentIntakeUpload {
       if (command.action === 'upload-choose') {
         if (parsing(this.job)) return reject('CONFLICT');
         const previous = this.phase; this.phase = 'choosing';
-        const picked = await this.native.chooseInputFile(controller.signal); assertActive();
+        const format = uploadCategory(source) === 'sop' ? 'sop' : 'faq';
+        const picked = await this.native.chooseInputFile(format, controller.signal); assertActive();
         if (!picked) { this.phase = previous; return null; }
-        const mime = intakeInputMime(picked.name);
+        const mime = intakeInputMime(picked.name, format);
         if (!mime || !Buffer.isBuffer(picked.bytes) || picked.bytes.length < 1 || picked.bytes.length > INTAKE_UPLOAD_MAX_BYTES
           || (mime !== 'text/csv' && (picked.bytes.length < 4 || picked.bytes.readUInt32LE(0) !== 0x04034b50))
           || /[\\/]/.test(picked.name) || [...picked.name].some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) || picked.name.length > 255) return reject('VALIDATION');

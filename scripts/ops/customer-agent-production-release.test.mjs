@@ -1277,3 +1277,43 @@ test('recovery does not claim completion after old readiness fails', async t => 
   assert.equal(f.state.journal.status, 'rolling_back');
   assert.equal(existsSync(f.backupFile), true);
 });
+
+for (const [reportedMode, recovered] of [[null, true], ['unified', true], ['intake-compat', false]]) {
+  test(`v3 unified rollback readiness with reported mode ${reportedMode}`, async t => {
+    const f = recoveryFixture(t);
+    const ready = { status: 'ready', checks: { auth: 'ok', content: 'ok', database: 'ok', schema: 'ok', storage: 'ok' } };
+    f.deps.waitForReady = async (_profile, version, _assertActive, expectedMode, allowLegacyMode) => {
+      const health = { status: 'ok', service: 'cs-ai-api', version: f.state.current.version };
+      if (!readinessMatches(health, ready, version, expectedMode, reportedMode, allowLegacyMode)) {
+        throw new ProductionReleaseError('READINESS_FAILED', 'rollback runtime is not ready in the proven mode');
+      }
+    };
+
+    const operation = runProductionRelease(f.options, f.deps);
+    if (recovered) {
+      assert.equal((await operation).status, 'rolled-back');
+      assert.equal(f.state.journal.status, 'rolled_back');
+    } else {
+      await assert.rejects(operation, error => {
+        assert.equal(error.code, 'ROLLBACK_FAILED');
+        assert.equal(error.rollbackError?.code, 'READINESS_FAILED');
+        return true;
+      });
+      assert.equal(f.state.journal.status, 'rolling_back');
+      assert.equal(existsSync(f.backupFile), true);
+    }
+  });
+}
+
+test('normal apply releases its lock without entering the release pipeline during a cold cutover', async (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  f.dependencies.assertNoActiveColdCutover = () => {
+    assert(f.isLockAcquired());
+    throw Object.assign(new Error('cold cutover in progress'), { code: 'COLD_CUTOVER_ACTIVE' });
+  };
+  await assert.rejects(runProductionRelease(f.options, f.dependencies), { code: 'COLD_CUTOVER_ACTIVE' });
+  assert(f.isLockReleased());
+  assert.deepEqual(f.events, []);
+  assert.deepEqual(f.audit, []);
+});

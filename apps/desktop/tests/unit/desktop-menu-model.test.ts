@@ -9,12 +9,12 @@ import {
 } from '../../src/main/desktop-menu-model';
 
 describe('desktop menu model', () => {
-  it('keeps the Tray menu fixed to query, dashboard and explicit Demo exit', () => {
+  it('offers query, dashboard and application exit in the tray', () => {
     expect(createTrayMenuModel()).toEqual([
       { type: 'action', id: 'open-search', label: '打开话术查询' },
       { type: 'action', id: 'open-dashboard', label: '打开运营工作台' },
       { type: 'separator' },
-      { type: 'action', id: 'quit', label: '退出 Demo' },
+      { type: 'action', id: 'quit', label: '退出客服话术浮窗' },
     ]);
   });
 

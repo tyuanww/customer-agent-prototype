@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE, SEAT_DISPLAY_SOURCE, SOP_OWNER_REVIEW_SOURCE } from './migration-artifact.mjs';
+import { GENERATED_HEADER, renderUpgradeMigration, renderRepairMigration, renderReadinessMigration, renderSopUnifiedMigration, renderSopLifecycleMigration, SOP_LIFECYCLE_SOURCE, renderSopQueryMigration, SOP_QUERY_SOURCE, renderSopContinuationMigration, SOP_CONTINUATION_SOURCE, renderSopResourceMigration, SOP_RESOURCE_SOURCE, SEAT_DISPLAY_SOURCE, SOP_OWNER_REVIEW_SOURCE, SOP_ENTRY_STOP_BATCH_SOURCE } from './migration-artifact.mjs';
 import { verifyIngestedCorrectedSopUnifiedContractSet, verifyCurrentSopResourceDisableContractSet, withVerifiedContractSetSnapshot } from '../../../scripts/customer-agent-contract-set.mjs';
 
 const GENERATOR_SCHEMA = 'customer-agent-database-migrations/v2';
@@ -947,7 +947,16 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   const ownerReview = resource ? renderIntakeOverlay(projectRoot, snapshot, SOP_OWNER_REVIEW_SOURCE.position, SOP_OWNER_REVIEW_SOURCE.id) : null;
   if (ownerReview && (sha256(readFileSync(path.join(projectRoot, SOP_OWNER_REVIEW_SOURCE.file), 'utf8')) !== SOP_OWNER_REVIEW_SOURCE.sha256
     || ownerReview.sha256 !== SOP_OWNER_REVIEW_SOURCE.migrationSha256)) throw new Error('Owner-reviewed SOP facts source drifted');
-  const migrations = Object.freeze([...prefix, ...(resource ? [resource, seatDisplay, ownerReview] : [])]);
+  const productPrefix = resource ? [...prefix, resource, seatDisplay, ownerReview] : prefix;
+  const entryStopBatch = resource
+    ? renderIntakeOverlay(projectRoot, snapshot, SOP_ENTRY_STOP_BATCH_SOURCE.position, SOP_ENTRY_STOP_BATCH_SOURCE.id) : null;
+  if (entryStopBatch && sha256(JSON.stringify(productPrefix.map(({ sql: _sql, ...entry }) => entry)))
+    !== SOP_ENTRY_STOP_BATCH_SOURCE.predecessorSha256) {
+    throw new Error('SOP entry stop batching requires the immutable 90-migration predecessor');
+  }
+  if (entryStopBatch && (sha256(readFileSync(path.join(projectRoot, SOP_ENTRY_STOP_BATCH_SOURCE.file), 'utf8')) !== SOP_ENTRY_STOP_BATCH_SOURCE.sha256
+    || entryStopBatch.sha256 !== SOP_ENTRY_STOP_BATCH_SOURCE.migrationSha256)) throw new Error('SOP entry stop batching source drifted');
+  const migrations = Object.freeze(entryStopBatch ? [...productPrefix, entryStopBatch] : productPrefix);
   const manifest = Object.freeze({ ...prior.manifest,
     compatibility: Object.freeze({ ...prior.manifest.compatibility,
       ...(resource ? { sop_resource_overlay: Object.freeze({ contract_set_id: resource.contract_set_id,
@@ -979,6 +988,7 @@ export function buildDatabaseMigrationOutputs(snapshot, { projectRoot = DEFAULT_
   if (resource) outputs.set(`packages/database/migrations/${resource.file}`, resource.sql);
   if (seatDisplay) outputs.set(`packages/database/migrations/${seatDisplay.file}`, seatDisplay.sql);
   if (ownerReview) outputs.set(`packages/database/migrations/${ownerReview.file}`, ownerReview.sql);
+  if (entryStopBatch) outputs.set(`packages/database/migrations/${entryStopBatch.file}`, entryStopBatch.sql);
   outputs.set(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
   outputs.set(CATALOGUE_PATH, renderCatalogue(manifest, migrations, compatibleUpgrades));
   return Object.freeze({ manifest, migrations, outputs });

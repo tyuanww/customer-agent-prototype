@@ -135,6 +135,23 @@ jobs:
         # Main's full gate uses an empty diff to select every map-owned Windows check.
         run: node scripts/verification-policy.mjs run --base HEAD --head HEAD --lane windows
       - if: needs.changes.outputs.mode != 'docs'
+        name: Verify installer and executable metadata and build identity
+        shell: pwsh
+        run: |
+          $desktop = Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json
+          $root = 'release/local-unsigned/windows'
+          $stamp = Get-Content "$root/win-unpacked/resources/build-identity.json" -Raw | ConvertFrom-Json
+          if ($stamp.gitSha -cne $env:GITHUB_SHA -or $stamp.productVersion -cne $desktop.version) {
+            throw 'Windows package build identity differs from the CI checkout.'
+          }
+          $installer = Get-Item -LiteralPath "$root/$($desktop.build.productName)-$($desktop.version)-win-x64-UNSIGNED.exe"
+          $client = Get-Item -LiteralPath "$root/win-unpacked/$($desktop.build.productName).exe"
+          foreach ($file in @($installer, $client)) {
+            if ($file.VersionInfo.CompanyName -cne $desktop.author -or $file.VersionInfo.ProductName -cne $desktop.build.productName) {
+              throw "Unexpected PE metadata in $($file.Name)"
+            }
+          }
+      - if: needs.changes.outputs.mode != 'docs'
         name: Upload UNSIGNED Windows package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -226,3 +243,40 @@ jobs:
       - env:
           CI_NEEDS: ${{ toJSON(needs) }}
         run: node scripts/verification-policy.mjs gate
+
+  macos-package:
+    needs: gate
+    name: macOS local-unsigned package
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm package:mac:local
+      - name: Verify the packaged build identity
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const desktop = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8'));
+          const resources = `release/local-unsigned/mac/mac-universal/${desktop.build.productName}.app/Contents/Resources`;
+          const stamp = JSON.parse(readFileSync(`${resources}/build-identity.json`, 'utf8'));
+          if (stamp.gitSha !== process.env.GITHUB_SHA || stamp.productVersion !== desktop.version) {
+            throw new Error('macOS package build identity differs from the CI checkout.');
+          }
+          JS
+      - name: Upload UNSIGNED macOS DMG
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mac-local-unsigned
+          path: release/local-unsigned/mac/*-mac-universal-UNSIGNED.dmg
+          if-no-files-found: error
+          retention-days: 7

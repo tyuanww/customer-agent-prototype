@@ -19,7 +19,7 @@ const timer = fileURLToPath(new URL('./customer-agent-health-check.timer', impor
 const STUB_SOURCE = `
 import { createServer } from 'node:http';
 import { appendFileSync } from 'node:fs';
-const [portFile, alertFile, mode] = process.argv.slice(2);
+const [portFile, alertFile, mode, ...alertStatuses] = process.argv.slice(2);
 const server = createServer((req, res) => {
   if (req.method === 'GET') {
     if (mode === 'down') { res.writeHead(503); res.end('not ready'); return; }
@@ -28,7 +28,12 @@ const server = createServer((req, res) => {
   }
   let body = '';
   req.on('data', (chunk) => { body += chunk; });
-  req.on('end', () => { appendFileSync(alertFile, body + '\\n'); res.end('{"ok":true}'); });
+  req.on('end', () => {
+    appendFileSync(alertFile, body + '\\n');
+    const [status, code = '0'] = (alertStatuses.shift() ?? '200').split(':');
+    res.writeHead(Number(status));
+    res.end(JSON.stringify({ code: Number(code) }));
+  });
 });
 server.listen(0, '127.0.0.1', () => { appendFileSync(portFile, String(server.address().port)); });
 `;
@@ -38,13 +43,13 @@ const stubs = [];
 after(() => { for (const child of stubs) child.kill('SIGKILL'); });
 
 /** Starts the stub in a child process (async spawn: it does not exit on its own). */
-function startStub(dir, mode) {
+function startStub(dir, mode, ...alertStatuses) {
   const portFile = path.join(dir, `port-${mode}`);
   const alertFile = path.join(dir, `alerts-${mode}`);
   writeFileSync(alertFile, '');
   const stubPath = path.join(dir, `stub-${mode}.mjs`);
   writeFileSync(stubPath, STUB_SOURCE);
-  const child = spawn('node', [stubPath, portFile, alertFile, mode], { stdio: 'ignore' });
+  const child = spawn('node', [stubPath, portFile, alertFile, mode, ...alertStatuses], { stdio: 'ignore' });
   stubs.push(child);
   return { portFile, alertFile };
 }
@@ -169,6 +174,25 @@ test('alerts once, on the third consecutive failure, then stays quiet', async ()
   assert.match(alert, /503/);
 });
 
+test('retries webhook rejections during an outage until the receiver accepts the alert', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'health-probe-'));
+  const stub = startStub(dir, 'down', '429', '200:9499', '200:0');
+  const port = await awaitPort(stub.portFile);
+  writeEnv(dir, `http://127.0.0.1:${port}/hook`, `http://127.0.0.1:${port}/probe`);
+
+  const attempts = [0, 0, 1, 2, 3, 3];
+  for (const [index, expectedAttempts] of attempts.entries()) {
+    const result = runProbe(dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(counterOf(dir), String(index + 1));
+    assert.equal(alertsOf(stub.alertFile).length, expectedAttempts);
+    if (index === 2) assert.match(result.stdout, /WARN alert delivery failed.*429/);
+    if (index === 3) assert.match(result.stdout, /WARN alert delivery failed.*200/);
+    if (index === 4) assert.match(result.stdout, /alert sent/);
+    else assert.doesNotMatch(result.stdout, /alert sent/);
+  }
+});
+
 test('recovery clears the counter so a later outage alerts again', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'health-probe-'));
   const down = startStub(dir, 'down');
@@ -185,6 +209,11 @@ test('recovery clears the counter so a later outage alerts again', async () => {
   assert.equal(recovered.status, 0, recovered.stderr);
   assert.equal(counterOf(dir), '0');
   assert.equal(alertsOf(up.alertFile).length, 0);
+
+  writeEnv(dir, `http://127.0.0.1:${downPort}/hook`, `http://127.0.0.1:${downPort}/probe`);
+  for (let run = 0; run < 3; run += 1) runProbe(dir);
+  assert.equal(counterOf(dir), '3');
+  assert.equal(alertsOf(down.alertFile).length, 2);
 });
 
 const watchdogScript = fileURLToPath(new URL('./customer-agent-stack-watchdog.sh', import.meta.url));

@@ -1,7 +1,8 @@
 import { expect,it,vi,afterEach } from 'vitest';
+import { parseContractSchema } from '@customer-agent/contracts';
 import { ContentIntakePermissions } from '../../src/main/content-intake-permissions';
 import { ProductHttpError } from '../../src/main/product-http';
-import { isIntakePermissionCommand } from '../../src/shared/content-intake-permissions';
+import { FAQ_PERMISSION_PRESET, isIntakePermissionCommand } from '../../src/shared/content-intake-permissions';
 import { isDefinitiveRollback } from '../../src/shared/content-intake-recovery';
 import type { ProductErrorCode } from '../../src/shared/product-session';
 import { intakePermissionsData } from '../fixtures/intake-permissions-data';
@@ -13,6 +14,72 @@ it.each(['VALIDATION','FORBIDDEN','UNAUTHORIZED','CONFLICT','GONE'] as ProductEr
 it('preserves recovery for transport uncertainty',()=>{
  expect(isDefinitiveRollback('UNAVAILABLE')).toBe(false);
  expect(isDefinitiveRollback('CANCELLED')).toBe(false);
+});
+it('distinguishes same-shop same-domain sources and previews the exact two FAQ actions on the selected source', async () => {
+ const f=intakePermissionsData(['import','source-confirm']);
+ f.sources.push({...f.sources[0]!,scope:{...f.scope,sourceId:'source-b'}});
+ const main=new ContentIntakePermissions(f.session);
+ try {
+  const initial=await main.command({action:'refresh'});
+  expect(initial.faqPreviewAvailable).toBeUndefined();
+  expect(initial.sources).toHaveLength(2);
+  expect(new Set(initial.sources.map(option=>option.label)).size).toBe(2);
+  expect(JSON.stringify(initial.sources)).not.toMatch(/source-[ab]|shop-a/);
+  for (const [index,option] of initial.sources.entries()) {
+   expect(option.label).toMatch(/^该店铺 \/ 产品 \/ FAQ 工作簿 [A-F0-9]{12}$/);
+   const selected=await main.command({action:'source',selection:option.selection});
+   expect(selected.faqPreviewAvailable).toBe(true);
+   const preview=await main.command(f.command(selected.people[0]!.selection,FAQ_PERMISSION_PRESET));
+   expect(preview.preview).toMatchObject({person:f.person.displayLabel,scope:option.label,actions:['import','source-confirm']});
+   const sent=parseContractSchema('IntakeGrantBatch',f.requests.filter(r=>r.path==='/v1/intake/grants/preview').at(-1)?.body);
+   expect(sent.items).toMatchObject(['import','source-confirm'].map(action=>({
+    kind:'business',recipientPrincipalId:f.person.principalId,action,scope:f.sources[index]!.scope,
+   })));
+  }
+  expect(f.requests.some(r=>r.path==='/v1/intake/grants')).toBe(false);
+  expect(f.receipts.size).toBe(0);
+ } finally { main.dispose(); }
+});
+it('represents a legacy SOP source and refuses the FAQ preset for it', async () => {
+ const f=intakePermissionsData(['import','source-confirm']);
+ f.sources.push({...f.sources[0]!,mappingVersion:'sop-not-imported',scope:{...f.scope,sourceId:'source-sop'}});
+ const main=new ContentIntakePermissions(f.session);
+ try {
+  const view=await main.command({action:'refresh'});
+  const [faq,sop]=view.sources;
+  expect(faq?.label).toMatch(/FAQ 工作簿/);
+  expect(sop?.label).toMatch(/SOP 工作簿/);
+  const selected=await main.command({action:'source',selection:sop!.selection});
+  expect(selected.faqPreviewAvailable).toBeUndefined();
+  await expect(main.command(f.command(selected.people[0]!.selection,FAQ_PERMISSION_PRESET))).rejects.toMatchObject({code:'STALE'});
+  expect(f.requests.some(r=>r.path==='/v1/intake/grants/preview')).toBe(false);
+ } finally { main.dispose(); }
+});
+it('rejects the FAQ preset locally when either action is unavailable', async () => {
+ const f=intakePermissionsData(['import']),main=new ContentIntakePermissions(f.session);
+ try {
+  const view=await main.command({action:'refresh'});
+  expect(view.faqPreviewAvailable).toBeUndefined();
+  await expect(main.command(f.command(view.people[0]!.selection,FAQ_PERMISSION_PRESET))).rejects.toMatchObject({code:'STALE'});
+  expect(f.requests.some(r=>r.path==='/v1/intake/grants/preview')).toBe(false);
+ } finally { main.dispose(); }
+});
+it('will not show or save an FAQ preview if returned rows do not match the exact batch', async () => {
+ const f=intakePermissionsData(['import','source-confirm']),original=f.session.request;
+ f.session.request=async(epoch,path,options)=>{
+  const response=await original(epoch,path,options);
+  if(path!=='/v1/intake/grants/preview')return response;
+  const value=parseContractSchema('IntakeGrantList',response.value);
+  return {...response,value:{...value,items:value.items.slice(0,1)}};
+ };
+ const main=new ContentIntakePermissions(f.session);
+ try {
+  const view=await main.command({action:'refresh'});
+  await expect(main.command(f.command(view.people[0]!.selection,FAQ_PERMISSION_PRESET))).rejects.toMatchObject({code:'STALE'});
+  expect(main.view().preview).toBeNull();
+  await expect(main.command({action:'save'})).rejects.toMatchObject({code:'STALE'});
+  expect(f.requests.some(r=>r.path==='/v1/intake/grants')).toBe(false);
+ } finally { main.dispose(); }
 });
 it('keeps IDs and original batch in Main; preview unsaved, unknown retry exact, stale selections rejected',async()=>{
  const f=intakePermissionsData(),main=new ContentIntakePermissions(f.session);
@@ -165,7 +232,10 @@ it('cancels pending reads, discards late results and invalidates prior-session s
 });
 it('rejects actor/grant IDs and arbitrary actions at renderer boundary',()=>{
  expect(isIntakePermissionCommand({action:'save',actor:'director'})).toBe(false);expect(isIntakePermissionCommand({action:'revoke',grantId:'g',reason:'r'})).toBe(false);
- expect(isIntakePermissionCommand({action:'preview',person:'h',actions:['review'],startsAt:'x',expiresAt:'y',reason:'r'})).toBe(false);
+ const command=intakePermissionsData().command('h',FAQ_PERMISSION_PRESET);
+ expect(isIntakePermissionCommand(command)).toBe(true);
+ expect(isIntakePermissionCommand({...command,preset:'review'})).toBe(false);
+ expect(isIntakePermissionCommand({...command,actions:['publish']})).toBe(false);
 });
 
 it.each(['stopped retry', 'new session'] as const)('late rejected writes cannot erase recovery for the %s', async transition => {

@@ -173,6 +173,7 @@ const CURRENT_IMPORT_BATCH_TRIGGER_SHA256 = '92be2db46447f1ed44d1ceefd2820d5a813
 const CURRENT_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = '5adc531fbc48161b54528d999affab3085f5343584a4b11f4c30db2fb7c651c9';
 const SOP_TRIGGER_ENTRIES = 124;
 const SOP_TRIGGER_SHA256 = '8b647176cc37c9832288f38a462c3553824309dec122bfb894b3354177059c9b';
+const SOP_ENTRY_STOP_BATCH_TRIGGER_SHA256 = '642f592ef0b94c32e8ff916820d89487551e42c485621913d374841dc0387ee5';
 const UNIFIED_SOP_TRIGGER_SHA256 = '8e0f0c238a34be2e80ed40ddbac6a116b6ae7938fe69d6d19f232ba7155ba79e';
 const UNIFIED_SOP_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = 'c008c0d0a59a7c875eccf877cabc0f926abd2854047aee6757d09f31419012f7';
 const SOP_LIFECYCLE_DISABLED_IMPORT_BATCH_TRIGGER_SHA256 = '1e61dd1d475ea434958e8fee4017e2db389b5d7218bab1f8db7367ceb6318f6f';
@@ -960,7 +961,8 @@ async function verifyCatalogueState(
     && expectedTriggerSha === '5f9474bf8d214fcf1d54b5bd9f5783af1b0a0b07acf403c53d290f1365b44435'
   ) || (
     expectedTriggerEntries === 151
-    && expectedTriggerSha === '62f61ac4d0a99f8f1deda75dc4ac0649ee78e44d02bb01ceb63e251e3d7b1784'
+    && (expectedTriggerSha === '62f61ac4d0a99f8f1deda75dc4ac0649ee78e44d02bb01ceb63e251e3d7b1784'
+      || expectedTriggerSha === SOP_ENTRY_STOP_BATCH_TRIGGER_SHA256)
   );
   const triggerSha = trigger ? sha256(trigger.manifest) : '';
   if (trigger && trigger.entries === expectedTriggerEntries && triggerSha === expectedTriggerSha) {
@@ -1204,6 +1206,7 @@ const READINESS_SUFFIX = [
   { length: 88, index: 87, id: '0088_sop_resource_lifecycle', sha256: '1ad88eab6fb5eeb22552471838f10f14b701430d8f8c913c50df71baee53488e' },
   { length: 89, index: 88, id: '0089_seat_display_projection' },
   { length: 90, index: 89, id: '0090_owner_reviewed_sop_query_facts' },
+  { length: 91, index: 90, id: '0091_sop_entry_stop_batch', sha256: '3ecb09121caed12f3b23d2ab8ee055b876638e1f4194d128296e25f250eec187' },
 ] as const;
 const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   tables?: number;
@@ -1288,6 +1291,7 @@ const READINESS_INVENTORY_BY_LENGTH: Partial<Record<number, {
   87: { tables: 131, functions: 360, objectEntries: 4063, objectSha256: '2e267e34d4a22e719688d40a7e0f64d1e97a3800a4de55ba9ae88dc72d2e2478', functionEntries: 360, functionSha256: '3ed6b5b05f8410955298a6aaaddb6e23e56799c7d784b946b5361ed54cb2a02f', triggerEntries: 144, triggerSha256: '49ae03b3cfebcfbe49c15b4459040faf8c2e6d0e567fc679f8a33f9b63401d72' },
   89: { tables: 136, functions: 381, objectEntries: 4254, objectSha256: '4e8911be0a35b4a68c440a833a144d7e3ac7d06448fef6d5ef732f5eef918c47', functionEntries: 381, functionSha256: 'ae60884a8700636e26c608aca5ef36326ea67ec271d86f6dca3c1f55e56839b8', triggerEntries: 150, triggerSha256: '5f9474bf8d214fcf1d54b5bd9f5783af1b0a0b07acf403c53d290f1365b44435' },
   90: { tables: 137, functions: 382, objectEntries: 4277, objectSha256: '3fed11d7372192516aedaf6309ffae0e9fefd4ae838667fb0f53b900d6c9b011', functionEntries: 382, functionSha256: '9d2652192dd74fe6dd3212529b413208c19c4d453c76b9dcb6a5f59fe9b52a54', triggerEntries: 151, triggerSha256: '62f61ac4d0a99f8f1deda75dc4ac0649ee78e44d02bb01ceb63e251e3d7b1784' },
+  91: { tables: 137, functions: 382, objectEntries: 4277, objectSha256: '3fed11d7372192516aedaf6309ffae0e9fefd4ae838667fb0f53b900d6c9b011', functionEntries: 382, functionSha256: '06dc787e6c33c527ddfac125dd7da6a21df7a5b9603b2ca2c9c16ebad9c870fe', triggerEntries: 151, triggerSha256: SOP_ENTRY_STOP_BATCH_TRIGGER_SHA256 },
   88: { tables: 136, functions: 381, objectEntries: 4254, objectSha256: '4e8911be0a35b4a68c440a833a144d7e3ac7d06448fef6d5ef732f5eef918c47', functionEntries: 381, functionSha256: '6af5c95321f4b3f01617f86d5b254f36868429eac721168b41e42fa84fa85617', triggerEntries: 150, triggerSha256: '5f9474bf8d214fcf1d54b5bd9f5783af1b0a0b07acf403c53d290f1365b44435' },
 };
 const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256: string }>> = {
@@ -1350,6 +1354,7 @@ const READINESS_ACL_BY_LENGTH: Partial<Record<number, { entries: number; sha256:
   87: { entries: 686, sha256: '095fd4657db4665352c80afc1f20dcf644af5f07b3ee41a9ea23b6a866cba4cd' },
   89: { entries: 696, sha256: 'b5dc769a700ba6d583242c9828344a8f1794a6c811c3c71146128c2fd86b8056' },
   90: { entries: 697, sha256: '7f65c20e4ffb652da1f688862538f743e9f6bc8090a8e5317ea9de814b140415' },
+  91: { entries: 697, sha256: '7f65c20e4ffb652da1f688862538f743e9f6bc8090a8e5317ea9de814b140415' },
   88: { entries: 696, sha256: 'b5dc769a700ba6d583242c9828344a8f1794a6c811c3c71146128c2fd86b8056' },
 };
 

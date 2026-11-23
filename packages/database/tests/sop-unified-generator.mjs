@@ -98,7 +98,7 @@ test('existing generation check rejects artifact drift and missing unified sourc
   assert.equal(readFileSync(target, 'utf8'), original);
 });
 
-test('snapshot consumption accepts the exact 90 tail and locked 87/88/89 predecessors', async t => {
+test('snapshot consumption accepts the exact 91 tail and locked 87–90 predecessors', async t => {
   const root = copyProduct(t);
   const migrationManifest = path.join(root, 'packages/database/migrations/manifest.generated.json');
   const originalManifest = readFileSync(migrationManifest, 'utf8');
@@ -107,7 +107,7 @@ test('snapshot consumption accepts the exact 90 tail and locked 87/88/89 predece
     return 'verified';
   });
   assert.equal(await consume(), 'verified');
-  for (const count of [89, 88, 87]) {
+  for (const count of [90, 89, 88, 87]) {
     const previous = JSON.parse(originalManifest);
     previous.migrations = previous.migrations.slice(0, count);
     if (count === 87) delete previous.compatibility.sop_resource_overlay;
@@ -148,6 +148,8 @@ test('snapshot consumption accepts the exact 90 tail and locked 87/88/89 predece
     value => { value.migrations[88].file = '0089_other.sql'; },
     value => { value.migrations[89].id = '0090_other'; },
     value => { value.migrations[89].sha256 = '0'.repeat(64); },
+    value => { value.migrations[90].id = '0091_other'; },
+    value => { value.migrations[90].sha256 = '0'.repeat(64); },
     value => { value.migrations[88].source_ranges = [{ start_line: 1, end_line: 1 }]; },
     value => { value.migrations[88].bytes += 1; },
     value => { value.migrations[88].sha256 = '0'.repeat(64); },
@@ -178,6 +180,8 @@ test('snapshot consumption accepts the exact 90 tail and locked 87/88/89 predece
     'packages/database/overlays/0089_seat_display_projection.sql',
     'packages/database/migrations/0090_owner_reviewed_sop_query_facts.sql',
     'packages/database/overlays/0090_owner_reviewed_sop_query_facts.sql',
+    'packages/database/migrations/0091_sop_entry_stop_batch.sql',
+    'packages/database/overlays/0091_sop_entry_stop_batch.sql',
     'contracts/upstream/customer-agent/sop-unified-contract-set.lock.json',
     'contracts/upstream/customer-agent/sop-unified-corrected-contract-set.lock.json',
     `contracts/upstream/customer-agent/${manifest.contract_set_id}/storage.v1.sql`,

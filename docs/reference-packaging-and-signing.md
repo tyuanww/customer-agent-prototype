@@ -33,7 +33,9 @@
 -c.mac.forceCodeSigning=false
 ```
 
-后验会**要求** `codesign --verify` 失败——真签上了反而报错。这保证本机包不会被误当成已签名产物。
+后验要求 `codesign --verify` 失败，并检查 `CFBundleName`、`CFBundleDisplayName` 和 `CFBundleIdentifier`。macOS 包显示「客服话术浮窗」。Electron 内部名称仍用于原用户数据目录和 macOS 钥匙串服务。
+
+完整 CI 在同一提交上生成 macOS 未签名 Universal DMG，并核对包中构建身份。Windows CI 同时核对安装器与主程序的 PE 产品名、发行者元数据和包中构建身份。受管分发仍须按实际授权执行。
 
 ### 正式外发（`package:mac`）
 
@@ -65,7 +67,7 @@ xcrun stapler validate <app>
 
 `scripts/package-windows.mjs` 的 mode 不是 `local` 就直接抛错：
 
-> Windows packaging in this Demo is local-unsigned only. There is no signed distribution path.
+> Windows packaging is local-unsigned only. There is no signed distribution path.
 
 本仓**没有** Authenticode / EV 签名路径。`build.win.signExecutable = false`，并关闭 `CSC_IDENTITY_AUTO_DISCOVERY`。
 

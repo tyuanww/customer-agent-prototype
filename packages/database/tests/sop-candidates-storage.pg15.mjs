@@ -32,11 +32,11 @@ test('W5 private storage and narrow usage functions on disposable PostgreSQL 15'
   const config = pg.createDatabase('w5_sop_candidates').config;
   const admin = await pg.connect(config);
   clients.push(admin);
-  await applyMigrationPrefix(admin, 89);
+  await applyMigrationPrefix(admin, 90);
   await assert.rejects(installSopCandidateSyntheticStorage(admin, pg), /ledger is pending|ledger is incomplete|ledger .* not complete/i);
   assert.equal((await admin.query('SELECT to_regnamespace($1) AS schema', [privateSchema])).rows[0].schema, null);
   await applyDatabaseMigrations(admin);
-  assert.equal((await verifyDatabaseMigrations(admin)).migrationCount, 90);
+  assert.equal((await verifyDatabaseMigrations(admin)).migrationCount, 91);
   const baseline = await admin.query('SELECT * FROM customer_agent_meta.schema_migrations ORDER BY position');
   const managed = await admin.query(`
     SELECT p.oid::regprocedure::text AS signature, pg_get_functiondef(p.oid) AS definition, p.proacl::text AS acl

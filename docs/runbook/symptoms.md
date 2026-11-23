@@ -77,7 +77,7 @@ journalctl -u customer-agent-health-check.service --no-pager
 
 `CUSTOMER_AGENT_HEALTH_URL` 为空时，脚本使用文件里的默认地址 `https://agent-auth.jianghua.site/ready`。它探测的是 `/ready`。`/health` 在依赖不可用时仍会返回 200。
 
-计数小于 3 时，脚本不发送文本。计数正好是 3 时，它向 `FEISHU_ALERT_WEBHOOK` 发送文件里已经写好的那条文本，其中有 `探针连续失败`。计数大于 3 时，它不再发送。
+计数达到 3 时，脚本向 `FEISHU_ALERT_WEBHOOK` 发送包含「探针连续失败」的文本。Webhook 返回 HTTP 2xx 且飞书确认成功后记录送达。持续故障期间，每次定时检查都会重试尚未送达的告警。
 
 同一脚本还会写下 `WARN cannot persist counter` 或 `WARN alert delivery failed`。
 
@@ -88,9 +88,9 @@ journalctl -u customer-agent-health-check.service --no-pager
 1. `http_code` 是 `503` 时，请求日志里的同一个 URL。响应里的 `checks` 有 `database`、`schema`、`auth`、`storage`、`content`。不是 `ok` 的项是 `not_ready`。修该项，直到同一个 URL 返回 200，并且 `status` 是 `ready`。检查全是 `not_ready`，同时标准错误有 `diagnostic=READINESS_REPOSITORY_CONTRACT_FAILED` 时，就绪查询抛错了。响应正文不含查询错误原文。
 2. `http_code` 是 `none` 时，这次 `curl` 没有拿到状态码。修到日志里的那个 URL 能返回状态码。不要改去探测 `/health`。
 3. 日志有 `WARN cannot persist counter` 时，计数没有写入句中的文件。单元把该文件设为 `/var/lib/customer-agent/health-failures`。单元打开了 `PrivateTmp`。不要把计数放进 `/tmp`。让 `customer-agent` 能写入单元已经指定的那个文件。
-4. 计数正好是 3，并且下一行是 `WARN alert delivery failed` 时，发往 `FEISHU_ALERT_WEBHOOK` 的请求失败了。修正这个键里已有的值。计数已经大于 3 之后，脚本要先看到一次 200 并写下 `recovered`，才会把计数写回 0。之后再连续失败到 3，才会再发送一次。
+4. 日志有 `WARN alert delivery failed` 时，检查 `FEISHU_ALERT_WEBHOOK` 和 Webhook 的连通性。探针继续失败时，下一次检查会重试。探针恢复 200 后写下 `recovered` 并清零，下轮故障重新计数。
 
-**确认。** 探测返回 200 且计数原先不是 0 时，日志有 `recovered`，计数文件里是 0。探测返回 200 且原先没有计数时，新日志不再出现 `probe failed`。需要发送文本时，计数到达 3 的那一次日志是 `alert sent`。
+**确认。** 探测返回 200 且计数原先不是 0 时，日志有 `recovered`，计数文件里是 0。探测返回 200 且原先没有计数时，新日志不再出现 `probe failed`。告警送达的那一次日志是 `alert sent`。
 
 ## 备份脚本以 FATAL 退出且没有留下完整 dump
 
@@ -133,7 +133,7 @@ journalctl -u customer-agent-backup.service --no-pager
 
 ## 备份失败写出 diagnostic=BACKUP_FAILED
 
-`scripts/ops/customer-agent-backup.sh` 的 `fail` 在退出码 1 之前写下 `diagnostic=BACKUP_FAILED`，并调用同目录的 `send-ops-alert.sh`。`FEISHU_ALERT_WEBHOOK` 未设置，且监控环境文件里也没有这个键时，脚本不发起连接，退出码仍是 1。键已设置且值以 `http://` 或 `https://` 开头时，POST 的 JSON 只有 `diagnostic` 和 `text`。`text` 是 `backup failed`。
+`scripts/ops/customer-agent-backup.sh` 的 `fail` 在退出码 1 之前写下 `diagnostic=BACKUP_FAILED`，并调用同目录的 `send-ops-alert.sh`。`FEISHU_ALERT_WEBHOOK` 未设置，且监控环境文件里也没有这个键时，脚本不发起连接，退出码仍是 1。键已设置且值以 `http://` 或 `https://` 开头时，发送器向飞书发送包含 `BACKUP_FAILED` 的文本。Webhook 返回 HTTP 2xx 且飞书确认成功后记录送达。
 
 退出码 3 的 `offsite copy: NOT CONFIGURED` 不调用这个脚本。
 

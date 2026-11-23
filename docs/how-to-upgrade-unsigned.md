@@ -5,16 +5,16 @@
 ## Prerequisites
 
 1. 安装包版本看 `apps/desktop/package.json`，并与根目录 `VERSION` 相同。UNSIGNED 产物在 gitignored 的 `release/local-unsigned/mac/`、`windows/` 或 `linux/`。如果目录里没有匹配版本，先运行对应平台的打包命令生成它。
-2. 先退出正在跑的「客服话术浮窗 Demo」。
+2. 先退出正在运行的「客服话术浮窗」。早期应用的名称带有「Demo」。
 3. Windows 办公机勾选仍由人在那台机器上做，见 [办公机产品主链](how-to-office-machine-product-remote.md)。
 
 ## Steps
 
 1. 看 [CHANGELOG](../CHANGELOG.md) 这一版的 Added / Changed，确认你要的是这版行为（将替换、下架两步确认、`matchesLease`）。
 
-2. macOS：打开 `release/local-unsigned/mac/` 里文件名含 `UNSIGNED` 的 `.dmg`，把 App 拖到「应用程序」，覆盖旧的「客服话术浮窗 Demo」。Gatekeeper 警告按未签名包处理，见 [打包与签名](reference-packaging-and-signing.md)。
+2. macOS 打开 `release/local-unsigned/mac/` 下的 `UNSIGNED` DMG，把「客服话术浮窗」拖到「应用程序」。如果旧包名为「客服话术浮窗 Demo.app」，先移出旧包，再安装新包。保留 `~/Library/Application Support/客服话术浮窗 Demo/`。Gatekeeper 警告按未签名包处理。[打包与签名](reference-packaging-and-signing.md)
 
-3. Windows：把 `客服话术浮窗 Demo-<VERSION>-win-x64-UNSIGNED.exe` 拷到 ASCII 路径后静默安装 `/S /currentuser`。步骤与路径见办公机 how-to。
+3. Windows：把 `客服话术浮窗-<VERSION>-win-x64-UNSIGNED.exe` 拷到 ASCII 路径后静默安装 `/S /currentuser`。步骤与配置路径见[办公机产品主链](how-to-office-machine-product-remote.md)。
 
 4. 启动后打开工作台 → 系统同步 → **软件版本更新**。管理员点「打开下载页」会用系统浏览器打开目录里当前建议版本的 https 地址（例如 GitHub Release 资产页）。文件名仍可含 `UNSIGNED`；界面徽章写「未签名」。没有当前建议版本时按钮禁用，状态写「目录为空，没有当前建议版本。」
 

@@ -114,6 +114,14 @@ node <test-candidate-release>/scripts/ops/customer-agent-production-release.mjs 
 
 测试模式拒绝生产 profile 和 `customer_agent_formal`。生产模式拒绝其他 root。测试结束后核对测试端口停止、生产端口仍正常，再按测试留存策略清理 release。
 
+### 验证停写冷回退
+
+在隔离 Linux 机器运行 `node --test scripts/ops/release-cold-snapshot.test.mjs scripts/ops/release-cold-cutover.test.mjs`。测试覆盖目录交换、发布进程退出后的恢复、停写期间验证失败、封存后的恢复重试和拒绝切回旧快照。候选启动、旧版启动和历史 FAQ 回读使用隔离 PostgreSQL 栈补验。
+
+`release-cold-cutover.mjs` 在调用者持有同一部署锁时管理停写。隔离演练需要把 `customer-agent-cold-maintenance.conf` 作为 drop-in 安装到模块所列的十个 unit，并重新加载 systemd。状态目录 `/var/lib/customer-agent-release` 归 root 所有，权限为 `0700`。模块核对生效的启动条件、service 的 control group 停止方式及 PostgreSQL 15 的干净停机，再复制和交换同一文件系统上的栈目录。停写标记跨重启保留。只有调用者通过私有运行验证、候选封存或原栈恢复状态落盘后，模块才移除停写标记并恢复原先活跃的 unit。恢复中途失败时，重试只恢复已确认的那一侧。
+
+生产 `--apply` 继续执行逐迁移前缀兼容校验，持锁期间发现停写标记或尚未完成的冷切换记录时返回 `COLD_CUTOVER_ACTIVE`。目前生产入口尚未接入冷切换。后续接入需要验证正式 ingress 和全部 writer 的归属，核对由 root 控制的栈父目录和快照 journal 路径，并把发布准入、指针和配置切换、私有运行及恢复证据绑定到同一次切换。私有验证要隔离测试请求和后台任务的外部写入。
+
 ## 审计
 
 apply 的默认审计文件是 `<root>/release-evidence/production-release.jsonl`，部署状态是 `<root>/release-evidence/deployment-state.json`，权限均为 `0600`；dry-run 只把事件随计划输出，不落盘。状态和审计只包含路径、完整 SHA、版本、阶段、计数和备份 ID，不记录 env 内容、数据库连接串、客户正文、身份明细或凭据。成功部署后保留状态以支持同一候选的回滚；下一次成功切换使用新候选状态覆盖它。

@@ -1,16 +1,27 @@
 import type { components } from '@customer-agent/contracts';
-import { GRANTABLE_ACTIONS } from './page-use';
+import { actionsForIntakePost, type IntakePost } from './intake-post-actions';
 import { exactKeys } from './product-session';
 type Action = components['schemas']['IntakeAction'];
+
+export const FAQ_PERMISSION_PRESET = 'faq-first-batch';
+export type IntakePermissionPreset = IntakePost | typeof FAQ_PERMISSION_PRESET;
+export const FAQ_PERMISSION_ACTIONS = ['import', 'source-confirm'] as const satisfies readonly Action[];
+
+export function actionsForPermissionPreset(preset: unknown): readonly Action[] | null {
+  if (preset === FAQ_PERMISSION_PRESET) return FAQ_PERMISSION_ACTIONS;
+  const result = actionsForIntakePost(preset);
+  return result.ok ? result.actions : null;
+}
+
 export type IntakePermissionCommand =
   | { action: 'refresh' | 'save' | 'retry' | 'discard' | 'stop' }
   | { action: 'source'; selection: string }
-  | { action: 'preview'; person: string; actions: Action[]; startsAt: string; expiresAt: string; reason: string }
+  | { action: 'preview'; person: string; preset: IntakePermissionPreset; startsAt: string; expiresAt: string; reason: string }
   | { action: 'revoke'; selection: string; reason: string };
 export type IntakePermissionView = {
   signedIn: boolean; available: boolean; busy: boolean; validUntil: string | null;
   sources: { selection: string; label: string }[]; source: string | null;
-  people: { selection: string; label: string }[]; actions: Action[];
+  people: { selection: string; label: string }[]; actions: Action[]; faqPreviewAvailable?: true;
   grants: { selection: string; reference: string; person: string; personSelection: string | null; action: Action; scope: string; startsAt: string; reason: string; expiresAt: string; revoked: boolean; canRevoke: boolean }[];
   preview: { person: string; actions: Action[]; scope: string; startsAt: string; expiresAt: string; reason: string } | null;
   pending: boolean; resultUnknown: boolean; notice: string | null;
@@ -24,8 +35,7 @@ export function isIntakePermissionCommand(value: unknown): value is IntakePermis
   if (['refresh','save','retry','discard','stop'].includes(r.action as string)) return exactKeys(r,['action']);
   if (r.action === 'source') return exactKeys(r,['action','selection']) && text(r.selection,128);
   if (r.action === 'revoke') return exactKeys(r,['action','selection','reason']) && text(r.selection,128) && text(r.reason,512);
-  return r.action === 'preview' && exactKeys(r,['action','person','actions','startsAt','expiresAt','reason']) && text(r.person,128)
-    && text(r.reason,512) && text(r.startsAt,35) && text(r.expiresAt,35) && Array.isArray(r.actions) && r.actions.length > 0 && r.actions.length <= 8
-    && new Set(r.actions).size === r.actions.length && r.actions.every(a => typeof a === 'string' && (GRANTABLE_ACTIONS as readonly string[]).includes(a));
+  return r.action === 'preview' && exactKeys(r,['action','person','preset','startsAt','expiresAt','reason']) && text(r.person,128)
+    && text(r.reason,512) && text(r.startsAt,35) && text(r.expiresAt,35) && actionsForPermissionPreset(r.preset) !== null;
 }
 export const INTAKE_PERMISSION_ACTION_LABELS: Readonly<Record<Action,string>> = { query:'查询复制', 'content-manage':'查看与管理资料',import:'上传资料','source-confirm':'确认来源',review:'旧审批（不提供新配置）',publish:'发布资料','candidate-cancel':'取消候选',rollback:'回退发布' };

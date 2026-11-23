@@ -1,3 +1,4 @@
+import { SOP_RULE_VERSION } from '@customer-agent/content-intake';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
 import { parseContractSchema as parseSopSchema, type components as SopComponents } from '@customer-agent/contracts/sop-resource-disable';
 import { intakeAccessDenial, IntakeUsageError, type IntakeUsageSession } from './content-intake-usage';
@@ -19,6 +20,11 @@ export type SopIntakeAccess = Access<S['IntakeSource'], S['IntakeAuthorization']
 type AccessVersions = { factsVersion: number; policyVersion: number; revocationGeneration: number };
 
 export { intakeAccessDenial };
+
+// Legacy discovery keeps the FAQ-compatible template and scope for registered SOP workbooks.
+export function isLegacySopIntakeSource(source: Pick<C['IntakeSource'], 'mappingVersion'>): boolean {
+  return source.mappingVersion === SOP_RULE_VERSION;
+}
 
 /** Main-only discovery. All pages and both lists must agree before any menu is
  * returned. This is an expiring selection hint, never permission to read/copy;

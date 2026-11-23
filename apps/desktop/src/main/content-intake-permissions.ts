@@ -1,19 +1,41 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { parseContractSchema, type components } from '@customer-agent/contracts';
-import type { IntakePermissionCommand, IntakePermissionView } from '../shared/content-intake-permissions';
+import { actionsForPermissionPreset, FAQ_PERMISSION_ACTIONS, FAQ_PERMISSION_PRESET, type IntakePermissionCommand, type IntakePermissionView } from '../shared/content-intake-permissions';
 import { GRANTABLE_ACTIONS, type OpenGrant } from '../shared/page-use';
 import { isDefinitiveRollback } from '../shared/content-intake-recovery';
 import { joinDisplayParts } from '../shared/display-separator';
-import { loadIntakeAccess } from './content-intake-access';
+import { isLegacySopIntakeSource, loadIntakeAccess } from './content-intake-access';
 import type { IntakeUsageSession } from './content-intake-usage';
 import { ProductHttpError } from './product-http';
 type C = components['schemas'];
-type Source = { selection: string; source: C['IntakeSource']; actions: C['IntakeAction'][] };
+type Source = { selection: string; source: C['IntakeSource']; label: string; faq: boolean; actions: C['IntakeAction'][] };
 type Person = C['IntakePrincipalPage']['items'][number] & { selection: string; deadline: number };
 type Pending = { path: string; method: 'POST' | 'PATCH'; body: C['IntakeGrantBatch'] | C['IntakeGrantChange']; uncertain: boolean };
 const reject = () => { throw new ProductHttpError('STALE'); };
-// IntakeScope has ids, not names. A missing name stays 该店铺 / 该来源, and the id never becomes the label.
-const label = (s: C['IntakeScope']) => joinDisplayParts(['该店铺', {product:'产品',campaign:'活动',presale:'售前',aftersale:'售后'}[s.domain], '该来源']);
+const DOMAIN_LABEL = { product: '产品', campaign: '活动', presale: '售前', aftersale: '售后' } as const;
+const FAQ_FORMAT_LABEL: ReadonlyMap<string, string> = new Map([
+  ['faq-p1.1', 'FAQ 工作簿'],
+  ['faq-csv-v1', 'FAQ CSV'],
+]);
+const grantableActions: ReadonlySet<C['IntakeAction']> = new Set(GRANTABLE_ACTIONS);
+
+function scopeLabel(scope: C['IntakeScope'], sourceLabel: string): string {
+  return joinDisplayParts([scope.shopId === null ? '品牌通用' : '该店铺', DOMAIN_LABEL[scope.domain], sourceLabel]);
+}
+
+function canPreviewFaq(source: Source): boolean {
+  return source.faq
+    && FAQ_PERMISSION_ACTIONS.every(action => source.actions.includes(action));
+}
+
+function matchesPreview(batch: C['IntakeGrantBatch'], result: C['IntakeGrantList']): boolean {
+  return result.nextCursor === null && result.items.length === batch.items.length && batch.items.every(item =>
+    result.items.some(grant => grant.action === item.action && grant.kind === item.kind
+      && grant.recipientPrincipalId === item.recipientPrincipalId && grant.reason === item.reason
+      && Date.parse(grant.startsAt) === Date.parse(item.startsAt) && Date.parse(grant.expiresAt) === Date.parse(item.expiresAt)
+      && Object.entries(item.scope).every(([key, value]) => Reflect.get(grant.scope, key) === value)),
+  );
+}
 
 /** Owns ephemeral selections, credential epochs and exact mutation recovery.
  * Renderer supplies intent; it never receives IDs to construct a grant request. */
@@ -78,11 +100,14 @@ export class ContentIntakePermissions {
     const fresh = this.fresh(), named = this.people.filter(p=>this.personFresh(p));
     const names = new Map(named.map(p=>[p.principalId,p.displayLabel]));
     const selections = new Map(named.map(p=>[p.principalId,p.selection]));
+    const selected = fresh ? this.selected : null;
     return { signedIn:this.session.view().signedIn,available:fresh && this.sources.length>0,busy:!!this.active,
-      validUntil:fresh ? this.access!.validUntil:null,sources:fresh?this.sources.map(s=>({selection:s.selection,label:label(s.source.scope)})):[],
-      source:fresh?this.selected?.selection??null:null,people:fresh?named.map(p=>({selection:p.selection,label:p.displayLabel})):[],
-      actions:fresh?this.selected?.actions??[]:[],grants:fresh?this.grants.map(({selection,grant:g})=>({selection,reference:g.grantId,startsAt:g.startsAt,reason:g.reason,
-        person:names.get(g.recipientPrincipalId)??'当前姓名不可用',personSelection:selections.get(g.recipientPrincipalId)??null,action:g.action,scope:label(g.scope),expiresAt:g.expiresAt,
+      validUntil:fresh ? this.access!.validUntil:null,sources:fresh?this.sources.map(s=>({selection:s.selection,label:s.label})):[],
+      source:selected?.selection??null,people:fresh?named.map(p=>({selection:p.selection,label:p.displayLabel})):[],
+      actions:selected?.actions??[],...(selected && canPreviewFaq(selected) ? { faqPreviewAvailable: true } : {}),
+      grants:selected?this.grants.map(({selection,grant:g})=>({selection,reference:g.grantId,startsAt:g.startsAt,reason:g.reason,
+        person:names.get(g.recipientPrincipalId)??'当前姓名不可用',personSelection:selections.get(g.recipientPrincipalId)??null,action:g.action,
+        scope:g.scope.sourceId===null?scopeLabel(g.scope,'全部来源'):selected.label,expiresAt:g.expiresAt,
         revoked:g.revokedAt!==null,canRevoke:g.kind==='business' && g.revokedAt===null})):[],
       preview:fresh && performance.now()<this.previewDeadline?this.previewView:null,pending:!!this.pending,
       resultUnknown:!!this.pending && (this.pending.uncertain || !!this.active),notice:this.notice };
@@ -166,8 +191,25 @@ export class ContentIntakePermissions {
       else if(command.action==='refresh') {
         this.clear();const access=await loadIntakeAccess(this.session,controller.signal);check();this.access=access;
         this.deadline=performance.now()+Math.max(0,Date.parse(access.validUntil)-Date.now());this.armExpiry();
-        this.sources=access.sources.flatMap(source=>{const c=access.capabilities.find(c=>c.scope.sourceId===source.scope.sourceId)!;
-          const actions=c.mayAllocate.filter(a=>(GRANTABLE_ACTIONS as readonly string[]).includes(a));return actions.length?[{source,actions,selection:randomUUID()}]:[];});
+        const references = new Map(access.sources.map(({ scope }) => [scope.sourceId, createHash('sha256').update(scope.sourceId).digest('hex').toUpperCase()]));
+        const prefixes = new Map<string, number>();
+        for (const reference of references.values()) {
+          const prefix = reference.slice(0, 12);
+          prefixes.set(prefix, (prefixes.get(prefix) ?? 0) + 1);
+        }
+        this.sources=access.sources.flatMap(source=>{
+          const capability=access.capabilities.find(c=>c.scope.sourceId===source.scope.sourceId);
+          const reference=references.get(source.scope.sourceId);
+          if(!capability || !reference)return reject();
+          const actions=capability.mayAllocate.filter(action=>grantableActions.has(action));
+          if(!actions.length)return [];
+          const prefix=reference.slice(0,12);
+          const sop=isLegacySopIntakeSource(source);
+          const faqFormat=sop ? undefined : FAQ_FORMAT_LABEL.get(source.templateVersion);
+          const format=sop ? 'SOP 工作簿' : faqFormat ?? '资料来源';
+          const label=scopeLabel(source.scope, `${format} ${prefixes.get(prefix)===1?prefix:reference}`);
+          return [{source,actions,selection:randomUUID(),label,faq:faqFormat!==undefined}];
+        });
         if(this.sources.length===1){this.selected=this.sources[0]!;await readSelected();}
       }else{
         if(!this.fresh())return reject();
@@ -175,12 +217,16 @@ export class ContentIntakePermissions {
         if(command.action==='preview') {
           this.preview=null;this.previewView=null;
           const person=this.people.find(p=>p.selection===command.person), selected=this.selected;
-          if(!person || !selected || !this.personFresh(person) || command.actions.some(a=>!selected.actions.includes(a)))return reject();
+          const actions=actionsForPermissionPreset(command.preset);
+          if(!person || !selected || !this.personFresh(person) || !actions || actions.some(a=>!selected.actions.includes(a))
+            || (command.preset===FAQ_PERMISSION_PRESET && !canPreviewFaq(selected)))return reject();
           const body=parseContractSchema('IntakeGrantBatch',{operationId:randomUUID(),issuerFactsVersion:this.access!.factsVersion,policyVersion:this.access!.policyVersion,
-            items:command.actions.map(action=>({kind:'business',recipientPrincipalId:person.principalId,recipientFactsVersion:person.factsVersion,action,scope:selected.source.scope,
+            items:actions.map(action=>({kind:'business',recipientPrincipalId:person.principalId,recipientFactsVersion:person.factsVersion,action,scope:selected.source.scope,
               startsAt:command.startsAt,expiresAt:command.expiresAt,reason:command.reason}))});
-          parseContractSchema('IntakeGrantList',await request('/v1/intake/grants/preview',{method:'POST',body}));
-          if(!this.fresh())return reject();this.preview=body;this.previewDeadline=Math.min(this.deadline,person.deadline);this.armExpiry();this.previewView={person:person.displayLabel,actions:command.actions,scope:label(selected.source.scope),startsAt:command.startsAt,expiresAt:command.expiresAt,reason:command.reason};
+          const result=parseContractSchema('IntakeGrantList',await request('/v1/intake/grants/preview',{method:'POST',body}));
+          if(!this.fresh() || !this.personFresh(person) || !matchesPreview(body,result))return reject();
+          this.preview=body;this.previewDeadline=Math.min(this.deadline,person.deadline);this.armExpiry();
+          this.previewView={person:person.displayLabel,actions:[...actions],scope:selected.label,startsAt:command.startsAt,expiresAt:command.expiresAt,reason:command.reason};
         }
         if(command.action==='save') {if(!this.preview || performance.now()>=this.previewDeadline)return reject();this.pending={path:'/v1/intake/grants',method:'POST',body:this.preview,uncertain:false};await write();}
         if(command.action==='revoke') {

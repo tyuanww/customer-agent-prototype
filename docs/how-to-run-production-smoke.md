@@ -30,7 +30,7 @@ pnpm test:production:smoke -- --expected-version "$(cat VERSION)"
 保留每个端点的 HTTP 状态和安全的传输错误码，例如 `CURL_6` 或 `ENOENT`，
 但不输出响应正文。
 
-GitHub Actions 的 `Production smoke` 每小时运行同一检查，也可手动启动。workflow 不使用生产密钥。
+GitHub Actions 的 `Production smoke` 每小时探测线上健康，输出的 `expectedVersion` 为 `null`。发布验收时手动启动，并填写待核对的 API 版本 `expected_version`。workflow 不使用生产密钥。
 
 ## 未证明的范围
 

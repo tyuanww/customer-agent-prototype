@@ -47,6 +47,12 @@ node --input-type=module -e 'import { INTAKE_DESTINATION_ROWS as rows } from "./
 
 纯函数在 `apps/desktop/src/shared/intake-post-actions.ts`：`INTAKE_POSTS`、`DEFAULT_INTAKE_POST`、`actionsForIntakePost`、`intakePostForActions`、`intakePostsCoveredBy`、`intakePostStatusForGrants`。
 
+## 首批 FAQ 权限配置
+
+在「权限」的「授权配置」中，选定登记为 FAQ 工作簿或 FAQ CSV 的来源，且当前签发人对该来源同时具备 `import` 和 `source-confirm` 的分配资格，才显示「首批 FAQ」。这个任务预设只生成两项业务授权，对应界面的「上传资料、确认来源」。Main 根据预设生成固定动作、人员和来源范围，预览由服务端核验。显式确认保存时，现有授权事务重新校验签发与接收资格。
+
+来源选项、确认预览和单来源授权明细共用同一个范围标签。冻结来源合同没有来源名称，界面显示内容域、登记模板类型和根据来源登记标识计算的稳定短参照。同店、同域、同模板的多个来源也能区分。复核时可与该来源登记标识的 SHA-256 前 12 位十六进制值核对，界面大小写不影响核对。
+
 ## 坐席命令
 
 通道是 `dashboard:seats-command`。远程工作台和显式 FAQ 合成工作台可使用；窗口、会话与账号管理权限由 Main 和服务端检查。账号能力来自 `GET /v1/intake/seats/administration` 的 `{ canManage: boolean }`；Main 在每次调用前检查当前 `settings.accounts`，服务端再用 `content_intake.seat_administration_allowed(actorId)` 复核。renderer 提交下面四种意图，不能带主体 ID、URL 或操作 ID。

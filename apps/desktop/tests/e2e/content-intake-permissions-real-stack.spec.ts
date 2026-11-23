@@ -70,7 +70,7 @@ test('director previews without saving, grants a named seat query access, then r
     await expect(dialog).toBeVisible();
     await dialog.getByRole('combobox', { name: '成员', exact: true }).click();
     await dashboard.getByRole('option', { name: '合成坐席', exact: true }).click();
-    await expect(dialog.getByRole('combobox', { name: '岗位', exact: true })
+    await expect(dialog.getByRole('combobox', { name: '授权配置', exact: true })
       .locator('xpath=ancestor::*[contains(@class,"ant-select")][1]')).toContainText('客服');
     await dialog.screenshot({ path: path.join(evidence, 'permissions-grant-dialog.png') });
     const localTime = (offset: number) => {
@@ -116,8 +116,7 @@ test('director previews without saving, grants a named seat query access, then r
     await detail.getByLabel('撤销原因', { exact: true }).fill('合成桌面验收撤销');
     await detail.getByRole('button', { name: '确认撤销', exact: true }).click();
     const revokeDialog = dashboard.getByRole('dialog', {
-      name: '收回 合成坐席 在 该店铺 / 产品 / 该来源的查询复制',
-      exact: true,
+      name: /收回 合成坐席 在 该店铺 \/ 产品 \/ FAQ 工作簿 [A-F0-9]{12}的查询复制/,
     });
     await expect(revokeDialog).toBeVisible();
     await expect(revokeDialog).toContainText('仅撤销这条权限。撤销后如需使用，须重新授权。');

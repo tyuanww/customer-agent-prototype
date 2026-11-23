@@ -2,8 +2,8 @@
   "name": "@customer-agent/desktop",
   "version": "0.3.44",
   "private": true,
-  "description": "客服话术浮窗本地 Demo：狐狸头 → 玻璃查询胶囊 → Top 3 → 人工选择 → 复制；另含静态合成 Dashboard",
-  "author": "Customer Agent Demo",
+  "description": "客服话术查询与运营工作台",
+  "author": "tyuanww",
   "type": "module",
   "main": "./out/main/index.js",
   "desktopName": "customer-agent-desktop",
@@ -61,8 +61,8 @@
   },
   "build": {
     "appId": "local.demo.customer-agent",
-    "productName": "客服话术浮窗 Demo",
-    "copyright": "Demo only — synthetic data",
+    "productName": "客服话术浮窗",
+    "copyright": "Copyright (c) 2026 tyuanww",
     "directories": {
       "output": "../../release"
     },
@@ -163,7 +163,7 @@
       "language": "2052",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "客服话术浮窗 Demo",
+      "shortcutName": "客服话术浮窗",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "displayLanguageSelector": false

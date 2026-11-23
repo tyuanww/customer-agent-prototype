@@ -74,6 +74,17 @@ it('uploads original bytes with opaque choices, permits disabled contributors, e
   } finally { f.main.dispose(); }
 });
 
+it('shows a registered SOP workbook as SOP even when the source ID and scope do not say SOP', async () => {
+  const f = fixture();
+  try {
+    expect(f.main.view(f.access).sources[0]).toMatchObject({ category: 'product', label: 'source-a / shop-a' });
+    f.access.sources[0].mappingVersion = 'sop-not-imported';
+    expect(f.main.view(f.access).sources[0]).toMatchObject({ category: 'sop', label: 'source-a / shop-a' });
+    await f.choose();
+    expect(f.main.view(f.access)).toMatchObject({ phase: 'confirming', file: { name: 'synthetic.xlsx' } });
+  } finally { f.main.dispose(); }
+});
+
 it.each(['xlsx', 'csv'] as const)('retains exact %s upload bytes, MIME and identity after lost response, then receives once on replay', async format => {
   const f = fixture(format);
   try {

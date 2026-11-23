@@ -10,7 +10,7 @@ P4 / P7 已在 `main`。本页证据必须是当前 `main`（根目录 `VERSION`
 
 ## 准备
 
-1. 当前 `main`（根目录 `VERSION` 对应的版本）的 UNSIGNED Windows 安装包（文件名含 `UNSIGNED`）。本机产物是 `release/local-unsigned/windows/客服话术浮窗 Demo-<VERSION>-win-x64-UNSIGNED.exe`。勾选仍须在那台办公机上由人完成。
+1. 当前 `main`（根目录 `VERSION` 对应的版本）的 Windows 安装包。本机产物是 `release/local-unsigned/windows/客服话术浮窗-<VERSION>-win-x64-UNSIGNED.exe`。勾选仍须在那台办公机上由人完成。
 2. 办公机**需要网络**（与首轮断网相反）。
 3. 把 `synthetic-stack.json` 放到 `%APPDATA%\客服话术浮窗 Demo\synthetic-stack.json`：
 
@@ -23,6 +23,20 @@ P4 / P7 已在 `main`。本页证据必须是当前 `main`（根目录 `VERSION`
 ```
 
 两个 origin 必须不同、必须是 `https://` 主机名。不要 IP、不要路径、不要 userinfo。不要在本机装数据库来「补主链」。
+
+新版快捷方式显示「客服话术浮窗」。应用继续用原用户数据目录读取连接配置。
+
+### 受管首装
+
+1. 部署员通过受管设备下发渠道交付已核对 SHA-256 的 EXE 和配套配置。将配套的 `Install-Profile.cmd`、`product-remote.json`、`offline-seed.json` 放在同一目录。
+2. 以使用这台设备的 Windows 用户运行下面的命令。确保应用已退出。先下发配置，再运行安装器，因为 NSIS 完成时可以直接启动应用。
+
+```cmd
+Install-Profile.cmd "%APPDATA%\客服话术浮窗 Demo"
+```
+
+3. 看到 `Remote profile verified.` 后运行 EXE。工具复跑时确认已有同一份远端配置。若设备曾启动到离线模式，工具备份匹配的默认离线配置再替换。如果工具提示保留其他配置，由部署员先核对现有文件再继续。
+4. 从空用户目录和已有远端配置的升级目录各验一次。打开查询窗并点击登录，确认看到「飞书」和「账号」。退出应用后重开，再检查远端登录入口和配置摘要。正式账号的登录结果按下表单独勾选。
 
 ## 勾选（全部未观察）
 
